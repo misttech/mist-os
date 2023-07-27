@@ -10,6 +10,7 @@ use core::{
     num::{NonZeroU8, NonZeroUsize},
 };
 
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
 use net_types::{
@@ -19,7 +20,6 @@ use net_types::{
     },
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
-use nonzero_ext::nonzero;
 use packet::{
     BufferMut, EmptyBuf, InnerPacketBuilder as _, ParseBuffer, Serializer, TruncateDirection,
     TruncatingSerializer,
@@ -309,7 +309,7 @@ impl<I: Ip> Into<usize> for IcmpUnboundId<I> {
 }
 
 impl<I: Ip> IdMapCollectionKey for IcmpUnboundId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
+    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
 
     fn get_variant(&self) -> usize {
         0
@@ -363,7 +363,7 @@ impl<I: Ip> Into<usize> for IcmpConnId<I> {
 }
 
 impl<I: Ip> IdMapCollectionKey for IcmpConnId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(1usize);
+    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
 
     fn get_variant(&self) -> usize {
         0

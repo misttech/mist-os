@@ -267,7 +267,7 @@ pub struct Primary<T> {
     inner: alloc::sync::Arc<Inner<T>>,
 }
 
-const ONE_NONZERO_USIZE: NonZeroUsize = nonzero_ext::nonzero!(1_usize);
+const ONE_NONZERO_USIZE: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(1_));
 
 impl<T> Drop for Primary<T> {
     fn drop(&mut self) {

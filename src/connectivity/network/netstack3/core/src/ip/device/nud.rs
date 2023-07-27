@@ -17,7 +17,6 @@ use core::{fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroU8};
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{ip::Ip, SpecifiedAddr};
-use nonzero_ext::nonzero;
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::utils::NonZeroDuration;
 
@@ -41,7 +40,8 @@ const MAX_PENDING_FRAMES: usize = 10;
 /// confirmation, as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const REACHABLE_TIME: NonZeroDuration = NonZeroDuration::from_nonzero_secs(nonzero!(30u64));
+const REACHABLE_TIME: NonZeroDuration =
+    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(30));
 
 /// The type of message with a dynamic neighbor update.
 #[derive(Copy, Clone)]
@@ -835,7 +835,6 @@ impl<
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
-    use core::num::NonZeroU64;
 
     use ip_test_macro::ip_test;
     use lock_order::Locked;
@@ -998,7 +997,7 @@ mod tests {
     }
 
     const ONE_SECOND: NonZeroDuration =
-        NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(1)));
+        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(1));
 
     #[track_caller]
     fn check_lookup_has<I: Ip>(

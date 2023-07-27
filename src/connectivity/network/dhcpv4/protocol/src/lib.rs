@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use const_unwrap::const_unwrap_option;
 use net_types::{
     ethernet::Mac as MacAddr,
     ip::{Ipv4, NotSubnetMaskError, PrefixLength},
@@ -35,7 +36,7 @@ use crate::size_of_contents::SizeOfContents as _;
 /// sent to the 'DHCP server' port (67)".
 ///
 /// [RFC 2131 section 4.1]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.1
-pub const SERVER_PORT: NonZeroU16 = nonzero_ext::nonzero!(67u16);
+pub const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(67));
 
 /// The port on which DHCP clients receive messages from DHCP servers.
 ///
@@ -43,7 +44,7 @@ pub const SERVER_PORT: NonZeroU16 = nonzero_ext::nonzero!(67u16);
 /// sent to the 'DHCP client' port (68)".
 ///
 /// [RFC 2131 section 4.1]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.1
-pub const CLIENT_PORT: NonZeroU16 = nonzero_ext::nonzero!(68u16);
+pub const CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(68));
 
 const OP_IDX: usize = 0;
 // currently unused

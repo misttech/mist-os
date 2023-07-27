@@ -7,6 +7,7 @@
 use alloc::vec::Vec;
 use core::{fmt::Debug, hash::Hash, num::NonZeroU8, time::Duration};
 
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::lock::{LockFor, RwLockFor};
 use net_types::{
@@ -16,7 +17,6 @@ use net_types::{
     },
     SpecifiedAddr, UnicastAddr, Witness,
 };
-use nonzero_ext::nonzero;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::{
@@ -34,11 +34,11 @@ use crate::{
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_nonzero_secs(nonzero!(1u64));
+const RETRANS_TIMER_DEFAULT: NonZeroDuration = const_unwrap_option(NonZeroDuration::from_secs(1));
 
 /// The default value for the default hop limit to be used when sending IP
 /// packets.
-const DEFAULT_HOP_LIMIT: NonZeroU8 = nonzero!(64u8);
+const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum DelIpv6AddrReason {
@@ -523,12 +523,13 @@ impl Ipv6DeviceConfiguration {
     /// The default `MAX_RTR_SOLICITATIONS` value from [RFC 4861 section 10].
     ///
     /// [RFC 4861 section 10]: https://datatracker.ietf.org/doc/html/rfc4861#section-10
-    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = nonzero!(3u8);
+    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(3));
 
     /// The default `DupAddrDetectTransmits` value from [RFC 4862 Section 5.1]
     ///
     /// [RFC 4862 Section 5.1]: https://www.rfc-editor.org/rfc/rfc4862#section-5.1
-    pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU8 = nonzero!(1u8);
+    pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU8 =
+        const_unwrap_option(NonZeroU8::new(1));
 }
 
 impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfiguration {

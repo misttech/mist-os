@@ -5059,6 +5059,7 @@ impl<I: Instant, R: Rng> ClientStateMachine<I, R> {
 
 #[cfg(test)]
 pub(crate) mod testconsts {
+    use const_unwrap::const_unwrap_option;
     use net_declare::{net_ip_v6, net_subnet_v6};
     use net_types::ip::{Ipv6Addr, Subnet};
     use packet_formats_dhcp::v6;
@@ -5110,23 +5111,21 @@ pub(crate) mod testconsts {
     pub(crate) const CONFIGURED_DELEGATED_PREFIXES: [Subnet<Ipv6Addr>; 3] =
         [net_subnet_v6!("a::/64"), net_subnet_v6!("b::/60"), net_subnet_v6!("c::/56")];
 
-    pub(crate) const T1: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(30));
-    pub(crate) const T2: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(70));
+    pub(crate) const T1: v6::NonZeroOrMaxU32 = const_unwrap_option(v6::NonZeroOrMaxU32::new(30));
+    pub(crate) const T2: v6::NonZeroOrMaxU32 = const_unwrap_option(v6::NonZeroOrMaxU32::new(70));
     pub(crate) const PREFERRED_LIFETIME: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(40));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(40));
     pub(crate) const VALID_LIFETIME: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(80));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(80));
 
     pub(crate) const RENEWED_T1: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(130));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(130));
     pub(crate) const RENEWED_T2: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(170));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(170));
     pub(crate) const RENEWED_PREFERRED_LIFETIME: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(140));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(140));
     pub(crate) const RENEWED_VALID_LIFETIME: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(180));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(180));
 }
 
 #[cfg(test)]
@@ -6164,6 +6163,7 @@ mod tests {
     use std::{cmp::Ordering, time::Instant};
 
     use super::*;
+    use const_unwrap::const_unwrap_option;
     use packet::ParsablePacket;
     use rand::rngs::mock::StepRng;
     use test_case::test_case;
@@ -6637,9 +6637,9 @@ mod tests {
             -> (Result<Lifetimes, LifetimesError>, Result<Lifetimes, LifetimesError>),
     ) {
         const IA_VALUE1_LIFETIME: v6::NonZeroOrMaxU32 =
-            const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(60));
+            const_unwrap_option(v6::NonZeroOrMaxU32::new(60));
         const IA_VALUE2_LIFETIME: v6::NonZeroOrMaxU32 =
-            const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(100));
+            const_unwrap_option(v6::NonZeroOrMaxU32::new(100));
         let iana_options = [
             v6::DhcpOption::IaAddr(v6::IaAddrSerializer::new(
                 CONFIGURED_NON_TEMPORARY_ADDRESSES[0],
@@ -10491,13 +10491,13 @@ mod tests {
     }
 
     const TINY_NON_ZERO_OR_MAX_U32: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(10));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(10));
     const SMALL_NON_ZERO_OR_MAX_U32: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(100));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(100));
     const MEDIUM_NON_ZERO_OR_MAX_U32: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(1000));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(1000));
     const LARGE_NON_ZERO_OR_MAX_U32: v6::NonZeroOrMaxU32 =
-        const_unwrap::const_unwrap_option(v6::NonZeroOrMaxU32::new(10000));
+        const_unwrap_option(v6::NonZeroOrMaxU32::new(10000));
 
     #[test_case(
         RENEW_TEST,

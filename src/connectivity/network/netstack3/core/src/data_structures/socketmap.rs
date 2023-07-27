@@ -14,7 +14,6 @@ use core::fmt::Debug;
 use core::{hash::Hash, num::NonZeroUsize};
 use either::Either;
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 
 /// A type whose values can "shadow" other values of the type.
@@ -373,7 +372,7 @@ impl<'a, A: Debug + Eq + Hash, V: Tagged<A>> Debug for OccupiedEntry<'a, A, V> {
 }
 
 impl<T: Eq, const INLINE_SIZE: usize> DescendantCounts<T, INLINE_SIZE> {
-    const ONE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
+    const ONE: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(1));
 
     /// Increments the count for the given tag.
     fn increment(&mut self, tag: T) {

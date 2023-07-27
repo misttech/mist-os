@@ -27,6 +27,7 @@ use core::{
     sync::atomic::{self, AtomicU16},
 };
 
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::UnlockedAccess;
@@ -44,7 +45,6 @@ use net_types::{
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
-use nonzero_ext::nonzero;
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::{
     error::IpParseError,
@@ -89,7 +89,7 @@ use crate::{
 };
 
 /// Default IPv4 TTL.
-const DEFAULT_TTL: NonZeroU8 = nonzero!(64u8);
+const DEFAULT_TTL: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 /// Hop limits for packets sent to multicast and unicast destinations.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -100,7 +100,7 @@ pub struct HopLimits {
 
 /// Default hop limits for sockets.
 pub(crate) const DEFAULT_HOP_LIMITS: HopLimits =
-    HopLimits { unicast: DEFAULT_TTL, multicast: nonzero!(1u8) };
+    HopLimits { unicast: DEFAULT_TTL, multicast: const_unwrap_option(NonZeroU8::new(1)) };
 
 /// The IPv6 subnet that contains all addresses; `::/0`.
 // Safe because 0 is less than the number of IPv6 address bits.
@@ -151,16 +151,16 @@ pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt {
 impl IpExt for Ipv4 {
     type RecvSrcAddr = Ipv4Addr;
     const IP_HEADER_LENGTH: NonZeroU32 =
-        nonzero_ext::nonzero!(packet_formats::ipv4::HDR_PREFIX_LEN as u32);
+        const_unwrap_option(NonZeroU32::new(packet_formats::ipv4::HDR_PREFIX_LEN as u32));
     const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 =
-        nonzero_ext::nonzero!(u16::MAX as u32 - Self::IP_HEADER_LENGTH.get());
+        const_unwrap_option(NonZeroU32::new(u16::MAX as u32 - Self::IP_HEADER_LENGTH.get()));
 }
 
 impl IpExt for Ipv6 {
     type RecvSrcAddr = Ipv6SourceAddr;
     const IP_HEADER_LENGTH: NonZeroU32 =
-        nonzero_ext::nonzero!(packet_formats::ipv6::IPV6_FIXED_HDR_LEN as u32);
-    const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 = nonzero_ext::nonzero!(u16::MAX as u32);
+        const_unwrap_option(NonZeroU32::new(packet_formats::ipv6::IPV6_FIXED_HDR_LEN as u32));
+    const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 = const_unwrap_option(NonZeroU32::new(u16::MAX as u32));
 }
 
 /// The execution context provided by a transport layer protocol to the IP

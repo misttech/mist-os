@@ -5,8 +5,6 @@
 use alloc::collections::hash_map::{Entry, HashMap};
 use core::{hash::Hash, num::NonZeroUsize};
 
-use nonzero_ext::nonzero;
-
 /// The result of inserting an element into a [`RefCountedHashMap`].
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub(crate) enum InsertResult<O> {
@@ -58,7 +56,8 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
             }
             Entry::Vacant(entry) => {
                 let (value, output) = f();
-                let _: &mut (NonZeroUsize, V) = entry.insert((nonzero!(1usize), value));
+                let _: &mut (NonZeroUsize, V) =
+                    entry.insert((const_unwrap::const_unwrap_option(NonZeroUsize::new(1)), value));
                 InsertResult::Inserted(output)
             }
         }

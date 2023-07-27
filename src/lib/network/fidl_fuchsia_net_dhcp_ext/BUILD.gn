@@ -28,8 +28,8 @@ rustc_library("fidl_fuchsia_net_dhcp_ext") {
   ]
 
   test_deps = [
+    "//src/lib/const-unwrap",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:proptest-derive",
     "//third_party/rust_crates:test-case",

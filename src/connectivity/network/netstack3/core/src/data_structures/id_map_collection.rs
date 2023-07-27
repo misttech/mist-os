@@ -399,8 +399,6 @@ impl<K: IdMapCollectionKey, T> Default for IdMapCollection<K, T> {
 mod tests {
     use alloc::collections::HashSet;
 
-    use nonzero_ext::nonzero;
-
     use super::*;
     use crate::testutil::assert_empty;
 
@@ -424,7 +422,7 @@ mod tests {
     }
 
     impl IdMapCollectionKey for FakeKey {
-        const VARIANT_COUNT: NonZeroUsize = nonzero!(3usize);
+        const VARIANT_COUNT: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(3));
 
         fn get_variant(&self) -> usize {
             match self.var {

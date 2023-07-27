@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 
+use const_unwrap::const_unwrap_option;
 use explicit::ResultExt as _;
 use fidl::{
     endpoints::{ClientEnd, RequestStream as _},
@@ -53,7 +54,6 @@ use netstack3_core::{
     },
     SyncCtx,
 };
-use nonzero_ext::nonzero;
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
 
@@ -741,8 +741,10 @@ where
                 //
                 // Always accept connections with a minimum backlog size of 1.
                 // Use a maximum value of 4096 like Linux.
-                const MINIMUM_BACKLOG_SIZE: NonZeroUsize = nonzero!(1usize);
-                const MAXIMUM_BACKLOG_SIZE: NonZeroUsize = nonzero!(4096usize);
+                const MINIMUM_BACKLOG_SIZE: NonZeroUsize =
+                    const_unwrap_option(NonZeroUsize::new(1));
+                const MAXIMUM_BACKLOG_SIZE: NonZeroUsize =
+                    const_unwrap_option(NonZeroUsize::new(4096));
 
                 let backlog = usize::try_from(backlog).unwrap_or(0);
                 let backlog = NonZeroUsize::new(backlog).map_or(MINIMUM_BACKLOG_SIZE, |b| {
@@ -1514,13 +1516,11 @@ where
                 value_secs,
                 responder,
             } => {
-                match NonZeroU64::new(value_secs.into())
-                    .filter(|value_secs| value_secs.get() <= MAX_TCP_KEEPINTVL_SECS)
+                match NonZeroDuration::from_secs(value_secs.into())
+                    .filter(|value_dur| value_dur.get().as_secs() <= MAX_TCP_KEEPINTVL_SECS)
                 {
-                    Some(secs) => {
-                        self.with_socket_options_mut(|so| {
-                            so.keep_alive.interval = NonZeroDuration::from_nonzero_secs(secs)
-                        });
+                    Some(dur) => {
+                        self.with_socket_options_mut(|so| so.keep_alive.interval = dur);
                         responder
                             .send(Ok(()))
                             .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));

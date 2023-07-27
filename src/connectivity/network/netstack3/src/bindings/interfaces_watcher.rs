@@ -873,6 +873,7 @@ mod tests {
     use super::*;
     use crate::bindings::util::TryIntoCore as _;
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use fidl_fuchsia_hardware_network as fhardware_network;
     use fixture::fixture;
     use futures::{Future, Stream};
@@ -881,8 +882,10 @@ mod tests {
         ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr},
         Witness as _,
     };
-    use nonzero_ext::nonzero;
-    use std::convert::{TryFrom as _, TryInto as _};
+    use std::{
+        convert::{TryFrom as _, TryInto as _},
+        num::NonZeroU64,
+    };
     use test_case::test_case;
 
     impl WorkerWatcherSink {
@@ -928,12 +931,12 @@ mod tests {
         let () = watchers.try_collect().await.expect("watchers error");
     }
 
-    const IFACE1_ID: BindingId = nonzero!(111u64);
+    const IFACE1_ID: BindingId = const_unwrap_option(NonZeroU64::new(111));
     const IFACE1_NAME: &str = "iface1";
     const IFACE1_CLASS: finterfaces::DeviceClass =
         finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet);
 
-    const IFACE2_ID: BindingId = nonzero!(222u64);
+    const IFACE2_ID: BindingId = const_unwrap_option(NonZeroU64::new(222));
     const IFACE2_NAME: &str = "iface2";
     const IFACE2_CLASS: finterfaces::DeviceClass =
         finterfaces::DeviceClass::Loopback(finterfaces::Empty {});

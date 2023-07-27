@@ -5,6 +5,7 @@
 use {
     crate::Error,
     anyhow::ensure,
+    core::num::NonZeroU32,
     ieee80211::Ssid,
     std::{convert::TryInto, str},
     wlan_common::security::wpa::{self, credential::Psk as CommonPsk},
@@ -13,7 +14,6 @@ use {
 // PBKDF2-HMAC-SHA1 is considered insecure but required for PSK computation.
 #[allow(deprecated)]
 use mundane::insecure::insecure_pbkdf2_hmac_sha1;
-use nonzero_ext::nonzero;
 
 /// Conversion of WPA credentials to a PSK.
 pub trait ToPsk {
@@ -100,8 +100,8 @@ pub fn compute(passphrase: &[u8], ssid: &Ssid) -> Result<Psk, anyhow::Error> {
     // Compute PSK: IEEE Std 802.11-2016, J.4.1
     let size = 256 / 8;
     let mut psk = vec![0_u8; size];
-    let iters = nonzero!(4096u32);
-    insecure_pbkdf2_hmac_sha1(&passphrase[..], &ssid[..], iters, &mut psk[..]);
+    const ITERS: NonZeroU32 = const_unwrap::const_unwrap_option(NonZeroU32::new(4096));
+    insecure_pbkdf2_hmac_sha1(&passphrase[..], &ssid[..], ITERS, &mut psk[..]);
     Ok(psk.into_boxed_slice())
 }
 

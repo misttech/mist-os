@@ -26,9 +26,9 @@ rustc_library("core") {
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/dhcpv4/lib",
+    "//src/lib/const-unwrap",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-subscriber",
   ]

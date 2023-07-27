@@ -1121,9 +1121,9 @@ mod tests {
         vec::Vec,
     };
 
+    use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use net_types::ethernet::Mac;
-    use nonzero_ext::nonzero;
     use packet::{Buf, BufferMut, ParsablePacket};
     use packet_formats::ethernet::EthernetFrameLengthCheck;
     use test_case::test_case;
@@ -1548,7 +1548,7 @@ mod tests {
         }
     }
 
-    const SOME_PROTOCOL: NonZeroU16 = nonzero!(2000u16);
+    const SOME_PROTOCOL: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2000));
 
     #[test]
     fn create_remove() {
@@ -1701,7 +1701,7 @@ mod tests {
         const SRC_MAC: Mac = Mac::new([0, 1, 2, 3, 4, 5]);
         const DST_MAC: Mac = Mac::new([6, 7, 8, 9, 10, 11]);
         /// Arbitrary protocol number.
-        const PROTO: NonZeroU16 = nonzero!(0x08ABu16);
+        const PROTO: NonZeroU16 = const_unwrap_option(NonZeroU16::new(0x08AB));
         const BODY: &'static [u8] = b"some pig";
         const BUFFER: &'static [u8] = &[
             6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 0x08, 0xAB, b's', b'o', b'm', b'e', b' ', b'p',
@@ -1719,7 +1719,7 @@ mod tests {
         }
     }
 
-    const WRONG_PROTO: NonZeroU16 = nonzero!(0x08ffu16);
+    const WRONG_PROTO: NonZeroU16 = const_unwrap_option(NonZeroU16::new(0x08ff));
 
     fn make_bound<SC: SocketHandler<C>, C: NonSyncContext<SC::DeviceId>>(
         sync_ctx: &mut SC,

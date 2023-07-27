@@ -15,6 +15,7 @@ use core::{
 };
 
 use assert_matches::assert_matches;
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use packet_formats::utils::NonZeroDuration;
@@ -41,13 +42,13 @@ pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
 // link-local workloads, these values are large enough to accommodate most cases
 // so it can help us detect failure faster. We should make them agree with other
 // common implementations once we can configure them through socket options.
-const DEFAULT_MAX_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(12_u8);
+const DEFAULT_MAX_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(12));
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
 
 /// Default maximum SYN's to send before giving up an attempt to connect.
 // TODO(https://fxbug.dev/126318): Make these constants configurable.
-pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(6_u8);
-const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(5_u8);
+pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(6));
+const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(5));
 
 /// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
 ///  ... in particular, the delay MUST be less than 0.5 seconds.
@@ -2740,7 +2741,7 @@ mod test {
 
     const RTT: Duration = Duration::from_millis(500);
 
-    const DEVICE_MAXIMUM_SEGMENT_SIZE: Mss = Mss(nonzero_ext::nonzero!(1400 as u16));
+    const DEVICE_MAXIMUM_SEGMENT_SIZE: Mss = Mss(const_unwrap_option(NonZeroU16::new(1400 as u16)));
 
     /// A buffer provider that doesn't need extra information to construct
     /// buffers as this is only used in unit tests for the state machine only.
@@ -5241,7 +5242,7 @@ mod test {
             clock.now(),
             (),
             Default::default(),
-            Mss(nonzero_ext::nonzero!(1_u16)),
+            Mss(const_unwrap_option(NonZeroU16::new(1))),
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             &SocketOptions::default(),
         );

@@ -22,6 +22,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
+use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 use futures::{
     future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _},
@@ -1049,8 +1050,8 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
     const SERVER_ID: [u8; 3] = [2, 5, 1];
     const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("a::/64");
     const RENEWED_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("b::/64");
-    const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(546));
-    const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(547));
+    const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(546));
+    const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(547));
     const INFINITE_TIME_VALUE: u32 = u32::MAX;
     const ONE_SECOND_TIME_VALUE: u32 = 1;
     // The DHCPv6 Client always sends IAs with the first IAID starting at 0.

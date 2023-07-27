@@ -7,9 +7,6 @@
 use core::num::{NonZeroU32, NonZeroU64};
 use core::time::Duration;
 
-/// A zero-valued `Duration`.
-const ZERO_DURATION: Duration = Duration::from_secs(0);
-
 /// A thin wrapper over a [`Duration`] that guarantees that the underlying
 /// `Duration` is non-zero.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
@@ -26,10 +23,32 @@ impl NonZeroDuration {
         NonZeroDuration(d)
     }
 
+    /// Creates a new `NonZeroDuration` from the specified number of whole
+    /// seconds if that number is non-zero.
+    pub const fn from_secs(secs: u64) -> Option<NonZeroDuration> {
+        NonZeroDuration::new(Duration::from_secs(secs))
+    }
+
     /// Creates a new `NonZeroDuration` from the specified non-zero number of
     /// whole seconds.
     pub const fn from_nonzero_secs(secs: NonZeroU64) -> NonZeroDuration {
         NonZeroDuration(Duration::from_secs(secs.get()))
+    }
+
+    /// Creates a new `NonZeroDuration` from the specified number of whole
+    /// seconds and additional nanoseconds if the resulting duration is
+    /// non-zero.
+    ///
+    /// If the number of nanoseconds is greater than 1 billion (the number of
+    /// nanoseconds in a second), then it will carry over into the seconds
+    /// provided.
+    ///
+    /// # Panics
+    ///
+    /// This constructor will panic if the carry from the nanoseconds overflows
+    /// the seconds counter.
+    pub const fn from_secs_nanos(secs: u64, nanos: u32) -> Option<NonZeroDuration> {
+        NonZeroDuration::new(Duration::new(secs, nanos))
     }
 
     /// Creates a new `NonZeroDuration` from the specified non-zero number of
@@ -43,9 +62,14 @@ impl NonZeroDuration {
     ///
     /// This constructor will panic if the carry from the nanoseconds overflows
     /// the seconds counter.
-    // TODO(https://github.com/rust-lang/rust/issues/72440): Make this const
-    pub fn from_nonzero_secs_nanos(secs: NonZeroU64, nanos: NonZeroU32) -> NonZeroDuration {
+    pub const fn from_nonzero_secs_nanos(secs: NonZeroU64, nanos: NonZeroU32) -> NonZeroDuration {
         NonZeroDuration(Duration::new(secs.get(), nanos.get()))
+    }
+
+    /// Creates a new `NonZeroDuration` from the specified number of
+    /// milliseconds if that number is non-zero.
+    pub const fn from_millis(millis: u64) -> Option<NonZeroDuration> {
+        NonZeroDuration::new(Duration::from_millis(millis))
     }
 
     /// Creates a new `NonZeroDuration` from the specified non-zero number of
@@ -54,10 +78,22 @@ impl NonZeroDuration {
         NonZeroDuration(Duration::from_millis(millis.get()))
     }
 
+    /// Creates a new `NonZeroDuration` from the specified number of
+    /// microseconds if that number is non-zero.
+    pub const fn from_micros(micros: u64) -> Option<NonZeroDuration> {
+        NonZeroDuration::new(Duration::from_micros(micros))
+    }
+
     /// Creates a new `NonZeroDuration` from the specified non-zero number of
     /// microseconds.
     pub const fn from_nonzero_micros(micros: NonZeroU64) -> NonZeroDuration {
         NonZeroDuration(Duration::from_micros(micros.get()))
+    }
+
+    /// Creates a new `NonZeroDuration` from the specified number of nanoseconds
+    /// if that number is non-zero.
+    pub const fn from_nanos(nanos: u64) -> Option<NonZeroDuration> {
+        NonZeroDuration::new(Duration::from_nanos(nanos))
     }
 
     /// Creates a new `NonZeroDuration` from the specified non-zero number of
@@ -67,8 +103,10 @@ impl NonZeroDuration {
     }
 
     /// Creates a non-zero if the given value is not zero.
-    pub fn new(d: Duration) -> Option<NonZeroDuration> {
-        if d == ZERO_DURATION {
+    pub const fn new(d: Duration) -> Option<NonZeroDuration> {
+        // Can't do this comparison as `d == Duration::from_secs(0)` because
+        // equality checking is not const.
+        if d.as_nanos() == 0 {
             return None;
         }
 
@@ -128,26 +166,28 @@ mod tests {
         assert_eq!(non_zero, Some(NonZeroDuration(d)));
 
         let one_u64 = NonZeroU64::new(1).unwrap();
-        assert_eq!(
-            NonZeroDuration::from_nonzero_secs(one_u64),
-            NonZeroDuration(Duration::from_secs(1))
-        );
+        let expect = NonZeroDuration(Duration::from_secs(1));
+        assert_eq!(NonZeroDuration::from_secs(1), Some(expect));
+        assert_eq!(NonZeroDuration::from_nonzero_secs(one_u64), expect);
+
+        let expect = NonZeroDuration(Duration::new(1, 1));
+        assert_eq!(NonZeroDuration::from_secs_nanos(1, 1), Some(expect));
         assert_eq!(
             NonZeroDuration::from_nonzero_secs_nanos(one_u64, NonZeroU32::new(1).unwrap()),
-            NonZeroDuration(Duration::new(1, 1))
+            expect
         );
-        assert_eq!(
-            NonZeroDuration::from_nonzero_millis(one_u64),
-            NonZeroDuration(Duration::from_millis(1))
-        );
-        assert_eq!(
-            NonZeroDuration::from_nonzero_micros(one_u64),
-            NonZeroDuration(Duration::from_micros(1))
-        );
-        assert_eq!(
-            NonZeroDuration::from_nonzero_nanos(one_u64),
-            NonZeroDuration(Duration::from_nanos(1))
-        );
+
+        let expect = NonZeroDuration(Duration::from_millis(1));
+        assert_eq!(NonZeroDuration::from_millis(1), Some(expect));
+        assert_eq!(NonZeroDuration::from_nonzero_millis(one_u64), expect);
+
+        let expect = NonZeroDuration(Duration::from_micros(1));
+        assert_eq!(NonZeroDuration::from_micros(1), Some(expect));
+        assert_eq!(NonZeroDuration::from_nonzero_micros(one_u64), expect);
+
+        let expect = NonZeroDuration(Duration::from_nanos(1));
+        assert_eq!(NonZeroDuration::from_nanos(1), Some(expect));
+        assert_eq!(NonZeroDuration::from_nonzero_nanos(one_u64), expect);
 
         // `get` and `Into::into` should return the underlying duration.
         let non_zero = non_zero.unwrap();
@@ -175,7 +215,7 @@ mod tests {
         let b = Duration::from_secs(195811);
         assert_eq!(Some(a + b), NonZeroDuration::new(a.get() + b));
 
-        assert_eq!(a + ZERO_DURATION, a);
+        assert_eq!(a + Duration::from_secs(0), a);
     }
 
     #[test]

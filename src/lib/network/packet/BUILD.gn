@@ -12,8 +12,8 @@ rustc_library("packet") {
   with_unit_tests = true
 
   deps = [
+    "//src/lib/const-unwrap",
     "//third_party/rust_crates:arrayvec",
-    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:zerocopy",
   ]
 

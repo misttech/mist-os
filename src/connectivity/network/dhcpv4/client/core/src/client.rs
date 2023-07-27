@@ -1406,6 +1406,7 @@ mod test {
     };
     use crate::deps::{Clock as _, DatagramInfo};
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::{join, Future};
@@ -1510,7 +1511,9 @@ mod test {
 
     fn build_test_selecting_state() -> Selecting<Duration> {
         Selecting {
-            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            discover_options: DiscoverOptions {
+                xid: TransactionId(const_unwrap_option(NonZeroU32::new(1))),
+            },
             start_time: std::time::Duration::from_secs(0),
         }
     }
@@ -1608,7 +1611,9 @@ mod test {
         let time = FakeTimeController::new();
 
         let selecting = Selecting {
-            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            discover_options: DiscoverOptions {
+                xid: TransactionId(const_unwrap_option(NonZeroU32::new(1))),
+            },
             start_time: std::time::Duration::from_secs(0),
         };
         let mut rng = FakeRngProvider::new(0);
@@ -1699,7 +1704,7 @@ mod test {
         run_with_accelerated_time(&mut executor, time, &mut main_future);
     }
 
-    const XID: NonZeroU32 = nonzero_ext::nonzero!(1u32);
+    const XID: NonZeroU32 = const_unwrap_option(NonZeroU32::new(1));
     #[test_case(u32::from(XID), TEST_MAC_ADDRESS => Ok(()) ; "accepts good reply")]
     #[test_case(u32::from(XID), TEST_SERVER_MAC_ADDRESS => Err(
         ValidateMessageError::WrongChaddr {
@@ -1935,9 +1940,9 @@ mod test {
                     server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                         .try_into()
                         .expect("should be specified"),
-                    ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(
+                    ip_address_lease_time_secs: Some(const_unwrap_option(NonZeroU32::new(
                         DEFAULT_LEASE_LENGTH_SECONDS
-                    )),
+                    ))),
                     ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
                         .try_into()
                         .expect("should be specified"),
@@ -1947,7 +1952,7 @@ mod test {
         );
     }
 
-    const TEST_XID: TransactionId = TransactionId(nonzero_ext::nonzero!(1u32));
+    const TEST_XID: TransactionId = TransactionId(const_unwrap_option(NonZeroU32::new(1)));
     const TEST_DISCOVER_OPTIONS: DiscoverOptions = DiscoverOptions { xid: TEST_XID };
 
     fn build_test_requesting_state() -> Requesting<std::time::Duration> {
@@ -1958,9 +1963,9 @@ mod test {
                 server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                     .try_into()
                     .expect("should be specified"),
-                ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(
-                    DEFAULT_LEASE_LENGTH_SECONDS
-                )),
+                ip_address_lease_time_secs: Some(const_unwrap_option(NonZeroU32::new(
+                    DEFAULT_LEASE_LENGTH_SECONDS,
+                ))),
                 ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
                     .try_into()
                     .expect("should be specified"),

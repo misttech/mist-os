@@ -446,11 +446,12 @@ impl_icmp_message!(Ipv6, Redirect, Redirect, IcmpUnusedCode, Options<B>);
 /// Parsing and serialization of NDP options.
 pub mod options {
     use core::convert::TryFrom;
+    use core::num::NonZeroUsize;
     use core::time::Duration;
 
+    use const_unwrap::const_unwrap_option;
     use net_types::ip::{IpAddress as _, Ipv6Addr, Subnet, SubnetError};
     use net_types::UnicastAddress;
-    use nonzero_ext::nonzero;
     use packet::records::options::{
         LengthEncoding, OptionBuilder, OptionLayout, OptionParseErr, OptionParseLayout, OptionsImpl,
     };
@@ -464,7 +465,7 @@ pub mod options {
     /// A value representing an infinite lifetime for various NDP options'
     /// lifetime fields.
     pub const INFINITE_LIFETIME: NonZeroDuration =
-        NonZeroDuration::from_nonzero_secs(nonzero!(core::u32::MAX as u64));
+        const_unwrap_option(NonZeroDuration::from_secs(core::u32::MAX as u64));
 
     /// The number of reserved bytes immediately following the kind and length
     /// bytes in a Redirected Header option.
@@ -861,8 +862,9 @@ pub mod options {
         type KindLenField = u8;
 
         // For NDP options the length should be multiplied by 8.
-        const LENGTH_ENCODING: LengthEncoding =
-            LengthEncoding::TypeLengthValue { option_len_multiplier: nonzero!(8usize) };
+        const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
+            option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+        };
     }
 
     impl OptionParseLayout for NdpOptionsImpl {

@@ -387,6 +387,7 @@ pub mod test {
     };
 
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use test_case::test_case;
 
     use crate::FILTER_CAS_RETRY_MAX;
@@ -411,9 +412,9 @@ pub mod test {
         fail_generations: i32,
     }
 
-    const VALID_INPUT_INTERFACE: NonZeroU64 = nonzero_ext::nonzero!(10u64);
-    const VALID_OUTPUT_INTERFACE: NonZeroU64 = nonzero_ext::nonzero!(11u64);
-    const NON_EXISTENT_INTERFACE: NonZeroU64 = nonzero_ext::nonzero!(1005u64);
+    const VALID_INPUT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(10));
+    const VALID_OUTPUT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(11));
+    const NON_EXISTENT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(1005));
 
     const VALID_SUBNET: Subnet = fidl_subnet!("192.0.2.0/24");
 

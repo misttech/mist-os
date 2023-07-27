@@ -18,7 +18,6 @@ use net_types::{
     ip::{Ip, IpAddress},
     AddrAndZone, SpecifiedAddr, Witness as _,
 };
-use nonzero_ext::nonzero;
 
 use crate::{
     data_structures::{
@@ -435,7 +434,7 @@ impl<S: SocketMapStateSpec> SocketId<S> {
 }
 
 impl<S: SocketMapStateSpec> IdMapCollectionKey for SocketId<S> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(2usize);
+    const VARIANT_COUNT: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(2));
     fn get_id(&self) -> usize {
         match self {
             Self::Listener(l) => l.get_key_index(),

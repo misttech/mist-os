@@ -25,6 +25,7 @@ rustc_binary("resource_usage_benchmark") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
+    "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -36,7 +37,6 @@ rustc_binary("resource_usage_benchmark") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:humansize",
-    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:serde_json",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

@@ -269,7 +269,7 @@ fn invalidate_route<
 
 #[cfg(test)]
 mod tests {
-    use core::{convert::TryInto as _, num::NonZeroU64, time::Duration};
+    use core::{convert::TryInto as _, time::Duration};
 
     use assert_matches::assert_matches;
     use net_types::{ip::Ipv6, Witness as _};
@@ -418,11 +418,11 @@ mod tests {
     };
 
     const ONE_SECOND: NonZeroDuration =
-        NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(1)));
+        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(1));
     const TWO_SECONDS: NonZeroDuration =
-        NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(2)));
+        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2));
     const THREE_SECONDS: NonZeroDuration =
-        NonZeroDuration::from_nonzero_secs(const_unwrap::const_unwrap_option(NonZeroU64::new(3)));
+        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(3));
 
     #[test]
     fn new_route_no_lifetime() {

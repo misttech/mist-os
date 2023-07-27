@@ -16,13 +16,13 @@ use core::{
 };
 use lock_order::Locked;
 
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
-use nonzero_ext::nonzero;
 use packet::{BufferMut, Nested, ParsablePacket, ParseBuffer, Serializer};
 use packet_formats::{
     error::ParseError,
@@ -711,7 +711,7 @@ fn try_alloc_listen_port<I: IpExt, D: WeakId>(
 
 impl<I: IpExt, D: WeakId> PortAllocImpl for UdpBoundSocketMap<I, D> {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
-    const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
+    const TABLE_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(20));
     type Id = ProtocolFlowId<I::Addr>;
 
     fn is_port_available(&self, id: &Self::Id, port: u16) -> bool {
@@ -2138,7 +2138,6 @@ mod tests {
         ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _,
     };
-    use nonzero_ext::nonzero;
     use packet::{Buf, InnerPacketBuilder, ParsablePacket, Serializer};
     use packet_formats::{
         icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
@@ -2434,8 +2433,8 @@ mod tests {
         .expect("Receive IP packet succeeds");
     }
 
-    const LOCAL_PORT: NonZeroU16 = nonzero!(100u16);
-    const REMOTE_PORT: NonZeroU16 = nonzero!(200u16);
+    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
+    const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
 
     fn conn_addr<I>(
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
@@ -2559,7 +2558,7 @@ mod tests {
                 addr: ReceivedPacketAddrs {
                     src_ip: remote_ip.get(),
                     dst_ip: local_ip.get(),
-                    src_port: Some(nonzero!(200u16)),
+                    src_port: Some(const_unwrap_option(NonZeroU16::new(200))),
                 },
                 socket,
             }
@@ -2767,7 +2766,7 @@ mod tests {
         set_logger_for_test();
         let local_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
         let remote_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
-        const REMOTE_PORT: NonZeroU16 = nonzero!(100u16);
+        const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } = UdpFakeDeviceCtx::with_sync_ctx(
             UdpFakeDeviceSyncCtx::<Ipv6>::with_local_remote_ip_addrs(
                 vec![local_ip],
@@ -2898,7 +2897,7 @@ mod tests {
 
         let local_ip = local_ip::<I>();
         let remote_ip = remote_ip::<I>();
-        let local_port = nonzero!(100u16);
+        let local_port = const_unwrap_option(NonZeroU16::new(100));
         let multicast_addr = I::get_multicast_addr(3);
         let socket = SocketHandler::create_udp(&mut sync_ctx);
 
@@ -2929,7 +2928,7 @@ mod tests {
             &mut non_sync_ctx,
             socket,
             ZonedAddr::Unzoned(remote_ip),
-            nonzero!(200u16),
+            const_unwrap_option(NonZeroU16::new(200)),
         )
         .expect("connect should succeed");
 
@@ -2939,7 +2938,10 @@ mod tests {
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.inner.get_ref())
                 .multicast_memberships(),
-            HashMap::from([((FakeDeviceId, multicast_addr), nonzero!(1usize))])
+            HashMap::from([(
+                (FakeDeviceId, multicast_addr),
+                const_unwrap_option(NonZeroUsize::new(1))
+            )])
         );
         assert_eq!(
             SocketHandler::set_udp_multicast_membership(
@@ -2983,7 +2985,7 @@ mod tests {
             &mut non_sync_ctx,
             socket,
             Some(ZonedAddr::Unzoned(local_ip)),
-            Some(nonzero!(100u16)),
+            Some(const_unwrap_option(NonZeroU16::new(100))),
         )
         .expect("Initial call to listen_udp was expected to succeed");
 
@@ -2993,7 +2995,7 @@ mod tests {
                 &mut non_sync_ctx,
                 socket,
                 ZonedAddr::Unzoned(remote_ip),
-                nonzero!(1234u16)
+                const_unwrap_option(NonZeroU16::new(1234))
             ),
             Err(ConnectError::Ip(IpSockCreationError::Route(ResolveRouteError::Unreachable)))
         );
@@ -3003,7 +3005,10 @@ mod tests {
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.inner.get_ref())
                 .multicast_memberships(),
-            HashMap::from([((FakeDeviceId, multicast_addr), nonzero!(1usize))])
+            HashMap::from([(
+                (FakeDeviceId, multicast_addr),
+                const_unwrap_option(NonZeroUsize::new(1))
+            )])
         );
         assert_eq!(
             SocketHandler::set_udp_multicast_membership(
@@ -3736,8 +3741,8 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(nonzero!(u16::MAX), Ok(nonzero!(u16::MAX)); "ephemeral available")]
-    #[test_case(nonzero!(100u16), Err(LocalAddressError::FailedToAllocateLocalPort);
+    #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
+    #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
         "no ephemeral available")]
     fn test_bind_picked_port_all_others_taken<I: Ip + TestIpExt>(
         available_port: NonZeroU16,
@@ -4744,7 +4749,10 @@ where {
         assert_eq!(result, Ok(()));
         assert_eq!(
             ip_options,
-            HashMap::from([((MultipleDevicesId::A, mcast_addr), nonzero!(1usize))])
+            HashMap::from([(
+                (MultipleDevicesId::A, mcast_addr),
+                const_unwrap_option(NonZeroUsize::new(1))
+            )])
         );
     }
 
@@ -4785,7 +4793,7 @@ where {
             ip_options,
             expected_result.map_or(HashMap::default(), |()| HashMap::from([(
                 (bound_device, mcast_addr),
-                nonzero!(1usize)
+                const_unwrap_option(NonZeroUsize::new(1))
             )]))
         );
     }
@@ -4847,7 +4855,10 @@ where {
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.inner.get_ref())
                 .multicast_memberships(),
-            HashMap::from([((MultipleDevicesId::A, group), nonzero!(1usize))])
+            HashMap::from([(
+                (MultipleDevicesId::A, group),
+                const_unwrap_option(NonZeroUsize::new(1))
+            )])
         );
 
         let _: SocketInfo<_, _> =
@@ -4901,8 +4912,8 @@ where {
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.inner.get_ref())
                 .multicast_memberships(),
             HashMap::from([
-                ((MultipleDevicesId::A, first_group), nonzero!(1usize)),
-                ((MultipleDevicesId::A, second_group), nonzero!(1usize))
+                ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
+                ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
             ])
         );
 
@@ -4957,8 +4968,8 @@ where {
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.inner.get_ref())
                 .multicast_memberships(),
             HashMap::from([
-                ((MultipleDevicesId::A, first_group), nonzero!(1usize)),
-                ((MultipleDevicesId::A, second_group), nonzero!(1usize))
+                ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
+                ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
             ])
         );
 
@@ -5110,7 +5121,7 @@ where {
             &mut non_sync_ctx,
             second,
             ZonedAddr::Unzoned(remote_ip::<I>()),
-            nonzero!(569u16),
+            const_unwrap_option(NonZeroU16::new(569)),
         )
         .expect("connect failed");
 
@@ -5928,8 +5939,8 @@ where {
             ));
         let listener = SocketHandler::create_udp(&mut sync_ctx);
 
-        const UNICAST_HOPS: NonZeroU8 = nonzero!(23u8);
-        const MULTICAST_HOPS: NonZeroU8 = nonzero!(98u8);
+        const UNICAST_HOPS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(23));
+        const MULTICAST_HOPS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(98));
         SocketHandler::set_udp_unicast_hop_limit(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5952,7 +5963,7 @@ where {
                 &mut non_sync_ctx,
                 listener,
                 ZonedAddr::Unzoned(remote_ip),
-                nonzero!(9090u16),
+                const_unwrap_option(NonZeroU16::new(9090)),
                 Buf::new(vec![], ..),
             )
             .expect("send failed");

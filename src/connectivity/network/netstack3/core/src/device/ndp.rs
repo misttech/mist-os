@@ -116,7 +116,6 @@ mod tests {
         ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Subnet},
         ScopeableAddress as _, UnicastAddr, Witness as _,
     };
-    use nonzero_ext::nonzero;
     use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
@@ -2358,7 +2357,7 @@ mod tests {
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device,
-            NonZeroDuration::from_nonzero_secs(nonzero!(10u64)),
+            const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(10)),
         );
 
         // Receive a new RA with new prefix (autonomous).

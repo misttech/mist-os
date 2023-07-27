@@ -32,6 +32,8 @@ pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> Net
 }
 
 pub(crate) mod errno {
+    use const_unwrap::const_unwrap_option;
+
     use super::*;
 
     /// Represents a Netlink Error code.
@@ -43,18 +45,14 @@ pub(crate) mod errno {
 
     impl Errno {
         pub(crate) const EADDRNOTAVAIL: Errno =
-            const_unwrap::const_unwrap_option(Errno::new(-libc::EADDRNOTAVAIL));
+            const_unwrap_option(Errno::new(-libc::EADDRNOTAVAIL));
         pub(crate) const EAFNOSUPPORT: Errno =
             const_unwrap::const_unwrap_option(Errno::new(-libc::EAFNOSUPPORT));
         pub(crate) const EBUSY: Errno = const_unwrap::const_unwrap_option(Errno::new(-libc::EBUSY));
-        pub(crate) const EEXIST: Errno =
-            const_unwrap::const_unwrap_option(Errno::new(-libc::EEXIST));
-        pub(crate) const EINVAL: Errno =
-            const_unwrap::const_unwrap_option(Errno::new(-libc::EINVAL));
-        pub(crate) const ENODEV: Errno =
-            const_unwrap::const_unwrap_option(Errno::new(-libc::ENODEV));
-        pub(crate) const ENOTSUP: Errno =
-            const_unwrap::const_unwrap_option(Errno::new(-libc::ENOTSUP));
+        pub(crate) const EEXIST: Errno = const_unwrap_option(Errno::new(-libc::EEXIST));
+        pub(crate) const EINVAL: Errno = const_unwrap_option(Errno::new(-libc::EINVAL));
+        pub(crate) const ENODEV: Errno = const_unwrap_option(Errno::new(-libc::ENODEV));
+        pub(crate) const ENOTSUP: Errno = const_unwrap_option(Errno::new(-libc::ENOTSUP));
 
         /// Construct a new [`Errno`] from the given negative integer.
         ///

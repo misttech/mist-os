@@ -147,7 +147,6 @@ netlink-packet-generic = "0.3.3"
 nix = "0.26.2"
 nom = { version = "5.0.0", default-features = false, features = ["std", "regexp_macros"] }
 nom_locate = "2.0.0"
-nonzero_ext = "0.3.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.3"
 num-traits = "0.2"

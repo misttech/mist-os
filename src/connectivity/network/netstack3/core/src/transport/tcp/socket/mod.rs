@@ -32,6 +32,7 @@ use core::{
 use lock_order::Locked;
 
 use assert_matches::assert_matches;
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use net_types::{
     ip::{
@@ -40,7 +41,6 @@ use net_types::{
     },
     AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
-use nonzero_ext::nonzero;
 use packet::EmptyBuf;
 use packet_formats::ip::IpProto;
 use rand::RngCore;
@@ -838,7 +838,7 @@ pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
 impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
     for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>
 {
-    const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
+    const TABLE_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(20));
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SpecifiedAddr<I::Addr>>;
 
@@ -4573,8 +4573,8 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(nonzero!(u16::MAX), Ok(nonzero!(u16::MAX)); "ephemeral available")]
-    #[test_case(nonzero!(100u16), Err(LocalAddressError::FailedToAllocateLocalPort);
+    #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
+    #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
                 "no ephemeral available")]
     fn bind_picked_port_all_others_taken<I: Ip + TcpTestIpExt>(
         available_port: NonZeroU16,
@@ -4597,8 +4597,12 @@ mod tests {
             let bound =
                 SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(port))
                     .expect("uncontested bind");
-            let _listener =
-                SocketHandler::listen(&mut sync_ctx, bound, nonzero!(1usize)).expect("can listen");
+            let _listener = SocketHandler::listen(
+                &mut sync_ctx,
+                bound,
+                const_unwrap_option(NonZeroUsize::new(1)),
+            )
+            .expect("can listen");
         }
 
         // Now that all but the LOCAL_PORT are occupied, ask the stack to
@@ -4711,7 +4715,7 @@ mod tests {
                 }
             },
         );
-        const PORT: NonZeroU16 = nonzero!(100u16);
+        const PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
         let client_connection = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let socket: UnboundId<Ipv6> =
                 SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
@@ -4791,7 +4795,7 @@ mod tests {
                 }
             },
         );
-        const PORT: NonZeroU16 = nonzero!(100u16);
+        const PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
         let server_listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let socket: UnboundId<Ipv6> =
                 SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
@@ -4939,7 +4943,7 @@ mod tests {
         });
     }
 
-    const LOCAL_PORT: NonZeroU16 = nonzero!(1845u16);
+    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1845));
 
     #[ip_test]
     fn listener_with_bound_device_conflict<I: Ip + TcpTestIpExt>() {
@@ -4958,8 +4962,12 @@ mod tests {
         let bound_a =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, bound_a, None, Some(LOCAL_PORT))
                 .expect("bind should succeed");
-        let _bound_a =
-            SocketHandler::listen(&mut sync_ctx, bound_a, nonzero!(10usize)).expect("can listen");
+        let _bound_a = SocketHandler::listen(
+            &mut sync_ctx,
+            bound_a,
+            const_unwrap_option(NonZeroUsize::new(10)),
+        )
+        .expect("can listen");
 
         let s = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
         // Binding `s` to the unspecified address should fail since the address
@@ -5077,8 +5085,12 @@ mod tests {
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, addr, Some(port))
                 .expect("bind should succeed");
         let info = if listen {
-            let listener =
-                SocketHandler::listen(&mut sync_ctx, bound, nonzero!(25usize)).expect("can listen");
+            let listener = SocketHandler::listen(
+                &mut sync_ctx,
+                bound,
+                const_unwrap_option(NonZeroUsize::new(25)),
+            )
+            .expect("can listen");
             SocketHandler::get_listener_info(&mut sync_ctx, listener)
         } else {
             SocketHandler::get_bound_info(&mut sync_ctx, bound)
@@ -5170,7 +5182,8 @@ mod tests {
             let bind =
                 SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, bind_addr, Some(PORT_1))
                     .expect("failed to bind the client socket");
-            SocketHandler::listen(sync_ctx, bind, nonzero!(1usize)).expect("can listen")
+            SocketHandler::listen(sync_ctx, bind, const_unwrap_option(NonZeroUsize::new(1)))
+                .expect("can listen")
         });
 
         let _remote_client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
@@ -5757,8 +5770,12 @@ mod tests {
                 .expect("bind succeeds")
         };
 
-        let _listen = SocketHandler::listen(&mut sync_ctx, first_bound, nonzero!(10usize))
-            .expect("can listen");
+        let _listen = SocketHandler::listen(
+            &mut sync_ctx,
+            first_bound,
+            const_unwrap_option(NonZeroUsize::new(10)),
+        )
+        .expect("can listen");
     }
 
     #[ip_test]
@@ -5893,7 +5910,8 @@ mod tests {
                 Some(PORT_1),
             )
             .expect("failed to bind the client socket");
-            SocketHandler::listen(sync_ctx, bound, nonzero!(10usize)).expect("can listen")
+            SocketHandler::listen(sync_ctx, bound, const_unwrap_option(NonZeroUsize::new(10)))
+                .expect("can listen")
         });
 
         let client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
@@ -6028,7 +6046,8 @@ mod tests {
             let bound =
                 SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                     .expect("bind succeeds");
-            SocketHandler::listen(&mut sync_ctx, bound, nonzero!(5usize)).expect("can listen")
+            SocketHandler::listen(&mut sync_ctx, bound, const_unwrap_option(NonZeroUsize::new(5)))
+                .expect("can listen")
         };
 
         // We can't clear SO_REUSEADDR on the listener because it's sharing with
@@ -6296,8 +6315,8 @@ mod tests {
     #[ip_test]
     fn time_wait_reuse<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
-        const CLIENT_PORT: NonZeroU16 = nonzero_ext::nonzero!(2u16);
-        const SERVER_PORT: NonZeroU16 = nonzero_ext::nonzero!(1u16);
+        const CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2));
+        const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1));
         let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
             BindConfig {

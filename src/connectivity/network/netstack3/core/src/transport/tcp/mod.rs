@@ -13,7 +13,7 @@ pub mod socket;
 pub mod state;
 
 use core::{
-    num::{NonZeroU16, NonZeroU64, NonZeroU8},
+    num::{NonZeroU16, NonZeroU8},
     time::Duration,
 };
 
@@ -207,8 +207,8 @@ impl Mss {
         //  implementations MUST assume a default send MSS of 536 (576 - 40) for
         //  IPv4 or 1220 (1280 - 60) for IPv6 (MUST-15).
         match I::VERSION {
-            IpVersion::V4 => Mss(nonzero_ext::nonzero!(536_u16)),
-            IpVersion::V6 => Mss(nonzero_ext::nonzero!(1220_u16)),
+            IpVersion::V4 => Mss(const_unwrap_option(NonZeroU16::new(536))),
+            IpVersion::V6 => Mss(const_unwrap_option(NonZeroU16::new(1220))),
         }
     }
 
@@ -337,10 +337,8 @@ impl Default for KeepAlive {
         Self {
             // Default values inspired by Linux's TCP implementation:
             // https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L155-L157
-            idle: NonZeroDuration::from_nonzero_secs(const_unwrap_option(NonZeroU64::new(
-                2 * 60 * 60,
-            ))),
-            interval: NonZeroDuration::from_nonzero_secs(const_unwrap_option(NonZeroU64::new(75))),
+            idle: const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2 * 60 * 60)),
+            interval: const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(75)),
             count: const_unwrap_option(NonZeroU8::new(9)),
             // Per RFC 9293(https://datatracker.ietf.org/doc/html/rfc9293#section-3.8.4):
             //   ... they MUST default to off.
@@ -360,5 +358,7 @@ mod testutil {
     ///   The default TCP Maximum Segment Size is 536.
     pub(super) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
     pub(super) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
-        Mss(nonzero_ext::nonzero!(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16));
+        Mss(const_unwrap::const_unwrap_option(core::num::NonZeroU16::new(
+            DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16,
+        )));
 }

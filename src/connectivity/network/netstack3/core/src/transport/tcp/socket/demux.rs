@@ -700,9 +700,9 @@ where
 
 #[cfg(test)]
 mod test {
+    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, Ipv4, Ipv6};
-    use nonzero_ext::nonzero;
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
@@ -738,7 +738,7 @@ mod test {
 
     #[ip_test]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }).into(), &[]; "syn")]
-    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(nonzero_ext::nonzero!(1440 as u16))), window_scale: None }).into(), &[]; "syn with mss")]
+    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }).into(), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)).into(), &[]; "ack")]
     #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
     #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
@@ -746,8 +746,8 @@ mod test {
         segment: Segment<SendPayload<'_>>,
         expected_body: &[u8],
     ) {
-        const SOURCE_PORT: NonZeroU16 = nonzero!(1111u16);
-        const DEST_PORT: NonZeroU16 = nonzero!(2222u16);
+        const SOURCE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1111));
+        const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 
         let options = segment.options;
         let serializer = super::tcp_serialize_segment(

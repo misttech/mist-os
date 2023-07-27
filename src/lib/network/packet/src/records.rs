@@ -1334,7 +1334,7 @@ pub mod options {
     use core::mem;
     use core::num::{NonZeroUsize, TryFromIntError};
 
-    use nonzero_ext::nonzero;
+    use const_unwrap::const_unwrap_option;
     use zerocopy::{byteorder::ByteOrder, AsBytes, FromBytes, Unaligned};
 
     use super::*;
@@ -1600,8 +1600,9 @@ pub mod options {
         /// `option_len_multiplier` field, and it defaults to 1.
         ///
         /// [`TypeLengthValue`]: LengthEncoding::TypeLengthValue
-        const LENGTH_ENCODING: LengthEncoding =
-            LengthEncoding::TypeLengthValue { option_len_multiplier: nonzero!(1usize) };
+        const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
+            option_len_multiplier: const_unwrap_option(NonZeroUsize::new(1)),
+        };
     }
 
     /// An error encountered while parsing an option or sequence of options.
@@ -1797,7 +1798,6 @@ pub mod options {
         use core::convert::TryInto as _;
         use core::fmt::Debug;
 
-        use nonzero_ext::nonzero;
         use zerocopy::byteorder::network_endian::U16;
 
         use super::*;
@@ -1923,15 +1923,17 @@ pub mod options {
         impl OptionLayout for NdpOption {
             type KindLenField = u8;
 
-            const LENGTH_ENCODING: LengthEncoding =
-                LengthEncoding::TypeLengthValue { option_len_multiplier: nonzero!(8usize) };
+            const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
+                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+            };
         }
 
         impl OptionLayout for DummyNdpOptionsImpl {
             type KindLenField = u8;
 
-            const LENGTH_ENCODING: LengthEncoding =
-                LengthEncoding::TypeLengthValue { option_len_multiplier: nonzero!(8usize) };
+            const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
+                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+            };
         }
 
         impl OptionParseLayout for DummyNdpOptionsImpl {
@@ -2022,10 +2024,12 @@ pub mod options {
 
         #[test]
         fn test_length_encoding() {
-            const TLV_1: LengthEncoding =
-                LengthEncoding::TypeLengthValue { option_len_multiplier: nonzero!(1usize) };
-            const TLV_2: LengthEncoding =
-                LengthEncoding::TypeLengthValue { option_len_multiplier: nonzero!(2usize) };
+            const TLV_1: LengthEncoding = LengthEncoding::TypeLengthValue {
+                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(1)),
+            };
+            const TLV_2: LengthEncoding = LengthEncoding::TypeLengthValue {
+                option_len_multiplier: const_unwrap_option(NonZeroUsize::new(2)),
+            };
 
             // Test LengthEncoding::record_length
 

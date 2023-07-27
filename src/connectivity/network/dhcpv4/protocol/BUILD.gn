@@ -11,9 +11,9 @@ rustc_library("protocol") {
   edition = "2021"
   deps = [
     "//src/connectivity/lib/net-types",
+    "//src/lib/const-unwrap",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:hex",
-    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:serde",

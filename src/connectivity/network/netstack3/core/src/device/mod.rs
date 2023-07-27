@@ -22,6 +22,7 @@ use core::{
     ops::Deref as _,
 };
 
+use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::{
     lock::{RwLockFor, UnlockedAccess},
@@ -33,7 +34,6 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use nonzero_ext::nonzero;
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
 use tracing::{debug, trace};
@@ -1614,7 +1614,7 @@ impl<C: DeviceLayerTypes> Debug for DeviceId<C> {
 }
 
 impl<C: DeviceLayerTypes> IdMapCollectionKey for DeviceId<C> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(2usize);
+    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(2));
 
     fn get_id(&self) -> usize {
         match self {
@@ -2477,7 +2477,6 @@ mod tests {
     use alloc::vec::Vec;
 
     use net_declare::net_mac;
-    use nonzero_ext::nonzero;
     use test_case::test_case;
 
     use super::*;
@@ -2577,7 +2576,7 @@ mod tests {
                 &mut non_sync_ctx,
                 &device,
                 Ipv6DeviceConfigurationUpdate {
-                    max_router_solicitations: Some(Some(nonzero!(2u8))),
+                    max_router_solicitations: Some(Some(const_unwrap_option(NonZeroU8::new(2)))),
                     slaac_config: Some(SlaacConfiguration {
                         enable_stable_addresses: true,
                         ..Default::default()
@@ -2690,7 +2689,7 @@ mod tests {
             Ipv6DeviceConfigurationUpdate {
                 // Enable DAD so that the auto-generated address triggers a DAD
                 // message immediately on interface enable.
-                dad_transmits: Some(Some(nonzero!(1u8))),
+                dad_transmits: Some(Some(const_unwrap_option(NonZeroU8::new(1)))),
                 // Enable stable addresses so the link-local address is auto-
                 // generated.
                 slaac_config: Some(SlaacConfiguration {

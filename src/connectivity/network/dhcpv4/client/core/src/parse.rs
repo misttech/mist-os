@@ -658,6 +658,7 @@ pub(crate) fn fields_to_retain_from_response_to_request(
 mod test {
     use super::*;
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use dhcp_protocol::{CLIENT_PORT, SERVER_PORT};
     use net_declare::{net::prefix_length_v4, net_ip_v4, net_mac, std_ip_v4};
     use net_types::ip::{Ipv4, PrefixLength};
@@ -702,7 +703,7 @@ mod test {
         assert_matches!(
             parse_dhcp_message_from_ip_packet(
                 &[0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF],
-                nonzero_ext::nonzero!(1u16)
+                const_unwrap_option(NonZeroU16::new(1))
             ),
             Err(ParseError::Ipv4(parse_error)) => {
                 assert_eq!(parse_error, packet_formats::error::IpParseError::Parse { error: packet_formats::error::ParseError::Format })
@@ -738,7 +739,10 @@ mod test {
             .expect("serialize error");
 
         assert_matches!(
-            parse_dhcp_message_from_ip_packet(bytes.as_ref(), nonzero_ext::nonzero!(1u16)),
+            parse_dhcp_message_from_ip_packet(
+                bytes.as_ref(),
+                const_unwrap_option(NonZeroU16::new(1))
+            ),
             Err(ParseError::NotUdp)
         );
     }
@@ -788,6 +792,8 @@ mod test {
     const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
     const TEST_SUBNET_MASK: PrefixLength<Ipv4> = prefix_length_v4!(24);
     const LEASE_LENGTH_SECS: u32 = 100;
+    const LEASE_LENGTH_SECS_NONZERO: NonZeroU32 =
+        const_unwrap_option(NonZeroU32::new(LEASE_LENGTH_SECS));
     const YIADDR: Ipv4Addr = std_ip_v4!("192.168.1.5");
 
     #[test_case(VaryingOfferFields {
@@ -802,7 +808,7 @@ mod test {
         server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
             .try_into()
             .expect("should be specified"),
-        ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(LEASE_LENGTH_SECS)),
+        ip_address_lease_time_secs: Some(LEASE_LENGTH_SECS_NONZERO),
         ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
             .try_into()
             .expect("should be specified"),
@@ -1002,7 +1008,7 @@ mod test {
                     .try_into()
                     .expect("should be specified"),
             ),
-            ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
+            ip_address_lease_time_secs: LEASE_LENGTH_SECS_NONZERO,
             parameters: vec![
                 dhcp_protocol::DhcpOption::SubnetMask(TEST_SUBNET_MASK),
                 dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())
@@ -1026,7 +1032,7 @@ mod test {
             .try_into()
             .expect("should be specified"),
         server_identifier: None,
-        ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
+        ip_address_lease_time_secs: LEASE_LENGTH_SECS_NONZERO,
         parameters: vec![
             dhcp_protocol::DhcpOption::SubnetMask(TEST_SUBNET_MASK),
             dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())
@@ -1054,7 +1060,7 @@ mod test {
                 .try_into()
                 .expect("should be specified"),
         ),
-        ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
+        ip_address_lease_time_secs: LEASE_LENGTH_SECS_NONZERO,
         parameters: vec![
             dhcp_protocol::DhcpOption::SubnetMask(TEST_SUBNET_MASK),
             dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())

@@ -1997,10 +1997,10 @@ mod test {
 
     use alloc::{vec, vec::Vec};
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, Ipv4, Ipv6};
-    use nonzero_ext::nonzero;
     use packet::Buf;
     use test_case::test_case;
 
@@ -2333,8 +2333,10 @@ mod test {
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create(&mut sync_ctx);
-        const EXPECTED_HOP_LIMITS: HopLimits =
-            HopLimits { unicast: nonzero!(45u8), multicast: nonzero!(23u8) };
+        const EXPECTED_HOP_LIMITS: HopLimits = HopLimits {
+            unicast: const_unwrap_option(NonZeroU8::new(45)),
+            multicast: const_unwrap_option(NonZeroU8::new(23)),
+        };
 
         update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), |limits| {
             *limits = SocketHopLimits {
@@ -2406,8 +2408,10 @@ mod test {
         );
 
         update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound.clone(), |limits| {
-            *limits =
-                SocketHopLimits { unicast: Some(nonzero!(1u8)), multicast: Some(nonzero!(1u8)) }
+            *limits = SocketHopLimits {
+                unicast: Some(const_unwrap_option(NonZeroU8::new(1))),
+                multicast: Some(const_unwrap_option(NonZeroU8::new(1))),
+            }
         });
 
         // The limits no longer match the default.

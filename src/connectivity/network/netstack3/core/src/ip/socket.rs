@@ -1316,6 +1316,7 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use lock_order::Locked;
     use net_types::{
@@ -1324,7 +1325,6 @@ mod tests {
         },
         Witness,
     };
-    use nonzero_ext::nonzero;
     use packet::{Buf, InnerPacketBuilder, ParseBuffer};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
@@ -1610,7 +1610,7 @@ mod tests {
         assert_eq!(res, get_expected_result(template.clone()));
 
         // Hop Limit is specified.
-        const SPECIFIED_HOP_LIMIT: NonZeroU8 = nonzero!(1u8);
+        const SPECIFIED_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(1));
         assert_eq!(
             IpSocketHandler::new_ip_socket(
                 &mut Locked::new(sync_ctx),
@@ -1766,7 +1766,7 @@ mod tests {
 
         let cfg = I::FAKE_CONFIG;
         let proto = I::ICMP_IP_PROTO;
-        let socket_options = WithHopLimit(Some(nonzero!(1u8)));
+        let socket_options = WithHopLimit(Some(const_unwrap_option(NonZeroU8::new(1))));
 
         let FakeEventDispatcherConfig::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } =
             cfg;
@@ -1908,7 +1908,7 @@ mod tests {
         #[derive(Copy, Clone, Debug)]
         struct SetHopLimitFor<A>(SpecifiedAddr<A>);
 
-        const SET_HOP_LIMIT: NonZeroU8 = nonzero!(42u8);
+        const SET_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(42));
 
         impl<A: IpAddress> SendOptions<A::Version> for SetHopLimitFor<A> {
             fn hop_limit(&self, destination: &SpecifiedAddr<A>) -> Option<NonZeroU8> {

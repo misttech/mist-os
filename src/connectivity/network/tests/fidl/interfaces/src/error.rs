@@ -6,8 +6,9 @@
 
 #![cfg(test)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, num::NonZeroU64};
 
+use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 use fuchsia_zircon as zx;
 use net_declare::fidl_subnet;
@@ -48,7 +49,7 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
             1,
             fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
                 properties: fidl_fuchsia_net_interfaces_ext::Properties {
-                    id: nonzero_ext::nonzero!(1u64),
+                    id: const_unwrap_option(NonZeroU64::new(1)),
                     name: "lo".to_owned(),
                     device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
                         fidl_fuchsia_net_interfaces::Empty,

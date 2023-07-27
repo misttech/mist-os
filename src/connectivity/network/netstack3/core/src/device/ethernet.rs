@@ -12,6 +12,7 @@ use lock_order::{
     Locked,
 };
 
+use const_unwrap::const_unwrap_option;
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
@@ -385,7 +386,7 @@ impl MaxFrameSize {
     /// The minimum ethernet frame size.
     ///
     /// We don't care about FCS, so the minimum frame size for us is 64 - 4.
-    pub(crate) const MIN: MaxFrameSize = MaxFrameSize(nonzero_ext::nonzero!(60_u32));
+    pub(crate) const MIN: MaxFrameSize = MaxFrameSize(const_unwrap_option(NonZeroU32::new(60)));
 
     /// Creates from the maximum size of ethernet header and ethernet payload,
     /// checks that it is valid, i.e., larger than the minimum frame size.
@@ -393,7 +394,7 @@ impl MaxFrameSize {
         if frame_size < Self::MIN.get().get() {
             return None;
         }
-        Some(Self(const_unwrap::const_unwrap_option(NonZeroU32::new(frame_size))))
+        Some(Self(const_unwrap_option(NonZeroU32::new(frame_size))))
     }
 
     const fn get(&self) -> NonZeroU32 {

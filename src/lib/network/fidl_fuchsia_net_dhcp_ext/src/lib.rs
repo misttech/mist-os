@@ -394,7 +394,7 @@ pub mod testutil {
 mod test {
     use crate::{ClientExt as _, Error};
 
-    use std::collections::HashSet;
+    use std::{collections::HashSet, num::NonZeroU64};
 
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_net as fnet;
@@ -408,7 +408,6 @@ mod test {
         ip::{Ip, Ipv4, Ipv4Addr},
         SpecifiedAddr, SpecifiedAddress as _, Witness as _,
     };
-    use nonzero_ext::nonzero;
     use proptest::prelude::*;
     use test_case::test_case;
 
@@ -593,7 +592,7 @@ mod test {
             .map(|addr| SpecifiedAddr::new(addr).unwrap())
             .collect::<HashSet<_>>();
 
-        let device_id = nonzero!(5u64);
+        let device_id = const_unwrap::const_unwrap_option(NonZeroU64::new(5));
 
         let apply_fut = crate::apply_new_routers(
             device_id,

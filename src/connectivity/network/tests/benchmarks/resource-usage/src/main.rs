@@ -4,6 +4,7 @@
 
 use argh::FromArgs;
 use async_trait::async_trait;
+use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -13,8 +14,7 @@ use humansize::FileSize as _;
 use netstack_testing_common::realms::{
     KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
 };
-use nonzero_ext::nonzero;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
 mod interfaces;
 mod sockets;
@@ -36,7 +36,11 @@ async fn main() {
     let Args { netstack3, perftest } = argh::from_env();
 
     const BENCHMARK_NAME: &str = "fuchsia.netstack.resource_usage";
-    let num_runs = if perftest { nonzero!(5usize) } else { nonzero!(1usize) };
+    let num_runs = if perftest {
+        const_unwrap_option(NonZeroUsize::new(5))
+    } else {
+        const_unwrap_option(NonZeroUsize::new(1))
+    };
     let metrics = if netstack3 {
         let benchmark_name = format!("{BENCHMARK_NAME}.netstack3");
         [

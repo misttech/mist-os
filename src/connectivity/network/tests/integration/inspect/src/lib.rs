@@ -15,6 +15,7 @@ use fuchsia_async as fasync;
 use fuchsia_inspect::testing::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
 use fuchsia_zircon as zx;
 
+use const_unwrap::const_unwrap_option;
 use diagnostics_hierarchy::Property;
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
@@ -26,7 +27,6 @@ use netstack_testing_common::{
     Result,
 };
 use netstack_testing_macros::netstack_test;
-use nonzero_ext::nonzero;
 use packet::{ParsablePacket as _, Serializer as _};
 use packet_formats::{
     ethernet::{
@@ -412,7 +412,7 @@ struct PacketAttributes {
     port: NonZeroU16,
 }
 
-const INVALID_PORT: NonZeroU16 = nonzero!(1234u16);
+const INVALID_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1234));
 
 #[netstack_test]
 #[test_case(
