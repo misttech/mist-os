@@ -179,8 +179,12 @@ async fn create_realm_instance(
     // those components can be extracted and modified.
     let mut modified_program_args = HashMap::new();
 
+    let name =
+        name.map(|name| format!("{}-{}", prefix, name)).unwrap_or_else(|| prefix.to_string());
     let builder = RealmBuilder::with_params(
-        RealmBuilderParams::new().in_collection(REALM_COLLECTION_NAME.to_string()),
+        RealmBuilderParams::new()
+            .in_collection(REALM_COLLECTION_NAME.to_string())
+            .realm_name(name.clone()),
     )
     .await?;
     let netemul_services = builder
@@ -476,10 +480,8 @@ async fn create_realm_instance(
         )
         .await?;
 
-    let name =
-        name.map(|name| format!("{}-{}", prefix, name)).unwrap_or_else(|| prefix.to_string());
     info!("creating new ManagedRealm with name '{}'", name);
-    builder.build_with_name(name).await.map_err(Into::into)
+    builder.build().await.map_err(Into::into)
 }
 
 struct ManagedRealm {

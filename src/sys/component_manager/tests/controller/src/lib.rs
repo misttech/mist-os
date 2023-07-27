@@ -334,7 +334,10 @@ pub async fn on_stop_is_called() {
     if let Ok(Some(fcomponent::ExecutionControllerEvent::OnStop { stopped_payload })) =
         execution_controller_proxy.take_event_stream().try_next().await
     {
-        assert_eq!(stopped_payload.status, Some(zx::Status::PEER_CLOSED.into_raw()));
+        assert_eq!(
+            stopped_payload.status,
+            Some(fcomponent::Error::InstanceDied.into_primitive() as i32)
+        );
     } else {
         panic!("expected OnStop to be called");
     }
@@ -361,7 +364,7 @@ pub async fn wait_for_exit() {
     if let Ok(Some(fcomponent::ExecutionControllerEvent::OnStop { stopped_payload })) =
         execution_controller_proxy.take_event_stream().try_next().await
     {
-        assert_eq!(stopped_payload.status, Some(zx::Status::PEER_CLOSED.into_raw()));
+        assert_eq!(stopped_payload.status, Some(zx::Status::OK.into_raw()));
     } else {
         panic!("expected OnStop to be called");
     }

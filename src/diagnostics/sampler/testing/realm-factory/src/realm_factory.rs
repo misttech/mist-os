@@ -10,7 +10,8 @@ use {
     fidl_test_sampler as ftest,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams,
+        RealmInstance, Ref, Route,
     },
     futures::{channel::mpsc, lock::Mutex, StreamExt},
     std::sync::Arc,
@@ -46,7 +47,11 @@ impl SamplerRealmFactory {
         }
 
         let options = self.realm_options.take().unwrap();
-        let builder = RealmBuilder::new().await?;
+        let mut params = RealmBuilderParams::new();
+        if let Some(realm_name) = options.realm_name {
+            params = params.realm_name(realm_name);
+        }
+        let builder = RealmBuilder::with_params(params).await?;
         let mocks_server = builder
             .add_local_child(
                 "mocks-server",
@@ -231,10 +236,7 @@ impl SamplerRealmFactory {
             )
             .await?;
 
-        let instance = match options.realm_name {
-            Some(realm_name) => builder.build_with_name(realm_name).await?,
-            None => builder.build().await?,
-        };
+        let instance = builder.build().await?;
 
         Ok(instance)
     }

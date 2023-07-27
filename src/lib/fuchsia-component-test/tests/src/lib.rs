@@ -12,14 +12,18 @@ use {
     fidl_fuchsia_component::EventStreamMarker,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_test as ftest,
     fidl_fuchsia_data as fdata, fidl_fuchsia_examples_services as fex_services,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component::server as fserver,
     fuchsia_component_test::{
         error::Error as RealmBuilderError, Capability, ChildOptions, DirectoryContents,
         LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
     },
     fuchsia_fs,
-    futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
+    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
+    futures::{
+        channel::mpsc, future::pending, lock::Mutex, FutureExt, SinkExt, StreamExt, TryStreamExt,
+    },
+    std::sync::Arc,
 };
 
 const V2_ECHO_CLIENT_ABSOLUTE_URL: &'static str =
@@ -1748,6 +1752,84 @@ async fn from_fragment() -> Result<(), Error> {
     echo_realm_decl.children = Some(vec![]);
 
     assert_eq!(builder.get_realm_decl().await?, echo_realm_decl.fidl_into_native());
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn start_and_stop() -> Result<(), Error> {
+    let builder = RealmBuilder::with_params(RealmBuilderParams::new().start(false)).await?;
+
+    let (handles_sender, mut handles_receiver) = mpsc::channel(1);
+    let (mut stop_sender, stop_receiver) = mpsc::channel(1);
+    let stop_receiver = Arc::new(Mutex::new(stop_receiver));
+
+    let child = builder
+        .add_local_child(
+            "child",
+            move |h| {
+                let mut handles_sender = handles_sender.clone();
+                let stop_receiver = stop_receiver.clone();
+                async move {
+                    handles_sender.send(h).await.unwrap();
+                    let mut stop_receiver_guard = stop_receiver.lock().await;
+                    let res = stop_receiver_guard.next().await;
+                    assert!(res.is_some());
+                    Ok(())
+                }
+                .boxed()
+            },
+            ChildOptions::new(),
+        )
+        .await?;
+
+    let child_decl = builder.get_component_decl(&child).await?;
+    builder.replace_realm_decl(child_decl).await?;
+
+    let instance = builder.build().await?;
+
+    // We can start a component without arguments and see it exit on its own.
+    {
+        let execution = instance.root.start().await?;
+        let handles = handles_receiver.next().await.unwrap();
+        assert!(handles.numbered_handles().is_empty());
+        stop_sender.send(()).await?;
+        let stopped_payload = execution.wait_for_stop().await?;
+        assert_eq!(stopped_payload.status, Some(zx::Status::OK.into_raw()));
+    }
+
+    // We can start a component without arguments and stop it ourselves.
+    {
+        let execution = instance.root.start().await?;
+        let handles = handles_receiver.next().await.unwrap();
+        assert!(handles.numbered_handles().is_empty());
+        let stopped_payload = execution.stop().await?;
+        assert_eq!(
+            stopped_payload.status,
+            Some(fcomponent::Error::InstanceDied.into_primitive() as i32)
+        );
+    }
+
+    // We can start a component with arguments.
+    {
+        let event = zx::Event::create();
+        let event_dup = event.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+        let _execution = instance
+            .root
+            .start_with_args(fcomponent::StartChildArgs {
+                numbered_handles: Some(vec![fprocess::HandleInfo {
+                    handle: event_dup.into_handle(),
+                    id: 123,
+                }]),
+                ..fcomponent::StartChildArgs::default()
+            })
+            .await?;
+        let mut handles = handles_receiver.next().await.unwrap();
+        assert_eq!(
+            event.get_koid().unwrap(),
+            handles.take_numbered_handle(123).unwrap().get_koid().unwrap()
+        );
+    }
 
     Ok(())
 }

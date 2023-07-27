@@ -5,24 +5,30 @@
 use crate::constants;
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_component_test::{
-    error::Error, Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route, SubRealmBuilder,
+    error::Error, Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, Ref, Route,
+    SubRealmBuilder,
 };
 
 /// Options for creating a test topology.
 pub struct Options {
     /// The URL of the archivist to be used in the test.
     pub archivist_url: &'static str,
+    pub realm_name: Option<&'static str>,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { archivist_url: constants::INTEGRATION_ARCHIVIST_URL }
+        Self { archivist_url: constants::INTEGRATION_ARCHIVIST_URL, realm_name: None }
     }
 }
 
 /// Creates a new topology for tests with an archivist inside.
 pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Error> {
-    let builder = RealmBuilder::new().await?;
+    let mut params = RealmBuilderParams::new();
+    if let Some(realm_name) = opts.realm_name {
+        params = params.realm_name(realm_name);
+    }
+    let builder = RealmBuilder::with_params(params).await?;
     let test_realm = builder.add_child_realm("test", ChildOptions::new().eager()).await?;
     let archivist =
         test_realm.add_child("archivist", opts.archivist_url, ChildOptions::new().eager()).await?;

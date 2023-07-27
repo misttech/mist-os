@@ -5,12 +5,12 @@
 use {
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints::{
-        create_request_stream, ClientEnd, DiscoverableProtocolMarker, MemberOpener, ProtocolMarker,
-        ServerEnd, ServiceMarker, ServiceProxy,
+        create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker, MemberOpener,
+        ProtocolMarker, RequestStream, ServerEnd, ServiceMarker, ServiceProxy,
     },
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component::DEFAULT_SERVICE_INSTANCE,
     fuchsia_fs, fuchsia_zircon as zx,
     futures::{channel::oneshot, future::BoxFuture, lock::Mutex, select, FutureExt, TryStreamExt},
@@ -82,6 +82,10 @@ impl LocalComponentHandles {
 
     pub fn take_numbered_handle(&mut self, id: u32) -> Option<zx::Handle> {
         self.numbered_handles.remove(&id)
+    }
+
+    pub fn numbered_handles(&self) -> &HashMap<u32, zx::Handle> {
+        &self.numbered_handles
     }
 
     /// Registers a new stop notifier for this component. If this function is called, then realm
@@ -329,18 +333,24 @@ impl LocalComponentRunner {
                     self.execution_scope.spawn(async move {
                         let mut local_component_implementation_fut =
                             (*local_component_implementation)(component_handles).fuse();
+                        let controller_control_handle = controller_request_stream.control_handle();
                         let mut controller_request_fut =
                             controller_request_stream.try_next().fuse();
                         loop {
                             select! {
                                 res = local_component_implementation_fut => {
-                                    if let Err(e) = res {
-                                        error!(
-                                            "the local component {:?} returned an error: {:?}",
-                                            local_component_name,
-                                            e,
-                                        );
-                                    }
+                                    let epitaph = match res {
+                                        Err(e) => {
+                                            error!(
+                                                "the local component {:?} returned an error: {:?}",
+                                                local_component_name,
+                                                e,
+                                            );
+                                            zx::Status::from_raw(fcomponent::Error::InstanceDied.into_primitive() as i32)
+                                        }
+                                        Ok(()) => zx::Status::OK,
+                                    };
+                                    controller_control_handle.shutdown_with_epitaph(epitaph);
                                     return;
                                 }
                                 req_res = controller_request_fut => {
@@ -355,11 +365,21 @@ impl LocalComponentRunner {
                                                 // already dropped. Let's ignore any errors about
                                                 // sending this.
                                                 let _ = stop_notifier.send(());
+
+                                                // Repopulate the `controller_request_fut` field so
+                                                // that we'll be able to see the `Kill` request.
+                                                controller_request_fut = controller_request_stream.try_next().fuse();
                                             } else {
+                                                controller_control_handle.shutdown_with_epitaph(
+                                                    zx::Status::from_raw(fcomponent::Error::InstanceDied.into_primitive() as i32),
+                                                );
                                                 return;
                                             }
                                         }
                                         Some(fcrunner::ComponentControllerRequest::Kill { .. }) => {
+                                            controller_control_handle.shutdown_with_epitaph(
+                                                zx::Status::from_raw(fcomponent::Error::InstanceDied.into_primitive() as i32),
+                                            );
                                             return;
                                         }
                                         _ => return,

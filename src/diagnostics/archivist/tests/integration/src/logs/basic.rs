@@ -67,6 +67,7 @@ async fn listen_for_syslog() {
 async fn listen_for_klog() {
     let (builder, _test_realm) = test_topology::create(test_topology::Options {
         archivist_url: constants::ARCHIVIST_WITH_KLOG_URL,
+        realm_name: None,
     })
     .await
     .expect("create base topology");

@@ -73,14 +73,17 @@ async fn read_components_inspect() {
 
 #[fuchsia::test]
 async fn read_component_with_hanging_lazy_node() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
+    let (builder, test_realm) = test_topology::create(test_topology::Options {
+        archivist_url: INTEGRATION_ARCHIVIST_URL,
+        realm_name: Some("hanging_lazy"),
+    })
+    .await
+    .expect("create base topology");
     test_topology::add_eager_child(&test_realm, "hanging_data", HANGING_INSPECT_COMPONENT_URL)
         .await
         .expect("add child");
 
-    let instance = builder.build_with_name("hanging_lazy").await.expect("create instance");
+    let instance = builder.build().await.expect("create instance");
 
     let accessor =
         instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
@@ -183,6 +186,7 @@ async fn unified_reader() -> Result<(), Error> {
 async fn memory_monitor_moniker_rewrite() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
         archivist_url: ARCHIVIST_WITH_LEGACY_METRICS,
+        realm_name: None,
     })
     .await
     .expect("create base topology");
@@ -260,6 +264,7 @@ async fn memory_monitor_moniker_rewrite() -> Result<(), Error> {
 async fn feedback_canonical_reader_test() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
         archivist_url: ARCHIVIST_WITH_FEEDBACK_FILTERING,
+        realm_name: None,
     })
     .await
     .expect("create base topology");
@@ -309,6 +314,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
 async fn feedback_disabled_pipeline() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
         archivist_url: ARCHIVIST_WITH_FEEDBACK_FILTERING_DISABLED,
+        realm_name: None,
     })
     .await
     .expect("create base topology");
@@ -342,6 +348,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
 async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
         archivist_url: ARCHIVIST_WITH_LOWPAN_FILTERING,
+        realm_name: None,
     })
     .await
     .expect("create base topology");

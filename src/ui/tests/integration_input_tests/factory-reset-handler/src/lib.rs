@@ -17,7 +17,7 @@ use {
         traits::realm_builder_ext::RealmBuilderExt as _,
     },
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_component_test::{DirectoryContents, RealmBuilder, RealmInstance},
+    fuchsia_component_test::{DirectoryContents, RealmBuilder, RealmBuilderParams, RealmInstance},
     futures::StreamExt,
     input_synthesis::{modern_backend, synthesizer},
 };
@@ -32,7 +32,9 @@ async fn assemble_realm(
     factory_reset_mock: FactoryResetMock,
     test_name: &str,
 ) -> RealmInstance {
-    let b = RealmBuilder::new().await.expect("Failed to create RealmBuilder");
+    let b = RealmBuilder::with_params(RealmBuilderParams::new().realm_name(test_name))
+        .await
+        .expect("Failed to create RealmBuilder");
 
     // Declare packaged components.
     let scenic_test_realm =
@@ -139,7 +141,7 @@ async fn assemble_realm(
     .await;
 
     // Create the test realm.
-    b.build_with_name(test_name).await.expect("Failed to create realm")
+    b.build().await.expect("Failed to create realm")
 }
 
 async fn perform_factory_reset(realm: &RealmInstance) {

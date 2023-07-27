@@ -7,7 +7,8 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_test_wlan_realm as fidl_realm,
     fuchsia_component_test::{
-        Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
+        Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, RealmInstance, Ref,
+        Route,
     },
     tracing::info,
 };
@@ -169,7 +170,11 @@ async fn build_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInsta
     let wlan_config =
         options.wlan_config.unwrap_or(fidl_realm::WlanConfig { ..Default::default() });
 
-    let builder = RealmBuilder::new().await?;
+    let mut params = RealmBuilderParams::new();
+    if let Some(name) = wlan_config.name {
+        params = params.realm_name(name);
+    }
+    let builder = RealmBuilder::with_params(params).await?;
 
     let wlan_components = builder
         .add_child("wlan-hw-sim", "#meta/wlan-hw-sim.cm", ChildOptions::new().eager())
@@ -214,11 +219,7 @@ async fn build_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInsta
         )
         .await?;
 
-    let realm = if let Some(name) = wlan_config.name {
-        builder.build_with_name(name).await?
-    } else {
-        builder.build().await?
-    };
+    let realm = builder.build().await?;
 
     let devfs = options.devfs_server_end.take().unwrap();
 

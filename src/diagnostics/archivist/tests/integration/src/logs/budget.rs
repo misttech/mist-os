@@ -84,6 +84,7 @@ impl PuppetEnv {
         let (sender, controllers) = mpsc::channel(1);
         let (builder, test_realm) = test_topology::create(test_topology::Options {
             archivist_url: ARCHIVIST_WITH_SMALL_CACHES,
+            realm_name: None,
         })
         .await
         .expect("create base topology");
