@@ -63,6 +63,15 @@ fuchsia_images_configuration(
     ],
 )
 
+fuchsia_images_configuration(
+    name = "zedboot_vim3",
+    fvm_slice_size = "8388608",
+    images = [
+        ":fuchsia_zbi",
+        ":fuchsia_vbmeta_vim3",
+    ],
+)
+
 fuchsia_zbi(
     name = "fuchsia_zbi",
 )
