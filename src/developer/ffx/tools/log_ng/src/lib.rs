@@ -8,7 +8,9 @@
 //! All new development is being done in this tool, and the legacy tool will be
 //! deprecated once this tool is feature complete.
 
-use diagnostics_data::{LogTextColor, LogTextDisplayOptions, LogTimeDisplayFormat, Timezone};
+use diagnostics_data::{
+    LogTextColor, LogTextDisplayOptions, LogTimeDisplayFormat, Timestamp, Timezone,
+};
 use error::LogError;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::create_proxy;
@@ -19,8 +21,8 @@ use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use log_command::{
     filter::LogFilterCriteria,
     log_formatter::{
-        dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
-        LogFormatterOptions, WriterContainer,
+        dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, DeviceOrLocalTimestamp,
+        LogEntry, LogFormatter, LogFormatterOptions, WriterContainer,
     },
     LogCommand, LogSubCommand, TimeFormat, WatchCommand,
 };
@@ -99,6 +101,19 @@ async fn log_main(
                     ..Default::default()
                 })
             },
+            since: cmd
+                .since
+                .as_ref()
+                .map(|value| DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
+                    is_monotonic: false,
+                })
+                .or_else(|| {
+                    cmd.since_monotonic.map(|value| DeviceOrLocalTimestamp {
+                        timestamp: Timestamp::from(value.as_nanos() as i64),
+                        is_monotonic: true,
+                    })
+                }),
             ..Default::default()
         },
     );
@@ -251,7 +266,7 @@ mod tests {
     use futures::StreamExt;
     use log_command::{
         log_formatter::{LogData, TIMESTAMP_FORMAT},
-        parse_time, DumpCommand,
+        parse_seconds_string_as_duration, parse_time, DumpCommand,
     };
     use selectors::parse_log_interest_selector;
     use std::rc::Rc;
@@ -510,6 +525,146 @@ mod tests {
         assert_eq!(
             test_buffers.stdout.into_string(),
             "[1970-01-01 00:00:00.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_logs_since_specific_timestamp() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                clock: TimeFormat::Local,
+                since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(
+                        parse_time("1980-01-01T00:00:00")
+                            .unwrap()
+                            .time
+                            .naive_utc()
+                            .timestamp_nanos(),
+                    ),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(
+                        parse_time("1980-01-01T00:00:03")
+                            .unwrap()
+                            .time
+                            .naive_utc()
+                            .timestamp_nanos(),
+                    ),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+            ],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_logs_since_specific_timestamp_monotonic() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                clock: TimeFormat::Utc,
+                since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(3000000000i64),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+            ],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "[1970-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
