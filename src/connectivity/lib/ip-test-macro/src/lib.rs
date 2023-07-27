@@ -26,11 +26,6 @@ pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
     ip_test_inner(attr, input, "ip_test", "Ip", "Ipv4", "Ipv6")
 }
 
-#[proc_macro_attribute]
-pub fn ip_addr_test(attr: TokenStream, input: TokenStream) -> TokenStream {
-    ip_test_inner(attr, input, "ip_addr_test", "IpAddress", "Ipv4Addr", "Ipv6Addr")
-}
-
 fn ip_test_inner(
     attr: TokenStream,
     input: TokenStream,

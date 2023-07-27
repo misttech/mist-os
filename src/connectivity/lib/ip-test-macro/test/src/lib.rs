@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Module with types that have the same identifiers that `ip_test` and
-/// `ip_addr_test` attributes looks for. Both of these attributes
-/// look for the `Ipv4`, `Ipv6`, `Ipv4Addr`, and `Ipv6Addr` identifiers
-/// within `net_types::ip` so we create the same hierarchy in this test.
+/// `ip_test` looks for `Ipv4` and `Ipv6` within `net_types::ip`, so we create the same hierarchy
+/// in this test.
 #[cfg(test)]
 pub(crate) mod net_types {
     pub(crate) mod ip {
@@ -17,9 +15,7 @@ pub(crate) mod net_types {
             const VERSION: usize;
         }
 
-        /// Simple trait with the identifier `IpAddress` to test that the
-        /// `ip_test` attribute specializes function for the various types that
-        /// implement this trait.
+        /// Helper trait for defining an associated type on `Ip`.
         pub(crate) trait IpAddress {
             const VERSION: usize;
             fn new() -> Self;
@@ -41,8 +37,7 @@ pub(crate) mod net_types {
             const VERSION: usize = 6;
         }
 
-        /// Test type with the identifier `Ipv4Addr` that the `ip_addr_test`
-        /// attribute can specialize a function for.
+        /// Helper to implement `Ip` for `Ipv4`.
         pub(crate) struct Ipv4Addr;
         impl IpAddress for Ipv4Addr {
             const VERSION: usize = 4;
@@ -51,8 +46,7 @@ pub(crate) mod net_types {
             }
         }
 
-        /// Test type with the identifier `Ipv6Addr` that the `ip_addr_test`
-        /// attribute can specialize a function for.
+        /// Helper to implement `Ip` for `Ipv6`.
         pub(crate) struct Ipv6Addr;
         impl IpAddress for Ipv6Addr {
             const VERSION: usize = 6;
@@ -65,8 +59,8 @@ pub(crate) mod net_types {
 
 #[cfg(test)]
 mod test {
-    use crate::net_types::ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-    use ip_test_macro::{ip_addr_test, ip_test};
+    use crate::net_types::ip::{Ip, IpAddress, Ipv4, Ipv6};
+    use ip_test_macro::ip_test;
 
     trait IpExt {
         const SIMPLE_VALUE: u8;
@@ -80,24 +74,8 @@ mod test {
         const SIMPLE_VALUE: u8 = 2;
     }
 
-    trait IpAddressExt {
-        const SIMPLE_VALUE: u16;
-    }
-
-    impl IpAddressExt for Ipv4Addr {
-        const SIMPLE_VALUE: u16 = 3;
-    }
-
-    impl IpAddressExt for Ipv6Addr {
-        const SIMPLE_VALUE: u16 = 4;
-    }
-
     fn simple_specialized_for_ip<I: IpExt>() -> u8 {
         I::SIMPLE_VALUE
-    }
-
-    fn simple_specialized_for_ip_address<A: IpAddressExt>() -> u16 {
-        A::SIMPLE_VALUE
     }
 
     #[ip_test]
@@ -110,23 +88,11 @@ mod test {
         }
     }
 
-    #[ip_addr_test]
-    fn test_ip_addr_test<A: IpAddress + IpAddressExt>() {
-        let x = simple_specialized_for_ip_address::<A>();
-        if A::VERSION == 4 {
-            assert!(x == 3);
-        } else {
-            assert!(x == 4);
-        }
-    }
-
-    // test that all the `ip_[addr]_test` functions were generated
+    // test that all the `ip_test` functions were generated
     #[test]
     fn test_all_tests_generation() {
         test_ip_test_v4();
         test_ip_test_v6();
-        test_ip_addr_test_v4();
-        test_ip_addr_test_v6();
     }
 
     #[ip_test]
