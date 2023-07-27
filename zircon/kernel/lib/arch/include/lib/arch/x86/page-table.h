@@ -37,21 +37,18 @@ enum class X86PagingLevel {
 struct X86SystemPagingState {
   template <typename MsrIoProvider>
   static X86SystemPagingState Create(MsrIoProvider&& msr) {
-    return {
-        .nxe = X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).nxe(),
-    };
-  }
+    // Safety check; this should always be present.
+    ZX_DEBUG_ASSERT(X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).nxe());
 
-  // Whether non-executable pages are supported (controlled by EFER.NXE).
-  bool nxe = false;
+    return {};
+  }
 };
 
 // Whether the given access permission are valid for an X86 page table entry.
 static constexpr bool X86IsValidPageAccess(const X86SystemPagingState& state,
                                            const AccessPermissions& access) {
-  // Must always be readable, and can only be non-executable if the NXE feature
-  // is enabled.
-  return access.readable && (access.executable || state.nxe);
+  // Must always be readable.
+  return access.readable;
 }
 
 // [intel/vol3]: Figure 4-11. Formats of CR3 and Paging-Structure Entries with 4-Level Paging and

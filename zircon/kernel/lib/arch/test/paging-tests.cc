@@ -82,14 +82,6 @@ constexpr bool kX86LevelCanBeTerminal =
 template <X86PagingLevel Level>
 constexpr bool kX86LevelCanBeNonTerminal = Level != X86PagingLevel::kPageTable;
 
-constexpr X86SystemState kX86SystemStateNxDisallowed = {
-    .nxe = false,
-};
-
-constexpr X86SystemState kX86SystemStateNxAllowed = {
-    .nxe = true,
-};
-
 //
 // Tests for PagingTraits implementations.
 //
@@ -598,8 +590,7 @@ void TestX86CheckAccessPermissions() {
               .executable = x,
               .user_accessible = u,
           };
-          EXPECT_EQ(r && x, arch::X86IsValidPageAccess(kX86SystemStateNxDisallowed, access));
-          EXPECT_EQ(r, arch::X86IsValidPageAccess(kX86SystemStateNxAllowed, access));
+          EXPECT_EQ(r, arch::X86IsValidPageAccess({}, access));
         }
       }
     }
@@ -723,55 +714,37 @@ void TestX86GetSetExecutable() {
 
   if constexpr (kX86LevelCanBeNonTerminal<Level>) {
     entry.set_reg_value(0).set_xd(false).Set(
-        kX86SystemStateNxAllowed,
-        PagingSettings{
-            .present = true,
-            .terminal = false,
-            .access = AccessPermissions{.readable = true, .executable = false},
-        });
+        {}, PagingSettings{
+                .present = true,
+                .terminal = false,
+                .access = AccessPermissions{.readable = true, .executable = false},
+            });
     EXPECT_TRUE(entry.xd());
     EXPECT_FALSE(entry.executable());
 
-    entry.set_reg_value(0).set_xd(false).Set(kX86SystemStateNxDisallowed, PagingSettings{
-                                                                              .present = true,
-                                                                              .terminal = false,
-                                                                              .access = kRX,
-                                                                          });
-    EXPECT_FALSE(entry.xd());
-    EXPECT_TRUE(entry.executable());
-
-    entry.set_reg_value(0).set_xd(false).Set(kX86SystemStateNxAllowed, PagingSettings{
-                                                                           .present = true,
-                                                                           .terminal = false,
-                                                                           .access = kRX,
-                                                                       });
+    entry.set_reg_value(0).set_xd(false).Set({}, PagingSettings{
+                                                     .present = true,
+                                                     .terminal = false,
+                                                     .access = kRX,
+                                                 });
     EXPECT_FALSE(entry.xd());
   }
 
   if constexpr (kX86LevelCanBeTerminal<Level>) {
     entry.set_reg_value(0).set_xd(false).Set(
-        kX86SystemStateNxAllowed,
-        PagingSettings{
-            .present = true,
-            .terminal = true,
-            .access = AccessPermissions{.readable = true, .executable = false},
-        });
+        {}, PagingSettings{
+                .present = true,
+                .terminal = true,
+                .access = AccessPermissions{.readable = true, .executable = false},
+            });
     EXPECT_TRUE(entry.xd());
     EXPECT_FALSE(entry.executable());
 
-    entry.set_reg_value(0).set_xd(false).Set(kX86SystemStateNxDisallowed, PagingSettings{
-                                                                              .present = true,
-                                                                              .terminal = true,
-                                                                              .access = kRX,
-                                                                          });
-    EXPECT_FALSE(entry.xd());
-    EXPECT_TRUE(entry.executable());
-
-    entry.set_reg_value(0).set_xd(false).Set(kX86SystemStateNxAllowed, PagingSettings{
-                                                                           .present = true,
-                                                                           .terminal = true,
-                                                                           .access = kRX,
-                                                                       });
+    entry.set_reg_value(0).set_xd(false).Set({}, PagingSettings{
+                                                     .present = true,
+                                                     .terminal = true,
+                                                     .access = kRX,
+                                                 });
     EXPECT_FALSE(entry.xd());
     EXPECT_TRUE(entry.executable());
   }
@@ -1604,13 +1577,8 @@ TEST(PagingTests, Compilation) {
 #define TEST_FOR_RISCV(name) \
   TEST(PagingTests, RiscvSv48##name) { name<arch::RiscvSv48PagingTraits>({}); }
 
-#define TEST_FOR_X86(name)                                             \
-  TEST(PagingTests, X86##name##NxAllowed) {                            \
-    name<arch::X86FourLevelPagingTraits>(kX86SystemStateNxAllowed);    \
-  }                                                                    \
-  TEST(PagingTests, X86##name##NxDisallowed) {                         \
-    name<arch::X86FourLevelPagingTraits>(kX86SystemStateNxDisallowed); \
-  }
+#define TEST_FOR_X86(name) \
+  TEST(PagingTests, X86##name##NxAllowed) { name<arch::X86FourLevelPagingTraits>({}); }
 
 template <class PagingTraits>
 void TranslationWith4KiBPages(const typename PagingTraits::SystemState& state) {
