@@ -3,14 +3,7 @@
 // found in the LICENSE file.
 
 use super::super::timer::TimerHeap;
-use super::{
-    common::{
-        with_local_timer_heap, EHandle, ExecutorTime, Inner, EMPTY_WAKEUP_ID, TASK_READY_WAKEUP_ID,
-    },
-    time::Time,
-};
-use crate::runtime::fuchsia::executor::instrumentation::WakeupReason;
-use fuchsia_zircon::{self as zx};
+use super::common::{with_local_timer_heap, ExecutorTime, Inner};
 use futures::{
     future::{self, FutureObj},
     FutureExt,
@@ -21,7 +14,9 @@ use std::{
     future::Future,
     mem,
     sync::{atomic::Ordering, Arc},
-    thread, usize,
+    thread,
+    time::{Duration, Instant},
+    usize,
 };
 
 /// A multi-threaded port-based executor for Fuchsia OS. Requires that tasks scheduled on it
@@ -39,8 +34,6 @@ pub struct SendExecutor {
     inner: Arc<Inner>,
     /// Worker thread handles
     threads: Vec<thread::JoinHandle<()>>,
-    /// Number of worker threads
-    num_threads: usize,
 }
 
 impl fmt::Debug for SendExecutor {
@@ -53,14 +46,22 @@ impl SendExecutor {
     /// Create a new multi-threaded executor.
     #[allow(deprecated)]
     pub fn new(num_threads: usize) -> Self {
-        let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ false));
+        let inner = Arc::new(Inner::new(
+            ExecutorTime::RealTime,
+            /* is_local */ false,
+            num_threads.try_into().expect("no more than 256 threads are supported"),
+        ));
         inner.clone().set_local(TimerHeap::default());
-        Self { inner, threads: Vec::default(), num_threads }
+        Self { inner, threads: Vec::default() }
     }
 
     /// Run `future` to completion, using this thread and `num_threads` workers in a pool to
     /// poll active tasks.
+    // The debugger looks for this function on the stack, so if its (fully-qualified) name changes,
+    // the debugger needs to be updated.
+    // LINT.IfChange
     pub fn run<F>(&mut self, future: F) -> F::Output
+    // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -71,7 +72,7 @@ impl SendExecutor {
         let pair2 = pair.clone();
 
         // Spawn a future which will set the result upon completion.
-        Inner::spawn(
+        Inner::spawn_main(
             &self.inner,
             FutureObj::new(Box::new(future.then(move |fut_result| {
                 let (lock, cvar) = &*pair2;
@@ -92,12 +93,40 @@ impl SendExecutor {
         // Wait until the signal the future has completed.
         let (lock, cvar) = &*pair;
         let mut result = lock.lock();
-        while result.is_none() {
-            cvar.wait(&mut result);
+        if result.is_none() {
+            let mut last_polled = 0;
+            let mut last_tasks_ready = false;
+            loop {
+                // This timeout is chosen to be quite high since it impacts all processes that have
+                // multi-threaded async executors, and it exists to workaround arguably misbehaving
+                // users (see the comment below).
+                const TIMEOUT: Duration = Duration::from_millis(250);
+                cvar.wait_until(&mut result, Instant::now() + TIMEOUT);
+                if result.is_some() {
+                    break;
+                }
+                let polled = self.inner.polled.load(Ordering::Relaxed);
+                let tasks_ready = !self.inner.ready_tasks.is_empty();
+                if polled == last_polled && last_tasks_ready && tasks_ready {
+                    // If this log message is printed, it most likely means that a task has blocked
+                    // making a reentrant synchronous call that doesn't involve a port message being
+                    // processed by this same executor. This can arise even if you would expect
+                    // there to normally be other port messages involved. One example (that has
+                    // actually happened): spawn a task to service a fuchsia.io connection, then try
+                    // and synchronously connect to that service. If the task hasn't had a chance to
+                    // run, then the async channel might not be registered with the executor, and so
+                    // sending messages to the channel doesn't trigger a port message. Typically,
+                    // the way to solve these issues is to run the service in a different executor
+                    // (which could be the same or a different process).
+                    eprintln!("Tasks might be stalled!");
+                    self.inner.wake_one_thread();
+                }
+                last_polled = polled;
+                last_tasks_ready = tasks_ready;
+            }
         }
 
         // Spin down worker threads
-        self.inner.done.store(true, Ordering::SeqCst);
         self.join_all();
 
         // Unwrap is fine because of the check to `is_none` above.
@@ -105,72 +134,24 @@ impl SendExecutor {
     }
 
     /// Add `self.num_threads` worker threads to the executor's thread pool.
-    /// `timers`: timers from the "master" thread which would otherwise be lost.
+    /// `timers`: timers from the "main" thread which would otherwise be lost.
     fn create_worker_threads(&mut self, mut timers: Option<TimerHeap>) {
-        for _ in 0..self.num_threads {
-            self.threads.push(self.new_worker(timers.take()));
+        for _ in 0..self.inner.num_threads {
+            let inner = self.inner.clone();
+            let timers = timers.take().unwrap_or(TimerHeap::default());
+            self.threads.push(thread::spawn(move || {
+                inner.clone().set_local(timers);
+                inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
+            }));
         }
     }
 
     fn join_all(&mut self) {
-        // Send a user packet to wake up all the threads
-        for _thread in self.threads.iter() {
-            self.inner.notify_empty();
-        }
+        self.inner.mark_done();
 
         // Join the worker threads
         for thread in self.threads.drain(..) {
             thread.join().expect("Couldn't join worker thread.");
-        }
-    }
-
-    fn new_worker(&self, timers: Option<TimerHeap>) -> thread::JoinHandle<()> {
-        let inner = self.inner.clone();
-        thread::spawn(move || Self::worker_lifecycle(inner, timers))
-    }
-
-    fn worker_lifecycle(inner: Arc<Inner>, timers: Option<TimerHeap>) {
-        inner.clone().set_local(timers.unwrap_or(TimerHeap::default()));
-        let mut local_collector = inner.collector.create_local_collector();
-        loop {
-            if inner.done.load(Ordering::SeqCst) {
-                EHandle::rm_local();
-                return;
-            }
-
-            let packet = with_local_timer_heap(|timer_heap| {
-                let deadline =
-                    timer_heap.next_deadline().map(|t| t.time()).unwrap_or(Time::INFINITE);
-
-                local_collector.will_wait();
-                // into_zx: we are using real time, so the time is a monotonic time.
-                match inner.port.wait(deadline.into_zx()) {
-                    Ok(packet) => Some(packet),
-                    Err(zx::Status::TIMED_OUT) => {
-                        local_collector.woke_up(WakeupReason::Deadline);
-                        let time_waker = timer_heap.pop().unwrap();
-                        time_waker.wake();
-                        None
-                    }
-                    Err(status) => {
-                        panic!("Error calling port wait: {:?}", status);
-                    }
-                }
-            });
-
-            if let Some(packet) = packet {
-                match packet.key() {
-                    EMPTY_WAKEUP_ID => local_collector.woke_up(WakeupReason::Notification),
-                    TASK_READY_WAKEUP_ID => {
-                        local_collector.woke_up(WakeupReason::Notification);
-                        inner.poll_ready_tasks(&mut local_collector);
-                    }
-                    receiver_key => {
-                        local_collector.woke_up(WakeupReason::Io);
-                        inner.deliver_packet(receiver_key as usize, packet);
-                    }
-                }
-            }
         }
     }
 
@@ -182,11 +163,49 @@ impl SendExecutor {
 
 impl Drop for SendExecutor {
     fn drop(&mut self) {
-        self.inner.mark_done();
-        // Wake the threads so they can kill themselves.
         self.join_all();
         self.inner.on_parent_drop();
     }
 }
 
 // TODO(fxbug.dev/76583) test SendExecutor with unit tests
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::SendExecutor,
+        crate::{Task, Timer},
+        fuchsia_zircon::DurationNum,
+        futures::channel::oneshot,
+        std::sync::{Arc, Condvar, Mutex},
+    };
+
+    #[test]
+    fn test_stalled_triggers_wake_up() {
+        SendExecutor::new(2).run(async {
+            // The timer will only fire on one thread, so use one so we can get to a point where
+            // only one thread is running.
+            Timer::new(10.millis()).await;
+
+            let (tx, rx) = oneshot::channel();
+            let pair = Arc::new((Mutex::new(false), Condvar::new()));
+            let pair2 = pair.clone();
+
+            let _task = Task::spawn(async move {
+                // Send a notification to the other task.
+                tx.send(()).unwrap();
+                // Now block the thread waiting for the result.
+                let (lock, cvar) = &*pair;
+                let mut done = lock.lock().unwrap();
+                while !*done {
+                    done = cvar.wait(done).unwrap();
+                }
+            });
+
+            rx.await.unwrap();
+            let (lock, cvar) = &*pair2;
+            *lock.lock().unwrap() = true;
+            cvar.notify_one();
+        });
+    }
+}

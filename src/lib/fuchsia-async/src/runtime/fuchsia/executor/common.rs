@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::timer::{TimerHandle, TimerHeap};
+use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
 use super::{
-    instrumentation::{Collector, LocalCollector},
+    instrumentation::{Collector, LocalCollector, WakeupReason},
     packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration},
     time::Time,
 };
@@ -21,7 +21,7 @@ use std::{
     collections::HashMap,
     fmt,
     panic::Location,
-    sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Weak},
     task::Context,
     u64, usize,
@@ -57,6 +57,26 @@ pub enum ExecutorTime {
     FakeTime(AtomicI64),
 }
 
+enum PollReadyTasksResult {
+    NoneReady,
+    MoreReady,
+    MainTaskCompleted,
+}
+
+// -- Helpers for threads_state below --
+
+fn threads_sleeping(state: u16) -> u8 {
+    state as u8
+}
+
+fn threads_notified(state: u16) -> u8 {
+    (state >> 8) as u8
+}
+
+fn make_threads_state(sleeping: u8, notified: u8) -> u16 {
+    sleeping as u16 | ((notified as u16) << 8)
+}
+
 pub(super) struct Inner {
     pub(super) port: zx::Port,
     pub(super) done: AtomicBool,
@@ -68,18 +88,22 @@ pub(super) struct Inner {
     time: ExecutorTime,
     pub(super) collector: Collector,
     pub(super) source: Option<&'static Location<'static>>,
+    // The low byte is the number of threads currently sleeping. The high byte is the number of
+    // of wake-up notifications pending.
+    pub(super) threads_state: AtomicU16,
+    pub(super) num_threads: u8,
+    pub(super) polled: AtomicU64,
 }
 
 impl Inner {
     #[cfg_attr(trace_level_logging, track_caller)]
-    pub fn new(time: ExecutorTime, is_local: bool) -> Self {
+    pub fn new(time: ExecutorTime, is_local: bool, num_threads: u8) -> Self {
         #[cfg(trace_level_logging)]
         let source = Some(Location::caller());
         #[cfg(not(trace_level_logging))]
         let source = None;
 
         let collector = Collector::new();
-        collector.task_created(MAIN_TASK_ID, source);
         Inner {
             port: zx::Port::create(),
             done: AtomicBool::new(false),
@@ -91,6 +115,9 @@ impl Inner {
             time,
             collector,
             source,
+            threads_state: AtomicU16::new(0),
+            num_threads,
+            polled: AtomicU64::new(0),
         }
     }
 
@@ -102,14 +129,49 @@ impl Inner {
         });
     }
 
-    pub fn poll_ready_tasks(&self, local_collector: &mut LocalCollector<'_>) {
-        // TODO: loop but don't starve
+    pub fn poll_one_ready_task(&self, local_collector: &mut LocalCollector<'_>) {
         if let Some(task) = self.ready_tasks.pop() {
             let complete = task.try_poll();
             local_collector.task_polled(task.id, task.source, complete, self.ready_tasks.len());
             if complete {
                 // Completed
                 self.active_tasks.lock().remove(&task.id);
+            }
+        }
+    }
+
+    fn poll_ready_tasks(&self, local_collector: &mut LocalCollector<'_>) -> PollReadyTasksResult {
+        loop {
+            for _ in 0..16 {
+                let Some(task) = self.ready_tasks.pop() else {
+                    return PollReadyTasksResult::NoneReady
+                };
+                let complete = task.try_poll();
+                local_collector.task_polled(task.id, task.source, complete, self.ready_tasks.len());
+                if complete {
+                    self.active_tasks.lock().remove(&task.id);
+                    if task.id == MAIN_TASK_ID {
+                        return PollReadyTasksResult::MainTaskCompleted;
+                    }
+                }
+                self.polled.fetch_add(1, Ordering::Relaxed);
+            }
+            // We didn't finish all the ready tasks. If there are sleeping threads, post a
+            // notification to wake one up.
+            let mut threads_state = self.threads_state.load(Ordering::Relaxed);
+            loop {
+                if threads_sleeping(threads_state) == 0 {
+                    // All threads are awake now. Prevent starvation.
+                    return PollReadyTasksResult::MoreReady;
+                }
+                if threads_notified(threads_state) >= threads_sleeping(threads_state) {
+                    // All sleeping threads have been notified. Keep going and poll more tasks.
+                    break;
+                }
+                match self.try_notify(threads_state) {
+                    Ok(()) => break,
+                    Err(s) => threads_state = s,
+                }
             }
         }
     }
@@ -143,17 +205,72 @@ impl Inner {
             // across multiple threads, so we can safely convert from a non-`Send`able
             // future to a `Send`able one.
             unsafe { future.into_future_obj() },
-        )
+        );
+    }
+
+    /// Spawns the main future.
+    pub fn spawn_main(self: &Arc<Self>, future: FutureObj<'static, ()>) {
+        let task = Task::new(MAIN_TASK_ID, future, self.clone());
+        self.collector.task_created(MAIN_TASK_ID, task.source);
+        let waker = task.waker();
+        assert!(self.active_tasks.lock().insert(0, task).is_none(), "Existing main task");
+        ArcWake::wake_by_ref(&waker);
     }
 
     pub fn notify_task_ready(&self) {
-        // TODO: optimize so that this function doesn't push new items onto
-        // the queue if all worker threads are already awake
-        self.notify_id(TASK_READY_WAKEUP_ID);
+        if self.is_local {
+            self.notify_id(TASK_READY_WAKEUP_ID);
+        } else {
+            // Only post if there's no thread running (or soon to be running). If we happen to be
+            // running on a thread for this executor, then threads_state won't be equal to
+            // num_threads, which means notifications only get fired if this is from a non-async
+            // thread, or a thread that belongs to a different executor. We use SeqCst ordering here
+            // to make sure this load happens *after* the change to ready_tasks and to synchronize
+            // with worker_lifecycle.
+            let mut threads_state = self.threads_state.load(Ordering::SeqCst);
+
+            // We compare threads_state directly against self.num_threads (which means that
+            // notifications must be zero) because we only want to notify if there are no pending
+            // notifications and *all* threads are currently asleep.
+            while threads_state == self.num_threads as u16 {
+                match self.try_notify(threads_state) {
+                    Ok(()) => break,
+                    Err(s) => threads_state = s,
+                }
+            }
+        }
     }
 
     pub fn notify_empty(&self) {
         self.notify_id(EMPTY_WAKEUP_ID);
+    }
+
+    /// Tries to notify a thread to wake up. Returns threads_state if it fails.
+    fn try_notify(&self, old_threads_state: u16) -> Result<(), u16> {
+        self.threads_state
+            .compare_exchange_weak(
+                old_threads_state,
+                old_threads_state + 0x100, // <- Add one to notifications.
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            )
+            .map(|_| self.notify_id(TASK_READY_WAKEUP_ID))
+    }
+
+    pub fn wake_one_thread(&self) {
+        let mut threads_state = self.threads_state.load(Ordering::Relaxed);
+        let current_sleeping = threads_sleeping(threads_state);
+        if current_sleeping == 0 {
+            return;
+        }
+        while threads_notified(threads_state) == 0
+            && threads_sleeping(threads_state) >= current_sleeping
+        {
+            match self.try_notify(threads_state) {
+                Ok(()) => break,
+                Err(s) => threads_state = s,
+            }
+        }
     }
 
     pub fn notify_id(&self, id: u64) {
@@ -186,7 +303,7 @@ impl Inner {
     pub fn set_fake_time(&self, new: Time) {
         match &self.time {
             ExecutorTime::RealTime => {
-                panic!("Error: called `advance_fake_time` on an executor using actual time.")
+                panic!("Error: called `set_fake_time` on an executor using actual time.")
             }
             ExecutorTime::FakeTime(t) => t.store(new.into_nanos(), Ordering::Relaxed),
         }
@@ -203,6 +320,33 @@ impl Inner {
     /// know that it's okay if their entries are already missing.
     pub fn mark_done(&self) {
         self.done.store(true, Ordering::SeqCst);
+
+        // Make sure there's at least one notification outstanding per thread to wake up all
+        // workers. This might be more notifications than required, but this way we don't have to
+        // worry about races where tasks are just about to sleep; when a task receives the
+        // notification, it will check done and terminate.
+        let mut threads_state = self.threads_state.load(Ordering::Relaxed);
+        let num_threads = self.num_threads;
+        loop {
+            let notified = threads_notified(threads_state);
+            if notified >= num_threads {
+                break;
+            }
+            match self.threads_state.compare_exchange_weak(
+                threads_state,
+                make_threads_state(threads_sleeping(threads_state), num_threads),
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    for _ in notified..num_threads {
+                        self.notify_id(TASK_READY_WAKEUP_ID);
+                    }
+                    return;
+                }
+                Err(old) => threads_state = old,
+            }
+        }
     }
 
     /// Notes about the lifecycle of an Executor.
@@ -283,6 +427,119 @@ impl Inner {
 
         // Remove the thread-local executor set in `new`.
         EHandle::rm_local();
+    }
+
+    // The debugger looks for this function on the stack, so if its (fully-qualified) name changes,
+    // the debugger needs to be updated.
+    // LINT.IfChange
+    pub fn worker_lifecycle<const UNTIL_STALLED: bool>(self: &Arc<Inner>) {
+        // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+        let mut local_collector = self.collector.create_local_collector();
+
+        loop {
+            // Keep track of whether we are considered asleep.
+            let mut sleeping = false;
+
+            match self.poll_ready_tasks(&mut local_collector) {
+                PollReadyTasksResult::NoneReady => {
+                    // No more tasks, indicate we are sleeping. We use SeqCst ordering because we
+                    // want this change here to happen *before* we check ready_tasks below. This
+                    // synchronizes with notify_task_ready which is called *after* a task is added
+                    // to ready_tasks.
+                    self.threads_state.fetch_add(1, Ordering::SeqCst);
+                    // Check ready tasks again. If a task got posted, wake up. This has to be done
+                    // because a notification won't get sent if there is at least one active thread
+                    // so there's a window between the preceding two lines where a task could be
+                    // made ready and a notification is not sent because it looks like there is at
+                    // least one thread running.
+                    if self.ready_tasks.is_empty() {
+                        sleeping = true;
+                    } else {
+                        // We lost a race, we're no longer sleeping.
+                        self.threads_state.fetch_sub(1, Ordering::Relaxed);
+                    }
+                }
+                PollReadyTasksResult::MoreReady => {}
+                PollReadyTasksResult::MainTaskCompleted => return,
+            }
+
+            // Check done here after updating threads_state to avoid shutdown races.
+            if self.done.load(Ordering::SeqCst) {
+                return;
+            }
+
+            enum Work {
+                None,
+                Packet(zx::Packet),
+                Timer(TimeWaker),
+                Stalled,
+            }
+
+            let mut notified = false;
+            let work = with_local_timer_heap(|timer_heap| {
+                // If we're considered awake choose INFINITE_PAST which will make the wait call
+                // return immediately. Otherwise choose a deadline from the timers.
+                let deadline = if !sleeping || UNTIL_STALLED {
+                    Time::INFINITE_PAST
+                } else {
+                    timer_heap.next_deadline().map(|t| t.time()).unwrap_or(Time::INFINITE)
+                };
+
+                local_collector.will_wait();
+
+                // into_zx: we are using real time, so the time is a monotonic time.
+                match self.port.wait(deadline.into_zx()) {
+                    Ok(packet) => {
+                        if packet.key() == TASK_READY_WAKEUP_ID {
+                            local_collector.woke_up(WakeupReason::Notification);
+                            notified = true;
+                            Work::None
+                        } else {
+                            Work::Packet(packet)
+                        }
+                    }
+                    Err(zx::Status::TIMED_OUT) => {
+                        if !sleeping {
+                            Work::None
+                        } else if UNTIL_STALLED {
+                            // Fire timers if using fake time.
+                            if !self.is_real_time() {
+                                if let Some(deadline) = timer_heap.next_deadline().map(|t| t.time())
+                                {
+                                    if deadline <= self.now() {
+                                        return Work::Timer(timer_heap.pop().unwrap());
+                                    }
+                                }
+                            }
+                            Work::Stalled
+                        } else {
+                            Work::Timer(timer_heap.pop().unwrap())
+                        }
+                    }
+                    Err(status) => {
+                        panic!("Error calling port wait: {:?}", status);
+                    }
+                }
+            });
+
+            let threads_state_sub = make_threads_state(sleeping as u8, notified as u8);
+            if threads_state_sub > 0 {
+                self.threads_state.fetch_sub(threads_state_sub, Ordering::Relaxed);
+            }
+
+            match work {
+                Work::Packet(packet) => {
+                    local_collector.woke_up(WakeupReason::Io);
+                    self.deliver_packet(packet.key() as usize, packet);
+                }
+                Work::Timer(timer) => {
+                    local_collector.woke_up(WakeupReason::Deadline);
+                    timer.wake();
+                }
+                Work::None => {}
+                Work::Stalled => return,
+            }
+        }
     }
 }
 

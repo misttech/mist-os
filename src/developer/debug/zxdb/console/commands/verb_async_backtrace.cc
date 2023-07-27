@@ -554,8 +554,7 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
       cmd_context->Output(FormatSendExecutorMainThread(options, stack[i]->GetEvalContext()));
       return;
     }
-    if (func_name ==
-        "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::worker_lifecycle") {
+    if (func_name == "fuchsia_async::runtime::fuchsia::executor::common::Inner::worker_lifecycle") {
       cmd_context->Output(FormatSendExecutorWorkerThread(options, stack[i]->GetEvalContext()));
       return;
     }

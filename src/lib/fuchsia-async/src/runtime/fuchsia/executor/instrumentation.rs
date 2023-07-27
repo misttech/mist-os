@@ -417,19 +417,23 @@ mod tests {
         let mut executor = LocalExecutor::new();
         executor.run_singlethreaded(simple_task_for_snapshot());
         let snapshot = executor.snapshot();
-        snapshot_sanity_check(&snapshot, 0);
+        snapshot_sanity_check(&snapshot);
+        assert_eq!(snapshot.tasks_created, 1);
+        assert_eq!(snapshot.tasks_completed, 1);
+        assert!(snapshot.wakeups_deadline >= 1);
     }
 
     #[test]
-    fn instrumentation_stepwise_smoke_test() {
-        let mut executor = TestExecutor::new();
+    fn instrumentation_until_stalled_smoke_test() {
+        let mut executor = TestExecutor::new_with_fake_time();
         let fut = simple_task_for_snapshot();
         pin_mut!(fut);
-        assert!(executor.run_until_stalled(&mut fut).is_pending());
-        executor.wake_expired_timers();
         assert!(executor.run_until_stalled(&mut fut).is_ready());
         let snapshot = executor.snapshot();
-        snapshot_sanity_check(&snapshot, 0);
+        snapshot_sanity_check(&snapshot);
+        assert_eq!(snapshot.tasks_created, 1);
+        assert_eq!(snapshot.tasks_completed, 1);
+        assert!(snapshot.wakeups_deadline >= 1);
     }
 
     #[test]
@@ -437,7 +441,10 @@ mod tests {
         let mut executor = SendExecutor::new(2);
         executor.run(simple_task_for_snapshot());
         let snapshot = executor.snapshot();
-        snapshot_sanity_check(&snapshot, /* extra_tasks */ 1);
+        snapshot_sanity_check(&snapshot);
+        assert_eq!(snapshot.tasks_created, 2);
+        assert_eq!(snapshot.tasks_completed, 2);
+        assert!(snapshot.wakeups_deadline >= 1);
     }
 
     // This task spawns another tasks, which completes. It should wake up from IO, notification
@@ -468,16 +475,9 @@ mod tests {
     // Sanity check for running simple_task on an executor. `extra_tasks` represents
     // synthetic tasks that are added as an impl detail of the execution - e.g. a multithreaded
     // execution run creates an extra synthetic task for the main future.
-    pub fn snapshot_sanity_check(snapshot: &Snapshot, extra_tasks: usize) {
+    pub fn snapshot_sanity_check(snapshot: &Snapshot) {
         assert!(snapshot.polls >= 4);
-        assert_eq!(snapshot.tasks_created - extra_tasks, 2);
-        assert_eq!(snapshot.tasks_completed - extra_tasks, 1);
         assert!(snapshot.wakeups_io >= 1);
-        assert!(snapshot.wakeups_deadline >= 1);
-
-        // Future optimizations of the executor could theoretically lead to notifications
-        // being eliminated in some cases.
-        assert!(snapshot.wakeups_notification >= 1);
         assert!(snapshot.ticks_awake >= 1);
         assert!(snapshot.ticks_asleep >= 1);
     }

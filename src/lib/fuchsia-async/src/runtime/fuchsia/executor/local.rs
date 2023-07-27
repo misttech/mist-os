@@ -51,7 +51,11 @@ impl fmt::Debug for LocalExecutor {
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
     pub fn new() -> Self {
-        let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ true));
+        let inner = Arc::new(Inner::new(
+            ExecutorTime::RealTime,
+            /* is_local */ true,
+            /* num_threads */ 1,
+        ));
         inner.clone().set_local(TimerHeap::default());
         let main_task =
             Arc::new(MainTask { executor: Arc::downgrade(&inner), notifier: Notifier::default() });
@@ -117,7 +121,7 @@ impl LocalExecutor {
                     }
                     TASK_READY_WAKEUP_ID => {
                         local_collector.woke_up(WakeupReason::Notification);
-                        self.inner.poll_ready_tasks(&mut local_collector);
+                        self.inner.poll_one_ready_task(&mut local_collector);
                     }
                     receiver_key => {
                         local_collector.woke_up(WakeupReason::Io);
@@ -162,6 +166,7 @@ impl TestExecutor {
         let inner = Arc::new(Inner::new(
             ExecutorTime::FakeTime(AtomicI64::new(Time::INFINITE_PAST.into_nanos())),
             /* is_local */ true,
+            /* num_threads */ 1,
         ));
         inner.clone().set_local(TimerHeap::default());
         let main_task =
@@ -221,6 +226,7 @@ impl TestExecutor {
                     }
                 }
                 NextStep::NextTimer => {
+                    local_collector.woke_up(WakeupReason::Deadline);
                     let next_timer = with_local_timer_heap(|timer_heap| {
                         // unwrap: will not fail because NextTimer
                         // guarantees there is a timer in the heap.
@@ -301,7 +307,7 @@ impl TestExecutor {
                 res
             }
             TASK_READY_WAKEUP_ID => {
-                self.local.inner.poll_ready_tasks(&mut local_collector);
+                self.local.inner.poll_one_ready_task(&mut local_collector);
                 Poll::Pending
             }
             receiver_key => {
