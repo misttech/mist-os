@@ -250,7 +250,6 @@ mod test {
 
         // Waiting for CHANNEL_PEER_CLOSED timed out (printing the helpful message), but then
         // a new indefinite wait began as the channel is still not closed.
-        assert!(executor.wake_expired_timers());
         assert!(executor.run_until_stalled(&mut fut).is_pending());
 
         // Send a CHANNEL_PEER_CLOSED to the guest proxy.

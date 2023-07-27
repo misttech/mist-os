@@ -560,7 +560,6 @@ mod tests {
             HostVsockAcceptorMarker, Listener,
         },
         fs::write,
-        fuchsia_async::WaitState,
         fuchsia_fs::{file, OpenFlags},
         futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
         futures::future::{self, join, Either},
