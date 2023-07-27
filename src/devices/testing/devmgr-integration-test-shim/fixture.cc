@@ -24,7 +24,7 @@ namespace devmgr_integration_test {
 
 namespace {
 constexpr std::string_view kBootPath = "/boot/";
-constexpr std::string_view kBootUrlPrefix = "fuchsia-boot:///#";
+constexpr std::string_view kBootUrlPrefix = "fuchsia-boot:///";
 
 std::string PathToUrl(std::string_view path) {
   if (path.find(kBootUrlPrefix) == 0) {
@@ -33,7 +33,7 @@ std::string PathToUrl(std::string_view path) {
   if (path.find(kBootPath) != 0) {
     ZX_ASSERT_MSG(false, "Driver path to devmgr-launcher must start with /boot/!");
   }
-  return std::string(kBootUrlPrefix).append(path.substr(kBootPath.size()));
+  return std::string(kBootUrlPrefix) + "#" + path.substr(kBootPath.size()).data();
 }
 }  // namespace
 

@@ -28,14 +28,23 @@ class FakeComponentResolver final
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
     std::string_view kBootPrefix = "fuchsia-boot:///";
     std::string_view kPkgPrefix = "fuchsia-pkg://fuchsia.com/";
+    std::string_view kUnpackagedBootPrefix = "fuchsia-boot:///#";
     std::string_view relative_path = request->component_url.get();
 
     std::string pkg_url;
-    bool is_boot = false;
+    bool is_unpackaged_boot = false;
 
-    if (cpp20::starts_with(relative_path, kBootPrefix)) {
-      is_boot = true;
-      relative_path.remove_prefix(kBootPrefix.size() + 1);
+    if (!cpp20::starts_with(relative_path, kBootPrefix) &&
+        !cpp20::starts_with(relative_path, kPkgPrefix)) {
+      FX_SLOG(ERROR, "FakeComponentResolver request not supported.",
+              KV("url", std::string(relative_path).c_str()));
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
+      return;
+    }
+
+    if (cpp20::starts_with(relative_path, kUnpackagedBootPrefix)) {
+      is_unpackaged_boot = true;
+      relative_path.remove_prefix(kUnpackagedBootPrefix.size());
       pkg_url = kBootPrefix;
 
       // driver_host2 is supposed to be in a bootfs package, but it's actually in the same package
@@ -45,17 +54,10 @@ class FakeComponentResolver final
       if (cpp20::starts_with(relative_path, kDriverHostPrefix)) {
         relative_path.remove_prefix(kDriverHostPrefix.size() + 1);
       }
-    } else if (cpp20::starts_with(relative_path, kPkgPrefix)) {
-      relative_path.remove_prefix(kPkgPrefix.size());
-      size_t pos = relative_path.find('#');
-      std::string pkg_name = std::string(relative_path.substr(0, pos));
-      relative_path.remove_prefix(pos + 1);
-      pkg_url = std::string(kPkgPrefix) + pkg_name;
     } else {
-      FX_SLOG(ERROR, "FakeComponentResolver request not supported.",
-              KV("url", std::string(relative_path).c_str()));
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
-      return;
+      size_t pos = relative_path.find('#');
+      std::string pkg_url = std::string(relative_path.substr(0, pos));
+      relative_path.remove_prefix(pos + 1);
     }
 
     auto file = fidl::CreateEndpoints<fuchsia_io::File>();
@@ -65,7 +67,7 @@ class FakeComponentResolver final
     }
 
     zx_handle_t dir = pkg_dir_.channel().get();
-    if (is_boot) {
+    if (is_unpackaged_boot) {
       dir = boot_dir_.channel().get();
     }
 
@@ -113,7 +115,7 @@ class FakeComponentResolver final
     abi_revision_file.close();
 
     zx::result<fidl::ClientEnd<fuchsia_io::Directory>> dir_clone_result;
-    if (is_boot) {
+    if (is_unpackaged_boot) {
       dir_clone_result = component::Clone(boot_dir_);
     } else {
       dir_clone_result = component::Clone(pkg_dir_);
