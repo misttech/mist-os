@@ -289,17 +289,13 @@ fn test_timeout() {
 
     pin_utils::pin_mut!(fut);
     loop {
-        executor.wake_main_future();
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()
                 + fuchsia_zircon::Duration::from_millis(timeout_ms).into_nanos(),
         );
-        match executor.run_one_step(&mut fut) {
-            Some(Poll::Ready(x)) => break x,
-            None => panic!("Executor stalled"),
-            Some(Poll::Pending) => {
-                executor.set_fake_time(new_time);
-            }
+        match executor.run_until_stalled(&mut fut) {
+            Poll::Ready(x) => break x,
+            Poll::Pending => executor.set_fake_time(new_time),
         }
     }
 }

@@ -53,6 +53,7 @@ enum HandlerAction {
     Ignore,
     Exit(ExitResult),
     Respond(SettingHandlerResult),
+    RespondAfterDelay(SettingHandlerResult, Duration),
 }
 
 impl SettingHandler {
@@ -73,11 +74,15 @@ impl SettingHandler {
         );
     }
 
-    fn process_request(&mut self, request: Request) -> Option<SettingHandlerResult> {
+    async fn process_request(&mut self, request: Request) -> Option<SettingHandlerResult> {
         if let Some((match_request, action)) = self.responses.pop() {
             if request == match_request {
                 match action {
                     HandlerAction::Respond(result) => {
+                        return Some(result);
+                    }
+                    HandlerAction::RespondAfterDelay(result, duration) => {
+                        fasync::Timer::new(duration).await;
                         return Some(result);
                     }
                     HandlerAction::Ignore => {
@@ -124,7 +129,8 @@ impl SettingHandler {
                         )),
                         client,
                     ) => {
-                        if let Some(response) = handler_clone.lock().await.process_request(request)
+                        if let Some(response) =
+                            handler_clone.lock().await.process_request(request).await
                         {
                             setting_handler::reply(client, response);
                         }
@@ -1108,17 +1114,13 @@ fn test_timeout() {
 
     pin_utils::pin_mut!(fut);
     loop {
-        executor.wake_main_future();
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()
                 + fuchsia_zircon::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
-        match executor.run_one_step(&mut fut) {
-            Some(Poll::Ready(x)) => break x,
-            None => panic!("Executor stalled"),
-            Some(Poll::Pending) => {
-                executor.set_fake_time(new_time);
-            }
+        match executor.run_until_stalled(&mut fut) {
+            Poll::Ready(x) => break x,
+            Poll::Pending => executor.set_fake_time(new_time),
         }
     }
 }
@@ -1137,12 +1139,14 @@ fn test_timeout_no_retry() {
 
         let mut event_receptor = service::build_event_listener(&environment.delegate).await;
 
-        // Queue up to ignore resquests
-        environment
-            .setting_handler
-            .lock()
-            .await
-            .queue_action(Request::Get, HandlerAction::Respond(Ok(None)));
+        // Queue up to ignore requests
+        environment.setting_handler.lock().await.queue_action(
+            Request::Get,
+            HandlerAction::RespondAfterDelay(
+                Ok(None),
+                Duration::from_millis(SETTING_PROXY_TIMEOUT_MS * 2),
+            ),
+        );
 
         let request = Request::Get;
 
@@ -1155,10 +1159,7 @@ fn test_timeout_no_retry() {
         .expect("result should be present");
 
         // Make sure the result is an `ControllerError::TimeoutError`
-        assert!(
-            matches!(handler_result, Err(HandlerError::TimeoutError)),
-            "error should have been encountered"
-        );
+        assert_matches!(handler_result, Err(HandlerError::TimeoutError));
 
         verify_handler_event(
             setting_type,
@@ -1182,15 +1183,13 @@ fn test_timeout_no_retry() {
 
     pin_utils::pin_mut!(fut);
     loop {
-        executor.wake_main_future();
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()
                 + fuchsia_zircon::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
-        match executor.run_one_step(&mut fut) {
-            Some(Poll::Ready(x)) => break x,
-            None => panic!("Executor stalled"),
-            Some(Poll::Pending) => {
+        match executor.run_until_stalled(&mut fut) {
+            Poll::Ready(x) => break x,
+            Poll::Pending => {
                 executor.set_fake_time(new_time);
             }
         }
