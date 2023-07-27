@@ -331,6 +331,7 @@ rustc_binary("starnix_kernel_bin") {
     "types/mod.rs",
     "types/mount_flags.rs",
     "types/open_flags.rs",
+    "types/ownership.rs",
     "types/personality.rs",
     "types/range_ext.rs",
     "types/resource_limits.rs",
