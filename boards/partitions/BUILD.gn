@@ -85,25 +85,10 @@ generated_partitions_config("vim3") {
   hw_revision = "vim3"
 }
 
-generated_partitions_config("chromebook-x64") {
-  forward_variables_from(_standard_names, "*")
-  hw_revision = "chromebook-x64"
-  bootloader_partitions = [
-    {
-      image = "//prebuilt/third_party/firmware/atlas/fuchsia_image.dev.bin"
-      type = "ap"
-
-      # TODO(fxbug.dev/83462): support flashing firmware over fastboot.
-      #name = "bootloader"
-    },
-  ]
-}
-
 group("partitions") {
   testonly = true
   public_deps = [
     ":arm64",
-    ":chromebook-x64",
     ":qemu-x64",
     ":vim3",
     ":x64",

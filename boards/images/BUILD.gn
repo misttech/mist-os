@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/generated_images_config.gni")
-import("//build/images/vboot/vboot.gni")
 
 #################################
 # Fuchsia images configurations #
@@ -144,41 +143,6 @@ generated_images_config("vim3") {
   }
 }
 
-generated_images_config("chromebook-x64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  forward_variables_from(_default_fvm, "*")
-
-  zbi.signing_script = vboot_action.script
-  zbi.signing_args = vboot_action.args
-
-  fvm.emmc = {
-    compress = false
-
-    # TODO(fxbug.dev/78185): don't hardcode the expected size, we should instead
-    # inflate to whatever the FVM partition size is at runtime.
-    #
-    # For now just hardcode 16GiB which is the minimum FVM partition size defined
-    # in the chromebook-x64 paver:
-    # http://cs/fuchsia/src/storage/lib/paver/chromebook-x64.cc?l=124
-    #
-    # This also assumes we are not using raw NAND but that's a safer assumption.
-    # In this case "emmc" is a misnomer, it really just means "not raw NAND".
-    truncate_to_length = 17179869184
-  }
-
-  deps = vboot_action.deps
-}
-
-generated_images_config("imx8mmevk") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  zbi.signing_script =
-      "//zircon/kernel/target/arm64/board/imx8mmevk/package-image.sh"
-  deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
-}
-
 #################################
 # zedboot images configurations #
 #################################
@@ -198,14 +162,6 @@ generated_images_config("zedboot_default") {
 generated_images_config("zedboot_vim3") {
   forward_variables_from(_default_zedboot_zbi, "*")
   forward_variables_from(_vim3_vbmeta, "*")
-}
-
-generated_images_config("zedboot_chromebook-x64") {
-  forward_variables_from(_default_zedboot_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  zbi.signing_script = vboot_action.script
-  zbi.signing_args = vboot_action.args
-  deps = vboot_action.deps
 }
 
 generated_images_config("zedboot_qemu") {
@@ -233,14 +189,6 @@ generated_images_config("bringup_vim3") {
   forward_variables_from(_vim3_vbmeta, "*")
 }
 
-generated_images_config("bringup_chromebook-x64") {
-  forward_variables_from(_default_bringup_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  zbi.signing_script = vboot_action.script
-  zbi.signing_args = vboot_action.args
-  deps = vboot_action.deps
-}
-
 generated_images_config("bringup_qemu") {
   forward_variables_from(_default_bringup_zbi, "*")
 }
@@ -249,7 +197,6 @@ group("images") {
   public_deps = [
     # Fuchsia images configs
     ":arm64",
-    ":chromebook-x64",
     ":default",
     ":qemu-x64",
     ":vim3",
@@ -257,13 +204,11 @@ group("images") {
     ":x64-fxfs",
 
     # zedboot images configs
-    ":zedboot_chromebook-x64",
     ":zedboot_default",
     ":zedboot_qemu",
     ":zedboot_vim3",
 
     # bringup images configs
-    ":bringup_chromebook-x64",
     ":bringup_default",
     ":bringup_qemu",
     ":bringup_vim3",
