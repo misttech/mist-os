@@ -12,6 +12,7 @@ load(
 
 package(default_visibility = [
     "//build/bazel/assembly:__subpackages__",
+    "//products:__subpackages__",
     "//vendor/google:__subpackages__",
 ])
 

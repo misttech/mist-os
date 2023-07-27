@@ -16,6 +16,7 @@ bazel_product_bundle("workbench_eng.x64") {
   bazel_inputs_from_gn = [
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//build/images/zedboot:zedboot.bazel_legacy_aib",
     "//src/ui/bin/tiles-session:tiles_session_bazel_inputs",
   ]
 }
@@ -29,6 +30,7 @@ bazel_product_bundle("workbench_eng.qemu-x64") {
   bazel_inputs_from_gn = [
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//build/images/zedboot:zedboot.bazel_legacy_aib",
     "//src/ui/bin/tiles-session:tiles_session_bazel_inputs",
   ]
 }
@@ -42,6 +44,7 @@ bazel_product_bundle("workbench_eng.vim3") {
   bazel_inputs_from_gn = [
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//build/images/zedboot:zedboot.bazel_legacy_aib",
     "//src/ui/bin/tiles-session:tiles_session_bazel_inputs",
   ]
 }
