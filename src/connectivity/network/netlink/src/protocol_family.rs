@@ -57,7 +57,6 @@ pub mod route {
 
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
-    use assert_matches::assert_matches;
     use either::Either;
     use futures::{
         channel::{mpsc, oneshot},
@@ -65,8 +64,8 @@ pub mod route {
     };
     use net_types::{
         ip::{
-            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpAddress as _, IpVersion, Ipv4,
-            Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
+            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpAddress as _, IpInvariant, IpVersion,
+            Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
         },
         SpecifiedAddr, SpecifiedAddress,
     };
@@ -268,9 +267,25 @@ pub mod route {
             }
         };
 
-        let family = match message.header.family.into() {
-            AF_INET => IpVersion::V4,
-            AF_INET6 => IpVersion::V6,
+        let addr = match message.header.family.into() {
+            AF_INET => {
+                let addr = ip_addr_from_bytes::<Ipv4>(address_bytes)?;
+                if !addr.is_specified() {
+                    // Linux treats adding the unspecified IPv4 address as a
+                    // no-op.
+                    return Ok(None);
+                }
+                IpAddr::V4(addr)
+            }
+            AF_INET6 => {
+                let addr = ip_addr_from_bytes::<Ipv6>(address_bytes)?;
+                if !addr.is_specified() {
+                    // Linux returns this error when adding the unspecified IPv6
+                    // address.
+                    return Err(Errno::EADDRNOTAVAIL);
+                }
+                IpAddr::V6(addr)
+            }
             family => {
                 log_debug!(
                     "invalid address family ({}) in new address \
@@ -281,29 +296,6 @@ pub mod route {
                 );
                 return Err(Errno::EINVAL);
             }
-        };
-
-        let addr = match ip_addr_from_bytes(address_bytes, family) {
-            Ok(addr) => {
-                match addr.clone() {
-                    IpAddr::V4(addr) => {
-                        if !addr.is_specified() {
-                            // Linux treats adding the unspecified IPv4 address as a
-                            // no-op.
-                            return Ok(None);
-                        }
-                    }
-                    IpAddr::V6(addr) => {
-                        if !addr.is_specified() {
-                            // Linux returns this error when adding the unspecified IPv6
-                            // address.
-                            return Err(Errno::EADDRNOTAVAIL);
-                        }
-                    }
-                };
-                addr
-            }
-            Err(errno) => return Err(errno),
         };
 
         let address = match AddrSubnetEither::new(addr, message.header.prefix_len) {
@@ -389,13 +381,6 @@ pub mod route {
         Ok(interfaces::SetLinkArgs { link, enable })
     }
 
-    /// An IPv4 extracted route request or an IPv6 extracted route request.
-    #[derive(Debug)]
-    enum ExtractedRouteRequestEither {
-        V4(ExtractedRouteRequest<Ipv4>),
-        V6(ExtractedRouteRequest<Ipv6>),
-    }
-
     #[derive(Debug)]
     enum ExtractedRouteRequest<I: Ip> {
         // A gateway or direct route.
@@ -413,13 +398,12 @@ pub mod route {
     // Extracts unicast route information from a request.
     // Returns an error if the request is malformed. This error
     // should be returned to the client.
-    fn extract_data_from_unicast_route_message(
-        family: IpVersion,
+    fn extract_data_from_unicast_route_message<I: Ip>(
         message: &RouteMessage,
         client: &impl Display,
         req: &RtnlMessage,
         kind: &str,
-    ) -> Result<ExtractedRouteRequestEither, Errno> {
+    ) -> Result<ExtractedRouteRequest<I>, Errno> {
         let destination_prefix_len = message.header.destination_prefix_length;
         let mut table: u32 = message.header.table.into();
 
@@ -476,7 +460,7 @@ pub mod route {
         };
 
         let destination_addr = match destination_bytes {
-            Some(bytes) => ip_addr_from_bytes(bytes, family)?,
+            Some(bytes) => ip_addr_from_bytes::<I>(bytes)?,
             None => {
                 // Use the unspecified address if there wasn't a destination NLA present
                 // and the prefix len is 0.
@@ -491,23 +475,17 @@ pub mod route {
                     );
                     return Err(Errno::EINVAL);
                 }
-                match family {
-                    IpVersion::V4 => IpAddr::V4(Ipv4::UNSPECIFIED_ADDRESS),
-                    IpVersion::V6 => IpAddr::V6(Ipv6::UNSPECIFIED_ADDRESS),
-                }
+                I::UNSPECIFIED_ADDRESS
             }
         };
 
         let next_hop = match next_hop_bytes {
-            Some(bytes) => match ip_addr_from_bytes(bytes, family) {
-                Ok(addr) => match addr {
-                    // Linux ignores the provided nexthop if it is the default route. To conform
-                    // to Linux expectations, we map the nexthop to `None` when it is unspecified.
-                    IpAddr::V4(addr) => SpecifiedAddr::new(addr).map(IpAddr::V4),
-                    IpAddr::V6(addr) => SpecifiedAddr::new(addr).map(IpAddr::V6),
-                },
-                Err(errno) => return Err(errno),
-            },
+            Some(bytes) => {
+                // Linux ignores the provided nexthop if it is the default route. To conform
+                // to Linux expectations, `SpecifiedAddr::new()` becomes `None` when the addr
+                // is unspecified.
+                ip_addr_from_bytes::<I>(bytes).map(|addr| SpecifiedAddr::new(addr))?
+            }
             None => None,
         };
 
@@ -527,57 +505,39 @@ pub mod route {
         //            also differ from iproute2.
         let priority: u32 = match priority {
             Some(priority) => priority,
-            None => match family {
-                IpVersion::V4 => 0,
-                IpVersion::V6 => 1,
-            },
+            None => {
+                let IpInvariant(priority) = I::map_ip((), |()| IpInvariant(0), |()| IpInvariant(1));
+                priority
+            }
         };
 
-        let extracted_route_request_either =
-            match SubnetEither::new(destination_addr, destination_prefix_len) {
-                Ok(SubnetEither::V4(v4_subnet)) => {
-                    let next_hop = next_hop
-                        .and_then(|hop| assert_matches!(hop, IpAddr::V4(addr) => Some(addr)));
-                    ExtractedRouteRequestEither::V4(ExtractedRouteRequest::Unicast(
-                        ExtractedUnicastRouteRequest {
-                            subnet: v4_subnet,
-                            target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
-                            priority,
-                            table,
-                        },
-                    ))
-                }
-                Ok(SubnetEither::V6(v6_subnet)) => {
-                    let next_hop = next_hop
-                        .and_then(|hop| assert_matches!(hop, IpAddr::V6(addr) => Some(addr)));
-                    ExtractedRouteRequestEither::V6(ExtractedRouteRequest::Unicast(
-                        ExtractedUnicastRouteRequest {
-                            subnet: v6_subnet,
-                            target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
-                            priority,
-                            table,
-                        },
-                    ))
-                }
-                Err(e) => {
-                    log_warn!(
-                        "{:?} subnet ({}) in route {} request from {}: {:?}",
-                        e,
-                        destination_addr,
-                        kind,
-                        client,
-                        req,
-                    );
-                    return Err(Errno::EINVAL);
-                }
-            };
+        let extracted_route_request = match Subnet::new(destination_addr, destination_prefix_len) {
+            Ok(subnet) => ExtractedRouteRequest::Unicast(ExtractedUnicastRouteRequest {
+                subnet,
+                target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
+                priority,
+                table,
+            }),
+            Err(e) => {
+                log_warn!(
+                    "{:?} subnet ({}) in route {} request from {}: {:?}",
+                    e,
+                    destination_addr,
+                    kind,
+                    client,
+                    req,
+                );
+                return Err(Errno::EINVAL);
+            }
+        };
 
-        Ok(extracted_route_request_either)
+        Ok(extracted_route_request)
     }
 
-    fn ip_addr_from_bytes(addr_bytes: &[u8], address_family: IpVersion) -> Result<IpAddr, Errno> {
-        match address_family {
-            IpVersion::V4 => {
+    fn ip_addr_from_bytes<I: Ip>(addr_bytes: &[u8]) -> Result<I::Addr, Errno> {
+        I::map_ip(
+            IpInvariant(addr_bytes),
+            |IpInvariant(addr_bytes)| {
                 const BYTES: usize = Ipv4Addr::BYTES as usize;
                 // To conform to Linux expectations, we allow more than the needed bytes
                 // to be present and cut off the remainder.
@@ -588,9 +548,9 @@ pub mod route {
                 let mut bytes = [0; BYTES as usize];
                 bytes.copy_from_slice(&addr_bytes[..BYTES]);
                 let addr: Ipv4Addr = bytes.into();
-                return Ok(IpAddr::V4(addr));
-            }
-            IpVersion::V6 => {
+                Ok(addr)
+            },
+            |IpInvariant(addr_bytes)| {
                 const BYTES: usize = Ipv6Addr::BYTES as usize;
                 // To conform to Linux expectations, we allow more than the needed bytes
                 // to be present and cut off the remainder.
@@ -601,9 +561,9 @@ pub mod route {
                 let mut bytes = [0; BYTES];
                 bytes.copy_from_slice(&addr_bytes[..BYTES]);
                 let addr: Ipv6Addr = bytes.into();
-                return Ok(IpAddr::V6(addr));
-            }
-        }
+                Ok(addr)
+            },
+        )
     }
 
     #[async_trait]
@@ -1004,35 +964,22 @@ pub mod route {
                         return;
                     }
 
-                    let family = match message.header.address_family.into() {
-                        AF_INET => IpVersion::V4,
-                        AF_INET6 => IpVersion::V6,
-                        family => {
-                            log_debug!("invalid address family ({}) in new route \
-                                request from {}: {:?}", family, client, req);
-                            return client.send_unicast(
-                                netlink_packet::new_error(Err(Errno::EINVAL), req_header)
-                            );
-                        }
-                    };
+                    let result = match message.header.address_family.into() {
+                        AF_INET => {
+                            let req = match extract_data_from_unicast_route_message::<Ipv4>(
+                                message,
+                                client,
+                                &req,
+                                "new",
+                            ) {
+                                Ok(req) => req,
+                                Err(e) => {
+                                    return client.send_unicast(
+                                        netlink_packet::new_error(Err(e), req_header)
+                                    );
+                                }
+                            };
 
-                    let extracted_request = match extract_data_from_unicast_route_message(
-                        family,
-                        message,
-                        client,
-                        &req,
-                        "new",
-                    ) {
-                        Ok(req) => req,
-                        Err(e) => {
-                            return client.send_unicast(
-                                netlink_packet::new_error(Err(e), req_header)
-                            );
-                        }
-                    };
-
-                    let result = match extracted_request {
-                        ExtractedRouteRequestEither::V4(req) => {
                             let ExtractedRouteRequest::Unicast(
                                 ExtractedUnicastRouteRequest {
                                     subnet,
@@ -1053,14 +1000,28 @@ pub mod route {
                                             priority,
                                             table
                             }))).await
-                        }
-                        ExtractedRouteRequestEither::V6(req) => {
+                        },
+                        AF_INET6 => {
+                            let req = match extract_data_from_unicast_route_message::<Ipv6>(
+                                message,
+                                client,
+                                &req,
+                                "new",
+                            ) {
+                                Ok(req) => req,
+                                Err(e) => {
+                                    return client.send_unicast(
+                                        netlink_packet::new_error(Err(e), req_header)
+                                    );
+                                }
+                            };
+
                             let ExtractedRouteRequest::Unicast(
                                 ExtractedUnicastRouteRequest {
                                     subnet,
                                     target,
                                     priority,
-                                    table,
+                                    table
                             }) = req;
 
                             process_routes_worker_request::<_, Ipv6>(
@@ -1073,8 +1034,15 @@ pub mod route {
                                             subnet,
                                             target,
                                             priority,
-                                            table,
+                                            table
                             }))).await
+                        },
+                        family => {
+                            log_debug!("invalid address family ({}) in new route \
+                                request from {}: {:?}", family, client, req);
+                            return client.send_unicast(
+                                netlink_packet::new_error(Err(Errno::EINVAL), req_header)
+                            );
                         }
                     };
 

@@ -33,6 +33,7 @@ pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> Net
 
 pub(crate) mod errno {
     use const_unwrap::const_unwrap_option;
+    use net_types::ip::{GenericOverIp, Ip};
 
     use super::*;
 
@@ -40,7 +41,7 @@ pub(crate) mod errno {
     ///
     /// Netlink errors are expected to be negative Errnos, with 0 used for ACKs.
     /// This type enforces that the contained code is NonZero & Negative.
-    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[derive(Copy, Clone, Debug, PartialEq, GenericOverIp)]
     pub(crate) struct Errno(i32);
 
     impl Errno {
