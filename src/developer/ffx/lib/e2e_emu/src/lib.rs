@@ -3,10 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::{ensure, Context as _};
+use async_stream::stream;
 use diagnostics_data::LogsData;
 use ffx_config::TestEnv;
 use ffx_isolate::Isolate;
+use futures::{channel::mpsc::TrySendError, Stream, StreamExt};
 use serde::Deserialize;
+use std::{
+    io::{BufRead, BufReader},
+    process::{Command, Stdio},
+};
 use tempfile::TempDir;
 use tracing::info;
 
@@ -165,6 +171,14 @@ impl IsolatedEmulator {
         Ok(output.stdout)
     }
 
+    /// Create an ffx command, which allows for streaming stdout/stderr.
+    pub async fn ffx_cmd_capture(&self, args: &[&str]) -> anyhow::Result<Command> {
+        let mut cmd =
+            self.ffx_isolate.ffx_cmd(&self.make_args(args)).await.context("running ffx")?;
+        cmd.stdout(Stdio::piped());
+        Ok(cmd)
+    }
+
     fn make_ssh_args<'a>(command: &[&'a str]) -> Vec<&'a str> {
         let mut args = vec!["target", "ssh", "--"];
         args.extend(command);
@@ -179,6 +193,60 @@ impl IsolatedEmulator {
     /// Run an ssh command, returning stdout and logging stderr as an INFO message.
     pub async fn ssh_output(&self, command: &[&str]) -> anyhow::Result<String> {
         self.ffx_output(&Self::make_ssh_args(command)).await
+    }
+
+    async fn log_stream(
+        &self,
+        mut receiver: futures::channel::mpsc::UnboundedReceiver<String>,
+        reader_task: fuchsia_async::Task<Result<(), TrySendError<String>>>,
+    ) -> impl Stream<Item = anyhow::Result<LogsData>> {
+        /// ffx log wraps each line from archivist in its own JSON object, unwrap those here
+        #[derive(Deserialize)]
+        struct FfxMachineLogLine {
+            data: FfxTargetLog,
+        }
+        #[derive(Deserialize)]
+        struct FfxTargetLog {
+            #[serde(rename = "TargetLog")]
+            target_log: LogsData,
+        }
+
+        stream! {
+            while let Some(line) = receiver.next().await {
+                if line.is_empty() {
+                    continue;
+                }
+                let ffx_message = serde_json::from_str::<FfxMachineLogLine>(&line)
+                    .context("parsing log line from ffx")?;
+                yield Ok(ffx_message.data.target_log);
+            }
+            drop(reader_task)
+        }
+    }
+
+    /// Collect the logs for a particular component.
+    pub async fn log_stream_for_moniker(
+        &self,
+        moniker: &str,
+    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<LogsData>>> {
+        let mut output = self
+            .ffx_cmd_capture(&["--machine", "json", "log", "--moniker", moniker])
+            .await
+            .context("running ffx log")?;
+
+        let child = output.spawn()?;
+        let stdout = child.stdout.context("no stdout")?;
+        let mut reader = BufReader::new(stdout);
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let reader_task = fuchsia_async::Task::local(fuchsia_async::unblock(move || {
+            let mut output = String::new();
+            while let Ok(_) = reader.read_line(&mut output) {
+                sender.unbounded_send(output)?;
+                output = String::new();
+            }
+            Result::<(), TrySendError<String>>::Ok(())
+        }));
+        Ok(self.log_stream(receiver, reader_task).await)
     }
 
     /// Collect the logs for a particular component.
@@ -230,6 +298,7 @@ impl Drop for IsolatedEmulator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::pin::pin;
 
     #[fuchsia::test]
     async fn public_apis_succeed() {
@@ -249,14 +318,14 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
 
+        info!("Checking that we can read streaming logs.");
+        let mut remote_control_logs =
+            pin!(emu.log_stream_for_moniker("/core/remote-control").await.unwrap());
+        remote_control_logs.next().await.unwrap().unwrap();
+
         info!("Checking that we can read RCS' logs.");
-        loop {
-            let remote_control_logs = emu.logs_for_moniker("/core/remote-control").await.unwrap();
-            if !remote_control_logs.is_empty() {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
+        let remote_control_logs = emu.logs_for_moniker("/core/remote-control").await.unwrap();
+        assert_eq!(remote_control_logs.is_empty(), false);
     }
 
     const TEST_PACKAGE_URL: &str = concat!("fuchsia-pkg://fuchsia.com/", env!("TEST_PACKAGE_NAME"));
