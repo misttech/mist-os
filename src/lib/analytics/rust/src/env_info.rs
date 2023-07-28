@@ -41,7 +41,10 @@ fn get_home_dir() -> PathBuf {
 const TEST_ENV_VAR: &'static str = "FUCHSIA_TEST_OUTDIR";
 const ANALYTICS_DISABLED_ENV_VAR: &'static str = "FUCHSIA_ANALYTICS_DISABLED";
 
-//const BOT_ENV_VARS: Vec<&str>  = vec!
+// To detect certain bot environmments that run as USER "builder"
+const USER: &'static str = "USER";
+const BUILDER: &'static str = "builder";
+
 const BOT_ENV_VARS: &'static [&'static str] = &[
     "TF_BUILD",           // Azure
     "bamboo.buildKey",    // Bamboo
@@ -56,8 +59,9 @@ const BOT_ENV_VARS: &'static [&'static str] = &[
     "GITLAB_CI",          // GitLab
     "HEROKU_TEST_RUN_ID", // Heroku
     "BUILD_ID",           // Hudson & Jenkins
-    "TEAMCITY_VERSION",   //Teamcity
+    "TEAMCITY_VERSION",   // Teamcity
     "TRAVIS",             // Travis
+    "BUILD_NUMBER",       // android-ci
 ];
 
 pub fn is_test_env() -> bool {
@@ -72,8 +76,15 @@ pub fn is_running_in_ci_bot_env() -> bool {
     BOT_ENV_VARS.iter().any(|env_var| std::env::var(env_var).is_ok())
 }
 
+pub fn is_user_a_bot() -> bool {
+    std::env::var(USER).is_ok_and(|v| v == BUILDER)
+}
+
 pub fn is_analytics_disabled_by_env() -> bool {
-    is_test_env() || is_fuchsia_analytics_disabled_set() || is_running_in_ci_bot_env()
+    is_test_env()
+        || is_fuchsia_analytics_disabled_set()
+        || is_running_in_ci_bot_env()
+        || is_user_a_bot()
 }
 
 #[cfg(test)]
