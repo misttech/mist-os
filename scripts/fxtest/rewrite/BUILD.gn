@@ -11,6 +11,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":event_test($host_toolchain)",
     ":selection_test($host_toolchain)",
     ":test_list_file_test($host_toolchain)",
     ":tests_json_file_test($host_toolchain)",
@@ -23,6 +24,7 @@ group("tests") {
 
 if (is_host) {
   binary_sources = [
+    "event.py",
     "selection.py",
     "test_list_file.py",
     "tests_json_file.py",
@@ -62,6 +64,14 @@ if (is_host) {
 
   python_host_test("tests_json_file_test") {
     main_source = "tests/tests_json_file_test.py"
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    sources = binary_sources
+    libraries = binary_deps
+  }
+
+  python_host_test("event_test") {
+    main_source = "tests/event_test.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
     sources = binary_sources
