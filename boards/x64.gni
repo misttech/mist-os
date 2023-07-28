@@ -49,6 +49,14 @@ board_bootfs_labels += _bootfs_deps
 board_recovery_bootfs_labels += _bootfs_deps
 board_zedboot_bootfs_labels += _bootfs_deps
 
+board_provided_drivers += [
+  {
+    package_target =
+        "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi"
+    driver_components = [ "meta/iwlwifi.cm" ]
+  },
+]
+
 # Some users leave a USB key (containing zedboot) plugged into their
 # device at all times. To avoid unintentionally breaking remote workflows,
 # we permit multiple GPT devices.

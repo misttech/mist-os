@@ -34,6 +34,9 @@ fuchsia_product_configuration(
 # LINT.IfChange
 fuchsia_product_configuration(
     name = "core",
+    base_driver_packages = [
+        "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
+    ],
     base_packages = [
         ":small-open-fonts-collection",
     ],

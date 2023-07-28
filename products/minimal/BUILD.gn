@@ -50,7 +50,10 @@ bazel_product_bundle("product_bundle.x64") {
   bazel_product_bundle_target = ":product_bundle.x64"
   bazel_product_image_target = ":image.x64"
   bazel_elf_sizes_target = ":elf_sizes.x64"
-  bazel_inputs_from_gn = [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
+  bazel_inputs_from_gn = [
+    "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
+  ]
 }
 
 bazel_product_bundle("product_bundle.qemu-x64") {
@@ -59,5 +62,8 @@ bazel_product_bundle("product_bundle.qemu-x64") {
   bazel_product_bundle_target = ":product_bundle.qemu-x64"
   bazel_product_image_target = ":image.qemu-x64"
   bazel_elf_sizes_target = ":elf_sizes.qemu-x64"
-  bazel_inputs_from_gn = [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
+  bazel_inputs_from_gn = [
+    "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
+  ]
 }
