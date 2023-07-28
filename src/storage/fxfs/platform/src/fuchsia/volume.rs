@@ -1185,7 +1185,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false, false)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1294,7 +1294,7 @@ mod tests {
             .await
             .unwrap();
             let volume_and_root = volumes_directory
-                .mount_volume(VOLUME_NAME, None)
+                .mount_volume(VOLUME_NAME, None, false)
                 .await
                 .expect("mount unencrypted volume failed");
             let (volume_proxy, volume_server_end) =
@@ -1311,7 +1311,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create dir proxy to succeed");
                 volumes_directory
-                    .serve_volume(&volume_and_root, dir_server_end, false, false)
+                    .serve_volume(&volume_and_root, dir_server_end, false)
                     .await
                     .expect("serve_volume failed");
 
@@ -1363,14 +1363,14 @@ mod tests {
         .await
         .unwrap();
         let volume_and_root = volumes_directory
-            .mount_volume(VOLUME_NAME, None)
+            .mount_volume(VOLUME_NAME, None, false)
             .await
             .expect("mount unencrypted volume failed");
         let (volume_dir_proxy, dir_server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                 .expect("Create dir proxy to succeed");
         volumes_directory
-            .serve_volume(&volume_and_root, dir_server_end, false, false)
+            .serve_volume(&volume_and_root, dir_server_end, false)
             .await
             .expect("serve_volume failed");
         let project_proxy = connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
@@ -1424,7 +1424,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false, false)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1542,7 +1542,7 @@ mod tests {
             .await
             .unwrap();
             let volume_and_root = volumes_directory
-                .mount_volume(VOLUME_NAME, Some(Arc::new(InsecureCrypt::new())))
+                .mount_volume(VOLUME_NAME, Some(Arc::new(InsecureCrypt::new())), false)
                 .await
                 .expect("mount unencrypted volume failed");
             let (volume_proxy, volume_server_end) =
@@ -1559,7 +1559,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create dir proxy to succeed");
                 volumes_directory
-                    .serve_volume(&volume_and_root, dir_server_end, false, false)
+                    .serve_volume(&volume_and_root, dir_server_end, false)
                     .await
                     .expect("serve_volume failed");
 
@@ -1732,7 +1732,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false, false)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1871,7 +1871,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end, false, false)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
             let project_proxy =

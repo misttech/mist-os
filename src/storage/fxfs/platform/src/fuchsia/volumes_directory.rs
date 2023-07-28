@@ -138,39 +138,29 @@ impl VolumesDirectory {
         crypt: Option<Arc<dyn Crypt>>,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        let store = self.root_volume.new_volume(name, crypt).await?;
-        let store_object_id = store.store_object_id();
-        let volume = self.mount_new_volume(store, name, as_blob).await?;
+        self.root_volume.new_volume(name, crypt).await.context("failed to create new volume")?;
+        // The volume store is unlocked when created, so we don't pass `crypt` when mounting.
+        let volume =
+            self.mount_volume(name, None, as_blob).await.context("failed to mount volume")?;
+        let store_object_id = volume.volume().store().store_object_id();
         self.add_directory_entry(name, store_object_id);
         Ok(volume)
     }
 
-    /// Mounts a new volume. If |as_blob| is set, the volume will be mounted as a blob filesystem.
-    pub async fn mount_new_volume(
-        self: &Arc<Self>,
-        store: Arc<ObjectStore>,
-        name: &str,
-        as_blob: bool,
-    ) -> Result<FxVolumeAndRoot, Error> {
-        let volume = if as_blob {
-            self.mount_store::<BlobDirectory>(name, store, FlushTaskConfig::default()).await?
-        } else {
-            self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await?
-        };
-        Ok(volume)
-    }
-
-    #[cfg(test)]
+    /// Mounts an existing volume. `crypt` will be used to unlock the volume if provided.
+    /// If `as_blob` is `true`, the volume will be mounted as a blob filesystem, otherwise
+    /// it will be treated as a regular fxfs volume.
     pub async fn mount_volume(
         self: &Arc<Self>,
         name: &str,
         crypt: Option<Arc<dyn Crypt>>,
+        as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        let store = self.root_volume.volume_directory().store();
-        let fs = store.filesystem();
+        let root_store = self.root_volume.volume_directory().store();
+        let fs = root_store.filesystem();
         let _guard = fs
             .transaction_lock(&[LockKey::object(
-                store.store_object_id(),
+                root_store.store_object_id(),
                 self.root_volume.volume_directory().object_id(),
             )])
             .await;
@@ -179,7 +169,11 @@ impl VolumesDirectory {
             !self.mounted_volumes.lock().await.contains_key(&store.store_object_id()),
             FxfsError::AlreadyBound
         );
-        self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await
+        if as_blob {
+            self.mount_store::<BlobDirectory>(name, store, FlushTaskConfig::default()).await
+        } else {
+            self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await
+        }
     }
 
     // Mounts the given store.  A lock *must* be held on the volume directory.
@@ -272,8 +266,6 @@ impl VolumesDirectory {
         self: &Arc<Self>,
         volume: &FxVolumeAndRoot,
         outgoing_dir_server_end: ServerEnd<fio::DirectoryMarker>,
-        // TODO(fxbug.dev/129991) Remove the `executable` parameter, use `as_blob` instead.
-        executable: bool,
         as_blob: bool,
     ) -> Result<(), Error> {
         let outgoing_dir = vfs::directory::immutable::simple();
@@ -322,7 +314,7 @@ impl VolumesDirectory {
         // GetToken and mutable methods which are not supported by the immutable version of Simple.
         let scope = volume.volume().scope().clone();
         let mut flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-        if executable {
+        if as_blob {
             flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
         }
         outgoing_dir.open(
@@ -382,7 +374,9 @@ impl VolumesDirectory {
             None
         };
         let volume = self.create_and_mount_volume(&name, crypt, as_blob).await?;
-        self.serve_volume(&volume, outgoing_directory, as_blob, as_blob).await
+        self.serve_volume(&volume, outgoing_directory, as_blob)
+            .await
+            .context("failed to serve volume")
     }
 
     async fn handle_volume_requests(
@@ -524,41 +518,18 @@ impl VolumesDirectory {
         options: MountOptions,
     ) -> Result<(), Error> {
         tracing::info!(%name, %store_id, ?options, "Received mount request");
-        let store = self.root_volume.volume_directory().store();
-        let fs = store.filesystem();
-        let _guard = fs
-            .transaction_lock(&[LockKey::object(
-                store.store_object_id(),
-                self.root_volume.volume_directory().object_id(),
-            )])
-            .await;
-        ensure!(
-            !self.mounted_volumes.lock().await.contains_key(&store_id),
-            FxfsError::AlreadyBound
-        );
-
         let crypt = if let Some(crypt) = options.crypt {
             Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
         } else {
             None
         };
-
-        let store_to_mount = self.root_volume.volume_from_id(store_id, crypt).await?;
-        let (volume, executable) = if options.as_blob {
-            (
-                self.mount_store::<BlobDirectory>(name, store_to_mount, FlushTaskConfig::default())
-                    .await?,
-                true,
-            )
-        } else {
-            (
-                self.mount_store::<FxDirectory>(name, store_to_mount, FlushTaskConfig::default())
-                    .await?,
-                false,
-            )
-        };
-
-        self.serve_volume(&volume, outgoing_directory, executable, options.as_blob).await
+        let volume = self
+            .mount_volume(name, crypt, options.as_blob)
+            .await
+            .context("failed to mount volume")?;
+        self.serve_volume(&volume, outgoing_directory, options.as_blob)
+            .await
+            .context("failed to serve volume")
     }
 
     async fn handle_admin_requests(
@@ -720,7 +691,7 @@ mod tests {
 
         {
             let vol = volumes_directory
-                .mount_volume("encrypted", Some(crypt.clone()))
+                .mount_volume("encrypted", Some(crypt.clone()), false)
                 .await
                 .expect("open existing encrypted volume failed");
             assert_eq!(vol.volume().store().store_object_id(), volume_id);
@@ -813,7 +784,7 @@ mod tests {
 
         {
             let vol = volumes_directory
-                .mount_volume("unencrypted", None)
+                .mount_volume("unencrypted", None, false)
                 .await
                 .expect("open existing unencrypted volume failed");
             assert_eq!(vol.volume().store().store_object_id(), volume_id);
@@ -894,7 +865,7 @@ mod tests {
         assert_eq!(entries, [".", "encrypted", "unencrypted"]);
 
         let _vol = volumes_directory
-            .mount_volume("encrypted", Some(crypt.clone()))
+            .mount_volume("encrypted", Some(crypt.clone()), false)
             .await
             .expect("Open encrypted volume failed");
 
@@ -1222,7 +1193,7 @@ mod tests {
             .expect("Create proxy to succeed");
 
         volumes_directory
-            .serve_volume(&vol, dir_server_end, false, false)
+            .serve_volume(&vol, dir_server_end, false)
             .await
             .expect("serve_volume failed");
 
@@ -1334,7 +1305,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume, dir_server_end, false, false)
+                .serve_volume(&volume, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 

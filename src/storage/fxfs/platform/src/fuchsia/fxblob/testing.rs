@@ -46,9 +46,9 @@ impl BlobFixture for TestFixture {
                 .expect("Create dir proxy to succeed");
 
         self.volumes_directory()
-            .serve_volume(self.volume(), server_end, true, true)
+            .serve_volume(self.volume(), server_end, true)
             .await
-            .expect("failed to create_and_serve the blob volume");
+            .expect("failed to serve the blob volume");
         let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
             &blob_volume_outgoing_dir,
         )

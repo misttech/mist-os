@@ -109,9 +109,9 @@ mod tests {
                 .expect("Create dir proxy to succeed");
         fixture
             .volumes_directory()
-            .serve_volume(fixture.volume(), server_end, true, true)
+            .serve_volume(fixture.volume(), server_end, true)
             .await
-            .expect("failed to create_and_serve the blob volume");
+            .expect("failed to serve the blob volume");
 
         let empty_blob_hash =
             write_blob(&blob_volume_outgoing_dir, &[]).await.expect("write empty blob");
