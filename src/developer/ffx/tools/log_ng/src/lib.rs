@@ -70,7 +70,7 @@ async fn log_main(
     let node_name = rcs_proxy.identify_host().await??.nodename;
     let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
     let formatter = DefaultLogFormatter::new(
-        LogFilterCriteria::default(),
+        LogFilterCriteria::try_from(&cmd)?,
         writer,
         LogFormatterOptions {
             // TODO(https://fxbug.dev/121413): Add support for log options.
@@ -525,6 +525,81 @@ mod tests {
         assert_eq!(
             test_buffers.stdout.into_string(),
             "[1970-01-01 00:00:00.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_shows_logs_filtered_by_severity() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let tool = LogTool {
+            cmd: LogCommand {
+                sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                    session: log_command::SessionSpec::Relative(0),
+                })),
+                clock: TimeFormat::Utc,
+                severity: Severity::Error,
+                ..LogCommand::default()
+            },
+            rcs_proxy: rcs_proxy,
+            target_collection: target_collection_proxy,
+        };
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Error,
+                    timestamp_nanos: Timestamp::from(3000000000i64),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(6000000000i64),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+            ],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager
+            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string(),
+            "\u{1b}[38;5;1m[1970-01-01 00:00:03.000][ffx] ERROR: Hello world!\u{1b}[m\n"
+                .to_string()
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
     }
