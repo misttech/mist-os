@@ -418,8 +418,8 @@ mod tests {
         executor.run_singlethreaded(simple_task_for_snapshot());
         let snapshot = executor.snapshot();
         snapshot_sanity_check(&snapshot);
-        assert_eq!(snapshot.tasks_created, 2);
-        assert_eq!(snapshot.tasks_completed, 2);
+        assert_eq!(snapshot.tasks_created, 1);
+        assert_eq!(snapshot.tasks_completed, 1);
         assert!(snapshot.wakeups_deadline >= 1);
     }
 
@@ -431,8 +431,8 @@ mod tests {
         assert!(executor.run_until_stalled(&mut fut).is_ready());
         let snapshot = executor.snapshot();
         snapshot_sanity_check(&snapshot);
-        assert_eq!(snapshot.tasks_created, 2);
-        assert_eq!(snapshot.tasks_completed, 2);
+        assert_eq!(snapshot.tasks_created, 1);
+        assert_eq!(snapshot.tasks_completed, 1);
         assert!(snapshot.wakeups_deadline >= 1);
     }
 

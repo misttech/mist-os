@@ -209,15 +209,4 @@ impl AtomicFuture {
             }
         }
     }
-
-    /// Drops the future without checking its current state.
-    ///
-    /// # Safety
-    ///
-    /// This doesn't check the current state, so this must only be called if it is known that there
-    /// is no concurrent access.
-    pub unsafe fn drop_future_unchecked(&self) {
-        (*self.future.get()).take();
-        self.state.store(DONE, Relaxed);
-    }
 }

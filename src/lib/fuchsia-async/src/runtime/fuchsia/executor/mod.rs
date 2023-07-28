@@ -13,7 +13,7 @@ mod send;
 mod time;
 
 pub use common::EHandle;
-pub use local::{LocalExecutor, TestExecutor};
+pub use local::{LocalExecutor, TestExecutor, WaitState};
 pub use packets::{need_signal, schedule_packet, PacketReceiver, ReceiverRegistration};
 pub use send::SendExecutor;
 pub use time::{Duration, Time};

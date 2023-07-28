@@ -256,7 +256,7 @@ mod tests {
         crate::{TestExecutor, Time, TimeoutExt, Timer},
         fuchsia_zircon::prelude::*,
         futures::{
-            future::{self, join},
+            future::join,
             io::{AsyncReadExt as _, AsyncWriteExt as _},
             stream::TryStreamExt,
             task::noop_waker_ref,
@@ -367,8 +367,6 @@ mod tests {
         drop(s1);
 
         // Dropping s1 raises a closed signal on s2 when the executor next polls the signal port.
-        // Run once to ensure all packets are processed before actually polling.
-        let _ = executor.run_until_stalled(&mut future::pending::<()>());
         let mut rx_fut = poll_fn(|cx| async_s2.poll_readable(cx));
         if let Poll::Ready(Ok(state)) = executor.run_until_stalled(&mut rx_fut) {
             assert_eq!(state, ReadableState::ReadableAndClosed);
