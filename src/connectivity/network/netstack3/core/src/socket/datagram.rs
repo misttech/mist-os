@@ -24,10 +24,7 @@ use thiserror::Error;
 use crate::{
     algorithm::ProtocolFlowId,
     context::RngContext,
-    data_structures::{
-        id_map::{Entry as IdMapEntry, EntryKey, IdMap},
-        socketmap::Tagged,
-    },
+    data_structures::id_map::{Entry as IdMapEntry, EntryKey, IdMap},
     device::{AnyDevice, DeviceIdContext, Id},
     error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
@@ -41,7 +38,7 @@ use crate::{
     socket::{
         self,
         address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerIpAddr},
-        AddrVec, Bound, BoundSocketMap, ExistsError, InsertError, ListenerAddr, SocketMapAddrSpec,
+        AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, SocketMapAddrSpec,
         SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketState as BoundSocketState, SocketStateSpec,
     },
@@ -65,7 +62,6 @@ pub(crate) enum SocketState<I: Ip, D, A: SocketMapAddrSpec, S: DatagramSocketSta
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> BoundSockets<I, D, A, S>
 where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
     S: SocketMapConflictPolicy<
             ListenerAddr<I::Addr, D, A::LocalIdentifier>,
             <S as SocketMapStateSpec>::ListenerSharingState,
@@ -97,7 +93,6 @@ where
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> SocketsState<I, D, A, S>
 where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
     S: SocketMapConflictPolicy<
             ListenerAddr<I::Addr, D, A::LocalIdentifier>,
             <S as SocketMapStateSpec>::ListenerSharingState,
@@ -127,7 +122,6 @@ pub(crate) enum FoundSockets<A, It> {
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketStateSpec> BoundSocketMap<I, D, A, S>
 where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
     S: SocketMapConflictPolicy<
             ListenerAddr<I::Addr, D, A::LocalIdentifier>,
             <S as SocketMapStateSpec>::ListenerSharingState,
@@ -348,8 +342,7 @@ pub(crate) trait LocalIdentifierAllocator<
     A: SocketMapAddrSpec,
     C,
     S: SocketMapStateSpec,
-> where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
+>
 {
     fn try_alloc_local_id(
         &mut self,
@@ -367,8 +360,6 @@ pub(crate) struct DatagramFlowId<A: IpAddress, RI> {
 
 pub(crate) trait DatagramStateContext<I: IpExt, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>:
     DeviceIdContext<AnyDevice>
-where
-    Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
@@ -448,8 +439,6 @@ where
 
 pub(crate) trait DatagramBoundStateContext<I: IpExt, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>:
     DeviceIdContext<AnyDevice>
-where
-    Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
@@ -497,8 +486,7 @@ pub(crate) trait BufferDatagramStateContext<
     C,
     S: SocketMapStateSpec,
     B: BufferMut,
->: DatagramStateContext<I, A, C, S> where
-    Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
+>: DatagramStateContext<I, A, C, S>
 {
     type BufferSocketStateCtx<'a>: BufferDatagramBoundStateContext<
         I,
@@ -541,8 +529,7 @@ pub(crate) trait BufferDatagramBoundStateContext<
     C,
     S: SocketMapStateSpec,
     B: BufferMut,
->: DatagramBoundStateContext<I, A, C, S> where
-    Bound<S>: Tagged<AddrVec<I, Self::WeakDeviceId, A>>,
+>: DatagramBoundStateContext<I, A, C, S>
 {
     type BufferIpSocketsCtx<'a>: BufferTransportIpContext<
         I,
@@ -590,7 +577,6 @@ impl<
         SC: DatagramStateContext<I, A, C, S>,
     > BufferDatagramStateContext<I, A, C, S, B> for SC
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     for<'a> SC::SocketsStateCtx<'a>: BufferDatagramBoundStateContext<I, A, C, S, B>,
 {
     type BufferSocketStateCtx<'a> = SC::SocketsStateCtx<'a>;
@@ -631,7 +617,6 @@ impl<
         SC: DatagramBoundStateContext<I, A, C, S>,
     > BufferDatagramBoundStateContext<I, A, C, S, B> for SC
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     for<'a> SC::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
 {
     type BufferIpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
@@ -720,7 +705,6 @@ pub(crate) fn create<
     sync_ctx: &mut SC,
 ) -> S::SocketId
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
 {
     sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
         state.push(SocketState::Unbound(UnboundSocketState::default())).into()
@@ -746,7 +730,6 @@ pub(crate) fn remove<
     id: S::SocketId,
 ) -> SocketInfo<I, SC::WeakDeviceId, A>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -791,10 +774,7 @@ pub(crate) fn get_info<
     sync_ctx: &mut SC,
     _ctx: &mut C,
     id: S::SocketId,
-) -> SocketInfo<I, SC::WeakDeviceId, A>
-where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
-{
+) -> SocketInfo<I, SC::WeakDeviceId, A> {
     sync_ctx.with_sockets(|_sync_ctx, state, _bound| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
@@ -824,7 +804,6 @@ pub(crate) fn listen<
     local_id: Option<A::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
@@ -851,7 +830,6 @@ fn listen_inner<
     local_id: Option<A::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
@@ -979,7 +957,6 @@ pub(crate) fn connect<
     proto: IpProto,
 ) -> Result<(), ConnectError>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     S::UnboundSharingState: Clone + Into<S::ConnSharingState>,
     S::ListenerAddrState:
@@ -1173,7 +1150,6 @@ pub(crate) fn disconnect_connected<
     id: S::SocketId,
 ) -> Result<(), ExpectedConnError>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1239,10 +1215,7 @@ pub(crate) fn shutdown_connected<
     _ctx: &C,
     id: S::SocketId,
     which: ShutdownType,
-) -> Result<(), ExpectedConnError>
-where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
-{
+) -> Result<(), ExpectedConnError> {
     sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
         let state = match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
@@ -1275,10 +1248,7 @@ pub(crate) fn get_shutdown_connected<
     sync_ctx: &mut SC,
     _ctx: &C,
     id: S::SocketId,
-) -> Option<ShutdownType>
-where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
-{
+) -> Option<ShutdownType> {
     sync_ctx.with_sockets(|_sync_ctx, state, _bound| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
@@ -1321,10 +1291,7 @@ pub(crate) fn send_conn<
     ctx: &mut C,
     id: S::SocketId,
     body: B,
-) -> Result<(), SendError<B, S::Serializer<B>>>
-where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
-{
+) -> Result<(), SendError<B, S::Serializer<B>>> {
     sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
@@ -1380,7 +1347,6 @@ pub(crate) fn send_to<
     body: B,
 ) -> Result<(), Either<(B, LocalAddressError), SendToError<B, S::Serializer<B>>>>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::UnboundSharingState: Clone + Into<S::ListenerSharingState>,
     S::ListenerSharingState: Default,
 {
@@ -1516,7 +1482,6 @@ pub(crate) fn set_device<
     new_device: Option<&SC::DeviceId>,
 ) -> Result<(), SocketError>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1638,7 +1603,6 @@ pub(crate) fn get_bound_device<
     id: S::SocketId,
 ) -> Option<SC::WeakDeviceId>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1745,7 +1709,6 @@ pub(crate) fn set_multicast_membership<
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError>
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1807,7 +1770,6 @@ fn get_options_device<I: IpExt, D: Id, A: SocketMapAddrSpec, S: DatagramSocketSp
     id: S::SocketId,
 ) -> (&IpOptions<I::Addr, D>, &Option<D>)
 where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1841,7 +1803,6 @@ fn get_options_mut<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketSpec<I, 
     id: S::SocketId,
 ) -> &mut IpOptions<I::Addr, D>
 where
-    Bound<S>: Tagged<AddrVec<I, D, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1883,7 +1844,6 @@ pub(crate) fn update_ip_hop_limit<
     id: S::SocketId,
     update: impl FnOnce(&mut SocketHopLimits),
 ) where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1907,7 +1867,6 @@ pub(crate) fn get_ip_hop_limits<
     id: S::SocketId,
 ) -> HopLimits
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
@@ -1931,10 +1890,7 @@ pub(crate) fn update_sharing<
     sync_ctx: &mut SC,
     id: S::SocketId,
     new_sharing: Sharing,
-) -> Result<(), ExpectedUnboundError>
-where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
-{
+) -> Result<(), ExpectedUnboundError> {
     sync_ctx.with_sockets_mut(|_sync_ctx, state, _bound, _allocator| {
         let state = match state.get_mut(id.get_key_index()).expect("socket not found") {
             SocketState::Bound(_) => return Err(ExpectedUnboundError),
@@ -1959,7 +1915,6 @@ pub(crate) fn get_sharing<
     id: S::SocketId,
 ) -> Sharing
 where
-    Bound<S>: Tagged<AddrVec<I, SC::WeakDeviceId, A>>,
     S: DatagramSocketSpec<
         I,
         SC::WeakDeviceId,
@@ -2013,7 +1968,7 @@ mod test {
             testutil::FakeIpDeviceIdCtx,
             IpLayerIpExt, SendIpPacketMeta, DEFAULT_HOP_LIMITS,
         },
-        socket::{IncompatibleError, InsertError, RemoveResult},
+        socket::{Bound, IncompatibleError, InsertError, RemoveResult},
         testutil::TestIpExt,
     };
 
@@ -2063,18 +2018,21 @@ mod test {
         type ListenerAddrState = Id;
         type ListenerId = Id;
         type ListenerSharingState = Sharing;
+
+        fn listener_tag(
+            _info: socket::ListenerAddrInfo,
+            _state: &Self::ListenerAddrState,
+        ) -> Self::AddrVecTag {
+            Tag
+        }
+        fn connected_tag(_has_device: bool, _state: &Self::ConnAddrState) -> Self::AddrVecTag {
+            Tag
+        }
     }
 
     impl<I: DatagramIpExt, D: crate::device::Id> SocketStateSpec for FakeStateSpec<I, D> {
         type ConnState = ConnState<I, D>;
         type ListenerState = ListenerState<I::Addr, D>;
-    }
-
-    impl<A> Tagged<A> for Id {
-        type Tag = Tag;
-        fn tag(&self, _address: &A) -> Self::Tag {
-            Tag
-        }
     }
 
     impl<I: DatagramIpExt, D: crate::device::Id> DatagramSocketStateSpec
@@ -2092,10 +2050,7 @@ mod test {
             _new_sharing_state: &Sharing,
             _addr: &A,
             _socketmap: &SocketMap<AddrVec<I, FakeWeakDeviceId<D>, FakeAddrSpec>, Bound<Self>>,
-        ) -> Result<(), InsertError>
-        where
-            Bound<Self>: Tagged<AddrVec<I, FakeWeakDeviceId<D>, FakeAddrSpec>>,
-        {
+        ) -> Result<(), InsertError> {
             // Addresses are completely independent and shadowing doesn't cause
             // conflicts.
             Ok(())

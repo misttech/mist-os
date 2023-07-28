@@ -61,9 +61,9 @@ use crate::{
             SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             SocketsState as DatagramSocketsState,
         },
-        AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, RemoveResult,
-        SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketState as DatagramBoundSocketState, SocketStateSpec,
+        AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, ListenerAddrInfo,
+        RemoveResult, SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec, SocketState as DatagramBoundSocketState, SocketStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -361,6 +361,25 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     type ListenerAddrState = AddrState<Self::ListenerId>;
 
     type ConnAddrState = AddrState<Self::ConnId>;
+    fn listener_tag(
+        ListenerAddrInfo { has_device, specified_addr }: ListenerAddrInfo,
+        state: &Self::ListenerAddrState,
+    ) -> Self::AddrVecTag {
+        AddrVecTag {
+            has_device,
+            addr_type: specified_addr
+                .then_some(SocketAddrType::SpecificListener)
+                .unwrap_or(SocketAddrType::AnyListener),
+            sharing: state.to_sharing_options(),
+        }
+    }
+    fn connected_tag(has_device: bool, state: &Self::ConnAddrState) -> Self::AddrVecTag {
+        AddrVecTag {
+            has_device,
+            addr_type: SocketAddrType::Connected,
+            sharing: state.to_sharing_options(),
+        }
+    }
 }
 
 impl<I: IpExt, D: Id> SocketStateSpec for Udp<I, D> {
@@ -479,32 +498,6 @@ pub(crate) struct AddrVecTag {
     pub(crate) has_device: bool,
     pub(crate) addr_type: SocketAddrType,
     pub(crate) sharing: Sharing,
-}
-
-impl<T, A: IpAddress, D, LI> Tagged<ListenerAddr<A, D, LI>> for AddrState<T> {
-    type Tag = AddrVecTag;
-
-    fn tag(&self, address: &ListenerAddr<A, D, LI>) -> Self::Tag {
-        let ListenerAddr { ip, device } = address;
-        AddrVecTag {
-            has_device: device.is_some(),
-            addr_type: ip.into(),
-            sharing: self.to_sharing_options(),
-        }
-    }
-}
-
-impl<T, A: IpAddress, D, LI, RI> Tagged<ConnAddr<A, D, LI, RI>> for AddrState<T> {
-    type Tag = AddrVecTag;
-
-    fn tag(&self, address: &ConnAddr<A, D, LI, RI>) -> Self::Tag {
-        let ConnAddr { ip, device } = address;
-        AddrVecTag {
-            has_device: device.is_some(),
-            addr_type: ip.into(),
-            sharing: self.to_sharing_options(),
-        }
-    }
 }
 
 pub(crate) trait ToSharingOptions {

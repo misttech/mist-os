@@ -57,7 +57,7 @@ use crate::{
             Entry as IdMapCollectionEntry, IdMapCollection,
             OccupiedEntry as IdMapCollectionOccupied,
         },
-        socketmap::{IterShadows as _, SocketMap, Tagged},
+        socketmap::{IterShadows as _, SocketMap},
     },
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
@@ -73,10 +73,10 @@ use crate::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         AddrVec, Bound, BoundSocketMap, Connection as BoundConnection, ConvertSocketMapState,
         ConvertSocketTypeState, IncompatibleError, InsertError, Inserter,
-        Listener as BoundListener, RemoveResult, SocketId as BoundSocketId, SocketMapAddrStateSpec,
-        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketMapUpdateSharingPolicy, SocketState as BoundSocketState, SocketStateSpec,
-        UpdateSharingError,
+        Listener as BoundListener, ListenerAddrInfo, RemoveResult, SocketId as BoundSocketId,
+        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketState as BoundSocketState,
+        SocketStateSpec, UpdateSharingError,
     },
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
@@ -261,6 +261,33 @@ impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I,
 
     type ListenerAddrState = ListenerAddrState<I>;
     type ConnAddrState = ConnAddrState<I>;
+
+    fn listener_tag(
+        ListenerAddrInfo { has_device, specified_addr: _ }: ListenerAddrInfo,
+        state: &Self::ListenerAddrState,
+    ) -> Self::AddrVecTag {
+        let (sharing, state) = match state {
+            ListenerAddrState::ExclusiveBound(_) => {
+                (SharingState::Exclusive, SocketTagState::Bound)
+            }
+            ListenerAddrState::ExclusiveListener(_) => {
+                (SharingState::Exclusive, SocketTagState::Listener)
+            }
+            ListenerAddrState::Shared { listener, bound: _ } => (
+                SharingState::ReuseAddress,
+                match listener {
+                    Some(_) => SocketTagState::Listener,
+                    None => SocketTagState::Bound,
+                },
+            ),
+        };
+        AddrVecTag { sharing, state, has_device }
+    }
+
+    fn connected_tag(has_device: bool, state: &Self::ConnAddrState) -> Self::AddrVecTag {
+        let ConnAddrState { sharing, id: _ } = state;
+        AddrVecTag { sharing: *sharing, has_device, state: SocketTagState::Conn }
+    }
 }
 
 impl<I: IpExt, D: Id, C: NonSyncContext> SocketStateSpec for TcpSocketSpec<I, D, C> {
@@ -444,8 +471,6 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
         D,
         IpPortSpec,
     > for TcpSocketSpec<I, D, C>
-where
-    Bound<Self>: Tagged<AddrVec<I, D, IpPortSpec>, Tag = AddrVecTag>,
 {
     fn allows_sharing_update(
         socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
@@ -733,29 +758,6 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
     }
 }
 
-impl<I: Ip, D, LI> Tagged<ListenerAddr<I::Addr, D, LI>> for ListenerAddrState<I> {
-    type Tag = AddrVecTag;
-    fn tag(&self, address: &ListenerAddr<I::Addr, D, LI>) -> Self::Tag {
-        let has_device = address.device.is_some();
-        let (sharing, state) = match self {
-            ListenerAddrState::ExclusiveBound(_) => {
-                (SharingState::Exclusive, SocketTagState::Bound)
-            }
-            ListenerAddrState::ExclusiveListener(_) => {
-                (SharingState::Exclusive, SocketTagState::Listener)
-            }
-            ListenerAddrState::Shared { listener, bound: _ } => (
-                SharingState::ReuseAddress,
-                match listener {
-                    Some(_) => SocketTagState::Listener,
-                    None => SocketTagState::Bound,
-                },
-            ),
-        };
-        AddrVecTag { sharing, state, has_device }
-    }
-}
-
 #[derive(Debug)]
 struct ConnAddrState<I: Ip> {
     sharing: SharingState,
@@ -799,18 +801,6 @@ impl<I: Ip> SocketMapAddrStateSpec for ConnAddrState<I> {
         _new_sharing_state: &'a Self::SharingState,
     ) -> Result<Self::Inserter<'b>, IncompatibleError> {
         Err(IncompatibleError)
-    }
-}
-
-impl<I: Ip, D, LI, RI> Tagged<ConnAddr<I::Addr, D, LI, RI>> for ConnAddrState<I> {
-    type Tag = AddrVecTag;
-    fn tag(&self, address: &ConnAddr<I::Addr, D, LI, RI>) -> Self::Tag {
-        let Self { sharing, id: _ } = self;
-        AddrVecTag {
-            sharing: *sharing,
-            has_device: address.device.is_some(),
-            state: SocketTagState::Conn,
-        }
     }
 }
 
