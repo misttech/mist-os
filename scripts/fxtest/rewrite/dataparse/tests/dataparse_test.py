@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 from dataclasses import dataclass
+import enum
 import typing
 import unittest
 
@@ -234,3 +235,38 @@ class TestDataParseErrors(unittest.TestCase):
                 pass
 
         self.assertRaises(DataParseError, wrap_a_non_dataclass)
+
+
+class StatusEnum(enum.Enum):
+    OK = "OK"
+    Failure = "FAILURE"
+
+
+@dataparse
+@dataclass
+class ContainsEnum:
+    status: StatusEnum
+
+
+class TestDataParseEnums(unittest.TestCase):
+    def test_valid_enum_type(self):
+        """Test that we can serialize and deserialize enum values."""
+
+        value = ContainsEnum(status=StatusEnum.Failure)
+        value2 = ContainsEnum(status=StatusEnum.OK)
+
+        value_dict = value.to_dict()  # type:ignore
+        self.assertEqual(value_dict["status"], "FAILURE")
+        value2_dict = value2.to_dict()  # type:ignore
+        self.assertEqual(value2_dict["status"], "OK")
+
+        self.assertEqual(value, ContainsEnum.from_dict(value_dict))  # type:ignore
+        self.assertEqual(value2, ContainsEnum.from_dict(value2_dict))  # type:ignore
+
+    def test_invalid_enum_parsing(self):
+        """Test that we throw an error when we encounter an unexpected enum value."""
+        value_to_parse = {"status": "NOT VALID"}
+        self.assertRaises(
+            DataParseError,
+            lambda: ContainsEnum.from_dict(value_to_parse),  # type:ignore
+        )

@@ -26,6 +26,7 @@ print(weather.to_dict())
 """
 
 import dataclasses
+import enum
 import typing
 
 
@@ -43,6 +44,12 @@ def dataparse(cls):
     (if not already set) to the class to support partial matching
     of input. It additionally provides basic type safety checks,
     and supports recursive definitions.
+
+    Only the following types of fields are supported:
+    - int, float, str.
+    - Classes decorated with @dataparse
+    - Lists and sets of the above.
+    - Enums with str values (note: lists of enums are not supported yet)
 
     Generated Methods:
         dataparse_renames (classmethod): Returns a mapping from
@@ -100,6 +107,8 @@ def dataparse(cls):
                     origin_vals = val
 
                 val = [x.to_dict() if hasattr(x, "to_dict") else x for x in origin_vals]
+            if isinstance(val, enum.Enum):
+                val = val.value
 
             if val is not None:
                 # Omit null fields.
@@ -194,6 +203,18 @@ def dataparse(cls):
                             for val in input[name]
                         ]
                     )
+                elif isinstance(real_type, type) and issubclass(real_type, enum.Enum):
+                    # Handle enums.
+                    # The value stored in the incoming dict is the value of
+                    # the enum. Create a map of value name to enum, and
+                    # select the correct one if it is present.
+                    v: enum.Enum
+                    values = {v.value: v for v in real_type.__members__.values()}
+                    if input[name] not in values:
+                        raise DataParseError(
+                            f"Enum {real_type} is missing field {input[name]}"
+                        )
+                    build_args[f.name] = values[input[name]]
                 else:
                     # Handle all other types by assigning directly.
                     build_args[f.name] = input[name]
