@@ -101,6 +101,7 @@
 #define DMA_INT_TIE                    (1 <<  0)
 
 
+#define DMA_STATUS_GLPII              (1 << 30)  /*GMAC LPI or GTMSI interrupt */
 #define DMA_STATUS_GLI                (1 << 26)  /*GMAC Line interface interrupt*/
 #define DMA_STATUS_AIS                (1 << 15)  /*GMAC Abnormal activity*/
 #define DMA_STATUS_RI                 (1 <<  6)  /*GMAC Rx Complete*/

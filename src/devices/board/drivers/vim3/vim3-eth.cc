@@ -31,7 +31,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 static const std::vector<fpbus::Irq> eth_mac_irqs{
     {{
         .irq = A311D_ETH_GMAC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
     }},
 };
 

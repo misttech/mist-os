@@ -47,6 +47,7 @@ int DWMacDevice::Thread() {
   zxlogf(INFO, "dwmac: ethmac started");
 
   zx_status_t status;
+
   while (true) {
     status = dma_irq_.wait(nullptr);
     if (!running_.load()) {
@@ -59,6 +60,11 @@ int DWMacDevice::Thread() {
     }
     uint32_t stat = mmio_->Read32(DW_MAC_DMA_STATUS);
     mmio_->Write32(stat, DW_MAC_DMA_STATUS);
+
+    if (stat & DMA_STATUS_GLPII) {
+      // Read the LPI status to clear the GLPII bit and prevent re-interrupting.
+      (void)mmio_->Read32(DW_MAC_MAC_LPICONTROL);
+    }
 
     if (stat & DMA_STATUS_GLI) {
       fbl::AutoLock lock(&lock_);  // Note: limited scope of autolock
