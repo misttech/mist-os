@@ -29,6 +29,29 @@ namespace arch {
 struct AccessPermissions;
 struct PagingSettings;
 
+/// Parameterizes the unaddressable bits of a virtual address.
+enum class VirtualAddressExtension {
+  /// Sign-extended (commonly referred to as "canonical"): each unaddressable
+  /// bit must match the highest addressable bit.
+  ///
+  /// Conventionally used in paging schemes that configure the upper and lower
+  /// spaces together: the subspace that is sign-extended as 0 represents the
+  /// lower, while the subspace that is sign-extended as 1 represents the upper.
+  kCanonical,
+
+  /// All unaddressable bits are 0.
+  ///
+  /// Conventionally used for describing the lower address space in paging
+  /// schemes that configure the upper and lower spaces separately.
+  k0,
+
+  /// All unaddressable bits are 1.
+  ///
+  /// Conventionally used for describing the upper address space in paging
+  /// schemes that configure the upper and lower spaces separately.
+  k1,
+};
+
 /// ExamplePagingTraits defines the "PagingTraits" API, being a coded examplar
 /// intended for documentation purposes only. Parameterizing the creation of
 /// virtual memory spaces, the traits are used to abstract away finicky paging
@@ -139,6 +162,9 @@ struct ExamplePagingTraits {
   /// `TableEntry<Level>::Set()` for non-terminal entries must be maximally
   /// permissive.
   static constexpr bool kNonTerminalAccessPermissions = false;
+
+  /// Parameterizes the unaddressable virtual address space bits.
+  static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
 
   /// Whether the given set of access permissions is generally valid for a
   /// page, as applied at the terminal level.
@@ -259,6 +285,8 @@ class Paging : public PagingTraits {
   static constexpr unsigned int kNumTableEntriesLog2 =
       PagingTraits::template kNumTableEntriesLog2<Level>;
 
+  using PagingTraits::kVirtualAddressExtension;
+
   static constexpr LevelType kFirstLevel = kLevels.front();
 
   /// A table's physical alignment at any level.
@@ -314,6 +342,31 @@ class Paging : public PagingTraits {
   /// The size of a would-be page if mapped from a given level.
   template <LevelType Level>
   static constexpr uint64_t kPageSize = uint64_t{1u} << kVirtualAddressBitRange<Level>.low;
+
+  /// The number of addressable bits in a virtual address (i.e., its "size").
+  static constexpr unsigned int kVirtualAddressSize = kVirtualAddressBitRange<kLevels[0]>.high + 1;
+
+  /// The virtual address marking the (exclusive) end of the lower range, if
+  /// parameterized by PagingTraits.
+  static constexpr std::optional<uint64_t> kLowerVirtualAddressRangeEnd = []() {
+    if constexpr (kVirtualAddressExtension == VirtualAddressExtension::k1) {
+      return std::nullopt;
+    } else if (kVirtualAddressSize < 64) {
+      return uint64_t{1u} << kVirtualAddressSize;
+    } else {
+      return std::numeric_limits<uint64_t>::max();
+    }
+  }();
+
+  /// The virtual address marking the beginning of the upper range, if
+  /// parameterized by PagingTraits.
+  static constexpr std::optional<uint64_t> kUpperVirtualAddressRangeStart = []() {
+    if constexpr (kVirtualAddressExtension == VirtualAddressExtension::k0) {
+      return std::nullopt;
+    } else {
+      return ~((uint64_t{1u} << kVirtualAddressSize) - 1);
+    }
+  }();
 
   ///
   /// Main paging trait methods.
@@ -473,6 +526,7 @@ class Paging : public PagingTraits {
       PaddrToTableIo&& paddr_to_io,  //
       Visitor&& visitor,             //
       uint64_t vaddr) {              //
+    AssertValidVirtualAddress<>(vaddr);
     return VisitPageTablesFrom<kFirstLevel>(table_paddr, std::forward<PaddrToTableIo>(paddr_to_io),
                                             std::forward<Visitor>(visitor), vaddr);
   }
@@ -641,6 +695,37 @@ class Paging : public PagingTraits {
 
   template <typename PageTableAllocator>
   MappingVisitor(PageTableAllocator, ...) -> MappingVisitor<PageTableAllocator>;
+
+  template <VirtualAddressExtension Extension = kVirtualAddressExtension>
+  static void AssertValidVirtualAddress(uint64_t vaddr);
+
+  template <>
+  static void AssertValidVirtualAddress<VirtualAddressExtension::kCanonical>(uint64_t vaddr) {
+    ZX_DEBUG_ASSERT(kLowerVirtualAddressRangeEnd);
+    ZX_DEBUG_ASSERT(kUpperVirtualAddressRangeStart);
+    ZX_DEBUG_ASSERT_MSG(
+        vaddr < *kLowerVirtualAddressRangeEnd || vaddr >= *kUpperVirtualAddressRangeStart,
+        "virtual address %#" PRIx64 " must be within [0, %#" PRIx64 ") or [%#" PRIx64
+        ", 0xffff'ffff'ffff'ffff]",
+        vaddr, *kLowerVirtualAddressRangeEnd, *kUpperVirtualAddressRangeStart);
+  }
+
+  template <>
+  static void AssertValidVirtualAddress<VirtualAddressExtension::k0>(uint64_t vaddr) {
+    ZX_DEBUG_ASSERT(kLowerVirtualAddressRangeEnd);
+    ZX_DEBUG_ASSERT_MSG(vaddr < *kLowerVirtualAddressRangeEnd,
+                        "virtual address %#" PRIx64 " must be within [0, %#" PRIx64 ")", vaddr,
+                        *kLowerVirtualAddressRangeEnd);
+  }
+
+  template <>
+  static void AssertValidVirtualAddress<VirtualAddressExtension::k1>(uint64_t vaddr) {
+    ZX_DEBUG_ASSERT(kUpperVirtualAddressRangeStart);
+    ZX_DEBUG_ASSERT_MSG(vaddr >= *kUpperVirtualAddressRangeStart,
+                        "virtual address %#" PRIx64 " must be within [%#" PRIx64
+                        ", 0xffff'ffff'ffff'ffff]",
+                        vaddr, *kUpperVirtualAddressRangeStart);
+  }
 
   /// A helper routine for `VisitPageTables()` starting a given level, allowing
   /// for a straightforward recursive(ish) definition.

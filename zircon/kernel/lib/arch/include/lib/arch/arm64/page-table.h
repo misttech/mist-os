@@ -487,8 +487,8 @@ class ArmAddressTranslationPageDescriptor
   constexpr SelfType& set_output_address(uint64_t addr) {
     constexpr auto kAddrHighBit = static_cast<unsigned int>(MaxVaddrWidth) - 1;
     constexpr auto kAddrLowBit = static_cast<unsigned int>(GranuleSize);
-    ZX_ASSERT((fbl::ExtractBits<61, kAddrHighBit + 1, uint64_t>(addr) == 0));
-    ZX_ASSERT((fbl::ExtractBits<kAddrLowBit - 1, 0, uint64_t>(addr) == 0));
+    ZX_DEBUG_ASSERT((fbl::ExtractBits<61, kAddrHighBit + 1, uint64_t>(addr) == 0));
+    ZX_DEBUG_ASSERT((fbl::ExtractBits<kAddrLowBit - 1, 0, uint64_t>(addr) == 0));
 
     if constexpr (kWidth52 && (kOaHighBit == 47)) {
       set_oa_51_48(fbl::ExtractBits<51, 48, uint64_t>(addr));
@@ -676,6 +676,17 @@ class ArmAddressTranslationBlockDescriptor
 // these are all are currently used.
 //
 
+// Specifies the upper or lower virtual address range (i.e., the
+// 1- or 0- extended ranges, respectively), which are configured separately.
+enum class ArmVirtualAddressRange {
+  // Configured by TCR_EL1.T0SZ.
+  kLower,
+
+  // Configured by TCR_EL1.T1SZ.
+  kUpper,
+};
+
+template <ArmVirtualAddressRange Range>
 struct ArmPagingTraits {
   using LevelType = ArmAddressTranslationLevel;
 
@@ -700,6 +711,10 @@ struct ArmPagingTraits {
   static constexpr unsigned int kNumTableEntriesLog2 = 9;
 
   static constexpr bool kNonTerminalAccessPermissions = true;
+
+  static constexpr auto kVirtualAddressExtension = Range == ArmVirtualAddressRange::kLower
+                                                       ? VirtualAddressExtension::k0
+                                                       : VirtualAddressExtension::k1;
 
   static constexpr bool IsValidPageAccess(const ArmSystemPagingState&, const AccessPermissions&) {
     return true;

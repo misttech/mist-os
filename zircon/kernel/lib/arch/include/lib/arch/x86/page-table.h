@@ -249,6 +249,8 @@ struct X86PagingTraitsBase {
 
   static constexpr bool kNonTerminalAccessPermissions = true;
 
+  static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
+
   static constexpr bool (*IsValidPageAccess)(const X86SystemPagingState&,
                                              const AccessPermissions&) = X86IsValidPageAccess;
 

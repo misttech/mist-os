@@ -43,7 +43,9 @@ using X86PagingLevel = arch::X86PagingLevel;
 using X86SystemState = arch::X86SystemPagingState;
 
 template <ArmPagingLevel Level>
-using ArmTableEntry = typename arch::ArmPagingTraits::template TableEntry<Level>;
+using ArmTableEntry =
+    arch::ArmAddressTranslationDescriptor<Level, arch::ArmGranuleSize::k4KiB,
+                                          arch::ArmMaximumVirtualAddressWidth::k48Bits>;
 
 constexpr bool kBools[] = {false, true};
 
@@ -1564,7 +1566,10 @@ TEST(PagingTests, Compilation) {
   static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv57PagingTraits>>);
   static_assert(std::is_empty_v<arch::Paging<arch::X86FourLevelPagingTraits>>);
   static_assert(std::is_empty_v<arch::Paging<arch::X86FiveLevelPagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::ArmPagingTraits>>);
+  static_assert(
+      std::is_empty_v<arch::Paging<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kLower>>>);
+  static_assert(
+      std::is_empty_v<arch::Paging<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kUpper>>>);
 }
 
 // The following macros are expected to be used on test cases given as
@@ -1580,8 +1585,15 @@ TEST(PagingTests, Compilation) {
   TEST_FOR_RISCV(name)            \
   TEST_FOR_X86(name)
 
-#define TEST_FOR_ARM(name) \
-  TEST(PagingTests, Arm##name) { name<arch::ArmPagingTraits>({}); }
+#define TEST_FOR_ARM(name)                                            \
+  TEST(PagingTests, ArmLower##name) {                                 \
+    name<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kLower>, \
+         /*VaddrHighBits=*/0x0000'0000'0000'0000u>({});               \
+  }                                                                   \
+  TEST(PagingTests, ArmUpper##name) {                                 \
+    name<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kUpper>, \
+         /*VaddrHighBits=*/0xffff'0000'0000'0000u>({});               \
+  }
 
 #define TEST_FOR_RISCV(name) \
   TEST(PagingTests, RiscvSv48##name) { name<arch::RiscvSv48PagingTraits>({}); }
@@ -1601,12 +1613,13 @@ bool OneGibPagesAllowed(const SystemState& state) {
 
 bool OneGibPagesAllowed(const X86SystemState& state) { return state.page1gb; }
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void TranslationWith4KiBPages(const typename PagingTraits::SystemState& state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---9---| |---9---| |----12----|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'100100100'000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'010101010'100100100'000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'ffff'1000;
 
   PagingHelper<PagingTraits> helper;
@@ -1694,12 +1707,13 @@ void TranslationWith4KiBPages(const typename PagingTraits::SystemState& state) {
 }
 TEST_FOR_ALL_TRAITS(TranslationWith4KiBPages)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void TranslationWith2MiBPages(const typename PagingTraits::SystemState& state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---9---| |------12 + 9-------|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'000000000000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'010101010'000000000000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'ff20'0000;
 
   PagingHelper<PagingTraits> helper;
@@ -1779,12 +1793,13 @@ void TranslationWith2MiBPages(const typename PagingTraits::SystemState& state) {
 }
 TEST_FOR_ALL_TRAITS(TranslationWith2MiBPages)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void TranslationWith1GiBPages(const typename PagingTraits::SystemState& state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---------12 + 9 + 9---------|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'000000000000000000000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'000000000000000000000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'4000'0000;
 
   PagingHelper<PagingTraits> helper;
@@ -1854,12 +1869,13 @@ void TranslationWith1GiBPages(const typename PagingTraits::SystemState& state) {
 }
 TEST_FOR_ALL_TRAITS(TranslationWith1GiBPages)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void TranslationFault(const typename PagingTraits::SystemState& state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---9---| |---9---| |----12----|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'100100100'000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'010101010'100100100'000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'ffff'1000;
 
   PagingHelper<PagingTraits> helper;
@@ -1951,12 +1967,13 @@ void TranslationFault(const typename PagingTraits::SystemState& state) {
 
 TEST_FOR_ALL_TRAITS(TranslationFault)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void Mapped4KiBPage(typename PagingTraits::SystemState state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---9---| |---9---| |----12----|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'100100100'000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'010101010'100100100'000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'ffff'1000;
 
   constexpr MapSettings kSettings = {
@@ -2030,12 +2047,13 @@ void Mapped4KiBPage(typename PagingTraits::SystemState state) {
 }
 TEST_FOR_ALL_TRAITS(Mapped4KiBPage)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void Mapped2MiBPage(typename PagingTraits::SystemState state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---9---| |------12 + 9-------|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'010101010'000000000000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'010101010'000000000000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'ff20'0000;
 
   constexpr MapSettings kSettings = {
@@ -2111,12 +2129,13 @@ void Mapped2MiBPage(typename PagingTraits::SystemState state) {
 }
 TEST_FOR_ALL_TRAITS(Mapped2MiBPage)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void Mapped1GiBPage(typename PagingTraits::SystemState state) {
   using Paging = arch::Paging<PagingTraits>;
 
   //                                |---9---| |---9---| |---------12 + 9 + 9---------|
-  constexpr uint64_t kPageVaddr = 0b111111111'101010101'000000000000000000000000000000;
+  constexpr uint64_t kPageVaddr =
+      VaddrHighBits | 0b111111111'101010101'000000000000000000000000000000;
   constexpr uint64_t kPagePaddr = 0xffff'4000'0000;
 
   constexpr MapSettings kSettings = {
@@ -2210,7 +2229,7 @@ void Mapped1GiBPage(typename PagingTraits::SystemState state) {
 }
 TEST_FOR_ALL_TRAITS(Mapped1GiBPage)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void DoubleMapping(typename PagingTraits::SystemState state) {
   //
   // Performing the same mapping twice should yield kAlreadyMapped.
@@ -2229,66 +2248,69 @@ void DoubleMapping(typename PagingTraits::SystemState state) {
   };
 
   {
-    constexpr uint64_t kAddr = 0xffff'ffff'1000;
+    constexpr uint64_t kPagePaddr = 0xffff'ffff'1000;
+    constexpr uint64_t kPageVaddr = VaddrHighBits | kPagePaddr;
 
     PagingHelper<PagingTraits> helper;
     Table& root = helper.NewTable();
 
     auto result1 =
         Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(), state,
-                             kAddr, 0x1000, kAddr, kSettings);
+                             kPageVaddr, 0x1000, kPagePaddr, kSettings);
     ASSERT_TRUE(result1.is_ok());
 
     auto result2 =
         Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(), state,
-                             kAddr, 0x1000, kAddr, kSettings);
+                             kPageVaddr, 0x1000, kPagePaddr, kSettings);
     ASSERT_TRUE(result2.is_error());
     auto error = std::move(result2).error_value();
     EXPECT_EQ(arch::MapError::Type::kAlreadyMapped, error.type);
-    EXPECT_EQ(kAddr, error.vaddr);
+    EXPECT_EQ(kPageVaddr, error.vaddr);
   }
   {
-    constexpr uint64_t kAddr = 0xffff'ff20'0000;
+    constexpr uint64_t kPagePaddr = 0xffff'ff20'0000;
+    constexpr uint64_t kPageVaddr = VaddrHighBits | kPagePaddr;
 
     PagingHelper<PagingTraits> helper;
     Table& root = helper.NewTable();
 
     auto result1 =
         Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(), state,
-                             kAddr, 0x20'0000, kAddr, kSettings);
+                             kPageVaddr, 0x20'0000, kPagePaddr, kSettings);
     ASSERT_TRUE(result1.is_ok());
 
     auto result2 =
         Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(), state,
-                             kAddr, 0x20'0000, kAddr, kSettings);
+                             kPageVaddr, 0x20'0000, kPagePaddr, kSettings);
     ASSERT_TRUE(result2.is_error());
     auto error = std::move(result2).error_value();
     EXPECT_EQ(arch::MapError::Type::kAlreadyMapped, error.type);
-    EXPECT_EQ(kAddr, error.vaddr);
+    EXPECT_EQ(kPageVaddr, error.vaddr);
   }
   {
-    constexpr uint64_t kAddr = 0xffff'4000'0000;
+    constexpr uint64_t kPagePaddr = 0xffff'4000'0000;
+    constexpr uint64_t kPageVaddr = VaddrHighBits | kPagePaddr;
 
     PagingHelper<PagingTraits> helper;
     Table& root = helper.NewTable();
 
     auto result1 =
         Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(), state,
-                             kAddr, 0x4000'0000, kAddr, kSettings);
+                             kPageVaddr, 0x4000'0000, kPagePaddr, kSettings);
     ASSERT_TRUE(result1.is_ok());
 
     auto result2 =
         Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(), state,
-                             kAddr, 0x4000'0000, kAddr, kSettings);
+                             kPageVaddr, 0x4000'0000, kPagePaddr, kSettings);
     ASSERT_TRUE(result2.is_error());
     auto error = std::move(result2).error_value();
     EXPECT_EQ(arch::MapError::Type::kAlreadyMapped, error.type);
-    EXPECT_EQ(kAddr, error.vaddr);
+    EXPECT_EQ(kPageVaddr, error.vaddr);
   }
 }
 TEST_FOR_ALL_TRAITS(DoubleMapping)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void MapAllocationFailure(typename PagingTraits::SystemState state) {
   using Paging = arch::Paging<PagingTraits>;
 
@@ -2329,7 +2351,7 @@ void MapAllocationFailure(typename PagingTraits::SystemState state) {
 }
 TEST_FOR_ALL_TRAITS(MapAllocationFailure)
 
-template <class PagingTraits>
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
 void MappedRegionWithMultipleMappings(typename PagingTraits::SystemState state) {
   using Paging = arch::Paging<PagingTraits>;
 
@@ -2337,15 +2359,16 @@ void MappedRegionWithMultipleMappings(typename PagingTraits::SystemState state) 
   constexpr uint64_t k2MiB = 0x0020'0000;
   constexpr uint64_t k4KiB = 0x0000'1000;
 
-  // Consider an identity-mapped region of size 2GiB + 6MiB + 36KiB that begins
-  // at an address (2MiB + 4KiB) shy of a 1GiB alignment. We'd expect the
-  // following mappings in order:
+  // Consider an mapped region of size 2GiB + 6MiB + 36KiB that begins at an
+  // address (2MiB + 4KiB) shy of a 1GiB alignment. We'd expect the following
+  // mappings in order:
   // * 1 4KiB page
   // * 1 2MiB page
   // * If 1GiB pages are supported, two 1GiB pages; else 512 2MiB ones
   // * 2 2MiB pages
   // * 8 4KiB pages.
-  constexpr uint64_t kAddr = 0xffff'0000'0000 - k2MiB - k4KiB;
+  constexpr uint64_t kPaddr = 0xffff'0000'0000 - k2MiB - k4KiB;
+  constexpr uint64_t kVaddr = VaddrHighBits | kPaddr;
   constexpr uint64_t kSize = 2 * k1GiB + 3 * k2MiB + 9 * k4KiB;
 
   constexpr MapSettings kSettings = {
@@ -2363,68 +2386,68 @@ void MappedRegionWithMultipleMappings(typename PagingTraits::SystemState state) 
 
   {
     auto result = Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(),
-                                       state, kAddr, kSize, kAddr, kSettings);
+                                       state, kVaddr, kSize, kPaddr, kSettings);
     ASSERT_TRUE(result.is_ok());
   }
 
   {
-    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kAddr);
+    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr);
     ASSERT_TRUE(result.is_ok());
 
     auto& page = result->page;
     EXPECT_EQ(0x1000u, page.size);
-    EXPECT_EQ(kAddr, page.paddr);
+    EXPECT_EQ(kPaddr, page.paddr);
   }
   {
     constexpr uint64_t kOffset = 0x1000u;
-    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kAddr + kOffset);
+    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr + kOffset);
     ASSERT_TRUE(result.is_ok());
 
     auto& page = result->page;
     EXPECT_EQ(0x20'0000u, page.size);
-    EXPECT_EQ(kAddr + kOffset, page.paddr);
+    EXPECT_EQ(kPaddr + kOffset, page.paddr);
   }
   if (OneGibPagesAllowed(state)) {
     for (size_t j = 0; j < 2; ++j) {
       uint64_t offset = 0x1000u + 0x20'0000u + j * 0x4000'0000u;
-      auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kAddr + offset);
+      auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr + offset);
       ASSERT_TRUE(result.is_ok());
 
       auto& page = result->page;
       EXPECT_EQ(0x4000'0000u, page.size);
-      EXPECT_EQ(kAddr + offset, page.paddr);
+      EXPECT_EQ(kPaddr + offset, page.paddr);
     }
   } else {
     for (size_t j = 0; j < 1024; ++j) {
       uint64_t offset = 0x1000u + 0x20'0000u + j * 0x20'0000u;
 
-      auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kAddr + offset);
+      auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr + offset);
       ASSERT_TRUE(result.is_ok());
 
       auto& page = result->page;
       EXPECT_EQ(0x20'0000u, page.size);
-      EXPECT_EQ(kAddr + offset, page.paddr);
+      EXPECT_EQ(kPaddr + offset, page.paddr);
     }
   }
   for (size_t j = 0; j < 2; ++j) {
     uint64_t offset = 0x1000u + 0x20'0000u + 2 * 0x4000'0000u + j * 0x20'0000u;
 
-    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kAddr + offset);
+    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr + offset);
     ASSERT_TRUE(result.is_ok());
 
     auto& page = result->page;
     EXPECT_EQ(0x20'0000u, page.size);
-    EXPECT_EQ(kAddr + offset, page.paddr);
+    EXPECT_EQ(kPaddr + offset, page.paddr);
   }
   for (size_t j = 0; j < 8; ++j) {
     uint64_t offset = 0x1000u + 0x20'0000u + 2 * 0x4000'0000u + 2 * 0x20'0000u + j * 0x1000u;
 
-    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kAddr + offset);
+    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr + offset);
     ASSERT_TRUE(result.is_ok());
 
     auto& page = result->page;
     EXPECT_EQ(0x1000u, page.size);
-    EXPECT_EQ(kAddr + offset, page.paddr);
+    EXPECT_EQ(kPaddr + offset, page.paddr);
   }
 }
 TEST_FOR_ALL_TRAITS(MappedRegionWithMultipleMappings)
