@@ -57,6 +57,7 @@ class As370Thermal : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TH
                              SetDvfsOperatingPointCompleter::Sync& completer) override;
   void GetFanLevel(GetFanLevelCompleter::Sync& completer) override;
   void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
   zx_status_t Init();
 

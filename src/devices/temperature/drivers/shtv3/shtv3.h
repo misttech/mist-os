@@ -29,6 +29,7 @@ class Shtv3Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TEM
   void DdkRelease();
 
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
   // Visible for testing.
   zx_status_t Init();

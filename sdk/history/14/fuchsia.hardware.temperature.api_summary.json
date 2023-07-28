@@ -1,6 +1,12 @@
 [
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.temperature/Device.GetSensorName",
+        "ordinal": "5529710860705727169",
+        "type": "() -> (string:256 name)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.temperature/Device.GetTemperatureCelsius",
         "ordinal": "8457206737810101052",
         "type": "() -> (int32 status,float32 temp)"
@@ -8,6 +14,12 @@
     {
         "kind": "protocol",
         "name": "fuchsia.hardware.temperature/Device"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.hardware.temperature/MAX_SENSOR_NAME_LEN",
+        "type": "uint32",
+        "value": "256"
     },
     {
         "kind": "library",

@@ -117,6 +117,8 @@ class FakePowerSensor : public fidl::WireServer<fuchsia_hardware_power_sensor::D
     completer.ReplySuccess(voltage_);
   }
 
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+
  private:
   std::atomic<float> voltage_ = 0.0f;
 };

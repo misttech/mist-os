@@ -7,6 +7,12 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.power.sensor/Device.GetSensorName",
+        "ordinal": "4392776413076894234",
+        "type": "() -> (string:256 name)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.power.sensor/Device.GetVoltageVolts",
         "ordinal": "5407987806620638263",
         "type": "() -> (fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result result)"
@@ -68,6 +74,12 @@
         "kind": "union",
         "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result",
         "strictness": "strict"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.hardware.power.sensor/MAX_SENSOR_NAME_LEN",
+        "type": "uint32",
+        "value": "256"
     },
     {
         "kind": "library",

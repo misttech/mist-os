@@ -40,6 +40,7 @@ class Ina231Device : public DeviceType {
 
   void GetPowerWatts(GetPowerWattsCompleter::Sync& completer) override;
   void GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
   // Visible for testing.
   zx_status_t Init(const Ina231Metadata& metadata);

@@ -50,6 +50,7 @@ class IntelThermal : public DeviceType,
   void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override;
   void SetTripCelsius(SetTripCelsiusRequestView request,
                       SetTripCelsiusCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
   // ACPI NotifyHandler FIDL methods.
   void Handle(HandleRequestView request, HandleCompleter::Sync& completer) override;

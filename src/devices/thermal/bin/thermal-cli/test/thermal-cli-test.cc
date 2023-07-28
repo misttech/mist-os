@@ -83,6 +83,8 @@ class ThermalCliTest : public zxtest::Test,
     completer.Reply(status, 0);
   }
 
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+
   void GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) override {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
   }

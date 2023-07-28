@@ -40,6 +40,7 @@ class CrOsEcPowerSensorDevice : public CrOsEcPowerSensorDeviceType {
   // fuchsia.hardware.power.sensor methods
   void GetPowerWatts(GetPowerWattsCompleter::Sync& completer) override;
   void GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
  private:
   CrOsEcPowerSensorDevice(ChromiumosEcCore* ec, zx_device_t* parent)

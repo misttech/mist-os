@@ -56,6 +56,7 @@ class Tmp112Device : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL
 
   // FIDL calls
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
  private:
   friend Tmp112DeviceTest;

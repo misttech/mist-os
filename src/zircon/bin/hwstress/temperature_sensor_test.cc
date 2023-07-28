@@ -32,6 +32,8 @@ class FakeThermalServer : public fuchsia::hardware::thermal::Device {
     callback(ZX_OK, reported_temperature_);
   }
 
+  void GetSensorName(fuchsia::hardware::thermal::Device::GetSensorNameCallback callback) override {}
+
   // Implementation of |Device| methods we don't care about.
   void GetInfo(GetInfoCallback callback) override {}
   void GetDeviceInfo(GetDeviceInfoCallback callback) override {}

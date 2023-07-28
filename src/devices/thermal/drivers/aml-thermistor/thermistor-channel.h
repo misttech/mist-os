@@ -34,6 +34,7 @@ class ThermistorChannel : public DeviceType2, public ddk::EmptyProtocol<ZX_PROTO
       : DeviceType2(device), adc_(adc), adc_channel_(ch), ntc_(ntc_info, pullup_ohms) {}
 
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
   void DdkRelease() { delete this; }
 
  private:

@@ -137,6 +137,7 @@ class FakeAmlThermal : public fidl::WireServer<fuchsia_thermal::Device> {
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
   void GetDvfsInfo(GetDvfsInfoRequestView request, GetDvfsInfoCompleter::Sync& completer) override;
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
   void GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) override;
   void GetStateChangePort(GetStateChangePortCompleter::Sync& completer) override;
   void SetTripCelsius(SetTripCelsiusRequestView request,

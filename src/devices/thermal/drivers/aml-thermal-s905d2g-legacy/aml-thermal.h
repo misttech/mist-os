@@ -76,6 +76,7 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
                              SetDvfsOperatingPointCompleter::Sync& completer) override;
   void GetFanLevel(GetFanLevelCompleter::Sync& completer) override;
   void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override;
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
   int ThermalNotificationThread();
   zx_status_t NotifyThermalDaemon();

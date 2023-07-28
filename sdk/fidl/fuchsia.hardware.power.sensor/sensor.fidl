@@ -5,6 +5,13 @@
 library fuchsia.hardware.power.sensor;
 using zx;
 
+@available(added=14)
+const MAX_SENSOR_NAME_LEN uint32 = 256;
+
+/// An arbritrary, human-readable string that uniquely identifies a power sensor.
+@available(added=14)
+alias SensorName = string:MAX_SENSOR_NAME_LEN;
+
 @discoverable
 closed protocol Device {
     strict GetPowerWatts() -> (struct {
@@ -13,6 +20,10 @@ closed protocol Device {
     strict GetVoltageVolts() -> (struct {
         voltage float32;
     }) error zx.Status;
+    @available(added=14)
+    strict GetSensorName() -> (struct {
+        name SensorName;
+    });
 };
 
 service Service {

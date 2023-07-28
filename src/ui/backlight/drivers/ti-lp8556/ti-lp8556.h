@@ -138,6 +138,8 @@ class Lp8556Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BA
 
   void GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) override;
 
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+
  private:
   zx_status_t SetCurrentScale(uint16_t scale);
   zx_status_t ReadInitialState();
