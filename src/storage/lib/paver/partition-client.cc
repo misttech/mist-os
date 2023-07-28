@@ -25,6 +25,30 @@ namespace paver {
 
 namespace block = fuchsia_hardware_block;
 
+zx::result<std::unique_ptr<BlockPartitionClient>> BlockPartitionClient::Create(
+    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller) {
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+  zx::result controller_server = fidl::CreateEndpoints(&controller);
+  if (fidl::OneWayStatus status =
+          fidl::WireCall(partition_controller)->ConnectToController(std::move(*controller_server));
+      !status.ok()) {
+    return zx::error(status.status());
+  }
+
+  fidl::ClientEnd<fuchsia_hardware_block::Block> partition;
+  zx::result server = fidl::CreateEndpoints(&partition);
+  if (server.is_error()) {
+    return server.take_error();
+  }
+  if (fidl::OneWayStatus status =
+          fidl::WireCall(partition_controller)->ConnectToDeviceFidl(server->TakeChannel());
+      !status.ok()) {
+    return zx::error(status.status());
+  }
+  return zx::ok(
+      std::make_unique<BlockPartitionClient>(std::move(controller), std::move(partition)));
+}
+
 zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>>
 BlockPartitionClient::ReadBlockInfo() {
   if (block_info_.has_value()) {
@@ -228,9 +252,7 @@ fidl::UnownedClientEnd<fuchsia_hardware_block::Block> BlockPartitionClient::bloc
 }
 
 fidl::UnownedClientEnd<fuchsia_device::Controller> BlockPartitionClient::controller_channel() {
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  return fidl::UnownedClientEnd<fuchsia_device::Controller>(
-      partition_.client_end().channel().borrow());
+  return controller_.client_end().borrow();
 }
 
 fidl::ClientEnd<block::Block> BlockPartitionClient::GetChannel() {
@@ -238,23 +260,31 @@ fidl::ClientEnd<block::Block> BlockPartitionClient::GetChannel() {
   return component::MaybeClone(partition_.client_end(), component::AssumeProtocolComposesNode);
 }
 
-fbl::unique_fd BlockPartitionClient::block_fd() {
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result cloned =
-      component::Clone(partition_.client_end(), component::AssumeProtocolComposesNode);
-  if (cloned.is_error()) {
-    ERROR("Failed to clone partition client: %s\n", cloned.status_string());
-    return {};
+zx::result<std::unique_ptr<FixedOffsetBlockPartitionClient>>
+FixedOffsetBlockPartitionClient::Create(
+    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
+    size_t offset_partition_in_blocks, size_t offset_buffer_in_blocks) {
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+  zx::result controller_server = fidl::CreateEndpoints(&controller);
+  if (fidl::OneWayStatus status =
+          fidl::WireCall(partition_controller)->ConnectToController(std::move(*controller_server));
+      !status.ok()) {
+    return zx::error(status.status());
   }
 
-  fbl::unique_fd fd;
-  if (zx_status_t status =
-          fdio_fd_create(cloned.value().TakeChannel().release(), fd.reset_and_get_address());
-      status != ZX_OK) {
-    ERROR("Failed to create block fd: %s\n", zx_status_get_string(status));
-    return {};
+  fidl::ClientEnd<fuchsia_hardware_block::Block> partition;
+  zx::result server = fidl::CreateEndpoints(&partition);
+  if (server.is_error()) {
+    return server.take_error();
   }
-  return fd;
+  if (fidl::OneWayStatus status =
+          fidl::WireCall(partition_controller)->ConnectToDeviceFidl(server->TakeChannel());
+      !status.ok()) {
+    return zx::error(status.status());
+  }
+  return zx::ok(std::make_unique<FixedOffsetBlockPartitionClient>(
+      std::move(controller), std::move(partition), offset_partition_in_blocks,
+      offset_buffer_in_blocks));
 }
 
 // The partition size does not account for the offset.
@@ -333,8 +363,6 @@ FixedOffsetBlockPartitionClient::controller_channel() {
 fidl::ClientEnd<block::Block> FixedOffsetBlockPartitionClient::GetChannel() {
   return client_.GetChannel();
 }
-
-fbl::unique_fd FixedOffsetBlockPartitionClient::block_fd() { return client_.block_fd(); }
 
 zx::result<size_t> PartitionCopyClient::GetBlockSize() {
   // Choose the lowest common multiple of all block sizes.

@@ -110,8 +110,8 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
       if (boot0_part.is_error()) {
         return boot0_part.take_error();
       }
-      auto boot0 =
-          std::make_unique<FixedOffsetBlockPartitionClient>(std::move(boot0_part.value()), 1, 0);
+      std::unique_ptr boot0 =
+          std::make_unique<FixedOffsetBlockPartitionClient>(std::move(*boot0_part), 1, 0);
 
       auto boot1_part = OpenBlockPartition(gpt_->devfs_root(), std::nullopt,
                                            Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));

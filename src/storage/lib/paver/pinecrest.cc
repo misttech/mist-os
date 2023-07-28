@@ -104,12 +104,12 @@ zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition
   std::function<bool(const gpt_partition_t&)> filter;
   switch (spec.partition) {
     case Partition::kAbrMeta: {
-      auto partition = OpenBlockPartition(gpt_->devfs_root(), std::nullopt,
-                                          Uuid(GUID_ABR_META_VALUE), ZX_SEC(5));
+      zx::result partition = OpenBlockPartition(gpt_->devfs_root(), std::nullopt,
+                                                Uuid(GUID_ABR_META_VALUE), ZX_SEC(5));
       if (partition.is_error()) {
         return partition.take_error();
       }
-      return zx::ok(new BlockPartitionClient(std::move(partition.value())));
+      return zx::ok(new BlockPartitionClient(std::move(*partition)));
     }
     case Partition::kBootloaderA:
     case Partition::kBootloaderB:

@@ -234,12 +234,14 @@ zx::result<std::unique_ptr<PartitionClient>> FixedDevicePartitioner::FindPartiti
   }
   Uuid type = type_or.value();
 
-  auto partition = OpenBlockPartition(devfs_root_, std::nullopt, type, ZX_SEC(5));
+  zx::result partition = OpenBlockPartition(devfs_root_, std::nullopt, type, ZX_SEC(5));
   if (partition.is_error()) {
     return partition.take_error();
   }
 
-  return zx::ok(new BlockPartitionClient(std::move(partition.value())));
+  return zx::ok(new BlockPartitionClient(
+      std::move(partition->controller),
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(partition->device))));
 }
 
 zx::result<> FixedDevicePartitioner::WipeFvm() const {

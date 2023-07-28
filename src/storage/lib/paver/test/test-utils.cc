@@ -94,13 +94,8 @@ void BlockDevice::Create(const fbl::unique_fd& devfs_root, const uint8_t* guid,
 
 void BlockDevice::Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset) {
   ASSERT_LE(blk_offset + blk_cnt, block_count());
-  fidl::UnownedClientEnd interface = block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result block_service_channel =
-      component::Clone(interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(block_service_channel.status_value());
-  std::unique_ptr<paver::BlockPartitionClient> block_client =
-      std::make_unique<paver::BlockPartitionClient>(std::move(block_service_channel.value()));
+  zx::result block_client = paver::BlockPartitionClient::Create(block_controller_interface());
+  ASSERT_OK(block_client);
   ASSERT_OK(block_client->Read(vmo, blk_cnt, blk_offset, 0));
 }
 

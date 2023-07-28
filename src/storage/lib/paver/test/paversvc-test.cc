@@ -2120,13 +2120,9 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
   ASSERT_OK(result.status());
 
   // Create a block partition client to read the written content directly.
-  fidl::UnownedClientEnd block_interface = gpt_dev_->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result block_service_channel =
-      component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(block_service_channel.status_value());
-  std::unique_ptr<paver::BlockPartitionClient> block_client =
-      std::make_unique<paver::BlockPartitionClient>(std::move(block_service_channel.value()));
+  zx::result block_client =
+      paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
+  ASSERT_OK(block_client);
 
   // Read the partition directly from block and verify.
   zx::vmo block_read_vmo;
@@ -2314,13 +2310,9 @@ TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   ASSERT_OK(result.status());
 
   // Create a block partition client to read the written content directly.
-  fidl::UnownedClientEnd block_interface = gpt_dev_->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result block_service_channel =
-      component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(block_service_channel.status_value());
-  std::unique_ptr<paver::BlockPartitionClient> block_client =
-      std::make_unique<paver::BlockPartitionClient>(std::move(block_service_channel.value()));
+  zx::result block_client =
+      paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
+  ASSERT_OK(block_client);
 
   // Read the partition directly from block and verify.  Read `image.image_length` bytes so we know
   // the image was paved to the desired length, although we only verify the bytes up to the size of
@@ -2427,13 +2419,9 @@ TEST_F(PaverServicePinecrestTest, PinecrestAbrClientEndToEnd) {
   }
 
   // Create a block partition client to read the abr content from block directly.
-  fidl::UnownedClientEnd block_interface = gpt_dev_->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result block_service_channel =
-      component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(block_service_channel.status_value());
-  std::unique_ptr<paver::BlockPartitionClient> block_client =
-      std::make_unique<paver::BlockPartitionClient>(std::move(block_service_channel.value()));
+  zx::result block_client =
+      paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
+  ASSERT_OK(block_client);
 
   // Read the abr data directly from block and verify.
   zx::vmo block_read_vmo;

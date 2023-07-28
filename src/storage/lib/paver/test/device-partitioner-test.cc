@@ -464,10 +464,9 @@ class GptDevicePartitionerTests : public zxtest::Test {
 
   void ReadBlocks(const BlockDevice* blk_dev, size_t offset_in_blocks, size_t size_in_blocks,
                   uint8_t* out) const {
-    fidl::UnownedClientEnd client = blk_dev->block_interface();
-    zx::result owned = component::Clone(client, component::AssumeProtocolComposesNode);
-    ASSERT_OK(owned.status_value());
-    auto block_client = std::make_unique<paver::BlockPartitionClient>(std::move(owned.value()));
+    zx::result block_client =
+        paver::BlockPartitionClient::Create(blk_dev->block_controller_interface());
+    ASSERT_OK(block_client);
 
     zx::vmo vmo;
     const size_t vmo_size = size_in_blocks * block_size_;
@@ -478,10 +477,9 @@ class GptDevicePartitionerTests : public zxtest::Test {
 
   void WriteBlocks(const BlockDevice* blk_dev, size_t offset_in_blocks, size_t size_in_blocks,
                    uint8_t* buffer) const {
-    fidl::UnownedClientEnd client = blk_dev->block_interface();
-    zx::result owned = component::Clone(client, component::AssumeProtocolComposesNode);
-    ASSERT_OK(owned.status_value());
-    auto block_client = std::make_unique<paver::BlockPartitionClient>(std::move(owned.value()));
+    zx::result block_client =
+        paver::BlockPartitionClient::Create(blk_dev->block_controller_interface());
+    ASSERT_OK(block_client);
 
     zx::vmo vmo;
     const size_t vmo_size = size_in_blocks * block_size_;

@@ -34,36 +34,34 @@ namespace skipblock = fuchsia_hardware_skipblock;
 
 zx::result<std::unique_ptr<SkipBlockPartitionClient>> SkipBlockDevicePartitioner::FindPartition(
     const Uuid& type) const {
-  auto status = OpenSkipBlockPartition(devfs_root_, type, ZX_SEC(5));
-  if (status.is_error()) {
-    return status.take_error();
+  zx::result partition = OpenSkipBlockPartition(devfs_root_, type, ZX_SEC(5));
+  if (partition.is_error()) {
+    return partition.take_error();
   }
 
-  return zx::ok(new SkipBlockPartitionClient(std::move(status.value())));
+  return zx::ok(new SkipBlockPartitionClient(
+      fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>(std::move(partition->device))));
 }
 
 zx::result<std::unique_ptr<PartitionClient>> SkipBlockDevicePartitioner::FindFvmPartition() const {
   // FVM partition is managed so it should expose a normal block device.
-  auto status = OpenBlockPartition(devfs_root_, std::nullopt, Uuid(GUID_FVM_VALUE), ZX_SEC(5));
-  if (status.is_error()) {
-    return status.take_error();
+  zx::result partition =
+      OpenBlockPartition(devfs_root_, std::nullopt, Uuid(GUID_FVM_VALUE), ZX_SEC(5));
+  if (partition.is_error()) {
+    return partition.take_error();
   }
-
-  return zx::ok(new BlockPartitionClient(std::move(status.value())));
+  return zx::ok(new BlockPartitionClient(std::move(*partition)));
 }
 
 zx::result<> SkipBlockDevicePartitioner::WipeFvm() const {
   const uint8_t fvm_type[GPT_GUID_LEN] = GUID_FVM_VALUE;
-  auto status = OpenBlockPartition(devfs_root_, std::nullopt, Uuid(fvm_type), ZX_SEC(3));
-  if (status.is_error()) {
-    ERROR("Warning: Could not open partition to wipe: %s\n", status.status_string());
+  zx::result partition = OpenBlockPartition(devfs_root_, std::nullopt, Uuid(fvm_type), ZX_SEC(3));
+  if (partition.is_error()) {
+    ERROR("Warning: Could not open partition to wipe: %s\n", partition.status_string());
     return zx::ok();
   }
 
-  // Note: converting from |fuchsia.hardware.block.partition/Partition| to
-  // |fuchsia.device/Controller| works because devfs connections compose |Controller|.
-  fidl::WireSyncClient<device::Controller> block_client(
-      fidl::ClientEnd<device::Controller>(status.value().TakeChannel()));
+  fidl::WireSyncClient<device::Controller> block_client(std::move(partition->controller));
 
   auto result = block_client->GetTopologicalPath();
   if (!result.ok()) {

@@ -24,6 +24,7 @@
 
 #include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/lib/storage/block_client/cpp/client.h"
+#include "src/storage/lib/paver/utils.h"
 
 namespace paver {
 
@@ -35,9 +36,6 @@ class BlockDeviceClient {
 
   // Returns a channel to the partition, when backed by a block device.
   virtual fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() = 0;
-
-  // Returns a file descriptor representing the partition.
-  virtual fbl::unique_fd block_fd() = 0;
 
   virtual zx::result<storage::OwnedVmoid> RegisterVmoid(const zx::vmo& vmo) = 0;
 
@@ -92,15 +90,16 @@ class BlockDevicePartitionClient : public PartitionClient, public BlockDeviceCli
 
 class BlockPartitionClient final : public BlockDevicePartitionClient {
  public:
-  explicit BlockPartitionClient(fidl::ClientEnd<fuchsia_hardware_block::Block> partition)
-      : partition_(std::move(partition)) {}
+  explicit BlockPartitionClient(fidl::ClientEnd<fuchsia_device::Controller> controller,
+                                fidl::ClientEnd<fuchsia_hardware_block::Block> partition)
+      : controller_(std::move(controller)), partition_(std::move(partition)) {}
 
-  // Note: converting from |fuchsia.hardware.block.partition/Partition|
-  // to |fuchsia.hardware.block/Block|.
-  explicit BlockPartitionClient(
-      fidl::ClientEnd<fuchsia_hardware_block_partition::Partition> partition)
-      : BlockPartitionClient(
-            fidl::ClientEnd<fuchsia_hardware_block::Block>(partition.TakeChannel())) {}
+  explicit BlockPartitionClient(PartitionConnection connection)
+      : controller_(std::move(connection.controller)),
+        partition_(fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connection.device))) {}
+
+  static zx::result<std::unique_ptr<BlockPartitionClient>> Create(
+      fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller);
 
   zx::result<size_t> GetBlockSize() final;
   zx::result<size_t> GetPartitionSize() final;
@@ -121,7 +120,6 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel() final;
   fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel() final;
   fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
-  fbl::unique_fd block_fd() final;
 
   // No copy, no move.
   BlockPartitionClient(const BlockPartitionClient&) = delete;
@@ -133,6 +131,7 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
   zx::result<> RegisterFastBlockIo();
   zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>> ReadBlockInfo();
 
+  fidl::WireSyncClient<fuchsia_device::Controller> controller_;
   fidl::WireSyncClient<fuchsia_hardware_block::Block> partition_;
   std::unique_ptr<block_client::Client> client_;
   std::optional<fuchsia_hardware_block::wire::BlockInfo> block_info_;
@@ -145,21 +144,24 @@ class BlockPartitionClient final : public BlockDevicePartitionClient {
 // It's also used for cases where input image is a combined image for multiple partitions.
 class FixedOffsetBlockPartitionClient final : public BlockDevicePartitionClient {
  public:
-  explicit FixedOffsetBlockPartitionClient(fidl::ClientEnd<fuchsia_hardware_block::Block> partition,
+  explicit FixedOffsetBlockPartitionClient(fidl::ClientEnd<fuchsia_device::Controller> controller,
+                                           fidl::ClientEnd<fuchsia_hardware_block::Block> partition,
                                            size_t offset_partition_in_blocks,
                                            size_t offset_buffer_in_blocks)
-      : client_(std::move(partition)),
+      : client_(std::move(controller), std::move(partition)),
         offset_partition_in_blocks_(offset_partition_in_blocks),
         offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
 
-  // Note: converting from |fuchsia.hardware.block.partition/Partition|
-  // to |fuchsia.hardware.block/Block|.
-  explicit FixedOffsetBlockPartitionClient(
-      fidl::ClientEnd<fuchsia_hardware_block_partition::Partition> partition,
-      size_t offset_partition_in_blocks, size_t offset_buffer_in_blocks)
-      : FixedOffsetBlockPartitionClient(
-            fidl::ClientEnd<fuchsia_hardware_block::Block>(partition.TakeChannel()),
-            offset_partition_in_blocks, offset_buffer_in_blocks) {}
+  explicit FixedOffsetBlockPartitionClient(PartitionConnection connection,
+                                           size_t offset_partition_in_blocks,
+                                           size_t offset_buffer_in_blocks)
+      : client_(std::move(connection)),
+        offset_partition_in_blocks_(offset_partition_in_blocks),
+        offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
+
+  static zx::result<std::unique_ptr<FixedOffsetBlockPartitionClient>> Create(
+      fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
+      size_t offset_partition_in_blocks, size_t offset_buffer_in_blocks);
 
   zx::result<size_t> GetBlockSize() final;
   zx::result<size_t> GetPartitionSize() final;
@@ -175,7 +177,6 @@ class FixedOffsetBlockPartitionClient final : public BlockDevicePartitionClient 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel() final;
   fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel() final;
   fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel() final;
-  fbl::unique_fd block_fd() final;
 
   // No copy, no move.
   FixedOffsetBlockPartitionClient(const FixedOffsetBlockPartitionClient&) = delete;

@@ -4,6 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_UTILS_H_
 #define SRC_STORAGE_LIB_PAVER_UTILS_H_
 
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
@@ -53,19 +54,26 @@ std::unique_ptr<T> WrapUnique(T* ptr) {
   return std::unique_ptr<T>(ptr);
 }
 
+struct PartitionConnection {
+  zx::channel device;
+  fidl::ClientEnd<fuchsia_device::Controller> controller;
+};
+
 // Either opens a |fuchsia.hardware.block.partition/Partition|, or
 // |fuchsia.hardware.skipblock/SkipBlock|, depending on the filter rules
 // defined in |should_filter_file|.
-zx::result<zx::channel> OpenPartition(const fbl::unique_fd& devfs_root, const char* path,
-                                      fit::function<bool(const zx::channel&)> should_filter_file,
-                                      zx_duration_t timeout);
+zx::result<PartitionConnection> OpenPartition(
+    const fbl::unique_fd& devfs_root, const char* path,
+    fit::function<bool(const zx::channel&)> should_filter_file, zx_duration_t timeout);
 
-zx::result<fidl::ClientEnd<fuchsia_hardware_block_partition::Partition>> OpenBlockPartition(
-    const fbl::unique_fd& devfs_root, std::optional<uuid::Uuid> unique_guid,
-    std::optional<uuid::Uuid> type_guid, zx_duration_t timeout);
+zx::result<PartitionConnection> OpenBlockPartition(const fbl::unique_fd& devfs_root,
+                                                   std::optional<uuid::Uuid> unique_guid,
+                                                   std::optional<uuid::Uuid> type_guid,
+                                                   zx_duration_t timeout);
 
-zx::result<fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>> OpenSkipBlockPartition(
-    const fbl::unique_fd& devfs_root, const uuid::Uuid& type_guid, zx_duration_t timeout);
+zx::result<PartitionConnection> OpenSkipBlockPartition(const fbl::unique_fd& devfs_root,
+                                                       const uuid::Uuid& type_guid,
+                                                       zx_duration_t timeout);
 
 bool HasSkipBlockDevice(const fbl::unique_fd& devfs_root);
 

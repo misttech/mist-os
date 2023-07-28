@@ -83,18 +83,18 @@ zx::result<> BlockWatcherPauser::Pause() {
   return zx::ok();
 }
 
-zx::result<zx::channel> OpenPartition(const fbl::unique_fd& devfs_root, const char* path,
-                                      fit::function<bool(const zx::channel&)> should_filter_file,
-                                      zx_duration_t timeout) {
+zx::result<PartitionConnection> OpenPartition(
+    const fbl::unique_fd& devfs_root, const char* path,
+    fit::function<bool(const zx::channel&)> should_filter_file, zx_duration_t timeout) {
   ZX_ASSERT(path != nullptr);
 
   struct CallbackInfo {
-    zx::channel out_partition;
+    PartitionConnection out_partition;
     fit::function<bool(const zx::channel&)> should_filter_file;
   };
 
   CallbackInfo info = {
-      .out_partition = zx::channel(),
+      .out_partition = {},
       .should_filter_file = std::move(should_filter_file),
   };
 
@@ -119,7 +119,17 @@ zx::result<zx::channel> OpenPartition(const fbl::unique_fd& devfs_root, const ch
     if (info->should_filter_file(partition_local)) {
       return ZX_OK;
     }
-    info->out_partition = std::move(partition_local);
+
+    zx::result controller_server = fidl::CreateEndpoints(&info->out_partition.controller);
+    if (controller_server.is_error()) {
+      return ZX_OK;
+    }
+    std::string controller_path = std::string(filename) + "/device_controller";
+    if (fdio_service_connect_at(caller.borrow_channel(), controller_path.c_str(),
+                                controller_server->TakeChannel().release()) != ZX_OK) {
+      return ZX_OK;
+    }
+    info->out_partition.device = std::move(partition_local);
     return ZX_ERR_STOP;
   };
 
@@ -140,9 +150,10 @@ zx::result<zx::channel> OpenPartition(const fbl::unique_fd& devfs_root, const ch
 
 constexpr char kBlockDevPath[] = "class/block/";
 
-zx::result<fidl::ClientEnd<partition::Partition>> OpenBlockPartition(
-    const fbl::unique_fd& devfs_root, std::optional<Uuid> unique_guid,
-    std::optional<Uuid> type_guid, zx_duration_t timeout) {
+zx::result<PartitionConnection> OpenBlockPartition(const fbl::unique_fd& devfs_root,
+                                                   std::optional<Uuid> unique_guid,
+                                                   std::optional<Uuid> type_guid,
+                                                   zx_duration_t timeout) {
   ZX_ASSERT(unique_guid || type_guid);
 
   auto cb = [&](const zx::channel& chan) {
@@ -176,8 +187,9 @@ zx::result<fidl::ClientEnd<partition::Partition>> OpenBlockPartition(
 
 constexpr char kSkipBlockDevPath[] = "class/skip-block/";
 
-zx::result<fidl::ClientEnd<skipblock::SkipBlock>> OpenSkipBlockPartition(
-    const fbl::unique_fd& devfs_root, const Uuid& type_guid, zx_duration_t timeout) {
+zx::result<PartitionConnection> OpenSkipBlockPartition(const fbl::unique_fd& devfs_root,
+                                                       const Uuid& type_guid,
+                                                       zx_duration_t timeout) {
   auto cb = [&](const zx::channel& chan) {
     auto result = fidl::WireCall(fidl::UnownedClientEnd<skipblock::SkipBlock>(chan.borrow()))
                       ->GetPartitionInfo();
@@ -204,15 +216,17 @@ bool HasSkipBlockDevice(const fbl::unique_fd& devfs_root) {
 // At most one of |unique_guid| and |type_guid| may be nullptr.
 zx::result<> WipeBlockPartition(const fbl::unique_fd& devfs_root, std::optional<Uuid> unique_guid,
                                 std::optional<Uuid> type_guid) {
-  auto status = OpenBlockPartition(devfs_root, unique_guid, type_guid, g_wipe_timeout);
-  if (status.is_error()) {
-    ERROR("Warning: Could not open partition to wipe: %s\n", status.status_string());
-    return status.take_error();
+  zx::result partition = OpenBlockPartition(devfs_root, unique_guid, type_guid, g_wipe_timeout);
+  if (partition.is_error()) {
+    ERROR("Warning: Could not open partition to wipe: %s\n", partition.status_string());
+    return partition.take_error();
   }
 
   // Overwrite the first block to (hackily) ensure the destroyed partition
   // doesn't "reappear" in place.
-  BlockPartitionClient block_partition(std::move(status.value()));
+  BlockPartitionClient block_partition(
+      std::move(partition->controller),
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(partition->device)));
   auto status2 = block_partition.GetBlockSize();
   if (status2.is_error()) {
     ERROR("Warning: Could not get block size of partition: %s\n", status2.status_string());

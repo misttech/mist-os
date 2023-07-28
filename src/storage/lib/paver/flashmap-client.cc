@@ -125,15 +125,15 @@ zx::result<std::unique_ptr<FlashmapPartitionClient>> FlashmapPartitionClient::Cr
   fidl::WireSyncClient<fuchsia_nand_flashmap::Manager> manager(std::move(*client_end));
 
   // Find the NAND device. For now, we just assume that it's the first NAND device.
-  auto result = OpenPartition(
+  auto partition = OpenPartition(
       devfs_root, kNandClassPath, [](const zx::channel& chan) { return false; }, timeout.get());
-  if (result.is_error()) {
-    ERROR("Could not find NAND device: %s\n", result.status_string());
-    return result.take_error();
+  if (partition.is_error()) {
+    ERROR("Could not find NAND device: %s\n", partition.status_string());
+    return partition.take_error();
   }
 
   // Connect to the NAND broker that is bound to this device.
-  auto broker = ConnectToBroker(devfs_root, result.value());
+  auto broker = ConnectToBroker(devfs_root, partition->device);
   if (broker.is_error()) {
     ERROR("Could not bind broker\n");
     return broker.take_error();
@@ -159,7 +159,7 @@ zx::result<std::unique_ptr<FlashmapPartitionClient>> FlashmapPartitionClient::Cr
     return cros_result.take_error();
   }
 
-  fidl::ClientEnd<fuchsia_acpi_chromeos::Device> cros_acpi(std::move(cros_result.value()));
+  fidl::ClientEnd<fuchsia_acpi_chromeos::Device> cros_acpi(std::move(cros_result->device));
 
   // Connect to the firmware parameter service.
   auto fwparam_client = component::Connect<fuchsia_vboot::FirmwareParam>();
