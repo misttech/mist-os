@@ -42,6 +42,8 @@ const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
 const ROOT_MONIKER_REPR: &str = "<root>";
 
+/// The possible name for a handle to inspect data. It could be a filename (being deprecated) or a
+/// name published using `fuchsia.inspect.InspectSink`.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Hash, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum InspectHandleName {
@@ -513,6 +515,7 @@ impl<D> Data<D>
 where
     D: DiagnosticsData,
 {
+    /// Returns a [`Data`] with an error indicating that the payload was dropped.
     pub fn dropped_payload_schema(self, error_string: String) -> Data<D>
     where
         D: DiagnosticsData,
@@ -598,6 +601,7 @@ pub struct LogsDataBuilder {
     printf_args: Vec<String>,
 }
 
+/// Arguments used to create a new [`LogsDataBuilder`].
 pub struct BuilderArgs {
     /// The moniker for the component
     pub moniker: String,
@@ -675,6 +679,7 @@ impl LogsDataBuilder {
         self
     }
 
+    /// Sets the severity of the log.
     pub fn set_severity(mut self, severity: Severity) -> Self {
         self.args.severity = severity;
         self
@@ -831,6 +836,7 @@ impl Data<Logs> {
         })
     }
 
+    /// If the log has a message, returns a shared reference to the message contents.
     pub fn msg_mut(&mut self) -> Option<&mut String> {
         self.payload_message_mut().and_then(|p| {
             p.properties.iter_mut().find_map(|property| match property {
@@ -840,6 +846,7 @@ impl Data<Logs> {
         })
     }
 
+    /// If the log has a printf format, returns an exclusive reference to format string.
     pub fn payload_printf_format(&mut self) -> Option<&str> {
         self.payload_printf().as_ref().and_then(|p| {
             p.properties.iter().find_map(|property| match property {
@@ -849,27 +856,31 @@ impl Data<Logs> {
         })
     }
 
-    pub fn payload_printf_args(&mut self) -> Option<&Vec<String>> {
+    /// If the log has printf args, returns an exclusive reference to args.
+    pub fn payload_printf_args(&mut self) -> Option<&[String]> {
         self.payload_printf().as_ref().and_then(|p| {
             p.properties.iter().find_map(|property| match property {
-                LogsProperty::StringList(LogsField::Args, format) => Some(format),
+                LogsProperty::StringList(LogsField::Args, format) => Some(format.as_slice()),
                 _ => None,
             })
         })
     }
 
+    /// If the log has printf payload, returns an exclusive reference to it.
     pub fn payload_printf(&self) -> Option<&DiagnosticsHierarchy<LogsField>> {
         self.payload
             .as_ref()
             .and_then(|p| p.children.iter().find(|property| property.name.as_str() == "printf"))
     }
 
+    /// If the log has message, returns an exclusive reference to it.
     pub fn payload_message(&self) -> Option<&DiagnosticsHierarchy<LogsField>> {
         self.payload
             .as_ref()
             .and_then(|p| p.children.iter().find(|property| property.name.as_str() == "message"))
     }
 
+    /// If the log has structured keys, returns an exclusive reference to them.
     pub fn payload_keys(&self) -> Option<&DiagnosticsHierarchy<LogsField>> {
         self.payload
             .as_ref()
@@ -936,6 +947,7 @@ impl Data<Logs> {
         }
     }
 
+    /// If the log has a message, returns a mutable reference to it.
     pub fn payload_message_mut(&mut self) -> Option<&mut DiagnosticsHierarchy<LogsField>> {
         self.payload.as_mut().and_then(|p| {
             p.children.iter_mut().find(|property| property.name.as_str() == "message")
@@ -1017,6 +1029,7 @@ impl Data<Logs> {
             .flatten()
     }
 
+    /// If the log has a verbosity, returns its value.
     pub fn verbosity(&self) -> Option<i8> {
         self.payload_message().and_then(|payload| {
             payload
@@ -1030,6 +1043,7 @@ impl Data<Logs> {
         })
     }
 
+    /// Sets the verbosity of a log.
     pub fn set_legacy_verbosity(&mut self, legacy: i8) {
         if let Some(payload_message) = self.payload_message_mut() {
             payload_message.properties.push(LogsProperty::Int(LogsField::Verbosity, legacy.into()));
@@ -1085,6 +1099,7 @@ impl Default for LogTextDisplayOptions {
     }
 }
 
+/// Configuration for the color of a log line that is displayed in tools using [`LogTextPresenter`].
 #[derive(Clone, Copy, Debug, Default)]
 pub enum LogTextColor {
     /// Do not print this log with ANSI colors.
@@ -1132,6 +1147,7 @@ impl LogTextColor {
     }
 }
 
+/// Options for the timezone associated to the timestamp of a log line.
 #[derive(Clone, Copy, Debug)]
 pub enum Timezone {
     /// Display a timestamp in terms of the local timezone as reported by the operating system.
@@ -1141,6 +1157,17 @@ pub enum Timezone {
     Utc,
 }
 
+impl Timezone {
+    fn format(&self, seconds: i64, rem_nanos: u32) -> impl std::fmt::Display {
+        const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
+        match self {
+            Timezone::Local => Local.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
+            Timezone::Utc => Utc.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
+        }
+    }
+}
+
+/// Configuration for how to display the timestamp associated to a log line.
 #[derive(Clone, Copy, Debug, Default)]
 pub enum LogTimeDisplayFormat {
     /// Display the log message's timestamp as monotonic nanoseconds since boot.
@@ -1161,7 +1188,6 @@ pub enum LogTimeDisplayFormat {
 impl LogTimeDisplayFormat {
     fn write_timestamp(&self, f: &mut fmt::Formatter<'_>, time: i64) -> fmt::Result {
         const NANOS_IN_SECOND: i64 = 1_000_000_000;
-        const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 
         match self {
             // Don't try to print a human readable string if it's going to be in 1970, fall back
@@ -1174,10 +1200,7 @@ impl LogTimeDisplayFormat {
                 let adjusted = time + offset;
                 let seconds = adjusted / NANOS_IN_SECOND;
                 let rem_nanos = (adjusted % NANOS_IN_SECOND) as u32;
-                let formatted = match tz {
-                    Timezone::Local => Local.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
-                    Timezone::Utc => Utc.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
-                };
+                let formatted = tz.format(seconds, rem_nanos);
                 write!(f, "[{}]", formatted)?;
             }
         }
@@ -1360,16 +1383,27 @@ impl fmt::Display for LogsField {
 
 // TODO(fxbug.dev/50519) - ensure that strings reported here align with naming
 // decisions made for the structured log format sent by other components.
+/// The label for the process koid in the log metadata.
 pub const PID_LABEL: &str = "pid";
+/// The label for the thread koid in the log metadata.
 pub const TID_LABEL: &str = "tid";
+/// The label for the number of dropped logs in the log metadata.
 pub const DROPPED_LABEL: &str = "num_dropped";
+/// The label for a tag in the log metadata.
 pub const TAG_LABEL: &str = "tag";
+/// The label for the contents of a message in the log payload.
 pub const MESSAGE_LABEL_STRUCTURED: &str = "value";
+/// The label for the message in the log payload.
 pub const MESSAGE_LABEL: &str = "message";
+/// The label for the format of a printf log in the log payload.
 pub const FORMAT_LABEL: &str = "format";
+/// The label for the args of a printf log in the log payload.
 pub const ARGS_LABEL: &str = "args";
+/// The label for the verbosity of a log.
 pub const VERBOSITY_LABEL: &str = "verbosity";
+/// The label for the file associated with a log line.
 pub const FILE_PATH_LABEL: &str = "file";
+/// The label for the line number in the file associated with a log line.
 pub const LINE_NUMBER_LABEL: &str = "line";
 
 impl LogsField {

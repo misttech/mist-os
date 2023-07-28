@@ -11,6 +11,7 @@ use fuchsia_zircon as zx;
 use std::{convert::TryFrom, fmt::Write, os::raw::c_int};
 use thiserror::Error;
 
+/// The legacy severity representation.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(i8)]
 pub enum LegacySeverity {
@@ -78,8 +79,10 @@ impl From<LegacySeverity> for c_int {
     }
 }
 
+/// Error that can happen when converting an integer to a [`LegacySeverity`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum SeverityError {
+    /// The number provided doesn't have a direct mapping to a [`LegacySeverity`].
     #[error("invalid or corrupt severity received: {provided}")]
     Invalid { provided: c_int },
 }
