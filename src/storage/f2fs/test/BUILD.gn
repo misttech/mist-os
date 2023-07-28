@@ -75,6 +75,7 @@ fuchsia_unittest_component("f2fs-unittest") {
 test("f2fs_slow_unit") {
   sources = [
     "unit/gc.cc",
+    "unit/large_volume.cc",
     "unit/multithreading.cc",
     "unit/unit_lib.cc",
   ]
