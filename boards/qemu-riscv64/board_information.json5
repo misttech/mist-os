@@ -9,4 +9,13 @@
         "fuchsia::driver_framework_v2_support",
         "fuchsia::network_require_netstack3",
     ],
+    filesystems: {
+        fvm: {
+            slice_size: 8388608,
+            blobfs: {
+                size_checker_maximum_bytes: 5216665600,
+            },
+            sparse_output: {},
+        },
+    },
 }

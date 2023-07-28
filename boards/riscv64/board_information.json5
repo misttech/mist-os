@@ -9,4 +9,9 @@
         "fuchsia::driver_framework_v2_support",
         "fuchsia::network_require_netstack3",
     ],
+    filesystems: {
+        fvm: {
+            sparse_output: {},
+        },
+    },
 }

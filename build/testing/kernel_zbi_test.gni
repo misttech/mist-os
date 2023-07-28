@@ -46,6 +46,8 @@ template("_cuckoo_kernel_zbi_test") {
   if (has_board) {
     assert(images_config_label != false,
            "Need to define images_config_label for cuckoo tests")
+    assert(board_information_for_assembly != false,
+           "Need to define board_information_for_assembly for cuckoo tests")
   } else {
     images_config_label = "//boards/images:default"
   }
@@ -81,6 +83,7 @@ template("_cuckoo_kernel_zbi_test") {
     assembly_images_config_label = images_config_label
     product_assembly_config_label =
         "//build/testing:cuckoo-product-configuration"
+    board_config = board_information_for_assembly
     allow_eng_platform_bundle_use = true
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob

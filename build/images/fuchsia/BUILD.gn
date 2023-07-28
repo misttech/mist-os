@@ -159,6 +159,7 @@ if (is_fuchsia) {
     }
 
     product_assembly_config_label = fuchsia_product_assembly_config_label
+    board_config = board_information_for_assembly
 
     cmdline_deps = [ "//build/input:bootfs" ]
 
@@ -256,6 +257,8 @@ if (is_fuchsia) {
     assert(images_config_label != false, "Need to define images_config_label")
     assert(partitions_config_label != false,
            "Need to define partitions_config_label")
+    assert(board_information_for_assembly != false,
+           "board_information_for_assembly must be defined for the build")
   } else {
     images_config_label = "//boards/images:default"
     partitions_config_label = "//boards/partitions:default"

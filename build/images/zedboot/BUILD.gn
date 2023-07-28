@@ -17,6 +17,8 @@ assert(current_toolchain == default_toolchain,
 if (has_board) {
   assert(zedboot_images_config_label != false,
          "Need to define zedboot_images_config_label")
+  assert(board_information_for_assembly != false,
+         "Need to define board_information_for_assembly")
 } else {
   zedboot_images_config_label = "//boards/images:default"
 }
@@ -34,6 +36,7 @@ assembled_system("zedboot_assembly") {
 
   assembly_images_config_label = zedboot_images_config_label
   product_assembly_config_label = "//build/assembly:default_product_config"
+  board_config = board_information_for_assembly
 
   base_packages = []
 

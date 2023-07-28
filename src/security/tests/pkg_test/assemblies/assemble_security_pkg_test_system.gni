@@ -122,6 +122,7 @@ template("assemble_security_pkg_test_system") {
     base_packages = "${assembly_name}.base_packages"
     images_config = "${assembly_name}_images_config"
     images_config_fxfs = "${assembly_name}_images_config_fxfs"
+    board_config = "${assembly_name}_board_config"
     build_info = "${assembly_name}_build_info"
     repository_config = "${assembly_name}_repository_config"
     packages_json = "${assembly_name}_packages_json"
@@ -163,6 +164,7 @@ template("assemble_security_pkg_test_system") {
         "${directories.assembly_out}/security_pkg_test_packages.json"
     partitions_json = "${directories.assembly_out}_partitions.json"
     images_json = "${directories.assembly_out}/images.json"
+    board_config = "${directories.assembly_out}/board_config.json"
     build_info_version = invoker.system_version_file
 
     # TODO(fxbug.dev/88453): These should be specified `invoker` to match the
@@ -279,6 +281,30 @@ template("assemble_security_pkg_test_system") {
                             "//src/sys/pkg/bin/system-update-committer:enable_reboot_on_verification_failure",
                           ] + invoker.base_packages
 
+  generated_file(labels.board_config) {
+    outputs = [ files.board_config ]
+    output_conversion = "json"
+    contents = {
+      name = "test"
+      filesystems = {
+        fvm = {
+          slice_size = 1048576
+          sparse_output = {
+          }
+        }
+        fxfs = {
+        }
+
+        if (defined(invoker.fvm_truncate_to_length)) {
+          fvm.truncate_to_length = invoker.fvm_truncate_to_length
+        }
+        if (defined(invoker.assembly_fxfs_image_size_bytes)) {
+          fxfs.size_bytes = invoker.assembly_fxfs_image_size_bytes
+        }
+      }
+    }
+  }
+
   # Main system assembly.
   assembled_system(labels.assembly) {
     testonly = true
@@ -297,6 +323,8 @@ template("assemble_security_pkg_test_system") {
     # The test never tries to boot using this assembly, and uses the resolution
     # code from the "main" assembly.
     product_assembly_config_label = "//build/assembly:default_product_config"
+    board_config = files.board_config
+    deps = [ ":${labels.board_config}" ]
     use_bringup_platform_bundles_only = true
     bootfs_labels = []
     base_packages = packages_for_assembly

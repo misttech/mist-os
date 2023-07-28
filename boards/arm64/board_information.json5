@@ -6,4 +6,16 @@
 {
     name: "arm64",
     provided_features: [],
+    filesystems: {
+        vbmeta: {
+            key: "../../third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
+            key_metadata: "../../third_party/android/platform/external/avb/test/data/atx_metadata.bin",
+        },
+        fvm: {
+            blobfs: {
+                size_checker_maximum_bytes: 5216665600,
+            },
+            sparse_output: {},
+        },
+    },
 }

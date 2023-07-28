@@ -16,6 +16,8 @@ assert(current_toolchain == default_toolchain,
 if (has_board) {
   assert(bringup_images_config_label != false,
          "Need to define bringup_images_config_label")
+  assert(board_information_for_assembly != false,
+         "board_information_for_assembly must be defined for the build")
 } else {
   bringup_images_config_label = "//boards/images:bringup_default"
 }
@@ -46,6 +48,7 @@ bringup_base = {
   }
 
   product_assembly_config_label = ":product_assembly_config"
+  board_config = board_information_for_assembly
   use_bringup_platform_bundles_only = true
 
   include_component_id_index = true

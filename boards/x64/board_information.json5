@@ -9,4 +9,19 @@
         "fuchsia::driver_framework_v2_support",
         "fuchsia::wlan_softmac",
     ],
+    filesystems: {
+        vbmeta: {
+            key: "../../third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
+            key_metadata: "../../third_party/android/platform/external/avb/test/data/atx_metadata.bin",
+        },
+        fvm: {
+            blobfs: {
+                size_checker_maximum_bytes: 5216665600,
+            },
+            sparse_output: {},
+            fastboot_output: {
+                truncate_to_length: 17179869184,
+            },
+        },
+    },
 }

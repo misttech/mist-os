@@ -9,6 +9,21 @@ package(default_visibility = ["//visibility:public"])
 fuchsia_board_configuration(
     name = "x64",
     board_name = "x64",
+    filesystems = {
+        "vbmeta": {
+            "key": "LABEL(//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem)",
+            "key_metadata": "LABEL(//:third_party/android/platform/external/avb/test/data/atx_metadata.bin)",
+        },
+        "fvm": {
+            "blobfs": {
+                "size_checker_maximum_bytes": 5216665600,
+            },
+            "sparse_output": {},
+            "fastboot_output": {
+                "truncate_to_length": 17179869184,
+            },
+        },
+    },
     provided_features = [
         "fuchsia::driver_framework_v2_support",
         "fuchsia::wlan_softmac",
@@ -18,6 +33,11 @@ fuchsia_board_configuration(
 fuchsia_board_configuration(
     name = "qemu-x64",
     board_name = "qemu-x64",
+    filesystems = {
+        "fvm": {
+            "sparse_output": {},
+        },
+    },
     provided_features = [
         "fuchsia::driver_framework_v2_support",
         "fuchsia::wlan_softmac",
@@ -27,6 +47,32 @@ fuchsia_board_configuration(
 fuchsia_board_configuration(
     name = "vim3",
     board_name = "vim3",
+    filesystems = {
+        "vbmeta": {
+            "key": "LABEL(//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_devkey_atx_psk.pem)",
+            "key_metadata": "LABEL(//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_dev_atx_metadata.bin)",
+        },
+        "fvm": {
+            "blobfs": {
+                "size_checker_maximum_bytes": 5216665600,
+            },
+            "sparse_output": {},
+            "fastboot_output": {
+                "compress": True,
+
+                # For VIM3, FVM partition uses all of the remaining eMMC.
+                # However, the total size of the eMMC storage maybe 16G or 32G
+                # depending on whether it is a basic or pro version. In
+                # addition, the actual size of the user block allocated by
+                # Fuchsia can be further different. (i.e. 'lsblk' shows a 29G
+                # size user block for the 32Gb version). To avoid the risk of
+                # overflowing available size, here we set it to be the same as
+                # sherlock (3280mb), which is clearly safe and sufficient for
+                # now.
+                "truncate_to_length": 3439329280,
+            },
+        },
+    },
     provided_features = [
         "fuchsia::driver_framework_v2_support",
         "fuchsia::fan",

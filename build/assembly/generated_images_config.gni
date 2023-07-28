@@ -7,10 +7,6 @@
 #
 # Parameters:
 #
-#   output_path (optional)
-#     [string] Where to write the images config to.
-#     Defaults to $target_out_dir/$target_name.json
-#
 #   zbi (required)
 #     [struct] Arguments for generating a ZBI.
 #     {
@@ -124,9 +120,7 @@
 #
 template("generated_images_config") {
   output_path = "$target_out_dir/$target_name.json"
-  if (defined(invoker.output_path)) {
-    output_path = invoker.output_path
-  }
+  product_output_path = "$target_out_dir/${target_name}_product.json"
 
   # ZBI
   assert(defined(invoker.zbi), "Need to define zbi")
@@ -186,19 +180,19 @@ template("generated_images_config") {
       name = "empty-data"
     }
     fvm_filesystems = [
-      blobfs,
       empty_data,
+      blobfs,
     ]
 
     # Optionally, reserve some slices in the FVM.
     if (defined(invoker_fvm.reserved)) {
       invoker_reserved = invoker_fvm.reserved
-      reserved = {
+      _reserved = {
         type = "reserved"
         name = "internal"
         slices = invoker_reserved.slices
       }
-      fvm_filesystems += [ reserved ]
+      fvm_filesystems += [ _reserved ]
     }
 
     standard_fvm = {
@@ -208,7 +202,7 @@ template("generated_images_config") {
         "empty-data",
         "blob",
       ]
-      if (defined(reserved)) {
+      if (defined(_reserved)) {
         filesystems += [ "internal" ]
       }
       if (defined(invoker_fvm.truncate_to_length)) {
@@ -223,7 +217,7 @@ template("generated_images_config") {
         "empty-data",
         "blob",
       ]
-      if (defined(reserved)) {
+      if (defined(_reserved)) {
         filesystems += [ "internal" ]
       }
       if (defined(invoker_fvm.max_disk_size)) {
@@ -244,7 +238,7 @@ template("generated_images_config") {
           "empty-data",
           "blob",
         ]
-        if (defined(reserved)) {
+        if (defined(_reserved)) {
           filesystems += [ "internal" ]
         }
         if (defined(invoker_fvm.max_disk_size)) {
@@ -277,7 +271,7 @@ template("generated_images_config") {
           "empty-data",
           "blob",
         ]
-        if (defined(reserved)) {
+        if (defined(_reserved)) {
           filesystems += [ "internal" ]
         }
         if (defined(invoker_fvm.max_disk_size)) {
@@ -307,7 +301,7 @@ template("generated_images_config") {
     }
 
     # Define an optional fvm
-    fvm = {
+    _fvm = {
       type = "fvm"
 
       # The size of a slice within the FVM.
@@ -337,6 +331,58 @@ template("generated_images_config") {
     }
   }
 
+  generated_file("${target_name}_product") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                           ])
+
+    outputs = [ product_output_path ]
+    output_conversion = "json"
+
+    # Pull out the blobfs and reserved sections.
+    if (defined(invoker.fvm)) {
+      _invoker_fvm = invoker.fvm
+      not_needed([ "_invoker_fvm" ])
+      if (defined(_invoker_fvm.reserved)) {
+        _invoker_fvm_reserved = _invoker_fvm.reserved
+      }
+      if (defined(_invoker_fvm.blobfs)) {
+        _invoker_fvm_blobfs = _invoker_fvm.blobfs
+      }
+    }
+
+    contents = {
+      image_name = invoker_zbi.name
+      format_data_on_corruption = false
+      if (defined(invoker.fvm)) {
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+              if (defined(_invoker_fvm_blobfs) &&
+                  defined(_invoker_fvm_blobfs.layout)) {
+                blob_layout = _invoker_fvm_blobfs.layout
+              }
+            }
+            if (defined(_invoker_fvm_reserved)) {
+              reserved = {
+                reserved_bytes = _invoker_fvm_reserved.slices
+              }
+            }
+          }
+        }
+      } else if (defined(invoker.fxfs)) {
+        volume = "fxfs"
+      } else {
+        volume = "none"
+      }
+    }
+  }
+
   generated_file(target_name) {
     forward_variables_from(invoker,
                            [
@@ -345,6 +391,10 @@ template("generated_images_config") {
                              "deps",
                            ])
 
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ ":${target_name}_product" ]
     outputs = [ output_path ]
     output_conversion = "json"
 
@@ -353,8 +403,8 @@ template("generated_images_config") {
     if (defined(vbmeta)) {
       _images += [ vbmeta ]
     }
-    if (defined(fvm)) {
-      _images += [ fvm ]
+    if (defined(_fvm)) {
+      _images += [ _fvm ]
     }
     if (defined(fxfs)) {
       _images += [ fxfs ]

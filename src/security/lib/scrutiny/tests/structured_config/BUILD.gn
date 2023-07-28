@@ -65,6 +65,7 @@ if (is_fuchsia) {
 
   files = {
     images_config = "$target_out_dir/fuchsia.images_config.json"
+    board_config = "$target_out_dir/fuchsia.board_config.json"
     partitions_config = "$target_out_dir/partitions_config.json"
 
     outdir = target_out_dir + "/assembly"
@@ -93,6 +94,20 @@ if (is_fuchsia) {
     }
   }
 
+  generated_file("board_config") {
+    outputs = [ files.board_config ]
+    output_conversion = "json"
+    contents = {
+      name = "test"
+      filesystems = {
+        fvm = {
+          sparse_output = {
+          }
+        }
+      }
+    }
+  }
+
   product_assembly_configuration("product_assembly_config") {
     platform = {
       build_type = "user"
@@ -108,6 +123,8 @@ if (is_fuchsia) {
 
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = ":product_assembly_config"
+    board_config = files.board_config
+    deps = [ ":board_config" ]
 
     # Needed for scrutiny to find root.cm and other component config.
     bootfs_labels = [ "//build/input:bootfs" ]

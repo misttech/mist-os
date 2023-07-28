@@ -23,6 +23,10 @@ template("assemble_network_conformance_system") {
     images_config_fvm = "${target_name}.images_config_fvm"
     images_config_fxfs = "${target_name}.images_config_fxfs"
     product_config = "${target_name}.product_assembly_config"
+    board_config = "${target_name}.board_config"
+  }
+  files = {
+    board_config = "${target_out_dir}/${target_name}.board_config.json"
   }
 
   core_realm_definition("core") {
@@ -46,6 +50,21 @@ template("assemble_network_conformance_system") {
     }
   }
 
+  generated_file(labels.board_config) {
+    outputs = [ files.board_config ]
+    output_conversion = "json"
+    contents = {
+      name = "network-conformance"
+      filesystems = {
+        fvm = {
+          slice_size = 1048576
+          sparse_output = {
+          }
+        }
+      }
+    }
+  }
+
   product_assembly_configuration(labels.product_config) {
     platform = {
       build_type = "eng"
@@ -66,6 +85,8 @@ template("assemble_network_conformance_system") {
     ramdisk_in_zbi = true
 
     product_assembly_config_label = ":${labels.product_config}"
+    board_config = files.board_config
+    deps = [ ":${labels.board_config}" ]
     allow_eng_platform_bundle_use = true
 
     base_packages = [

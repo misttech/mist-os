@@ -10,6 +10,8 @@ import("//src/sys/core/build/core.gni")
 
 assert(images_config_label != false,
        "images_config_label must be defined for the build")
+assert(board_information_for_assembly != false,
+       "board_information_for_assembly must be defined for the build")
 
 core_realm_definition("core") {
   testonly = true
@@ -19,6 +21,7 @@ assembled_system("overnet") {
   testonly = true
   assembly_images_config_label = images_config_label
   product_assembly_config_label = "//build/assembly:default_product_config"
+  board_config = board_information_for_assembly
   use_bringup_platform_bundles_only = true
 
   generate_fvm = !fxfs_blob

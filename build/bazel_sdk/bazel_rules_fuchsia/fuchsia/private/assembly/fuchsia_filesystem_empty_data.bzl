@@ -19,7 +19,7 @@ fuchsia_filesystem_empty_data = rule(
     attrs = {
         "empty_data_name": attr.string(
             doc = "Name of filesystem",
-            default = "empty_data",
+            default = "empty-data",
         ),
     },
 )

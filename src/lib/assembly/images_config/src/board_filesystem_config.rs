@@ -131,6 +131,10 @@ pub struct Fvm {
     #[serde(default)]
     pub slice_size: FvmSliceSize,
 
+    /// If provided, the standard fvm will be truncated to the specified length.
+    #[serde(default)]
+    pub truncate_to_length: Option<u64>,
+
     /// Board configuration for a blobfs if requested by a product. If the product does not
     /// request a blobfs, then these values are ignored.
     #[serde(default)]

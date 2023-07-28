@@ -11,6 +11,7 @@ load(
     "FuchsiaProductAssemblyInfo",
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
+    "FuchsiaProductImagesConfigInfo",
 )
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
@@ -24,6 +25,7 @@ $FFX \
     assembly \
     product \
     --product $PRODUCT_CONFIG_PATH \
+    --filesystem-config $PRODUCT_IMAGES_CONFIG_PATH \
     {board_config_arg} \
     --legacy-bundle $LEGACY_AIB \
     --input-bundles-dir $PLATFORM_AIB_DIR \
@@ -68,6 +70,7 @@ def _fuchsia_product_assembly_impl(ctx):
 
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
+    product_images_config_file = ctx.attr.filesystem_config[FuchsiaProductImagesConfigInfo].config
     board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config if ctx.attr.board_config else None
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
         board_config_arg = "--board-info $BOARD_CONFIG_PATH" if board_config_file else "",
@@ -75,11 +78,11 @@ def _fuchsia_product_assembly_impl(ctx):
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
+    ffx_inputs += ctx.files.filesystem_config
     if board_config_file:
         ffx_inputs.append(board_config_file)
     ffx_inputs += legacy_aib.files
     ffx_inputs += platform_aibs.files
-    ffx_inputs += ctx.files.product_config
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     shell_env = {
@@ -88,6 +91,7 @@ def _fuchsia_product_assembly_impl(ctx):
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
         "PRODUCT_CONFIG_PATH": product_config_file.path,
+        "PRODUCT_IMAGES_CONFIG_PATH": product_images_config_file.path,
         "LEGACY_AIB": legacy_aib.dir.path,
         "PLATFORM_AIB_DIR": platform_aibs.dir.path,
     }
@@ -146,6 +150,11 @@ fuchsia_product_assembly = rule(
         "product_config": attr.label(
             doc = "A product configuration target.",
             providers = [FuchsiaProductConfigInfo],
+            mandatory = True,
+        ),
+        "filesystem_config": attr.label(
+            doc = "A fuchsia_images_configuration target.",
+            providers = [FuchsiaProductImagesConfigInfo],
             mandatory = True,
         ),
         "board_config": attr.label(
@@ -272,6 +281,7 @@ def fuchsia_product_image(
         name = name + "_product_assembly",
         board_config = board_config,
         product_config = product_config,
+        filesystem_config = image,
         legacy_aib = legacy_aib,
         platform_aibs = platform_aibs,
     )

@@ -52,6 +52,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   assembly_images_config_label (required)
 #     [label] A label for the above images config file.
 #
+#   board_config (optional)
+#     [label] A board config file.
+#
 #   product_assembly_config_label (required)
 #     [label] A label for the product assembly config, should be a
 #     `product_assembly_configuration` target.
@@ -219,6 +222,10 @@ template("assembled_system") {
   assert(defined(invoker.assembly_images_config_label),
          "Need to define assembly_images_config_label")
 
+  _board_config = board_information_for_assembly
+  if (defined(invoker.board_config)) {
+    _board_config = invoker.board_config
+  }
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
     _generate_fvm = invoker.generate_fvm
@@ -375,12 +382,14 @@ template("assembled_system") {
     image_assembly_inputs =
         "$target_out_dir/${_namespace}.image_assembly_inputs"
 
-    gn_images_config = "$target_out_dir/${_namespace}.images_config.json"
-
     images_config =
         get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
         "/" + get_label_info(invoker.assembly_images_config_label, "name") +
         ".json"
+    filesystem_config =
+        get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
+        "/" + get_label_info(invoker.assembly_images_config_label, "name") +
+        "_product.json"
 
     outdir = "$target_out_dir/$_namespace"
     gendir = "$outdir/gen"
@@ -641,9 +650,13 @@ template("assembled_system") {
   ffx_action(labels.product_assembler) {
     forward_variables_from(invoker,
                            [
+                             "deps",
                              "testonly",
                              "visibility",
                            ])
+    if (!defined(deps)) {
+      deps = []
+    }
 
     # This will not be resolved except by moving to Bazel.
     hermetic_deps = false
@@ -660,14 +673,6 @@ template("assembled_system") {
       rebase_path(files.product_assembly_config, root_build_dir),
     ]
 
-    # If it's not set, assembly will fail, but this will at least allow GN to
-    # complete in situations where assembly won't be run.
-    if (board_information_for_assembly != false) {
-      args += [
-        "--board-info",
-        rebase_path(board_information_for_assembly, root_build_dir),
-      ]
-    }
     args += [
       "--input-bundles-dir",
       rebase_path(files.platform_common_aibs_dir, root_build_dir),
@@ -675,17 +680,28 @@ template("assembled_system") {
       rebase_path(files.legacy_assembly_input_bundle_dir, root_build_dir),
       "--outdir",
       rebase_path(files.outdir, root_build_dir),
+      "--filesystem-config",
+      rebase_path(files.filesystem_config, root_build_dir),
     ]
 
-    deps = [
-             ":${labels.legacy_assembly_input_bundle}",
-             labels.product_assembly_config,
-           ] + labels.platform_common_aibs
+    deps += [
+              ":${labels.legacy_assembly_input_bundle}",
+              labels.product_assembly_config,
+              labels.images_config,
+            ] + labels.platform_common_aibs
 
     inputs = [
                files.legacy_assembly_input_bundle_manifest,
                files.product_assembly_config,
              ] + files.platform_common_aibs
+
+    if (_board_config != false) {
+      args += [
+        "--board-info",
+        rebase_path(_board_config, root_build_dir),
+      ]
+      inputs += [ _board_config ]
+    }
 
     outputs = [ files.regenerated_image_assembly_config ]
 

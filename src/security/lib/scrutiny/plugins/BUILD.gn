@@ -17,6 +17,7 @@ import("//zircon/kernel/phys/qemu.gni")
 if (is_fuchsia) {
   files = {
     partitions = "$target_out_dir/partitions.json"
+    board_config = "$target_out_dir/board_config.json"
 
     assembly_outdir = "$target_out_dir/assembly"
     assembly_manifest = "$assembly_outdir/images.json"
@@ -41,6 +42,20 @@ if (is_fuchsia) {
   resource("bootfs") {
     sources = [ files.version ]
     outputs = [ "path/to/version" ]
+  }
+
+  generated_file("board_config") {
+    outputs = [ files.board_config ]
+    output_conversion = "json"
+    contents = {
+      name = "test"
+      filesystems = {
+        fvm = {
+          sparse_output = {
+          }
+        }
+      }
+    }
   }
 
   generated_images_config("images_config") {
@@ -68,6 +83,8 @@ if (is_fuchsia) {
 
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = ":assembly_config"
+    board_config = files.board_config
+    deps = [ ":board_config" ]
   }
 
   product_bundle("product_bundle") {

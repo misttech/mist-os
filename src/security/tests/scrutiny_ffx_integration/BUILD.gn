@@ -25,6 +25,22 @@ if (is_fuchsia) {
     outputs = [ "empty/{{source_file_part}}" ]
   }
 
+  _board_config = "$target_out_dir/board_config.json"
+  generated_file("board_config") {
+    outputs = [ _board_config ]
+    output_conversion = "json"
+    contents = {
+      name = "test"
+      filesystems = {
+        fvm = {
+          slice_size = 1048576
+          sparse_output = {
+          }
+        }
+      }
+    }
+  }
+
   generated_images_config("images_config") {
     zbi = {
       name = _assemble_system_target_name
@@ -55,6 +71,8 @@ if (is_fuchsia) {
     generate_fvm = true
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = "//build/assembly:default_product_config"
+    board_config = _board_config
+    deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true
     bootfs_labels = []
     base_packages = [
@@ -71,6 +89,8 @@ if (is_fuchsia) {
     generate_fvm = true
     assembly_images_config_label = ":images_config_recovery"
     product_assembly_config_label = "//build/assembly:default_product_config"
+    board_config = _board_config
+    deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true
     bootfs_labels = []
     ramdisk_in_zbi = true

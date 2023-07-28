@@ -32,9 +32,20 @@ rustc_test("resolve_bootfs_package") {
   sources = [ "src/resolve_bootfs_package.rs" ]
 }
 if (current_toolchain == default_toolchain) {
+  files = {
+    board_config = "$target_out_dir/board_config.json"
+  }
   generated_images_config("images_config") {
     zbi = {
       name = "test_zbi"
+    }
+  }
+
+  generated_file("board_config") {
+    outputs = [ files.board_config ]
+    output_conversion = "json"
+    contents = {
+      name = "test"
     }
   }
 
@@ -43,6 +54,8 @@ if (current_toolchain == default_toolchain) {
     testonly = true
     assembly_images_config_label = ":images_config"
     product_assembly_config_label = "//build/assembly:default_product_config"
+    board_config = files.board_config
+    deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true
     bootfs_labels = [ ":config" ]
     bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]

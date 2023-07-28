@@ -223,11 +223,11 @@ fuchsia_images_configuration(
     name = "images_config",
     fvm_slice_size = "8388608",
     images = [
-        ":fuchsia_vbmeta",
         ":fuchsia_zbi",
+        ":fuchsia_vbmeta",
         ":standard_fvm",
-        ":fastboot_fvm",
         ":sparse_fvm",
+        ":fastboot_fvm",
     ],
 )
 
@@ -285,12 +285,16 @@ fuchsia_fvm_standard(
 # Currently required by bazel_assembled_system
 fuchsia_fvm_sparse(
     name = "sparse_fvm",
-    filesystems = [":blobfs"],
+    filesystems = [
+        ":empty_data",
+        ":blobfs",
+    ],
     fvm_sparse_name = "fvm.sparse",
 )
 
 fuchsia_filesystem_blobfs(
     name = "blobfs",
+    maximum_contents_size = "5216665600",
 )
 
 fuchsia_filesystem_empty_data(

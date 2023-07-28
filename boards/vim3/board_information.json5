@@ -10,4 +10,30 @@
         "fuchsia::fan",
         "fuchsia::usb_peripheral_support",
     ],
+    filesystems: {
+        vbmeta: {
+            key: "../../src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem",
+            key_metadata: "../../src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin",
+        },
+        fvm: {
+            blobfs: {
+                size_checker_maximum_bytes: 5216665600,
+            },
+            sparse_output: {},
+            fastboot_output: {
+                compress: true,
+
+                // For VIM3, FVM partition uses all of the remaining eMMC.
+                // However, the total size of the eMMC storage maybe 16G or 32G
+                // depending on whether it is a basic or pro version. In
+                // addition, the actual size of the user block allocated by
+                // Fuchsia can be further different. (i.e. 'lsblk' shows a 29G
+                // size user block for the 32Gb version). To avoid the risk of
+                // overflowing available size, here we set it to be the same as
+                // sherlock (3280mb), which is clearly safe and sufficient for
+                // now.
+                truncate_to_length: 3439329280,
+            },
+        },
+    },
 }

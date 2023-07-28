@@ -115,14 +115,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let mut image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
 
-    if let Some(filesystem_config) = &filesystem_config {
-        let filesystem_config: ProductFilesystemConfig =
-            util::read_config(filesystem_config).context("Loading filesystem configuration")?;
-        let images =
-            ImagesConfig::from_product_and_board(&filesystem_config, &board_info.filesystems)
-                .context("Constructing images config")?;
-        image_assembly.images_config = Some(images);
-    }
+    let filesystem_config: ProductFilesystemConfig =
+        util::read_config(filesystem_config).context("Loading filesystem configuration")?;
+    let images = ImagesConfig::from_product_and_board(&filesystem_config, &board_info.filesystems)
+        .context("Constructing images config")?;
+    image_assembly.images_config = Some(images);
 
     // Validate the built product assembly.
     assembly_validate_product::validate_product(

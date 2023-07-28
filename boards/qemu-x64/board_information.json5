@@ -9,4 +9,9 @@
         "fuchsia::driver_framework_v2_support",
         "fuchsia::wlan_softmac",
     ],
+    filesystems: {
+        fvm: {
+            sparse_output: {},
+        },
+    },
 }

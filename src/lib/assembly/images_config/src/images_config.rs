@@ -409,6 +409,11 @@ impl ImagesConfig {
                 // Construct the list of FVM filesystems.
                 let mut filesystems = vec![];
                 let mut filesystem_names = vec![];
+                if let Some(_) = fvm.data {
+                    filesystems
+                        .push(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
+                    filesystem_names.push("empty-data".to_string());
+                }
                 if let Some(pfc::BlobFvmVolumeConfig { blob_layout }) = &fvm.blob {
                     filesystems.push(FvmFilesystem::BlobFS(BlobFS {
                         name: "blob".into(),
@@ -419,11 +424,6 @@ impl ImagesConfig {
                         maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
                     }));
                     filesystem_names.push("blob".to_string());
-                }
-                if let Some(_) = fvm.data {
-                    filesystems
-                        .push(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
-                    filesystem_names.push("empty-data".to_string());
                 }
                 if let Some(pfc::ReservedFvmVolumeConfig { reserved_bytes }) = fvm.reserved {
                     filesystems.push(FvmFilesystem::Reserved(Reserved {
@@ -440,7 +440,7 @@ impl ImagesConfig {
                     filesystems: filesystem_names.clone(),
                     compress: false,
                     resize_image_file_to_fit: false,
-                    truncate_to_length: None,
+                    truncate_to_length: board.fvm.truncate_to_length.clone(),
                 }));
                 if let Some(sparse) = &board.fvm.sparse_output {
                     outputs.push(FvmOutput::Sparse(SparseFvm {
@@ -513,6 +513,7 @@ mod tests {
             fxfs: bfc::Fxfs { size_bytes: Some(1234) },
             fvm: bfc::Fvm {
                 slice_size: bfc::FvmSliceSize(5678),
+                truncate_to_length: None,
                 blobfs: bfc::Blobfs {
                     size_checker_maximum_bytes: Some(12),
                     maximum_bytes: Some(34),
@@ -547,6 +548,7 @@ mod tests {
             fxfs: bfc::Fxfs { size_bytes: Some(1234) },
             fvm: bfc::Fvm {
                 slice_size: bfc::FvmSliceSize(5678),
+                truncate_to_length: None,
                 blobfs: bfc::Blobfs {
                     size_checker_maximum_bytes: Some(12),
                     maximum_bytes: Some(34),
@@ -676,6 +678,7 @@ mod tests {
                     Image::Fvm(Fvm {
                         slice_size: 5678,
                         filesystems: vec![
+                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
                             FvmFilesystem::BlobFS(BlobFS {
                                 name: "blob".into(),
                                 layout: BlobfsLayout::Compact,
@@ -684,7 +687,6 @@ mod tests {
                                 minimum_data_bytes: Some(78),
                                 maximum_contents_size: Some(12),
                             }),
-                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
                             FvmFilesystem::Reserved(Reserved {
                                 name: "internal".into(),
                                 slices: 7,
@@ -694,8 +696,8 @@ mod tests {
                             FvmOutput::Standard(StandardFvm {
                                 name: "fvm".into(),
                                 filesystems: vec![
-                                    "blob".to_string(),
                                     "empty-data".to_string(),
+                                    "blob".to_string(),
                                     "internal".to_string(),
                                 ],
                                 compress: false,
@@ -705,8 +707,8 @@ mod tests {
                             FvmOutput::Sparse(SparseFvm {
                                 name: "fvm.sparse".into(),
                                 filesystems: vec![
-                                    "blob".to_string(),
                                     "empty-data".to_string(),
+                                    "blob".to_string(),
                                     "internal".to_string(),
                                 ],
                                 max_disk_size: Some(2345),
@@ -714,8 +716,8 @@ mod tests {
                             FvmOutput::Standard(StandardFvm {
                                 name: "fvm.fastboot".into(),
                                 filesystems: vec![
-                                    "blob".to_string(),
                                     "empty-data".to_string(),
+                                    "blob".to_string(),
                                     "internal".to_string(),
                                 ],
                                 compress: true,
@@ -768,6 +770,7 @@ mod tests {
                     Image::Fvm(Fvm {
                         slice_size: 5678,
                         filesystems: vec![
+                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
                             FvmFilesystem::BlobFS(BlobFS {
                                 name: "blob".into(),
                                 layout: BlobfsLayout::Compact,
@@ -776,7 +779,6 @@ mod tests {
                                 minimum_data_bytes: Some(78),
                                 maximum_contents_size: Some(12),
                             }),
-                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
                             FvmFilesystem::Reserved(Reserved {
                                 name: "internal".into(),
                                 slices: 7,
@@ -786,8 +788,8 @@ mod tests {
                             FvmOutput::Standard(StandardFvm {
                                 name: "fvm".into(),
                                 filesystems: vec![
-                                    "blob".to_string(),
                                     "empty-data".to_string(),
+                                    "blob".to_string(),
                                     "internal".to_string(),
                                 ],
                                 compress: false,
@@ -797,8 +799,8 @@ mod tests {
                             FvmOutput::Sparse(SparseFvm {
                                 name: "fvm.sparse".into(),
                                 filesystems: vec![
-                                    "blob".to_string(),
                                     "empty-data".to_string(),
+                                    "blob".to_string(),
                                     "internal".to_string(),
                                 ],
                                 max_disk_size: Some(2345),
@@ -806,8 +808,8 @@ mod tests {
                             FvmOutput::Nand(NandFvm {
                                 name: "fvm.fastboot".into(),
                                 filesystems: vec![
-                                    "blob".to_string(),
                                     "empty-data".to_string(),
+                                    "blob".to_string(),
                                     "internal".to_string(),
                                 ],
                                 max_disk_size: Some(3456),

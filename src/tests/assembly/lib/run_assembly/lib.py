@@ -9,6 +9,7 @@ import subprocess
 def run_product_assembly(
         ffx_bin,
         product,
+        filesystem_config,
         board_info,
         input_bundles,
         legacy_bundle,
@@ -51,6 +52,8 @@ def run_product_assembly(
         "product",
         "--product",
         product,
+        "--filesystem-config",
+        filesystem_config,
         "--board-info",
         board_info,
         "--input-bundles-dir",

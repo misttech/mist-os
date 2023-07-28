@@ -37,6 +37,13 @@ FuchsiaBoardConfigInfo = provider(
     },
 )
 
+FuchsiaProductImagesConfigInfo = provider(
+    doc = "The product arguments of the images config.",
+    fields = {
+        "config": "JSON configuration file",
+    },
+)
+
 FuchsiaAssemblyConfigInfo = provider(
     doc = "Private provider that includes a single JSON configuration file.",
     fields = {
