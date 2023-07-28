@@ -722,12 +722,12 @@ pub fn sys_mknodat(
     mode: FileMode,
     dev: DeviceType,
 ) -> Result<(), Errno> {
-    let file_type = match mode & FileMode::IFMT {
+    let file_type = match mode.fmt() {
         FileMode::IFREG
         | FileMode::IFCHR
         | FileMode::IFBLK
         | FileMode::IFIFO
-        | FileMode::IFSOCK => mode & FileMode::IFMT,
+        | FileMode::IFSOCK => mode.fmt(),
         FileMode::EMPTY => FileMode::IFREG,
         _ => return error!(EINVAL),
     };

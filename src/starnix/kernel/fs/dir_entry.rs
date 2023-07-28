@@ -374,6 +374,20 @@ impl DirEntry {
                 mode &= !FileMode::ISGID;
             }
 
+            // https://man7.org/linux/man-pages/man2/mknod.2.html says:
+            //
+            //   mode requested creation of something other than a regular
+            //   file, FIFO (named pipe), or UNIX domain socket, and the
+            //   caller is not privileged (Linux: does not have the
+            //   CAP_MKNOD capability); also returned if the filesystem
+            //   containing pathname does not support the type of node
+            //   requested.
+            if !creds.has_capability(CAP_MKNOD) {
+                if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
+                    return error!(EPERM);
+                }
+            }
+
             let node = self.node.mknod(current_task, name, mode, dev, owner)?;
             if mode.is_sock() {
                 node.set_socket(Socket::new(
