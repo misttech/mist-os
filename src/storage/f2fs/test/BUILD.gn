@@ -12,8 +12,7 @@ group("test") {
   testonly = true
   deps = [
     ":f2fs-fs-tests",
-    # TODO(https://fxbug.dev/131297): Re-enable once this is not flaky.
-    # ":f2fs-slow-fs-tests",
+    ":f2fs-slow-fs-tests",
   ]
 }
 
