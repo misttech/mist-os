@@ -11,6 +11,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
@@ -41,6 +42,8 @@ constexpr uint32_t capture_yuv2rgb_coeff[3][3] = {
     {0x04a8, 0x0000, 0x072c}, {0x04a8, 0x1f26, 0x1ddd}, {0x04a8, 0x0876, 0x0000}};
 constexpr uint32_t capture_yuv2rgb_preoffset[3] = {0xfc0, 0xe00, 0xe00};
 constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
+
+constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInputModule1;
 
 }  // namespace
 
@@ -425,10 +428,11 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
   WrBackCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_chan0_sel(5).WriteTo(&(*vpu_mmio_));
 
   // setup hold lines and vdin selection to internal loopback
-  VdInComCtrl0Reg::Get()
+  VideoInputCommandControl::Get(kVideoInputModuleId)
       .ReadFrom(&(*vpu_mmio_))
       .set_hold_lines(0)
-      .set_vdin_selection(7)
+      .set_input_source_selection(
+          VideoInputCommandControl::InputSource::kVideoInputUnitInternalLoopback)
       .WriteTo(&(*vpu_mmio_));
   VdinLFifoCtrlReg::Get().FromValue(0).set_fifo_buf_size(0x780).WriteTo(&(*vpu_mmio_));
 
@@ -547,7 +551,10 @@ zx_status_t Vpu::CaptureStart() {
   VdInWrCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_write_ctrl(0).WriteTo(&(*vpu_mmio_));
 
   // disable vdin path
-  VdInComCtrl0Reg::Get().ReadFrom(&(*vpu_mmio_)).set_enable_vdin(0).WriteTo(&(*vpu_mmio_));
+  VideoInputCommandControl::Get(kVideoInputModuleId)
+      .ReadFrom(&(*vpu_mmio_))
+      .set_video_input_enabled(false)
+      .WriteTo(&(*vpu_mmio_));
 
   // reset mif
   VdInMiscCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_mif_reset(1).WriteTo(&(*vpu_mmio_));
@@ -570,7 +577,10 @@ zx_status_t Vpu::CaptureStart() {
   VdInWrCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_write_mem_enable(1).WriteTo(&(*vpu_mmio_));
 
   // enable vdin path
-  VdInComCtrl0Reg::Get().ReadFrom(&(*vpu_mmio_)).set_enable_vdin(1).WriteTo(&(*vpu_mmio_));
+  VideoInputCommandControl::Get(kVideoInputModuleId)
+      .ReadFrom(&(*vpu_mmio_))
+      .set_video_input_enabled(true)
+      .WriteTo(&(*vpu_mmio_));
 
   capture_state_ = CAPTURE_ACTIVE;
   return ZX_OK;
@@ -583,7 +593,10 @@ zx_status_t Vpu::CaptureDone() {
   VdInWrCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_write_ctrl(0).WriteTo(&(*vpu_mmio_));
 
   // disable vdin path
-  VdInComCtrl0Reg::Get().ReadFrom(&(*vpu_mmio_)).set_enable_vdin(0).WriteTo(&(*vpu_mmio_));
+  VideoInputCommandControl::Get(kVideoInputModuleId)
+      .ReadFrom(&(*vpu_mmio_))
+      .set_video_input_enabled(0)
+      .WriteTo(&(*vpu_mmio_));
 
   // reset mif
   VdInMiscCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_mif_reset(1).WriteTo(&(*vpu_mmio_));
@@ -595,7 +608,8 @@ zx_status_t Vpu::CaptureDone() {
 
 void Vpu::CapturePrintRegisters() {
   DISP_INFO("** Display Loopback Register Dump **\n\n");
-  DISP_INFO("VdInComCtrl0Reg = 0x%x\n", VdInComCtrl0Reg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
+  DISP_INFO("VdInComCtrl0Reg = 0x%x\n",
+            VideoInputCommandControl::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInComStatus0Reg = 0x%x\n",
             VdInComStatus0Reg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInMatrixCtrlReg = 0x%x\n",

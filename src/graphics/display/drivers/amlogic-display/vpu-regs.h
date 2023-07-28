@@ -190,14 +190,6 @@ class WrBackCtrlReg : public hwreg::RegisterBase<WrBackCtrlReg, uint32_t> {
   static auto Get() { return hwreg::RegisterAddr<WrBackCtrlReg>(VPU_WRBACK_CTRL); }
 };
 
-class VdInComCtrl0Reg : public hwreg::RegisterBase<VdInComCtrl0Reg, uint32_t> {
- public:
-  DEF_FIELD(26, 20, hold_lines);
-  DEF_BIT(4, enable_vdin);
-  DEF_FIELD(3, 0, vdin_selection);
-  static auto Get() { return hwreg::RegisterAddr<VdInComCtrl0Reg>(VPU_VDIN1_COM_CTRL0); }
-};
-
 class VdInComStatus0Reg : public hwreg::RegisterBase<VdInComStatus0Reg, uint32_t> {
  public:
   DEF_BIT(2, done);
