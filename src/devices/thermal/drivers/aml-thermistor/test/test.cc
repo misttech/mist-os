@@ -5,9 +5,11 @@
 #include <fidl/fuchsia.hardware.adc/cpp/wire.h>
 #include <fidl/fuchsia.hardware.temperature/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <string.h>
 
 #include <cmath>
 #include <memory>
+#include <string_view>
 
 #include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
@@ -110,8 +112,8 @@ class ThermistorDeviceTest : public zxtest::Test {
     adc_ = fbl::MakeRefCounted<TestSarAdc>(mock0.GetMmioBuffer(), mock1.GetMmioBuffer(),
                                            std::move(irq));
 
-    thermistor_ =
-        std::make_unique<ThermistorChannel>(root_.get(), adc_, 0, ntc_info[0], kPullupValue);
+    thermistor_ = std::make_unique<ThermistorChannel>(root_.get(), adc_, 0, ntc_info[0],
+                                                      kPullupValue, "channel");
 
     loop_.StartThread();
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
@@ -150,6 +152,15 @@ TEST_F(ThermistorDeviceTest, GetTemperatureCelsius) {
     auto result = client_->GetTemperatureCelsius();
     EXPECT_NOT_OK(result.value().status);
   }
+}
+
+TEST_F(ThermistorDeviceTest, GetSensorName) {
+  constexpr char kExpectedSensorName[] = "channel";
+
+  auto result = client_->GetSensorName();
+  ASSERT_TRUE(result.ok());
+  const std::string_view name(result->name.data(), result->name.size());
+  EXPECT_STREQ(name, kExpectedSensorName);
 }
 
 }  //  namespace thermal

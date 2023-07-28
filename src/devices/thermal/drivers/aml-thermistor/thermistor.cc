@@ -75,7 +75,7 @@ zx_status_t AmlThermistor::AddThermChannel(NtcChannel ch, NtcInfo info) {
   zx_status_t status;
 
   std::unique_ptr<ThermistorChannel> dev(
-      new ThermistorChannel(zxdev(), saradc_, ch.adc_channel, info, ch.pullup_ohms));
+      new ThermistorChannel(zxdev(), saradc_, ch.adc_channel, info, ch.pullup_ohms, ch.name));
 
   status = dev->DdkAdd(ddk::DeviceAddArgs(ch.name));
   if (status != ZX_OK) {

@@ -21,6 +21,10 @@ void ThermistorChannel::GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sy
   }
 }
 
+void ThermistorChannel::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+  completer.Reply(fidl::StringView::FromExternal(name_));
+}
+
 void RawChannel::GetSample(GetSampleCompleter::Sync& completer) {
   uint32_t sample;
   zx_status_t status = adc_->GetSample(adc_channel_, &sample);

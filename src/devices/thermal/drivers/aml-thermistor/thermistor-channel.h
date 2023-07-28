@@ -12,6 +12,8 @@
 #include <lib/thermal/ntc.h>
 #include <lib/zx/interrupt.h>
 
+#include <string>
+
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
@@ -30,11 +32,15 @@ using DeviceType2 =
 class ThermistorChannel : public DeviceType2, public ddk::EmptyProtocol<ZX_PROTOCOL_TEMPERATURE> {
  public:
   ThermistorChannel(zx_device_t* device, fbl::RefPtr<AmlSaradcDevice> adc, uint32_t ch,
-                    NtcInfo ntc_info, uint32_t pullup_ohms)
-      : DeviceType2(device), adc_(adc), adc_channel_(ch), ntc_(ntc_info, pullup_ohms) {}
+                    NtcInfo ntc_info, uint32_t pullup_ohms, const char* name)
+      : DeviceType2(device),
+        adc_(adc),
+        adc_channel_(ch),
+        ntc_(ntc_info, pullup_ohms),
+        name_(name) {}
 
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
-  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
   void DdkRelease() { delete this; }
 
  private:
@@ -43,6 +49,7 @@ class ThermistorChannel : public DeviceType2, public ddk::EmptyProtocol<ZX_PROTO
   const fbl::RefPtr<AmlSaradcDevice> adc_;
   const uint32_t adc_channel_;
   const Ntc ntc_;
+  const std::string name_;
 };
 
 namespace FidlAdc = fuchsia_hardware_adc;
