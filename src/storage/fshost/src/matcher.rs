@@ -296,7 +296,7 @@ impl Matcher for FvmMatcher {
                     env.mount_data_on(data_name).await?;
                 } else {
                     let fvm_driver_path = format!("{}/fvm", device.topological_path());
-                    tracing::warn!(%fvm_driver_path,
+                    tracing::warn!(%fvm_driver_path, ?volume_names,
                         "No existing data partition. Calling format_data().",
                     );
                     let fs =

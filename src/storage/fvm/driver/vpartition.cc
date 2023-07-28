@@ -513,4 +513,24 @@ void VPartition::DdkRelease() { delete this; }
 
 zx_device_t* VPartition::GetParent() const { return mgr_->parent(); }
 
+void VPartition::DdkInit(ddk::InitTxn init_txn) {
+  init_txn.Reply(ZX_OK);
+  // Signal to the VPartitionManager that the device has been initialized.
+  if (on_init_) {
+    sync_completion_signal(on_init_);
+  }
+}
+
+zx_status_t VPartition::AddWaitForInit(std::unique_ptr<VPartition> vp, const std::string& name,
+                                       sync_completion_t* on_init) {
+  vp->on_init_ = on_init;
+  if (zx_status_t status = vp->DdkAdd(name.c_str()); status != ZX_OK) {
+    return status;
+  }
+  // The VPartition object was added to the DDK and is now owned by it. It will be deleted when the
+  // device is released.
+  static_cast<void>(vp.release());
+  return ZX_OK;
+}
+
 }  // namespace fvm

@@ -114,20 +114,22 @@ void VPartitionManager::DdkInit(ddk::InitTxn txn) {
   // device visible and able to be unbound.
 }
 
-zx_status_t VPartitionManager::AddPartition(std::unique_ptr<VPartition> vp) {
+zx_status_t VPartitionManager::AddPartition(std::unique_ptr<VPartition> vp,
+                                            sync_completion_t* on_init) {
   const std::string name =
       GetAllocatedVPartEntry(vp->entry_index())->name() + "-p-" + std::to_string(vp->entry_index());
-
-  zx_status_t status;
-  if ((status = vp->DdkAdd(name.c_str())) != ZX_OK) {
+  const size_t entry_index = vp->entry_index();
+  {
+    fbl::AutoLock lock(&lock_);
+    ZX_DEBUG_ASSERT(!device_bound_at_entry_[entry_index]);
+    device_bound_at_entry_[entry_index] = true;
+  }
+  if (zx_status_t status = VPartition::AddWaitForInit(std::move(vp), name, on_init);
+      status != ZX_OK) {
+    fbl::AutoLock lock(&lock_);
+    device_bound_at_entry_[entry_index] = false;
     return status;
   }
-  fbl::AutoLock lock(&lock_);
-  device_bound_at_entry_[vp->entry_index()] = true;
-
-  // The VPartition object was added to the DDK and is now owned by it. It will be deleted when the
-  // device is released.
-  [[maybe_unused]] auto ptr = vp.release();
   return ZX_OK;
 }
 
@@ -380,10 +382,12 @@ zx_status_t VPartitionManager::Load() {
       FreeSlices(vpartitions[i].get(), 0, VSliceMax());
       continue;
     }
-    if ((status = AddPartition(std::move(vpartitions[i]))) != ZX_OK) {
+    sync_completion_t on_init = {};
+    if ((status = AddPartition(std::move(vpartitions[i]), &on_init)) != ZX_OK) {
       zxlogf(ERROR, "Failed to add partition: %s", zx_status_get_string(status));
       continue;
     }
+    sync_completion_wait(&on_init, ZX_TIME_INFINITE);
     partitions.push_back({.name = entry->name(), .num_slices = entry->slices});
     device_count++;
   }
@@ -871,17 +875,17 @@ void VPartitionManager::AllocatePartition(AllocatePartitionRequestView request,
   zx_status_t status = partition_or.status_value();
   if (partition_or.is_ok()) {
     // Register the created partition with the device manager.
-    status = AddPartition(std::move(partition_or.value()));
+    status = AddPartition(std::move(partition_or.value()), /*on_init*/ nullptr);
   }
 
   completer.Reply(status);
 }
 
 void VPartitionManager::GetInfo(GetInfoCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/126961): GetInfo waits for partitions_ready_ to be true, which
-  // happens once DdkAdd has completed binding all child volumes of the VPartitionManager. So long
-  // as VPartition does NOT implement DdkInit, GetInfo() can be used as a barrier for enumerating
-  // child partitions in devfs, as long as the VPartitionManager has already been made visible.
+  // TODO(https://fxbug.dev/126961): GetInfo() waits for all initial child volumes of the
+  // VPartitionManager to be initialized before responding to any requests. This is used to
+  // mitigate but not entirely fix a race between child devices have been initialized versus
+  // when they are able to be enumerated in devfs.
   {
     fbl::AutoLock lock(&lock_);
     if (get_info_requests_) {
