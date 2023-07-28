@@ -8,17 +8,12 @@ config("magma_include") {
   include_dirs = [ "include" ]
 }
 
-source_set("magma_common") {
-  sources = [ "include/lib/magma/magma_common_defs.h" ]
-  public_configs = [ ":magma_include" ]
-}
-
 source_set("magma_headers") {
   sources = [
     "include/lib/magma/magma.h",
     "include/lib/magma/magma_sysmem.h",
   ]
-  public_deps = [ ":magma_common" ]
+  public_deps = [ "//sdk/lib/magma_common" ]
   public_configs = [ ":magma_include" ]
 }
 
@@ -27,9 +22,9 @@ sdk_static_library("magma_client") {
   sdk_name = "magma_client"
   public = [
     "include/lib/magma/magma.h",
-    "include/lib/magma/magma_common_defs.h",
     "include/lib/magma/magma_sysmem.h",
   ]
+  public_deps = [ "//sdk/lib/magma_common" ]
   deps = [ "//src/graphics/lib/magma/src/libmagma:magma_client" ]
   complete_static_lib = true
 }

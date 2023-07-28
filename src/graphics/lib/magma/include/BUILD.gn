@@ -9,7 +9,7 @@ source_set("magma") {
 }
 
 source_set("magma_common") {
-  public_deps = [ "//sdk/lib/magma_client:magma_common" ]
+  public_deps = [ "//sdk/lib/magma_common" ]
 }
 
 config("msd_config") {

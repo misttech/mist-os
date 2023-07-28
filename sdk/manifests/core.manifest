@@ -204,6 +204,7 @@ sdk://pkg/input_report_reader
 sdk://pkg/inspect
 sdk://pkg/inspect_service_cpp
 sdk://pkg/magma_client
+sdk://pkg/magma_common
 sdk://pkg/media_cpp
 sdk://pkg/media_cpp_no_converters
 sdk://pkg/scenic_cpp

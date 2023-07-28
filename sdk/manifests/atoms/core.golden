@@ -181,6 +181,7 @@
 //sdk/lib/inspect/service/cpp:cpp_sdk
 //sdk/lib/inspect:inspect
 //sdk/lib/magma_client:magma_client_sdk_manifest
+//sdk/lib/magma_common:magma_common_sdk
 //sdk/lib/media/cpp:cpp_sdk
 //sdk/lib/media/cpp:no_converters_sdk
 //sdk/lib/stdcompat:stdcompat_sdk

@@ -365,6 +365,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/inspect",
     "//sdk/lib/inspect/service/cpp:cpp_sdk",
     "//sdk/lib/magma_client:magma_client_sdk",
+    "//sdk/lib/magma_common:magma_common_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
     "//sdk/lib/svc:svc_sdk",

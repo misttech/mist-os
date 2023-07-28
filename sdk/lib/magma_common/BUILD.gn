@@ -1,0 +1,16 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+
+config("magma_include") {
+  include_dirs = [ "include" ]
+}
+
+sdk_source_set("magma_common") {
+  category = "partner"
+  sdk_name = "magma_common"
+  public = [ "include/lib/magma/magma_common_defs.h" ]
+  public_configs = [ ":magma_include" ]
+}
