@@ -17,6 +17,14 @@ type Named = struct {
     s string:200;
 };
 
+alias NamedAlias = Named;
+
+alias StringAlias = string:100;
+
+alias VectorAlias = vector<NamedAlias>:20;
+
+alias HandleAlias = zx.Handle;
+
 closed protocol FidlCodecTestProtocol {
     strict Empty();
     strict String(struct {

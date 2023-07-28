@@ -67,7 +67,7 @@ class IR(dict):
             #
             # See _sorted_type_declarations for an example of looking these fields up.
             for decl in ["bits", "enum", "struct", "table", "union", "const",
-                         "alias", "protocol"]:
+                         "alias", "protocol", "experimental_resource"]:
                 setattr(self, f"{decl}_decls", self._decl_dict(decl))
 
     def _decl_dict(self, ty: str) -> Dict[str, IR]:
@@ -132,6 +132,12 @@ class IR(dict):
 
     def table_declarations(self) -> List[IR]:
         return self._sorted_type_declarations("table")
+
+    def alias_declarations(self) -> List[IR]:
+        return self._sorted_type_declarations("alias")
+
+    def experimental_resource_declarations(self) -> List[IR]:
+        return self._sorted_type_declarations("experimental_resource")
 
     def resolve_kind(self, key) -> Tuple[str, str]:
         """Iteratively attempts to resolve the passed kind.
@@ -342,6 +348,21 @@ def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
     ty = enum.IntFlag(name, members)
     setattr(ty, "__fidl_kind__", type_name)
     setattr(ty, "__doc__", docstring(ir))
+    setattr(ty, "__members_for_aliasing__", members)
+    return ty
+
+
+def experimental_resource_type(ir, root_ir, recurse_guard=None) -> type:
+    name = fidl_ident_to_py_library_member(ir.name())
+    ty = type(
+        name,
+        (int,),
+        {
+            "__doc__": docstring(ir),
+            "__fidl_kind__": "experimental_resource",
+            "__fidl_type__": ir.name(),
+        },
+    )
     return ty
 
 
@@ -501,6 +522,45 @@ def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
         return FIDLConstant(name, ir["value"]["value"])
     raise TypeError(
         f"As yet unsupported type in library '{root_ir['name']}': {kind}")
+
+
+def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
+    """Constructs a Python type from a FIDL IR alias declaration."""
+    name = fidl_ident_to_py_library_member(ir.name())
+    ctor = ir.get("partial_type_ctor")
+    if ctor:
+        ctor_type = ctor["name"]
+        try:
+            base_type = string_to_basetype(ctor_type)
+        except Exception:
+            if ctor_type == "string":
+                base_type = str
+            elif ctor_type == "vector":
+                # This can likely be annotated better, like constraining types.
+                # There is a doc explaining some of the limitations here at go/fidl-ir-aliases
+                # So for the time being this is just a generic list rather than anything specific
+                # Like the struct-creating code that builds vector annotations in a more rigorous
+                # way.
+                base_type = list
+            else:
+                base_type = get_type_by_identifier(ctor_type, root_ir)
+        if type(base_type) == enum.EnumType:
+            # This is a bit of a special case. Enum cannot be used as a base type when using the
+            # `type` operator.
+            ty = enum.IntFlag(name, base_type.__members_for_aliasing__)
+            setattr(ty, "__doc__", docstring(ir))
+            setattr(ty, "__fidl_kind__", "alias")
+            setattr(ty, "__fidl_type__", ir.name())
+            setattr(
+                ty, "__members_for_aliasing__",
+                base_type.__members_for_aliasing__)
+            return ty
+        base_params = {
+            "__doc__": docstring(ir),
+            "__fidl_kind__": "alias",
+            "__fidl_type__": ir.name(),
+        }
+        return type(name, (base_type,), base_params)
 
 
 def protocol_type(ir, root_ir, recurse_guard=None) -> type:
@@ -679,6 +739,7 @@ class FIDLLibraryModule(types.ModuleType):
         self.__all__: List[str] = []
 
         self.export_bits()
+        self.export_experimental_resources()
         self.export_enums()
         self.export_structs()
         self.export_tables()
@@ -702,6 +763,11 @@ class FIDLLibraryModule(types.ModuleType):
             if decl.name() not in self.__all__:
                 self.export_type(table_type(decl, self.__ir__))
 
+    def export_experimental_resources(self):
+        for decl in self.__ir__.experimental_resource_declarations():
+            if decl.name() not in self.__all__:
+                self.export_type(experimental_resource_type(decl, self.__ir__))
+
     def export_bits(self):
         for decl in self.__ir__.bits_declarations():
             if decl.name() not in self.__all__:
@@ -718,9 +784,9 @@ class FIDLLibraryModule(types.ModuleType):
                 self.export_fidl_const(const_declaration(decl, self.__ir__))
 
     def export_aliases(self):
-        # TODO(fxbug.dev/127714): support aliases. This will require constructing types based on
-        # other types.
-        pass
+        for decl in self.__ir__.alias_declarations():
+            if decl.name() not in self.__all__:
+                self.export_type(alias_declaration(decl, self.__ir__))
 
     def export_unions(self):
         for decl in self.__ir__.union_declarations():

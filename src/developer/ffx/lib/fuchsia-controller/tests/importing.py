@@ -89,3 +89,21 @@ class Importing(unittest.TestCase):
                 method="DefaultEnumMessage"))
         msg = decode_fidl_request(bytes=b, handles=h)
         self.assertEqual(msg["ev"], mod.DefaultEnum.X)
+
+    def test_alias_import_subclasses_structs(self):
+        mod = importlib.import_module("fidl.test_fidlcodec_examples")
+        alias = mod.NamedAlias
+        base_ty = mod.Named
+        self.assertTrue(issubclass(alias, base_ty))
+
+    def test_alias_type_correct_base(self):
+        mod = importlib.import_module("fidl.test_fidlcodec_examples")
+        alias = mod.StringAlias
+        self.assertTrue(issubclass(alias, str))
+        alias = mod.VectorAlias
+        self.assertTrue(issubclass(alias, list))
+
+    def test_alias_from_other_library_is_imported(self):
+        mod = importlib.import_module("fidl.test_fidlcodec_examples")
+        alias = mod.HandleAlias
+        self.assertTrue(issubclass(alias, int))
