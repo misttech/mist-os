@@ -4,7 +4,18 @@
 
 #![deny(missing_docs)]
 
-//! Ping library.
+//! Helpers to ping an IPv4 or IPv6 address by sending ICMP echo requests and
+//! waiting for ICMP echo replies.
+//!
+//! Functionality in this crate relies on [ICMP sockets], a kind of socket where
+//! each payload read/written contains ICMP headers.
+//!
+//! As a starting point, see [`new_unicast_sink_and_stream`], which is built
+//! on top of the other facilities in the crate and models pinging as sending
+//! an ICMP echo request whenever a value is sent to the sink, and a stream
+//! which yields an item for every echo reply received.
+//!
+//! [ICMP sockets]: https://lwn.net/Articles/422330/
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia;
