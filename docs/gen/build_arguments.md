@@ -5920,6 +5920,15 @@ Default gn build virtualenv target.
 
 From //third_party/pigweed/src/pw_build/python_gn_args.gni:23
 
+### pw_build_PYTHON_PIP_DEFAULT_OPTIONS
+
+General options passed to pip commands
+https://pip.pypa.io/en/stable/cli/pip/#general-options
+
+**Current value (from the default):** `["--disable-pip-version-check"]`
+
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:50
+
 ### pw_build_PYTHON_PIP_DOWNLOAD_ALL_PLATFORMS
 
 DOCSTAG: [default-pip-gn-args]
