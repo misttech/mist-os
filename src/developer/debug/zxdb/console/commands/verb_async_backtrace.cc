@@ -489,29 +489,6 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
   return out;
 }
 
-fxl::RefPtr<AsyncOutputBuffer> FormatLocalExecutor(const FormatFutureOptions& options,
-                                                   const fxl::RefPtr<EvalContext>& context) {
-  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-
-  // For single-threaded executor, the main_future only lives on the stack so we need to print
-  // both the main_future and the active_tasks.
-  EvalExpression("main_future", context, false, [out, options, context](const ErrOrValue& value) {
-    if (value.has_error()) {
-      out->Append(FormatError("Cannot locate main_future: " + value.err().msg() +
-                              ". Note that only debug build is supported for now."));
-    } else {
-      out->Append("MainTask\n", TextForegroundColor::kGreen);
-      out->Append(kAwaiteeMarker);
-      out->Append(FormatFuture(value.value(), options, context, 3));
-    }
-    EvalExpression("self.inner->data.active_tasks.data.value", context, false,
-                   [out, options, context](const ErrOrValue& value) {
-                     out->Complete(FormatActiveTasksHashMap(value, options, context));
-                   });
-  });
-  return out;
-}
-
 fxl::RefPtr<AsyncOutputBuffer> FormatSendExecutorMainThread(
     const FormatFutureOptions& options, const fxl::RefPtr<EvalContext>& context) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
@@ -522,10 +499,10 @@ fxl::RefPtr<AsyncOutputBuffer> FormatSendExecutorMainThread(
   return out;
 }
 
-fxl::RefPtr<AsyncOutputBuffer> FormatSendExecutorWorkerThread(
-    const FormatFutureOptions& options, const fxl::RefPtr<EvalContext>& context) {
+fxl::RefPtr<AsyncOutputBuffer> FormatExecutorWorkerThread(const FormatFutureOptions& options,
+                                                          const fxl::RefPtr<EvalContext>& context) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  EvalExpression("inner->data.active_tasks.data.value", context, false,
+  EvalExpression("self.ptr->data.active_tasks.data.value", context, false,
                  [out, options, context](const ErrOrValue& value) {
                    out->Complete(FormatActiveTasksHashMap(value, options, context));
                  });
@@ -545,17 +522,12 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
     if (!stack[i]->GetLocation().has_symbols())
       continue;
     std::string func_name(StripTemplate(stack[i]->GetLocation().symbol().Get()->GetFullName()));
-    if (func_name ==
-        "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run_singlethreaded") {
-      cmd_context->Output(FormatLocalExecutor(options, stack[i]->GetEvalContext()));
+    if (func_name == "fuchsia_async::runtime::fuchsia::executor::common::Inner::worker_lifecycle") {
+      cmd_context->Output(FormatExecutorWorkerThread(options, stack[i]->GetEvalContext()));
       return;
     }
     if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
       cmd_context->Output(FormatSendExecutorMainThread(options, stack[i]->GetEvalContext()));
-      return;
-    }
-    if (func_name == "fuchsia_async::runtime::fuchsia::executor::common::Inner::worker_lifecycle") {
-      cmd_context->Output(FormatSendExecutorWorkerThread(options, stack[i]->GetEvalContext()));
       return;
     }
   }

@@ -32,7 +32,7 @@ pub use task_group::*;
 // Fuchsia specific exports.
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::{
-    executor::{EHandle, PacketReceiver, ReceiverRegistration, WaitState},
+    executor::{EHandle, PacketReceiver, ReceiverRegistration},
     timer::Interval,
 };
 
