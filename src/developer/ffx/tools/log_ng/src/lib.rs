@@ -8,9 +8,7 @@
 //! All new development is being done in this tool, and the legacy tool will be
 //! deprecated once this tool is feature complete.
 
-use diagnostics_data::{
-    LogTextColor, LogTextDisplayOptions, LogTimeDisplayFormat, Timestamp, Timezone,
-};
+use diagnostics_data::{LogTextColor, LogTextDisplayOptions, LogTimeDisplayFormat, Timezone};
 use error::LogError;
 use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::create_proxy;
@@ -101,19 +99,8 @@ async fn log_main(
                     ..Default::default()
                 })
             },
-            since: cmd
-                .since
-                .as_ref()
-                .map(|value| DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
-                    is_monotonic: false,
-                })
-                .or_else(|| {
-                    cmd.since_monotonic.map(|value| DeviceOrLocalTimestamp {
-                        timestamp: Timestamp::from(value.as_nanos() as i64),
-                        is_monotonic: true,
-                    })
-                }),
+            since: DeviceOrLocalTimestamp::new(cmd.since.as_ref(), cmd.since_monotonic.as_ref()),
+            until: DeviceOrLocalTimestamp::new(cmd.until.as_ref(), cmd.until_monotonic.as_ref()),
             ..Default::default()
         },
     );
@@ -616,6 +603,7 @@ mod tests {
                 })),
                 clock: TimeFormat::Local,
                 since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
+                until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
                 ..LogCommand::default()
             },
             rcs_proxy: rcs_proxy,
@@ -645,6 +633,22 @@ mod tests {
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(
                         parse_time("1980-01-01T00:00:03")
+                            .unwrap()
+                            .time
+                            .naive_utc()
+                            .timestamp_nanos(),
+                    ),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(
+                        parse_time("1980-01-01T00:00:06")
                             .unwrap()
                             .time
                             .naive_utc()
@@ -692,6 +696,7 @@ mod tests {
                 })),
                 clock: TimeFormat::Utc,
                 since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
+                until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
                 ..LogCommand::default()
             },
             rcs_proxy: rcs_proxy,
@@ -714,6 +719,16 @@ mod tests {
                     moniker: "ffx".into(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(3000000000i64),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(6000000000i64),
                 })
                 .set_pid(1)
                 .set_tid(2)

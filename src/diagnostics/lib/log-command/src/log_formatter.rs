@@ -5,6 +5,7 @@
 use crate::{
     filter::LogFilterCriteria,
     log_socket_stream::{JsonDeserializeError, LogsDataStream},
+    DetailedDateTime,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -16,7 +17,11 @@ use diagnostics_data::{
 use ffx_writer::ToolIO;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, io::Write, time::SystemTime};
+use std::{
+    fmt::Display,
+    io::Write,
+    time::{Duration, SystemTime},
+};
 use thiserror::Error;
 
 pub const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
@@ -151,6 +156,27 @@ pub struct DeviceOrLocalTimestamp {
     /// True if this filter should be applied to monotonic time,
     /// false if UTC time.
     pub is_monotonic: bool,
+}
+
+impl DeviceOrLocalTimestamp {
+    /// Creates a DeviceOrLocalTimestamp from a real-time date/time or
+    /// a monotonic date/time. Returns None if both rtc and monotonic are None.
+    pub fn new(
+        rtc: Option<&DetailedDateTime>,
+        monotonic: Option<&Duration>,
+    ) -> Option<DeviceOrLocalTimestamp> {
+        rtc.as_ref()
+            .map(|value| DeviceOrLocalTimestamp {
+                timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
+                is_monotonic: false,
+            })
+            .or_else(|| {
+                monotonic.map(|value| DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(value.as_nanos() as i64),
+                    is_monotonic: true,
+                })
+            })
+    }
 }
 
 /// Log formatter options
