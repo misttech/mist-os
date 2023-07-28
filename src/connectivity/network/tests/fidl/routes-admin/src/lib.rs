@@ -112,13 +112,18 @@ async fn add_remove_route<
 
     let route_to_add = test_route(&interface);
 
-    assert!(fnet_routes_ext::admin::add_route::<I>(
-        &proxy,
-        &route_to_add.try_into().expect("convert to FIDL")
-    )
-    .await
-    .expect("no FIDL error")
-    .expect("add route"));
+    let add_route_and_assert_added = |proxy| async {
+        assert!(fnet_routes_ext::admin::add_route::<I>(
+            &proxy,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error")
+        .expect("add route"));
+        proxy
+    };
+
+    let proxy = add_route_and_assert_added(proxy).await;
 
     fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
         routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
@@ -129,7 +134,7 @@ async fn add_remove_route<
     println!("routes after adding = {routes:?}");
 
     // Move the RouteSet Proxy into an Option so that we can avoid dropping it in one of the cases.
-    let _maybe_proxy = if explicit_remove {
+    let maybe_proxy = if explicit_remove {
         assert!(fnet_routes_ext::admin::remove_route::<I>(
             &proxy,
             &route_to_add.try_into().expect("convert to FIDL")
@@ -152,6 +157,19 @@ async fn add_remove_route<
     .expect("should succeed");
 
     println!("routes after removing = {routes:?}");
+
+    if let Some(proxy) = maybe_proxy {
+        // Adding the route back again should succeed.
+        let _proxy = add_route_and_assert_added(proxy).await;
+
+        fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+            routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+        })
+        .await
+        .expect("should succeed");
+
+        println!("routes after re-adding = {routes:?}");
+    }
 }
 
 #[netstack_test]
