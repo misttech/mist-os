@@ -15,18 +15,21 @@ assembly_bundle(
     name = "legacy_fuchsia",
     dir = "@legacy_ninja_build_outputs//:obj/build/images/fuchsia/fuchsia/fuchsia.bazel_legacy_aib",
     files = "@legacy_ninja_build_outputs//:fuchsia.bazel_legacy_aib",
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 assembly_bundle(
     name = "legacy_bringup",
     dir = "@legacy_ninja_build_outputs//:obj/build/images/bringup/bringup/bringup.bazel_legacy_aib",
     files = "@legacy_ninja_build_outputs//:bringup.bazel_legacy_aib",
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 assembly_bundle(
     name = "legacy_zedboot",
     dir = "@legacy_ninja_build_outputs//:obj/build/images/zedboot/zedboot/zedboot.bazel_legacy_aib",
     files = "@legacy_ninja_build_outputs//:zedboot.bazel_legacy_aib",
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 platform_aib(
@@ -45,6 +48,7 @@ platform_aibs(
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 platform_aibs(
@@ -53,6 +57,7 @@ platform_aibs(
         "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
         for aib in BRINGUP_PLATFORM_AIB_NAMES
     ],
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 platform_aibs(
@@ -73,6 +78,7 @@ platform_aibs(
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 platform_aibs(
@@ -93,6 +99,7 @@ platform_aibs(
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
 
 platform_aibs(
@@ -113,4 +120,5 @@ platform_aibs(
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],
+    applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
 )
