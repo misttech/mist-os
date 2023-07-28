@@ -88,7 +88,7 @@ class GatherPackageDepsTests(unittest.TestCase):
 
         with open(self.package_json, 'w') as f:
             f.write(r'{ "blobs": [] }')
-        manifest_paths = gatherer.parse_package_json()
+        manifest_paths, package_json = gatherer.parse_package_json()
         self.assertEqual(manifest_paths, [])
 
         with open(self.package_json, 'w') as f:
@@ -97,8 +97,14 @@ class GatherPackageDepsTests(unittest.TestCase):
                         [ { "source_path": "some/path/A", "path": "path/A" } ]
                    }
                 """)
-        manifest_paths = gatherer.parse_package_json()
+        manifest_paths, package_json = gatherer.parse_package_json()
         self.assertEqual(manifest_paths, [('path/A', 'some/path/A')])
+        self.assertEqual(
+            package_json,
+            {"blobs": [{
+                "source_path": "path/A",
+                "path": "path/A"
+            }]})
 
         with open(self.package_json, 'w') as f:
             f.write(
@@ -109,7 +115,7 @@ class GatherPackageDepsTests(unittest.TestCase):
                         ]
                     }
                 """)
-        manifest_paths = gatherer.parse_package_json()
+        manifest_paths, package_json = gatherer.parse_package_json()
         self.assertEqual(
             manifest_paths,
             [
@@ -117,6 +123,19 @@ class GatherPackageDepsTests(unittest.TestCase):
                 ('path/B', 'some/path/B'),
             ],
         )
+        self.assertEqual(
+            package_json, {
+                "blobs":
+                    [
+                        {
+                            "source_path": "path/A",
+                            "path": "path/A"
+                        }, {
+                            "source_path": "path/B",
+                            "path": "path/B"
+                        }
+                    ]
+            })
 
         with open(self.package_json, 'w') as f:
             f.write(
@@ -127,7 +146,7 @@ class GatherPackageDepsTests(unittest.TestCase):
                         ]
                     }
                 """)
-        manifest_paths = gatherer.parse_package_json()
+        manifest_paths, package_json = gatherer.parse_package_json()
         self.assertEqual(
             manifest_paths,
             [
@@ -135,11 +154,24 @@ class GatherPackageDepsTests(unittest.TestCase):
                 ('path/B', '../../path/to/B'),
             ],
         )
+        self.assertEqual(
+            package_json, {
+                "blobs":
+                    [
+                        {
+                            "source_path": "path/A",
+                            "path": "path/A"
+                        }, {
+                            "source_path": "path/B",
+                            "path": "path/B"
+                        }
+                    ]
+            })
 
     def test_create_archive(self):
         gatherer = GatherPackageDeps(
             self.package_json, self.meta_far, self.output_tar, self.depfile)
-        gatherer.create_archive({})
+        gatherer.create_archive({}, {})
         self.assertTrue(os.path.isfile(self.output_tar))
 
         file_a = os.path.join(self.source_dir.name, 'fileA')
@@ -159,7 +191,7 @@ class GatherPackageDepsTests(unittest.TestCase):
             ('path/B', file_b),
             ('path/C', file_c),
         }
-        gatherer.create_archive(manifest_paths)
+        gatherer.create_archive(manifest_paths, {})
         self.assertTrue(os.path.isfile(self.output_tar))
 
         # Main thing we need to check here is that the paths within the archive
@@ -169,7 +201,7 @@ class GatherPackageDepsTests(unittest.TestCase):
             'path/B': 2,
             'path/C': 3,
             'meta.far': 0,
-            'package.manifest': 64,
+            'package_manifest.json': 2,
         }
         observed_size_index = {}
         with tarfile.open(self.output_tar, 'r') as tar:
@@ -209,29 +241,22 @@ class GatherPackageDepsTests(unittest.TestCase):
             self.package_json, self.meta_far, self.output_tar, self.depfile)
         gatherer.run()
         expected_files = {
-            'package.manifest',
+            'package_manifest.json',
             'meta.far',
             'path/A',
             'path/B',
             'path/C',
         }
+        expected_manifest = '{"blobs": [{"source_path": "path/A", "path": "path/A"}, {"source_path": "path/B", "path": "path/B"}, {"source_path": "path/C", "path": "path/C"}]}'
         observed_files = set()
-        expected_manifest_lines = {
-            'path/A=path/A',
-            'path/B=path/B',
-            'path/C=path/C',
-            'meta/package=meta.far',
-        }
-        observed_manifest_lines = set()
         with tarfile.open(self.output_tar, 'r') as tar:
             for member in tar.getmembers():
                 observed_files.add(member.name)
-                if member.name == 'package.manifest':
-                    for line in tar.extractfile(member).readlines():
-                        observed_manifest_lines.add(
-                            line.decode("utf-8").strip())
+                if member.name == 'package_manifest.json':
+                    self.assertEqual(
+                        tar.extractfile(member).read(),
+                        expected_manifest.encode())
         self.assertEqual(observed_files, expected_files)
-        self.assertEqual(observed_manifest_lines, expected_manifest_lines)
 
         with open(self.depfile, 'r') as f:
             observed_depfile = f.read()

@@ -102,18 +102,27 @@ class PackageManagerRepo {
         ['repository', 'publish', '--package-archive', archivePath, _repoPath]);
   }
 
-  /// Create archive for a given manifest using `pm archive`.
+  /// Create archive for a given manifest using `ffx package archive create`.
   ///
   /// Uses this command:
-  /// `pm -m=<manifest path> archive`
-  Future<ProcessResult> pmMArchive(String packageManifestPath) async {
+  /// `ffx package archive create <manifest path> --out <archivePath> --root-dir <rootDirectory>`
+  Future<ProcessResult> ffxPackageArchiveCreate(
+      String packageManifestPath, String archivePath) async {
     _log.info('Creating archive from a given package manifest.');
-    // Running the process from runtime_deps directory is needed since meta.far needs to be
-    // a relative path.
-    final workingDirectory =
-        Platform.script.resolve('runtime_deps').toFilePath();
-    return Process.run(_pmPath, ['-m=$packageManifestPath', 'archive'],
-        workingDirectory: workingDirectory);
+    final rootDirectory = Platform.script.resolve('runtime_deps').toFilePath();
+    return Process.run(
+      _ffxPath,
+      [
+        'package',
+        'archive',
+        'create',
+        packageManifestPath,
+        '--out',
+        archivePath,
+        '--root-dir',
+        rootDirectory
+      ],
+    );
   }
 
   /// Wait for the serve process's stdout to report its status.
@@ -394,16 +403,18 @@ class PackageManagerRepo {
   }
 
   Future<bool> setupRepo(String farPath, String manifestPath) async {
-    var responses =
-        await Future.wait([ffxRepositoryCreate(), pmMArchive(manifestPath)]);
-    expect(responses.length, 2);
-    // Response for creating a new repo.
-    expect(responses[0].exitCode, 0);
-    // Response for creating a `.far` archive file.
-    expect(responses[1].exitCode, 0);
-
     final archivePath =
         Platform.script.resolve('runtime_deps/$farPath').toFilePath();
+    var responses = await Future.wait([
+      ffxRepositoryCreate(),
+      ffxPackageArchiveCreate(manifestPath, archivePath)
+    ]);
+    expect(responses.length, 2);
+    // Response for creating a new repo.
+    expect(responses[0].exitCode, 0, reason: responses[0].stderr);
+    // Response for creating a `.far` archive file.
+    expect(responses[1].exitCode, 0, reason: responses[1].stderr);
+
     _log.info(
         'Publishing package from archive: $archivePath to repo: $_repoPath');
     final publishPackageResponse = await ffxRepositoryPublish(archivePath);

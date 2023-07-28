@@ -76,9 +76,10 @@ void main() {
       }
     }
 
-    // The `package.manifest` file comes from the tar extracted above.
-    manifestPath =
-        Platform.script.resolve('runtime_deps/package.manifest').toFilePath();
+    // The `package_manifest.json` file comes from the tar extracted above.
+    manifestPath = Platform.script
+        .resolve('runtime_deps/package_manifest.json')
+        .toFilePath();
   });
 
   tearDownAll(() async {

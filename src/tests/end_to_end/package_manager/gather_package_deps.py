@@ -52,11 +52,14 @@ class GatherPackageDeps:
             data = json.load(f)
             for file in data['blobs']:
                 if file['path'].startswith('meta/'):
+                    file['source_path'] = 'meta.far'
                     continue
                 manifest_paths.append((file['path'], file['source_path']))
-        return manifest_paths
+                # Update the source path to be relative path inside the tar.
+                file['source_path'] = file['path']
+        return manifest_paths, data
 
-    def create_archive(self, manifest_paths):
+    def create_archive(self, manifest_paths, package_json_data):
         # Explicitly use the GNU_FORMAT because the current dart library
         # (v.3.0.0) does not support parsing other tar formats that allow for
         # filenames longer than 100 characters.
@@ -64,25 +67,20 @@ class GatherPackageDeps:
                           format=tarfile.GNU_FORMAT) as tar:
             # Follow symlinks
             tar.dereference = True
-            # Create package.manifest in memory and add it to archive.
-            manifest_lines = []
-            # Add all source files to archive and add manfiest lines.
+            # Add all source files to archive.
             for (archive_path, source_path) in manifest_paths:
                 tar.add(source_path, arcname=archive_path)
-                manifest_lines.append(f'{archive_path}={archive_path}')
 
-            # Add meta.far to archive and insert corresponding manfiest line.
+            # Add meta.far and package_manifest.json to archive.
             tar.add(self.meta_far, arcname='meta.far')
-            manifest_lines.append('meta/package=meta.far\n')
-
-            with io.BytesIO('\n'.join(manifest_lines).encode()) as manifest:
-                tarinfo = tarfile.TarInfo('package.manifest')
+            with io.BytesIO(json.dumps(package_json_data).encode()) as manifest:
+                tarinfo = tarfile.TarInfo('package_manifest.json')
                 tarinfo.size = len(manifest.getvalue())
                 tar.addfile(tarinfo, fileobj=manifest)
 
     def run(self):
-        manifest_paths = self.parse_package_json()
-        self.create_archive(manifest_paths)
+        manifest_paths, package_json_data = self.parse_package_json()
+        self.create_archive(manifest_paths, package_json_data)
         with open(self.depfile, 'w') as f:
             f.write(
                 "{}: {}\n".format(
