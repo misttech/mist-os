@@ -165,7 +165,6 @@
                 "keyctl06",
                 "kill10",
                 "leapsec01",
-                "llseek01",
                 "lremovexattr01",
                 "lseek11",
                 "madvise01",
