@@ -572,7 +572,7 @@ where
         }
         let conn_id = socketmap
             .conns_mut()
-            .try_insert(
+            .try_insert_with(
                 ConnAddr {
                     ip: ConnIpAddr {
                         local: (local_ip, local_port),

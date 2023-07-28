@@ -1559,7 +1559,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
                 let bound = socketmap
                     .listeners_mut()
-                    .try_insert(
+                    .try_insert_with(
                         ListenerAddr {
                             ip: ListenerIpAddr { addr: local_ip, identifier: port },
                             device: device.map(|d| d.as_weak(ip_transport_ctx).into_owned()),
@@ -3127,7 +3127,7 @@ where
 
     let conn_id = socketmap
         .conns_mut()
-        .try_insert(conn_addr.clone(), sharing, |_addr, _sharing| {
+        .try_insert_with(conn_addr.clone(), sharing, |_addr, _sharing| {
             make_connection(
                 conn_addr,
                 Connection {

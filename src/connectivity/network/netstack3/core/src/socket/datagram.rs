@@ -914,26 +914,25 @@ where
         None => (None, device.clone().map(EitherDeviceId::Weak), identifier),
     };
 
-    let sharing = sharing.clone();
     let ip_options = ip_options.clone();
     match bound.listeners_mut().try_insert(
         ListenerAddr {
             ip: ListenerIpAddr { addr, identifier },
             device: device.map(|d| d.as_weak(sync_ctx).into_owned()),
         },
-        sharing.into(),
-        |addr, sharing| {
+        sharing.clone().into(),
+        id,
+    ) {
+        Ok(bound_entry) => {
             // Replace the unbound state only after we're sure the
-            // insertion is going to succeed.
+            // insertion has succeeded.
             *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
                 { ListenerState { ip_options } },
-                sharing,
-                addr,
+                sharing.clone().into(),
+                bound_entry.get_addr().clone(),
             )));
-            id
-        },
-    ) {
-        Ok(_entry) => Ok(()),
+            Ok(())
+        }
         Err((
             InsertError::ShadowAddrExists
             | InsertError::Exists
@@ -1111,20 +1110,20 @@ where
         };
 
         let ip_options = ip_options.clone();
-        match bound.conns_mut().try_insert(c, sharing, |addr, sharing| {
-            *ip_sock.options_mut() = ip_options;
-            *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected((
-                ConnState {
-                    socket: ip_sock,
-                    clear_device_on_disconnect,
-                    shutdown: Shutdown::default(),
-                },
-                sharing,
-                addr,
-            )));
-            id
-        }) {
-            Ok(_entry) => Ok(()),
+        match bound.conns_mut().try_insert(c, sharing.clone(), id) {
+            Ok(bound_entry) => {
+                *ip_sock.options_mut() = ip_options;
+                *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected((
+                    ConnState {
+                        socket: ip_sock,
+                        clear_device_on_disconnect,
+                        shutdown: Shutdown::default(),
+                    },
+                    sharing,
+                    bound_entry.get_addr().clone(),
+                )));
+                Ok(())
+            }
             Err((
                 InsertError::Exists
                 | InsertError::IndirectConflict
@@ -1138,13 +1137,13 @@ where
                     Some(BoundMapSocketState::Listener(addr, sharing, id)) => {
                         let _entry = bound
                             .listeners_mut()
-                            .try_insert(addr, sharing, |_addr, _sharing| id)
+                            .try_insert(addr, sharing, id)
                             .expect("reinserting just-removed listener failed");
                     }
                     Some(BoundMapSocketState::Connected(addr, sharing, id)) => {
                         let _entry = bound
                             .conns_mut()
-                            .try_insert(addr, sharing, |_addr, _sharing| id)
+                            .try_insert(addr, sharing, id)
                             .expect("reinserting just-removed connection failed");
                     }
                 };
@@ -1205,18 +1204,15 @@ where
 
         let addr = ListenerAddr { ip: ListenerIpAddr { addr: Some(local_ip), identifier }, device };
 
-        let _entry = bound
+        let bound_entry = bound
             .listeners_mut()
-            .try_insert(addr, sharing.clone().into(), |addr, sharing| {
-                *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
-                    ListenerState { ip_options },
-                    sharing,
-                    addr,
-                )));
-                id
-            })
+            .try_insert(addr, sharing.clone().into(), id)
             .expect("inserting listener for disconnected socket failed");
-
+        *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
+            ListenerState { ip_options },
+            sharing.clone().into(),
+            bound_entry.get_addr().clone(),
+        )));
         Ok(())
     })
 }

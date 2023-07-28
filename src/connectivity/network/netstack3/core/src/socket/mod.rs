@@ -556,6 +556,19 @@ where
         self,
         socket_addr: SocketType::Addr,
         tag_state: SocketType::SharingState,
+        id: SocketType::Id,
+    ) -> Result<SocketStateEntry<'a, I, D, A, S, SocketType>, (InsertError, SocketType::SharingState)>
+    {
+        self.try_insert_with(socket_addr, tag_state, |_addr, _sharing| id)
+    }
+
+    // TODO(https://fxbug.dev/126141): remove this and inline its contents into
+    // try_insert once TCP socket IDs are not being constructed inside the
+    // make_id callback.
+    pub(crate) fn try_insert_with(
+        self,
+        socket_addr: SocketType::Addr,
+        tag_state: SocketType::SharingState,
         make_id: impl FnOnce(SocketType::Addr, SocketType::SharingState) -> SocketType::Id,
     ) -> Result<SocketStateEntry<'a, I, D, A, S, SocketType>, (InsertError, SocketType::SharingState)>
     {
@@ -1119,18 +1132,6 @@ mod tests {
     #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
     struct Listener(usize);
 
-    impl From<usize> for Listener {
-        fn from(index: usize) -> Listener {
-            Listener(index)
-        }
-    }
-
-    impl From<usize> for Conn {
-        fn from(index: usize) -> Conn {
-            Conn(index)
-        }
-    }
-
     #[derive(PartialEq, Eq, Debug)]
     struct Multiple<T>(char, Vec<T>);
 
@@ -1170,22 +1171,16 @@ mod tests {
 
     /// Generator for unique socket IDs that don't have any state.
     ///
-    /// Calling [`fakeSocketIdGen::id_maker`] returns a callable object that
-    /// creates new socket IDs of the requested type that are all unique. The
-    /// IDs can be stored in a [`BoundSocketMap`] but don't have any additional
-    /// state associated with them.
+    /// Calling [`FakeSocketIdGen::next`] returns a unique ID.
     #[derive(Default)]
     struct FakeSocketIdGen {
         next_id: usize,
     }
 
     impl FakeSocketIdGen {
-        fn id_maker<T: From<usize>, A, B>(&mut self) -> impl FnOnce(A, B) -> T + '_ {
-            |_: A, _: B| {
-                let id = self.next_id;
-                self.next_id += 1;
-                id.into()
-            }
+        fn next(&mut self) -> usize {
+            let next_next_id = self.next_id + 1;
+            core::mem::replace(&mut self.next_id, next_next_id)
         }
     }
 
@@ -1337,7 +1332,7 @@ mod tests {
 
         let id = {
             let entry =
-                bound.listeners_mut().try_insert(addr, 'v', fake_id_gen.id_maker()).unwrap();
+                bound.listeners_mut().try_insert(addr, 'v', Listener(fake_id_gen.next())).unwrap();
             assert_eq!(entry.get_addr(), &addr);
             entry.id()
         };
@@ -1357,7 +1352,7 @@ mod tests {
         let addr = CONN_ADDR;
 
         let id = {
-            let entry = bound.conns_mut().try_insert(addr, 'v', fake_id_gen.id_maker()).unwrap();
+            let entry = bound.conns_mut().try_insert(addr, 'v', Conn(fake_id_gen.next())).unwrap();
             assert_eq!(entry.get_addr(), &addr);
             entry.id()
         };
@@ -1398,10 +1393,10 @@ mod tests {
 
         for addr in listener_addrs.iter().cloned() {
             let _entry =
-                bound.listeners_mut().try_insert(addr, 'a', fake_id_gen.id_maker()).unwrap();
+                bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap();
         }
         for addr in conn_addrs.iter().cloned() {
-            let _entry = bound.conns_mut().try_insert(addr, 'a', fake_id_gen.id_maker()).unwrap();
+            let _entry = bound.conns_mut().try_insert(addr, 'a', Conn(fake_id_gen.next())).unwrap();
         }
         let expected_addrs = listener_addrs
             .into_iter()
@@ -1413,6 +1408,52 @@ mod tests {
     }
 
     #[test]
+    fn try_insert_with_callback_not_called_on_error() {
+        // TODO(https://fxbug.dev/126141): remove this test along with
+        // try_insert_with.
+        set_logger_for_test();
+        let mut bound = FakeBoundSocketMap::default();
+        let addr = LISTENER_ADDR;
+
+        // Insert a listener so that future calls can conflict.
+        let _: Listener = bound.listeners_mut().try_insert(addr, 'a', Listener(0)).unwrap().id();
+
+        // All of the below try_insert_with calls should fail, but more
+        // importantly, they should not call the `make_id` callback (because it
+        // is only called once success is certain).
+        fn is_never_called<A, B, T>(_: A, _: B) -> T {
+            panic!("should never be called");
+        }
+
+        assert_matches!(
+            bound.listeners_mut().try_insert_with(addr, 'b', is_never_called),
+            Err((InsertError::Exists, _))
+        );
+        assert_matches!(
+            bound.listeners_mut().try_insert_with(
+                ListenerAddr { device: Some(FakeWeakDeviceId(FakeDeviceId)), ..addr },
+                'b',
+                is_never_called
+            ),
+            Err((InsertError::ShadowAddrExists, _))
+        );
+        assert_matches!(
+            bound.conns_mut().try_insert_with(
+                ConnAddr {
+                    device: None,
+                    ip: ConnIpAddr {
+                        local: (addr.ip.addr.unwrap(), addr.ip.identifier),
+                        remote: (SpecifiedAddr::new(net_ip_v4!("1.1.1.1")).unwrap(), ()),
+                    },
+                },
+                'b',
+                is_never_called,
+            ),
+            Err((InsertError::ShadowAddrExists, _))
+        );
+    }
+
+    #[test]
     fn insert_listener_conflict_with_listener() {
         set_logger_for_test();
         let mut bound = FakeBoundSocketMap::default();
@@ -1420,9 +1461,9 @@ mod tests {
         let addr = LISTENER_ADDR;
 
         let _: Listener =
-            bound.listeners_mut().try_insert(addr, 'a', fake_id_gen.id_maker()).unwrap().id();
+            bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap().id();
         assert_matches!(
-            bound.listeners_mut().try_insert(addr, 'b', fake_id_gen.id_maker()),
+            bound.listeners_mut().try_insert(addr, 'b', Listener(fake_id_gen.next())),
             Err((InsertError::Exists, 'b'))
         );
     }
@@ -1439,9 +1480,9 @@ mod tests {
         };
 
         let _: Listener =
-            bound.listeners_mut().try_insert(addr, 'a', fake_id_gen.id_maker()).unwrap().id();
+            bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap().id();
         assert_matches!(
-            bound.listeners_mut().try_insert(shadows_addr, 'b', fake_id_gen.id_maker()),
+            bound.listeners_mut().try_insert(shadows_addr, 'b', Listener(fake_id_gen.next())),
             Err((InsertError::ShadowAddrExists, 'b'))
         );
     }
@@ -1461,9 +1502,9 @@ mod tests {
         };
 
         let _: Listener =
-            bound.listeners_mut().try_insert(addr, 'a', fake_id_gen.id_maker()).unwrap().id();
+            bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap().id();
         assert_matches!(
-            bound.conns_mut().try_insert(shadows_addr, 'b', fake_id_gen.id_maker()),
+            bound.conns_mut().try_insert(shadows_addr, 'b', Conn(fake_id_gen.next())),
             Err((InsertError::ShadowAddrExists, 'b'))
         );
     }
@@ -1475,8 +1516,10 @@ mod tests {
         let mut fake_id_gen = FakeSocketIdGen::default();
         let addr = LISTENER_ADDR;
 
-        let a = bound.listeners_mut().try_insert(addr, 'x', fake_id_gen.id_maker()).unwrap().id();
-        let b = bound.listeners_mut().try_insert(addr, 'x', fake_id_gen.id_maker()).unwrap().id();
+        let a =
+            bound.listeners_mut().try_insert(addr, 'x', Listener(fake_id_gen.next())).unwrap().id();
+        let b =
+            bound.listeners_mut().try_insert(addr, 'x', Listener(fake_id_gen.next())).unwrap().id();
         assert_ne!(a, b);
 
         assert_eq!(bound.listeners_mut().remove(&a, &addr), Ok(()));
@@ -1490,8 +1533,8 @@ mod tests {
         let mut fake_id_gen = FakeSocketIdGen::default();
         let addr = CONN_ADDR;
 
-        let a = bound.conns_mut().try_insert(addr, 'x', fake_id_gen.id_maker()).unwrap().id();
-        let b = bound.conns_mut().try_insert(addr, 'x', fake_id_gen.id_maker()).unwrap().id();
+        let a = bound.conns_mut().try_insert(addr, 'x', Conn(fake_id_gen.next())).unwrap().id();
+        let b = bound.conns_mut().try_insert(addr, 'x', Conn(fake_id_gen.next())).unwrap().id();
         assert_ne!(a, b);
 
         assert_eq!(bound.conns_mut().remove(&a, &addr), Ok(()));
@@ -1516,11 +1559,14 @@ mod tests {
             device: None,
         };
 
-        let first =
-            bound.listeners_mut().try_insert(first_addr, 'a', fake_id_gen.id_maker()).unwrap().id();
+        let first = bound
+            .listeners_mut()
+            .try_insert(first_addr, 'a', Listener(fake_id_gen.next()))
+            .unwrap()
+            .id();
         let second = bound
             .listeners_mut()
-            .try_insert(second_addr, 'b', fake_id_gen.id_maker())
+            .try_insert(second_addr, 'b', Listener(fake_id_gen.next()))
             .unwrap()
             .id();
 
@@ -1553,7 +1599,7 @@ mod tests {
         let addr = CONN_ADDR;
         let conn_id = map
             .conns_mut()
-            .try_insert(addr.clone(), 'a', fake_id_gen.id_maker())
+            .try_insert(addr.clone(), 'a', Conn(fake_id_gen.next()))
             .expect("failed to insert")
             .id();
         assert_matches!(map.conns_mut().remove(&conn_id, &addr), Ok(()));
@@ -1568,7 +1614,7 @@ mod tests {
         let addr = CONN_ADDR;
         let entry = map
             .conns_mut()
-            .try_insert(addr.clone(), 'a', fake_id_gen.id_maker())
+            .try_insert(addr.clone(), 'a', Conn(fake_id_gen.next()))
             .expect("failed to insert");
 
         entry.try_update_sharing(&'a', 'd').expect("worked");
@@ -1576,7 +1622,7 @@ mod tests {
         // the address.
         let second_conn = map
             .conns_mut()
-            .try_insert(addr.clone(), 'd', fake_id_gen.id_maker())
+            .try_insert(addr.clone(), 'd', Conn(fake_id_gen.next()))
             .expect("can insert");
         assert_matches!(second_conn.try_update_sharing(&'d', 'e'), Err(UpdateSharingError));
     }

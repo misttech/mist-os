@@ -6358,12 +6358,12 @@ where {
         let mut try_insert = |(index, (addr, options))| match addr {
             AddrVec::Conn(c) => map
                 .conns_mut()
-                .try_insert(c, options, |_addr, _sharing| SocketId::from(index))
+                .try_insert(c, options, SocketId::from(index))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
             AddrVec::Listen(l) => map
                 .listeners_mut()
-                .try_insert(l, options, |_addr, _sharing| SocketId::from(index))
+                .try_insert(l, options, SocketId::from(index))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
         };
@@ -6413,12 +6413,12 @@ where {
                 .map(|(socket_index, (addr, options))| match addr {
                     AddrVec::Conn(c) => map
                         .conns_mut()
-                        .try_insert(c, options, |_addr, _sharing| SocketId::from(socket_index))
+                        .try_insert(c, options, SocketId::from(socket_index))
                         .map(|entry| Socket::Conn(entry.id().clone(), entry.get_addr().clone()))
                         .expect("insert_failed"),
                     AddrVec::Listen(l) => map
                         .listeners_mut()
-                        .try_insert(l, options, |_addr, _sharing| SocketId::from(socket_index))
+                        .try_insert(l, options, SocketId::from(socket_index))
                         .map(|entry| Socket::Listener(entry.id().clone(), entry.get_addr().clone()))
                         .expect("insert_failed"),
                 })
