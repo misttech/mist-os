@@ -27,6 +27,7 @@ rustc_library("lib") {
   name = "unreliable_echo"
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  disable_rustdoc = true
 }
 
 fuchsia_component("unreliable-echo-v4") {
