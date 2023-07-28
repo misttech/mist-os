@@ -30,34 +30,34 @@ void DwarfDieDecoder::AddPresenceCheck(llvm::dwarf::Attribute attribute, bool* p
       attribute, [present](llvm::DWARFUnit*, const llvm::DWARFFormValue&) { *present = true; });
 }
 
-void DwarfDieDecoder::AddBool(llvm::dwarf::Attribute attribute, llvm::Optional<bool>* output) {
+void DwarfDieDecoder::AddBool(llvm::dwarf::Attribute attribute, std::optional<bool>* output) {
   attrs_.emplace_back(attribute, [output](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
     *output = !!form.getAsUnsignedConstant();
   });
 }
 
 void DwarfDieDecoder::AddUnsignedConstant(llvm::dwarf::Attribute attribute,
-                                          llvm::Optional<uint64_t>* output) {
+                                          std::optional<uint64_t>* output) {
   attrs_.emplace_back(attribute, [output](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
     *output = form.getAsUnsignedConstant();
   });
 }
 
 void DwarfDieDecoder::AddSignedConstant(llvm::dwarf::Attribute attribute,
-                                        llvm::Optional<int64_t>* output) {
+                                        std::optional<int64_t>* output) {
   attrs_.emplace_back(attribute, [output](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
     *output = form.getAsSignedConstant();
   });
 }
 
 void DwarfDieDecoder::AddAddress(llvm::dwarf::Attribute attribute,
-                                 llvm::Optional<uint64_t>* output) {
+                                 std::optional<uint64_t>* output) {
   attrs_.emplace_back(attribute, [output](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
     *output = form.getAsAddress();
   });
 }
 
-void DwarfDieDecoder::AddHighPC(llvm::Optional<HighPC>* output) {
+void DwarfDieDecoder::AddHighPC(std::optional<HighPC>* output) {
   attrs_.emplace_back(llvm::dwarf::DW_AT_high_pc,
                       [output](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
                         if (form.isFormClass(llvm::DWARFFormValue::FC_Constant)) {
@@ -73,7 +73,7 @@ void DwarfDieDecoder::AddHighPC(llvm::Optional<HighPC>* output) {
 }
 
 void DwarfDieDecoder::AddCString(llvm::dwarf::Attribute attribute,
-                                 llvm::Optional<const char*>* output) {
+                                 std::optional<const char*>* output) {
   attrs_.emplace_back(attribute, [output](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
     if (auto res = form.getAsCString(); res) {
       *output = *res;
@@ -82,7 +82,7 @@ void DwarfDieDecoder::AddCString(llvm::dwarf::Attribute attribute,
 }
 
 void DwarfDieDecoder::AddLineTableFile(llvm::dwarf::Attribute attribute,
-                                       llvm::Optional<std::string>* output) {
+                                       std::optional<std::string>* output) {
   attrs_.emplace_back(
       attribute, [this, output](llvm::DWARFUnit* unit, const llvm::DWARFFormValue& form) {
         const llvm::DWARFDebugLine::LineTable* line_table = context_->getLineTableForUnit(unit);
@@ -124,7 +124,7 @@ void DwarfDieDecoder::AddConstValue(llvm::dwarf::Attribute attribute, ConstValue
 }
 
 void DwarfDieDecoder::AddSectionOffset(llvm::dwarf::Attribute attribute,
-                                       llvm::Optional<uint64_t>* offset) {
+                                       std::optional<uint64_t>* offset) {
   // The returned section offset will be the raw value. The caller will have to look up the
   // address of the elf section it references and interpret it accordingly.
   attrs_.emplace_back(attribute, [offset](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
@@ -135,7 +135,7 @@ void DwarfDieDecoder::AddSectionOffset(llvm::dwarf::Attribute attribute,
 }
 
 void DwarfDieDecoder::AddBlock(llvm::dwarf::Attribute attribute,
-                               llvm::Optional<std::vector<uint8_t>>* dest) {
+                               std::optional<std::vector<uint8_t>>* dest) {
   attrs_.emplace_back(attribute, [dest](llvm::DWARFUnit*, const llvm::DWARFFormValue& form) {
     if (form.isFormClass(llvm::DWARFFormValue::FC_Block) ||
         form.isFormClass(llvm::DWARFFormValue::FC_Exprloc)) {
@@ -153,10 +153,10 @@ void DwarfDieDecoder::AddReference(llvm::dwarf::Attribute attribute, llvm::DWARF
 }
 
 void DwarfDieDecoder::AddFile(llvm::dwarf::Attribute attribute,
-                              llvm::Optional<std::string>* output) {
+                              std::optional<std::string>* output) {
   attrs_.emplace_back(
       attribute, [this, output](llvm::DWARFUnit* unit, const llvm::DWARFFormValue& form) {
-        llvm::Optional<uint64_t> file_index = form.getAsUnsignedConstant();
+        std::optional<uint64_t> file_index = form.getAsUnsignedConstant();
         if (!file_index)
           return;
 

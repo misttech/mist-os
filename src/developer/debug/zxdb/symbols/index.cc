@@ -231,7 +231,7 @@ class UnitIndexer {
   // Used to decode names for DIEs in the second pass when we find one we need that wasn't extracted
   // in the first.
   DwarfDieDecoder name_decoder_;
-  llvm::Optional<const char*> name_decoder_name_;
+  std::optional<const char*> name_decoder_name_;
 };
 
 // The symbol storage will be filled with the indexable entries.
@@ -242,16 +242,16 @@ void UnitIndexer::Scan(std::vector<IndexNode::SymbolRef>* main_functions) {
   llvm::DWARFDie decl_die;
   decoder.AddReference(llvm::dwarf::DW_AT_specification, &decl_die);
 
-  llvm::Optional<bool> is_declaration;
+  std::optional<bool> is_declaration;
   decoder.AddBool(llvm::dwarf::DW_AT_declaration, &is_declaration);
 
   bool has_const_value = false;
   decoder.AddPresenceCheck(llvm::dwarf::DW_AT_const_value, &has_const_value);
 
-  llvm::Optional<bool> is_main_subprogram;
+  std::optional<bool> is_main_subprogram;
   decoder.AddBool(llvm::dwarf::DW_AT_main_subprogram, &is_main_subprogram);
 
-  llvm::Optional<const char*> name;
+  std::optional<const char*> name;
   decoder.AddCString(llvm::dwarf::DW_AT_name, &name);
 
   bool has_abstract_origin = false;

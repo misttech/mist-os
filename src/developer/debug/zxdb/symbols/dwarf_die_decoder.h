@@ -5,11 +5,11 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_DWARF_DIE_DECODER_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_DWARF_DIE_DECODER_H_
 
+#include <optional>
 #include <string>
 #include <utility>
 
 #include "lib/fit/function.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/DebugInfo/DWARF/DWARFDataExtractor.h"
 #include "src/lib/fxl/macros.h"
@@ -71,16 +71,16 @@ class DwarfDieDecoder {
   // llvm::DWARFFormValue to extract the attribute and place it into the given output variable.
   //
   // The output pointers must remain valid until the last call to Decode() has returned.
-  void AddBool(llvm::dwarf::Attribute attribute, llvm::Optional<bool>* output);
-  void AddUnsignedConstant(llvm::dwarf::Attribute attribute, llvm::Optional<uint64_t>* output);
-  void AddSignedConstant(llvm::dwarf::Attribute attribute, llvm::Optional<int64_t>* output);
-  void AddAddress(llvm::dwarf::Attribute attribute, llvm::Optional<uint64_t>* output);
-  void AddHighPC(llvm::Optional<HighPC>* output);
-  void AddCString(llvm::dwarf::Attribute attribute, llvm::Optional<const char*>* output);
-  void AddLineTableFile(llvm::dwarf::Attribute attribute, llvm::Optional<std::string>* output);
+  void AddBool(llvm::dwarf::Attribute attribute, std::optional<bool>* output);
+  void AddUnsignedConstant(llvm::dwarf::Attribute attribute, std::optional<uint64_t>* output);
+  void AddSignedConstant(llvm::dwarf::Attribute attribute, std::optional<int64_t>* output);
+  void AddAddress(llvm::dwarf::Attribute attribute, std::optional<uint64_t>* output);
+  void AddHighPC(std::optional<HighPC>* output);
+  void AddCString(llvm::dwarf::Attribute attribute, std::optional<const char*>* output);
+  void AddLineTableFile(llvm::dwarf::Attribute attribute, std::optional<std::string>* output);
   void AddConstValue(llvm::dwarf::Attribute attribute, ConstValue* const_value);
-  void AddSectionOffset(llvm::dwarf::Attribute attribute, llvm::Optional<uint64_t>* offset);
-  void AddBlock(llvm::dwarf::Attribute attribute, llvm::Optional<std::vector<uint8_t>>* block);
+  void AddSectionOffset(llvm::dwarf::Attribute attribute, std::optional<uint64_t>* offset);
+  void AddBlock(llvm::dwarf::Attribute attribute, std::optional<std::vector<uint8_t>>* block);
 
   // For cross-DIE references. Note that the resulting DIE may not be in the same unit. If the
   // attribute doesn't exist or is invalid, this DIE will be !isValid().
@@ -89,7 +89,7 @@ class DwarfDieDecoder {
   // Extract a file name. File names (e.g. for DW_AT_decl_file) are not strings but rather indices
   // into the file name table for the corresponding unit. This accessor resolves the string
   // automatically.
-  void AddFile(llvm::dwarf::Attribute attribute, llvm::Optional<std::string>* output);
+  void AddFile(llvm::dwarf::Attribute attribute, std::optional<std::string>* output);
 
   // A special handler to get the parent of the most deep abstract origin.
   //

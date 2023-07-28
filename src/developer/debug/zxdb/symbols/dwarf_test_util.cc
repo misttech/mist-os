@@ -15,7 +15,7 @@ namespace {
 std::string GetDIEName(llvm::DWARFContext* context, const llvm::DWARFDie& die) {
   DwarfDieDecoder decoder(context);
 
-  llvm::Optional<const char*> name;
+  std::optional<const char*> name;
   decoder.AddCString(llvm::dwarf::DW_AT_name, &name);
 
   if (!decoder.Decode(die) || !name)
