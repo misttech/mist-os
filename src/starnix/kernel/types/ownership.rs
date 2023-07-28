@@ -544,13 +544,18 @@ mod test {
     #[should_panic]
     fn test_debug_assert_no_local_temp_ref_aborts() {
         let value = OwnedRef::new(Data {});
-        let _temp_ref = OwnedRef::temp(&value);
-        debug_assert_no_local_temp_ref();
+        {
+            let _temp_ref = OwnedRef::temp(&value);
+            debug_assert_no_local_temp_ref();
+        }
+        // This code should not be reached, but ensures the test will fail is
+        // `debug_assert_no_local_temp_ref` fails to panic.
+        value.release(&());
     }
 
     #[::fuchsia::test]
     #[should_panic]
-    fn test_clone_release_owned_ref_abort_in_test() {
+    fn test_clone_released_owned_ref_abort_in_test() {
         let value = OwnedRef::new(Data {});
         value.release(&());
         let _ = OwnedRef::clone(&value);
