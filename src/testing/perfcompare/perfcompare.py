@@ -262,6 +262,7 @@ def FormatUnit(unit_set):
 # and treated as bigger-is-better by catapult_converter, and that don't
 # have an explicit "_biggerIsBetter" suffix.
 BIGGERISBETTER_UNITS = {
+    'bits/second',
     'bytes/second',
     'frames/second',
 }
