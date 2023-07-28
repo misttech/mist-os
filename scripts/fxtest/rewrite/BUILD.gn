@@ -16,6 +16,7 @@ group("tests") {
     ":tests_json_file_test($host_toolchain)",
     "dataparse:tests",
     "statusinfo:tests",
+    "termout:tests",
     "util:tests",
   ]
 }
@@ -30,6 +31,7 @@ if (is_host) {
   binary_deps = [
     "dataparse",
     "statusinfo",
+    "termout",
     "util",
     "//third_party/jellyfish",
   ]
