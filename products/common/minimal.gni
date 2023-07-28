@@ -37,7 +37,3 @@ legacy_base_package_labels += [
 # Set the SWD policy for core.gni, details can be found in
 # //build/security/policies_swd.gni.
 policy_labels.swd = "unrestricted"
-
-# Set the update_checker policy for core.gni, details can be found in
-# //build/security/policies_swd.gni.
-policy_labels.update_checker = "system_update_checker"
