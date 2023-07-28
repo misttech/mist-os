@@ -63,12 +63,10 @@ impl FileSystemOps for Arc<TmpFs> {
         if renamed.is_dir() {
             old_parent.update_info(|info| {
                 info.link_count -= 1;
-                Ok(())
-            })?;
+            });
             new_parent.update_info(|info| {
                 info.link_count += 1;
-                Ok(())
-            })?;
+            });
         }
         // Fix the wrong changes to new_parent due to the fact that the target element has
         // been replaced instead of added.
@@ -76,8 +74,7 @@ impl FileSystemOps for Arc<TmpFs> {
             if replaced.is_dir() {
                 new_parent.update_info(|info| {
                     info.link_count -= 1;
-                    Ok(())
-                })?;
+                });
             }
             *child_count(new_parent) -= 1;
         }
@@ -180,8 +177,7 @@ impl FsNodeOps for TmpfsDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         node.update_info(|info| {
             info.link_count += 1;
-            Ok(())
-        })?;
+        });
         *self.child_count.lock() += 1;
         Ok(node.fs().create_node(TmpfsDirectory::new(), FsNodeInfo::new_factory(mode, owner)))
     }
@@ -243,8 +239,7 @@ impl FsNodeOps for TmpfsDirectory {
     ) -> Result<(), Errno> {
         child.update_info(|info| {
             info.link_count += 1;
-            Ok(())
-        })?;
+        });
         *self.child_count.lock() += 1;
         Ok(())
     }
@@ -259,13 +254,11 @@ impl FsNodeOps for TmpfsDirectory {
         if child.is_dir() {
             node.update_info(|info| {
                 info.link_count -= 1;
-                Ok(())
-            })?;
+            });
         }
         child.update_info(|info| {
             info.link_count -= 1;
-            Ok(())
-        })?;
+        });
         *self.child_count.lock() -= 1;
         Ok(())
     }

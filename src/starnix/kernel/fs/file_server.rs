@@ -332,11 +332,7 @@ impl StarnixNodeConnection {
 
     /// Implementation of `vfs::directory::entry_container::MutableDirectory::set_attrs` and
     /// `vfs::File::set_attrs`.
-    fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attributes: fio::NodeAttributes,
-    ) -> Result<(), Errno> {
+    fn set_attrs(&self, flags: fio::NodeAttributeFlags, attributes: fio::NodeAttributes) {
         self.file.node().update_info(|info| {
             if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
                 info.time_status_change = zx::Time::from_nanos(attributes.creation_time as i64);
@@ -344,11 +340,10 @@ impl StarnixNodeConnection {
             if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
                 info.time_modify = zx::Time::from_nanos(attributes.modification_time as i64);
             }
-            Ok(())
-        })
+        });
     }
 
-    fn update_attributes(&self, attributes: fio::MutableNodeAttributes) -> Result<(), Errno> {
+    fn update_attributes(&self, attributes: fio::MutableNodeAttributes) {
         self.file.node().update_info(|info| {
             if let Some(time) = attributes.creation_time {
                 info.time_status_change = zx::Time::from_nanos(time as i64);
@@ -368,8 +363,7 @@ impl StarnixNodeConnection {
             if let Some(rdev) = attributes.rdev {
                 info.rdev = DeviceType::from_bits(rdev);
             }
-            Ok(())
-        })
+        });
     }
 }
 
@@ -421,14 +415,14 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
-        StarnixNodeConnection::set_attrs(self, flags, attributes)?;
+        StarnixNodeConnection::set_attrs(self, flags, attributes);
         Ok(())
     }
     async fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), zx::Status> {
-        StarnixNodeConnection::update_attributes(self, attributes)?;
+        StarnixNodeConnection::update_attributes(self, attributes);
         Ok(())
     }
     async fn unlink(
@@ -507,14 +501,14 @@ impl file::File for StarnixNodeConnection {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
-        StarnixNodeConnection::set_attrs(self, flags, attributes)?;
+        StarnixNodeConnection::set_attrs(self, flags, attributes);
         Ok(())
     }
     async fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), zx::Status> {
-        StarnixNodeConnection::update_attributes(self, attributes)?;
+        StarnixNodeConnection::update_attributes(self, attributes);
         Ok(())
     }
     async fn sync(&self, _mode: file::SyncMode) -> Result<(), zx::Status> {

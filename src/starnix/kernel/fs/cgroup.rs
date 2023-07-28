@@ -77,8 +77,7 @@ impl FsNodeOps for CgroupDirectoryNode {
     ) -> Result<FsNodeHandle, Errno> {
         node.update_info(|info| {
             info.link_count += 1;
-            Ok(())
-        })?;
+        });
         Ok(node.fs().create_node(CgroupDirectoryNode::new(), FsNodeInfo::new_factory(mode, owner)))
     }
 

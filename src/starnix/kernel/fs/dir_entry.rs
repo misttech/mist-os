@@ -244,7 +244,7 @@ impl DirEntry {
             }
         } else {
             // An entry was created. Update the ctime and mtime of this directory.
-            self.node.update_ctime_mtime()?;
+            self.node.update_ctime_mtime();
             Ok(entry)
         }
     }
@@ -699,7 +699,7 @@ impl DirEntry {
         }
 
         // Renaming a file updates its ctime.
-        renamed.node.update_ctime()?;
+        renamed.node.update_ctime();
 
         Ok(())
     }

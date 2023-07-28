@@ -163,8 +163,7 @@ impl FsNodeOps for ExtDirectory {
             child.update_info(|info| {
                 info.size = size;
                 info.link_count = nlink;
-                Ok(())
-            })?;
+            });
             Ok(child)
         })
     }

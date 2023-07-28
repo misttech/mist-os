@@ -1032,7 +1032,7 @@ impl FsNode {
         self.check_access(current_task, Access::WRITE)?;
         self.check_sticky_bit(current_task, child)?;
         self.ops().unlink(self, current_task, name, child)?;
-        self.update_ctime_mtime()?;
+        self.update_ctime_mtime();
         Ok(())
     }
 
@@ -1081,12 +1081,12 @@ impl FsNode {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
-        self.clear_suid_and_sgid_bits(current_task)?;
+        self.clear_suid_and_sgid_bits(current_task);
         // We have to take the append lock since otherwise it would be possible to truncate and for
         // an append to continue using the old size.
         let _guard = self.append_lock.read(current_task);
         self.ops().truncate(self, current_task, length)?;
-        self.update_ctime_mtime()?;
+        self.update_ctime_mtime();
         Ok(())
     }
 
@@ -1094,7 +1094,7 @@ impl FsNode {
     /// which will also perform additional verifications.
     pub fn fallocate(&self, mode: FallocMode, offset: u64, length: u64) -> Result<(), Errno> {
         self.ops().allocate(self, mode, offset, length)?;
-        self.update_ctime_mtime()?;
+        self.update_ctime_mtime();
         Ok(())
     }
 
@@ -1418,42 +1418,38 @@ impl FsNode {
     pub fn info(&self) -> RwLockReadGuard<'_, FsNodeInfo> {
         self.info.read()
     }
-    pub fn update_info<F, T>(&self, mutator: F) -> Result<T, Errno>
+    pub fn update_info<F, T>(&self, mutator: F) -> T
     where
-        F: FnOnce(&mut FsNodeInfo) -> Result<T, Errno>,
+        F: FnOnce(&mut FsNodeInfo) -> T,
     {
         let mut info = self.info.write();
         mutator(&mut info)
     }
 
     /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
-    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) {
         if !current_task.creds().has_capability(CAP_FSETID) {
             self.update_info(|info| {
                 info.clear_suid_and_sgid_bits();
-                Ok(())
-            })?;
+            });
         }
-        Ok(())
     }
 
     /// Update the ctime and mtime of a file to now.
-    pub fn update_ctime_mtime(&self) -> Result<(), Errno> {
+    pub fn update_ctime_mtime(&self) {
         self.update_info(|info| {
             let now = utc::utc_now();
             info.time_status_change = now;
             info.time_modify = now;
-            Ok(())
-        })
+        });
     }
 
     /// Update the ctime of a file to now.
-    pub fn update_ctime(&self) -> Result<(), Errno> {
+    pub fn update_ctime(&self) {
         self.update_info(|info| {
             let now = utc::utc_now();
             info.time_status_change = now;
-            Ok(())
-        })
+        });
     }
 
     /// Update the atime and mtime if the `current_task` has write access, is the file owner, or
@@ -1495,8 +1491,7 @@ impl FsNode {
                 if let Some(time) = get_time(mtime) {
                     info.time_modify = time;
                 }
-                Ok(())
-            })?;
+            });
         }
         Ok(())
     }
@@ -1586,9 +1581,7 @@ mod tests {
             info.time_access = zx::Time::from_nanos(2);
             info.time_modify = zx::Time::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
-            Ok(())
-        })
-        .expect("update_info");
+        });
         let stat = node.stat(&current_task).expect("stat");
 
         assert_eq!(stat.st_mode, FileMode::IFSOCK.bits());
@@ -1648,8 +1641,7 @@ mod tests {
                 info.mode = mode!(IFREG, perm);
                 info.uid = uid;
                 info.gid = gid;
-                Ok(())
-            })?;
+            });
             node.check_access(&current_task, access)
         };
 

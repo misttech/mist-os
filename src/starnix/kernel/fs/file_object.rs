@@ -1061,9 +1061,9 @@ impl FileObject {
         if !self.can_write() {
             return error!(EBADF);
         }
-        self.node().clear_suid_and_sgid_bits(current_task)?;
+        self.node().clear_suid_and_sgid_bits(current_task);
         let bytes_written = write()?;
-        self.node().update_ctime_mtime()?;
+        self.node().update_ctime_mtime();
 
         if bytes_written > 0 {
             self.notify(InotifyMask::MODIFY);

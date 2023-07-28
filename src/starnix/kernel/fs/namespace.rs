@@ -1188,14 +1188,10 @@ impl NamespaceNode {
         // or is mounted with the NOATIME flag.
         if let Some(mount) = &self.mount {
             if !mount.flags().contains(MountFlags::NOATIME) {
-                self.entry
-                    .node
-                    .update_info(|info| {
-                        let now = utc::utc_now();
-                        info.time_access = now;
-                        Ok(())
-                    })
-                    .expect("update_info() is not expected to fail");
+                self.entry.node.update_info(|info| {
+                    let now = utc::utc_now();
+                    info.time_access = now;
+                });
             }
         }
     }
