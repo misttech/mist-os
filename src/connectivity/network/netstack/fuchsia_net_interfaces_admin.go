@@ -398,12 +398,12 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		defer impl.mu.Unlock()
 		if err := impl.mu.eventProxy.OnAddressRemoved(reason); err != nil {
 			var zxError *zx.Error
-			if !errors.As(err, &zxError) || zxError.Status != zx.ErrPeerClosed {
-				_ = syslog.ErrorTf(controlName, "NICID=%d failed to send OnAddressRemoved(%s) for %s: %s", impl.nicid, reason, protocolAddr.AddressWithPrefix.Address, err)
+			if !errors.As(err, &zxError) || (zxError.Status != zx.ErrPeerClosed && zxError.Status != zx.ErrBadHandle) {
+				_ = syslog.WarnTf(controlName, "NICID=%d failed to send OnAddressRemoved(%s) for %s: %s", impl.nicid, reason, protocolAddr.AddressWithPrefix.Address, err)
 			}
 		}
 		if err := impl.mu.eventProxy.Close(); err != nil {
-			_ = syslog.ErrorTf(controlName, "NICID=%d failed to close %s channel", impl.nicid, addressStateProviderName)
+			_ = syslog.WarnTf(controlName, "NICID=%d failed to close %s channel", impl.nicid, addressStateProviderName)
 		}
 		return nil
 	}
