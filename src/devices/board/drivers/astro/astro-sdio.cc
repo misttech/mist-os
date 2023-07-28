@@ -12,7 +12,6 @@
 #include <lib/zircon-internal/align.h>
 
 #include <fbl/algorithm.h>
-#include <hwreg/bitfields.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
@@ -31,20 +30,6 @@ namespace {
 
 constexpr uint32_t kGpioBase = fbl::round_down<uint32_t, uint32_t>(S905D2_GPIO_BASE, PAGE_SIZE);
 constexpr uint32_t kGpioBaseOffset = S905D2_GPIO_BASE - kGpioBase;
-
-class PadDsReg2A : public hwreg::RegisterBase<PadDsReg2A, uint32_t> {
- public:
-  static constexpr uint32_t kDriveStrengthMax = 3;
-
-  static auto Get() { return hwreg::RegisterAddr<PadDsReg2A>((0xd2 * 4) + kGpioBaseOffset); }
-
-  DEF_FIELD(1, 0, gpiox_0_select);
-  DEF_FIELD(3, 2, gpiox_1_select);
-  DEF_FIELD(5, 4, gpiox_2_select);
-  DEF_FIELD(7, 6, gpiox_3_select);
-  DEF_FIELD(9, 8, gpiox_4_select);
-  DEF_FIELD(11, 10, gpiox_5_select);
-};
 
 }  // namespace
 
@@ -142,22 +127,6 @@ static const fpbus::Node sd_emmc_dev = []() {
 }();
 
 zx_status_t Astro::SdEmmcConfigurePortB() {
-  // Clear GPIO_X
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D0, 0);
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D1, 0);
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D2, 0);
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D3, 0);
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_CLK, 0);
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_CMD, 0);
-  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_WAKE_HOST, 0);
-  // Clear GPIO_C
-  gpio_impl_.SetAltFunction(S905D2_GPIOC(0), 0);
-  gpio_impl_.SetAltFunction(S905D2_GPIOC(1), 0);
-  gpio_impl_.SetAltFunction(S905D2_GPIOC(2), 0);
-  gpio_impl_.SetAltFunction(S905D2_GPIOC(3), 0);
-  gpio_impl_.SetAltFunction(S905D2_GPIOC(4), 0);
-  gpio_impl_.SetAltFunction(S905D2_GPIOC(5), 0);
-
   size_t aligned_size = ZX_ROUNDUP((S905D2_GPIO_BASE - kGpioBase) + S905D2_GPIO_LENGTH, PAGE_SIZE);
   // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
   zx::unowned_resource resource(get_root_resource(parent()));
@@ -174,31 +143,48 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
     zxlogf(ERROR, "Create(gpio) error: %s", gpio_base.status_string());
   }
 
-  // TODO(ravoorir): Figure out if we need gpio protocol ops to modify these
+  // TODO(fxbug.dev/75530): Figure out if we need gpio protocol ops to modify these
   // gpio registers.
-  uint32_t preg_pad_gpio5_val =
-      gpio_base->Read32(kGpioBaseOffset + (S905D2_PREG_PAD_GPIO5_O << 2)) |
-      AML_SDIO_PORTB_GPIO_REG_5_VAL;
-  gpio_base->Write32(preg_pad_gpio5_val, kGpioBaseOffset + (S905D2_PREG_PAD_GPIO5_O << 2));
 
-  uint32_t periphs_pin_mux2_val =
-      gpio_base->Read32(kGpioBaseOffset + (S905D2_PERIPHS_PIN_MUX_2 << 2)) |
-      AML_SDIO_PORTB_PERIPHS_PINMUX2_VAL;
-  gpio_base->Write32(periphs_pin_mux2_val, kGpioBaseOffset + (S905D2_PERIPHS_PIN_MUX_2 << 2));
+  // PREG_PAD_GPIO5_O[17] is an undocumented bit that selects between (0) GPIO and (1) SDMMC port B
+  // as outputs to GPIOX_4 (the SDIO clock pin). This mux is upstream of the alt function mux, so in
+  // order for port B to use GPIOX, the alt function value must also be set to zero. Note that the
+  // output enable signal does not seem to be muxed here, and must be set separately in order for
+  // clock output to work.
+  gpio_base->SetBits32(AML_SDIO_PORTB_GPIO_REG_5_VAL,
+                       kGpioBaseOffset + (S905D2_PREG_PAD_GPIO5_O << 2));
 
-  uint32_t gpio2_en_n_val = gpio_base->Read32(kGpioBaseOffset + (S905D2_PREG_PAD_GPIO2_EN_N << 2)) &
-                            AML_SDIO_PORTB_PERIPHS_GPIO2_EN;
-  gpio_base->Write32(gpio2_en_n_val, kGpioBaseOffset + (S905D2_PREG_PAD_GPIO2_EN_N << 2));
+  // PERIPHS_PIN_MUX_2[24] is another undocumented bit that controls the corresponding mux for the
+  // rest of the SDIO pins (data and cmd). Unlike GPIOX_4, the output enable signals are also muxed,
+  // so the pin directions don't need to be set manually.
+  gpio_base->SetBits32(AML_SDIO_PORTB_PERIPHS_PINMUX2_VAL,
+                       kGpioBaseOffset + (S905D2_PERIPHS_PIN_MUX_2 << 2));
 
-  PadDsReg2A::Get()
-      .ReadFrom(&(*gpio_base))
-      .set_gpiox_0_select(PadDsReg2A::kDriveStrengthMax)
-      .set_gpiox_1_select(PadDsReg2A::kDriveStrengthMax)
-      .set_gpiox_2_select(PadDsReg2A::kDriveStrengthMax)
-      .set_gpiox_3_select(PadDsReg2A::kDriveStrengthMax)
-      .set_gpiox_4_select(PadDsReg2A::kDriveStrengthMax)
-      .set_gpiox_5_select(PadDsReg2A::kDriveStrengthMax)
-      .WriteTo(&(*gpio_base));
+  // Clear GPIO_X
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D0, 0);
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D1, 0);
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D2, 0);
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_D3, 0);
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_CLK, 0);
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_CMD, 0);
+  gpio_impl_.SetAltFunction(S905D2_WIFI_SDIO_WAKE_HOST, 0);
+  // Clear GPIO_C
+  gpio_impl_.SetAltFunction(S905D2_GPIOC(0), 0);
+  gpio_impl_.SetAltFunction(S905D2_GPIOC(1), 0);
+  gpio_impl_.SetAltFunction(S905D2_GPIOC(2), 0);
+  gpio_impl_.SetAltFunction(S905D2_GPIOC(3), 0);
+  gpio_impl_.SetAltFunction(S905D2_GPIOC(4), 0);
+  gpio_impl_.SetAltFunction(S905D2_GPIOC(5), 0);
+
+  // Enable output from SDMMC port B on GPIOX_4.
+  gpio_impl_.ConfigOut(S905D2_WIFI_SDIO_CLK, 1);
+
+  gpio_impl_.SetDriveStrength(S905D2_WIFI_SDIO_D0, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(S905D2_WIFI_SDIO_D1, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(S905D2_WIFI_SDIO_D2, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(S905D2_WIFI_SDIO_D3, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(S905D2_WIFI_SDIO_CLK, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(S905D2_WIFI_SDIO_CMD, 4'000, nullptr);
 
   // Configure clock settings
   status = zx::vmo::create_physical(*resource, S905D2_HIU_BASE, S905D2_HIU_LENGTH, &vmo);
