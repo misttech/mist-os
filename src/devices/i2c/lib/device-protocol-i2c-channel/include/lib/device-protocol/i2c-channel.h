@@ -137,6 +137,10 @@ class I2cChannel {
     return fidl_client_->Transfer(transactions);
   }
 
+  fidl::WireResult<fuchsia_hardware_i2c::Device::GetName> GetName() {
+    return fidl_client_->GetName();
+  }
+
   bool is_valid() const { return fidl_client_.is_valid(); }
 
  private:
