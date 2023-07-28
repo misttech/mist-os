@@ -163,6 +163,15 @@ struct ExamplePagingTraits {
   /// permissive.
   static constexpr bool kNonTerminalAccessPermissions = false;
 
+  /// An optional override for the number of addressable bits of a virtual
+  /// address. The values of `kNumTableEntriesLog2<Level>` collectively and
+  /// indirectly prescribe a maximum width, as this determines the maximum bit
+  /// that figures into the first level of paging. There are cases in which an
+  /// address space may be configured to be strictly smaller, which can be
+  /// specified by this value (which must be smaller than the default max);
+  /// otherwise, a value of std::nullopt specifies the size as the default max.
+  static constexpr std::optional<unsigned int> kVirtualAddressSizeOverride = std::nullopt;
+
   /// Parameterizes the unaddressable virtual address space bits.
   static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
 
@@ -286,6 +295,7 @@ class Paging : public PagingTraits {
       PagingTraits::template kNumTableEntriesLog2<Level>;
 
   using PagingTraits::kVirtualAddressExtension;
+  using PagingTraits::kVirtualAddressSizeOverride;
 
   static constexpr LevelType kFirstLevel = kLevels.front();
 
@@ -344,7 +354,14 @@ class Paging : public PagingTraits {
   static constexpr uint64_t kPageSize = uint64_t{1u} << kVirtualAddressBitRange<Level>.low;
 
   /// The number of addressable bits in a virtual address (i.e., its "size").
-  static constexpr unsigned int kVirtualAddressSize = kVirtualAddressBitRange<kLevels[0]>.high + 1;
+  static constexpr unsigned int kVirtualAddressSize = []() {
+    constexpr unsigned int kMaxSize = kVirtualAddressBitRange<kLevels[0]>.high + 1;
+    if constexpr (kVirtualAddressSizeOverride) {
+      static_assert(*kVirtualAddressSizeOverride <= kMaxSize);
+      return *kVirtualAddressSizeOverride;
+    }
+    return kMaxSize;
+  }();
 
   /// The virtual address marking the (exclusive) end of the lower range, if
   /// parameterized by PagingTraits.

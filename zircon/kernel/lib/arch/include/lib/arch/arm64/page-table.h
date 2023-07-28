@@ -8,11 +8,13 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ARM64_PAGE_TABLE_H_
 
 #include <lib/arch/paging.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -672,8 +674,8 @@ class ArmAddressTranslationBlockDescriptor
 // Implementations of the PagingTraits API (defined in <lib/arch/paging.h>) for
 // ARM.
 //
-// We just define the 4KiB granule, 48-bit wide versions of these for now, as
-// these are all are currently used.
+// We just define the 4KiB granule, max 48-bit wide versions of these for now,
+// as these are all that are currently used.
 //
 
 // Specifies the upper or lower virtual address range (i.e., the
@@ -686,7 +688,9 @@ enum class ArmVirtualAddressRange {
   kUpper,
 };
 
-template <ArmVirtualAddressRange Range>
+// VirtualAddressSize represents the value of 64 - TnSZ, which restricts the
+// addressable virtual address range and may result in few levels of paging.
+template <ArmVirtualAddressRange Range, unsigned int VirtualAddressSize = 48>
 struct ArmPagingTraits {
   using LevelType = ArmAddressTranslationLevel;
 
@@ -695,13 +699,6 @@ struct ArmPagingTraits {
   template <ArmAddressTranslationLevel Level>
   using TableEntry = ArmAddressTranslationDescriptor<Level, ArmGranuleSize::k4KiB,
                                                      ArmMaximumVirtualAddressWidth::k48Bits>;
-
-  static constexpr std::array kLevels = {
-      ArmAddressTranslationLevel::k0,
-      ArmAddressTranslationLevel::k1,
-      ArmAddressTranslationLevel::k2,
-      ArmAddressTranslationLevel::k3,
-  };
 
   static constexpr unsigned int kMaxPhysicalAddressSize = 48;
 
@@ -712,9 +709,38 @@ struct ArmPagingTraits {
 
   static constexpr bool kNonTerminalAccessPermissions = true;
 
+  static_assert(16 <= VirtualAddressSize);
+  static_assert(VirtualAddressSize <= 48);
+  static constexpr std::optional<unsigned int> kVirtualAddressSizeOverride = VirtualAddressSize;
+
   static constexpr auto kVirtualAddressExtension = Range == ArmVirtualAddressRange::kLower
                                                        ? VirtualAddressExtension::k0
                                                        : VirtualAddressExtension::k1;
+
+  static constexpr std::array kAllLevels = {
+      ArmAddressTranslationLevel::k0,
+      ArmAddressTranslationLevel::k1,
+      ArmAddressTranslationLevel::k2,
+      ArmAddressTranslationLevel::k3,
+  };
+
+  // [arm/v8]: Table D5-13 TCR_ELx.TnSZ values and IA ranges, 4KB granule with no concatenation of
+  // tables
+  //
+  // Restrictions of the virtual address space can result in fewer levels.
+  static constexpr unsigned int kFirstLevelIndex = []() {
+    switch (VirtualAddressSize) {
+      case 40 ... 48:
+        return 0;
+      case 31 ... 39:
+        return 1;
+      case 22 ... 30:
+        return 2;
+      case 16 ... 21:
+        return 3;
+    }
+  }();
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(kFirstLevelIndex);
 
   static constexpr bool IsValidPageAccess(const ArmSystemPagingState&, const AccessPermissions&) {
     return true;
