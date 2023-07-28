@@ -26,7 +26,7 @@ use net_types::{
 use netemul::{InStack, InterfaceConfig};
 use netstack_testing_common::{
     interfaces,
-    realms::{Netstack, Netstack2, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
+    realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
 
@@ -233,17 +233,13 @@ async fn resolve_route<N: Netstack>(name: &str) {
     .await;
 }
 
-// TODO(https://fxbug.dev/124960): Test against NS3 once it supports adding
-// static neighbors. It will probably also need a slight rewrite to make use of
-// the out-of-stack DHCPv4 client.
 #[netstack_test]
-async fn resolve_default_route_while_dhcp_is_running(name: &str) {
+async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     // Configure a host.
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create client realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
 
     let stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()

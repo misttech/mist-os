@@ -15,23 +15,14 @@ group("tests") {
   ]
 }
 
-tests = [ "routes" ]
-
 tests_with_expectations = [
   "debug",
   "interfaces",
   "interfaces-admin",
   "neighbor",
+  "routes",
   "routes-admin",
 ]
-
-foreach(test, tests) {
-  name = "netstack-${test}-fidl-test"
-  fuchsia_test_component(name) {
-    manifest = "meta/${name}.cml"
-    deps = [ test ]
-  }
-}
 
 foreach(test, tests_with_expectations) {
   name = "netstack-${test}-fidl-test"
@@ -90,9 +81,6 @@ fuchsia_test_package("netstack-fidl-tests-with-expectations") {
 
 fuchsia_test_package("netstack-fidl-tests") {
   test_components = []
-  foreach(test, tests) {
-    test_components += [ ":netstack-${test}-fidl-test" ]
-  }
   foreach(test, filter_tests) {
     test_components += [ ":netstack-${test}-filter-fidl-test" ]
   }

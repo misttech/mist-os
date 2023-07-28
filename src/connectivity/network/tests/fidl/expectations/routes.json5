@@ -1,0 +1,27 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/124960): Implement fuchsia.net.neighbor in NS3.
+                "resolve_default_route_while_dhcp_is_running_ns3",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Flakes.
+                "resolve_fails_with_no_src_address_ns3_v6",
+            ],
+        },
+    ],
+}
