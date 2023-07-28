@@ -7,10 +7,7 @@ group("tests") {
   testonly = true
   assert_no_deps = e2e_test_libs
 
-  deps = [
-    "experimental_fidl:tests",
-    "fidl:tests",
-  ]
+  deps = [ "fidl:tests" ]
 
   # Don't release examples in CTF
   metadata = {
