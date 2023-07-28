@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! Macros to define tests to run with both IPv4 and IPv6 from logic that
+//! is parameterized over IP version.
+
 #[macro_use]
 extern crate quote;
 #[macro_use]
@@ -21,6 +24,45 @@ use syn::{
     TypeImplTrait, TypeParamBound, TypePath,
 };
 
+/// Defines tests which call the annotated function with [`net_types::ip::Ipv4`]
+/// and [`net_types::ip::Ipv6`] in place of the [`net_types::ip::Ip`] type
+/// parameter.
+///
+/// Modulo interactions with other attribute macros, a function marked with
+/// `#[ip_test]` must *always*:
+/// * Receive zero arguments
+/// * Have *exactly one* type parameter that has an [`net_types::ip::Ip`] trait bound.
+///
+/// ## Example
+///
+/// The following code:
+///
+/// ```rust
+/// #[ip_test]
+/// fn test_foo<I: Ip>() {
+///    assert!(do_ip_specific_thing::<I>());
+///    /* ... */
+/// }
+/// ```
+///
+/// generates the following:
+///
+/// ```rust
+/// fn test_foo<I: Ip>() {
+///    assert!(do_ip_specific_thing::<I>());
+///    /* ... */
+/// }
+///
+/// #[test]
+/// fn test_foo_v4() {
+///    test_foo::<Ipv4>();
+/// }
+///
+/// #[test]
+/// fn test_foo_v6() {
+///    test_foo::<Ipv6>();
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
     ip_test_inner(attr, input, "ip_test", "Ip", "Ipv4", "Ipv6")
