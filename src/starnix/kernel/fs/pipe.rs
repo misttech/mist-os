@@ -63,7 +63,7 @@ impl Pipe {
         Arc::new(Mutex::new(Pipe::default()))
     }
 
-    pub fn open(pipe: &Arc<Mutex<Self>>, flags: OpenFlags) -> Box<dyn FileOps> {
+    pub fn open(pipe: &Arc<Mutex<Self>>, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
         let mut events = FdEvents::empty();
         let mut pipe_locked = pipe.lock();
         if flags.can_read() {
@@ -73,6 +73,14 @@ impl Pipe {
             pipe_locked.add_reader();
         }
         if flags.can_write() {
+            // https://man7.org/linux/man-pages/man2/open.2.html says:
+            //
+            //  ENXIO  O_NONBLOCK | O_WRONLY is set, the named file is a FIFO,
+            //         and no process has the FIFO open for reading.
+            if flags.contains(OpenFlags::NONBLOCK) && pipe_locked.reader_count == 0 {
+                assert!(!flags.can_read()); // Otherwise we would have called add_reader() above.
+                return error!(ENXIO);
+            }
             if !pipe_locked.had_writer {
                 events |= FdEvents::POLLIN;
             }
@@ -81,7 +89,7 @@ impl Pipe {
         if events != FdEvents::empty() {
             pipe_locked.waiters.notify_fd_events(events);
         }
-        Box::new(PipeFileObject { pipe: Arc::clone(pipe) })
+        Ok(Box::new(PipeFileObject { pipe: Arc::clone(pipe) }))
     }
 
     /// Increments the reader count for this pipe by 1.

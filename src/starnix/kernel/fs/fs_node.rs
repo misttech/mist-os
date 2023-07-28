@@ -915,7 +915,7 @@ impl FsNode {
                 rdev,
                 DeviceMode::Block,
             ),
-            FileMode::IFIFO => Ok(Pipe::open(self.fifo.as_ref().unwrap(), flags)),
+            FileMode::IFIFO => Pipe::open(self.fifo.as_ref().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(current_task, flags),
