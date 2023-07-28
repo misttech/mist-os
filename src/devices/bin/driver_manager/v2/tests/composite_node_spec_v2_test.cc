@@ -22,8 +22,8 @@ class FakeNodeManager : public dfv2::NodeManager {
 class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {
  public:
   std::shared_ptr<dfv2::Node> CreateNode(const char* name, dfv2::NodeManager* manager) {
-    return std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), manager, dispatcher(),
-                                        inspect_.CreateDevice(name, zx::vmo(), 0));
+    return std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(), manager,
+                                        dispatcher(), inspect_.CreateDevice(name, zx::vmo(), 0));
   }
 
  private:
@@ -84,8 +84,8 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   auto composite_node = composite_node_ptr.lock();
   ASSERT_TRUE(composite_node);
   ASSERT_TRUE(composite_node->IsComposite());
-  ASSERT_EQ("spec_parent_1", composite_node->parents()[0]->name());
-  ASSERT_EQ("spec_parent_2", composite_node->parents()[1]->name());
+  ASSERT_EQ("spec_parent_1", composite_node->parents()[0].lock()->name());
+  ASSERT_EQ("spec_parent_2", composite_node->parents()[1].lock()->name());
 
   ASSERT_EQ("spec_parent_2", composite_node->GetPrimaryParent()->name());
 }

@@ -108,7 +108,7 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
   }
 
   std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
-    return std::make_shared<dfv2::Node>("node", std::vector<dfv2::Node*>{}, nullptr,
+    return std::make_shared<dfv2::Node>("node", std::vector<std::weak_ptr<dfv2::Node>>{}, nullptr,
                                         loop_.dispatcher(),
                                         inspect_.CreateDevice(name, zx::vmo(), 0));
   }

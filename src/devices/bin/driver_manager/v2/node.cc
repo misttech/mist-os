@@ -348,8 +348,9 @@ void BindResultTracker::Complete(size_t current) {
   }
 }
 
-Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
-           async_dispatcher_t* dispatcher, DeviceInspect inspect, uint32_t primary_index)
+Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
+           NodeManager* node_manager, async_dispatcher_t* dispatcher, DeviceInspect inspect,
+           uint32_t primary_index)
     : name_(name),
       parents_(std::move(parents)),
       primary_index_(primary_index),
@@ -366,8 +367,9 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
   }
 }
 
-Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
-           async_dispatcher_t* dispatcher, DeviceInspect inspect, DriverHost* driver_host)
+Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
+           NodeManager* node_manager, async_dispatcher_t* dispatcher, DeviceInspect inspect,
+           DriverHost* driver_host)
     : name_(name),
       parents_(std::move(parents)),
       node_manager_(node_manager),
@@ -377,7 +379,8 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
       tasks_(dispatcher) {}
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
-    std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
+    std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
+    std::vector<std::string> parents_names,
     const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
     NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
@@ -386,8 +389,13 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
+  auto primary_node_ptr = parents[primary_index].lock();
+  if (!primary_node_ptr) {
+    LOGF(ERROR, "Primary node freed before use");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
   DeviceInspect inspect =
-      parents[primary_index]->inspect_.CreateChild(std::string(node_name), zx::vmo(), 0);
+      primary_node_ptr->inspect_.CreateChild(std::string(node_name), zx::vmo(), 0);
   std::shared_ptr composite = std::make_shared<Node>(node_name, std::move(parents), driver_binder,
                                                      dispatcher, std::move(inspect), primary_index);
   composite->parents_names_ = std::move(parents_names);
@@ -415,8 +423,13 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   // Copy the offers from each parent.
   std::vector<fdecl::wire::Offer> node_offers;
   size_t parent_index = 0;
-  for (const Node* parent : composite->parents_) {
-    auto parent_offers = parent->offers();
+  for (const std::weak_ptr<Node> parent : composite->parents_) {
+    auto parent_ptr = parent.lock();
+    if (!parent_ptr) {
+      LOGF(ERROR, "Composite parent node freed before use");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    auto parent_offers = parent_ptr->offers();
     node_offers.reserve(node_offers.size() + parent_offers.count());
 
     for (auto& parent_offer : parent_offers) {
@@ -457,7 +470,7 @@ const std::string& Node::driver_url() const {
   }
   return kUnboundUrl;
 }
-const std::vector<Node*>& Node::parents() const { return parents_; }
+const std::vector<std::weak_ptr<Node>>& Node::parents() const { return parents_; }
 
 const std::list<std::shared_ptr<Node>>& Node::children() const { return children_; }
 
@@ -518,7 +531,7 @@ void Node::Kill(KillCompleter::Sync& completer) {
 }
 
 Node* Node::GetPrimaryParent() const {
-  return parents_.empty() ? nullptr : parents_[primary_index_];
+  return parents_.empty() ? nullptr : parents_[primary_index_].lock().get();
 }
 
 void Node::CompleteBind(zx::result<> result) {
@@ -542,8 +555,12 @@ void Node::CompleteBind(zx::result<> result) {
 
 void Node::AddToParents() {
   auto this_node = shared_from_this();
-  for (auto parent : parents_) {
-    parent->children_.push_back(this_node);
+  for (auto& parent : parents_) {
+    if (auto ptr = parent.lock(); ptr) {
+      ptr->children_.push_back(this_node);
+      continue;
+    }
+    LOGF(WARNING, "Parent freed before child %s could be added to it", name().c_str());
   }
 }
 
@@ -599,7 +616,11 @@ void Node::FinishRemoval() {
   node_state_ = NodeState::kStopping;
   driver_component_.reset();
   for (auto& parent : parents()) {
-    parent->RemoveChild(shared_from_this());
+    if (auto ptr = parent.lock(); ptr) {
+      ptr->RemoveChild(shared_from_this());
+      continue;
+    }
+    LOGF(WARNING, "Parent freed before child %s could be removed from it", name().c_str());
   }
   parents_.clear();
 
@@ -815,8 +836,9 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     inspect_vmo = std::move(args.devfs_args()->inspect().value());
   }
   DeviceInspect inspect = inspect_.CreateChild(std::string(name), std::move(inspect_vmo), 0);
-  std::shared_ptr child = std::make_shared<Node>(name, std::vector<Node*>{this}, *node_manager_,
-                                                 dispatcher_, std::move(inspect));
+  std::shared_ptr child =
+      std::make_shared<Node>(name, std::vector<std::weak_ptr<Node>>{weak_from_this()},
+                             *node_manager_, dispatcher_, std::move(inspect));
 
   if (args.offers().has_value()) {
     child->offers_.reserve(args.offers().value().size());

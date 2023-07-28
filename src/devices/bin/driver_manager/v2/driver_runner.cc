@@ -189,8 +189,13 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
 Collection ToCollection(const Node& node, fdi::DriverPackageType package_type) {
   Collection collection = ToCollection(package_type);
   for (const auto& parent : node.parents()) {
-    if (parent->collection() > collection) {
-      collection = parent->collection();
+    auto parent_ptr = parent.lock();
+    if (!parent_ptr) {
+      LOGF(WARNING, "Parent node released");
+      continue;
+    }
+    if (parent_ptr->collection() > collection) {
+      collection = parent_ptr->collection();
     }
   }
   return collection;
@@ -203,9 +208,9 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
     : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
-      root_node_(
-          std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher,
-                                 inspect.CreateDevice(std::string(kRootDeviceName), zx::vmo(), 0))),
+      root_node_(std::make_shared<Node>(
+          kRootDeviceName, std::vector<std::weak_ptr<Node>>{}, this, dispatcher,
+          inspect.CreateDevice(std::string(kRootDeviceName), zx::vmo(), 0))),
       composite_node_spec_manager_(this),
       bind_manager_(this, this, dispatcher),
       runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)) {

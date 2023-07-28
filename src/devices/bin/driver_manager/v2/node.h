@@ -126,15 +126,15 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
              public fidl::WireAsyncEventHandler<fuchsia_driver_host::Driver>,
              public std::enable_shared_from_this<Node> {
  public:
-  Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
+  Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents, NodeManager* node_manager,
        async_dispatcher_t* dispatcher, DeviceInspect inspect, uint32_t primary_index = 0);
-  Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
+  Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents, NodeManager* node_manager,
        async_dispatcher_t* dispatcher, DeviceInspect inspect, DriverHost* driver_host);
 
   ~Node() override;
 
   static zx::result<std::shared_ptr<Node>> CreateCompositeNode(
-      std::string_view node_name, std::vector<Node*> parents,
+      std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
       std::vector<std::string> parents_names,
       const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
@@ -215,7 +215,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   const std::string& name() const { return name_; }
   const DriverHost* driver_host() const { return *driver_host_; }
   const std::string& driver_url() const;
-  const std::vector<Node*>& parents() const;
+  const std::vector<std::weak_ptr<Node>>& parents() const;
   const std::list<std::shared_ptr<Node>>& children() const;
   fidl::ArenaBase& arena() { return arena_; }
   fidl::VectorView<fuchsia_component_decl::wire::Offer> offers() const;
@@ -334,7 +334,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // If this is a composite device, this stores the list of each parent's names.
   std::vector<std::string> parents_names_;
-  std::vector<Node*> parents_;
+  std::vector<std::weak_ptr<Node>> parents_;
   uint32_t primary_index_ = 0;
   std::list<std::shared_ptr<Node>> children_;
   fit::nullable<NodeManager*> node_manager_;

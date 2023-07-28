@@ -242,7 +242,7 @@ void CompositeDeviceAssembler::TryToAssemble() {
   }
 
   std::vector<std::shared_ptr<Node>> strong_parents;
-  std::vector<Node*> parents;
+  std::vector<std::weak_ptr<Node>> parents;
   std::vector<std::string> parents_names;
   for (auto& fragment : fragments_) {
     auto node = fragment.bound_node();
@@ -250,7 +250,7 @@ void CompositeDeviceAssembler::TryToAssemble() {
     if (!node) {
       return;
     }
-    parents.push_back(node.get());
+    parents.push_back(node);
     parents_names.emplace_back(fragment.name());
     strong_parents.push_back(std::move(node));
   }

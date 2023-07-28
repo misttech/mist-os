@@ -42,8 +42,13 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   const auto& parents = node->parents();
   fidl::VectorView<uint64_t> parent_ids(allocator, parents.size());
   i = 0;
-  for (const auto* parent : parents) {
-    parent_ids[i++] = reinterpret_cast<uint64_t>(parent);
+  for (const auto& parent : parents) {
+    auto parent_ptr = parent.lock();
+    if (!parent_ptr) {
+      LOGF(ERROR, "Parent node freed before it could be used");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    parent_ids[i++] = reinterpret_cast<uint64_t>(parent_ptr.get());
   }
   if (!parent_ids.empty()) {
     device_info.parent_ids(parent_ids);

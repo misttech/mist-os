@@ -44,8 +44,9 @@ class Dfv2NodeTest : public gtest::TestLoopFixture {
   void SetUp() override { TestLoopFixture::SetUp(); }
 
   std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
-    return std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), &node_manager_,
-                                        dispatcher(), inspect_.CreateDevice(name, zx::vmo(), 0));
+    return std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(),
+                                        &node_manager_, dispatcher(),
+                                        inspect_.CreateDevice(name, zx::vmo(), 0));
   }
 
  private:

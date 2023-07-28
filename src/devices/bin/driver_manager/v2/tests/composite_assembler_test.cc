@@ -45,8 +45,8 @@ class CompositeAssemblerTest : public gtest::TestLoopFixture {
  public:
   std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
     std::shared_ptr new_node =
-        std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), &node_manager, dispatcher(),
-                                     inspect.CreateDevice(name, zx::vmo(), 0));
+        std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(), &node_manager,
+                                     dispatcher(), inspect.CreateDevice(name, zx::vmo(), 0));
     new_node->AddToDevfsForTesting(root_devnode.value());
     new_node->devfs_device().publish();
     return new_node;

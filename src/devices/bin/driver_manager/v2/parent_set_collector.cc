@@ -28,16 +28,14 @@ zx::result<std::shared_ptr<Node>> ParentSetCollector::TryToAssemble(
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
-  std::vector<Node*> parents;
   for (auto& node : parents_) {
     auto parent = node.lock();
     if (!parent) {
       return zx::error(ZX_ERR_SHOULD_WAIT);
     }
-    parents.push_back(parent.get());
   }
 
-  auto result = Node::CreateCompositeNode(composite_name_, std::move(parents), parent_names_, {},
+  auto result = Node::CreateCompositeNode(composite_name_, parents_, parent_names_, {},
                                           node_manager, dispatcher, primary_index_);
   if (result.is_error()) {
     return result.take_error();
