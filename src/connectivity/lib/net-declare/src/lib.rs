@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! Macros for constructing networking address types from the standard library,
+//! FIDL, and [`net_types`] from human-readable representations.
+
 /// Declares an [`std::net::IpAddr`] from a parsable IP address (either V4 or
 /// V6) string.
 pub use net_declare_macros::std_ip;
