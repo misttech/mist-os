@@ -240,10 +240,12 @@ fn test_start_clock_from_rtc() {
                     ..Default::default()
                 })
                 .await;
+            tracing::info!("[fxb/130140]: after push_source_controller.set_sample stage 1");
             poll_until!(|| {
                 clock.get_details().unwrap().last_value_update_ticks != clock_last_set_ticks
             })
             .await;
+            tracing::info!("[fxb/130140]: after push_source_controller.set_sample stage 2");
             let clock_utc = clock.read().unwrap();
             let monotonic_after_read = zx::Time::get_monotonic();
             assert_geq!(clock_utc, *VALID_TIME);
