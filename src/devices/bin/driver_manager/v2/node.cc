@@ -17,8 +17,6 @@
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
-const std::string kUnboundUrl = "unbound";
-
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
@@ -28,6 +26,8 @@ namespace fcomponent = fuchsia_component;
 namespace dfv2 {
 
 namespace {
+
+const std::string kUnboundUrl = "unbound";
 
 const char* State2String(NodeState state) {
   switch (state) {
@@ -470,26 +470,6 @@ const std::string& Node::driver_url() const {
   }
   return kUnboundUrl;
 }
-const std::vector<std::weak_ptr<Node>>& Node::parents() const { return parents_; }
-
-const std::list<std::shared_ptr<Node>>& Node::children() const { return children_; }
-
-fidl::VectorView<fuchsia_component_decl::wire::Offer> Node::offers() const {
-  // TODO(fxbug.dev/66150): Once FIDL wire types support a Clone() method,
-  // remove the const_cast.
-  return fidl::VectorView<fdecl::wire::Offer>::FromExternal(
-      const_cast<decltype(offers_)&>(offers_));
-}
-
-fidl::VectorView<fdf::wire::NodeSymbol> Node::symbols() const {
-  // TODO(fxbug.dev/7999): Remove const_cast once VectorView supports const.
-  return fidl::VectorView<fdf::wire::NodeSymbol>::FromExternal(
-      const_cast<decltype(symbols_)&>(symbols_));
-}
-
-const std::vector<fdf::wire::NodeProperty>& Node::properties() const { return properties_; }
-
-void Node::set_collection(Collection collection) { collection_ = collection; }
 
 std::string Node::MakeTopologicalPath() const {
   std::deque<std::string_view> names;
@@ -528,10 +508,6 @@ void Node::Stop(StopCompleter::Sync& completer) {
 void Node::Kill(KillCompleter::Sync& completer) {
   LOGF(DEBUG, "Calling Remove on %s because of Kill() from component framework.", name().c_str());
   Remove(RemovalSet::kAll, nullptr);
-}
-
-Node* Node::GetPrimaryParent() const {
-  return parents_.empty() ? nullptr : parents_[primary_index_].lock().get();
 }
 
 void Node::CompleteBind(zx::result<> result) {
@@ -985,8 +961,6 @@ void Node::AddChild(fuchsia_driver_framework::NodeAddArgs args,
         callback(self->AddChildHelper(std::move(args), std::move(controller), std::move(node)));
       });
 }
-
-bool Node::IsComposite() const { return parents_.size() > 1; }
 
 void Node::Remove(RemoveCompleter::Sync& completer) {
   LOGF(DEBUG, "Remove() Fidl call for %s", name().c_str());

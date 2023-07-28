@@ -181,7 +181,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
                    fit::callback<void(zx::result<>)> cb);
 
-  bool IsComposite() const;
+  bool IsComposite() const { return parents_.size() > 1; }
 
   // Creates the node's topological path by combining each primary parent's name together,
   // separated by '/'.
@@ -194,7 +194,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::string MakeComponentMoniker() const;
 
   // Exposed for testing.
-  Node* GetPrimaryParent() const;
+  Node* GetPrimaryParent() const {
+    return parents_.empty() ? nullptr : parents_[primary_index_].lock().get();
+  }
 
   // This should be used on the root node. Install the root node at the top of the devfs filesystem.
   void SetupDevfsForRootNode(
@@ -213,15 +215,36 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void CompleteBind(zx::result<> result);
 
   const std::string& name() const { return name_; }
+
   const DriverHost* driver_host() const { return *driver_host_; }
+
   const std::string& driver_url() const;
-  const std::vector<std::weak_ptr<Node>>& parents() const;
-  const std::list<std::shared_ptr<Node>>& children() const;
+
+  const std::vector<std::weak_ptr<Node>>& parents() const { return parents_; }
+
+  const std::list<std::shared_ptr<Node>>& children() const { return children_; }
+
   fidl::ArenaBase& arena() { return arena_; }
-  fidl::VectorView<fuchsia_component_decl::wire::Offer> offers() const;
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const;
-  const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties() const;
+
+  // TODO(fxbug.dev/66150): Once FIDL wire types support a Clone() method,
+  // remove the const_cast.
+  fidl::VectorView<fuchsia_component_decl::wire::Offer> offers() const {
+    return fidl::VectorView<fuchsia_component_decl::wire::Offer>::FromExternal(
+        const_cast<decltype(offers_)&>(offers_));
+  }
+
+  // TODO(fxbug.dev/7999): Remove const_cast once VectorView supports const.
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const {
+    return fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol>::FromExternal(
+        const_cast<decltype(symbols_)&>(symbols_));
+  }
+
+  const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties() const {
+    return properties_;
+  }
+
   const Collection& collection() const { return collection_; }
+
   DevfsDevice& devfs_device() { return devfs_device_; }
 
   // Exposed for testing.
@@ -232,7 +255,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   bool can_multibind_composites() const { return can_multibind_composites_; }
 
-  void set_collection(Collection collection);
+  void set_collection(Collection collection) { collection_ = collection; }
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
     offers_ = std::move(offers);
   }
