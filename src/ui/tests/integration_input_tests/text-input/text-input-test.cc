@@ -217,15 +217,11 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
     AssembleRealm(GetTestComponents(), GetTestRoutes());
 
     // Get the display dimensions.
-    FX_LOGS(INFO) << "Waiting for scenic display info";
-    auto scenic = realm_exposed_services()->Connect<fuchsia::ui::scenic::Scenic>();
-    scenic->GetDisplayInfo([this](fuchsia::ui::gfx::DisplayInfo display_info) {
-      display_width_ = display_info.width_in_px;
-      display_height_ = display_info.height_in_px;
-      FX_LOGS(INFO) << "Got display_width = " << display_width()
-                    << " and display_height = " << display_height();
-    });
-    RunLoopUntil([this] { return display_width_.has_value() && display_height_.has_value(); });
+    auto display_info = ui_test_manager_->GetDisplayDimensions();
+    display_width_ = display_info.first;
+    display_height_ = display_info.second;
+    FX_LOGS(INFO) << "Got display_width = " << display_width()
+                  << " and display_height = " << display_height();
 
     input_registry_ = realm_exposed_services()->Connect<fuchsia::ui::test::input::Registry>();
     input_registry_.set_error_handler([](zx_status_t status) {
