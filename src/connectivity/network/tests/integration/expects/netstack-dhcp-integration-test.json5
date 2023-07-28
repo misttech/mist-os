@@ -21,6 +21,16 @@
             type: "expect_failure_with_err_logs",
             matchers: [
                 "acquire_with_dhcpd_bound_device_dup_addr_ns[23]_ns[23]_with_dhcp_out_of_stack",
+                "does_not_crash_with_overlapping_subnet_route_ns2_ns3_with_dhcp_out_of_stack",
+                "does_not_crash_with_overlapping_subnet_route_ns3_ns3_with_dhcp_out_of_stack",
+
+                // TODO(https://fxbug.dev/131152): This test should pass once
+                // the linked bug is fixed in netstack2.
+                "does_not_crash_with_overlapping_subnet_route_ns2_ns2_with_dhcp_in_stack",
+
+                // TODO(https://fxbug.dev/131152): This test should pass once
+                // the linked bug is fixed in netstack2.
+                "does_not_crash_with_overlapping_subnet_route_ns3_ns2_with_dhcp_in_stack",
             ],
         },
     ],

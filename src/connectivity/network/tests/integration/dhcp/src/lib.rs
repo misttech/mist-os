@@ -4,11 +4,15 @@
 
 #![cfg(test)]
 
-use std::{cell::RefCell, time::Duration};
+use std::{cell::RefCell, collections::HashSet, time::Duration};
 
 use async_utils::async_once::Once;
 use dhcpv4::protocol::IntoFidlExt as _;
-use fidl_fuchsia_net_ext::IntoExt as _;
+use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_ext::{self as fnet_ext, FromExt as _, IntoExt as _};
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_zircon as zx;
 use fuchsia_zircon_types::zx_time_t;
@@ -16,7 +20,8 @@ use futures::{
     future::TryFutureExt as _,
     stream::{self, StreamExt as _, TryStreamExt as _},
 };
-use net_declare::{fidl_ip_v4, fidl_mac};
+use net_declare::{fidl_ip_v4, fidl_mac, net_subnet_v4};
+use net_types::ip::Ipv4;
 use netemul::DhcpClient;
 use netstack_testing_common::{
     annotate, dhcpv4 as dhcpv4_helper, interfaces,
@@ -102,7 +107,7 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
 
     let mut properties =
         fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(client_interface.id());
-    for () in std::iter::repeat(()).take(cycles) {
+    for cycle in 0..cycles {
         // Enable the interface and assert that binding fails before the address is acquired.
         let () = client_interface.stop_dhcp::<D>().await.expect("failed to stop DHCP");
         let () = client_interface.set_link_up(true).await.expect("failed to bring link up");
@@ -147,6 +152,12 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
             )
             .await;
         }
+
+        if cycle == cycles - 1 {
+            // last cycle, so just return.
+            return;
+        }
+
         // Set interface online signal to down and wait for address to be removed.
         let () = client_interface.set_link_up(false).await.expect("failed to bring link down");
         let () = client_interface.stop_dhcp::<D>().await.expect("failed to stop DHCP");
@@ -259,7 +270,7 @@ async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDh
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
-    test_dhcp::<CLIENT::DhcpClient>(
+    let _ = test_dhcp::<CLIENT::DhcpClient>(
         name,
         &sandbox,
         &mut [
@@ -295,7 +306,138 @@ async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDh
         1,
         false,
     )
+    .await;
+}
+
+// Regression test for https://fxbug.dev/131152.
+#[netstack_test]
+async fn does_not_crash_with_overlapping_subnet_route<
+    SERVER: Netstack,
+    CLIENT: NetstackAndDhcpClient,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
+
+    let expected_acquired = dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired();
+    let mut netstack_configs = [
+        TestNetstackRealmConfig {
+            clients: &[DhcpTestEndpointConfig {
+                ep_type: DhcpEndpointType::Client { expected_acquired: expected_acquired.clone() },
+                network: &network,
+            }],
+            servers: &mut [],
+            netstack_version: CLIENT::Netstack::VERSION,
+        },
+        TestNetstackRealmConfig {
+            clients: &[],
+            servers: &mut [TestServerConfig {
+                endpoints: &[DhcpTestEndpointConfig {
+                    ep_type: DhcpEndpointType::Server {
+                        static_addrs: vec![dhcpv4_helper::DEFAULT_TEST_CONFIG
+                            .server_addr_with_prefix()
+                            .into_ext()],
+                    },
+                    network: &network,
+                }],
+                settings: Settings {
+                    parameters: &mut dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters(),
+                    options: &mut [],
+                },
+            }],
+            netstack_version: SERVER::VERSION,
+        },
+    ];
+
+    let realms_and_interfaces =
+        test_dhcp::<CLIENT::DhcpClient>(name, &sandbox, &mut netstack_configs, 1, false).await;
+    let (client_realm, client_interfaces) = match &realms_and_interfaces[..] {
+        [(client_realm, client_interfaces), (_server_realm, _server_interfaces)] => {
+            (client_realm, client_interfaces)
+        }
+        _ => panic!("should have a client realm and a server realm: {:?}", &realms_and_interfaces),
+    };
+
+    let dhcp_added_subnet = fnet_ext::apply_subnet_mask(expected_acquired);
+    let state_v4 = client_realm
+        .connect_to_protocol::<fnet_routes::StateV4Marker>()
+        .expect("connect to routes StateV4");
+    let routes_event_stream =
+        fnet_routes_ext::event_stream_from_state::<Ipv4>(&state_v4).expect("routes event stream");
+    futures::pin_mut!(routes_event_stream);
+
+    let mut routes = HashSet::new();
+    fnet_routes_ext::wait_for_routes::<Ipv4, _, _>(
+        &mut routes_event_stream,
+        &mut routes,
+        |routes| {
+            routes.iter().any(|installed_route| {
+                &fnet::Subnet::from_ext(installed_route.route.destination.clone())
+                    == &dhcp_added_subnet
+            })
+        },
+    )
     .await
+    .expect("wait for DHCP-acquired subnet route");
+
+    let dhcp_added_route = routes
+        .iter()
+        .find_map(|installed_route| {
+            (&fnet::Subnet::from_ext(installed_route.route.destination.clone())
+                == &dhcp_added_subnet)
+                .then_some(installed_route.route.clone())
+        })
+        .expect("should find DHCP-added route in table");
+
+    // Add a second, identical route independently of the DHCP-installed one.
+    let set_provider = client_realm
+        .connect_to_protocol::<fnet_routes_admin::SetProviderV4Marker>()
+        .expect("connect to routes-admin V4");
+    let route_set = fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider)
+        .expect("new route set should succeed");
+    assert!(fnet_routes_ext::admin::add_route::<Ipv4>(
+        &route_set,
+        &dhcp_added_route.try_into().expect("convert to FIDL route")
+    )
+    .await
+    .expect("should have no FIDL error")
+    .expect("add route should succeed"));
+
+    let route_to_use_for_flushing = fnet_routes_ext::Route {
+        destination: net_subnet_v4!("199.198.197.0/32"),
+        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+            outbound_interface: client_interfaces
+                .iter()
+                .last()
+                .expect("should have client interface")
+                .id(),
+            next_hop: None,
+        }),
+        properties: fnet_routes_ext::RouteProperties {
+            specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            },
+        },
+    };
+
+    // If the netstack is behaving correctly, the identical route we added would
+    // never appear on the watcher, but we need to wait long enough for it to
+    // get processed by the netstack. Thus, we add an unrelated route and watch
+    // for it in order to "flush" the watcher.
+    assert!(fnet_routes_ext::admin::add_route::<Ipv4>(
+        &route_set,
+        &route_to_use_for_flushing.clone().try_into().expect("convert to FIDL route")
+    )
+    .await
+    .expect("should have no FIDL error")
+    .expect("add route should succeed"));
+
+    fnet_routes_ext::wait_for_routes::<Ipv4, _, _>(routes_event_stream, &mut routes, |routes| {
+        routes.iter().any(|installed_route| &installed_route.route == &route_to_use_for_flushing)
+    })
+    .await
+    .expect("wait for other route");
 }
 
 #[netstack_test]
@@ -320,7 +462,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
         ..Default::default()
     }));
 
-    test_dhcp::<CLIENT::DhcpClient>(
+    let _ = test_dhcp::<CLIENT::DhcpClient>(
         name,
         &sandbox,
         &mut [
@@ -358,7 +500,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
         1,
         true,
     )
-    .await
+    .await;
 }
 
 #[netstack_test]
@@ -392,7 +534,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
         }
     };
 
-    test_dhcp::<CLIENT::DhcpClient>(
+    let _ = test_dhcp::<CLIENT::DhcpClient>(
         name,
         &sandbox,
         &mut [
@@ -434,7 +576,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
         1,
         false,
     )
-    .await
+    .await;
 }
 
 /// test_dhcp provides a flexible way to test DHCP acquisition across various network topologies.
@@ -452,7 +594,8 @@ fn test_dhcp<'a, D: DhcpClient>(
     netstack_configs: &'a mut [TestNetstackRealmConfig<'a>],
     dhcp_loop_cycles: usize,
     expect_client_renews: bool,
-) -> impl futures::Future<Output = ()> + 'a {
+) -> impl futures::Future<Output = Vec<(netemul::TestRealm<'a>, Vec<netemul::TestInterface<'a>>)>> + 'a
+{
     async move {
         let dhcp_objects = stream::iter(netstack_configs.into_iter())
             .enumerate()
@@ -594,7 +737,10 @@ fn test_dhcp<'a, D: DhcpClient>(
             .await
             .expect("failed to create DHCP domain objects");
 
+        let mut realms = Vec::new();
+
         for (netstack_realm, servers, clients) in dhcp_objects {
+            let mut ifaces = Vec::new();
             for (client, expected_acquired) in clients {
                 assert_client_acquires_addr::<D>(
                     &netstack_realm,
@@ -604,11 +750,16 @@ fn test_dhcp<'a, D: DhcpClient>(
                     expect_client_renews,
                 )
                 .await;
+                ifaces.push(client);
             }
-            for (server, _) in servers {
+            for (server, mut server_ifaces) in servers {
                 let () = server.stop_serving().await.expect("failed to stop server");
+                ifaces.append(&mut server_ifaces);
             }
+            realms.push((netstack_realm, ifaces));
         }
+
+        realms
     }
 }
 
