@@ -4,23 +4,24 @@
 
 #![deny(missing_docs)]
 
-//! Some methods to help run command line processes.
+//! Some functions to help run command line processes for tests.
 //!
-//! Usage:
-//!    let mut fs = ServiceFs::new();
-//!    let (svc_client_end, svc_server_end) = zx::Channel::create().expect("create channel");
-//!    let svc_proxy = fidl_fuchsia_io::DirectoryProxy::from_channel(
-//!        fuchsia_async::Channel::from_channel(svc_client_end).unwrap(),
-//!    );
-//!    let env = fs.serve_connection(svc_server_end);
-//!    ...
-//!    let output = shell_process::run_process(
-//!        "someprocess",
-//!        ["--arg", "foo"],
-//!        [("/svc", &svc_proxy)],
-//!    );
-//!    assert!(output.is_ok());
-//!
+//! ## Usage:
+//! ```
+//! let mut fs = ServiceFs::new();
+//! let (svc_client_end, svc_server_end) = zx::Channel::create().expect("create channel");
+//! let svc_proxy = fidl_fuchsia_io::DirectoryProxy::from_channel(
+//!     fuchsia_async::Channel::from_channel(svc_client_end).unwrap(),
+//! );
+//! let env = fs.serve_connection(svc_server_end);
+//! ...
+//! let output = shell_process::run_process(
+//!     "someprocess",
+//!     ["--arg", "foo"],
+//!     [("/svc", &svc_proxy)],
+//! );
+//! assert!(output.is_ok());
+//! ```
 
 use {
     fdio::{SpawnAction, SpawnOptions},
