@@ -123,7 +123,7 @@ zx_status_t UsbAudioDevice::Bind() {
   }
 
   // Publish our device.
-  status = DdkAdd("usb-audio-ctrl");
+  status = DdkAdd(ddk::DeviceAddArgs("usb-audio-ctrl").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
     return status;
   }
