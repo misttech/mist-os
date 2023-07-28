@@ -13,12 +13,16 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FdTableId(usize);
 
 impl FdTableId {
     fn new(id: *const HashMap<FdNumber, FdTableEntry>) -> Self {
         Self(id as usize)
+    }
+
+    pub fn raw(&self) -> usize {
+        self.0
     }
 }
 

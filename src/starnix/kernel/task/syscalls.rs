@@ -4,9 +4,11 @@
 
 use fuchsia_zircon::AsHandleRef;
 
+use fuchsia_zircon as zx;
+use once_cell::sync::Lazy;
 use static_assertions::const_assert;
 use std::{cmp, ffi::CString, sync::Arc};
-use zerocopy::AsBytes;
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     auth::{Credentials, SecureBits},
@@ -1287,6 +1289,34 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
     Ok(())
 }
 
+#[derive(Default, Debug, AsBytes, FromBytes, FromZeroes)]
+#[repr(C)]
+struct KcmpParams {
+    mask: usize,
+    shuffle: usize,
+}
+
+static KCMP_PARAMS: Lazy<KcmpParams> = Lazy::new(|| {
+    let mut params = KcmpParams::default();
+    zx::cprng_draw(params.as_bytes_mut());
+    // Ensure the shuffle is odd so that multiplying a usize by this value is a permutation.
+    params.shuffle |= 1;
+    params
+});
+
+fn obfuscate_value(value: usize) -> usize {
+    let KcmpParams { mask, shuffle } = *KCMP_PARAMS;
+    (value ^ mask).wrapping_mul(shuffle)
+}
+
+fn obfuscate_ptr<T>(ptr: *const T) -> usize {
+    obfuscate_value(ptr as usize)
+}
+
+fn obfuscate_arc<T>(arc: &Arc<T>) -> usize {
+    obfuscate_ptr(Arc::as_ptr(arc))
+}
+
 pub fn sys_kcmp(
     current_task: &CurrentTask,
     pid1: pid_t,
@@ -1321,18 +1351,20 @@ pub fn sys_kcmp(
             }
             let file1 = get_file(task1, index1)?;
             let file2 = get_file(task2, index2)?;
-            Ok(encode_ordering(Arc::as_ptr(&file1).cmp(&Arc::as_ptr(&file2))))
+            Ok(encode_ordering(obfuscate_arc(&file1).cmp(&obfuscate_arc(&file2))))
         }
-        KcmpResource::FILES => Ok(encode_ordering(task1.files.id().cmp(&task2.files.id()))),
+        KcmpResource::FILES => Ok(encode_ordering(
+            obfuscate_value(task1.files.id().raw()).cmp(&obfuscate_value(task2.files.id().raw())),
+        )),
         KcmpResource::FS => {
-            Ok(encode_ordering(Arc::as_ptr(&task1.fs()).cmp(&Arc::as_ptr(&task2.fs()))))
+            Ok(encode_ordering(obfuscate_arc(&task1.fs()).cmp(&obfuscate_arc(&task2.fs()))))
         }
         KcmpResource::SIGHAND => Ok(encode_ordering(
-            Arc::as_ptr(&task1.thread_group.signal_actions)
-                .cmp(&Arc::as_ptr(&task2.thread_group.signal_actions)),
+            obfuscate_arc(&task1.thread_group.signal_actions)
+                .cmp(&obfuscate_arc(&task2.thread_group.signal_actions)),
         )),
         KcmpResource::VM => {
-            Ok(encode_ordering(Arc::as_ptr(&task1.mm).cmp(&Arc::as_ptr(&task2.mm))))
+            Ok(encode_ordering(obfuscate_arc(&task1.mm).cmp(&obfuscate_arc(&task2.mm))))
         }
         _ => error!(EINVAL),
     }
