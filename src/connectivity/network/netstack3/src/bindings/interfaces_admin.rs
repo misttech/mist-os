@@ -1179,6 +1179,15 @@ async fn run_address_state_provider(
                 StateInCore { address: true, subnet_route: false }
             };
 
+            control_handle.send_on_address_added().unwrap_or_else(|e| {
+                tracing::error!(
+                    "failed to send address added event for addr {:?} on interface {}: {:?}",
+                    address,
+                    id,
+                    e
+                );
+            });
+
             // Receive the initial assignment state from Core. The message
             // must already be in the channel, so don't await.
             let initial_assignment_state = assignment_state_receiver
@@ -1677,6 +1686,13 @@ mod tests {
                 valid_until: _,
             }
         }) if (id == binding_id && address.into_fidl() == addr ));
+        let mut asp_event_stream = asp_client_end.take_event_stream();
+        let event = asp_event_stream
+            .try_next()
+            .await
+            .expect("read AddressStateProvider event")
+            .expect("AddressStateProvider event stream unexpectedly empty");
+        assert_matches!(event, fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {});
 
         // Drop the control handle and expect interface control to exit
         drop(control_client_end);
@@ -1692,13 +1708,16 @@ mod tests {
         assert_matches!(event_receiver.next().await, None);
 
         // Verify the ASP closed for the correct reason.
-        let fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error: reason } =
-            asp_client_end
-                .take_event_stream()
-                .try_next()
-                .await
-                .expect("read AddressStateProvider event")
-                .expect("AddressStateProvider event stream unexpectedly empty");
-        assert_eq!(reason, fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved)
+        let event = asp_event_stream
+            .try_next()
+            .await
+            .expect("read AddressStateProvider event")
+            .expect("AddressStateProvider event stream unexpectedly empty");
+        assert_matches!(
+            event,
+            fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error } => {
+                assert_eq!(error, fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved)
+            }
+        );
     }
 }

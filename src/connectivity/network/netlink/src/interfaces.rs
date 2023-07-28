@@ -21,7 +21,7 @@ use fidl_fuchsia_net_interfaces_admin::{
 };
 use fidl_fuchsia_net_interfaces_ext::{
     self as fnet_interfaces_ext,
-    admin::{assignment_state_stream, AddressStateProviderError, TerminalError},
+    admin::{wait_for_address_added_event, AddressStateProviderError, TerminalError},
     Update as _,
 };
 use fidl_fuchsia_net_root as fnet_root;
@@ -908,30 +908,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             )
         });
 
-        match assignment_state_stream(asp).try_next().await {
-            Ok(None) => {
-                log_warn!(
-                    "ASP state stream ended before update for {} on interface ({})",
-                    address,
-                    interface_id,
-                );
-
-                // If the ASP stream ended without sending a state update, then
-                // assume the server end was closed immediately which occurs
-                // when the interface does not exist (either because it was
-                // removed of the request interface never existed).
-                Err(RequestError::UnrecognizedInterface)
-            }
-            Ok(Some(state)) => {
-                log_debug!(
-                    "{} added on interface ({}) with initial state = {:?}",
-                    address,
-                    interface_id,
-                    state,
-                );
-
-                // We got an initial state update indicating that the address
-                // was successfully added.
+        match wait_for_address_added_event(&mut asp.take_event_stream()).await {
+            Ok(()) => {
+                log_debug!("{} added on interface ({})", address, interface_id);
                 Ok(address_and_interface_id)
             }
             Err(e) => {
@@ -960,8 +939,6 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         }
                     },
                     AddressStateProviderError::Fidl(e) => {
-                        // If the channel is closed, assume a similar situation
-                        // as `Ok(None)`.
                         if !e.is_closed() {
                             log_error!(
                                 "unexpected ASP error when adding {} on interface ({}): {:?}",
@@ -974,8 +951,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         RequestError::UnrecognizedInterface
                     }
                     AddressStateProviderError::ChannelClosed => {
-                        // If the channel is closed, assume a similar situation
-                        // as `Ok(None)`.
+                        // If the channel is closed, assume the interface was
+                        // removed.
                         RequestError::UnrecognizedInterface
                     }
                 })
@@ -3347,35 +3324,24 @@ mod tests {
     #[test_case(add_test_addr_subnet_v4(); "v4")]
     #[test_case(add_test_addr_subnet_v6(); "v6")]
     #[fuchsia::test]
-    async fn test_new_addr_with_state_update(address: AddrSubnetEither) {
+    async fn test_new_addr_with_address_added_event(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
-            test_new_addr_asp_detach_handled_helper(
-                address,
-                true,
-                |asp_request_stream| {
-                    asp_request_stream
-                        .into_future()
-                        .map(|(asp_request, _asp_request_stream)| {
-                            let responder = asp_request
-                                .expect(
-                                    "eventloop watches for address assignment state before dropping ASP",
-                                )
-                                .expect("unexpected error while waiting for event from event loop")
-                                .into_watch_address_assignment_state()
-                                .expect("eventloop only makes WatchAddressAssignmentState request");
-                            responder.send(AddressAssignmentState::Assigned).unwrap();
+            test_new_addr_asp_detach_handled_helper(address, true, |asp_request_stream| {
+                asp_request_stream
+                    .control_handle()
+                    .send_on_address_added()
+                    .expect("send address added");
 
-                            // Send an update with the deleted address to complete the
-                            // request.
-                            futures::stream::iter([fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
-                                id: Some(ETH_INTERFACE_ID.try_into().unwrap()),
-                                addresses: Some(vec![test_addr(address.into_ext())]),
-                                ..fnet_interfaces::Properties::default()
-                            })])
-                        })
-                        .flatten_stream()
-                }
-            )
+                // Send an update with the added address to complete the
+                // request.
+                futures::stream::iter([fnet_interfaces::Event::Changed(
+                    fnet_interfaces::Properties {
+                        id: Some(ETH_INTERFACE_ID.try_into().unwrap()),
+                        addresses: Some(vec![test_addr(address.into_ext())]),
+                        ..fnet_interfaces::Properties::default()
+                    },
+                )])
+            })
             .await,
             TestRequestResult { messages: Vec::new(), waiter_results: vec![Ok(())] },
         )

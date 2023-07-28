@@ -115,8 +115,18 @@ closed protocol AddressStateProvider {
     /// completed, and the `USER_REMOVED` `OnAddressRemoved` event is sent.
     strict Remove();
 
-    /// Terminal event. Immediately precedes the closure of the server end of
-    /// the protocol.
+    /// Address successfully added event.
+    ///
+    /// This event is emitted at max once for the lifetime of the address when
+    /// the address is successfully added. If the address failed to be added,
+    /// this event will not be emitted and a terminal [`OnAddressRemoved`] event
+    /// is emitted instead with the reason [`AddressRemovalReason.INVALID`] or
+    /// [`AddressRemovalReason.ALREADY_ASSIGNED`].
+    strict -> OnAddressAdded();
+
+    /// Terminal event.
+    ///
+    /// Immediately precedes the closure of the server end of the protocol.
     ///
     /// - response `error` the removal reason.
     strict -> OnAddressRemoved(struct {

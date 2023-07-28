@@ -435,15 +435,23 @@ async fn add_address_removal<N: Netstack>(name: &str, removal_method: AddressRem
             }
         };
 
-        let fidl_fuchsia_net_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
-            error: reason,
-        } = address_state_provider
+        let event = address_state_provider
             .take_event_stream()
             .try_next()
             .await
             .expect("read AddressStateProvider event")
             .expect("AddressStateProvider event stream ended unexpectedly");
-        assert_eq!(reason, fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::UserRemoved);
+        assert_matches!(
+            event,
+            fidl_fuchsia_net_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                error: reason,
+            } => {
+                assert_eq!(
+                    reason,
+                    fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::UserRemoved,
+                )
+            }
+        );
     }
 
     // Adding a valid address and removing the interface.
@@ -460,17 +468,22 @@ async fn add_address_removal<N: Netstack>(name: &str, removal_method: AddressRem
 
         let (_netemul_endpoint, _device_control_handle) =
             interface.remove().await.expect("failed to remove interface");
-        let fidl_fuchsia_net_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
-            error: reason,
-        } = address_state_provider
+        let event = address_state_provider
             .take_event_stream()
             .try_next()
             .await
             .expect("read AddressStateProvider event")
             .expect("AddressStateProvider event stream ended unexpectedly");
-        assert_eq!(
-            reason,
-            fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+        assert_matches!(
+            event,
+            fidl_fuchsia_net_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                error: reason,
+            } => {
+                assert_eq!(
+                    reason,
+                    fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+                );
+            }
         );
 
         assert_matches::assert_matches!(

@@ -425,6 +425,15 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
                 server,
             )
             .expect("send add address request");
+        // We need to wait for the `OnAddressAdded` before dropping the
+        // ASP to make sure that the `Detach` request above is handled.
+        // See https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=131322
+        // for more details.
+        fnet_interfaces_ext::admin::wait_for_address_added_event(
+            &mut address_state_provider.take_event_stream(),
+        )
+        .await
+        .expect("wait for address successfully added");
     }
     want_until_address_state(
         fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,

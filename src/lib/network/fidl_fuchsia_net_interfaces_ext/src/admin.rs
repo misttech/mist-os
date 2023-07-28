@@ -37,6 +37,25 @@ impl From<TerminalError<fnet_interfaces_admin::AddressRemovalReason>>
     }
 }
 
+/// Waits for the `OnAddressAdded` event to be received on the event stream.
+///
+/// Returns an error if an address removed event is received instead.
+pub async fn wait_for_address_added_event(
+    event_stream: &mut fnet_interfaces_admin::AddressStateProviderEventStream,
+) -> Result<(), AddressStateProviderError> {
+    let event = event_stream
+        .next()
+        .await
+        .ok_or(AddressStateProviderError::ChannelClosed)?
+        .map_err(AddressStateProviderError::Fidl)?;
+    match event {
+        fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {} => Ok(()),
+        fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error } => {
+            Err(AddressStateProviderError::AddressRemoved(error))
+        }
+    }
+}
+
 // TODO(https://fxbug.dev/81964): Introduce type with better concurrency safety
 // for hanging gets.
 /// Returns a stream of assignment states obtained by watching on `address_state_provider`.
@@ -53,17 +72,21 @@ pub fn assignment_state_stream(
     address_state_provider: fnet_interfaces_admin::AddressStateProviderProxy,
 ) -> impl Stream<Item = Result<fnet_interfaces::AddressAssignmentState, AddressStateProviderError>>
 {
-    let event_fut = address_state_provider.take_event_stream().into_future().map(
-        |(item, _stream)| match item {
-            Some(Ok(
-                fidl_fuchsia_net_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
-                    error,
+    let event_fut = address_state_provider
+        .take_event_stream()
+        .filter_map(|event| {
+            futures::future::ready(match event {
+                Ok(event) => match event {
+                    fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {} => None,
+                    fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                        error,
+                    } => Some(AddressStateProviderError::AddressRemoved(error)),
                 },
-            )) => AddressStateProviderError::AddressRemoved(error),
-            Some(Err(e)) => AddressStateProviderError::Fidl(e),
-            None => AddressStateProviderError::ChannelClosed,
-        },
-    );
+                Err(e) => Some(AddressStateProviderError::Fidl(e)),
+            })
+        })
+        .into_future()
+        .map(|(event, _stream)| event.unwrap_or(AddressStateProviderError::ChannelClosed));
     futures::stream::try_unfold(
         (address_state_provider, event_fut),
         |(address_state_provider, event_fut)| {
@@ -279,12 +302,11 @@ impl Control {
             .map::<_, ControlEventStreamFutureToReason>(|(event, _stream)| {
                 event
                     .map(|r| {
-                        r.map(|event| {
-                            let fidl_fuchsia_net_interfaces_admin::ControlEvent::OnInterfaceRemoved {
-                                reason,
-                            } = event;
-                            reason
-                        })
+                        r.map(
+                            |fnet_interfaces_admin::ControlEvent::OnInterfaceRemoved { reason }| {
+                                reason
+                            },
+                        )
                     })
                     .transpose()
             })

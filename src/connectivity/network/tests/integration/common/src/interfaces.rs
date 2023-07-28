@@ -94,6 +94,11 @@ pub async fn add_address_wait_assigned(
         .add_address(&mut address, address_parameters, server)
         .expect("Control.AddAddress FIDL error");
 
+    fidl_fuchsia_net_interfaces_ext::admin::wait_for_address_added_event(
+        &mut address_state_provider.take_event_stream(),
+    )
+    .await?;
+
     {
         let state_stream = fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
             address_state_provider.clone(),

@@ -160,18 +160,21 @@ impl Lease {
             .await
             .context("unexpected zx::Status while awaiting AddressStateProvider channel close")?;
 
-        let fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error: reason } =
-            event_stream
-                .try_next()
-                .await
-                .context("AddressStateProviderEventStream FIDL error")?
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "AddressStateProvider event stream ended without yielding removal reason"
-                    )
-                })?;
+        let event_stream = event_stream.try_filter_map(|event| async move {
+            match event {
+                fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {} => Ok(None),
+                fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error } => {
+                    Ok(Some(error))
+                }
+            }
+        });
+        futures::pin_mut!(event_stream);
 
-        Ok(reason)
+        event_stream
+            .try_next()
+            .await
+            .context("AddressStateProviderEventStream FIDL error")?
+            .context("AddressStateProvider event stream ended without yielding removal reason")
     }
 }
 

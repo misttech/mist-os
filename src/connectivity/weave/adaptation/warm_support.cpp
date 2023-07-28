@@ -316,9 +316,14 @@ class LlcppControlClientFromHlcpp {
 // A Handler for
 // `fuchsia.net.interfaces.admin/AddressStateProvider.OnAddressRemoved` events
 // that simply records the `AddressRemovalReason`.
+//
+// The `fuchsia.net.interfaces.admin/AddressStateProvider.OnAddressAdded` event
+// is ignored by this handler.
 class OnAddressRemovedHandler
     : public fidl::SyncEventHandler<fuchsia_net_interfaces_admin::AddressStateProvider> {
  public:
+  void OnAddressAdded() override {}
+
   void OnAddressRemoved(
       fidl::Event<fuchsia_net_interfaces_admin::AddressStateProvider::OnAddressRemoved> &event)
       override {

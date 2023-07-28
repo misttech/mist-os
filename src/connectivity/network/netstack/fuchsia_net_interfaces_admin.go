@@ -423,6 +423,12 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		)
 	}
 
+	impl.mu.Lock()
+	defer impl.mu.Unlock()
+	if err := impl.mu.eventProxy.OnAddressAdded(); err != nil {
+		_ = syslog.ErrorTf(controlName, "NICID=%d failed to send OnAddressAdded() for %s - THIS MAY RESULT IN DROPPED ASP REQUESTS (https://fxbug.dev/131322): %s", impl.nicid, protocolAddr.AddressWithPrefix.Address, err)
+	}
+
 	go func() {
 		defer cancel()
 		component.Serve(ctx, &admin.AddressStateProviderWithCtxStub{Impl: impl}, request.Channel, component.ServeOptions{
