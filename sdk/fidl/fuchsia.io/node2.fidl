@@ -372,3 +372,30 @@ closed protocol ExtendedAttributeIterator {
         last bool;
     }) error zx.Status;
 };
+
+// Not all nodes support Linkable (e.g. Directories don't).
+@available(added=HEAD)
+closed protocol Linkable {
+    /// Creates a link to this this object with name `dst` in the directory represented by
+    /// `dst_parent_token`.
+    ///
+    /// `dst` must be a resolved object name. Including "/" in the string will return
+    /// `ZX_ERR_INVALID_ARGS`.
+    ///
+    /// This method requires the maximal set of rights supported by the filesystem for this object.
+    /// For files this would typically be [`Rights.READ_BYTES`], [`Rights.WRITE_BYTES`],
+    /// [`Rights.GET_ATTRIBUTES`] and [`Rights.UPDATE_ATTRIBUTES`]. Some filesystems might also
+    /// support the [`Rights.EXECUTE`] right. Insufficient rights will result in
+    /// `ZX_ERR_ACCESS_DENIED`.
+    ///
+    /// If this object has no links, it will fail with `ZX_ERR_NOT_FOUND`.
+    ///
+    /// This method does not have the same atomicity properties has the `Directory::Link` method,
+    /// which means that calling `Open` then `LinkInto` is not equivalent to `Directory::Link`
+    /// because `LinkInto` will not prevent the source from being renamed or unlinked.
+    @selector("fuchsia.io/Linkable.LinkInto")
+    strict LinkInto(resource struct {
+        dst_parent_token Token;
+        dst Name;
+    }) -> () error zx.Status;
+};

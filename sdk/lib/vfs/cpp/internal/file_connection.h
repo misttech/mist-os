@@ -79,6 +79,9 @@ class FileConnection final : public Connection, public fuchsia::io::File {
                                RemoveExtendedAttributeCallback callback) override {
     callback(fuchsia::io::Node2_RemoveExtendedAttribute_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
+  void LinkInto(zx::event dst_parent_token, std::string dst, LinkIntoCallback callback) override {
+    callback(fuchsia::io::Linkable_LinkInto_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
 #endif
 
  protected:

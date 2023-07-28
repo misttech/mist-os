@@ -75,6 +75,10 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
                                RemoveExtendedAttributeCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
+  void LinkInto(fuchsia_io::wire::LinkableLinkIntoRequest* request,
+                LinkIntoCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 #endif
 
   //

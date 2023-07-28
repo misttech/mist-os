@@ -104,6 +104,9 @@ impl Connection {
                 responder.send(Ok(()))?;
                 return Ok(true);
             }
+            fio::SymlinkRequest::LinkInto { responder, .. } => {
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
                 let rights = fio::Operations::GET_ATTRIBUTES;

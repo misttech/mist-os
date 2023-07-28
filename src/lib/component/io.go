@@ -644,6 +644,10 @@ func (fState *fileState) Describe(fidl.Context) (io.FileInfo, error) {
 	return fileInfo, nil
 }
 
+func (*fileState) LinkInto(fidl.Context, zx.Event, string) (io.LinkableLinkIntoResult, error) {
+	return io.LinkableLinkIntoResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (fState *fileState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
 	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.

@@ -318,13 +318,25 @@ closed protocol Directory2 {
     /// `src` and `dst` must be valid node names.
     /// See [`Name`] for what constitutes a valid name.
     ///
-    /// This method requires the following rights on both the current
-    /// connection, and the connection identified by `dst_parent_token`:
+    /// This method requires the following rights on both the current connection, and the connection
+    /// identified by `dst_parent_token`:
     ///
     /// * [`Rights.ENUMERATE`]
     /// * [`Rights.MODIFY_DIRECTORY`]
     ///
+    /// The following requirements are necessary to avoid rights escalations.
+    ///
+    /// If the source and destination directory differ, the source directory must also have the
+    /// maximal set of abilities supported for files, which would typically be
+    /// [`Rights.READ_BYTES`], [`Rights.WRITE_BYTES`], [`Rights.GET_ATTRIBUTES`] and
+    /// [`Rights.UPDATE_ATTRIBUTES`]. Some filesystems might also support the [`Rights.EXECUTE`]
+    /// right.
+    ///
+    /// If `src` refers to a directory, and differs from the destination directory, then the source
+    /// directory must have also have the [`Rights.CONNECT`] and [`Rights.TRAVERSE`] rights.
+    ///
     /// * error `ZX_ERR_INVALID_ARGS` if `src` or `dst` is invalid.
+    /// * error `ZX_ERR_ACCESS_DENIED` for insufficient rights.
     @selector("fuchsia.io/Directory.Rename")
     strict Rename(resource struct {
         src Name;

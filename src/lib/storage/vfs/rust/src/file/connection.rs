@@ -493,6 +493,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     ..Default::default()
                 })?;
             }
+            fio::FileRequest::LinkInto { responder, .. } => {
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetConnectionInfo");
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.

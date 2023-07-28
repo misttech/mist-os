@@ -310,8 +310,13 @@ closed protocol Directory1 {
     /// `dst` must be a resolved object name. Including "/" in the string will
     /// return `ZX_ERR_INVALID_ARGS`.
     ///
-    /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
-    /// `ZX_ERR_BAD_HANDLE`.
+    /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE` and
+    /// `OpenFlags.RIGHT_READABLE`, otherwise returns `ZX_ERR_BAD_HANDLE`.
+    ///
+    /// This will be atomic with respect to renaming or unlinking the source concurrently e.g. if
+    /// there are two actors operating concurrently, and one actor performs a rename that affects
+    /// the source within this directory, and the other does a link, each will appear to occur
+    /// atomically in an unspecified order.
     @selector("fuchsia.io1/Directory.Link")
     strict Link(resource struct {
         src string:MAX_FILENAME;
