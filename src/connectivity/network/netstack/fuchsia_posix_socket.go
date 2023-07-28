@@ -1969,9 +1969,16 @@ func (eps *endpointWithSocket) shutdown(how socket.ShutdownMode) (posix.Errno, e
 	// Only handle a shutdown read on the endpoint here. Shutdown write is
 	// performed by the loopWrite goroutine: it ensures that it happens *after*
 	// all the buffered data in the zircon socket was read.
+	//
+	// Note that if the shutdown mode is write only, `ep.Shutdown` is still called
+	// with an unset flags value in order to propagate ENOTCONN to callers.
+	var flags tcpip.ShutdownFlags
 	if disposition&zx.SocketDispositionWriteDisabled != 0 {
-		switch err := eps.endpoint.ep.Shutdown(tcpip.ShutdownRead); err.(type) {
-		case nil, *tcpip.ErrNotConnected:
+		flags = tcpip.ShutdownRead
+	}
+	switch err := eps.endpoint.ep.Shutdown(flags); err.(type) {
+	case nil, *tcpip.ErrNotConnected:
+		if flags == tcpip.ShutdownRead {
 			// Shutdown can return ErrNotConnected if the endpoint was connected but
 			// no longer is, in which case the loopRead is also expected to be
 			// terminating.
@@ -1982,9 +1989,12 @@ func (eps *endpointWithSocket) shutdown(how socket.ShutdownMode) (posix.Errno, e
 				for range ch {
 				}
 			}
-		default:
-			panic(err)
 		}
+		if err != nil {
+			return tcpipErrorToCode(err), nil
+		}
+	default:
+		panic(err)
 	}
 
 	return 0, nil
@@ -2723,12 +2733,7 @@ func (s *datagramSocketImpl) GetError(fidl.Context) (socket.BaseSocketGetErrorRe
 func (s *datagramSocketImpl) Shutdown(ctx fidl.Context, how socket.ShutdownMode) (socket.BaseNetworkSocketShutdownResult, error) {
 	switch state := transport.DatagramEndpointState(s.ep.State()); state {
 	case transport.DatagramEndpointStateConnected, transport.DatagramEndpointStateBound:
-		result, err := s.endpointWithSocket.Shutdown(ctx, how)
-
-		if state == transport.DatagramEndpointStateBound && result.Which() != socket.BaseNetworkSocketShutdownResultErr {
-			return socket.BaseNetworkSocketShutdownResultWithErr(tcpipErrorToCode(&tcpip.ErrNotConnected{})), nil
-		}
-		return result, err
+		return s.endpointWithSocket.Shutdown(ctx, how)
 	default:
 		return socket.BaseNetworkSocketShutdownResultWithErr(tcpipErrorToCode(&tcpip.ErrNotConnected{})), nil
 	}

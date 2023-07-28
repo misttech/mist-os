@@ -2170,4 +2170,50 @@ TEST_P(IOMethodTest, NullptrFaultSTREAM) {
 INSTANTIATE_TEST_SUITE_P(IOMethodTests, IOMethodTest, testing::ValuesIn(kAllIOMethods),
                          [](const auto info) { return info.param.IOMethodToString(); });
 
+enum class ShutdownFlags {
+  kNull,
+  kRead,
+  kWrite,
+  kReadWrite,
+};
+
+int ShutdownFlagsToInt(const ShutdownFlags f) {
+  switch (f) {
+    case ShutdownFlags::kNull:
+      return 0;
+    case ShutdownFlags::kRead:
+      return SHUT_RD;
+    case ShutdownFlags::kWrite:
+      return SHUT_WR;
+    case ShutdownFlags::kReadWrite:
+      return SHUT_RDWR;
+  }
+}
+
+class ShutdownTest : public testing::TestWithParam<ShutdownFlags> {};
+
+TEST_P(ShutdownTest, NotConn) {
+  fbl::unique_fd sock;
+  ASSERT_TRUE(sock = fbl::unique_fd(socket(AF_INET6, SOCK_STREAM, 0))) << strerror(errno);
+
+  ASSERT_EQ(shutdown(sock.get(), ShutdownFlagsToInt(GetParam())), -1) << strerror(errno);
+  ASSERT_EQ(errno, ENOTCONN) << strerror(errno);
+}
+
+INSTANTIATE_TEST_SUITE_P(ShutdownTests, ShutdownTest,
+                         testing::Values(ShutdownFlags::kNull, ShutdownFlags::kRead,
+                                         ShutdownFlags::kWrite, ShutdownFlags::kReadWrite),
+                         [](const auto info) {
+                           switch (info.param) {
+                             case ShutdownFlags::kNull:
+                               return "NULL";
+                             case ShutdownFlags::kRead:
+                               return "RD";
+                             case ShutdownFlags::kWrite:
+                               return "WR";
+                             case ShutdownFlags::kReadWrite:
+                               return "RDWR";
+                           }
+                         });
+
 }  // namespace
