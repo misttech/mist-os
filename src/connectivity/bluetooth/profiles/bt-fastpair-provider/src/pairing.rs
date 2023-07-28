@@ -312,9 +312,10 @@ impl PairingManagerInspect {
         let Some(ActiveProcedureInspect { start_time, inspect_node }) = self.active_procedures.remove(&id) else { return };
         let pairing_time_seconds = (at - start_time).into_seconds().try_into().unwrap_or(0);
         inspect_node.record_uint("pairing_time_seconds", pairing_time_seconds);
-        let node_writer = bounded_list_node.create_entry();
-        let _ = node_writer.adopt(&inspect_node);
-        let _ = node_writer.record(inspect_node);
+        let _ = bounded_list_node.add_entry(|node| {
+            let _ = node.adopt(&inspect_node);
+            let _ = node.record(inspect_node);
+        });
         // Record the pairing time to Cobalt.
         self.metrics.log_integer(
             bt_metrics::FASTPAIR_PROVIDER_PAIRING_TIME_SECONDS_METRIC_ID,

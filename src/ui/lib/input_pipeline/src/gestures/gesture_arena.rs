@@ -396,47 +396,45 @@ impl GestureArena {
 
 impl TouchpadEvent {
     fn log_inspect(&self, log_entry_node: &InspectNode) {
-        log_entry_node.atomic_update(|log_entry_node| {
-            let touchpad_event_node = log_entry_node.create_child("touchpad_event");
+        let touchpad_event_node = log_entry_node.create_child("touchpad_event");
 
-            // Create an inspect array from the pressed buttons.
-            let pressed_buttons_node = touchpad_event_node
-                .create_uint_array("pressed_buttons", self.pressed_buttons.len());
-            self.pressed_buttons.iter().enumerate().for_each(|(i, &button_id)| {
-                pressed_buttons_node.set(i, button_id);
-            });
+        // Create an inspect array from the pressed buttons.
+        let pressed_buttons_node =
+            touchpad_event_node.create_uint_array("pressed_buttons", self.pressed_buttons.len());
+        self.pressed_buttons.iter().enumerate().for_each(|(i, &button_id)| {
+            pressed_buttons_node.set(i, button_id);
+        });
 
-            // Populate the touchpad event details
-            log_common(&touchpad_event_node, self.timestamp);
-            touchpad_event_node.record(pressed_buttons_node);
-            touchpad_event_node.record_child("contacts", |contact_set_node| {
-                self.contacts.iter().for_each(|contact| {
-                    contact_set_node.record_child(contact.id.to_string(), |contact_node| {
-                        contact_node.record_double("pos_x_mm", f64::from(contact.position.x));
-                        contact_node.record_double("pos_y_mm", f64::from(contact.position.y));
-                        if let Some(contact_size) = contact.contact_size {
-                            contact_node.record_double("width_mm", f64::from(contact_size.width));
-                            contact_node.record_double("height_mm", f64::from(contact_size.height));
-                        }
-                    })
+        // Populate the touchpad event details
+        log_common(&touchpad_event_node, self.timestamp);
+        touchpad_event_node.record(pressed_buttons_node);
+        touchpad_event_node.record_child("contacts", |contact_set_node| {
+            self.contacts.iter().for_each(|contact| {
+                contact_set_node.record_child(contact.id.to_string(), |contact_node| {
+                    contact_node.record_double("pos_x_mm", f64::from(contact.position.x));
+                    contact_node.record_double("pos_y_mm", f64::from(contact.position.y));
+                    if let Some(contact_size) = contact.contact_size {
+                        contact_node.record_double("width_mm", f64::from(contact_size.width));
+                        contact_node.record_double("height_mm", f64::from(contact_size.height));
+                    }
                 })
-            });
-            touchpad_event_node.record_child("filtered_palm_contacts", |contact_set_node| {
-                self.filtered_palm_contacts.iter().for_each(|contact| {
-                    contact_set_node.record_child(contact.id.to_string(), |contact_node| {
-                        contact_node.record_double("pos_x_mm", f64::from(contact.position.x));
-                        contact_node.record_double("pos_y_mm", f64::from(contact.position.y));
-                        if let Some(contact_size) = contact.contact_size {
-                            contact_node.record_double("width_mm", f64::from(contact_size.width));
-                            contact_node.record_double("height_mm", f64::from(contact_size.height));
-                        }
-                    })
+            })
+        });
+        touchpad_event_node.record_child("filtered_palm_contacts", |contact_set_node| {
+            self.filtered_palm_contacts.iter().for_each(|contact| {
+                contact_set_node.record_child(contact.id.to_string(), |contact_node| {
+                    contact_node.record_double("pos_x_mm", f64::from(contact.position.x));
+                    contact_node.record_double("pos_y_mm", f64::from(contact.position.y));
+                    if let Some(contact_size) = contact.contact_size {
+                        contact_node.record_double("width_mm", f64::from(contact_size.width));
+                        contact_node.record_double("height_mm", f64::from(contact_size.height));
+                    }
                 })
-            });
+            })
+        });
 
-            // Pass ownership of the touchpad event node to the log.
-            log_entry_node.record(touchpad_event_node);
-        })
+        // Pass ownership of the touchpad event node to the log.
+        log_entry_node.record(touchpad_event_node);
     }
 }
 
@@ -598,7 +596,9 @@ impl GestureArena {
         let touchpad_event = parse_touchpad_event(event_time, touchpad_event, device_descriptor)
             .context("dropping touchpad event")?;
         let touchpad_event = filter_palm_contact(touchpad_event);
-        touchpad_event.log_inspect(self.inspect_log.borrow_mut().create_entry());
+        self.inspect_log.borrow_mut().add_entry(|node| {
+            touchpad_event.log_inspect(node);
+        });
 
         let old_state_name = self.mutable_state.borrow().get_state_name();
         let (new_state, generated_events) = match self.mutable_state.replace(MutableState::Invalid)
@@ -655,11 +655,11 @@ impl GestureArena {
                         ExamineEventResult::MatchedContender(matched_contender) => {
                             matched_contenders.push(matched_contender);
                         }
-                        ExamineEventResult::Mismatch(mismatch_data) => log_mismatch_reason(
-                            self.inspect_log.borrow_mut().create_entry(),
-                            type_name,
-                            mismatch_data,
-                        ),
+                        ExamineEventResult::Mismatch(mismatch_data) => {
+                            self.inspect_log.borrow_mut().add_entry(|node| {
+                                log_mismatch_reason(node, type_name, mismatch_data);
+                            });
+                        }
                     }
                     (contenders, matched_contenders)
                 },
@@ -694,11 +694,11 @@ impl GestureArena {
                         ExamineEventResult::MatchedContender(matched_contender) => {
                             matched_contenders.push(matched_contender);
                         }
-                        ExamineEventResult::Mismatch(mismatch_data) => log_mismatch_reason(
-                            self.inspect_log.borrow_mut().create_entry(),
-                            type_name,
-                            mismatch_data,
-                        ),
+                        ExamineEventResult::Mismatch(mismatch_data) => {
+                            self.inspect_log.borrow_mut().add_entry(|node| {
+                                log_mismatch_reason(node, type_name, mismatch_data);
+                            });
+                        }
                     }
                     (contenders, matched_contenders)
                 },
@@ -740,11 +740,11 @@ impl GestureArena {
                     VerifyEventResult::MatchedContender(m) => {
                         matched_contenders.push(m);
                     }
-                    VerifyEventResult::Mismatch(mismatch_data) => log_mismatch_reason(
-                        self.inspect_log.borrow_mut().create_entry(),
-                        type_name,
-                        mismatch_data,
-                    ),
+                    VerifyEventResult::Mismatch(mismatch_data) => {
+                        self.inspect_log.borrow_mut().add_entry(|node| {
+                            log_mismatch_reason(node, type_name, mismatch_data);
+                        });
+                    }
                 }
                 matched_contenders
             });
@@ -761,11 +761,11 @@ impl GestureArena {
                         ExamineEventResult::MatchedContender(matched_contender) => {
                             matched_contenders.push(matched_contender);
                         }
-                        ExamineEventResult::Mismatch(mismatch_data) => log_mismatch_reason(
-                            self.inspect_log.borrow_mut().create_entry(),
-                            type_name,
-                            mismatch_data,
-                        ),
+                        ExamineEventResult::Mismatch(mismatch_data) => {
+                            self.inspect_log.borrow_mut().add_entry(|node| {
+                                log_mismatch_reason(node, type_name, mismatch_data);
+                            });
+                        }
                     }
                     (contenders, matched_contenders)
                 },
@@ -822,12 +822,14 @@ impl GestureArena {
                 let type_name = matched_contender.get_type_name();
                 let ProcessBufferedEventsResult { generated_events, winner, recognized_gesture } =
                     matched_contender.process_buffered_events(buffered_events);
-                log_gesture_start(
-                    self.inspect_log.borrow_mut().create_entry(),
-                    recognized_gesture,
-                    num_previous_events,
-                    new_event_timestamp - first_event_timestamp,
-                );
+                self.inspect_log.borrow_mut().add_entry(|node| {
+                    log_gesture_start(
+                        node,
+                        recognized_gesture,
+                        num_previous_events,
+                        new_event_timestamp - first_event_timestamp,
+                    );
+                });
 
                 match winner {
                     Some(winner) => (
@@ -840,14 +842,16 @@ impl GestureArena {
                         generated_events,
                     ),
                     None => {
-                        log_gesture_end(
-                            self.inspect_log.borrow_mut().create_entry(),
-                            type_name,
-                            recognized_gesture,
-                            Reason::Basic("discrete-recognizer"),
-                            0,
-                            zx::Duration::from_nanos(0),
-                        );
+                        self.inspect_log.borrow_mut().add_entry(|node| {
+                            log_gesture_end(
+                                node,
+                                type_name,
+                                recognized_gesture,
+                                Reason::Basic("discrete-recognizer"),
+                                0,
+                                zx::Duration::from_nanos(0),
+                            );
+                        });
                         if has_finger_contact {
                             (MutableState::Chain, generated_events)
                         } else {
@@ -900,14 +904,16 @@ impl GestureArena {
                 reason,
             ) => {
                 tracing::debug!("touchpad: {} ended: {:?}", type_name, reason);
-                log_gesture_end(
-                    self.inspect_log.borrow_mut().create_entry(),
-                    type_name,
-                    current_gesture,
-                    reason,
-                    num_events,
-                    new_event_timestamp - gesture_start_timestamp,
-                );
+                self.inspect_log.borrow_mut().add_entry(|node| {
+                    log_gesture_end(
+                        node,
+                        type_name,
+                        current_gesture,
+                        reason,
+                        num_events,
+                        new_event_timestamp - gesture_start_timestamp,
+                    );
+                });
                 if has_finger_contact {
                     (MutableState::Chain, vec![generated_event])
                 } else {
@@ -919,14 +925,16 @@ impl GestureArena {
                 reason,
             ) => {
                 tracing::debug!("touchpad: {} ended: {:?}", type_name, reason);
-                log_gesture_end(
-                    self.inspect_log.borrow_mut().create_entry(),
-                    type_name,
-                    current_gesture,
-                    reason,
-                    num_events,
-                    new_event_timestamp - gesture_start_timestamp,
-                );
+                self.inspect_log.borrow_mut().add_entry(|node| {
+                    log_gesture_end(
+                        node,
+                        type_name,
+                        current_gesture,
+                        reason,
+                        num_events,
+                        new_event_timestamp - gesture_start_timestamp,
+                    );
+                });
                 if unconsumed_event.contacts.len() > 0 {
                     self.handle_event_while_chain(unconsumed_event)
                 } else {
@@ -935,14 +943,16 @@ impl GestureArena {
             }
             ProcessNewEventResult::EndGesture(EndGestureEvent::NoEvent, reason) => {
                 tracing::debug!("touchpad: {} ended: {:?}", type_name, reason);
-                log_gesture_end(
-                    self.inspect_log.borrow_mut().create_entry(),
-                    type_name,
-                    current_gesture,
-                    reason,
-                    num_events,
-                    new_event_timestamp - gesture_start_timestamp,
-                );
+                self.inspect_log.borrow_mut().add_entry(|node| {
+                    log_gesture_end(
+                        node,
+                        type_name,
+                        current_gesture,
+                        reason,
+                        num_events,
+                        new_event_timestamp - gesture_start_timestamp,
+                    );
+                });
                 if has_finger_contact {
                     (MutableState::Chain, vec![])
                 } else {
@@ -1043,10 +1053,9 @@ impl InputHandler for GestureArena {
                 event_time,
                 ..
             } => {
-                log_keyboard_event_timestamp(
-                    self.inspect_log.borrow_mut().create_entry(),
-                    event_time,
-                );
+                self.inspect_log.borrow_mut().add_entry(|node| {
+                    log_keyboard_event_timestamp(node, event_time);
+                });
                 vec![input_event]
             }
             _ => {
@@ -1156,10 +1165,8 @@ fn get_position_divisor_to_mm(
 }
 
 fn log_keyboard_event_timestamp(log_entry_node: &InspectNode, driver_timestamp: zx::Time) {
-    log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child("key_event", |key_event_node| {
-            log_common(key_event_node, driver_timestamp);
-        })
+    log_entry_node.record_child("key_event", |key_event_node| {
+        log_common(key_event_node, driver_timestamp);
     });
 }
 
@@ -1212,11 +1219,9 @@ fn log_reason(reason_node: &InspectNode, contender_name: &'static str, reason: R
 
 fn log_mismatch_reason(log_entry_node: &InspectNode, contender_name: &'static str, reason: Reason) {
     tracing::debug!("touchpad: {} mismatched: {:?}", contender_name, reason);
-    log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child("mismatch_event", |mismatch_event_node| {
-            log_reason(mismatch_event_node, contender_name, reason);
-        })
-    })
+    log_entry_node.record_child("mismatch_event", |mismatch_event_node| {
+        log_reason(mismatch_event_node, contender_name, reason);
+    });
 }
 
 fn log_gesture_start(
@@ -1226,20 +1231,18 @@ fn log_gesture_start(
     elapsed_from_first_event: zx::Duration,
 ) {
     tracing::debug!("touchpad: recognized start {:?}", recognized_gesture);
-    log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child("gesture_start", |gesture_start_node| {
-            gesture_start_node.record_string("gesture_name", recognized_gesture.to_str());
-            gesture_start_node.record_int(
-                "latency_micros",
-                // Reduce precision, to minimize space.
-                elapsed_from_first_event.into_micros(),
-            );
-            gesture_start_node.record_uint(
-                "latency_event_count",
-                u64::try_from(num_previous_events).unwrap_or(u64::MAX),
-            );
-        })
-    })
+    log_entry_node.record_child("gesture_start", |gesture_start_node| {
+        gesture_start_node.record_string("gesture_name", recognized_gesture.to_str());
+        gesture_start_node.record_int(
+            "latency_micros",
+            // Reduce precision, to minimize space.
+            elapsed_from_first_event.into_micros(),
+        );
+        gesture_start_node.record_uint(
+            "latency_event_count",
+            u64::try_from(num_previous_events).unwrap_or(u64::MAX),
+        );
+    });
 }
 
 fn log_gesture_end(
@@ -1251,19 +1254,16 @@ fn log_gesture_end(
     elapsed_from_gesture_start: zx::Duration,
 ) {
     tracing::debug!("touchpad: recognized end {:?}", current_gesture);
-    log_entry_node.atomic_update(|log_entry_node| {
-        log_entry_node.record_child("gesture_end", |gesture_end_node| {
-            gesture_end_node.record_string("gesture_name", current_gesture.to_str());
-            gesture_end_node.record_int(
-                "duration_micros",
-                // Reduce precision, to minimize space.
-                elapsed_from_gesture_start.into_micros(),
-            );
-            gesture_end_node
-                .record_uint("event_count", u64::try_from(num_events).unwrap_or(u64::MAX));
-            log_reason(gesture_end_node, contender_name, reason)
-        })
-    })
+    log_entry_node.record_child("gesture_end", |gesture_end_node| {
+        gesture_end_node.record_string("gesture_name", current_gesture.to_str());
+        gesture_end_node.record_int(
+            "duration_micros",
+            // Reduce precision, to minimize space.
+            elapsed_from_gesture_start.into_micros(),
+        );
+        gesture_end_node.record_uint("event_count", u64::try_from(num_events).unwrap_or(u64::MAX));
+        log_reason(gesture_end_node, contender_name, reason)
+    });
 }
 
 #[cfg(test)]

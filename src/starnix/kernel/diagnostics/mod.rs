@@ -28,25 +28,25 @@ impl CoreDumpList {
 
     pub fn record_core_dump(&self, task: &Task) {
         let mut list = self.list.lock();
-        let crash_node = list.create_entry();
+        list.add_entry(|crash_node| {
+            let pid = task.thread_group.leader as i64;
+            let mut argv = task
+                .read_argv()
+                .unwrap_or_else(|_| vec![b"<unknown>".to_vec()])
+                .into_iter()
+                .map(|a| String::from_utf8_lossy(&a).to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
 
-        let pid = task.thread_group.leader as i64;
-        let mut argv = task
-            .read_argv()
-            .unwrap_or_else(|_| vec![b"<unknown>".to_vec()])
-            .into_iter()
-            .map(|a| String::from_utf8_lossy(&a).to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
+            let original_len = argv.len();
+            argv.truncate(MAX_ARGV_LENGTH - 3);
+            if argv.len() < original_len {
+                argv.push_str("...");
+            }
 
-        let original_len = argv.len();
-        argv.truncate(MAX_ARGV_LENGTH - 3);
-        if argv.len() < original_len {
-            argv.push_str("...");
-        }
-
-        log_debug!(pid, %argv, "Recording task with a coredump.");
-        crash_node.record_int("pid", pid);
-        crash_node.record_string("argv", argv);
+            log_debug!(pid, %argv, "Recording task with a coredump.");
+            crash_node.record_int("pid", pid);
+            crash_node.record_string("argv", argv);
+        });
     }
 }

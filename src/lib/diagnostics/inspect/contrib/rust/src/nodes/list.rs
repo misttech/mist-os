@@ -35,12 +35,22 @@ impl BoundedListNode {
     /// children to be maintained in the list.
     ///
     /// If creating new entry exceeds capacity of the list, the oldest entry is evicted.
-    pub fn create_entry(&mut self) -> &Node {
+    ///
+    /// The `initialize` function will be used to atomically initialize all children and properties
+    /// under the node.
+    pub fn add_entry<F>(&mut self, initialize: F) -> &Node
+    where
+        F: FnOnce(&Node),
+    {
         if self.items.len() >= self.capacity {
             self.items.pop_front();
         }
 
-        let entry_node = self.node.create_child(&self.index.to_string());
+        let entry_node = self.node.atomic_update(|node| {
+            let child = node.create_child(self.index.to_string());
+            initialize(&child);
+            child
+        });
         self.items.push_back(entry_node);
 
         self.index += 1;
@@ -51,17 +61,22 @@ impl BoundedListNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use assert_matches::assert_matches;
+    use fuchsia_inspect::{
+        assert_data_tree,
+        reader::{self, ReaderError},
+        Inspector,
+    };
+    use std::sync::mpsc;
 
     #[fuchsia::test]
     fn test_bounded_list_node_basic() {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 3);
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "0": {} } });
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "0": {}, "1": {} } });
     }
 
@@ -70,16 +85,16 @@ mod tests {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 3);
-        let _ = list_node.create_entry();
-        let _ = list_node.create_entry();
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
+        let _ = list_node.add_entry(|_| {});
+        let _ = list_node.add_entry(|_| {});
 
         assert_data_tree!(inspector, root: { list_node: { "0": {}, "1": {}, "2": {} } });
 
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "1": {}, "2": {}, "3": {} } });
 
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "2": {}, "3": {}, "4": {} } });
     }
 
@@ -88,9 +103,9 @@ mod tests {
         let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let mut list_node = BoundedListNode::new(list_node, 0);
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "0": {} } });
-        let _ = list_node.create_entry();
+        let _ = list_node.add_entry(|_| {});
         assert_data_tree!(inspector, root: { list_node: { "1": {} } });
     }
 
@@ -101,7 +116,7 @@ mod tests {
         let mut list_node = BoundedListNode::new(list_node, 3);
 
         {
-            let node_writer = list_node.create_entry();
+            let node_writer = list_node.add_entry(|_| {});
             node_writer.record_string("str_key", "str_value");
             node_writer.record_child("child", |child| child.record_int("int_key", 2));
         } // <-- node_writer is dropped
@@ -114,6 +129,48 @@ mod tests {
                     child: {
                         int_key: 2i64,
                     }
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    async fn add_entry_is_atomic() {
+        let inspector = Inspector::default();
+        let list_node = inspector.root().create_child("list_node");
+        let mut list_node = BoundedListNode::new(list_node, 3);
+
+        let (sender, receiver) = mpsc::channel();
+        let (sender2, receiver2) = mpsc::channel();
+
+        let t = std::thread::spawn(move || {
+            list_node.add_entry(|node| {
+                node.record_string("key1", "value1");
+                sender.send(()).unwrap();
+                let _ = receiver2.recv().unwrap();
+                node.record_string("key2", "value2");
+            });
+            list_node
+        });
+
+        // Make sure we already called `add_entry`.
+        let _ = receiver.recv().unwrap();
+
+        // We can't read until the atomic transaction is completed.
+        assert_matches!(reader::read(&inspector).await, Err(ReaderError::InconsistentSnapshot));
+
+        // Let `add_entry` continue executing and wait for completion.
+        sender2.send(()).unwrap();
+
+        // Ensure we don't drop the list node.
+        let _list_node = t.join().unwrap();
+
+        // We can now read and we can see that everything was correctly created.
+        assert_data_tree!(inspector, root: {
+            list_node: {
+                "0": {
+                    key1: "value1",
+                    key2: "value2",
                 }
             }
         });

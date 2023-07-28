@@ -141,7 +141,9 @@ async fn run<N, U, E>(
             match op {
                 // We got a FIDL requests (via the mpsc::Receiver).
                 Op::Request(req) => {
-                    req.write_to_inspect(requests_node.create_entry());
+                    requests_node.add_entry(|node| {
+                        req.write_to_inspect(node);
+                    });
                     handle_active_control_request(
                         req,
                         &mut monitor_queue,
@@ -197,7 +199,9 @@ where
 
     // Right now we are in a state where there is no update running.
     while let Some(control_request) = recv.next().await {
-        control_request.write_to_inspect(requests_node.create_entry());
+        requests_node.add_entry(|node| {
+            control_request.write_to_inspect(node);
+        });
         match control_request {
             ControlRequest::Start(start_data) => {
                 return Some(start_data);

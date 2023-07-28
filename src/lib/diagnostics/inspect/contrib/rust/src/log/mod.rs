@@ -65,20 +65,10 @@ pub trait WriteInspect {
 macro_rules! inspect_log {
     ($bounded_list_node:expr, $($args:tt)+) => {{
         use $crate::{inspect_insert, nodes::NodeExt};
-        // Hack to allow the client to pass in a MutexGuard temporary for $bounded_list_node expr,
-        // since the temporary lives until the end of the match expression. Example usage:
-        // ```
-        // let list_node: Mutex<BoundedListNode> = ...;
-        // inspect_log!(list_node.lock(), ...);
-        // ```
-        match $bounded_list_node.create_entry() {
-            node => {
-                node.atomic_update(|this_node| {
-                    this_node.record_time("@time");
-                    inspect_insert!(@internal_inspect_log this_node, $($args)+);
-                });
-            }
-        }
+        $bounded_list_node.add_entry(|node| {
+            node.record_time("@time");
+            inspect_insert!(@internal_inspect_log node, $($args)+);
+        });
     }};
 }
 
@@ -449,10 +439,10 @@ mod tests {
         // if this test compiles, it's considered as succeeded
         let _executor = fasync::TestExecutor::new();
         let (_inspector, mut node) = inspector_and_list_node();
-        let node_writer = node.create_entry();
-
-        // Non-block version, no trailing comma
-        inspect_insert!(node_writer, k1: "v1".to_string(), k2: if true { 10u64 } else { 20 });
+        let node_writer = node.add_entry(|node_writer| {
+            // Non-block version, no trailing comma
+            inspect_insert!(node_writer, k1: "v1".to_string(), k2: if true { 10u64 } else { 20 });
+        });
 
         // Non-block version, trailing comma
         inspect_insert!(node_writer, k1: 1i64, k2: 2f64,);
