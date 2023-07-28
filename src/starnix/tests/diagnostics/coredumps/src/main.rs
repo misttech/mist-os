@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Context as _;
 use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
 use fuchsia_component_test::ScopedInstance;
 
@@ -23,15 +22,11 @@ async fn main() {
         // about the observed diagnostics.
         eprintln!("retrieving coredump reports...");
         let observed_coredumps = loop {
-            match get_coredumps_from_inspect().await {
-                Ok(observed_coredumps) => {
-                    if let Some(most_recent) = observed_coredumps.last() {
-                        if most_recent.idx == current_idx {
-                            break observed_coredumps;
-                        }
-                    }
+            let observed_coredumps = get_coredumps_from_inspect().await;
+            if let Some(most_recent) = observed_coredumps.last() {
+                if most_recent.idx == current_idx {
+                    break observed_coredumps;
                 }
-                Err(e) => eprintln!("will retry after error reading coredump reports: {e:?}"),
             }
             eprintln!("waiting for coredump ({current_idx}/{max_idx}) to show up...");
             std::thread::sleep(std::time::Duration::from_secs(1));
@@ -76,7 +71,7 @@ struct CoredumpReport {
     argv: String,
 }
 
-async fn get_coredumps_from_inspect() -> anyhow::Result<Vec<CoredumpReport>> {
+async fn get_coredumps_from_inspect() -> Vec<CoredumpReport> {
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
         .with_minimum_schema_count(1)
@@ -122,11 +117,11 @@ async fn get_coredumps_from_inspect() -> anyhow::Result<Vec<CoredumpReport>> {
 
         reports.push(CoredumpReport {
             idx: idx_str.parse().unwrap(),
-            pid: pid.context("retrieving pid property")?,
-            argv: argv.context("retrieving argv property")?,
+            pid: pid.expect("retrieving pid property"),
+            argv: argv.expect("retrieving argv property"),
         });
     }
     reports.sort();
 
-    Ok(reports)
+    reports
 }
