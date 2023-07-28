@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Fuchsia netdevice client library
+//! Client library for [`fidl_fuchsia_hardware_network`]. Contains helpers
+//! for sending frames to and receiving frames from L2/L3 network devices.
 
 #![deny(missing_docs)]
 pub mod client;
