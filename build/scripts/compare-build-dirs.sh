@@ -143,39 +143,21 @@ function diff_file_relpath() {
     *.d) expect=match; diff_text "$left" "$right" ;;
 
     # C++ object files (binary)
-    *.o)
-      case "$common_path" in
-        efi_x64/obj/src/firmware/*.c.o) expect=diff ;;
-        efi_x64/obj/src/*.c.o) expect=unknown ;;
-
-        efi_x64/obj/zircon/system/ulib/*.c.o) expect=diff ;;
-        efi_x64/obj/zircon/third_party/ulib/cksum/*.c.o) expect=diff ;;
-        efi_x64/obj/zircon/*.c.o) expect=unknown ;;
-
-        # See http://fxbug.dev/128466 for aac vs. __TIME__ macros.
-        obj/third_party/android/platform/external/aac/*.cpp.o) expect=unknown ;;
-        *) expect=match ;;
-      esac
-      diff_binary "$left" "$right"
+    # Nondeterminism due to __TIME__-stamping has been eliminated
+    # and is continuously verified by another builder.
+    *.o) expect=match; diff_binary "$left" "$right"
       # TODO(fangism): compare objdumps for details
+      # See build/rbe/detail-diff.sh.
       ;;
-    *.so) expect=unknown; diff_binary "$left" "$right" ;;
+    *.so) expect=match; diff_binary "$left" "$right" ;;
+    *.dylib) expect=match; diff_binary "$left" "$right" ;;
 
-    # Ignore .a differences until .o differences have been eliminated.
-    # Eventually, use diff_binary.
-    *.a) expect=skip ;;
+    *.a) expect=match; diff_binary "$left" "$right" ;;
 
     # Rust libraries (binary)
-    *.rlib)
-      case "$common_path" in
-        host_arm64/obj/*.rlib) expect=unknown ;;
-        *) expect=match ;;
-      esac
-      diff_binary "$left" "$right"
-      ;;
-
     # There may be unexpected rmeta mismatches.
     # See http//fxbug.dev/129074, https://github.com/rust-lang/rust/issues/113584
+    *.rlib) expect=match; diff_binary "$left" "$right" ;;
     *.rmeta) expect=match; diff_binary "$left" "$right" ;;
 
     # Generated code
@@ -230,10 +212,9 @@ function diff_file_relpath() {
 
     compile_commands.json) expect=skip ;;  # too many
 
-    test.stringarrays.api_summary.json |
-      test.experimentalzxctypes.api_summary.json)
-      # printed types contain memory addresses
-      expect=ignore ;;
+    # printed types contain memory addresses
+    test.stringarrays.api_summary.json ) expect=ignore ;;
+    test.experimentalzxctypes.api_summary.json) expect=ignore ;;
 
     docs.goldens.json)
       # in fuchsia-idk-build-*/gen/zircon/vdso
