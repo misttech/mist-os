@@ -97,6 +97,7 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
             .await
         {
             Ok(Reply::Info(msg)) => listener.on_info(msg)?,
+            #[cfg(target_os = "linux")]
             Err(e) => {
                 // If we get a TIMEDOUT response, keep reading -- that's just the usb_bulk crate
                 // not willing to spend more than 800ms waiting for a result
@@ -114,6 +115,14 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
                 if e.to_string() != "Read error: -110" {
                     bail!(e);
                 }
+            }
+            #[cfg(target_os = "macos")]
+            Err(_) => {
+                // usb_bulk returns different values on mac vs. linux. On Linux it
+                // returns ETIMEDOUT, but on the Mac it's just a generic -1. (And
+                // Apple doesn't actually document how to determine whether a read
+                // has timed out.)  So on Mac, we'll ignore _all_ errors, and cross
+                // our fingers.
             }
             other => return other,
         }
