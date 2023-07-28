@@ -4002,25 +4002,62 @@ static bool vmo_high_priority_reclaim_test() {
   END_TEST;
 }
 
-// Tests that calling snapshot modified will return ZX_ERR_NOT_SUPPORTED
-static bool vmo_snapshot_modified_smoke_test() {
+// Tests that snapshot modified behaves as expected
+static bool vmo_snapshot_modified_test() {
   BEGIN_TEST;
 
-  // Create VMO
+  AutoVmScannerDisable scanner_disable;
+
+  // Create 3 page, pager-backed VMO.
+  constexpr uint64_t kNumPages = 3;
+  vm_page_t* pages[kNumPages];
+  auto alloc_size = kNumPages * PAGE_SIZE;
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE,
-                                             AttributionObject::GetKernelAttribution(), &vmo);
-  ASSERT_EQ(ZX_OK, status, "vmobject creation\n");
-  ASSERT_NONNULL(vmo, "vmobject creation\n");
 
-  vmo->set_user_id(ZX_KOID_KERNEL);
+  zx_status_t status = make_committed_pager_vmo(kNumPages, false, false, pages, &vmo);
+  ASSERT_EQ(ZX_OK, status);
+  vmo->set_user_id(42);
 
-  // Attempt to snapshot-modified, which should fail as it is unimplemented
+  // Snapshot-modified all 3 pages of root.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, alloc_size,
                             false, AttributionObject::GetKernelAttribution(), &clone);
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "vmobject creation\n");
-  ASSERT_NULL(clone, "vmobject creation\n");
+  ASSERT_EQ(ZX_OK, status, "vmobject full clone\n");
+  ASSERT_NONNULL(clone, "vmobject full clone\n");
+  clone->set_user_id(43);
+
+  // Hang another snapshot-modified clone off root that only sees the first page.
+  fbl::RefPtr<VmObject> clone2;
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
+                            false, AttributionObject::GetKernelAttribution(), &clone2);
+  ASSERT_EQ(ZX_OK, status, "vmobject partial clone\n");
+  ASSERT_NONNULL(clone2, "vmobject partial clone\n");
+  clone2->set_user_id(44);
+
+  // Ensure pages are attributed to vmo (not clones)
+  EXPECT_EQ(alloc_size, PAGE_SIZE * vmo->AttributedPages().uncompressed, "vmo attribution\n");
+  EXPECT_EQ(0u, PAGE_SIZE * clone->AttributedPages().uncompressed, "clone attribution\n");
+  EXPECT_EQ(0u, PAGE_SIZE * clone2->AttributedPages().uncompressed, "clone2 attribution\n");
+
+  // COW page into clone & check that it is attributed.
+  uint8_t data = 0xff;
+  status = clone->Write(&data, 0, sizeof(data));
+  ASSERT_EQ(ZX_OK, status);
+
+  EXPECT_EQ((size_t)PAGE_SIZE, PAGE_SIZE * clone->AttributedPages().uncompressed,
+            "clone attribution\n");
+
+  // Try to COW a page into clone2 that it doesn't see.
+  status = clone2->Write(&data, PAGE_SIZE, sizeof(data));
+  ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, status);
+
+  // Calling snapshot-modified on clone shouldn't be supported yet.
+  fbl::RefPtr<VmObject> snapshot;
+  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+                              PAGE_SIZE * kNumPages, false,
+                              AttributionObject::GetKernelAttribution(), &snapshot);
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "vmobject snapshot-modified\n");
+  ASSERT_NULL(snapshot, "vmobject snapshot-modified\n");
 
   END_TEST;
 }
@@ -4086,7 +4123,7 @@ VM_UNITTEST(vmo_zero_pinned_test)
 VM_UNITTEST(vmo_pinned_wrapper_test)
 VM_UNITTEST(vmo_dedup_dirty_test)
 VM_UNITTEST(vmo_high_priority_reclaim_test)
-VM_UNITTEST(vmo_snapshot_modified_smoke_test)
+VM_UNITTEST(vmo_snapshot_modified_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

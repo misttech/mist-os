@@ -747,6 +747,11 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool can_snapshot_modified_locked() const TA_REQ(lock()) {
+    // Snapshot-at-least-on-write must also be supported.
+    if (!is_snapshot_at_least_on_write_supported()) {
+      return false;
+    }
+
     // We don't support COW clones for contiguous VMOs.
     if (is_source_supplying_specific_physical_pages()) {
       return false;

@@ -771,7 +771,16 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       break;
     }
     case CloneType::SnapshotModified: {
-      return ZX_ERR_NOT_SUPPORTED;
+      if (!can_snapshot_modified_locked()) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
+      if (pinned_page_count_locked()) {
+        return ZX_ERR_BAD_STATE;
+      }
+      // TODO(fxbug.dev/123742) Implement snapshots of clones.
+      if (parent_) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
       break;
     }
   }
@@ -842,7 +851,25 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       return ZX_OK;
     }
     case CloneType::SnapshotModified: {
-      return ZX_ERR_NOT_SUPPORTED;
+      // If at the root of vmo hierarchy, create a unidirectional clone
+      if (!parent_) {
+        fbl::AllocChecker ac;
+        auto cow_pages =
+            NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
+                          size, nullptr, nullptr, ktl::move(attribution_object));
+        if (!ac.check()) {
+          return ZX_ERR_NO_MEMORY;
+        }
+
+        new_root_parent_offset = CheckedAdd(offset, root_parent_offset_);
+        AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
+
+        *cow_child = ktl::move(cow_pages);
+        // Else make a snapshot (unsupported at the moment).
+        return ZX_OK;
+      } else {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
     }
   }
   return ZX_ERR_NOT_SUPPORTED;
