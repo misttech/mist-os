@@ -92,12 +92,6 @@ impl BootfsSvc {
         Self::new_internal(bootfs)
     }
 
-    // BootfsSvc can be used in hermetic integration tests by providing
-    // an arbitrary vmo containing a valid bootfs image.
-    pub fn new_for_test(bootfs: zx::Vmo) -> Result<Self, BootfsError> {
-        Self::new_internal(bootfs)
-    }
-
     fn new_internal(bootfs: zx::Vmo) -> Result<Self, BootfsError> {
         let bootfs_dup = bootfs
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -226,19 +220,6 @@ impl BootfsSvc {
         let bootfs_exec = bootfs_exec.replace_as_executable(&vmex).map_err(BootfsError::ExecVmo)?;
 
         self.ingest_bootfs_vmo_internal(bootfs_exec)
-    }
-
-    // Ingesting the bootfs vmo with this API will produce a /boot VFS that supports all
-    // functionality except execution of contents; the permission to convert arbitrary vmos
-    // to executable requires the root System resource, which is not available to fuchsia
-    // test components.
-    pub fn ingest_bootfs_vmo_for_test(self) -> Result<Self, BootfsError> {
-        let fake_exec: zx::Vmo = self
-            .bootfs
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .map_err(BootfsError::DuplicateHandle)?
-            .into();
-        self.ingest_bootfs_vmo_internal(fake_exec)
     }
 
     pub fn ingest_bootfs_vmo_internal(mut self, bootfs_exec: zx::Vmo) -> Result<Self, BootfsError> {

@@ -17,24 +17,19 @@ use {
         },
     },
     ::routing::config::RuntimeConfig,
-    anyhow::{Context, Error},
     cm_rust::{
         Availability, CapabilityDecl, ChildDecl, ComponentDecl, ConfigValuesData, EventStreamDecl,
         NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
     },
     cm_types::Name,
     cm_types::Url,
-    diagnostics_message::MonikerWithUrl,
     fidl::{endpoints, prelude::*},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream},
+    fidl_fuchsia_logger::LogSinkRequestStream,
     fuchsia_async as fasync,
-    fuchsia_component::{
-        client::connect_to_named_protocol_at_dir_root,
-        server::{ServiceFs, ServiceObjLocal},
-    },
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon::{self as zx, AsHandleRef, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
     moniker::{ChildName, Moniker},
@@ -55,8 +50,6 @@ pub fn default_component_decl() -> ComponentDecl {
 pub fn component_decl_with_test_runner() -> ComponentDecl {
     ::routing_test_helpers::component_decl_with_test_runner()
 }
-
-pub type MockServiceFs<'a> = ServiceFs<ServiceObjLocal<'a, MockServiceRequest>>;
 
 pub enum MockServiceRequest {
     LogSink(LogSinkRequestStream),
@@ -169,34 +162,11 @@ pub async fn get_live_child<'a>(
     }
 }
 
-pub async fn dir_contains<'a>(
-    root_proxy: &'a fio::DirectoryProxy,
-    path: &'a str,
-    entry_name: &'a str,
-) -> bool {
-    let dir = fuchsia_fs::directory::open_directory_no_describe(
-        &root_proxy,
-        path,
-        fio::OpenFlags::empty(),
-    )
-    .expect("Failed to open directory");
-    let entries = fuchsia_fs::directory::readdir(&dir).await.expect("readdir failed");
-    let listing = entries.iter().map(|entry| entry.name.clone()).collect::<Vec<String>>();
-    listing.contains(&String::from(entry_name))
-}
-
 pub async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {
     let entries = fuchsia_fs::directory::readdir(&root_proxy).await.expect("readdir failed");
     let mut items = entries.iter().map(|entry| entry.name.clone()).collect::<Vec<String>>();
     items.sort();
     items
-}
-
-pub async fn list_sub_directory(parent: &fio::DirectoryProxy, path: &str) -> Vec<String> {
-    let sub_dir =
-        fuchsia_fs::directory::open_directory_no_describe(&parent, path, fio::OpenFlags::empty())
-            .expect("Failed to open directory");
-    list_directory(&sub_dir).await
 }
 
 pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {
@@ -514,44 +484,6 @@ impl ActionsTest {
             .create_child(&collection_ref, &child_decl, args)
             .await;
         res.expect("failed to create child")
-    }
-}
-
-/// Create a new local fs and install a mock LogSink service into.
-/// Returns the created directory and corresponding namespace entries.
-pub fn create_fs_with_mock_logsink(
-) -> Result<(MockServiceFs<'static>, Vec<fcrunner::ComponentNamespaceEntry>), Error> {
-    let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-    let mut dir = ServiceFs::new_local();
-    dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
-    dir.serve_connection(server).context("Failed to add serving channel.")?;
-    let entries = vec![fcrunner::ComponentNamespaceEntry {
-        path: Some("/svc".to_string()),
-        directory: Some(client),
-        ..Default::default()
-    }];
-
-    Ok((dir, entries))
-}
-
-/// Retrieve message logged to socket. The wire format is expected to
-/// match with the LogSink protocol format.
-pub fn get_message_logged_to_socket(socket: zx::Socket) -> Option<String> {
-    let mut buffer: [u8; 1024] = [0; 1024];
-    match socket.read(&mut buffer) {
-        Ok(read_len) => {
-            let msg = diagnostics_message::from_structured(
-                MonikerWithUrl {
-                    moniker: "test-pkg/test-component.cmx".to_string(),
-                    url: "fuchsia-pkg://fuchsia.com/test-pkg#meta/test-component.cm".to_string(),
-                },
-                &buffer[..read_len],
-            )
-            .expect("must be able to decode a valid message from buffer");
-
-            msg.msg().map(String::from)
-        }
-        Err(_) => None,
     }
 }
 

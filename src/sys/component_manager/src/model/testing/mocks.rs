@@ -341,11 +341,6 @@ impl MockRunner {
         self.inner.lock().unwrap().outgoing_host_fns.insert(name.to_string(), Arc::new(function));
     }
 
-    /// Register `function` to serve the runtime directory of component `name`
-    pub fn add_runtime_host_fn(&self, name: &str, function: HostFn) {
-        self.inner.lock().unwrap().runtime_host_fns.insert(name.to_string(), Arc::new(function));
-    }
-
     /// Get the input namespace for component `name`.
     pub fn get_namespace(&self, name: &str) -> Option<Arc<ManagedNamespace>> {
         self.inner.lock().unwrap().namespaces.get(name).map(Arc::clone)

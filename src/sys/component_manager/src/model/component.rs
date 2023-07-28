@@ -647,6 +647,7 @@ impl ComponentInstance {
     }
 
     /// Stops this component.
+    #[cfg(test)]
     pub async fn stop(self: &Arc<Self>) -> Result<(), StopActionError> {
         ActionSet::register(self.clone(), StopAction::new(false)).await
     }

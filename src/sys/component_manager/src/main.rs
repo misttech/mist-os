@@ -27,20 +27,18 @@ use {
     tracing::{error, info},
 };
 
-pub mod bootfs;
-pub mod builtin;
-pub mod builtin_environment;
-pub mod capability;
-pub mod elf_runner;
-pub mod framework;
-pub mod model;
-pub mod startup;
-
-pub(crate) mod directory_ready_notifier;
-pub(crate) mod root_stop_notifier;
-
+mod bootfs;
+mod builtin;
+mod builtin_environment;
+mod capability;
 mod constants;
 mod diagnostics;
+mod directory_ready_notifier;
+mod elf_runner;
+mod framework;
+mod model;
+mod root_stop_notifier;
+mod startup;
 
 extern "C" {
     fn dl_set_loader_service(

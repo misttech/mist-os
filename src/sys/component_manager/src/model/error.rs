@@ -26,8 +26,6 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    #[error("component collection not found with name {}", name)]
-    CollectionNotFound { name: String },
     // TODO(https://fxbug.dev/117080): Remove this error by using the `camino` library
     #[error("path is not utf-8: {:?}", path)]
     PathIsNotUtf8 { path: PathBuf },
@@ -163,8 +161,6 @@ pub enum StructuredConfigError {
     ConfigResolutionFailed(#[source] config_encoder::ResolutionError),
     #[error("couldn't create vmo: {_0}")]
     VmoCreateFailed(#[source] zx::Status),
-    #[error("couldn't write to vmo: {_0}")]
-    VmoWriteFailed(#[source] zx::Status),
 }
 
 #[derive(Clone, Debug, Error)]
@@ -596,8 +592,6 @@ impl OpenError {
 /// Describes all errors encountered when routing and opening a namespace capability.
 #[derive(Debug, Clone, Error)]
 pub enum RouteAndOpenCapabilityError {
-    #[error("not a namespace capability")]
-    NotNamespaceCapability,
     #[error("could not route {request}: {err}")]
     RoutingError {
         request: RouteRequest,
@@ -615,7 +609,6 @@ pub enum RouteAndOpenCapabilityError {
 impl RouteAndOpenCapabilityError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::NotNamespaceCapability { .. } => zx::Status::INVALID_ARGS,
             Self::RoutingError { err, .. } => err.as_zx_status(),
             Self::OpenError { err, .. } => err.as_zx_status(),
         }

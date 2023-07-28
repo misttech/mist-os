@@ -128,7 +128,6 @@ impl LifecycleController {
         let parent_moniker = join_monikers(scope_moniker, &parent_moniker)
             .map_err(|_| fsys::CreateError::BadMoniker)?;
         let parent_component = self.model.look_up(&parent_moniker).await.map_err(|e| match e {
-            ModelError::CollectionNotFound { name: _ } => fsys::CreateError::CollectionNotFound,
             ModelError::PathIsNotUtf8 { path: _ }
             | ModelError::UnexpectedComponentManagerMoniker
             | ModelError::ComponentInstanceError { err: _ } => fsys::CreateError::InstanceNotFound,

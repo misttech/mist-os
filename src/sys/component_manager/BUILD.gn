@@ -91,7 +91,6 @@ rustc_binary("bin") {
     "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//src/lib/diagnostics/hierarchy/rust",
-    "//src/lib/diagnostics/log/message/rust",
     "//src/lib/fuchsia",
     "//src/lib/process_builder:test-util-fidl_rust",
     "//src/sys/lib/cm_rust/testing",
