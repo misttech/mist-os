@@ -611,7 +611,7 @@ void Vpu::CapturePrintRegisters() {
   DISP_INFO("VdInComCtrl0Reg = 0x%x\n",
             VideoInputCommandControl::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInComStatus0Reg = 0x%x\n",
-            VdInComStatus0Reg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
+            VideoInputCommandStatus0::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInMatrixCtrlReg = 0x%x\n",
             VdInMatrixCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdinCoef00_01Reg = 0x%x\n",

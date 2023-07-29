@@ -144,6 +144,64 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
   }
 };
 
+// VDIN0_COM_STATUS0, VDIN1_COM_STATUS0
+//
+// This register is read-only.
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1087, 1109
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 778, 802
+// S905D3 Datasheet, Section 8.2.3.41 VDIN, Pages 714, 737
+class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandStatus0, uint32_t> {
+ public:
+  // Bits 17-3` are defined differently for VDIN0_COM_STATUS0 and
+  // VDIN0_COM_STATUS0, in all the datasheets mentioned above.
+  //
+  // VDIN0_COM_STATUS0 uses bit 17 as `vid_wr_pending_ddr_wrrsp`, bit 16
+  // as `curr_pic_sec`, and bit 15 as `curr_pic_sec_sav`, bits 14-3 as
+  // `lfifo_buf_cnt`.
+  //
+  // VDIN1_COM_STATUS0 uses bits 12-3 as `lfifo_buf_cnt` and bits 17-13
+  // reserved.
+  //
+  // Since these fields are not currently used by the driver, we are omitting
+  // these fields as reserved. Future drivers may need to fork the register
+  // definitions or create helper functions to access the fields.
+
+  // Indicates that the write of raw pixels from input source to RAM is done.
+  //
+  // Cleared by `clear_direct_write_done` bit in `VDIN0/1_WR_CTRL` register.
+  DEF_BIT(2, direct_write_done);
+
+  // Indicates that the write of noise-reduced (NR) pixels from input source to
+  // RAM is done.
+  //
+  // Cleared by `clear_noise_reduced_write_done` bit in `VDIN0/1_WR_CTRL`
+  // register.
+  DEF_BIT(1, noise_reduced_write_done);
+
+  // Current field for interlaced input.
+  //
+  // For interlaced inputs, 0 means top field, 1 means bottom field.
+  // This is not documented in Amlogic datasheets but appears in drivers.
+  //
+  // Unused for progressive inputs.
+  DEF_BIT(0, current_field);
+
+  static auto Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        static constexpr uint32_t kVideoInput0RegAddr = 0x1205 * sizeof(uint32_t);
+        return hwreg::RegisterAddr<VideoInputCommandStatus0>(kVideoInput0RegAddr);
+      case VideoInputModuleId::kVideoInputModule1:
+        static constexpr uint32_t kVideoInput1RegAddr = 0x1305 * sizeof(uint32_t);
+        return hwreg::RegisterAddr<VideoInputCommandStatus0>(kVideoInput1RegAddr);
+      default:
+        ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d",
+                            static_cast<int>(video_input));
+    }
+  }
+};
+
 }  // namespace amlogic_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_REGS_H_

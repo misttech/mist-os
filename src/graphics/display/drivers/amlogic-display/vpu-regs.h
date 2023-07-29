@@ -126,7 +126,6 @@
 #define VPU_WRBACK_CTRL (0x1df9 << 2)
 #define VPU_VDIN0_WRARB_REQEN_SLV (0x12c1 << 2)
 #define VPU_VDIN1_COM_CTRL0 (0x1302 << 2)
-#define VPU_VDIN1_COM_STATUS0 (0x1305 << 2)
 #define VPU_VDIN1_MATRIX_CTRL (0x1310 << 2)
 #define VPU_VDIN1_COEF00_01 (0x1311 << 2)
 #define VPU_VDIN1_COEF02_10 (0x1312 << 2)
@@ -188,12 +187,6 @@ class WrBackCtrlReg : public hwreg::RegisterBase<WrBackCtrlReg, uint32_t> {
  public:
   DEF_FIELD(2, 0, chan0_sel);
   static auto Get() { return hwreg::RegisterAddr<WrBackCtrlReg>(VPU_WRBACK_CTRL); }
-};
-
-class VdInComStatus0Reg : public hwreg::RegisterBase<VdInComStatus0Reg, uint32_t> {
- public:
-  DEF_BIT(2, done);
-  static auto Get() { return hwreg::RegisterAddr<VdInComStatus0Reg>(VPU_VDIN1_COM_STATUS0); }
 };
 
 class VdInMatrixCtrlReg : public hwreg::RegisterBase<VdInMatrixCtrlReg, uint32_t> {
