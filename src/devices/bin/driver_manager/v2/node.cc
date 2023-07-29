@@ -1085,6 +1085,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
         if (!node_ptr) {
           LOGF(WARNING, "Node freed before it is used");
           cb(result);
+          return;
         }
 
         if (result.is_error()) {
