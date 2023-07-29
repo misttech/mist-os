@@ -5,7 +5,7 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("cpp") {
-  category = "experimental"
+  category = "internal"
   sdk_name = "driver_promise_cpp"
   include_base = "//sdk"
 
