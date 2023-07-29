@@ -26,7 +26,7 @@ $FFX \
     product \
     --product $PRODUCT_CONFIG_PATH \
     --filesystem-config $PRODUCT_IMAGES_CONFIG_PATH \
-    {board_config_arg} \
+    --board-info $BOARD_CONFIG_PATH \
     --legacy-bundle $LEGACY_AIB \
     --input-bundles-dir $PLATFORM_AIB_DIR \
     --outdir $OUTDIR
@@ -71,16 +71,13 @@ def _fuchsia_product_assembly_impl(ctx):
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
     product_images_config_file = ctx.attr.filesystem_config[FuchsiaProductImagesConfigInfo].config
-    board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config if ctx.attr.board_config else None
-    shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
-        board_config_arg = "--board-info $BOARD_CONFIG_PATH" if board_config_file else "",
-    )
+    board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config
+    shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
     ffx_inputs += ctx.files.filesystem_config
-    if board_config_file:
-        ffx_inputs.append(board_config_file)
+    ffx_inputs += ctx.files.board_config
     ffx_inputs += legacy_aib.files
     ffx_inputs += platform_aibs.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
@@ -91,12 +88,11 @@ def _fuchsia_product_assembly_impl(ctx):
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
         "PRODUCT_CONFIG_PATH": product_config_file.path,
+        "BOARD_CONFIG_PATH": board_config_file.path,
         "PRODUCT_IMAGES_CONFIG_PATH": product_images_config_file.path,
         "LEGACY_AIB": legacy_aib.dir.path,
         "PLATFORM_AIB_DIR": platform_aibs.dir.path,
     }
-    if board_config_file:
-        shell_env["BOARD_CONFIG_PATH"] = board_config_file.path
 
     ctx.actions.run_shell(
         inputs = ffx_inputs,
@@ -160,8 +156,7 @@ fuchsia_product_assembly = rule(
         "board_config": attr.label(
             doc = "A board configuration target.",
             providers = [FuchsiaBoardConfigInfo],
-            # TODO(fxb/119590): Make mandatory once soft transition completes.
-            mandatory = False,
+            mandatory = True,
         ),
         "legacy_aib": attr.label(
             doc = "Legacy AIB for this product.",
@@ -274,7 +269,7 @@ def fuchsia_product_image(
         legacy_aib,
         platform_aibs,
         image,
-        board_config = None,
+        board_config,
         create_system_mode = None,
         **kwargs):
     fuchsia_product_assembly(

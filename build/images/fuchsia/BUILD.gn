@@ -457,6 +457,7 @@ if (is_fuchsia) {
     ramdisk_in_zbi = true
 
     assembly_images_config_label = images_config_label
+    board_config = board_information_for_assembly
     image_metadata_overrides = {
       zbi = {
         name = "netboot"
