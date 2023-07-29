@@ -148,7 +148,7 @@ pub async fn dump_annotations<W: Write>(
     // Build parameters
     let params = GetAnnotationsParameters {
         collection_timeout_per_annotation: Some(
-            i64::try_from(Duration::from_secs(5 * 60).as_nanos()).map_err(|e| anyhow!(e))?,
+            i64::try_from(Duration::from_secs(60).as_nanos()).map_err(|e| anyhow!(e))?,
         ),
         ..Default::default()
     };

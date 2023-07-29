@@ -21,7 +21,7 @@ bool MakeSnapshot(std::shared_ptr<sys::ServiceDirectory> services, const char* o
   fuchsia::feedback::Snapshot snapshot;
   if (const zx_status_t status = feedback_data_provider->GetSnapshot(
           std::move(fuchsia::feedback::GetSnapshotParameters().set_collection_timeout_per_data(
-              zx::min(5).get())),
+              zx::min(1).get())),
           &snapshot);
       status != ZX_OK) {
     fprintf(stderr, "Failed to get data from fuchsia.feedback.DataProvider: %d (%s)\n", status,
