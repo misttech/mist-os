@@ -56,13 +56,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         '--image-assembly-config',
-        type=argparse.FileType('r'),
         required=True,
         help='The path to the image assembly config file')
-    parser.add_argument(
-        '--images-config',
-        type=argparse.FileType('r'),
-        help='The path to the image assembly images config file')
     parser.add_argument(
         '--output',
         type=str,
@@ -75,33 +70,30 @@ def main():
         help='The path to the depfile for this script')
 
     args = parser.parse_args()
-
-    config = ImageAssemblyConfig.json_load(args.image_assembly_config)
-
-    # Collect the list of files that are read in this script.
     deps: Set[FilePath] = set()
-    deps.update(config.base)
-    deps.update(config.cache)
-    deps.update(config.system)
-    deps.update(config.bootfs_packages)
-
-    # Collect the list of inputs to image assembly.
     inputs: Set[FilePath] = set()
-    inputs.update(files_from_package_set(config.base, deps))
-    inputs.update(files_from_package_set(config.cache, deps))
-    inputs.update(files_from_package_set(config.system, deps))
-    inputs.update(files_from_package_set(config.bootfs_packages, deps))
-    inputs.update([entry.source for entry in config.bootfs_files])
-    inputs.add(config.kernel.path)
 
-    if deps:
-        dep_file = DepFile(args.output)
-        dep_file.update(deps)
-        dep_file.write_to(args.depfile)
+    with open(args.image_assembly_config, 'r') as f:
+        config = ImageAssemblyConfig.json_load(f)
 
-    if args.images_config:
-        images_config = json.load(args.images_config)['images']
-        for image in images_config:
+        # Collect the list of files that are read in this script.
+        deps.update(config.base)
+        deps.update(config.cache)
+        deps.update(config.system)
+        deps.update(config.bootfs_packages)
+
+        # Collect the list of inputs to image assembly.
+        inputs.update(files_from_package_set(config.base, deps))
+        inputs.update(files_from_package_set(config.cache, deps))
+        inputs.update(files_from_package_set(config.system, deps))
+        inputs.update(files_from_package_set(config.bootfs_packages, deps))
+        inputs.update([entry.source for entry in config.bootfs_files])
+        inputs.add(config.kernel.path)
+
+    with open(args.image_assembly_config, 'r') as f:
+        image_assembly_config = json.load(f)
+        images_config = image_assembly_config['images_config']
+        for image in images_config['images']:
             if image['type'] == 'vbmeta':
                 if 'key' in image:
                     inputs.add(image['key'])
@@ -113,6 +105,11 @@ def main():
                     script = image['postprocessing_script']
                     if 'path' in script:
                         inputs.add(script['path'])
+
+    if deps:
+        dep_file = DepFile(args.output)
+        dep_file.update(deps)
+        dep_file.write_to(args.depfile)
 
     with open(args.output, 'w') as f:
         for input in inputs:

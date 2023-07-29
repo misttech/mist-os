@@ -93,7 +93,6 @@ ffx_plugin("ffx_assembly") {
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:num",
-    "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",

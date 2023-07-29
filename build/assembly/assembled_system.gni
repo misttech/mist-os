@@ -379,10 +379,6 @@ template("assembled_system") {
     image_assembly_inputs =
         "$target_out_dir/${_namespace}.image_assembly_inputs"
 
-    images_config =
-        get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
-        "/" + get_label_info(invoker.assembly_images_config_label, "name") +
-        ".json"
     filesystem_config =
         get_label_info(invoker.assembly_images_config_label, "target_out_dir") +
         "/" + get_label_info(invoker.assembly_images_config_label, "name") +
@@ -724,7 +720,6 @@ template("assembled_system") {
     ]
 
     image_assembly_config = files.regenerated_image_assembly_config
-    images_config = files.images_config
     output = files.image_assembly_inputs
   }
 
@@ -801,8 +796,6 @@ template("assembled_system") {
       "create-system",
       "--image-assembly-config",
       rebase_path(files.regenerated_image_assembly_config, root_build_dir),
-      "--images",
-      rebase_path(files.images_config, root_build_dir),
       "--gendir",
       rebase_path(files.gendir, root_build_dir),
       "--outdir",
@@ -841,10 +834,7 @@ template("assembled_system") {
       deps += [ ":${labels.fshost_validator}" ]
     }
 
-    inputs = [
-      files.images_config,
-      files.regenerated_image_assembly_config,
-    ]
+    inputs = [ files.regenerated_image_assembly_config ]
     if (defined(invoker.inputs)) {
       inputs += invoker.inputs
     }

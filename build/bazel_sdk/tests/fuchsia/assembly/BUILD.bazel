@@ -3,33 +3,20 @@
 # found in the LICENSE file.
 
 load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test")
-load(":fuchsia_images_configuration_test.bzl", "fuchsia_images_configuration_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
-    "BLOBFS_LAYOUT",
     "PARTITION_TYPE",
     "SLOT",
-    "ZBI_COMPRESSION",
     "fuchsia_assemble_package",
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
-    "fuchsia_filesystem_blobfs",
-    "fuchsia_filesystem_empty_account",
-    "fuchsia_filesystem_empty_data",
-    "fuchsia_filesystem_reserved",
-    "fuchsia_fvm_nand",
-    "fuchsia_fvm_sparse",
-    "fuchsia_fvm_standard",
-    "fuchsia_images_configuration",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
     "fuchsia_prebuilt_package",
     "fuchsia_product_configuration",
-    "fuchsia_vbmeta",
     "fuchsia_virtual_device",
-    "fuchsia_zbi",
 )
 
 fuchsia_prebuilt_package(
@@ -134,131 +121,6 @@ fuchsia_product_configuration_test(
     name = "product_config_with_labels_golden_test",
     golden_file = ":test_data/product_config_with_labels_golden_file.json",
     product_config = ":testing_product_config_with_labels",
-    visibility = ["//visibility:public"],
-)
-
-fuchsia_zbi(
-    name = "my_zbi",
-    compression = ZBI_COMPRESSION.ZSTD_MAX,
-    postprocessing_args = [
-        "-v",
-    ],
-    postprocessing_script = ":test_data/execute_script.sh",
-    zbi_name = "fuchsia",
-)
-
-fuchsia_vbmeta(
-    name = "my_vbmeta",
-    key = ":test_data/local_key_file",
-    key_metadata = ":test_data/local_key_metadata_file",
-    vbmeta_name = "fuchsia",
-)
-
-fuchsia_filesystem_blobfs(
-    name = "my_blobfs",
-    compress = True,
-    layout = BLOBFS_LAYOUT.DEPRECATED_PADDED,
-    maximum_contents_size = "182452224",
-)
-
-fuchsia_filesystem_empty_data(
-    name = "my_empty_data",
-)
-
-fuchsia_filesystem_reserved(
-    name = "my_reserved",
-    slices = "32",
-)
-
-fuchsia_filesystem_empty_account(
-    name = "my_empty_account",
-)
-
-fuchsia_fvm_standard(
-    name = "fvm_standard",
-    compress = True,
-    filesystems = [
-        ":my_blobfs",
-        ":my_empty_account",
-        ":my_empty_data",
-        ":my_reserved",
-    ],
-    fvm_standard_name = "fvm",
-)
-
-fuchsia_fvm_standard(
-    name = "fvm_standard_no_account",
-    compress = True,
-    filesystems = [
-        ":my_blobfs",
-        ":my_empty_data",
-        ":my_reserved",
-    ],
-    fvm_standard_name = "fvm",
-    resize_image_file_to_fit = True,
-    truncate_to_length = "17179869184",
-)
-
-fuchsia_fvm_sparse(
-    name = "fvm_sparse",
-    filesystems = [
-        ":my_blobfs",
-        ":my_empty_data",
-        ":my_reserved",
-    ],
-    fvm_sparse_name = "fvm.sparse",
-    max_disk_size = "410779648",
-)
-
-fuchsia_fvm_nand(
-    name = "fvm_nand",
-    block_count = "1564",
-    compress = True,
-    filesystems = [
-        ":my_blobfs",
-        ":my_empty_data",
-        ":my_reserved",
-    ],
-    fvm_nand_name = "fvm.nand",
-    max_disk_size = "410779648",
-    oob_size = "8",
-    page_size = "4096",
-    pages_per_block = "64",
-)
-
-fuchsia_images_configuration(
-    name = "my_images_configuration",
-    fvm_slice_size = "32768",
-    images = [
-        ":my_zbi",
-        ":my_vbmeta",
-        ":fvm_nand",
-        ":fvm_standard",
-        ":fvm_sparse",
-    ],
-)
-
-fuchsia_images_configuration(
-    name = "my_images_configuration_no_vbmeta_no_account",
-    images = [
-        ":my_zbi",
-        ":fvm_nand",
-        ":fvm_standard_no_account",
-        ":fvm_sparse",
-    ],
-)
-
-fuchsia_images_configuration_test(
-    name = "images_config_golden_test",
-    golden_file = ":test_data/images_config_golden_file.json",
-    images_config = ":my_images_configuration",
-    visibility = ["//visibility:public"],
-)
-
-fuchsia_images_configuration_test(
-    name = "images_config_no_vbmeta_no_account_golden_test",
-    golden_file = ":test_data/images_config_golden_file_no_vbmeta.json",
-    images_config = ":my_images_configuration_no_vbmeta_no_account",
     visibility = ["//visibility:public"],
 )
 

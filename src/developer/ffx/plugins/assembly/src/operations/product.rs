@@ -119,7 +119,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         util::read_config(filesystem_config).context("Loading filesystem configuration")?;
     let images = ImagesConfig::from_product_and_board(&filesystem_config, &board_info.filesystems)
         .context("Constructing images config")?;
-    image_assembly.images_config = Some(images);
+    image_assembly.images_config = images;
 
     // Validate the built product assembly.
     assembly_validate_product::validate_product(

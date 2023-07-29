@@ -338,8 +338,8 @@ mod tests {
     use crate::base_package::BasePackage;
     use assembly_config_schema::image_assembly_config::{ImageAssemblyConfig, KernelConfig};
     use assembly_images_config::{
-        BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
-        StandardFvm,
+        BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, ImagesConfig, NandFvm, Reserved,
+        SparseFvm, StandardFvm,
     };
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -369,7 +369,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
-            images_config: None,
+            images_config: ImagesConfig::default(),
         };
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -419,7 +419,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
-            images_config: None,
+            images_config: ImagesConfig::default(),
         };
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -487,7 +487,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
-            images_config: None,
+            images_config: ImagesConfig::default(),
         };
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
@@ -612,7 +612,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
-            images_config: None,
+            images_config: ImagesConfig::default(),
         };
         let mut assembly_manifest = AssemblyManifest::default();
 
@@ -728,7 +728,7 @@ mod tests {
             qemu_kernel: "path/to/qemu/kernel".into(),
             boot_args: Vec::new(),
             bootfs_files: Vec::new(),
-            images_config: None,
+            images_config: ImagesConfig::default(),
         };
         let mut assembly_manifest = AssemblyManifest::default();
 

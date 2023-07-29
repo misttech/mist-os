@@ -57,6 +57,7 @@ pub struct Zbi {
     /// An optional script to post-process the ZBI.
     /// This is often used to prepare the ZBI for flashing/updating.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub postprocessing_script: Option<PostProcessingScript>,
 }
 
@@ -172,18 +173,22 @@ pub struct BlobFS {
     /// Reserve |minimum_data_bytes| and |minimum_inodes| in the FVM, and ensure
     /// that the final reserved size does not exceed |maximum_bytes|.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub maximum_bytes: Option<u64>,
 
     /// Reserve space for at least this many data bytes.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub minimum_data_bytes: Option<u64>,
 
     /// Reserved space for this many inodes.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub minimum_inodes: Option<u64>,
 
     /// Maximum amount of contents for an assembled blobfs.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub maximum_contents_size: Option<u64>,
 }
 
@@ -300,6 +305,7 @@ pub struct StandardFvm {
 
     /// After the optional resize, truncate the file to this length.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub truncate_to_length: Option<u64>,
 }
 
@@ -316,6 +322,7 @@ pub struct SparseFvm {
     /// This sets the amount of slice metadata to allocate during construction,
     /// which cannot be modified at runtime.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_disk_size: Option<u64>,
 }
 
@@ -333,6 +340,7 @@ pub struct NandFvm {
     /// This sets the amount of slice metadata to allocate during construction,
     /// which cannot be modified at runtime.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_disk_size: Option<u64>,
 
     /// Whether to compress the FVM.
@@ -359,6 +367,7 @@ pub struct Fxfs {
     /// If unset, there's no limit, and the image will be an arbitrary size greater than or equal to
     /// the space needed for the base system's contents.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
 }
 

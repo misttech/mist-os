@@ -44,10 +44,6 @@ pub struct CreateSystemArgs {
     #[argh(switch)]
     pub include_account: bool,
 
-    /// the configuration file that specifies which images to generate and how.
-    #[argh(option)]
-    pub images: Utf8PathBuf,
-
     /// the directory to write assembled outputs to.
     #[argh(option)]
     pub outdir: Utf8PathBuf,

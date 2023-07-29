@@ -177,10 +177,8 @@ pub struct ImageAssemblyConfig {
     pub bootfs_packages: Vec<Utf8PathBuf>,
 
     /// Which images to produce and how.
-    /// If specified, image assembly will assert that it is equivalent to any
-    /// images config passed to it via the command-line.
     #[serde(default)]
-    pub images_config: Option<ImagesConfig>,
+    pub images_config: ImagesConfig,
 }
 
 impl ImageAssemblyConfig {
@@ -200,7 +198,7 @@ impl ImageAssemblyConfig {
                 clock_backstop,
             },
             qemu_kernel: "path/to/qemu/kernel".into(),
-            images_config: None,
+            images_config: ImagesConfig::default(),
         }
     }
 
@@ -245,7 +243,7 @@ impl ImageAssemblyConfig {
             boot_args,
             bootfs_files,
             bootfs_packages,
-            images_config: None,
+            images_config: ImagesConfig::default(),
         })
     }
 }

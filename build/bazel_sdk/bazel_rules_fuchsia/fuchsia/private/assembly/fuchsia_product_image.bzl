@@ -5,7 +5,6 @@
 
 load(
     ":providers.bzl",
-    "FuchsiaAssemblyConfigInfo",
     "FuchsiaBoardConfigInfo",
     "FuchsiaProductAssemblyBundleInfo",
     "FuchsiaProductAssemblyInfo",
@@ -42,7 +41,6 @@ $FFX \
     assembly \
     create-system \
     --image-assembly-config $PRODUCT_ASSEMBLY_OUTDIR/image_assembly.json \
-    --images $IMAGES_CONFIG_PATH \
     {mode_arg} \
     --outdir $OUTDIR
 """
@@ -191,11 +189,9 @@ def _fuchsia_product_create_system_impl(ctx):
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
 
     # Assembly create-system
-    images_config_file = ctx.attr.image[FuchsiaAssemblyConfigInfo].config
     product_assembly_out = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].product_assembly_out
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
-    ffx_inputs += ctx.files.image
     ffx_inputs += ctx.files.product_assembly
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
@@ -208,7 +204,6 @@ def _fuchsia_product_create_system_impl(ctx):
         "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
-        "IMAGES_CONFIG_PATH": images_config_file.path,
         "PRODUCT_ASSEMBLY_OUTDIR": product_assembly_out.path,
     }
 
@@ -243,11 +238,6 @@ fuchsia_product_create_system = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     provides = [FuchsiaProductImageInfo],
     attrs = {
-        "image": attr.label(
-            doc = "A fuchsia_images_configuration target.",
-            providers = [FuchsiaAssemblyConfigInfo],
-            mandatory = True,
-        ),
         "product_assembly": attr.label(
             doc = "A fuchsia_product_assembly target.",
             providers = [FuchsiaProductAssemblyInfo],
@@ -284,7 +274,6 @@ def fuchsia_product_image(
     fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
-        image = image,
         mode = create_system_mode,
         **kwargs
     )

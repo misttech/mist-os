@@ -11,51 +11,28 @@ load(
     "FuchsiaFVMSparseInfo",
     "FuchsiaFVMStandardInfo",
     "FuchsiaFsBlobFsInfo",
-    "FuchsiaFsEmptyAccountInfo",
     "FuchsiaFsEmptyDataInfo",
     "FuchsiaFsReservedInfo",
     "FuchsiaFxfsInfo",
     "FuchsiaProductImagesConfigInfo",
-    "FuchsiaVbmetaExtraDescriptorInfo",
     "FuchsiaVbmetaInfo",
     "FuchsiaZbiInfo",
 )
 
-def _collect_file_systems(raw_filesystems, filesystems_dict, volume_dict):
-    file_systems = []
+def _collect_file_systems(raw_filesystems, volume_dict):
     for filesystem in raw_filesystems:
         if FuchsiaFsBlobFsInfo in filesystem:
             raw_fs = filesystem[FuchsiaFsBlobFsInfo]
-            filesystems_dict[raw_fs.blobfs_name] = raw_fs.blobfs_info
             volume_dict["blob"] = {
                 "blob_layout": raw_fs.blobfs_info["layout"],
             }
-            file_systems.append(raw_fs.blobfs_name)
-        elif FuchsiaFsEmptyAccountInfo in filesystem:
-            raw_fs = filesystem[FuchsiaFsEmptyAccountInfo]
-            empty_account_fs = {
-                "type": "empty-account",
-                "name": raw_fs.empty_account_name,
-            }
-            filesystems_dict[raw_fs.empty_account_name] = empty_account_fs
-            file_systems.append(raw_fs.empty_account_name)
         elif FuchsiaFsEmptyDataInfo in filesystem:
-            raw_fs = filesystem[FuchsiaFsEmptyDataInfo]
-            empty_data = {
-                "type": "empty-data",
-                "name": raw_fs.empty_data_name,
-            }
-            filesystems_dict[raw_fs.empty_data_name] = empty_data
             volume_dict["data"] = {}
-            file_systems.append(raw_fs.empty_data_name)
         elif FuchsiaFsReservedInfo in filesystem:
             raw_fs = filesystem[FuchsiaFsReservedInfo]
-            filesystems_dict[raw_fs.reserved_name] = raw_fs.reserved_info
             volume_dict["reserved"] = {
                 "reserved_bytes": raw_fs.reserved_info["slices"],
             }
-            file_systems.append(raw_fs.reserved_name)
-    return file_systems
 
 def _fuchsia_images_configuration_impl(ctx):
     if ctx.attr.images_config:
@@ -70,105 +47,47 @@ def _fuchsia_images_configuration_impl(ctx):
             ),
         ]
 
-    config_file = ctx.actions.declare_file(ctx.label.name + ".json")
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product.json")
-    files = []
-    images = []
-    fvms = []
-    filesystems = {}
     volume = {}
     product_images_config = {}
+    using_fvm = False
     using_fxfs = False
     for image in ctx.attr.images:
         if FuchsiaZbiInfo in image:
             raw_image = image[FuchsiaZbiInfo]
             product_images_config["image_name"] = raw_image.zbi_name
-            zbi_image = {
-                "type": "zbi",
-                "name": raw_image.zbi_name,
-                "compression": raw_image.compression,
-            }
-            if raw_image.postprocessing_script != None:
-                postprocessing_script = {
-                    "path": raw_image.postprocessing_script.path,
-                }
-                if raw_image.postprocessing_args:
-                    postprocessing_script["args"] = raw_image.postprocessing_args
-                zbi_image["postprocessing_script"] = postprocessing_script
-                files.append(raw_image.postprocessing_script)
-            images.append(zbi_image)
-        elif FuchsiaVbmetaInfo in image:
-            raw_image = image[FuchsiaVbmetaInfo]
-            vbmeta_image = {
-                "type": "vbmeta",
-                "name": raw_image.vbmeta_name,
-            }
-            if raw_image.key != None:
-                vbmeta_image["key"] = raw_image.key.path
-                vbmeta_image["key_metadata"] = raw_image.key_metadata.path
-                files += [raw_image.key, raw_image.key_metadata]
-            if raw_image.extra_descriptors:
-                vbmeta_image["additional_descriptors"] = []
-                for descriptor in raw_image.extra_descriptors:
-                    descriptor = descriptor[FuchsiaVbmetaExtraDescriptorInfo]
-                    vbmeta_image["additional_descriptors"].append({
-                        "name": descriptor.name,
-                        "size": int(descriptor.size),
-                        "flags": int(descriptor.flags),
-                        "min_avb_version": descriptor.min_avb_version,
-                    })
-            images.append(vbmeta_image)
         elif FuchsiaFVMStandardInfo in image:
             raw_image = image[FuchsiaFVMStandardInfo]
-            standard_fvm = dict(raw_image.fvm_info)
-            standard_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems, volume)
-            fvms.append(standard_fvm)
+            _collect_file_systems(raw_image.filesystems, volume)
+            using_fvm = True
         elif FuchsiaFVMSparseInfo in image:
             raw_image = image[FuchsiaFVMSparseInfo]
-            sparse_fvm = dict(raw_image.fvm_info)
-            sparse_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems, volume)
-            fvms.append(sparse_fvm)
+            _collect_file_systems(raw_image.filesystems, volume)
+            using_fvm = True
         elif FuchsiaFVMNandInfo in image:
             raw_image = image[FuchsiaFVMNandInfo]
-            nand_fvm = dict(raw_image.fvm_info)
-            nand_fvm["filesystems"] = _collect_file_systems(raw_image.filesystems, filesystems, volume)
-            fvms.append(nand_fvm)
+            _collect_file_systems(raw_image.filesystems, volume)
+            using_fvm = True
         elif FuchsiaFxfsInfo in image:
-            fxfs = {
-                "type": "fxfs",
-            }
-            images.append(fxfs)
             using_fxfs = True
 
-    if fvms:
-        fvm = {
-            "type": "fvm",
-            "filesystems": filesystems.values(),
-            "outputs": fvms,
-        }
-        if ctx.attr.fvm_slice_size:
-            fvm["slice_size"] = int(ctx.attr.fvm_slice_size)
-        images.append(fvm)
+    if using_fvm:
         product_images_config["volume"] = {"fvm": volume}
     elif using_fxfs:
         product_images_config["volume"] = "fxfs"
     else:
         product_images_config["volume"] = "none"
 
-    image_config = {"images": images}
-
-    ctx.actions.write(config_file, json.encode(image_config))
     ctx.actions.write(product_config_file, json.encode(product_images_config))
     return [
-        DefaultInfo(files = depset(direct = [config_file, product_config_file] + files)),
-        FuchsiaAssemblyConfigInfo(config = config_file),
+        DefaultInfo(files = depset(direct = [product_config_file])),
         FuchsiaProductImagesConfigInfo(config = product_config_file),
     ]
 
 fuchsia_images_configuration = rule(
     doc = "Declares an images configuration JSON file for use with ffx assembly.",
     implementation = _fuchsia_images_configuration_impl,
-    provides = [FuchsiaAssemblyConfigInfo],
+    provides = [FuchsiaProductImagesConfigInfo],
     attrs = {
         # TODO(jayzhuang): Remove this when we decide how to implement imagess configuration so it supports in-tree builds.
         "images_config": attr.label(

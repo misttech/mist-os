@@ -33,8 +33,6 @@ test_suite(
 test_suite(
     name = "assembly_tests",
     tests = [
-        "//fuchsia/assembly:images_config_golden_test",
-        "//fuchsia/assembly:images_config_no_vbmeta_no_account_golden_test",
         "//fuchsia/assembly:partitions_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",
         "//fuchsia/assembly:product_config_with_labels_golden_test",
