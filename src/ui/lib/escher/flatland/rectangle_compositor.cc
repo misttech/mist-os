@@ -343,7 +343,7 @@ void RectangleCompositor::DrawBatch(CommandBuffer* cmd_buf,
 
 void RectangleCompositor::SetColorConversionParams(
     const ColorConversionParams& color_conversion_params) {
-  FX_LOGS(INFO) << "Color conversion params applied.";
+  FX_VLOGS(1) << "Color conversion params applied.";
   color_conversion_params_ = color_conversion_params;
 }
 
