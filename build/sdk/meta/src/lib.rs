@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/124409) remove
-#![allow(unknown_lints, ambiguous_glob_reexports)]
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -49,8 +46,11 @@ pub use crate::json::JsonObject;
 pub use crate::loadable_module::*;
 pub use crate::manifest::*;
 pub use crate::metadata::*;
-pub use crate::physical_device::*;
+pub use crate::physical_device::PhysicalDeviceV1;
 pub use crate::product_bundle::*;
 pub use crate::product_bundle_container::*;
 pub use crate::sysroot::*;
-pub use crate::virtual_device::*;
+pub use crate::virtual_device::{
+    AudioDevice, DataAmount, InputDevice, Screen, VirtualDevice, VirtualDeviceManifest,
+    VirtualDeviceV1,
+};
