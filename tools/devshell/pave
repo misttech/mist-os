@@ -27,6 +27,10 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 
+fx-warn "DEPRECATION WARNING"
+fx-warn "\`fx pave\` is deprecated and will be removed soon, please use \`fx flash\`."
+fx-warn "See https://fxbug.dev/131144.\n"
+
 function main {
   local single_run=true
   local build=false
