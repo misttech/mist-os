@@ -140,16 +140,19 @@ impl<T> IntoIterator for OneOrMany<T> {
 /// Error type for log streamer
 #[derive(Error, Debug)]
 pub enum JsonDeserializeError {
-    #[error("Unknown error: {}", error)]
-    UnknownError {
+    /// Unknown error deserializing JSON
+    #[error(transparent)]
+    Other {
         #[from]
         error: anyhow::Error,
     },
+    /// I/O error
     #[error("IO error {}", error)]
-    IOError {
+    IO {
         #[from]
         error: std::io::Error,
     },
+    /// End of stream has been reached
     #[error("No more data")]
     NoMoreData,
 }

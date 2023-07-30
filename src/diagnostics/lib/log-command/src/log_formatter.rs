@@ -215,12 +215,15 @@ pub trait LogSpamFilter {
     fn is_spam(&self, file: Option<&str>, line: Option<u64>, msg: &str) -> bool;
 }
 
+/// Log formatter error
 #[derive(Error, Debug)]
 pub enum FormatterError {
+    /// An unknown error occurred
     #[error(transparent)]
-    UnknownError(#[from] anyhow::Error),
+    Other(#[from] anyhow::Error),
+    /// An IO error occurred
     #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    IO(#[from] std::io::Error),
 }
 
 /// Default formatter implementation
@@ -354,6 +357,7 @@ impl<W> DefaultLogFormatter<W>
 where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
+    /// Creates a new DefaultLogFormatter with the given writer and options.
     pub fn new(filters: LogFilterCriteria, writer: W, options: LogFormatterOptions) -> Self {
         Self { filters, writer, options }
     }
@@ -435,8 +439,10 @@ impl Symbolize for NoOpSymbolizer {
     }
 }
 
+/// Trait for formatting logs one at a time.
 #[async_trait(?Send)]
 pub trait LogFormatter {
+    /// Formats a log entry and writes it to the output.
     async fn push_log(&mut self, log_entry: LogEntry) -> anyhow::Result<()>;
 }
 
