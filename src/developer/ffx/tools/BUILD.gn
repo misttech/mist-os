@@ -7,6 +7,7 @@ import("//src/developer/ffx/config.gni")
 # The list of tools under this directory
 _tools = [
   "echo",
+  "profiler",
   "starnix",
   "target-package",
   "log_ng",

@@ -11,7 +11,6 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.audio:fuchsia.audio",
   "//sdk/fidl/fuchsia.boot:fuchsia.boot",
   "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal",
-  "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler",
   "//sdk/fidl/fuchsia.dash:fuchsia.dash",
   "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
   "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx",

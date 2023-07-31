@@ -1,11 +1,12 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+mod args;
 
 use anyhow::{Context as _, Result};
+use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use errors::{ffx_bail, ffx_error};
-use ffx_profiler_args::{ProfilerCommand, ProfilerSubCommand};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
 use std::{default::Default, io::stdin, io::BufRead, time::Duration};
@@ -19,8 +20,6 @@ pub struct ProfilerTool {
     cmd: ProfilerCommand,
 }
 
-fho::embedded_plugin!(ProfilerTool);
-
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ProfilerTool {
     type Writer = Writer;
@@ -30,9 +29,7 @@ impl FfxMain for ProfilerTool {
     }
 }
 
-fn gather_targets(
-    opts: &ffx_profiler_args::Start,
-) -> Result<Vec<fidl_fuchsia_cpu_profiler::TargetConfig>> {
+fn gather_targets(opts: &args::Start) -> Result<Vec<fidl_fuchsia_cpu_profiler::TargetConfig>> {
     if !opts.monikers.is_empty() {
         ffx_bail!("Monikers are not supported yet. Try a pid or tid instead.");
     }
@@ -127,7 +124,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_gather_targets() {
-        let args = ffx_profiler_args::Start {
+        let args = args::Start {
             pids: vec![1, 2, 3],
             tids: vec![4, 5, 6],
             job_ids: vec![7, 8, 9],
@@ -140,7 +137,7 @@ mod tests {
         assert!(targets.is_ok());
         assert!(targets.unwrap().len() == 9);
 
-        let empty_args = ffx_profiler_args::Start {
+        let empty_args = args::Start {
             pids: vec![],
             tids: vec![],
             job_ids: vec![],

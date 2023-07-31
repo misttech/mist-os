@@ -2,18 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-ffx_plugin("ffx_profiler") {
-  version = "0.1.0"
+rustc_library("lib") {
+  name = "ffx_tool_profiler"
   edition = "2021"
   with_unit_tests = true
-  args_with_unit_tests = true
 
-  args_sources = [ "src/args.rs" ]
-
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/args.rs",
+    "src/lib.rs",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_rust",
@@ -22,22 +22,35 @@ ffx_plugin("ffx_profiler") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",
   ]
-
-  test_deps = []
 }
 
-ffx_tool("ffx_profiler_tool") {
+ffx_tool("ffx_profiler") {
   edition = "2021"
   output_name = "ffx-profiler"
   deps = [
-    ":ffx_profiler",
+    ":lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+  sdk_category = "internal"
+}
+
+group("profiler") {
+  public_deps = [ ":ffx_profiler" ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_profiler_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":lib_test" ]
 }

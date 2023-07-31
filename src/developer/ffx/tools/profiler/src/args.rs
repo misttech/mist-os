@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use ffx_core::ffx_command;
 
-#[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
 /// Interact with the profiling subsystem.
 #[argh(subcommand, name = "profiler")]
