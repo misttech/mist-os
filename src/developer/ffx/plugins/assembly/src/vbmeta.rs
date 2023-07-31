@@ -4,7 +4,7 @@
 
 use crate::extra_hash_descriptor::ExtraHashDescriptor;
 use crate::vfs::{FilesystemProvider, RealFilesystemProvider};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use assembly_images_config::{VBMeta, VBMetaDescriptor};
 use assembly_manifest::{AssemblyManifest, Image};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -31,12 +31,15 @@ pub fn construct_vbmeta(
         &vbmeta_config.additional_descriptors,
         salt,
         &RealFilesystemProvider {},
-    )?;
+    )
+    .context("signing vbmeta")?;
 
     // Write VBMeta to a file and return the path.
     let vbmeta_path = outdir.as_ref().join(format!("{}.vbmeta", vbmeta_config.name));
-    std::fs::write(&vbmeta_path, vbmeta.as_bytes())?;
-    let vbmeta_path_relative = path_relative_from_current_dir(vbmeta_path)?;
+    std::fs::write(&vbmeta_path, vbmeta.as_bytes())
+        .with_context(|| format!("writing vbmeta: {}", &vbmeta_path))?;
+    let vbmeta_path_relative = path_relative_from_current_dir(&vbmeta_path)
+        .with_context(|| format!("calculating relative path for: {}", &vbmeta_path))?;
     assembly_manifest.images.push(Image::VBMeta(vbmeta_path_relative.clone()));
     Ok(vbmeta_path_relative)
 }
@@ -52,8 +55,12 @@ pub fn sign<FSP: FilesystemProvider>(
     fs: &FSP,
 ) -> Result<(VBMetaImage, Salt)> {
     // Read the signing key's bytes and metadata.
-    let key_pem = fs.read_to_string(key)?;
-    let key_metadata = fs.read(key_metadata)?;
+    let key_pem = fs
+        .read_to_string(&key)
+        .with_context(|| format!("reading key: {}", key.as_ref().display()))?;
+    let key_metadata = fs
+        .read(&key_metadata)
+        .with_context(|| format!("reading key metadata: {}", key_metadata.as_ref().display()))?;
     // And then create the signing key from those.
     let key = Key::try_new(&key_pem, key_metadata).unwrap();
 
@@ -73,7 +80,9 @@ pub fn sign<FSP: FilesystemProvider>(
         .collect();
 
     // Read the image into memory, so that it can be hashed.
-    let image = fs.read(image_path)?;
+    let image = fs
+        .read(&image_path)
+        .with_context(|| format!("reading image: {}", image_path.as_ref().display()))?;
 
     // Create the descriptor for the image.
     let descriptor = HashDescriptor::new(name.as_ref(), &image, salt.clone());
