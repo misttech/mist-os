@@ -218,7 +218,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/x64.gni:72
+From //boards/x64.gni:64
 
 **Overridden from the default:** `""`
 
@@ -238,7 +238,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/x64.gni:70
+From //boards/x64.gni:62
 
 **Overridden from the default:** `""`
 
@@ -625,7 +625,7 @@ From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:87
+From //boards/x64.gni:79
 
 **Overridden from the default:** `false`
 
@@ -855,26 +855,6 @@ Each entry in the list is a scope containing:
 
 From //build/images/args.gni:78
 
-### bringup_images_config_label
-
-The images config information used for bringup images.
-
-**Current value for `target_cpu = "arm64"`:** `"//boards/images:bringup_default"`
-
-From //boards/arm64.gni:46
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:116
-
-**Current value for `target_cpu = "x64"`:** `"//boards/images:bringup_default"`
-
-From //boards/x64.gni:91
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:116
-
 ### build_all_vp9_file_decoder_conformance_tests
 
 **Current value (from the default):** `false`
@@ -1000,7 +980,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:67
+From //boards/x64.gni:59
 
 **Overridden from the default:** `false`
 
@@ -2738,7 +2718,7 @@ From //build/config/compiler.gni:66
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:51
+From //build/product.gni:57
 
 ### emu_window_size_width
 
@@ -2746,7 +2726,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:50
+From //build/product.gni:56
 
 ### enable_api_diff
 
@@ -3363,6 +3343,29 @@ TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to bui
 
 From //build/product.gni:38
 
+### fuchsia_filesystem_config
+
+The filesystem config to pass to product assembly.
+This should point to a generated_images_config() target.
+TODO(b/292181325): Delete this once the filesystems configs are moved into
+the product assembly config.
+
+**Current value for `target_cpu = "arm64"`:** `"//boards/images:default"`
+
+From //products/bringup.gni:27
+
+**Overridden from the default:** `false`
+
+From //build/product.gni:47
+
+**Current value for `target_cpu = "x64"`:** `"//boards/images:default"`
+
+From //products/bringup.gni:27
+
+**Overridden from the default:** `false`
+
+From //build/product.gni:47
+
 ### fuchsia_product_assembly_config_label
 
 The product assembly config used to configure the main Fuchsia image.
@@ -3962,26 +3965,6 @@ directories, not the root_build_dir.
 **Current value (from the default):** `true`
 
 From //build/icu.gni:31
-
-### images_config_label
-
-The images config information used during assembly.
-
-**Current value for `target_cpu = "arm64"`:** `"//boards/images:arm64"`
-
-From //boards/arm64.gni:44
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:110
-
-**Current value for `target_cpu = "x64"`:** `"//boards/images:x64"`
-
-From //boards/x64.gni:89
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:110
 
 ### include_account_in_fvm
 
@@ -5399,19 +5382,19 @@ From //zircon/kernel/params.gni:142
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:48
+From //boards/arm64.gni:45
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:132
+From //build/board.gni:112
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:93
+From //boards/x64.gni:82
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:132
+From //build/board.gni:112
 
 ### partitions_config_label
 
@@ -5420,19 +5403,19 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:47
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:131
+From //build/board.gni:111
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:92
+From //boards/x64.gni:81
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:131
+From //build/board.gni:111
 
 ### perfetto_build_with_android
 
@@ -7020,21 +7003,6 @@ From //zircon/kernel/phys/qemu.gni:103
 
 From //src/recovery/system/system_recovery_args.gni:11
 
-### recovery_fdr_images_config_label
-
-The images config information used for recovery images, including
-recovery-fdr and recovery-ota.
-
-NOTE: Only one recovery image can be selected for a build configuration.
-However, images config is selected based on board, while recovery images are
-selected based on product, so the build system doesn't always have full
-information to match them. Also this is expected to be temporary until we
-fully migrate assembly to Bazel.
-
-**Current value (from the default):** `false`
-
-From //build/board.gni:126
-
 ### recovery_label
 
 Allows a product to specify the recovery image used in the zirconr slot.
@@ -7064,12 +7032,6 @@ assembly work until that's been addressed.
 **Current value (from the default):** `false`
 
 From //build/images/args.gni:19
-
-### recovery_ota_images_config_label
-
-**Current value (from the default):** `false`
-
-From //build/board.gni:127
 
 ### recovery_route_sources_config
 
@@ -8342,7 +8304,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:68
+From //boards/x64.gni:60
 
 **Overridden from the default:** `false`
 
@@ -8518,7 +8480,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:66
+From //boards/x64.gni:58
 
 **Overridden from the default:** `false`
 
@@ -8633,7 +8595,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:47
+From //build/product.gni:53
 
 ### vm_tracing_level
 
@@ -8781,26 +8743,6 @@ List of arguments to populate /boot/config/additional_boot_args in the Zedboot i
 **Current value (from the default):** `[]`
 
 From //build/images/zedboot/zedboot_args.gni:7
-
-### zedboot_images_config_label
-
-The images config information used for zedboot images.
-
-**Current value for `target_cpu = "arm64"`:** `"//boards/images:zedboot_default"`
-
-From //boards/arm64.gni:45
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:113
-
-**Current value for `target_cpu = "x64"`:** `"//boards/images:zedboot_default"`
-
-From //boards/x64.gni:90
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:113
 
 ### zircon_a_partition
 
