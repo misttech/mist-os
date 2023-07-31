@@ -39,12 +39,12 @@ pub mod time;
 #[cfg(target_os = "fuchsia")]
 pub mod timer;
 pub mod tx_vector;
-pub mod unaligned_view;
 pub mod wmm;
 
 use {
     channel::{Cbw, Channel},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
+    zerocopy::{LayoutVerified, Unalign},
 };
 
 pub use time::TimeUnit;
@@ -73,3 +73,5 @@ impl RadioConfig {
         RadioConfig { phy, channel: Channel::new(primary_channel, cbw) }
     }
 }
+
+pub type UnalignedView<B, T> = LayoutVerified<B, Unalign<T>>;

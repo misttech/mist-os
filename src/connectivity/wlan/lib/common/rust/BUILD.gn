@@ -112,7 +112,6 @@ rustc_library("wlan-common") {
     "src/tim.rs",
     "src/time.rs",
     "src/tx_vector.rs",
-    "src/unaligned_view.rs",
     "src/wmm.rs",
   ]
 

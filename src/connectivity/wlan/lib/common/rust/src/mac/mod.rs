@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{buffer_reader::BufferReader, unaligned_view::UnalignedView},
+    crate::{buffer_reader::BufferReader, UnalignedView},
     ieee80211::MacAddr,
     num::Unsigned,
     zerocopy::{ByteSlice, LayoutVerified},

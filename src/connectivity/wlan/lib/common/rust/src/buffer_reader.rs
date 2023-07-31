@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::unaligned_view::UnalignedView,
+    crate::UnalignedView,
     core::mem::size_of,
     zerocopy::{ByteSlice, ByteSliceMut, FromBytes, LayoutVerified, Unaligned},
 };
@@ -29,7 +29,7 @@ impl<B: ByteSlice> BufferReader<B> {
     where
         T: FromBytes,
     {
-        self.read_bytes(size_of::<T>()).map(|bytes| UnalignedView::new(bytes).unwrap())
+        self.read_bytes(size_of::<T>()).map(|bytes| UnalignedView::new_unaligned(bytes).unwrap())
     }
 
     pub fn peek<T>(&self) -> Option<LayoutVerified<&[u8], T>>
@@ -43,7 +43,7 @@ impl<B: ByteSlice> BufferReader<B> {
     where
         T: FromBytes,
     {
-        self.peek_bytes(size_of::<T>()).map(|bytes| UnalignedView::new(bytes).unwrap())
+        self.peek_bytes(size_of::<T>()).map(|bytes| UnalignedView::new_unaligned(bytes).unwrap())
     }
 
     pub fn read_array<T>(&mut self, num_elems: usize) -> Option<LayoutVerified<B, [T]>>
@@ -142,7 +142,8 @@ impl<B: ByteSliceMut> BufferReader<B> {
     where
         T: FromBytes,
     {
-        self.peek_bytes_mut(size_of::<T>()).map(|bytes| UnalignedView::new(bytes).unwrap())
+        self.peek_bytes_mut(size_of::<T>())
+            .map(|bytes| UnalignedView::new_unaligned(bytes).unwrap())
     }
 
     pub fn peek_array_mut<T>(&mut self, num_elems: usize) -> Option<LayoutVerified<&mut [u8], [T]>>

@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        buffer_reader::BufferReader, mac::ReasonCode, organization::Oui,
-        unaligned_view::UnalignedView,
-    },
+    crate::{buffer_reader::BufferReader, mac::ReasonCode, organization::Oui, UnalignedView},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     ieee80211::MacAddr,
     static_assertions::const_assert_eq,
