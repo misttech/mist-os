@@ -256,7 +256,8 @@ pub async fn set_extended_attribute_for_node(
     let dir = walk_dir(vol, path.parent().unwrap()).await?;
     let filename = path.file_name().unwrap().to_str().unwrap();
     let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
-    let handle = StoreObjectHandle::new(vol.clone(), node_id, HandleOptions::default(), false);
+    let handle =
+        StoreObjectHandle::new(vol.clone(), node_id, None, HandleOptions::default(), false);
     handle
         .set_extended_attribute(name.to_vec(), value.to_vec(), SetExtendedAttributeMode::Set)
         .await

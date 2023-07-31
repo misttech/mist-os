@@ -45,7 +45,7 @@ pub struct Directory<S: HandleOwner> {
 impl<S: HandleOwner> Directory<S> {
     fn new(owner: Arc<S>, object_id: u64) -> Self {
         Directory {
-            handle: StoreObjectHandle::new(owner, object_id, HandleOptions::default(), false),
+            handle: StoreObjectHandle::new(owner, object_id, None, HandleOptions::default(), false),
             is_deleted: AtomicBool::new(false),
         }
     }
@@ -463,56 +463,28 @@ impl<S: HandleOwner> Directory<S> {
     pub async fn update_attributes<'a>(
         &self,
         transaction: &mut Transaction<'a>,
-        create_attributes: Option<&fio::MutableNodeAttributes>,
+        node_attributes: Option<&fio::MutableNodeAttributes>,
         sub_dirs_delta: i64,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let mut mutation =
-            self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
-        if let ObjectValue::Object { attributes, kind: ObjectKind::Directory { sub_dirs } } =
-            &mut mutation.item.value
-        {
-            if let Some(create_attributes) = create_attributes {
-                if let Some(time) = create_attributes.creation_time {
-                    attributes.creation_time = Timestamp::from_nanos(time);
-                }
-                if let Some(time) = create_attributes.modification_time {
-                    attributes.modification_time = Timestamp::from_nanos(time);
-                }
-                if create_attributes.mode.is_some()
-                    || create_attributes.uid.is_some()
-                    || create_attributes.gid.is_some()
-                    || create_attributes.rdev.is_some()
-                {
-                    if let Some(a) = &mut attributes.posix_attributes {
-                        if let Some(mode) = create_attributes.mode {
-                            a.mode = mode;
-                        }
-                        if let Some(uid) = create_attributes.uid {
-                            a.uid = uid;
-                        }
-                        if let Some(gid) = create_attributes.gid {
-                            a.gid = gid;
-                        }
-                        if let Some(rdev) = create_attributes.rdev {
-                            a.rdev = rdev;
-                        }
-                    } else {
-                        attributes.posix_attributes = Some(PosixAttributes {
-                            mode: create_attributes.mode.unwrap_or_default(),
-                            uid: create_attributes.uid.unwrap_or_default(),
-                            gid: create_attributes.gid.unwrap_or_default(),
-                            rdev: create_attributes.rdev.unwrap_or_default(),
-                        });
-                    }
-                }
-            }
-            *sub_dirs = sub_dirs.saturating_add_signed(sub_dirs_delta);
-        } else {
-            bail!(anyhow!(FxfsError::Inconsistent)
-                .context("update_attributes: expected directory object"));
-        };
-        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+        if sub_dirs_delta != 0 {
+            let mut mutation =
+                self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
+            if let ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs }, .. } =
+                &mut mutation.item.value
+            {
+                *sub_dirs = sub_dirs.saturating_add_signed(sub_dirs_delta);
+            } else {
+                bail!(anyhow!(FxfsError::Inconsistent)
+                    .context("Directory.update_attributes: expected directory object"));
+            };
+            transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+        }
+
+        // Delegate to the StoreObjectHandle update_attributes for the rest of the updates.
+        if let Some(node_attributes) = node_attributes {
+            self.handle.update_attributes(transaction, node_attributes).await?;
+        }
         Ok(())
     }
 
