@@ -48,6 +48,7 @@ rustc_library("net-types-nostd") {
   # enabled in our build system in order to ensure that net-types continues to
   # compile and pass tests when the "std" feature is disabled.
   visibility = [ ":*" ]
+  disable_rustdoc = true
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
