@@ -27,8 +27,10 @@ group("additional_build_targets") {
     "//sdk:tests",
 
     # TODO(fxbug.dev/122609): Enable the rest after removing Go dependencies.
-    # "//src/connectivity/network:tests"
-    "//src/connectivity/network/tests:tests",
+    # "//src/connectivity/network:tests",
+    "//src/connectivity/network/tests/fidl:netstack-debug-fidl-test",
+    "//src/connectivity/network/tests/fidl:netstack-error-fidl-tests",
+    "//src/connectivity/network/tests/fidl:netstack-fidl-tests",
 
     # TODO(fxbug.dev/130998): Enable once all dependencies succeed on RISC-V.
     # "//src/developer:tests",
