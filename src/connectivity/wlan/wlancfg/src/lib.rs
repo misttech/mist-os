@@ -13,6 +13,9 @@
 #![warn(clippy::manual_map)]
 #![warn(clippy::needless_borrow)]
 #![warn(clippy::wrong_self_convention)]
+// TODO(fxbug.dev/131331): this throws false positives for async fns
+#![allow(unknown_lints)]
+#![allow(clippy::needless_pass_by_ref_mut)]
 
 pub mod access_point;
 pub mod client;

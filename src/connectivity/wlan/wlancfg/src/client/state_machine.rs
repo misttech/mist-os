@@ -661,7 +661,7 @@ async fn connected_state(
                             avg_rssi.add(DecibelMilliWatt(ind.rssi_dbm));
                             let current_connection = &options.currently_fulfilled_connection.target;
                             handle_connection_stats(
-                                &mut common_options.telemetry_sender,
+                                &common_options.telemetry_sender,
                                 &mut common_options.stats_sender,
                                 common_options.iface_id,
                                 current_connection.network.clone(),
@@ -809,7 +809,7 @@ async fn connected_state(
 
 /// Update IfaceManager with the updated connection quality data.
 async fn handle_connection_stats(
-    telemetry_sender: &mut TelemetrySender,
+    telemetry_sender: &TelemetrySender,
     stats_sender: &mut ConnectionStatsSender,
     iface_id: u16,
     id: types::NetworkIdentifier,

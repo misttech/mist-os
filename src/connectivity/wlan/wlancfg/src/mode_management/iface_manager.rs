@@ -946,7 +946,7 @@ pub fn wpa3_supported(security_support: fidl_common::SecuritySupport) -> bool {
 }
 
 async fn initiate_connection_selection(
-    iface_manager: &mut IfaceManagerService,
+    iface_manager: &IfaceManagerService,
     connection_selector: Arc<ConnectionSelector>,
 ) {
     if !iface_manager.idle_clients().is_empty()
@@ -1416,7 +1416,7 @@ pub(crate) async fn serve_iface_manager_requests(
             },
             () = connectivity_monitor_timer.select_next_some() => {
                 initiate_connection_selection(
-                    &mut iface_manager,
+                    &iface_manager,
                     connection_selector.clone(),
                 ).await;
             },
@@ -5321,7 +5321,7 @@ mod tests {
 
         {
             // Run the future to completion.
-            let fut = initiate_connection_selection(&mut iface_manager, selector);
+            let fut = initiate_connection_selection(&iface_manager, selector);
             pin_mut!(fut);
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
         }

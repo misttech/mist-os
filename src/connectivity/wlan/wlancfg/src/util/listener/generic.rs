@@ -133,7 +133,7 @@ mod tests {
         /// Broadcasts an update to all registered listeners.
         pub fn broadcast_update<F>(
             exec: &mut fasync::TestExecutor,
-            sender: &mut ClientListenerMessageSender,
+            sender: &ClientListenerMessageSender,
             update: ClientStateUpdate,
             serve_listeners: &mut F,
         ) where
@@ -163,7 +163,7 @@ mod tests {
         /// Registers a new listener.
         pub fn register_listener<F>(
             exec: &mut fasync::TestExecutor,
-            sender: &mut ClientListenerMessageSender,
+            sender: &ClientListenerMessageSender,
             serve_listeners: &mut F,
         ) -> fidl_policy::ClientStateUpdatesRequestStream
         where
@@ -201,7 +201,7 @@ mod tests {
     #[fuchsia::test]
     fn initial_update() {
         let mut exec = fasync::TestExecutor::new();
-        let (mut update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
+        let (update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
         let serve_listeners = serve::<
             fidl_policy::ClientStateUpdatesProxy,
             fidl_policy::ClientStateSummary,
@@ -212,7 +212,7 @@ mod tests {
 
         // Register listener.
         let mut l1_stream =
-            test_utils::register_listener(&mut exec, &mut update_sender, &mut serve_listeners);
+            test_utils::register_listener(&mut exec, &update_sender, &mut serve_listeners);
 
         // Verify first listener received an update.
         let summary =
@@ -233,7 +233,7 @@ mod tests {
     #[fuchsia::test]
     fn multiple_listeners_broadcast() {
         let mut exec = fasync::TestExecutor::new();
-        let (mut update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
+        let (update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
         let serve_listeners = serve::<
             fidl_policy::ClientStateUpdatesProxy,
             fidl_policy::ClientStateSummary,
@@ -244,12 +244,12 @@ mod tests {
 
         // Register #1 listener & ack initial update.
         let mut l1_stream =
-            test_utils::register_listener(&mut exec, &mut update_sender, &mut serve_listeners);
+            test_utils::register_listener(&mut exec, &update_sender, &mut serve_listeners);
         let _ = test_utils::ack_next_status_update(&mut exec, &mut l1_stream, &mut serve_listeners);
 
         // Register #2 listener & ack initial update.
         let mut l2_stream =
-            test_utils::register_listener(&mut exec, &mut update_sender, &mut serve_listeners);
+            test_utils::register_listener(&mut exec, &update_sender, &mut serve_listeners);
         let _ = test_utils::ack_next_status_update(&mut exec, &mut l2_stream, &mut serve_listeners);
 
         // Send an update to both listeners.
@@ -264,7 +264,7 @@ mod tests {
         };
         test_utils::broadcast_update(
             &mut exec,
-            &mut update_sender,
+            &update_sender,
             update.clone(),
             &mut serve_listeners,
         );
@@ -285,7 +285,7 @@ mod tests {
     #[fuchsia::test]
     fn multiple_listeners_unacked() {
         let mut exec = fasync::TestExecutor::new();
-        let (mut update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
+        let (update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
         let serve_listeners = serve::<
             fidl_policy::ClientStateUpdatesProxy,
             fidl_policy::ClientStateSummary,
@@ -296,12 +296,12 @@ mod tests {
 
         // Register #1 listener & ack initial update.
         let mut l1_stream =
-            test_utils::register_listener(&mut exec, &mut update_sender, &mut serve_listeners);
+            test_utils::register_listener(&mut exec, &update_sender, &mut serve_listeners);
         let _ = test_utils::ack_next_status_update(&mut exec, &mut l1_stream, &mut serve_listeners);
 
         // Register #2 listener & ack initial update.
         let mut l2_stream =
-            test_utils::register_listener(&mut exec, &mut update_sender, &mut serve_listeners);
+            test_utils::register_listener(&mut exec, &update_sender, &mut serve_listeners);
         let _ = test_utils::ack_next_status_update(&mut exec, &mut l2_stream, &mut serve_listeners);
 
         // Send an update to both listeners.
@@ -311,7 +311,7 @@ mod tests {
         };
         test_utils::broadcast_update(
             &mut exec,
-            &mut update_sender,
+            &update_sender,
             update.clone(),
             &mut serve_listeners,
         );
@@ -328,7 +328,7 @@ mod tests {
         };
         test_utils::broadcast_update(
             &mut exec,
-            &mut update_sender,
+            &update_sender,
             update.clone(),
             &mut serve_listeners,
         );
@@ -361,7 +361,7 @@ mod tests {
         };
         test_utils::broadcast_update(
             &mut exec,
-            &mut update_sender,
+            &update_sender,
             update.clone(),
             &mut serve_listeners,
         );

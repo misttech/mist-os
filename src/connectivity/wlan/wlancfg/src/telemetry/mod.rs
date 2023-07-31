@@ -7583,7 +7583,7 @@ mod tests {
                         respond_iface_counter_stats_req(
                             &mut self.exec,
                             telemetry_svc_stream,
-                            &mut self.counter_stats_resp,
+                            &self.counter_stats_resp,
                         );
                     }
                 }
@@ -7674,7 +7674,7 @@ mod tests {
     fn respond_iface_counter_stats_req(
         executor: &mut fasync::TestExecutor,
         telemetry_svc_stream: &mut fidl_fuchsia_wlan_sme::TelemetryRequestStream,
-        counter_stats_resp: &mut Option<
+        counter_stats_resp: &Option<
             Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetCounterStatsResult>,
         >,
     ) {
