@@ -25,6 +25,48 @@ impl From<sys::zx_info_task_runtime_t> for TaskRuntimeInfo {
     }
 }
 
+impl std::ops::Add for TaskRuntimeInfo {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            cpu_time: self.cpu_time + rhs.cpu_time,
+            queue_time: self.queue_time + rhs.queue_time,
+            page_fault_time: self.page_fault_time + rhs.page_fault_time,
+            lock_contention_time: self.lock_contention_time + rhs.lock_contention_time,
+        }
+    }
+}
+
+impl std::ops::AddAssign for TaskRuntimeInfo {
+    fn add_assign(&mut self, rhs: Self) {
+        self.cpu_time += rhs.cpu_time;
+        self.queue_time += rhs.queue_time;
+        self.page_fault_time += rhs.page_fault_time;
+        self.lock_contention_time += rhs.lock_contention_time;
+    }
+}
+
+impl std::ops::Sub for TaskRuntimeInfo {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            cpu_time: self.cpu_time - rhs.cpu_time,
+            queue_time: self.queue_time - rhs.queue_time,
+            page_fault_time: self.page_fault_time - rhs.page_fault_time,
+            lock_contention_time: self.lock_contention_time - rhs.lock_contention_time,
+        }
+    }
+}
+
+impl std::ops::SubAssign for TaskRuntimeInfo {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.cpu_time -= rhs.cpu_time;
+        self.queue_time -= rhs.queue_time;
+        self.page_fault_time -= rhs.page_fault_time;
+        self.lock_contention_time -= rhs.lock_contention_time;
+    }
+}
+
 unsafe impl ObjectQuery for TaskRuntimeInfo {
     const TOPIC: Topic = Topic::TASK_RUNTIME;
     type InfoTy = TaskRuntimeInfo;
