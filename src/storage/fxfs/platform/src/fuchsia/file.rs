@@ -748,7 +748,12 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions { format: false, as_blob: false, encrypted: true },
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
         )
         .await;
         let root = fixture.root();
@@ -787,7 +792,12 @@ mod tests {
         let reused_device = {
             let fixture = TestFixture::open(
                 DeviceHolder::new(device),
-                TestFixtureOptions { format: true, as_blob: false, encrypted: true },
+                TestFixtureOptions {
+                    format: true,
+                    as_blob: false,
+                    encrypted: true,
+                    serve_volume: false,
+                },
             )
             .await;
             let root = fixture.root();
@@ -816,7 +826,12 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions { format: false, as_blob: false, encrypted: true },
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
         )
         .await;
         let root = fixture.root();
@@ -845,7 +860,12 @@ mod tests {
         for i in 0..2 {
             let fixture = TestFixture::open(
                 device,
-                TestFixtureOptions { format: i == 0, as_blob: false, encrypted: true },
+                TestFixtureOptions {
+                    format: i == 0,
+                    as_blob: false,
+                    encrypted: true,
+                    serve_volume: false,
+                },
             )
             .await;
             let root = fixture.root();

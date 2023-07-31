@@ -32,53 +32,11 @@ impl BlobDirectory {
 mod tests {
     use {
         super::*,
-        crate::fuchsia::fxblob::testing::new_blob_fixture,
-        delivery_blob::{CompressionMode, Type1Blob},
+        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
         fidl_fuchsia_io::{self as fio},
         fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_merkle::MerkleTreeBuilder,
     };
-
-    /// Write a blob using BlobCreator API and return its hash.
-    async fn write_blob(
-        blob_volume_outgoing_dir: &fio::DirectoryProxy,
-        data: &[u8],
-    ) -> Result<Hash, Error> {
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
-        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
-        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
-            &blob_volume_outgoing_dir,
-        )
-        .expect("failed to connect to the BlobCreator service");
-        let blob_writer_client_end = blob_proxy
-            .create(&hash.into(), false)
-            .await
-            .expect("transport error on create")
-            .expect("failed to create blob");
-
-        let writer = blob_writer_client_end.into_proxy().unwrap();
-        let vmo = writer
-            .get_vmo(compressed_data.len() as u64)
-            .await
-            .expect("transport error on get_vmo")
-            .expect("failed to get vmo");
-
-        let vmo_size = vmo.get_size().expect("failed to get vmo size") as usize;
-        let mut offset = 0;
-        for chunk in compressed_data.chunks(vmo_size / 2) {
-            vmo.write(chunk, (offset % vmo_size) as u64).expect("failed to write to vmo");
-            let _ = writer
-                .bytes_ready(chunk.len() as u64)
-                .await
-                .expect("transport error on bytes_ready")
-                .expect("failed to write data to vmo");
-            offset += chunk.len();
-        }
-        Ok(hash)
-    }
 
     /// Read a blob using BlobReader API and return its contents as a boxed slice.
     async fn read_blob(
@@ -104,38 +62,26 @@ mod tests {
     #[fasync::run(10, test)]
     async fn test_blob_reader() {
         let fixture = new_blob_fixture().await;
-        let (blob_volume_outgoing_dir, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .expect("Create dir proxy to succeed");
-        fixture
-            .volumes_directory()
-            .serve_volume(fixture.volume(), server_end, true)
-            .await
-            .expect("failed to serve the blob volume");
-
-        let empty_blob_hash =
-            write_blob(&blob_volume_outgoing_dir, &[]).await.expect("write empty blob");
+        let empty_blob_hash = fixture.write_blob(&[]).await;
         let short_data = b"This is some data";
-        let short_blob_hash =
-            write_blob(&blob_volume_outgoing_dir, short_data).await.expect("write short blob");
+        let short_blob_hash = fixture.write_blob(short_data).await;
         let long_data = &[0x65u8; 30000];
-        let long_blob_hash =
-            write_blob(&blob_volume_outgoing_dir, long_data).await.expect("write long blob");
+        let long_blob_hash = fixture.write_blob(long_data).await;
 
         assert_eq!(
-            &*read_blob(&blob_volume_outgoing_dir, empty_blob_hash).await.expect("read empty"),
+            &*read_blob(fixture.volume_out_dir(), empty_blob_hash).await.expect("read empty"),
             &[0u8; 0]
         );
         assert_eq!(
-            &*read_blob(&blob_volume_outgoing_dir, short_blob_hash).await.expect("read short"),
+            &*read_blob(fixture.volume_out_dir(), short_blob_hash).await.expect("read short"),
             short_data
         );
         assert_eq!(
-            &*read_blob(&blob_volume_outgoing_dir, long_blob_hash).await.expect("read long"),
+            &*read_blob(fixture.volume_out_dir(), long_blob_hash).await.expect("read long"),
             long_data
         );
         let missing_hash = Hash::from([0x77u8; 32]);
-        assert!(read_blob(&blob_volume_outgoing_dir, missing_hash).await.is_err());
+        assert!(read_blob(fixture.volume_out_dir(), missing_hash).await.is_err());
 
         fixture.close().await;
     }

@@ -558,7 +558,6 @@ mod tests {
             fixture
                 .volumes_directory()
                 .serve_volume(fixture.volume(), server_end, true)
-                .await
                 .expect("failed to serve blob volume");
             let blob_proxy =
                 connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
@@ -631,7 +630,6 @@ mod tests {
             fixture
                 .volumes_directory()
                 .serve_volume(fixture.volume(), server_end, true)
-                .await
                 .expect("failed to serve blob volume");
             let blob_proxy =
                 connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(

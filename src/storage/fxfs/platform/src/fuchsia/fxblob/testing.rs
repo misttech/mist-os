@@ -10,6 +10,7 @@ use {
     async_trait::async_trait,
     blob_writer::BlobWriter,
     delivery_blob::{CompressionMode, Type1Blob},
+    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobWriterProxy, CreateBlobError},
     fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
@@ -20,17 +21,21 @@ use {
 pub async fn new_blob_fixture() -> TestFixture {
     TestFixture::open(
         DeviceHolder::new(FakeDevice::new(16384, 512)),
-        TestFixtureOptions { encrypted: false, as_blob: true, format: true },
+        TestFixtureOptions { encrypted: false, as_blob: true, format: true, serve_volume: true },
     )
     .await
 }
 
-// TODO(fxbug.dev/125334): Support using the new write API in this fixture.
 #[async_trait]
 pub trait BlobFixture {
     async fn write_blob(&self, data: &[u8]) -> Hash;
     async fn read_blob(&self, name: &str) -> Vec<u8>;
     async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume>;
+    async fn create_blob(
+        &self,
+        hash: &[u8; 32],
+        allow_existing: bool,
+    ) -> Result<BlobWriterProxy, CreateBlobError>;
 }
 
 #[async_trait]
@@ -40,27 +45,7 @@ impl BlobFixture for TestFixture {
         builder.write(&data);
         let hash = builder.finish().root();
         let delivery_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Never);
-
-        let (blob_volume_outgoing_dir, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .expect("Create dir proxy to succeed");
-
-        self.volumes_directory()
-            .serve_volume(self.volume(), server_end, true)
-            .await
-            .expect("failed to serve the blob volume");
-        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
-            &blob_volume_outgoing_dir,
-        )
-        .expect("failed to connect to the Blob service");
-
-        let blob_writer_client_end = blob_proxy
-            .create(&hash.into(), false)
-            .await
-            .expect("transport error on create")
-            .expect("failed to create blob");
-
-        let writer = blob_writer_client_end.into_proxy().unwrap();
+        let writer = self.create_blob(&hash.into(), false).await.expect("failed to create blob");
         let mut blob_writer = BlobWriter::create(writer, delivery_data.len() as u64)
             .await
             .expect("failed to create BlobWriter");
@@ -93,5 +78,17 @@ impl BlobFixture for TestFixture {
         ObjectStore::open_object(self.volume().volume(), object_id, HandleOptions::default(), None)
             .await
             .expect("open_object failed")
+    }
+
+    async fn create_blob(
+        &self,
+        hash: &[u8; 32],
+        allow_existing: bool,
+    ) -> Result<BlobWriterProxy, CreateBlobError> {
+        let blob_proxy = connect_to_protocol_at_dir_svc::<BlobCreatorMarker>(self.volume_out_dir())
+            .expect("failed to connect to the BlobCreator service");
+        let blob_writer =
+            blob_proxy.create(hash, allow_existing).await.expect("transport error on create")?;
+        Ok(blob_writer.into_proxy().expect("into_proxy failed"))
     }
 }

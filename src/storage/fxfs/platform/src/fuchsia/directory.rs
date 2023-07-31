@@ -926,7 +926,12 @@ mod tests {
         for i in 0..2 {
             let fixture = TestFixture::open(
                 device,
-                TestFixtureOptions { format: i == 0, encrypted: true, as_blob: false },
+                TestFixtureOptions {
+                    format: i == 0,
+                    encrypted: true,
+                    as_blob: false,
+                    serve_volume: false,
+                },
             )
             .await;
             let root = fixture.root();

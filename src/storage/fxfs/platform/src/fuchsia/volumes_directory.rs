@@ -262,7 +262,7 @@ impl VolumesDirectory {
     }
 
     /// Serves the given volume on `outgoing_dir_server_end`.
-    pub async fn serve_volume(
+    pub fn serve_volume(
         self: &Arc<Self>,
         volume: &FxVolumeAndRoot,
         outgoing_dir_server_end: ServerEnd<fio::DirectoryMarker>,
@@ -374,9 +374,7 @@ impl VolumesDirectory {
             None
         };
         let volume = self.create_and_mount_volume(&name, crypt, as_blob).await?;
-        self.serve_volume(&volume, outgoing_directory, as_blob)
-            .await
-            .context("failed to serve volume")
+        self.serve_volume(&volume, outgoing_directory, as_blob).context("failed to serve volume")
     }
 
     async fn handle_volume_requests(
@@ -528,7 +526,6 @@ impl VolumesDirectory {
             .await
             .context("failed to mount volume")?;
         self.serve_volume(&volume, outgoing_directory, options.as_blob)
-            .await
             .context("failed to serve volume")
     }
 
@@ -1192,10 +1189,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
 
-        volumes_directory
-            .serve_volume(&vol, dir_server_end, false)
-            .await
-            .expect("serve_volume failed");
+        volumes_directory.serve_volume(&vol, dir_server_end, false).expect("serve_volume failed");
 
         let admin_proxy = connect_to_protocol_at_dir_svc::<AdminMarker>(&dir_proxy)
             .expect("Unable to connect to admin service");
@@ -1306,7 +1300,6 @@ mod tests {
                     .expect("Create dir proxy to succeed");
             volumes_directory
                 .serve_volume(&volume, dir_server_end, false)
-                .await
                 .expect("serve_volume failed");
 
             let (volume_proxy, volume_server_end) =

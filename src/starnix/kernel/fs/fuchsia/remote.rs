@@ -1291,7 +1291,12 @@ mod test {
 
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions { encrypted: true, as_blob: false, format: false },
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
         )
         .await;
 

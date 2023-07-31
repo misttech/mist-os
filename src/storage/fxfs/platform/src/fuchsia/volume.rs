@@ -1186,7 +1186,6 @@ mod tests {
                     .expect("Create dir proxy to succeed");
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
-                .await
                 .expect("serve_volume failed");
 
             let project_proxy =
@@ -1312,7 +1311,6 @@ mod tests {
                         .expect("Create dir proxy to succeed");
                 volumes_directory
                     .serve_volume(&volume_and_root, dir_server_end, false)
-                    .await
                     .expect("serve_volume failed");
 
                 connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
@@ -1371,7 +1369,6 @@ mod tests {
                 .expect("Create dir proxy to succeed");
         volumes_directory
             .serve_volume(&volume_and_root, dir_server_end, false)
-            .await
             .expect("serve_volume failed");
         let project_proxy = connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
             .expect("Unable to connect to project id service");
@@ -1425,7 +1422,6 @@ mod tests {
                     .expect("Create dir proxy to succeed");
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
-                .await
                 .expect("serve_volume failed");
 
             let project_proxy =
@@ -1560,7 +1556,6 @@ mod tests {
                         .expect("Create dir proxy to succeed");
                 volumes_directory
                     .serve_volume(&volume_and_root, dir_server_end, false)
-                    .await
                     .expect("serve_volume failed");
 
                 let (root_proxy, root_server_end) =
@@ -1733,7 +1728,6 @@ mod tests {
                     .expect("Create dir proxy to succeed");
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
-                .await
                 .expect("serve_volume failed");
 
             let project_proxy =
@@ -1872,7 +1866,6 @@ mod tests {
                     .expect("Create dir proxy to succeed");
             volumes_directory
                 .serve_volume(&volume_and_root, dir_server_end, false)
-                .await
                 .expect("serve_volume failed");
             let project_proxy =
                 connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
