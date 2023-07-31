@@ -1186,9 +1186,39 @@ pub struct Document {
 
 impl<T> Canonicalize for Vec<T>
 where
-    T: Canonicalize + CapabilityClause,
+    T: Canonicalize + CapabilityClause + PathClause,
 {
     fn canonicalize(&mut self) {
+        // Collapse like-entries into one. Like entries are those that are equal in all fields
+        // but their capability names. Accomplish this by collecting all the names into a vector
+        // keyed by an instance of T with its names removed.
+        let mut to_merge: Vec<(T, Vec<Name>)> = vec![];
+        let mut to_keep: Vec<T> = vec![];
+        self.iter().for_each(|c| {
+            // Any entry with a `path` set cannot be merged with another.
+            if !c.are_many_names_allowed() || c.path().is_some() {
+                to_keep.push(c.clone());
+                return;
+            }
+            let mut names = c.names();
+            let mut copy = c.clone();
+            copy.set_names(vec![Name::from_str("a").unwrap()]); // The name here is arbitrary.
+            let r = to_merge.iter().position(|(t, _)| t == &copy);
+            match r {
+                Some(i) => to_merge[i].1.append(&mut names),
+                None => to_merge.push((copy, names)),
+            };
+        });
+        let mut merged = to_merge
+            .into_iter()
+            .map(|(mut t, names)| {
+                t.set_names(names);
+                t
+            })
+            .collect::<Vec<_>>();
+        to_keep.append(&mut merged);
+        *self = to_keep;
+
         self.iter_mut().for_each(|c| c.canonicalize());
         self.sort_by(|a, b| {
             // Sort by capability type, then by the name of the first entry for
@@ -2808,6 +2838,9 @@ pub trait CapabilityClause: Clone + PartialEq {
     /// Panics if a capability keyword is not set.
     fn capability_type(&self) -> &'static str;
 
+    /// Returns true if this capability type allows the ::Many variant of OneOrMany.
+    fn are_many_names_allowed(&self) -> bool;
+
     fn decl_type(&self) -> &'static str;
     fn supported(&self) -> &[&'static str];
 
@@ -2827,6 +2860,33 @@ pub trait CapabilityClause: Clone + PartialEq {
             .map(|o| o.map(|o| o.into_iter().collect::<Vec<Name>>()).unwrap_or(vec![]))
             .flatten()
             .collect()
+    }
+
+    fn set_names(&mut self, names: Vec<Name>) {
+        let names = if names.len() == 1 {
+            OneOrMany::One(names.first().unwrap().clone())
+        } else {
+            OneOrMany::Many(names)
+        };
+
+        let cap_type = self.capability_type();
+        if cap_type == "protocol" {
+            self.set_protocol(Some(names));
+        } else if cap_type == "service" {
+            self.set_service(Some(names));
+        } else if cap_type == "directory" {
+            self.set_directory(Some(names));
+        } else if cap_type == "storage" {
+            self.set_storage(Some(names));
+        } else if cap_type == "runner" {
+            self.set_runner(Some(names));
+        } else if cap_type == "resolver" {
+            self.set_resolver(Some(names));
+        } else if cap_type == "event_stream" {
+            self.set_event_stream(Some(names));
+        } else {
+            panic!("Unknown capability type {}", cap_type);
+        }
     }
 }
 
@@ -2945,6 +3005,9 @@ impl CapabilityClause for Capability {
     fn supported(&self) -> &[&'static str] {
         &["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
     }
+    fn are_many_names_allowed(&self) -> bool {
+        ["service", "protocol", "event_stream"].contains(&self.capability_type())
+    }
 }
 
 impl AsClause for Capability {
@@ -3021,6 +3084,9 @@ impl CapabilityClause for DebugRegistration {
     }
     fn supported(&self) -> &[&'static str] {
         &["service", "protocol"]
+    }
+    fn are_many_names_allowed(&self) -> bool {
+        ["protocol"].contains(&self.capability_type())
     }
 }
 
@@ -3126,6 +3192,9 @@ impl CapabilityClause for Use {
     }
     fn supported(&self) -> &[&'static str] {
         &["service", "protocol", "directory", "storage", "event_stream"]
+    }
+    fn are_many_names_allowed(&self) -> bool {
+        ["service", "protocol", "event_stream"].contains(&self.capability_type())
     }
 }
 
@@ -3251,6 +3320,10 @@ impl CapabilityClause for Expose {
     }
     fn supported(&self) -> &[&'static str] {
         &["service", "protocol", "directory", "runner", "resolver", "event_stream"]
+    }
+    fn are_many_names_allowed(&self) -> bool {
+        ["service", "protocol", "directory", "runner", "resolver", "event_stream"]
+            .contains(&self.capability_type())
     }
 }
 
@@ -3384,6 +3457,10 @@ impl CapabilityClause for Offer {
     }
     fn supported(&self) -> &[&'static str] {
         &["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
+    }
+    fn are_many_names_allowed(&self) -> bool {
+        ["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
+            .contains(&self.capability_type())
     }
 }
 
@@ -4212,19 +4289,27 @@ mod tests {
             // Will have entries sorted by capability type, then
             // by capability name (using the first entry in Many cases).
             "capabilities": [
-                // Will be transformed to the "one" form
+                // Will be merged with "bar"
                 { "protocol": ["foo"] },
-                { "protocol": "bar" },  // Will appear before protocol: foo
+                { "protocol": "bar" },
+                // Will not be merged, but will be sorted before "bar"
+                { "protocol": "arg", "path": "/arg" },
                 // Will have list of names sorted
                 { "service": ["b", "a"] },
                 // Will have list of names sorted
                 { "event_stream": ["b", "a"] },
                 { "runner": "myrunner" },
+                // The following two will *not* be merged, because they have a `path`.
+                { "runner": "mypathrunner1", "path": "/foo" },
+                { "runner": "mypathrunner2", "path": "/foo" },
             ],
             // Same rules as for "capabilities".
             "offer": [
+                // Will be sorted after "bar"
+                { "protocol": "baz", "from": "#a_child", "to": "#c_child"  },
+                // The following two entries will be merged
                 { "protocol": ["foo"], "from": "#a_child", "to": "#b_child"  },
-                { "protocol": "bar", "from": "#a_child", "to": "#b_child"  },  // Will appear before protocol: foo
+                { "protocol": "bar", "from": "#a_child", "to": "#b_child"  },
                 // Will have list of names sorted
                 { "service": ["b", "a"], "from": "#a_child", "to": "#b_child"  },
                 // Will have list of names sorted
@@ -4254,9 +4339,11 @@ mod tests {
                 { "directory": [ "b" ], "from": "#a_child" },
             ],
             "use": [
-                // Will be transformed to the "one" form
+                // Will be sorted after "baz"
+                { "protocol": ["zazzle"], "path": "/zazbaz" },
+                // These will be merged
                 { "protocol": ["foo"] },
-                { "protocol": "bar" },  // Will appear before protocol: foo
+                { "protocol": "bar" },
                 // Will have list of names sorted
                 { "service": ["b", "a"] },
                 // Will have list of names sorted
@@ -4282,15 +4369,17 @@ mod tests {
                 ],
                 "capabilities": [
                     { "event_stream": ["a", "b"] },
-                    { "protocol": "bar" },
-                    { "protocol": "foo" },
+                    { "protocol": "arg", "path": "/arg" },
+                    { "protocol": ["bar", "foo"] },
+                    { "runner": "mypathrunner1", "path": "/foo" },
+                    { "runner": "mypathrunner2", "path": "/foo" },
                     { "runner": "myrunner" },
                     { "service": ["a", "b"] },
                 ],
                 "use": [
                     { "event_stream": ["a", "b"], "scope": ["#a", "#b"] },
-                    { "protocol": "bar" },
-                    { "protocol": "foo" },
+                    { "protocol": ["bar", "foo"] },
+                    { "protocol": "zazzle", "path": "/zazbaz" },
                     { "service": ["a", "b"] },
                 ],
                 "offer": [
@@ -4301,10 +4390,9 @@ mod tests {
                         "to": "#b_child",
                         "scope": ["#a", "#b", "#c"],
                     },
-                    { "protocol": "bar", "from": "#a_child", "to": "#b_child" },
-                    { "protocol": "foo", "from": "#a_child", "to": "#b_child" },
-                    { "runner": [ "a", "myrunner" ], "from": "#a_child", "to": "#b_child" },
-                    { "runner": "b", "from": "#a_child", "to": "#b_child" },
+                    { "protocol": ["bar", "foo"], "from": "#a_child", "to": "#b_child" },
+                    { "protocol": "baz", "from": "#a_child", "to": "#c_child"  },
+                    { "runner": [ "a", "b", "myrunner" ], "from": "#a_child", "to": "#b_child" },
                     { "service": ["a", "b"], "from": "#a_child", "to": "#b_child" },
                 ],
                 "expose": [
@@ -4314,10 +4402,8 @@ mod tests {
                         "from": "#a_child",
                         "scope": ["#a", "#b", "#c"],
                     },
-                    { "protocol": "bar", "from": "#a_child" },
-                    { "protocol": "foo", "from": "#a_child" },
-                    { "runner": [ "a", "myrunner" ], "from": "#a_child" },
-                    { "runner": "b", "from": "#a_child" },
+                    { "protocol": ["bar", "foo"], "from": "#a_child" },
+                    { "runner": [ "a", "b", "myrunner" ], "from": "#a_child" },
                     { "service": ["a", "b"], "from": "#a_child" },
                 ],
             }))
