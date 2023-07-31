@@ -115,7 +115,7 @@ assembly_generate_fvm_fastboot = true
 board_is_emu = false
 board_is_phys = true
 
-images_config_label = "//boards/images:vim3"
+images_config_label = "//boards/images:default"
 partitions_config_label = "//boards/partitions:vim3"
 partitions_config_contents +=
     [ "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned" ]

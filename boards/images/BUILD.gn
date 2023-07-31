@@ -4,153 +4,26 @@
 
 import("//build/assembly/generated_images_config.gni")
 
-#################################
-# Fuchsia images configurations #
-#################################
-
-_default_zbi = {
+generated_images_config("default") {
   zbi = {
     name = "fuchsia"
-    compression = "zstd"
   }
-}
-
-_default_vbmeta = {
-  vbmeta = {
-    key = "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
-    key_metadata =
-        "//third_party/android/platform/external/avb/test/data/atx_metadata.bin"
-  }
-}
-
-_vim3_vbmeta = {
-  vbmeta = {
-    key = "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
-    key_metadata =
-        "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
-  }
-}
-
-_default_fvm = {
   fvm = {
-    slice_size = 8388608
-    blobfs = {
-      layout = "compact"
-    }
-    reserved = {
-      slices = 0
-    }
   }
 }
 
-_default_fxfs = {
+generated_images_config("default-fxfs") {
+  zbi = {
+    name = "fuchsia"
+  }
   fxfs = {
-  }
-}
-
-_default_fvm_with_size_limits = {
-  fvm = {
-    slice_size = 8388608
-    blobfs = {
-      layout = "compact"
-      maximum_contents_size = 5216665600
-    }
-    reserved = {
-      slices = 0
-    }
-  }
-}
-
-generated_images_config("default") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  forward_variables_from(_default_fvm, "*")
-}
-
-generated_images_config("arm64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-}
-
-generated_images_config("riscv64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_fvm, "*")
-}
-
-generated_images_config("x64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  fvm.emmc = {
-    # TODO(fxbug.dev/68692): finish implementing decompression in Gigaboot so we
-    # can compress here to speed up FVM transmission.k
-    compress = false
-
-    # TODO(fxbug.dev/78185): don't hardcode the expected size, we should instead
-    # inflate to whatever the FVM partition size is at runtime.
-    #
-    # For now just hardcode 16GiB which is the minimum FVM partition size defined
-    # in the x64 paver.
-    #
-    # This also assumes we are not using raw NAND but that's a safer assumption.
-    # In this case "emmc" is a misnomer, it really just means "not raw NAND".
-    truncate_to_length = 17179869184
-  }
-}
-
-generated_images_config("x64-fxfs") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-  forward_variables_from(_default_fxfs, "*")
-}
-
-generated_images_config("qemu-x64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_fvm, "*")
-}
-
-generated_images_config("qemu-arm64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-}
-
-generated_images_config("qemu-riscv64") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-}
-
-# NOTE: if you touch this target, please add this line to your commit
-# description so that the vim3 tests are run as we do not run vim3 tests in CQ
-# by default.
-# Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
-generated_images_config("vim3") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_vim3_vbmeta, "*")
-  forward_variables_from(_default_fvm_with_size_limits, "*")
-
-  fvm.emmc = {
-    compress = true
-
-    # For VIM3, FVM partition uses all of the remaining eMMC. However, the total size of the eMMC
-    # storage maybe 16G or 32G depending on whether it is a basic or pro version. In addition,
-    # the actual size of the user block allocated by Fuchsia can be further different. (i.e. 'lsblk'
-    # shows a 29G size user block for the 32Gb version). To avoid the risk of overflowing
-    # available size, here we set it to be the same as sherlock (3280mb), which is clearly safe
-    # and sufficient for now.
-    truncate_to_length = 3439329280
   }
 }
 
 group("images") {
   public_deps = [
     # Fuchsia images configs
-    ":arm64",
     ":default",
-    ":qemu-x64",
-    ":vim3",
-    ":x64",
-    ":x64-fxfs",
+    ":default-fxfs",
   ]
 }

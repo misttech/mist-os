@@ -86,7 +86,7 @@ fastboot_product = "gigaboot"
 # Supports both physical and virtual devices.
 board_is_emu = true
 
-images_config_label = "//boards/images:x64"
+images_config_label = "//boards/images:default"
 partitions_config_label = "//boards/partitions:x64"
 partitions_config_contents += [ "$root_build_dir/fuchsia.esp.blk" ]
 
