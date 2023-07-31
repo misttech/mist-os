@@ -38,3 +38,6 @@ extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]
 
 assembly_fshost = true
+
+# Packages to be published to universe that do not go through assembly.
+discoverable_package_labels += [ "//src/developer/debug/debug_agent" ]

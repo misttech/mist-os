@@ -5,11 +5,6 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-# Set manually to true to compile helper executables for manual debugger
-# testing of various conditions. Use `ffx component explore /core/debug_agent`
-# to run these executables.
-include_helper_executables = false
-
 static_library("lib") {
   sources = [
     "align.cc",
@@ -183,22 +178,27 @@ executable("zxdb_test_app") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-  public_deps = [ ":debug_agent" ]
-}
+if (current_cpu == "riscv64") {
+  # TODO(https://fxbug.dev/123097): remove this empty group
+  group("debug_agent") {
+  }
+} else {
+  fuchsia_package("debug_agent") {
+    deps = [ ":debug_agent-component" ]
 
-fuchsia_package("debug_agent") {
-  deps = [ ":debug_agent-component" ]
+    # Set manually to true to compile helper executables for manual debugger
+    # testing of various conditions. Use `ffx component explore /core/debug_agent`
+    # to run these executables.
+    include_helper_executables = false
 
-  if (include_helper_executables) {
-    # These executables are not used by tests or the agent, but are useful for
-    # replicating behaviour in development.
-    deps += [
-      ":zxdb_test_app",
-      "test_data:helper_executables",
-    ]
+    if (include_helper_executables) {
+      # These executables are not used by tests or the agent, but are useful for
+      # replicating behaviour in development.
+      deps += [
+        ":zxdb_test_app",
+        "test_data:helper_executables",
+      ]
+    }
   }
 }
 

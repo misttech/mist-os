@@ -42,10 +42,6 @@ bazel_product_bundle_prefix = "//products/workbench:workbench_eng"
 fuchsia_product_assembly_config_label = "//products/minimal"
 fuchsia_filesystem_config = "//boards/images:default"
 
-# Package to be published to universe that do not go through assembly.
-discoverable_package_labels +=
-    [ "//src/developer/debug/debug_agent:for_transition" ]
-
 # Kernel command line arguments.
 product_bootfs_labels += [
   "//products/kernel_cmdline:oom.reboot-timeout--low",
@@ -82,4 +78,7 @@ legacy_base_package_labels += [
   "//src/connectivity:tools",
   "//src/diagnostics/log_listener:log_listener_shell",
 ]
+
+# Debugging support
+discoverable_package_labels += [ "//src/developer/debug/debug_agent" ]
 # END: Baseline eng support

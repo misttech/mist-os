@@ -120,7 +120,7 @@ if (is_fuchsia) {
     "//src/connectivity/wlan/wlancfg/tool:for_transition",
 
     # Device side of zxdb & fidlcat:
-    "//src/developer/debug/debug_agent:for_transition",
+    "//src/developer/debug/debug_agent",
   ]
   core_realm_testing_aib_pkgs = [
     # SL4F for infra testing
