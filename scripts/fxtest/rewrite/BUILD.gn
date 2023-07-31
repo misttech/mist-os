@@ -49,44 +49,24 @@ if (is_host) {
     deps = binary_deps
   }
 
-  python_host_test("selection_test") {
-    main_source = "tests/selection_test.py"
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-    sources = binary_sources
-    libraries = binary_deps
-  }
+  main_module_tests = [
+    "args",
+    "event",
+    "selection",
+    "test_list_file",
+    "tests_json_file",
+  ]
 
-  python_host_test("test_list_file_test") {
-    main_source = "tests/test_list_file_test.py"
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-    sources = binary_sources
-    libraries = binary_deps
-  }
-
-  python_host_test("tests_json_file_test") {
-    main_source = "tests/tests_json_file_test.py"
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-    sources = binary_sources
-    libraries = binary_deps
-  }
-
-  python_host_test("event_test") {
-    main_source = "tests/event_test.py"
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-    sources = binary_sources
-    libraries = binary_deps
-  }
-
-  python_host_test("args_test") {
-    main_source = "tests/args_test.py"
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-    sources = binary_sources
-    libraries = binary_deps
+  foreach(test_name, main_module_tests) {
+    target = "${test_name}_test"
+    main_source = "tests/${test_name}_test.py"
+    python_host_test(target) {
+      main_source = main_source
+      main_callable = "unittest.main"
+      extra_args = [ "-v" ]
+      sources = binary_sources
+      libraries = binary_deps
+    }
   }
 
   # Rename the resulting .pyz for the host tool
