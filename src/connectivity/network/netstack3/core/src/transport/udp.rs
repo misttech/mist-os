@@ -52,8 +52,8 @@ use crate::{
         datagram::{
             self, AddrEntry, BoundSockets as DatagramBoundSockets, ConnState, ConnectError,
             DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec,
-            DatagramStateContext, ExpectedConnError, ExpectedUnboundError, FoundSockets,
-            InUseError, ListenerState, LocalIdentifierAllocator,
+            DatagramStateContext, EitherIpSocket, ExpectedConnError, ExpectedUnboundError,
+            FoundSockets, InUseError, ListenerState, LocalIdentifierAllocator,
             MulticastMembershipInterfaceSelector, SendError as DatagramSendError,
             SetMulticastMembershipError, Shutdown, ShutdownType, SocketHopLimits,
             SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
@@ -348,8 +348,8 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
 }
 
 impl<I: IpExt, D: Id> SocketMapStateSpec for (Udp, I, D) {
-    type ListenerId = SocketId<I>;
-    type ConnId = SocketId<I>;
+    type ListenerId = I::DualStackReceivingId<Udp>;
+    type ConnId = I::DualStackReceivingId<Udp>;
 
     type AddrVecTag = AddrVecTag;
 
@@ -406,6 +406,13 @@ impl DatagramSocketSpec for Udp {
 
     type Serializer<I: Ip, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
 
+    fn make_receiving_map_id<I: IpExt, D: WeakId>(
+        s: Self::SocketId<I>,
+    ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::ReceivingId
+    {
+        I::dual_stack_receiver(s)
+    }
+
     fn make_packet<I: Ip, B: BufferMut>(
         body: B,
         addr: &ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
@@ -428,12 +435,12 @@ impl DatagramSocketSpec for Udp {
 }
 
 impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IpPortSpec> for (Udp, I, D) {
-    type ReceivingId = SocketId<I>;
+    type ReceivingId = I::DualStackReceivingId<Udp>;
 }
 
-enum LookupResult<'a, I: Ip, D: Id> {
-    Conn(&'a SocketId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
-    Listener(&'a SocketId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
+enum LookupResult<'a, I: IpExt, D: Id> {
+    Conn(&'a I::DualStackReceivingId<Udp>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
+    Listener(&'a I::DualStackReceivingId<Udp>, ListenerAddr<I::Addr, D, NonZeroU16>),
 }
 
 #[derive(Hash, Copy, Clone)]
@@ -669,6 +676,8 @@ fn lookup<'s, I: Ip + IpExt, D: WeakId>(
     .into_iter()
     .filter(|lookup_result| match lookup_result {
         LookupResult::Conn(id, _) => {
+            let id = assert_is_ip_socket::<I>(*id);
+
             let (
                 ConnState {
                     socket: _,
@@ -677,13 +686,31 @@ fn lookup<'s, I: Ip + IpExt, D: WeakId>(
                 },
                 _sharing,
                 _addr,
-            ) = assert_matches!(state.get_socket_state(&id).expect("socket ID is valid"),
+            ) = assert_matches!(state.get_socket_state(id).expect("socket ID is valid"),
                 DatagramSocketState::Bound(DatagramBoundSocketState::Connected(state)) => state
             );
             !shutdown_receive
         }
         LookupResult::Listener(_, _) => true,
     })
+}
+
+// TODO(https://fxbug.dev/21198): Remove this function before making it possible
+// to insert IPv6 sockets into the IPv4 map.
+fn assert_is_ip_socket<I: Ip + IpExt>(id: &I::DualStackReceivingId<Udp>) -> &SocketId<I> {
+    #[derive(GenericOverIp)]
+    struct RxIdWrapper<'a, I: Ip + IpExt>(&'a I::DualStackReceivingId<Udp>);
+    I::map_ip(
+        RxIdWrapper(id),
+        |RxIdWrapper(id)| {
+            assert_matches!(
+                id, EitherIpSocket::V4(id) => id,
+                "TODO(https://fxbug.dev/21198): deliver IPv4 packets
+                to IPv6 sockets"
+            )
+        },
+        |RxIdWrapper(id)| id,
+    )
 }
 
 /// Helper function to allocate a listen port.
@@ -1004,6 +1031,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
                     let id = match id {
                         LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
                     };
+                    let id = assert_is_ip_socket::<I>(id);
                     ctx.receive_icmp_error(*id, err);
                 } else {
                     trace!(
@@ -1075,14 +1103,17 @@ impl<
                                 device: _,
                             },
                         ) => ctx.receive_udp(
-                            *id,
+                            *assert_is_ip_socket::<I>(id),
                             dst_ip.get(),
                             (remote_ip.get(), Some(remote_port)),
                             &buffer,
                         ),
-                        LookupResult::Listener(id, _) => {
-                            ctx.receive_udp(*id, dst_ip.get(), (src_ip, src_port), &buffer)
-                        }
+                        LookupResult::Listener(id, _) => ctx.receive_udp(
+                            *assert_is_ip_socket::<I>(id),
+                            dst_ip.get(),
+                            (src_ip, src_port),
+                            &buffer,
+                        ),
                     }
                 }
                 Ok(())
@@ -6354,12 +6385,12 @@ where {
         let mut try_insert = |(index, (addr, options))| match addr {
             AddrVec::Conn(c) => map
                 .conns_mut()
-                .try_insert(c, options, SocketId::from(index))
+                .try_insert(c, options, EitherIpSocket::V4(SocketId::from(index)))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
             AddrVec::Listen(l) => map
                 .listeners_mut()
-                .try_insert(l, options, SocketId::from(index))
+                .try_insert(l, options, EitherIpSocket::V4(SocketId::from(index)))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
         };
@@ -6409,13 +6440,23 @@ where {
                 .map(|(socket_index, (addr, options))| match addr {
                     AddrVec::Conn(c) => map
                         .conns_mut()
-                        .try_insert(c, options, SocketId::from(socket_index))
-                        .map(|entry| Socket::Conn(entry.id().clone(), entry.get_addr().clone()))
+                        .try_insert(c, options, EitherIpSocket::V4(SocketId::from(socket_index)))
+                        .map(|entry| {
+                            Socket::Conn(
+                                assert_is_ip_socket::<Ipv4>(&entry.id()).clone(),
+                                entry.get_addr().clone(),
+                            )
+                        })
                         .expect("insert_failed"),
                     AddrVec::Listen(l) => map
                         .listeners_mut()
-                        .try_insert(l, options, SocketId::from(socket_index))
-                        .map(|entry| Socket::Listener(entry.id().clone(), entry.get_addr().clone()))
+                        .try_insert(l, options, EitherIpSocket::V4(SocketId::from(socket_index)))
+                        .map(|entry| {
+                            Socket::Listener(
+                                assert_is_ip_socket::<Ipv4>(&entry.id()).clone(),
+                                entry.get_addr().clone(),
+                            )
+                        })
                         .expect("insert_failed"),
                 })
                 .collect::<Vec<_>>();
@@ -6423,10 +6464,16 @@ where {
             for socket in sockets {
                 match socket {
                     Socket::Listener(l, addr) => {
-                        assert_matches!(map.listeners_mut().remove(&l, &addr), Ok(()));
+                        assert_matches!(
+                            map.listeners_mut().remove(&EitherIpSocket::V4(l), &addr),
+                            Ok(())
+                        );
                     }
                     Socket::Conn(c, addr) => {
-                        assert_matches!(map.conns_mut().remove(&c, &addr), Ok(()));
+                        assert_matches!(
+                            map.conns_mut().remove(&EitherIpSocket::V4(c), &addr),
+                            Ok(())
+                        );
                     }
                 }
             }

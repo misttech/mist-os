@@ -14,7 +14,7 @@ use core::{
 use derivative::Derivative;
 use either::Either;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress},
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
     MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
@@ -50,8 +50,8 @@ pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 /// Storage of state for all datagram sockets.
 pub(crate) type SocketsState<I, D, S> = IdMap<SocketState<I, D, S>>;
 
-pub(crate) trait IpExt: crate::ip::IpExt {}
-impl<I: crate::ip::IpExt> IpExt for I {}
+pub(crate) trait IpExt: crate::ip::IpExt + DualStackIpExt {}
+impl<I: crate::ip::IpExt + DualStackIpExt> IpExt for I {}
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
@@ -395,7 +395,7 @@ pub(crate) trait DatagramStateContext<I: IpExt, C, S: DatagramSocketSpec>:
     }
 }
 
-pub(crate) trait DatagramBoundStateContext<I: IpExt, C, S: DatagramSocketSpec>:
+pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback provided to
@@ -661,6 +661,74 @@ pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
     type ReceivingId: Clone + Debug;
 }
 
+/// Common features of dual-stack sockets that vary by IP version.
+///
+/// This trait exists to provide per-IP-version associated types that are
+/// useful for implementing dual-stack sockets. The types are intentionally
+/// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
+/// and [`Ipv6`] impls.
+// TODO(https://fxbug.dev/21198): Move this somewhere more general once the
+// approach is proven to work for datagram sockets. When implementing dual-stack
+// TCP, extract a supertrait from `DatagramSocketSpec` as described in the TODO
+// below and put that together with this trait.
+pub(crate) trait DualStackIpExt: Ip {
+    /// The type of socket that can receive an IP packet.
+    ///
+    /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
+    /// `S::SocketId<Ipv6>`.
+    ///
+    /// [`EitherIpSocket<S>]`: [EitherIpSocket]
+    // TODO(https://fxbug.dev/21198): Extract the necessary GAT from
+    // DatagramSocketSpec into its own trait and use that as the bound here.
+    type DualStackReceivingId<S: DatagramSocketSpec>: Clone + Debug + Eq;
+
+    /// Convert a socket ID into a `Self::DualStackReceivingId`.
+    ///
+    /// For coherency reasons this can't be a `From` bound on
+    /// `DualStackReceivingId`. If more methods are added, consider moving this
+    /// to its own dedicated trait that bounds `DualStackReceivingId`.
+    fn dual_stack_receiver<S: DatagramSocketSpec>(
+        id: S::SocketId<Self>,
+    ) -> Self::DualStackReceivingId<S>
+    where
+        Self: IpExt;
+}
+
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Eq(bound = "S::SocketId<Ipv4>: Eq, S::SocketId<Ipv6>: Eq"),
+    PartialEq(bound = "S::SocketId<Ipv4>: PartialEq, S::SocketId<Ipv6>: PartialEq")
+)]
+pub(crate) enum EitherIpSocket<S: DatagramSocketSpec> {
+    V4(S::SocketId<Ipv4>),
+    #[allow(unused)] // TODO(https://fxbug.dev/21198): Remove 'allow(unused)'
+    V6(S::SocketId<Ipv6>),
+}
+
+impl DualStackIpExt for Ipv4 {
+    /// Incoming IPv4 packets may be received by either IPv4 or IPv6 sockets.
+    type DualStackReceivingId<S: DatagramSocketSpec> = EitherIpSocket<S>;
+
+    fn dual_stack_receiver<S: DatagramSocketSpec>(
+        id: S::SocketId<Self>,
+    ) -> Self::DualStackReceivingId<S> {
+        EitherIpSocket::V4(id)
+    }
+}
+
+impl DualStackIpExt for Ipv6 {
+    /// Incoming IPv6 packets may only be received by IPv6 sockets.
+    type DualStackReceivingId<S: DatagramSocketSpec> = S::SocketId<Self>;
+
+    fn dual_stack_receiver<S: DatagramSocketSpec>(
+        id: S::SocketId<Self>,
+    ) -> Self::DualStackReceivingId<S> {
+        id
+    }
+}
+
 /// Types and behavior for datagram sockets.
 ///
 /// These sockets may or may not support dual-stack operation.
@@ -676,24 +744,26 @@ pub(crate) trait DatagramSocketSpec {
     /// Corresponds uniquely to a socket resource. This is the type that will
     /// be returned by [`create`] and used to identify which socket is being
     /// acted on by calls like [`listen`], [`connect`], [`remove`], etc.
-    type SocketId<I: IpExt>: Clone + Debug + EntryKey + From<usize>;
+    type SocketId<I: IpExt>: Clone + Debug + EntryKey + From<usize> + Eq;
 
     /// The specification for the [`BoundSocketMap`] for a given IP version.
     ///
     /// Describes the per-address and per-socket values held in the
     /// demultiplexing map for a given IP version.
-    type SocketMapSpec<I: IpExt, D: device::WeakId>: SocketStateSpec<ListenerState = ListenerState<I::Addr, D>, ConnState = ConnState<I, D>>
-        + DatagramSocketMapSpec<
-            I,
-            D,
-            Self::AddrSpec,
-            // TODO(https://fxbug.dev/21198): Relax this requirement to allow
-            // IPv4 and IPv6 socket IDs in the IPv4 map.
-            ReceivingId = Self::SocketId<I>,
-        >;
+    type SocketMapSpec<I: IpExt + DualStackIpExt, D: device::WeakId>: SocketStateSpec<ListenerState = ListenerState<I::Addr, D>, ConnState = ConnState<I, D>>
+        + DatagramSocketMapSpec<I, D, Self::AddrSpec>;
 
     /// The sharing state for a socket that hasn't yet been bound.
     type UnboundSharingState<I: IpExt>: Clone + Debug + Default;
+
+    /// Converts [`Self::SocketId`] to [`DatagramSocketMapSpec::ReceivingId`].
+    ///
+    /// Constructs a socket identifier to its in-demultiplexing map form. For
+    /// protocols with dual-stack sockets, like UDP, implementations should
+    /// perform a transformation. Otherwise it should be the identity function.
+    fn make_receiving_map_id<I: IpExt, D: device::WeakId>(
+        s: Self::SocketId<I>,
+    ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::ReceivingId;
 
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
     /// for a given IP version and buffer type.
@@ -758,14 +828,20 @@ where
             SocketState::Bound(state) => match state {
                 BoundSocketState::Listener(state) => {
                     let (state, _sharing, addr) = state;
-                    bound.listeners_mut().remove(&id, &addr).expect("Invalid UDP listener ID");
+                    bound
+                        .listeners_mut()
+                        .remove(&S::make_receiving_map_id(id), &addr)
+                        .expect("Invalid UDP listener ID");
 
                     let ListenerState { ip_options } = state;
                     (ip_options, SocketInfo::Listener(addr))
                 }
                 BoundSocketState::Connected(state) => {
                     let (state, _sharing, addr) = state;
-                    bound.conns_mut().remove(&id, &addr).expect("UDP connection not found");
+                    bound
+                        .conns_mut()
+                        .remove(&S::make_receiving_map_id(id), &addr)
+                        .expect("UDP connection not found");
                     let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
                     (socket.into_options(), SocketInfo::Connected(addr))
                 }
@@ -915,7 +991,7 @@ where
             device: device.map(|d| d.as_weak(sync_ctx).into_owned()),
         },
         sharing.clone().into(),
-        id,
+        S::make_receiving_map_id(id),
     ) {
         Ok(bound_entry) => {
             // Replace the unbound state only after we're sure the
@@ -1025,7 +1101,7 @@ where
                         Some(BoundMapSocketState::<_, _, S::AddrSpec, S::SocketMapSpec<I, SC::WeakDeviceId>>::Listener(
                             listener_addr.clone(),
                             listener_sharing.clone(),
-                            id.clone(),
+                            S::make_receiving_map_id(id.clone()),
                         )),
                         ip_options,
                     )
@@ -1047,7 +1123,7 @@ where
                         Some(BoundMapSocketState::Connected(
                             original_addr.clone(),
                             conn_sharing.clone(),
-                            id.clone(),
+                            S::make_receiving_map_id(id.clone()),
                         )),
                         socket.options(),
                     )
@@ -1100,7 +1176,7 @@ where
         };
 
         let ip_options = ip_options.clone();
-        match bound.conns_mut().try_insert(c, sharing.clone(), id) {
+        match bound.conns_mut().try_insert(c, sharing.clone(), S::make_receiving_map_id(id)) {
             Ok(bound_entry) => {
                 *ip_sock.options_mut() = ip_options;
                 *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected((
@@ -1113,7 +1189,7 @@ where
                     bound_entry.get_addr().clone(),
                 )));
                 Ok(())
-            }
+            },
             Err((
                 InsertError::Exists
                 | InsertError::IndirectConflict
@@ -1181,6 +1257,7 @@ where
             SocketState::Bound(BoundSocketState::Connected(state)) => state,
         };
 
+        let id = S::make_receiving_map_id(id);
         let _bound_addr = bound.conns_mut().remove(&id, &addr).expect("connection not found");
 
         let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = conn_state;
@@ -1533,7 +1610,7 @@ pub(crate) fn set_device<
 
                     let entry = bound
                         .listeners_mut()
-                        .entry(&id, addr)
+                        .entry(&S::make_receiving_map_id(id.clone()), addr)
                         .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
                     let new_addr = ListenerAddr {
                         device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
@@ -1587,7 +1664,7 @@ pub(crate) fn set_device<
 
                     let entry = bound
                         .conns_mut()
-                        .entry(&id, addr)
+                        .entry(&S::make_receiving_map_id(id.clone()), addr)
                         .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
                     let new_addr =
                         ConnAddr { device: new_socket.device().cloned(), ..addr.clone() };
@@ -2039,6 +2116,13 @@ mod test {
         type SocketId<I: IpExt> = Id;
         type UnboundSharingState<I: IpExt> = Sharing;
         type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
+
+        fn make_receiving_map_id<I: IpExt, D: device::WeakId>(
+            s: Self::SocketId<I>,
+        ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::ReceivingId
+        {
+            s
+        }
 
         type Serializer<I: Ip, B: BufferMut> = B;
         fn make_packet<I: Ip, B: BufferMut>(
