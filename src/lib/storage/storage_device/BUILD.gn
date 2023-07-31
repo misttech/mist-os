@@ -17,6 +17,7 @@ lib_srcs = [
 lib_deps = [
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",
+  "//third_party/rust_crates:futures",
   "//third_party/rust_crates:num",
   "//third_party/rust_crates:tracing",
 ]
@@ -37,7 +38,6 @@ rustc_library("storage_device") {
   test_deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
   ]
   sources = lib_srcs

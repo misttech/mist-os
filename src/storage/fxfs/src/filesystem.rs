@@ -33,10 +33,7 @@ use {
     event_listener::Event,
     fuchsia_async as fasync,
     fuchsia_inspect::{NumericProperty as _, UintProperty},
-    futures::{
-        channel::oneshot::{channel, Sender},
-        FutureExt,
-    },
+    futures::FutureExt,
     fxfs_crypto::Crypt,
     once_cell::sync::OnceCell,
     scopeguard::ScopeGuard,
@@ -226,12 +223,9 @@ impl OpenFxFilesystem {
     /// Waits for filesystem to be dropped (so callers should ensure all direct and indirect
     /// references are dropped) and returns the device.  No attempt is made at a graceful shutdown.
     pub async fn take_device(self) -> DeviceHolder {
-        let (sender, receiver) = channel::<DeviceHolder>();
-        self.device_sender
-            .set(sender)
-            .unwrap_or_else(|_| panic!("take_device should only be called once"));
+        let fut = self.device.take_when_dropped();
         std::mem::drop(self);
-        debug_assert_not_too_long!(receiver).unwrap()
+        debug_assert_not_too_long!(fut)
     }
 }
 
@@ -399,15 +393,20 @@ impl FxFilesystemBuilder {
                 Some(Box::new(move || instance.clone().run().boxed()));
         }
 
+        if !read_only && !self.format {
+            // See comment in JournalRecord::DidFlushDevice for why we need to flush the device
+            // before replay.
+            device.flush().await.context("Device flush failed")?;
+        }
+
         let filesystem = Arc::new(FxFilesystem {
-            device: OnceCell::new(),
+            device,
             block_size,
             objects: objects.clone(),
             journal,
             commit_mutex: futures::lock::Mutex::new(()),
             lock_manager: LockManager::new(),
             flush_task: Mutex::new(None),
-            device_sender: OnceCell::new(),
             closed: AtomicBool::new(true),
             trace: self.trace,
             graveyard: Graveyard::new(objects.clone()),
@@ -424,13 +423,6 @@ impl FxFilesystemBuilder {
                 .set(Arc::downgrade(&filesystem))
                 .unwrap_or_else(|_| unreachable!());
         }
-
-        if !read_only && !self.format {
-            // See comment in JournalRecord::DidFlushDevice for why we need to flush the device
-            // before replay.
-            device.flush().await.context("Device flush failed")?;
-        }
-        filesystem.device.set(device).unwrap_or_else(|_| unreachable!());
 
         filesystem.journal.set_trace(self.trace);
         if self.format {
@@ -487,14 +479,12 @@ impl FxFilesystemBuilder {
 }
 
 pub struct FxFilesystem {
-    device: OnceCell<DeviceHolder>,
     block_size: u64,
     objects: Arc<ObjectManager>,
     journal: Arc<Journal>,
     commit_mutex: futures::lock::Mutex<()>,
     lock_manager: LockManager,
     flush_task: Mutex<Option<fasync::Task<()>>>,
-    device_sender: OnceCell<Sender<DeviceHolder>>,
     closed: AtomicBool,
     trace: bool,
     graveyard: Arc<Graveyard>,
@@ -509,6 +499,10 @@ pub struct FxFilesystem {
     event: Event,
 
     background_task_spawner: Box<dyn Fn(futures::future::BoxFuture<'static, ()>) + Send + Sync>,
+
+    // NOTE: This *must* go last so that when users take the device from a closed filesystem, the
+    // filesystem has dropped all other members first (Rust drops members in declaration order).
+    device: DeviceHolder,
 }
 
 impl FxFilesystem {
@@ -632,19 +626,10 @@ impl FxFilesystem {
     }
 }
 
-impl Drop for FxFilesystem {
-    fn drop(&mut self) {
-        if let Some(sender) = self.device_sender.take() {
-            // We don't care if this fails to send.
-            let _ = sender.send(self.device.take().unwrap());
-        }
-    }
-}
-
 #[async_trait]
 impl Filesystem for FxFilesystem {
     fn device(&self) -> Arc<dyn Device> {
-        Arc::clone(self.device.get().unwrap())
+        Arc::clone(&self.device)
     }
 
     fn root_store(&self) -> Arc<ObjectStore> {
@@ -673,7 +658,7 @@ impl Filesystem for FxFilesystem {
 
     fn get_info(&self) -> Info {
         Info {
-            total_bytes: self.device.get().unwrap().size(),
+            total_bytes: self.device.size(),
             used_bytes: self.object_manager().allocator().get_used_bytes(),
         }
     }

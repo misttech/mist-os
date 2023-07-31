@@ -6,7 +6,13 @@ use {
     crate::buffer::{Buffer, BufferRef, MutableBufferRef},
     anyhow::{bail, Error},
     async_trait::async_trait,
-    std::{ops::Deref, sync::Arc},
+    futures::channel::oneshot::{channel, Sender},
+    std::{
+        future::Future,
+        mem::ManuallyDrop,
+        ops::Deref,
+        sync::{Arc, OnceLock},
+    },
 };
 
 pub mod buffer;
@@ -71,17 +77,42 @@ pub trait Device: Send + Sync {
 // accepts a DeviceHolder won't be sharing the device with something else that accepts a
 // DeviceHolder.  For example, FxFilesystem accepts a DeviceHolder which means that you cannot
 // create two FxFilesystem instances that are both sharing the same device.
-pub struct DeviceHolder(Arc<dyn Device>);
+pub struct DeviceHolder {
+    device: ManuallyDrop<Arc<dyn Device>>,
+    on_drop: OnceLock<Sender<DeviceHolder>>,
+}
 
 impl DeviceHolder {
     pub fn new(device: impl Device + 'static) -> Self {
-        DeviceHolder(Arc::new(device))
+        DeviceHolder { device: ManuallyDrop::new(Arc::new(device)), on_drop: OnceLock::new() }
     }
 
     // Ensures there are no dangling references to the device. Useful for tests to ensure orderly
     // shutdown.
     pub fn ensure_unique(&self) {
-        assert_eq!(Arc::strong_count(&self.0), 1);
+        assert_eq!(Arc::strong_count(&self.device), 1);
+    }
+
+    pub fn take_when_dropped(&self) -> impl Future<Output = DeviceHolder> {
+        let (sender, receiver) = channel::<DeviceHolder>();
+        self.on_drop
+            .set(sender)
+            .unwrap_or_else(|_| panic!("take_when_dropped should only be called once"));
+        async { receiver.await.unwrap() }
+    }
+}
+
+impl Drop for DeviceHolder {
+    fn drop(&mut self) {
+        if let Some(sender) = self.on_drop.take() {
+            // SAFETY: `device` is not used again.
+            let device = ManuallyDrop::new(unsafe { ManuallyDrop::take(&mut self.device) });
+            // We don't care if this fails to send.
+            let _ = sender.send(DeviceHolder { device, on_drop: OnceLock::new() });
+        } else {
+            // SAFETY: `device` is not used again.
+            unsafe { ManuallyDrop::drop(&mut self.device) }
+        }
     }
 }
 
@@ -89,6 +120,19 @@ impl Deref for DeviceHolder {
     type Target = Arc<dyn Device>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.device
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::DeviceHolder, crate::fake_device::FakeDevice};
+
+    #[fuchsia::test]
+    async fn test_take_when_dropped() {
+        let holder = DeviceHolder::new(FakeDevice::new(1, 512));
+        let fut = holder.take_when_dropped();
+        std::mem::drop(holder);
+        fut.await.ensure_unique();
     }
 }
