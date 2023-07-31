@@ -7,10 +7,8 @@
 use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
 use assert_matches::assert_matches;
 use core::{
-    convert::Infallible as Never,
     fmt::Debug,
     hash::{Hash, Hasher},
-    marker::PhantomData,
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
@@ -53,7 +51,7 @@ use crate::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         datagram::{
             self, AddrEntry, BoundSockets as DatagramBoundSockets, ConnState, ConnectError,
-            DatagramBoundStateContext, DatagramFlowId, DatagramSocketSpec, DatagramSocketStateSpec,
+            DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec,
             DatagramStateContext, ExpectedConnError, ExpectedUnboundError, FoundSockets,
             InUseError, ListenerState, LocalIdentifierAllocator,
             MulticastMembershipInterfaceSelector, SendError as DatagramSendError,
@@ -110,17 +108,17 @@ impl UdpStateBuilder {
 }
 
 /// Convenience alias to make names shorter.
-type UdpBoundSocketMap<I, D> = BoundSocketMap<I, D, IpPortSpec, Udp<I, D>>;
+type UdpBoundSocketMap<I, D> = BoundSocketMap<I, D, IpPortSpec, (Udp, I, D)>;
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct BoundSockets<I: IpExt, D: WeakId> {
-    bound_sockets: DatagramBoundSockets<I, D, IpPortSpec, Udp<I, D>>,
+    bound_sockets: UdpBoundSocketMap<I, D>,
     /// lazy_port_alloc is lazy-initialized when it's used.
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
 }
 
-pub(crate) type SocketsState<I, D> = DatagramSocketsState<I, D, IpPortSpec, Udp<I, D>>;
+pub(crate) type SocketsState<I, D> = DatagramSocketsState<I, D, Udp>;
 
 /// A collection of UDP sockets.
 #[derive(Derivative)]
@@ -145,7 +143,7 @@ impl<I: IpExt, D: WeakId> Default for UdpState<I, D> {
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
-pub(crate) struct Udp<I, D>(PhantomData<(I, D)>, Never);
+pub(crate) enum Udp {}
 
 /// Produces an iterator over eligible receiving socket addresses.
 #[cfg(test)]
@@ -159,7 +157,7 @@ fn iter_receiving_addrs<I: Ip + IpExt, D: WeakId>(
 fn check_posix_sharing<I: IpExt, D: WeakId>(
     new_sharing: Sharing,
     dest: AddrVec<I, D, IpPortSpec>,
-    socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Udp<I, D>>>,
+    socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<(Udp, I, D)>>,
 ) -> Result<(), InsertError> {
     // Having a value present at a shadowed address is disqualifying, unless
     // both the new and existing sockets allow port sharing.
@@ -201,7 +199,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
     // values for entries with and without device IDs specified.
     fn conflict_exists<I: IpExt, D: WeakId>(
         new_sharing: Sharing,
-        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Udp<I, D>>>,
+        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<(Udp, I, D)>>,
         addr: impl Into<AddrVec<I, D, IpPortSpec>>,
         mut is_conflicting: impl FnMut(&AddrVecTag) -> bool,
     ) -> bool {
@@ -349,7 +347,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
     }
 }
 
-impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
+impl<I: IpExt, D: Id> SocketMapStateSpec for (Udp, I, D) {
     type ListenerId = SocketId<I>;
     type ConnId = SocketId<I>;
 
@@ -382,12 +380,12 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     }
 }
 
-impl<I: IpExt, D: Id> SocketStateSpec for Udp<I, D> {
+impl<I: IpExt, D: WeakId> SocketStateSpec for (Udp, I, D) {
     type ListenerState = ListenerState<I::Addr, D>;
     type ConnState = ConnState<I, D>;
 }
 
-impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, I, D, IpPortSpec> for Udp<I, D>
+impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, I, D, IpPortSpec> for (Udp, I, D)
 where
     AA: Into<AddrVec<I, D, IpPortSpec>> + Clone,
 {
@@ -400,17 +398,18 @@ where
     }
 }
 
-impl<I: IpExt, D: WeakId> DatagramSocketStateSpec for Udp<I, D> {
-    type SocketId = SocketId<I>;
-    type UnboundSharingState = Sharing;
-}
+impl DatagramSocketSpec for Udp {
+    type AddrSpec = IpPortSpec;
+    type SocketId<I: IpExt> = SocketId<I>;
+    type UnboundSharingState<I: IpExt> = Sharing;
+    type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
 
-impl<I: IpExt, D: WeakId> DatagramSocketSpec<I, D, IpPortSpec> for Udp<I, D> {
-    type Serializer<B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
-    fn make_packet<B: BufferMut>(
+    type Serializer<I: Ip, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
+
+    fn make_packet<I: Ip, B: BufferMut>(
         body: B,
         addr: &ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
-    ) -> Self::Serializer<B> {
+    ) -> Self::Serializer<I, B> {
         let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = addr;
         body.encapsulate(UdpPacketBuilder::new(
             local_ip.get(),
@@ -420,7 +419,7 @@ impl<I: IpExt, D: WeakId> DatagramSocketSpec<I, D, IpPortSpec> for Udp<I, D> {
         ))
     }
 
-    fn try_alloc_listen_identifier(
+    fn try_alloc_listen_identifier<I: IpExt, D: WeakId>(
         rng: &mut impl crate::RngContext,
         is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
     ) -> Option<NonZeroU16> {
@@ -428,7 +427,11 @@ impl<I: IpExt, D: WeakId> DatagramSocketSpec<I, D, IpPortSpec> for Udp<I, D> {
     }
 }
 
-enum LookupResult<'a, I: IpExt, D: Id> {
+impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IpPortSpec> for (Udp, I, D) {
+    type ReceivingId = SocketId<I>;
+}
+
+enum LookupResult<'a, I: Ip, D: Id> {
     Conn(&'a SocketId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
     Listener(&'a SocketId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
 }
@@ -608,7 +611,7 @@ impl<T> AddrState<T> {
     }
 }
 
-impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, I, D, IpPortSpec, Udp<I, D>> {
+impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, I, D, IpPortSpec, (Udp, I, D)> {
     /// Returns an iterator that yields a `LookupResult` for each contained ID.
     fn collect_all_ids(self) -> impl Iterator<Item = LookupResult<'a, I, D>> + 'a {
         match self {
@@ -639,8 +642,8 @@ impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, I, D, IpPortSpec, Udp<I, D
 /// should receive a matching incoming packet. The returned iterator may
 /// yield 0, 1, or multiple sockets.
 fn lookup<'s, I: Ip + IpExt, D: WeakId>(
-    state: &'s DatagramSocketsState<I, D, IpPortSpec, Udp<I, D>>,
-    bound: &'s DatagramBoundSockets<I, D, IpPortSpec, Udp<I, D>>,
+    state: &'s DatagramSocketsState<I, D, Udp>,
+    bound: &'s DatagramBoundSockets<I, D, IpPortSpec, (Udp, I, D)>,
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
     device: D,
@@ -1351,7 +1354,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-        datagram::listen::<I, _, _, _, _>(self, ctx, id, addr, port)
+        datagram::listen(self, ctx, id, addr, port)
     }
 }
 
@@ -1522,8 +1525,8 @@ pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     .map_err(|IpInvariant(e)| e)
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
-    DatagramStateContext<I, IpPortSpec, C, Udp<I, SC::WeakDeviceId>> for SC
+impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> DatagramStateContext<I, C, Udp>
+    for SC
 {
     type SocketsStateCtx<'a> = SC::SocketStateCtx<'a>;
 
@@ -1531,7 +1534,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::SocketsStateCtx<'_>,
-            &DatagramSocketsState<I, Self::WeakDeviceId, IpPortSpec, Udp<I, SC::WeakDeviceId>>,
+            &DatagramSocketsState<I, Self::WeakDeviceId, Udp>,
         ) -> O,
     >(
         &mut self,
@@ -1544,7 +1547,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::SocketsStateCtx<'_>,
-            &mut DatagramSocketsState<I, Self::WeakDeviceId, IpPortSpec, Udp<I, SC::WeakDeviceId>>,
+            &mut DatagramSocketsState<I, Self::WeakDeviceId, Udp>,
         ) -> O,
     >(
         &mut self,
@@ -1555,7 +1558,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
-    DatagramBoundStateContext<I, IpPortSpec, C, Udp<I, SC::WeakDeviceId>> for SC
+    DatagramBoundStateContext<I, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, SC::WeakDeviceId>>>;
@@ -1564,7 +1567,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &DatagramBoundSockets<I, Self::WeakDeviceId, IpPortSpec, Udp<I, SC::WeakDeviceId>>,
+            &DatagramBoundSockets<I, Self::WeakDeviceId, IpPortSpec, (Udp, I, SC::WeakDeviceId)>,
         ) -> O,
     >(
         &mut self,
@@ -1579,7 +1582,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut DatagramBoundSockets<I, Self::WeakDeviceId, IpPortSpec, Udp<I, SC::WeakDeviceId>>,
+            &mut DatagramBoundSockets<I, Self::WeakDeviceId, IpPortSpec, (Udp, I, SC::WeakDeviceId)>,
             &mut Self::LocalIdAllocator,
         ) -> O,
     >(
@@ -1600,7 +1603,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
-    LocalIdentifierAllocator<I, D, IpPortSpec, C, Udp<I, D>>
+    LocalIdentifierAllocator<I, D, IpPortSpec, C, (Udp, I, D)>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
     fn try_alloc_local_id(
@@ -6240,7 +6243,7 @@ where {
         I,
         FakeWeakDeviceId<FakeDeviceId>,
         IpPortSpec,
-        Udp<I, FakeWeakDeviceId<FakeDeviceId>>,
+        (Udp, I, FakeWeakDeviceId<FakeDeviceId>),
     >;
 
     fn listen<I: Ip + IpExt>(

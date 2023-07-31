@@ -465,14 +465,19 @@ where
     }
 }
 
-/// A bidirectional map between sockets and their state, keyed in one direction
-/// by socket IDs, and in the other by socket addresses.
+/// A map from socket addresses to sockets.
 ///
 /// The types of keys and IDs is determined by the [`SocketMapStateSpec`]
 /// parameter. Each listener and connected socket stores additional state.
 /// Listener and connected sockets are keyed independently, but share the same
 /// address vector space. Conflicts are detected on attempted insertion of new
 /// sockets.
+///
+/// Listener addresses map to listener-address-specific state, and likewise
+/// with connected addresses. Depending on protocol (determined by the
+/// `SocketMapStateSpec` protocol), these address states can hold one or more
+/// socket identifiers (e.g. UDP sockets with `SO_REUSEPORT` set can share an
+/// address).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct BoundSocketMap<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
