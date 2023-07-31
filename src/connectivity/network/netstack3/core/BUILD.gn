@@ -161,6 +161,8 @@ rustc_library("netstack3-core-instrumented") {
   sources = lib_sources
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  disable_rustdoc = true
 }
 
 fuchsia_unittest_package("netstack3-core-test-package") {
@@ -183,6 +185,8 @@ rustc_library("netstack3-core-testutils") {
   sources = lib_sources
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  disable_rustdoc = true
 }
 
 if (is_host) {
@@ -202,6 +206,8 @@ if (is_host) {
 
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
     configs += [ ":loom" ]
+
+    disable_rustdoc = true
   }
 }
 

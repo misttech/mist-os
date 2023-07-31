@@ -27,6 +27,8 @@ rustc_library("netstack3_sync_instrumented") {
   sources = _sources
   deps = _deps
   test_deps = [ "//third_party/rust_crates:assert_matches" ]
+
+  disable_rustdoc = true
 }
 
 rustc_library("netstack3_sync_not_instrumented") {
@@ -52,6 +54,8 @@ if (is_host) {
 
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
     configs += [ "//src/connectivity/network/netstack3/core:loom" ]
+
+    disable_rustdoc = true
   }
 }
 
