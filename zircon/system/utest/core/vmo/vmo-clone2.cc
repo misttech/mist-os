@@ -1750,6 +1750,11 @@ TEST_F(VmoClone2TestCase, MapRangeReadOnly) {
   ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE | ZX_VM_PERM_READ, 0, clone, 0,
                                        kNumPages * zx_system_get_page_size(), &clone_addr));
 
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(clone_addr, kNumPages * zx_system_get_page_size());
+  });
+
   // No pages committed in the clone.
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
   EXPECT_EQ(0u, info.committed_bytes);
