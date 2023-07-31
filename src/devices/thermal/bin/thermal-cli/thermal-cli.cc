@@ -147,3 +147,12 @@ zx_status_t ThermalCli::FrequencyCommand(fuchsia_hardware_thermal::wire::PowerDo
 
   return ZX_OK;
 }
+
+zx::result<std::string> ThermalCli::GetSensorName() {
+  const fidl::WireResult result = device_->GetSensorName();
+  if (!result.ok()) {
+    fprintf(stderr, "DeviceGetSensorName failed: %s\n", result.status_string());
+    return zx::error(result.status());
+  }
+  return zx::ok(std::string(result->name.data(), result->name.size()));
+}

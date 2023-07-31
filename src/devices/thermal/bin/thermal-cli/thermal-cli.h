@@ -6,6 +6,9 @@
 #define SRC_DEVICES_THERMAL_BIN_THERMAL_CLI_THERMAL_CLI_H_
 
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
+#include <lib/zx/result.h>
+
+#include <string>
 
 class ThermalCli {
  public:
@@ -16,6 +19,7 @@ class ThermalCli {
   zx_status_t FanLevelCommand(const char* value);
   zx_status_t FrequencyCommand(fuchsia_hardware_thermal::wire::PowerDomain cluster,
                                const char* value);
+  zx::result<std::string> GetSensorName();
 
  private:
   const fidl::WireSyncClient<fuchsia_hardware_thermal::Device> device_;

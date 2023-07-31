@@ -11,6 +11,7 @@ constexpr char kUsageMessage[] = R"""(Usage: thermal-cli <device> <command>
     temp - Read the device's thermal sensor in degrees C
     fan [value] - Get or set the fan speed
     freq <big/little> [value] - Get or set the cluster frequency in Hz
+    name - Print the name of the sensor
 
     Example:
     thermal-cli /dev/class/thermal/000 freq big 1000000000
@@ -45,6 +46,12 @@ int main(int argc, char** argv) {
 
     const char* value = argc >= 5 ? argv[4] : nullptr;
     status = thermal_cli.FrequencyCommand(cluster, value);
+  } else if (strcmp(argv[2], "name") == 0) {
+    const zx::result name = thermal_cli.GetSensorName();
+    status = name.status_value();
+    if (name.is_ok()) {
+      printf("Name: %s\n", name->c_str());
+    }
   } else {
     printf("%s", kUsageMessage);
     return 1;

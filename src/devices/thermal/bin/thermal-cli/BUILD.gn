@@ -42,6 +42,8 @@ test("thermal-cli-test-bin") {
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/lib/driver/runtime/testing/cpp",
+    "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mock-function",
