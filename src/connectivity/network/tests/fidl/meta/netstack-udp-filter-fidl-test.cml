@@ -4,6 +4,7 @@
 {
     include: [ "//src/connectivity/network/tests/fidl/meta/netstack-filter-fidl-test.shard.cml" ],
     program: {
+        runner: "rust_test_runner",
         binary: "bin/udp_filter_fidl_test",
     },
 }

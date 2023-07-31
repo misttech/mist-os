@@ -5,11 +5,12 @@
 #![cfg(test)]
 
 use fidl_fuchsia_net_filter as fnetfilter;
+use netstack_testing_common::realms::Netstack;
 use netstack_testing_macros::netstack_test;
 
 #[netstack_test]
-async fn drop_tcp_incoming(name: &str) {
-    common::test_filter(
+async fn drop_tcp_incoming<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -26,8 +27,8 @@ async fn drop_tcp_incoming(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_outgoing(name: &str) {
-    common::test_filter(
+async fn drop_tcp_outgoing<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -44,8 +45,8 @@ async fn drop_tcp_outgoing(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_incoming_within_port_range(name: &str) {
-    common::test_filter(
+async fn drop_tcp_incoming_within_port_range<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -62,8 +63,8 @@ async fn drop_tcp_incoming_within_port_range(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_outgoing_within_port_range(name: &str) {
-    common::test_filter(
+async fn drop_tcp_outgoing_within_port_range<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -80,8 +81,8 @@ async fn drop_tcp_outgoing_within_port_range(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_incoming_outside_port_range(name: &str) {
-    common::test_filter(
+async fn drop_tcp_incoming_outside_port_range<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -98,8 +99,8 @@ async fn drop_tcp_incoming_outside_port_range(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_outgoing_outside_port_range(name: &str) {
-    common::test_filter(
+async fn drop_tcp_outgoing_outside_port_range<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -116,8 +117,8 @@ async fn drop_tcp_outgoing_outside_port_range(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_incoming_with_address_range(name: &str) {
-    common::test_filter(
+async fn drop_tcp_incoming_with_address_range<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -134,8 +135,8 @@ async fn drop_tcp_incoming_with_address_range(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_outgoing_with_address_range(name: &str) {
-    common::test_filter(
+async fn drop_tcp_outgoing_with_address_range<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -152,8 +153,8 @@ async fn drop_tcp_outgoing_with_address_range(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_incoming_with_src_address_invert(name: &str) {
-    common::test_filter(
+async fn drop_tcp_incoming_with_src_address_invert<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -170,8 +171,8 @@ async fn drop_tcp_incoming_with_src_address_invert(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_outgoing_with_src_address_invert(name: &str) {
-    common::test_filter(
+async fn drop_tcp_outgoing_with_src_address_invert<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -188,8 +189,8 @@ async fn drop_tcp_outgoing_with_src_address_invert(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_incoming_with_dst_address_invert(name: &str) {
-    common::test_filter(
+async fn drop_tcp_incoming_with_dst_address_invert<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Tcp,
@@ -206,8 +207,8 @@ async fn drop_tcp_incoming_with_dst_address_invert(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_tcp_outgoing_with_dst_address_invert(name: &str) {
-    common::test_filter(
+async fn drop_tcp_outgoing_with_dst_address_invert<N: Netstack>(name: &str) {
+    common::test_filter::<N>(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Tcp,

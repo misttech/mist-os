@@ -4,7 +4,7 @@
 {
     include: [
         "//src/connectivity/network/tests/integration/common/client.shard.cml",
-        "//src/sys/test_runners/rust/default.shard.cml",
+        "//src/lib/testing/expectation/meta/client.shard.cml",
         "syslog/client.shard.cml",
     ],
 }

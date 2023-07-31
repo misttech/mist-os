@@ -11,11 +11,10 @@ group("tests") {
   deps = [
     ":netstack-error-fidl-tests",
     ":netstack-fidl-tests",
-    ":netstack-fidl-tests-with-expectations",
   ]
 }
 
-tests_with_expectations = [
+tests = [
   "debug",
   "interfaces",
   "interfaces-admin",
@@ -24,7 +23,7 @@ tests_with_expectations = [
   "routes-admin",
 ]
 
-foreach(test, tests_with_expectations) {
+foreach(test, tests) {
   name = "netstack-${test}-fidl-test"
   fuchsia_test_component_with_expectations(name) {
     manifest = "meta/${name}.cml"
@@ -41,8 +40,9 @@ filter_tests = [
 
 foreach(test, filter_tests) {
   name = "netstack-${test}-filter-fidl-test"
-  fuchsia_test_component(name) {
+  fuchsia_test_component_with_expectations(name) {
     manifest = "meta/netstack-${test}-filter-fidl-test.cml"
+    expectations = "expectations/${test}.json5"
     deps = [ "filter/${test}" ]
   }
 }
@@ -61,10 +61,13 @@ if (target_cpu != "riscv64") {
       [ "//src/connectivity/network/netstack:component-debug" ]
 }
 
-fuchsia_test_package("netstack-fidl-tests-with-expectations") {
+fuchsia_test_package("netstack-fidl-tests") {
   test_components = []
-  foreach(test, tests_with_expectations) {
+  foreach(test, tests) {
     test_components += [ ":netstack-${test}-fidl-test" ]
+  }
+  foreach(test, filter_tests) {
+    test_components += [ ":netstack-${test}-filter-fidl-test" ]
   }
 
   deps = _common_test_package_deps +
@@ -77,15 +80,6 @@ fuchsia_test_package("netstack-fidl-tests-with-expectations") {
       max_severity = "ERROR"
     }
   }
-}
-
-fuchsia_test_package("netstack-fidl-tests") {
-  test_components = []
-  foreach(test, filter_tests) {
-    test_components += [ ":netstack-${test}-filter-fidl-test" ]
-  }
-
-  deps = _common_test_package_deps
 }
 
 fuchsia_test_component("netstack-interfaces-error-fidl-test") {
