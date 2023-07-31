@@ -11,6 +11,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":args_test($host_toolchain)",
     ":event_test($host_toolchain)",
     ":selection_test($host_toolchain)",
     ":test_list_file_test($host_toolchain)",
@@ -24,6 +25,7 @@ group("tests") {
 
 if (is_host) {
   binary_sources = [
+    "args.py",
     "event.py",
     "selection.py",
     "test_list_file.py",
@@ -35,6 +37,7 @@ if (is_host) {
     "statusinfo",
     "termout",
     "util",
+    "//third_party/colorama",
     "//third_party/jellyfish",
   ]
 
@@ -72,6 +75,14 @@ if (is_host) {
 
   python_host_test("event_test") {
     main_source = "tests/event_test.py"
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    sources = binary_sources
+    libraries = binary_deps
+  }
+
+  python_host_test("args_test") {
+    main_source = "tests/args_test.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
     sources = binary_sources
