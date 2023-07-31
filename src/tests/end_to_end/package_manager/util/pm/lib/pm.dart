@@ -22,83 +22,46 @@ import 'package:test/test.dart';
 
 class PackageManagerRepo {
   final sl4f.Sl4f _sl4fDriver;
-  final String _pmPath;
   final String _ffxPath;
+  final String _ffxIsolateDir;
   final String _repoPath;
   final Logger _log;
-  Optional<Process> _serveProcess;
   Optional<int> _servePort;
-  Optional<StreamSplitter<List<int>>> _serveStdout;
-  Optional<StreamSplitter<List<int>>> _serveStderr;
 
-  Optional<Process> getServeProcess() => _serveProcess;
   Optional<int> getServePort() => _servePort;
   String getRepoPath() => _repoPath;
 
-  /// Uses [StreamSplitter] to split the serve process's stdout so there can
-  /// be multiple listeners for a single stream source.
-  ///
-  /// This is useful because we are listening to stdout to determine if serve
-  /// has successfully started up, but tests want to be able to listen for
-  /// their own purposes as well.
-  Stream<List<int>> getServeStdoutSplitStream() {
-    if (_serveProcess.isNotPresent) {
-      throw Exception(
-          'Trying to get stdout from a process that does not exist.');
-    }
-    if (_serveStdout.isNotPresent) {
-      _serveStdout =
-          Optional.of(StreamSplitter<List<int>>(_serveProcess.value.stdout));
-    }
-    return _serveStdout.value.split();
-  }
-
-  /// Uses [StreamSplitter] to split the serve process's stderr so there can
-  /// be multiple listeners for a single stream source.
-  Stream<List<int>> getServeStderrSplitStream() {
-    if (_serveProcess.isNotPresent) {
-      throw Exception(
-          'Trying to get stderr from a process that does not exist.');
-    }
-    if (_serveStderr.isNotPresent) {
-      _serveStderr =
-          Optional.of(StreamSplitter<List<int>>(_serveProcess.value.stderr));
-    }
-    return _serveStderr.value.split();
-  }
-
-  PackageManagerRepo._create(this._sl4fDriver, this._pmPath, this._ffxPath,
-      this._repoPath, this._log) {
-    _serveProcess = Optional.absent();
+  PackageManagerRepo._create(this._sl4fDriver, this._ffxPath,
+      this._ffxIsolateDir, this._repoPath, this._log) {
     _servePort = Optional.absent();
-    _serveStdout = Optional.absent();
-    _serveStderr = Optional.absent();
   }
 
   static Future<PackageManagerRepo> initRepo(
-      sl4f.Sl4f sl4fDriver, String pmPath, String ffxPath, Logger log) async {
+      sl4f.Sl4f sl4fDriver, String ffxPath, Logger log) async {
     var repoPath = (await Directory.systemTemp.createTemp('repo')).path;
+    var ffxIsolateDir =
+        (await Directory.systemTemp.createTemp('ffx_isolate_dir')).path;
     return PackageManagerRepo._create(
-        sl4fDriver, pmPath, ffxPath, repoPath, log);
+        sl4fDriver, ffxPath, ffxIsolateDir, repoPath, log);
   }
 
   /// Create new repo using `ffx repository create`.
   ///
   /// Uses this command:
   /// `ffx repository create <repo path>`
-  Future<ProcessResult> ffxRepositoryCreate() async {
+  Future<void> ffxRepositoryCreate() async {
     _log.info('Initializing repo: $_repoPath');
 
-    return Process.run(_ffxPath, ['repository', 'create', _repoPath]);
+    await ffx(['repository', 'create', _repoPath]);
   }
 
   /// Publish an archive to a repo using `ffx repository publish`.
   ///
   /// Uses this command:
   /// `ffx repository publish --package-archive <archive path> <repo path>`
-  Future<ProcessResult> ffxRepositoryPublish(String archivePath) async {
+  Future<void> ffxRepositoryPublish(String archivePath) async {
     _log.info('Publishing $archivePath to repo.');
-    return Process.run(_ffxPath,
+    await ffx(
         ['repository', 'publish', '--package-archive', archivePath, _repoPath]);
   }
 
@@ -106,12 +69,11 @@ class PackageManagerRepo {
   ///
   /// Uses this command:
   /// `ffx package archive create <manifest path> --out <archivePath> --root-dir <rootDirectory>`
-  Future<ProcessResult> ffxPackageArchiveCreate(
+  Future<void> ffxPackageArchiveCreate(
       String packageManifestPath, String archivePath) async {
     _log.info('Creating archive from a given package manifest.');
     final rootDirectory = Platform.script.resolve('runtime_deps').toFilePath();
-    return Process.run(
-      _ffxPath,
+    await ffx(
       [
         'package',
         'archive',
@@ -125,152 +87,98 @@ class PackageManagerRepo {
     );
   }
 
-  /// Wait for the serve process's stdout to report its status.
+  /// Attempts to start the `ffx repository server` process.
   ///
-  /// Listens to the given process's stdout for either
-  /// `[pm serve] serving /repo/path at http://[::]:55555`
-  /// or
-  /// `bind: address already in use`
-  ///
-  /// `timeout` parmeter dictates how long to wait for the serve to start.
-  /// This defaults to 10 seconds - arbitrarily chosen assuming test servers
-  /// are very slow.
-  Future waitForServeStartup(Process process,
-      {Duration timeout = const Duration(seconds: 10)}) {
-    final completer = Completer();
-
-    RegExp servingRegex = RegExp(r'\[pm serve\] serving.+ at http.+:(\d+)');
-
-    getServeStdoutSplitStream().transform(utf8.decoder).listen((data) {
-      print('[pm test][stdout] $data');
-      var servingMatch = servingRegex.firstMatch(data);
-      if (servingMatch != null) {
-        if (_servePort.isPresent) {
-          // Check the port if we can.
-          expect(servingMatch.group(1), _servePort.value.toString());
-        }
-        completer.complete(true);
-      }
-    });
-
-    getServeStderrSplitStream().transform(utf8.decoder).listen((data) {
-      print('[pm test][stderr] $data');
-      if (data.contains('address already in use')) {
-        completer.complete(false);
-      }
-    });
-
-    Timer(timeout, () {
-      if (!completer.isCompleted) {
-        completer.completeError(
-            'Timed out waiting for serve to print its own status.');
-      }
-    });
-
-    return completer.future;
-  }
-
-  /// Attempts to start the `serve` process.
-  ///
-  /// `port` is optional, but if it is given then `curl` will be used as an
-  /// additional check for whether `serve` has successfully started.
+  /// `curl` will be used as an additional check for whether `ffx repository
+  /// server` has successfully started.
   ///
   /// Returns `true` if serve startup was successful.
-  Future<bool> tryServe(List<String> args, {int port}) async {
-    resetServe();
-    _serveProcess = Optional.of(await Process.start(_pmPath, args));
+  Future<bool> tryServe(String repoName, int port) async {
+    await stopServer();
+    await ffx(
+        ['repository', 'add-from-pm', _repoPath, '--repository', repoName]);
+    await ffx(['repository', 'server', 'start', '--address', '[::]:$port']);
 
-    // Watch `serve`'s prints if we can.
-    // However, the `-q` flag makes its output silent.
-    // If `serve` is silent, skip and only check based on `curl`.
-    if (!args.contains('-q')) {
-      if (!await waitForServeStartup(_serveProcess.value)) {
-        return false;
-      }
+    final status = await serverStatus();
+    expect(status['state'], 'running');
+
+    _servePort = Optional.of(Uri.parse('http://' + status['address']).port);
+
+    if (port != 0) {
+      expect(_servePort.value, port);
     }
-
-    // Check if `serve` is up using `curl`.
-    // However, if no port number is given then we do not know the URL and
-    // cannot do this check.
-    //
-    // NOTE: It is possible for `-q` to exist as an argument and for there
-    // to be no port number given. In such a case, this method will simply
-    // start the process and return `true`. In practice, none of the tests
-    // do this. If they do in the future, there is not much we can do anyway.
-    if (port != null) {
-      _log.info('Wait until serve responds to curl.');
-      final curlStatus = await retryWaitForCurlHTTPCode(
-          ['http://localhost:$port/targets.json'], 200,
-          logger: _log);
-      _log.info('curl return code: $curlStatus');
-      if (curlStatus != 0) {
-        return false;
-      }
+    _log.info('Wait until serve responds to curl.');
+    final curlStatus = await retryWaitForCurlHTTPCode(
+        ['http://localhost:${_servePort.value}/$repoName/targets.json'], 200,
+        logger: _log);
+    _log.info('curl return code: $curlStatus');
+    if (curlStatus != 0) {
+      return false;
     }
     return true;
   }
 
-  /// Start a package server using `pm serve` with serve-selected port.
+  /// Start a package server using `ffx repository server` with serve-selected
+  /// port.
   ///
-  /// Passes in `-l :0` to tell `serve` to choose its own port.
-  /// `-f <port file path>` saves the chosen port number to a file.
-  ///
-  /// Does not return until the port file is created, or times out.
-  ///
-  /// Uses this command:
-  /// `pm serve -repo=<repo path> -l :0 -f <port file path> [extraArgs]`
-  Future<void> pmServeRepoLFExtra(List<String> extraServeArgs) async {
-    final portFilePath = path.join(_repoPath, 'port_file.txt');
-    List<String> arguments = [
-      'serve',
-      '-repo=$_repoPath',
-      '-l',
-      ':0',
-      '-f',
-      portFilePath
-    ];
-    _log.info('Serve is starting.');
-    final retryOptions = RetryOptions(maxAttempts: 5);
-    // final args = arguments + extraServeArgs
-    await retryOptions.retry(() async {
-      if (!await tryServe(arguments + extraServeArgs)) {
-        throw Exception('Attempt to bringup `pm serve` has failed.');
-      }
-    });
-
-    _log.info('Waiting until the port file is created at: $portFilePath');
-    final portFile = File(portFilePath);
-    String portString = await retryOptions.retry(portFile.readAsStringSync);
-    expect(portString, isNotNull);
-    _servePort = Optional.of(int.parse(portString));
-    expect(_servePort.isPresent, isTrue);
-    _log.info('Serve started on port: ${_servePort.value}');
-  }
-
-  /// Start a package server using `pm serve` with our own port selection.
+  /// Passes in `--address [::]:0` to tell `ffx repository` to choose its own
+  /// port.
   ///
   /// Does not return until the serve begins listening, or times out.
   ///
-  /// Uses this command:
-  /// `pm serve -repo=<repo path> -l :<port number> [extraArgs]`
-  Future<void> pmServeRepoLExtra(List<String> extraServeArgs) async {
-    await getUnusedPort<Process>((unusedPort) async {
-      _servePort = Optional.of(unusedPort);
-      List<String> arguments = [
-        'serve',
-        '-repo=$_repoPath',
-        '-l',
-        ':$unusedPort'
-      ];
+  /// Uses these commands:
+  /// `ffx repository add-from-pm <repo path> --repository <repo name>`
+  /// `ffx repository server start --address [::]:0`
+  Future<void> startServer(String repoName) async {
+    _log.info('Server is starting.');
+    final retryOptions = RetryOptions(maxAttempts: 5);
+    await retryOptions.retry(() async {
+      if (!await tryServe(repoName, 0)) {
+        throw Exception(
+            'Attempt to bringup `ffx repository server` has failed.');
+      }
+    });
+  }
+
+  /// Start a package server using `ffx repository server` with our own port
+  /// selection.
+  ///
+  /// Does not return until the serve begins listening, or times out.
+  ///
+  /// Uses these commands:
+  /// `ffx repository add-from-pm <repo path> --repository <repo name>`
+  /// `ffx repository server start --address [::]:<port number>`
+  Future<void> startServerUnusedPort(String repoName) async {
+    await getUnusedPort<bool>((unusedPort) async {
       _log.info('Serve is starting on port: $unusedPort');
-      if (await tryServe(arguments + extraServeArgs, port: unusedPort)) {
-        return _serveProcess.value;
+      if (await tryServe(repoName, unusedPort)) {
+        return true;
       }
       return null;
     });
 
-    expect(_serveProcess.isPresent, isTrue);
     expect(_servePort.isPresent, isTrue);
+  }
+
+  Future<dynamic> serverStatus() async {
+    return json.decode(
+        await ffx(['--machine', 'json', 'repository', 'server', 'status']));
+  }
+
+  /// Register the repo in target using `ffx target repository register`.
+  ///
+  /// Uses this command:
+  /// `ffx target repository register`
+  Future<void> ffxTargetRepositoryRegister() async {
+    await ffx(['target', 'repository', 'register']);
+  }
+
+  Future<String> ffx(List<String> args) async {
+    final result =
+        await Process.run(_ffxPath, ['--isolate-dir', _ffxIsolateDir] + args);
+    expect(result.exitCode, 0,
+        reason: '`ffx ${args.join(" ")}` failed: ' + result.stderr);
+    return result.stdout;
   }
 
   /// Get the named component from the repo using `pkgctl resolve`.
@@ -297,46 +205,6 @@ class PackageManagerRepo {
   /// `pkgctl repo`
   Future<ProcessResult> pkgctlRepo(String msg, int retCode) async {
     return _sl4fRun(msg, 'pkgctl repo', [], retCode);
-  }
-
-  /// Add repo source using `pkgctl repo add file`.
-  ///
-  /// Uses this command:
-  /// `pkgctl repo add file <path> -f <format version>`
-  Future<ProcessResult> pkgctlRepoAddFileF(
-      String msg, String path, String format, int retCode) async {
-    return _sl4fRun(
-        msg, 'pkgctl repo add', ['file $path', '-f $format'], retCode);
-  }
-
-  /// Add repo source using `pkgctl repo add file`.
-  ///
-  /// Uses this command:
-  /// `pkgctl repo add file <path> -n <name> -f <format version>`
-  Future<ProcessResult> pkgctlRepoAddFileNF(
-      String msg, String path, String name, String format, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl repo add',
-        ['file $path', '-n $name', '-f $format'], retCode);
-  }
-
-  /// Add repo source using `pkgctl repo add url`.
-  ///
-  /// Uses this command:
-  /// `pkgctl repo add url <url> -f <format version>`
-  Future<ProcessResult> pkgctlRepoAddUrlF(
-      String msg, String url, String format, int retCode) async {
-    return _sl4fRun(
-        msg, 'pkgctl repo add', ['url $url', '-f $format'], retCode);
-  }
-
-  /// Add repo source using `pkgctl repo add url`.
-  ///
-  /// Uses this command:
-  /// `pkgctl repo add url <url> -n <name> -f <format version>`
-  Future<ProcessResult> pkgctlRepoAddUrlNF(
-      String msg, String url, String name, String format, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl repo add',
-        ['url $url', '-n $name', '-f $format'], retCode);
   }
 
   /// Remove a repo source using `pkgctl repo rm`.
@@ -405,56 +273,37 @@ class PackageManagerRepo {
   Future<bool> setupRepo(String farPath, String manifestPath) async {
     final archivePath =
         Platform.script.resolve('runtime_deps/$farPath').toFilePath();
-    var responses = await Future.wait([
+    await Future.wait([
       ffxRepositoryCreate(),
       ffxPackageArchiveCreate(manifestPath, archivePath)
     ]);
-    expect(responses.length, 2);
-    // Response for creating a new repo.
-    expect(responses[0].exitCode, 0, reason: responses[0].stderr);
-    // Response for creating a `.far` archive file.
-    expect(responses[1].exitCode, 0, reason: responses[1].stderr);
 
     _log.info(
         'Publishing package from archive: $archivePath to repo: $_repoPath');
-    final publishPackageResponse = await ffxRepositoryPublish(archivePath);
-    expect(publishPackageResponse.exitCode, 0);
+    await ffxRepositoryPublish(archivePath);
 
     return true;
   }
 
   Future<bool> setupServe(
-      String farPath, String manifestPath, List<String> extraServeArgs) async {
+      String farPath, String manifestPath, String repoName) async {
     await setupRepo(farPath, manifestPath);
-    await pmServeRepoLExtra(extraServeArgs);
+    await startServerUnusedPort(repoName);
     return true;
   }
 
-  void resetServe() {
-    if (_serveStdout.isPresent) {
-      _serveStdout.value.close();
-      _serveStdout = Optional.absent();
-    }
-    if (_serveStderr.isPresent) {
-      _serveStderr.value.close();
-      _serveStderr = Optional.absent();
-    }
-    if (_serveProcess.isPresent) {
-      _serveProcess.value.kill();
-      _serveProcess = Optional.absent();
+  Future<void> stopServer() async {
+    final status = await serverStatus();
+    if (status['state'] == 'running') {
+      await ffx(['repository', 'server', 'stop']);
     }
   }
 
-  bool kill() {
-    bool success = true; // Allows scaling to more things later.
-    if (_serveProcess.isPresent) {
-      success &= _serveProcess.value.kill();
-    }
-    return success;
-  }
-
-  void cleanup() {
-    Directory(_repoPath).deleteSync(recursive: true);
-    resetServe();
+  Future<void> cleanup() async {
+    await ffx(['daemon', 'stop']);
+    await Future.wait([
+      Directory(_repoPath).delete(recursive: true),
+      Directory(_ffxIsolateDir).delete(recursive: true),
+    ]);
   }
 }

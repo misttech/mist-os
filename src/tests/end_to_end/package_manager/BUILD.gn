@@ -33,9 +33,8 @@ dart_test("package_manager_test") {
 
   # Runs on "main" builders (try and ci) in QEMU environments, but only on x64,
   # as we don't currently support Dart on arm64 hosts.
-  # As delivery blobs aren't supported, it is also disabled on targets using fxblob.
   environments = []
-  if (is_host && !fxfs_blob && target_cpu == "x64") {
+  if (is_host && target_cpu == "x64") {
     environments = [ emu_env ]
   }
 }
@@ -78,7 +77,6 @@ if (is_host) {
 
   host_test_data("runtime_deps") {
     sources = [
-      "$host_tools_dir/pm",
       "$root_out_dir/ffx",
       "$target_gen_dir/pm_deps/package.tar",
     ]
@@ -86,7 +84,6 @@ if (is_host) {
     deps = [
       ":pm_test_package_gather_deps($host_toolchain)",
       "//src/developer/ffx:ffx_bin",
-      "//src/sys/pkg/bin/pm:host($host_toolchain)",
     ]
   }
 

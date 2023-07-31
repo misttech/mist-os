@@ -46,7 +46,6 @@ Future<String> formattedHostAddress(sl4f.Sl4f sl4fDriver, Logger log) async {
 void main() {
   final log = Logger('package_manager_test');
   final runtimeDepsPath = Platform.script.resolve('runtime_deps').toFilePath();
-  final pmPath = Platform.script.resolve('runtime_deps/pm').toFilePath();
   final ffxPath = Platform.script.resolve('runtime_deps/ffx').toFilePath();
   String hostAddress;
   String manifestPath;
@@ -92,13 +91,13 @@ void main() {
     String originalRewriteRuleJson;
     Set<String> originalRepos;
     PackageManagerRepo repoServer;
+    String repoName = 'pm-test-repo';
     String testPackageName = 'package-manager-sample';
     String testRepoRewriteRule =
         '{"version":"1","content":[{"host_match":"package-manager-test","host_replacement":"%%NAME%%","path_prefix_match":"/","path_prefix_replacement":"/"}]}';
 
     setUp(() async {
-      repoServer =
-          await PackageManagerRepo.initRepo(sl4fDriver, pmPath, ffxPath, log);
+      repoServer = await PackageManagerRepo.initRepo(sl4fDriver, ffxPath, log);
 
       // Gather the original package management settings before test begins.
       originalRepos = await getCurrentRepos(sl4fDriver);
@@ -113,13 +112,11 @@ void main() {
         log.severe('Failed to reset pkgctl to default state');
       }
       if (repoServer != null) {
-        repoServer
-          ..kill()
-          ..cleanup();
+        await repoServer.cleanup();
       }
     });
     test(
-        'Test that creates a repository, registers it using pkgctl, and validates that the '
+        'Test that creates a repository, registers it, and validates that the '
         'package in the repository is visible.', () async {
       // Covers these commands (success cases only):
       //
@@ -129,19 +126,20 @@ void main() {
       // pkgctl repo add url <repo URL> -f 1
       // pkgctl repo rm fuchsia-pkg://<repo URL>
       // pkgctl repo
-      // pm serve -repo=<path> -l :<port>
-      await repoServer.setupServe('$testPackageName-0.far', manifestPath, []);
+      // ffx repository add-from-pm <repo path> --repository <repo name>
+      // ffx repository server start --address [::]:<port>
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoName);
       final optionalPort = repoServer.getServePort();
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
-      String repoName = 'pm-test-repo';
       String repoUrl = 'fuchsia-pkg://$repoName';
 
       // Confirm our serve is serving what we expect.
       log.info('Getting the available packages');
       final curlResponse = await Process.run(
-          'curl', ['http://localhost:$port/targets.json', '-i']);
+          'curl', ['http://localhost:$port/$repoName/targets.json', '-i']);
 
       log.info('curl response: ${curlResponse.stdout.toString()}');
       expect(curlResponse.exitCode, 0);
@@ -162,12 +160,7 @@ void main() {
           .stdout
           .toString();
 
-      await repoServer.pkgctlRepoAddUrlNF(
-          'Adding the new repository ${repoServer.getRepoPath()} as an update source with http://$hostAddress:$port/config.json',
-          'http://$hostAddress:$port/config.json',
-          repoName,
-          '1',
-          0);
+      await repoServer.ffxTargetRepositoryRegister();
 
       // Check that our new repo source is listed.
       var listSrcsOutput = (await repoServer.pkgctlRepo(
@@ -214,148 +207,48 @@ void main() {
           .stdout
           .toString();
       expect(ruleListOutput, originalRuleList);
-
-      log.info(
-          'Killing serve process and ensuring the output contains `[pm serve]`.');
-      final killStatus = repoServer.kill();
-      expect(killStatus, isTrue);
-
-      var serveOutputBuilder = StringBuffer();
-      var serveProcess = repoServer.getServeProcess();
-      expect(serveProcess.isPresent, isTrue);
-      await repoServer
-          .getServeStdoutSplitStream()
-          .transform(utf8.decoder)
-          .listen((data) {
-        serveOutputBuilder.write(data);
-      }).asFuture();
-      final serveOutput = serveOutputBuilder.toString();
-      // Ensuring that `[pm serve]` appears in the output because the `-q` flag
-      // wasn't used in the serve command.
-      expect(serveOutput.contains('[pm serve]'), isTrue);
     });
     test(
         'Test that creates a repository, deploys a package, and '
-        'validates that the deployed package is visible from the server. '
-        'Then make sure `pm serve` output is quiet.', () async {
+        'validates that the deployed package is visible from the server. ',
+        () async {
       // Covers these commands (success cases only):
-      //
-      // Newly covered:
-      // pm serve -repo=<path> -l :<port> -q
       //
       // Previously covered:
       // pkgctl repo add url http://<host>:<port>/config.json -n testhost -f 1
-      await repoServer
-          .setupServe('$testPackageName-0.far', manifestPath, ['-q']);
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoName);
       final optionalPort = repoServer.getServePort();
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
       log.info('Getting the available packages');
       final curlResponse = await Process.run(
-          'curl', ['http://localhost:$port/targets.json', '-i']);
+          'curl', ['http://localhost:$port/$repoName/targets.json', '-i']);
 
       log.info('curl response: ${curlResponse.stdout.toString()}');
       expect(curlResponse.exitCode, 0);
       final curlOutput = curlResponse.stdout.toString();
       expect(curlOutput.contains('$testPackageName/0'), isTrue);
 
-      await repoServer.pkgctlRepoAddUrlNF(
-          'Adding the new repository as an update source with http://$hostAddress:$port',
-          'http://$hostAddress:$port/config.json',
-          'testhost',
-          '1',
-          0);
-
-      log.info(
-          'Killing serve process and ensuring the output does not contain `[pm serve]`.');
-      final killStatus = repoServer.kill();
-      expect(killStatus, isTrue);
-
-      var serveOutputBuilder = StringBuffer();
-      var serveProcess = repoServer.getServeProcess();
-      expect(serveProcess.isPresent, isTrue);
-      await repoServer
-          .getServeStdoutSplitStream()
-          .transform(utf8.decoder)
-          .listen((data) {
-        serveOutputBuilder.write(data);
-      }).asFuture();
-      final serveOutput = serveOutputBuilder.toString();
-      // The `-q` flag was given to `pm serve`, so there should be no serve output.
-      expect(serveOutput.contains('[pm serve]'), isFalse);
+      await repoServer.ffxTargetRepositoryRegister();
     });
-    test('Test pkgctl default name behavior when no name is given.', () async {
+    test('Test `ffx repository server` chooses its own port number.', () async {
       // Covers these commands (success cases only):
       //
       // Newly covered:
-      // pkgctl repo add url http://<host>:<port>/config.json -f 1
-      //
-      // Previously covered:
-      // pm serve -repo=<path> -l :<port>
-      // pkgctl repo
-      await repoServer.setupServe('$testPackageName-0.far', manifestPath, []);
-      final optionalPort = repoServer.getServePort();
-      expect(optionalPort.isPresent, isTrue);
-      final port = optionalPort.value;
-
-      await repoServer.pkgctlRepoAddUrlF(
-          'Adding the new repository as an update source with http://$hostAddress:$port',
-          'http://$hostAddress:$port/config.json',
-          '1',
-          0);
-
-      var listSrcsOutput = (await repoServer.pkgctlRepo(
-              'Running pkgctl repo to list sources', 0))
-          .stdout
-          .toString();
-
-      log.info('Running pkgctl repo to list sources');
-      String repoName = 'http://$hostAddress:$port';
-      // Ensure the repo name complies to
-      // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
-      repoName = validRepoName(repoName);
-
-      log.info('Checking repo name is $repoName');
-      expect(listSrcsOutput.contains(repoName), isTrue);
-    });
-    test('Test `pm serve` writes its port number to a given file path.',
-        () async {
-      // Covers these commands (success cases only):
-      //
-      // Newly covered:
-      // pm serve -repo=<path> -l :<port> -f <path to export port number>
-      await repoServer.setupRepo('$testPackageName-0.far', manifestPath);
-      final portFilePath = path.join(repoServer.getRepoPath(), 'port_file.txt');
-
-      await repoServer.pmServeRepoLExtra(['-f', '$portFilePath']);
-      final optionalPort = repoServer.getServePort();
-      expect(optionalPort.isPresent, isTrue);
-      final port = optionalPort.value;
-
-      log.info('Checking that $portFilePath was generated with content: $port');
-      final retryOptions = RetryOptions(maxAttempts: 5);
-      String portString =
-          await retryOptions.retry(File(portFilePath).readAsStringSync);
-      expect(portString, isNotNull);
-      expect(int.parse(portString), port);
-    });
-    test(
-        'Test `pm serve` chooses its own port number and writes it to a given file path.',
-        () async {
-      // Covers these commands (success cases only):
-      //
-      // Newly covered:
-      // pm serve -repo=<path> -l :0 -f <path to export port number>
+      // ffx repository server start --address [::]:0
       await repoServer.setupRepo('$testPackageName-0.far', manifestPath);
 
-      await repoServer.pmServeRepoLFExtra([]);
+      await repoServer.startServer(repoName);
       final optionalPort = repoServer.getServePort();
       expect(optionalPort.isPresent, isTrue);
 
       log.info('Checking port ${optionalPort.value} is valid.');
-      final curlResponse = await Process.run('curl',
-          ['http://localhost:${optionalPort.value}/targets.json', '-i']);
+      final curlResponse = await Process.run('curl', [
+        'http://localhost:${optionalPort.value}/$repoName/targets.json',
+        '-i'
+      ]);
 
       log.info('curl response: ${curlResponse.stdout.toString()}');
       expect(curlResponse.exitCode, 0);
@@ -377,23 +270,19 @@ void main() {
           equals(
               'resolving fuchsia-pkg://package-manager-test/package-manager-sample\n'));
 
-      await repoServer.setupServe('$testPackageName-0.far', manifestPath, []);
-      final optionalPort = repoServer.getServePort();
-      expect(optionalPort.isPresent, isTrue);
-      final port = optionalPort.value;
-
       // The repo path usually contains disallowed characters like '/' and
       // uppercase characters. pkgctl will return an error in this case.
       // Ensure we have a repoNameFixed that is known to comply with
       // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
       var repoNameFixed = validRepoName(repoServer.getRepoPath());
 
-      await repoServer.pkgctlRepoAddUrlNF(
-          'Adding the new repository with http://$hostAddress:$port',
-          'http://$hostAddress:$port/config.json',
-          repoNameFixed,
-          '1',
-          0);
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoNameFixed);
+      final optionalPort = repoServer.getServePort();
+      expect(optionalPort.isPresent, isTrue);
+      final port = optionalPort.value;
+
+      await repoServer.ffxTargetRepositoryRegister();
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule =
@@ -429,23 +318,19 @@ void main() {
       expect(resolveVProcessResult.stdout.toString(),
           isNot(contains('package contents:\n')));
 
-      await repoServer.setupServe('$testPackageName-0.far', manifestPath, []);
-      final optionalPort = repoServer.getServePort();
-      expect(optionalPort.isPresent, isTrue);
-      final port = optionalPort.value;
-
       // The repo path usually contains disallowed characters like '/' and
       // uppercase characters. pkgctl will return an error in this case.
       // Ensure we have a repoNameFixed that is known to comply with
       // https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
       var repoNameFixed = validRepoName(repoServer.getRepoPath());
 
-      await repoServer.pkgctlRepoAddUrlNF(
-          'Adding the new repository with http://$hostAddress:$port',
-          'http://$hostAddress:$port/config.json',
-          repoNameFixed,
-          '1',
-          0);
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoNameFixed);
+      final optionalPort = repoServer.getServePort();
+      expect(optionalPort.isPresent, isTrue);
+      final port = optionalPort.value;
+
+      await repoServer.ffxTargetRepositoryRegister();
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule =
@@ -483,23 +368,18 @@ void main() {
           .exitCode;
       expect(resolveExitCode, isNonZero);
 
-      await repoServer.setupServe('$testPackageName-0.far', manifestPath, []);
+      var repoNameFixed = validRepoName(repoServer.getRepoPath());
+
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoNameFixed);
       final optionalPort = repoServer.getServePort();
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
-      var repoNameFixed = validRepoName(repoServer.getRepoPath());
-
-      await repoServer.pkgctlRepoAddUrlNF(
-          'Adding the new repository with http://$hostAddress:$port',
-          'http://$hostAddress:$port/config.json',
-          repoNameFixed,
-          '1',
-          0);
+      await repoServer.ffxTargetRepositoryRegister();
 
       var localRewriteRule = testRepoRewriteRule;
-      localRewriteRule =
-          localRewriteRule.replaceAll('%%NAME%%', '$repoNameFixed');
+      localRewriteRule = localRewriteRule.replaceAll('%%NAME%%', repoNameFixed);
       await repoServer.pkgctlRuleReplace(
           'Setting rewriting rule for new repository', localRewriteRule, 0);
 
@@ -526,20 +406,15 @@ void main() {
       // 3. We are able to serve our repo to a given Fuchsia device.
       // 4. The device is able to pull the given component from our repo.
       // 5. The given component contains the expected content.
-      await repoServer.setupServe('$testPackageName-0.far', manifestPath, []);
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoName);
       final optionalPort = repoServer.getServePort();
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
-      String repoName = 'pm-test-repo';
       String repoUrl = 'fuchsia-pkg://$repoName';
 
-      await repoServer.pkgctlRepoAddUrlNF(
-          'Adding the new repository as an update source with http://$hostAddress:$port',
-          'http://$hostAddress:$port/config.json',
-          repoName,
-          '1',
-          0);
+      await repoServer.ffxTargetRepositoryRegister();
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule = localRewriteRule.replaceAll('%%NAME%%', '$repoName');
