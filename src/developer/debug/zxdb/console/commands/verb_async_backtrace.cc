@@ -8,12 +8,14 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
+#include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/console/async_output_buffer.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
@@ -378,37 +380,40 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
 }
 
 // Format (usize, alloc::sync::Arc<fuchsia_async::runtime::fuchsia::executor::common::Task>)
-fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMapTuple(
+// Instead of return an AsyncOutputBuffer directly, use a callback to also return task_id.
+void FormatActiveTasksHashMapTuple(
     const ExprValue& tuple, const FormatFutureOptions& options,
-    const fxl::RefPtr<EvalContext>& context) {
+    const fxl::RefPtr<EvalContext>& context,
+    fit::callback<void(uint64_t, fxl::RefPtr<AsyncOutputBuffer>)> cb) {
   ErrOrValue arc_inner_ptr = ResolveNonstaticMember(context, tuple, {"__1", "ptr", "pointer"});
   if (arc_inner_ptr.has_error())
-    return FormatError("Invalid HashMap tuple (1)", arc_inner_ptr.err());
-  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  ResolvePointer(context, arc_inner_ptr.value(), [=](ErrOrValue arc_inner) {
-    if (arc_inner.has_error())
-      return out->Complete(FormatError("Invalid HashMap tuple (2)", arc_inner.err()));
-    ErrOrValue id = ResolveNonstaticMember(context, arc_inner.value(), {"data", "id"});
-    uint64_t task_id = 0;
-    if (id.has_error() || id.value().PromoteTo64(&task_id).has_error())
-      return out->Complete(FormatError("Invalid HashMap tuple (3)", id.err()));
-    out->Append("Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGreen);
-    out->Append(kAwaiteeMarker);
-    ErrOrValue some =
-        ResolveNonstaticMember(context, arc_inner.value(), {"data", "future", "future", "value"});
-    if (some.has_error())
-      return out->Complete(FormatError("Invalid HashMap tuple (4)", some.err()));
-    some = ResolveSingleVariantValue(context, some.value());
-    if (some.has_error() || some.value().type()->GetAssignedName() != "Some")
-      return out->Complete(FormatError("Invalid HashMap tuple (5)", some.err()));
-    ErrOrValue future = ResolveNonstaticMember(context, some.value(), {"__0", "__0", "future"});
-    if (future.has_error())
-      return out->Complete(FormatError("Invalid HashMap tuple (6)", future.err()));
+    return cb(0, FormatError("Invalid HashMap tuple (1)", arc_inner_ptr.err()));
+  ResolvePointer(
+      context, arc_inner_ptr.value(), [=, cb = std::move(cb)](ErrOrValue arc_inner) mutable {
+        if (arc_inner.has_error())
+          return cb(0, FormatError("Invalid HashMap tuple (2)", arc_inner.err()));
+        ErrOrValue id = ResolveNonstaticMember(context, arc_inner.value(), {"data", "id"});
+        uint64_t task_id = 0;
+        if (id.has_error() || id.value().PromoteTo64(&task_id).has_error())
+          return cb(0, FormatError("Invalid HashMap tuple (3)", id.err()));
+        auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+        out->Append("Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGreen);
+        out->Append(kAwaiteeMarker);
+        ErrOrValue some = ResolveNonstaticMember(context, arc_inner.value(),
+                                                 {"data", "future", "future", "value"});
+        if (some.has_error())
+          return cb(task_id, FormatError("Invalid HashMap tuple (4)", some.err()));
+        some = ResolveSingleVariantValue(context, some.value());
+        if (some.has_error() || some.value().type()->GetAssignedName() != "Some")
+          return cb(task_id, FormatError("Invalid HashMap tuple (5)", some.err()));
+        ErrOrValue future = ResolveNonstaticMember(context, some.value(), {"__0", "__0", "future"});
+        if (future.has_error())
+          return cb(task_id, FormatError("Invalid HashMap tuple (6)", future.err()));
 
-    // |future| is a $(*mut dyn core::future::future::Future<Output=()>).
-    out->Complete(FormatFuture(future.value(), options, context, 3));
-  });
-  return out;
+        // |future| is a $(*mut dyn core::future::future::Future<Output=()>).
+        out->Complete(FormatFuture(future.value(), options, context, 3));
+        cb(task_id, out);
+      });
 }
 
 // Format HashMap<usize, alloc::sync::Arc<fuchsia_async::runtime::fuchsia::executor::common::Task>>
@@ -475,40 +480,32 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
           out->Complete(FormatError("Invalid HashMap (8)", err));
           return;
         }
+        // Tasks are collected using a JoinCallbacks first so that they can be sorted by their id
+        // rather than the orders appearing in the hashmap.
+        using CallbackDataType = std::pair<uint64_t, fxl::RefPtr<AsyncOutputBuffer>>;
+        auto joiner = fxl::MakeRefCounted<JoinCallbacks<CallbackDataType>>();
         for (size_t idx = 0; idx < capacity; idx++) {
           if ((data[total_buckets_size + idx] & 0x80))  // not present
             continue;
           uint8_t* slot = &data[total_buckets_size - (idx + 1) * tuple_type->byte_size()];
           ExprValue tuple(tuple_type, {slot, slot + tuple_type->byte_size()},
                           ExprValueSource(ctrl - (idx + 1) * tuple_type->byte_size()));
-          out->Append(FormatActiveTasksHashMapTuple(tuple, options, context));
+          FormatActiveTasksHashMapTuple(
+              tuple, options, context,
+              [cb = joiner->AddCallback()](auto task_id, auto output) mutable {
+                cb(std::make_pair(task_id, std::move(output)));
+              });
         }
-        out->Complete();
+        joiner->Ready([out](std::vector<CallbackDataType> tasks) {
+          std::sort(tasks.begin(), tasks.end(),
+                    [](auto& p1, auto& p2) { return p1.first < p2.first; });
+          for (auto& p : tasks) {
+            out->Append(std::move(p.second));
+          }
+          out->Complete();
+        });
       });
 
-  return out;
-}
-
-fxl::RefPtr<AsyncOutputBuffer> FormatLocalExecutor(const FormatFutureOptions& options,
-                                                   const fxl::RefPtr<EvalContext>& context) {
-  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-
-  // For single-threaded executor, the main_future only lives on the stack so we need to print
-  // both the main_future and the active_tasks.
-  EvalExpression("main_future", context, false, [out, options, context](const ErrOrValue& value) {
-    if (value.has_error()) {
-      out->Append(FormatError("Cannot locate main_future: " + value.err().msg() +
-                              ". Note that only debug build is supported for now."));
-    } else {
-      out->Append("MainTask\n", TextForegroundColor::kGreen);
-      out->Append(kAwaiteeMarker);
-      out->Append(FormatFuture(value.value(), options, context, 3));
-    }
-    EvalExpression("self.inner->data.active_tasks.data.value", context, false,
-                   [out, options, context](const ErrOrValue& value) {
-                     out->Complete(FormatActiveTasksHashMap(value, options, context));
-                   });
-  });
   return out;
 }
 
@@ -522,10 +519,10 @@ fxl::RefPtr<AsyncOutputBuffer> FormatSendExecutorMainThread(
   return out;
 }
 
-fxl::RefPtr<AsyncOutputBuffer> FormatSendExecutorWorkerThread(
-    const FormatFutureOptions& options, const fxl::RefPtr<EvalContext>& context) {
+fxl::RefPtr<AsyncOutputBuffer> FormatExecutorWorkerThread(const FormatFutureOptions& options,
+                                                          const fxl::RefPtr<EvalContext>& context) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  EvalExpression("inner->data.active_tasks.data.value", context, false,
+  EvalExpression("self.ptr->data.active_tasks.data.value", context, false,
                  [out, options, context](const ErrOrValue& value) {
                    out->Complete(FormatActiveTasksHashMap(value, options, context));
                  });
@@ -545,17 +542,12 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
     if (!stack[i]->GetLocation().has_symbols())
       continue;
     std::string func_name(StripTemplate(stack[i]->GetLocation().symbol().Get()->GetFullName()));
-    if (func_name ==
-        "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run_singlethreaded") {
-      cmd_context->Output(FormatLocalExecutor(options, stack[i]->GetEvalContext()));
+    if (func_name == "fuchsia_async::runtime::fuchsia::executor::common::Inner::worker_lifecycle") {
+      cmd_context->Output(FormatExecutorWorkerThread(options, stack[i]->GetEvalContext()));
       return;
     }
     if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
       cmd_context->Output(FormatSendExecutorMainThread(options, stack[i]->GetEvalContext()));
-      return;
-    }
-    if (func_name == "fuchsia_async::runtime::fuchsia::executor::common::Inner::worker_lifecycle") {
-      cmd_context->Output(FormatSendExecutorWorkerThread(options, stack[i]->GetEvalContext()));
       return;
     }
   }

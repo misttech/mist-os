@@ -5,6 +5,7 @@ Launched Process 1 state=Running koid=?? name=async_rust.cm component=async_rust
 🛑 abort() • abort.c:??
 
 [zxdb] abt
+Task(id = 0)
 └─ async_rust::main::func • select_mod.rs:??
    └─ select!
       └─ async_rust::foo • join_mod.rs:??
@@ -21,9 +22,6 @@ Launched Process 1 state=Running koid=?? name=async_rust.cm component=async_rust
 Task(id = 1)
 └─ async_rust::baz • async_rust.rs:??
    └─ fuchsia_async::runtime::fuchsia::timer::Timer
-
-# Rerun the command again because the order between Task(1) and Task(2) is nondeterministic.
-[zxdb] abt
 Task(id = 2)
 └─ async_rust::baz (Unresumed) • async_rust.rs:??
 

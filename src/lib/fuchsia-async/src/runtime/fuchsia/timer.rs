@@ -239,6 +239,7 @@ impl Eq for TimeWaker {}
 mod test {
     use super::*;
     use crate::{LocalExecutor, SendExecutor, TestExecutor, Timer};
+    use assert_matches::assert_matches;
     use fuchsia_zircon::prelude::*;
     use fuchsia_zircon::Duration;
     use futures::future::Either;
@@ -268,28 +269,33 @@ mod test {
 
     #[test]
     fn fires_after_timeout() {
-        let mut exec = TestExecutor::new();
+        let mut exec = TestExecutor::new_with_fake_time();
+        exec.set_fake_time(Time::from_nanos(0));
         let deadline = Time::after(5.seconds());
         let mut future = Timer::new(deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
-        assert_eq!(Some(deadline), exec.wake_next_timer());
+        exec.set_fake_time(deadline);
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut future));
     }
 
     #[test]
     fn timer_before_now_fires_immediately() {
         let mut exec = TestExecutor::new();
-        let deadline = Time::from(Time::now() - Duration::from_nanos(1));
-        let mut future = Timer::new(deadline);
-        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
-        assert!(exec.wake_expired_timers());
-        assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut future));
+        let now = Time::now();
+        let before = Timer::new(now - Duration::from_nanos(1));
+        let after = Timer::new(now + Duration::from_nanos(1));
+        assert_matches!(
+            exec.run_singlethreaded(futures::future::select(before, after)),
+            Either::Left(_),
+            "Timer in the past should fire first"
+        );
     }
 
     #[test]
     fn interval() {
-        let mut exec = TestExecutor::new();
-        let start = Time::now();
+        let mut exec = TestExecutor::new_with_fake_time();
+        let start = Time::from_nanos(0);
+        exec.set_fake_time(start);
 
         let counter = Arc::new(::std::sync::atomic::AtomicUsize::new(0));
         let mut future = {
@@ -306,8 +312,9 @@ mod test {
         assert_eq!(0, counter.load(Ordering::SeqCst));
 
         // Pretend to wait until the next timer
-        let first_deadline = exec.wake_next_timer().expect("Expected a pending timeout (1)");
-        assert!(first_deadline >= start + 5.seconds());
+        let first_deadline = exec.next_timer().expect("Expected a pending timeout (1)");
+        assert!(first_deadline >= 5.seconds() + start);
+        exec.set_fake_time(first_deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(1, counter.load(Ordering::SeqCst));
 
@@ -316,7 +323,8 @@ mod test {
         assert_eq!(1, counter.load(Ordering::SeqCst));
 
         // "Wait" until the next timeout and poll again: expect another item from the stream
-        let second_deadline = exec.wake_next_timer().expect("Expected a pending timeout (2)");
+        let second_deadline = exec.next_timer().expect("Expected a pending timeout (2)");
+        exec.set_fake_time(second_deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(2, counter.load(Ordering::SeqCst));
 
@@ -329,11 +337,9 @@ mod test {
         exec.set_fake_time(Time::from_nanos(0));
 
         let mut timer = Timer::new(Time::after(1.seconds()));
-        assert_eq!(exec.wake_expired_timers(), false);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut timer));
 
         exec.set_fake_time(Time::after(1.seconds()));
-        assert_eq!(exec.wake_expired_timers(), true);
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut timer));
     }
 }
