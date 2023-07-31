@@ -90,33 +90,20 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 _MAIN_ARG_PARSER = _main_arg_parser()
 
 
-def read_download_stub_infos(
-    stub_paths: Iterable[Path],
-    verbose: bool = False,
-    dry_run: bool = False,
-) -> Dict[Path, remote_action.DownloadStubInfo]:
-    result = dict()
-    for p in stub_paths:
-        if remote_action.is_download_stub_file(p):
-            vmsg(verbose, f"Read download stub for {p}.")
-            result[p] = remote_action.DownloadStubInfo.read_from_file(p)
-        else:
-            vmsg(verbose, f"{p} is not a download stub, skipping.")
-    return result
-
-
 def _download_for_mp(
-    packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
-                       Path, Path]
+    packed_args: Tuple[Path, remotetool.RemoteTool, Path]
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     """multiprocessing requires functions to be pickle-able,
     thus this function must exist at the module-level scope.
     """
-    stub, downloader, working_dir_abs, dest = packed_args
+    stub_path, downloader, working_dir_abs = packed_args
     return (
-        dest,
-        stub.download(
-            downloader=downloader, working_dir_abs=working_dir_abs, dest=dest))
+        stub_path,
+        remote_action.download_from_stub(
+            stub=stub_path,
+            downloader=downloader,
+            working_dir_abs=working_dir_abs,
+        ))
 
 
 def download_artifacts(
@@ -129,15 +116,12 @@ def download_artifacts(
     """Download remotely stored artifacts.
 
     Args:
-      stub_paths: path that point to either download stubs or real artifacts.
+      stub_paths: paths that point to either download stubs or real artifacts.
         Real artifacts are ignored automatically.
     """
-    stub_infos = read_download_stub_infos(
-        set(stub_paths), verbose=verbose, dry_run=dry_run)
-
     download_args = [
-        (stub_info, downloader, working_dir_abs, p)
-        for p, stub_info in stub_infos.items()
+        # for _download_for_mp()
+        (path, downloader, working_dir_abs) for path in stub_paths
     ]
     try:
         with multiprocessing.Pool() as pool:
@@ -168,12 +152,13 @@ def _main(
 ) -> int:
     main_args = _MAIN_ARG_PARSER.parse_args(argv)
 
-    paths = main_args.download + list(
-        cl_utils.expand_paths_from_files(main_args.download_list))
+    paths = set(main_args.download)
+    paths.update(cl_utils.expand_paths_from_files(main_args.download_list))
 
     if main_args.undownload:
         vmsg(main_args.verbose, f"Restoring download stubs.")
         for p in paths:
+            # Fast, no need to parallelize.
             remote_action.undownload(p)
 
         if main_args.command:

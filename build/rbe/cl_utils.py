@@ -10,6 +10,7 @@ import asyncio
 import collections
 import contextlib
 import dataclasses
+import fcntl
 import filecmp
 import io
 import os
@@ -461,6 +462,35 @@ def exec_relaunch(command: Sequence[str]) -> None:
     # Workaround: fork a subprocess
     sys.exit(subprocess.call(command))
     assert False, "exec_relaunch() should never return"
+
+
+#####################################################################
+class BlockingFileLock(object):
+    """A minimal mutual exclusion lock (blocking)."""
+
+    def __init__(self, lockfile: Path):
+        self._lockfile: Path = lockfile
+        self._lockfile_fd = None
+
+    def _acquire(self):
+        lockfile_fd = os.open(self._lockfile, os.O_RDWR | os.O_CREAT, 0o644)
+        fcntl.flock(lockfile_fd, fcntl.LOCK_EX)  # Blocking
+        self._lockfile_fd = lockfile_fd
+
+    def _release(self):
+        lockfile_fd = self._lockfile_fd
+        self._lockfile_fd = None
+        fcntl.flock(lockfile_fd, fcntl.LOCK_UN)
+        os.close(lockfile_fd)
+        # Do not remove the lock file:
+        # https://stackoverflow.com/questions/17708885/flock-removing-locked-file-without-race-condition
+
+    def __enter__(self) -> 'BlockingFileLock':
+        self._acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._release()
 
 
 #####################################################################
