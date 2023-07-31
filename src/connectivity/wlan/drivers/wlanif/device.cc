@@ -67,14 +67,15 @@ Device::Device(zx_device_t* device) : ddk::Device<Device, ddk::Unbindable>(devic
 Device::Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client)
     : ddk::Device<Device, ddk::Unbindable>(device) {
   // Create a dispatcher to wait on the runtime channel
-  auto dispatcher =
-      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                          "wlan_fullmac_ifc_server", [&](fdf_dispatcher_t*) {
-                                            if (unbind_txn_) {
-                                              unbind_txn_->Reply();
-                                              unbind_txn_.reset();
-                                            }
-                                          });
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_server",
+      [&](fdf_dispatcher_t*) {
+        if (unbind_txn_) {
+          unbind_txn_->Reply();
+        } else {
+          lerror("No unbind_txn_ found, this should never happen.");
+        }
+      });
 
   if (dispatcher.is_error()) {
     lerror("Creating server dispatcher error : %s\n",
