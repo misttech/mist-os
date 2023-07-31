@@ -16,6 +16,8 @@ namespace ktl {
 // inline it for some reason, so we need to provide a definition.
 using std::align;
 
+using std::align_val_t;
+
 }  // namespace ktl
 
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ALIGN_H_
