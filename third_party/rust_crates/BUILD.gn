@@ -1084,6 +1084,10 @@ group("webpki") {
   public_deps = [ ":webpki-v0_21_0" ]
 }
 
+group("which") {
+  public_deps = [ ":which-v4_0_2" ]
+}
+
 group("xml-rs") {
   public_deps = [ ":xml-rs-v0_8_0" ]
 }
