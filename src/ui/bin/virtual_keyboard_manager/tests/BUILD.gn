@@ -64,7 +64,6 @@ executable("focus_dispatcher_unittests_bin") {
   deps = [
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/cpp/testing:integration_fixture",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",

@@ -5,8 +5,9 @@
 #include <fuchsia/camera/test/cpp/fidl.h>
 #include <fuchsia/camera2/hal/cpp/fidl.h>
 #include <fuchsia/camera3/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/cpp/testing/fake_launcher.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/camera/bin/device_watcher/device_instance.h"

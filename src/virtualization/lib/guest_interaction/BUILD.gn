@@ -100,7 +100,7 @@ source_set("integration_test_lib") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//sdk/lib/sys/cpp/testing:integration_fixture",
+    "//src/lib/testing/loop_fixture",
     "//src/virtualization/tests/lib:fake_netstack",
   ]
   deps = [
@@ -108,6 +108,7 @@ source_set("integration_test_lib") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/testing/predicates",
     "//src/virtualization/tests/lib:guest_console",
   ]
@@ -233,6 +234,7 @@ executable("server_daemon_test") {
     ":fuchsia.virtualization.guest.interaction_hlcpp",
     ":guest_interaction_client",
     ":integration_test_lib",
+    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/virtualization/lib/grpc",

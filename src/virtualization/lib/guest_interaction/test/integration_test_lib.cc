@@ -15,7 +15,6 @@
 #include <fuchsia/virtualization/cpp/fidl.h>
 #include <fuchsia/virtualization/guest/interaction/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/sys/cpp/file_descriptor.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/lib/testing/predicates/status.h"

@@ -76,6 +76,7 @@ executable("camera_device_watcher_unittest_bin") {
   deps = [
     ":fuchsia.camera.test_hlcpp",
     ":lib",
+    "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/storage/vfs/cpp",

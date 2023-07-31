@@ -32,7 +32,6 @@ executable("bin") {
   deps = [
     ":icu_headers",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/cpp/testing:integration_fixture",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",

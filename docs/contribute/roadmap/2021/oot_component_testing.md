@@ -51,7 +51,7 @@ impossible to scale for the following reasons:
 
 - Some tools and source code is distributed to partners not via the
   [Fuchsia IDK][idk], the set of [SDK tools][sdk-tools]. For instance the
-  [`TestWithEnvironment`][testwithenvironment] helper class is
+  `TestWithEnvironment` helper class is
   [manually copied to the Flutter repository on GitHub][fxb-73984] to unblock
   integration testing needs.
 
@@ -349,6 +349,5 @@ covered in a [separate roadmap document][oot-system-testing].
 [stress-tests]: /docs/development/testing/stress_tests.md
 [tefmocheck]: /tools/testing/tefmocheck/README.md
 [testrunner]: /tools/testing/testrunner/README.md
-[testwithenvironment]: /sdk/lib/sys/cpp/testing/test_with_environment.h
 [trf]: /docs/development/testing/components/test_runner_framework.md
 [troubleshooting-run-test-component]: /docs/development/testing/components/test_runner_framework.md#troubleshooting

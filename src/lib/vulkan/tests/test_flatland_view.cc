@@ -5,7 +5,6 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl_test_base.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
-#include <lib/sys/cpp/testing/fake_component.h>
 
 #include <gtest/gtest.h>
 #include <src/lib/vulkan/flatland_view/flatland_view.h>

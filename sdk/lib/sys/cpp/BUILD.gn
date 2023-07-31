@@ -13,19 +13,14 @@ sdk_source_set("cpp") {
   sources = [
     "component_context.cc",
     "component_context.h",
-    "file_descriptor.cc",
-    "file_descriptor.h",
     "outgoing_directory.cc",
     "outgoing_directory.h",
     "service_directory.cc",
     "service_directory.h",
-    "termination_reason.cc",
-    "termination_reason.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/fit",
     "//sdk/lib/sys/service/cpp",

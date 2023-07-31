@@ -20,7 +20,6 @@
 //sdk/fidl/fuchsia.mem:fuchsia.mem_sdk
 //sdk/fidl/fuchsia.process:fuchsia.process_sdk
 //sdk/fidl/fuchsia.scenic.scheduling:fuchsia.scenic.scheduling_sdk
-//sdk/fidl/fuchsia.sys:fuchsia.sys_sdk
 //sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_sdk
 //sdk/fidl/fuchsia.test:fuchsia.test_sdk
 //sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_sdk

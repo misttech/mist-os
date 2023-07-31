@@ -16,23 +16,13 @@ sdk_source_set("cpp") {
   sources = [
     "component_context_provider.cc",
     "component_context_provider.h",
-    "enclosing_environment.cc",
-    "enclosing_environment.h",
-    "fake_component.cc",
-    "fake_component.h",
-    "fake_launcher.cc",
-    "fake_launcher.h",
-    "launcher_impl.cc",
-    "launcher_impl.h",
     "service_directory_provider.cc",
     "service_directory_provider.h",
-    "test_with_environment.cc",
-    "test_with_environment.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//zircon/system/ulib/zx",
@@ -52,16 +42,4 @@ group("unit") {
   testonly = true
 
   public_deps = [ ":cpp" ]
-}
-
-source_set("integration_fixture") {
-  testonly = true
-
-  sources = [ "test_with_environment_fixture.h" ]
-
-  public_deps = [
-    "//sdk/lib/async-loop-testing/cpp",
-    "//sdk/lib/sys/cpp/testing:cpp",
-    "//src/lib/testing/loop_fixture",
-  ]
 }

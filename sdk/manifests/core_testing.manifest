@@ -21,7 +21,6 @@ sdk://fidl/fuchsia.math
 sdk://fidl/fuchsia.mem
 sdk://fidl/fuchsia.process
 sdk://fidl/fuchsia.scenic.scheduling
-sdk://fidl/fuchsia.sys
 sdk://fidl/fuchsia.sysmem
 sdk://fidl/fuchsia.test
 sdk://fidl/fuchsia.ui.composition

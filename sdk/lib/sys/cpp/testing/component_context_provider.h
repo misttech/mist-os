@@ -5,7 +5,7 @@
 #ifndef LIB_SYS_CPP_TESTING_COMPONENT_CONTEXT_PROVIDER_H_
 #define LIB_SYS_CPP_TESTING_COMPONENT_CONTEXT_PROVIDER_H_
 
-#include <lib/fdio/directory.h>
+#include <fuchsia/io/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
 

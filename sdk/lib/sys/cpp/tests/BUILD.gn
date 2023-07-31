@@ -14,7 +14,6 @@ test("component_cpp_unittests_bin") {
   sources = [
     "component_context_unittest.cc",
     "echo_server.h",
-    "file_descriptor_unittest.cc",
     "outgoing_directory_unittest.cc",
     "service_directory_unittest.cc",
   ]
@@ -54,7 +53,6 @@ test("component_cpp_testing_unittests_bin") {
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/fidl",
-    "//sdk/lib/sys/cpp/testing:integration_fixture",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl/test:gtest_main",

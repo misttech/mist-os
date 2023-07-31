@@ -7,6 +7,7 @@
 
 #include <fuchsia/accessibility/tts/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/fit/function.h>
 #include <lib/sys/cpp/component_context.h>
 
 namespace a11y {

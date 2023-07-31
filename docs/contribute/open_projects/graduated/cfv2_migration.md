@@ -25,7 +25,7 @@ The legacy framework is largely comprised of:
 *   `sysmgr`, a component that manages the `sys` realm. `sysmgr` is launched by `appmgr`.
 *   The `.cmx` file format for legacy component manifests.
 *   The [`fuchsia.sys.*`][fuchsia-sys] FIDL library.
-*   The [TestWithEnvironment][sdk-test-with-environment] testing library.
+*   The testing portion of the [C++ component library][sdk-lib-sys-cpp].
 
 The legacy framework's development reached its peak in 2018. In 2019, Fuchsia
 team began developing the modern [Component Framework][intro]. Component
@@ -42,7 +42,7 @@ The following component framework software supports both modern and legacy
 components:
 
 *   Libraries that wrap Component Framework APIs, such as the SDK
-    [C++ component library][sdk-components], the internal
+    [C++ component library][sdk-lib-sys-cpp], the internal
     [`fuchsia-component`][lib-fuchsia-component] Rust component library
 *   [`cmc`][cmc], the component manifest compiler.
 
@@ -188,7 +188,6 @@ Reach out for questions or for status updates:
 [intro]: /docs/concepts/components/v2/introduction.md
 [label-cf-v2-migration]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3Acf-v2-migration
 [lib-fuchsia-component]: /src/lib/fuchsia-component/README.md
-[sdk-components]: /sdk/lib/sys/cpp
-[sdk-test-with-environment]: /sdk/lib/sys/cpp/testing/test_with_environment.h
+[sdk-lib-sys-cpp]: /sdk/lib/sys/cpp
 [glossary.session-component]: /docs/glossary/README.md#session-component
 [unit-tests-generated]: /docs/development/components/build.md#unit-tests

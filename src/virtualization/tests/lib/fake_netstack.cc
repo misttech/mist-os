@@ -20,7 +20,6 @@
 #include <lib/fpromise/scope.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
-#include <lib/sys/cpp/testing/enclosing_environment.h>
 #include <lib/syslog/cpp/macros.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>

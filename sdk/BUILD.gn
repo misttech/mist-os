@@ -424,6 +424,7 @@ sdk_molecule("core_testing_deps") {
 
   deps = [
     "//sdk/fidl:fidl_testing",
+    "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
     "//sdk/lib/driver/testing/cpp:cpp_sdk",
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp/testing:cpp_sdk",

@@ -5,6 +5,8 @@
 #ifndef LIB_SYS_CPP_TESTING_SERVICE_DIRECTORY_PROVIDER_H_
 #define LIB_SYS_CPP_TESTING_SERVICE_DIRECTORY_PROVIDER_H_
 
+#include <lib/fidl/cpp/interface_request.h>
+#include <lib/fit/function.h>
 #include <lib/sys/cpp/service_directory.h>
 
 #include <memory>

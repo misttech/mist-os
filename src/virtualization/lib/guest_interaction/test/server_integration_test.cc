@@ -6,7 +6,6 @@
 #include <fuchsia/virtualization/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/sys/cpp/file_descriptor.h>
 #include <threads.h>
 
 #include <map>

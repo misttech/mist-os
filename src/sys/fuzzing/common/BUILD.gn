@@ -59,6 +59,7 @@ source_set("common") {
   ]
   public_deps = [
     "../fidl:fuchsia.fuzzer_hlcpp",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/debug:backtrace-request",
