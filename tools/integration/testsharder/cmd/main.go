@@ -286,8 +286,8 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 	if newTargetDuration > targetDuration {
 		targetDuration = newTargetDuration
 	}
-	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, flags.targetTestCount, testsharder.MultipliedShardPrefix)
-	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, flags.targetTestCount, testsharder.AffectedShardPrefix)
+	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, flags.targetTestCount, testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix)
+	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, flags.targetTestCount, testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix)
 	shards = append(multipliedAffectedShards, shards...)
 	shards = append(shards, multipliedShards...)
 

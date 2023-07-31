@@ -26,6 +26,7 @@ const (
 // Note that just printing a list of shard pointers will print a list of memory addresses,
 // which would make for an unhelpful error message.
 func assertEqual(t *testing.T, expected, actual []*Shard) {
+	t.Helper()
 	opts := cmp.Options{
 		// We don't care about ordering of shards.
 		cmpopts.SortSlices(func(s1, s2 *Shard) bool {

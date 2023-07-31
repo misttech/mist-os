@@ -453,6 +453,10 @@ func TestSplitOutMultipliers(t *testing.T) {
 				tc.testDurations,
 				tc.targetDuration,
 				tc.targetTestCount,
+				// Override the default max multiplied runs per shard
+				// so test data doesn't need to be updated when changing the
+				// production value.
+				2000,
 				MultipliedShardPrefix,
 			)
 			assertEqual(t, tc.expected, actual)

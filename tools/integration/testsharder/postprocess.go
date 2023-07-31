@@ -31,7 +31,7 @@ const (
 	multipliedTestMaxRuns = 1000
 
 	// The maximum total runs across all automatically multiplied tests.
-	maxMultipliedRunsPerShard = 2000
+	MaxMultipliedRunsPerShard = 1000
 
 	// The maximum number of tests that a multiplier can match. testsharder will
 	// fail if this is exceeded.
@@ -125,6 +125,7 @@ func SplitOutMultipliers(
 	// WithTargetDuration instead of the original target duration.
 	targetDuration time.Duration,
 	targetTestCount int,
+	maxMultipliedRunsPerShard int,
 	prefix string,
 ) []*Shard {
 	shardIdxToMatches := make([]map[int]struct{}, len(shards))
