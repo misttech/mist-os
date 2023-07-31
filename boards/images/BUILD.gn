@@ -143,56 +143,6 @@ generated_images_config("vim3") {
   }
 }
 
-#################################
-# zedboot images configurations #
-#################################
-
-_default_zedboot_zbi = {
-  zbi = {
-    name = "zedboot"
-    compression = "zstd"
-  }
-}
-
-generated_images_config("zedboot_default") {
-  forward_variables_from(_default_zedboot_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-}
-
-generated_images_config("zedboot_vim3") {
-  forward_variables_from(_default_zedboot_zbi, "*")
-  forward_variables_from(_vim3_vbmeta, "*")
-}
-
-generated_images_config("zedboot_qemu") {
-  forward_variables_from(_default_zedboot_zbi, "*")
-}
-
-#################################
-# bringup images configurations #
-#################################
-
-_default_bringup_zbi = {
-  zbi = {
-    name = "bringup"
-    compression = "zstd"
-  }
-}
-
-generated_images_config("bringup_default") {
-  forward_variables_from(_default_bringup_zbi, "*")
-  forward_variables_from(_default_vbmeta, "*")
-}
-
-generated_images_config("bringup_vim3") {
-  forward_variables_from(_default_bringup_zbi, "*")
-  forward_variables_from(_vim3_vbmeta, "*")
-}
-
-generated_images_config("bringup_qemu") {
-  forward_variables_from(_default_bringup_zbi, "*")
-}
-
 group("images") {
   public_deps = [
     # Fuchsia images configs
@@ -202,15 +152,5 @@ group("images") {
     ":vim3",
     ":x64",
     ":x64-fxfs",
-
-    # zedboot images configs
-    ":zedboot_default",
-    ":zedboot_qemu",
-    ":zedboot_vim3",
-
-    # bringup images configs
-    ":bringup_default",
-    ":bringup_qemu",
-    ":bringup_vim3",
   ]
 }

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
@@ -14,12 +15,8 @@ assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
 if (has_board) {
-  assert(bringup_images_config_label != false,
-         "Need to define bringup_images_config_label")
   assert(board_information_for_assembly != false,
          "board_information_for_assembly must be defined for the build")
-} else {
-  bringup_images_config_label = "//boards/images:bringup_default"
 }
 
 product_assembly_configuration("product_assembly_config") {
@@ -31,6 +28,12 @@ product_assembly_configuration("product_assembly_config") {
   # The bringup product can't specify anything in base/cache packages, as it
   # doesn't have an fvm with blobfs.
   product = {
+  }
+}
+
+generated_images_config("images_config") {
+  zbi = {
+    name = "bringup"
   }
 }
 
@@ -85,6 +88,6 @@ bringup_base = {
 
 assembled_system("bringup") {
   forward_variables_from(bringup_base, "*")
-  assembly_images_config_label = bringup_images_config_label
+  assembly_images_config_label = ":images_config"
   image_metadata_overrides = legacy_bringup_image_metadata_overrides
 }

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
@@ -15,12 +16,14 @@ assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
 if (has_board) {
-  assert(zedboot_images_config_label != false,
-         "Need to define zedboot_images_config_label")
   assert(board_information_for_assembly != false,
          "Need to define board_information_for_assembly")
-} else {
-  zedboot_images_config_label = "//boards/images:default"
+}
+
+generated_images_config("images_config") {
+  zbi = {
+    name = "zedboot"
+  }
 }
 
 # Note: This ZBI output is also used by a script in //scripts/verify_cmdline_params.
@@ -34,7 +37,7 @@ assembled_system("zedboot_assembly") {
   fshost_config = board_zedboot_fshost_config
   use_bringup_platform_bundles_only = true
 
-  assembly_images_config_label = zedboot_images_config_label
+  assembly_images_config_label = ":images_config"
   product_assembly_config_label = "//build/assembly:default_product_config"
   board_config = board_information_for_assembly
 
