@@ -8,10 +8,6 @@
 #include <string>
 
 // This takes in a class name and returns true iff the entries in `/dev/class/{class_name}` should
-// have fuchsia.device/Controller multiplexed on the channel.
-bool AllowMultiplexingController(std::string_view class_name);
-
-// This takes in a class name and returns true iff the entries in `/dev/class/{class_name}` should
 // have fuchsia.io/Node multiplexed on the channel.
 bool AllowMultiplexingNode(std::string_view class_name);
 

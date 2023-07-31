@@ -349,8 +349,7 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
   if (target.has_value()) {
     if (class_name.has_value()) {
       target->default_connection_type.include_node = AllowMultiplexingNode(class_name.value());
-      target->default_connection_type.include_controller =
-          AllowMultiplexingController(class_name.value());
+      target->default_connection_type.include_controller = false;
     } else {
       // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
       target->default_connection_type.include_node = true;

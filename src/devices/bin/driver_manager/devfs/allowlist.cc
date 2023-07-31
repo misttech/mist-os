@@ -6,16 +6,6 @@
 
 #include <unordered_set>
 
-bool AllowMultiplexingController(std::string_view class_name) {
-  // TODO(https://fxbug.dev/112484): Remove entries from this list.
-  static const std::unordered_set<std::string_view> classes_that_include_controller({
-      "block",
-      "nand",
-      "skip-block",
-  });
-  return classes_that_include_controller.find(class_name) != classes_that_include_controller.end();
-}
-
 bool AllowMultiplexingNode(std::string_view class_name) {
   // TODO(https://fxbug.dev/112484): Remove entries from this list.
   static const std::unordered_set<std::string_view> classes_that_include_node({
