@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -27,6 +28,7 @@
 #include <src/lib/unwinder/registers.h>
 #include <src/lib/unwinder/unwind.h>
 
+#include "job_watcher.h"
 #include "process_watcher.h"
 #include "symbolization_context.h"
 #include "targets.h"
@@ -52,7 +54,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
   zx::suspend_token suspend_token;
   status = thread->suspend(&suspend_token);
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to suspend thread: " << thread->get();
+    FX_PLOGS(WARNING, status) << "Failed to suspend thread: " << thread->get();
     return {zx::ticks(), std::vector<uint64_t>()};  // Skip this thread.
   }
 
@@ -108,30 +110,103 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
   return {duration, pcs};
 }
 
+zx::result<> profiler::Sampler::AddTarget(JobTarget&& target) {
+  return targets_.AddJob(std::move(target));
+}
+
+zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
+  auto job_watcher = std::make_unique<JobWatcher>(
+      target.job.borrow(), [job_path = target.ancestry, this](zx_koid_t pid, zx::process p) {
+        // We've intercepted this process before its threads have started, so we don't recursively
+        // add them here. We let the watcher handle the thread start exceptions as soon as we
+        // acknowledge this process start exception.
+        ProcessTarget process_target =
+            ProcessTarget{std::move(p), pid, std::unordered_map<zx_koid_t, ThreadTarget>()};
+        // Furthermore, we need to watch each started process for threads it creates
+        auto process_watcher = std::make_unique<ProcessWatcher>(
+            process_target.handle.borrow(),
+            [job_path, this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
+              zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
+              if (res.is_error()) {
+                FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
+              }
+            },
+            [job_path, this](zx_koid_t pid, zx_koid_t tid) {
+              zx::result res = targets_.RemoveThread(job_path, pid, tid);
+              if (res.is_error()) {
+                FX_PLOGS(ERROR, res.status_value()) << "Failed to remove exited thread: " << tid;
+              }
+            }
+
+        );
+        auto [it, emplaced] = process_watchers_.emplace(pid, std::move(process_watcher));
+        if (emplaced) {
+          if (zx::result watch_result = it->second->Watch(dispatcher_); watch_result.is_error()) {
+            FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << pid;
+            job_watchers_.clear();
+            process_watchers_.clear();
+            return;
+          }
+        }
+
+        if (zx::result res = targets_.AddProcess(std::move(process_target)); res.is_error()) {
+          FX_PLOGS(ERROR, res.status_value()) << "Failed to add process to session: " << pid;
+        }
+      });
+
+  auto [it, emplaced] = job_watchers_.emplace(target.job_id, std::move(job_watcher));
+  if (emplaced) {
+    if (zx::result res = it->second->Watch(dispatcher_); res.is_error()) {
+      FX_PLOGS(ERROR, res.status_value()) << "Failed to watch job : " << target.job_id;
+      job_watchers_.clear();
+      return res;
+    }
+  }
+  return zx::ok();
+}
+
 zx::result<> profiler::Sampler::Start() {
   // If a watched process launches a new thread, we want to add it to the set of monitored threads.
-  zx::result res = targets_.ForEachProcess(
+  zx::result<> res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
         std::vector<const zx_koid_t> saved_path{job_path.begin(), job_path.end()};
         auto process_watcher = std::make_unique<ProcessWatcher>(
             p.handle.borrow(),
-            [saved_path = std::move(saved_path), this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
+            [saved_path, this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
               zx::result res = targets_.AddThread(saved_path, pid, ThreadTarget{std::move(t), tid});
               if (res.is_error()) {
                 FX_PLOGS(ERROR, res.status_value())
                     << "Failed to add thread: " << tid << " pid: " << pid;
               }
+            },
+            [saved_path, this](zx_koid_t pid, zx_koid_t tid) {
+              zx::result res = targets_.RemoveThread(saved_path, pid, tid);
+              if (res.is_error()) {
+                FX_PLOGS(ERROR, res.status_value())
+                    << "Failed to remove thread: " << tid << " pid: " << pid;
+              }
             });
 
-        zx::result watch_result =
-            watchers_.emplace_back(std::move(process_watcher))->Watch(dispatcher_);
-        if (watch_result.is_error()) {
-          FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << p.pid;
-          watchers_.clear();
-          return watch_result.take_error();
+        auto [it, emplaced] = process_watchers_.emplace(p.pid, std::move(process_watcher));
+        if (emplaced) {
+          zx::result watch_result = it->second->Watch(dispatcher_);
+          if (watch_result.is_error()) {
+            FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << p.pid;
+            job_watchers_.clear();
+            process_watchers_.clear();
+            return watch_result.take_error();
+          }
         }
         return zx::ok();
       });
+
+  if (res.is_error()) {
+    return res;
+  }
+
+  // If we watched job launches a new process, we want to add it to the set
+  res = targets_.ForEachJob([this](const JobTarget& target) { return WatchTarget(target); });
+
   if (res.is_error()) {
     return res;
   }
@@ -143,6 +218,7 @@ zx::result<> profiler::Sampler::Start() {
 }
 
 zx::result<> profiler::Sampler::Stop() {
+  sample_task_.Cancel();
   FX_LOGS(INFO) << "Stopped! Collected " << samples_.size() << " samples";
   sample_task_.Cancel();
   return zx::ok();
@@ -153,6 +229,7 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
   if (status != ZX_OK) {
     return;
   }
+
   zx::result res =
       targets_.ForEachProcess([this](cpp20::span<const zx_koid_t>, const ProcessTarget& target) {
         for (const auto& [_, thread] : target.threads) {

@@ -16,6 +16,8 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <src/lib/unwinder/cfi_unwinder.h>
@@ -23,6 +25,7 @@
 #include <src/lib/unwinder/fuchsia.h>
 #include <src/lib/unwinder/unwind.h>
 
+#include "job_watcher.h"
 #include "process_watcher.h"
 #include "symbolization_context.h"
 #include "targets.h"
@@ -36,7 +39,7 @@ struct Sample {
 
 class Sampler {
  public:
-  explicit Sampler(async_dispatcher_t* dispatcher, TargetTree targets)
+  explicit Sampler(async_dispatcher_t* dispatcher, TargetTree&& targets)
       : dispatcher_(dispatcher), targets_(std::move(targets)) {}
 
   zx::result<> Start();
@@ -47,8 +50,10 @@ class Sampler {
 
   std::vector<Sample> GetSamples() { return samples_; }
   std::vector<zx::ticks> SamplingDurations() { return inspecting_durations_; }
+  zx::result<> AddTarget(JobTarget&& target);
 
  private:
+  zx::result<> WatchTarget(const JobTarget& target);
   void AddThread(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                  const zx_packet_signal_t* signal) {}
 
@@ -60,7 +65,10 @@ class Sampler {
   TargetTree targets_;
   std::vector<zx::ticks> inspecting_durations_;
   std::vector<Sample> samples_;
-  std::vector<std::unique_ptr<ProcessWatcher>> watchers_;
+
+  // Watchers cannot be moved, so we need to box them
+  std::unordered_map<zx_koid_t, std::unique_ptr<ProcessWatcher>> process_watchers_;
+  std::unordered_map<zx_koid_t, std::unique_ptr<JobWatcher>> job_watchers_;
 };
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_

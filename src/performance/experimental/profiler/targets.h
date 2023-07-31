@@ -79,7 +79,7 @@ struct JobTarget {
   JobTarget(const JobTarget&) = delete;
   JobTarget(JobTarget&&) = default;
 
-  std::optional<zx::job> job;
+  zx::job job;
   zx_koid_t job_id;
   std::unordered_map<zx_koid_t, ProcessTarget> processes;
   std::unordered_map<zx_koid_t, JobTarget> child_jobs;
@@ -119,6 +119,7 @@ struct JobTarget {
   // ZX_ERR_ALREADY_EXISTS if there is already an existing thread at the location with the same tid
   zx::result<> AddThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
                          ThreadTarget&& thread);
+  zx::result<> RemoveThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 };
 
 // Given a process, create a process target containing it and all its threads
@@ -153,6 +154,7 @@ class TargetTree {
   // ZX_ERR_NOT_FOUND if there is no process matching `pid`
   // ZX_ERR_ALREADY_EXISTS if there is already an existing thread at the location
   zx::result<> AddThread(zx_koid_t pid, ThreadTarget&& thread);
+  zx::result<> RemoveThread(zx_koid_t pid, zx_koid_t tid);
 
   // Add `process` into the job tree as a process with no parent job
   //
@@ -169,6 +171,8 @@ class TargetTree {
   // Note: `ancestry` is the jobs that `job` will be placed under and does not include the job_id of
   // `job` itself.
   zx::result<> AddJob(cpp20::span<const zx_koid_t> ancestry, JobTarget&& job);
+
+  zx::result<> RemoveThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 
   // Add `thread` into the job tree as a child to the job specified by `job_path` in the process
   // `pid`

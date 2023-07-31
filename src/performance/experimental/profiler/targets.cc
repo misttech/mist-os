@@ -105,6 +105,24 @@ zx::result<> profiler::JobTarget::AddThread(cpp20::span<const zx_koid_t> job_pat
   return next_child->second.AddThread(job_path.subspan(1), pid, std::move(thread));
 }
 
+zx::result<> profiler::JobTarget::RemoveThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
+                                               zx_koid_t tid) {
+  if (job_path.empty()) {
+    auto process = processes.find(pid);
+    if (process == processes.end()) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    size_t num_removed = process->second.threads.erase(tid);
+    return zx::make_result(num_removed == 1 ? ZX_OK : ZX_ERR_NOT_FOUND);
+  }
+
+  auto next_child = child_jobs.find(job_path[0]);
+  if (next_child == child_jobs.end()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  return next_child->second.RemoveThread(job_path.subspan(1), pid, tid);
+}
+
 zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
   size_t num_threads;
   zx_status_t status = process.get_info(ZX_INFO_PROCESS_THREADS, nullptr, 0, nullptr, &num_threads);
@@ -296,6 +314,10 @@ zx::result<> profiler::TargetTree::AddThread(zx_koid_t pid, ThreadTarget&& threa
   return AddThread(cpp20::span<const zx_koid_t>{}, pid, std::move(thread));
 }
 
+zx::result<> profiler::TargetTree::RemoveThread(zx_koid_t pid, zx_koid_t tid) {
+  return RemoveThread(cpp20::span<const zx_koid_t>{}, pid, tid);
+}
+
 zx::result<> profiler::TargetTree::AddThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
                                              ThreadTarget&& thread) {
   if (job_path.empty()) {
@@ -312,6 +334,23 @@ zx::result<> profiler::TargetTree::AddThread(cpp20::span<const zx_koid_t> job_pa
   auto it = jobs_.find(next_child_koid);
   return it == jobs_.end() ? zx::error(ZX_ERR_NOT_FOUND)
                            : it->second.AddThread(job_path.subspan(1), pid, std::move(thread));
+}
+
+zx::result<> profiler::TargetTree::RemoveThread(cpp20::span<const zx_koid_t> job_path,
+                                                zx_koid_t pid, zx_koid_t tid) {
+  if (job_path.empty()) {
+    auto it = processes_.find(pid);
+    if (it == processes_.end()) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    size_t num_erased = it->second.threads.erase(tid);
+    return zx::make_result(num_erased == 1 ? ZX_OK : ZX_ERR_NOT_FOUND);
+  }
+
+  zx_koid_t next_child_koid = job_path[0];
+  auto it = jobs_.find(next_child_koid);
+  return it == jobs_.end() ? zx::error(ZX_ERR_NOT_FOUND)
+                           : it->second.RemoveThread(job_path.subspan(1), pid, tid);
 }
 
 void profiler::TargetTree::Clear() {

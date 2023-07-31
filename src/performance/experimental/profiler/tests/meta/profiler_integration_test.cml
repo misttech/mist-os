@@ -21,6 +21,9 @@
             protocol: "fuchsia.cpu.profiler.Session",
             from: "#profiler",
         },
+        {
+            protocol: [ "fuchsia.process.Launcher" ],
+        },
     ],
     offer: [
         {

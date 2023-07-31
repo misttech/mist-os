@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
@@ -28,8 +29,11 @@ TEST(ProcessWatcherTests, SelfThreads) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   zx::unowned_process self = zx::process::self();
 
-  ProcessWatcher watcher{std::move(self),
-                         [](zx_koid_t, zx_koid_t, zx::thread t) { saw_child = true; }};
+  profiler::ProcessWatcher watcher{
+      std::move(self),
+      [](zx_koid_t, zx_koid_t, zx::thread t) { saw_child = true; },
+      [](zx_koid_t, zx_koid_t) {},
+  };
   std::thread thread_spawner{[]() {
     for (;;) {
       if (saw_child) {
