@@ -68,5 +68,8 @@ core_shard("profiler_core_shard") {
 
 group("tests") {
   testonly = true
-  deps = [ "tests" ]
+  deps = [
+    "samples_to_pprof:tests",
+    "tests",
+  ]
 }
