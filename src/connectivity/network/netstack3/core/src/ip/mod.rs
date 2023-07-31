@@ -2897,7 +2897,7 @@ pub(crate) mod testutil {
     use crate::{
         context::{testutil::FakeInstant, RngContext},
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-        ip::{device::state::IpDeviceStateIpExt, socket::testutil::FakeIpSocketCtx},
+        ip::device::state::IpDeviceStateIpExt,
         testutil::{FakeNonSyncCtx, FakeSyncCtx},
     };
 
@@ -2938,6 +2938,90 @@ pub(crate) mod testutil {
 
         fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
             self.inner.is_device_installed(device_id)
+        }
+    }
+
+    #[derive(Debug, GenericOverIp)]
+    pub(crate) enum DualStackSendIpPacketMeta<D> {
+        V4(SendIpPacketMeta<Ipv4, D, SpecifiedAddr<Ipv4Addr>>),
+        V6(SendIpPacketMeta<Ipv6, D, SpecifiedAddr<Ipv6Addr>>),
+    }
+
+    impl<I: packet_formats::ip::IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
+        for DualStackSendIpPacketMeta<D>
+    {
+        fn from(value: SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>) -> Self {
+            #[derive(GenericOverIp)]
+            struct Wrap<I: Ip + packet_formats::ip::IpExt, D>(
+                SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
+            );
+            use DualStackSendIpPacketMeta::*;
+            let IpInvariant(dual_stack) = I::map_ip(
+                Wrap(value),
+                |Wrap(value)| IpInvariant(V4(value)),
+                |Wrap(value)| IpInvariant(V6(value)),
+            );
+            dual_stack
+        }
+    }
+
+    #[cfg(test)]
+    impl<
+            I: packet_formats::ip::IpExt,
+            B: BufferMut,
+            S,
+            Id,
+            Event: Debug,
+            DeviceId,
+            NonSyncCtxState,
+        >
+        crate::context::SendFrameContext<
+            crate::context::testutil::FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            B,
+            SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
+        >
+        for crate::context::testutil::FakeSyncCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
+    {
+        fn send_frame<SS: Serializer<Buffer = B>>(
+            &mut self,
+            ctx: &mut crate::context::testutil::FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            metadata: SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
+            frame: SS,
+        ) -> Result<(), SS> {
+            self.send_frame(ctx, DualStackSendIpPacketMeta::from(metadata), frame)
+        }
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct WrongIpVersion;
+
+    impl<D> DualStackSendIpPacketMeta<D> {
+        // TODO(https://fxbug.dev/21198): Use this to test dual-stack sockets.
+        #[allow(unused)]
+        pub(crate) fn try_as<I: packet_formats::ip::IpExt>(
+            &self,
+        ) -> Result<&SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, WrongIpVersion> {
+            #[derive(GenericOverIp)]
+            struct Wrap<'a, I: Ip + packet_formats::ip::IpExt, D>(
+                Option<&'a SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>,
+            );
+            use DualStackSendIpPacketMeta::*;
+            let Wrap(dual_stack) = I::map_ip(
+                self,
+                |value| {
+                    Wrap(match value {
+                        V4(meta) => Some(meta),
+                        V6(_) => None,
+                    })
+                },
+                |value| {
+                    Wrap(match value {
+                        V4(_) => None,
+                        V6(meta) => Some(meta),
+                    })
+                },
+            );
+            dual_stack.ok_or(WrongIpVersion)
         }
     }
 
@@ -3025,10 +3109,11 @@ pub(crate) mod testutil {
             I: Ip + IpDeviceStateIpExt,
             C: RngContext + InstantContext<Instant = FakeInstant>,
             D: FakeStrongDeviceId + 'static,
-            State: AsMut<FakeIpSocketCtx<I, D>> + AsRef<FakeIpDeviceIdCtx<D>>,
+            State: MulticastMembershipHandler<I, C, DeviceId = D>,
             Meta,
-        > MulticastMembershipHandler<I, C>
-        for crate::context::testutil::FakeSyncCtx<State, Meta, D>
+        > MulticastMembershipHandler<I, C> for crate::context::testutil::FakeSyncCtx<State, Meta, D>
+    where
+        Self: DeviceIdContext<AnyDevice, DeviceId = D>,
     {
         fn join_multicast_group(
             &mut self,
@@ -3036,7 +3121,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            self.get_mut().as_mut().join_multicast_group(ctx, device, addr)
+            self.get_mut().join_multicast_group(ctx, device, addr)
         }
 
         fn leave_multicast_group(
@@ -3045,7 +3130,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            self.get_mut().as_mut().leave_multicast_group(ctx, device, addr)
+            self.get_mut().leave_multicast_group(ctx, device, addr)
         }
     }
 }

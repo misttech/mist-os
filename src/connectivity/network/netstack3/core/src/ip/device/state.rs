@@ -960,6 +960,28 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv
         self.state.write()
     }
 }
+#[cfg(test)]
+mod testutil {
+    use super::*;
+
+    impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<Self> for IpDeviceState<Instant, I> {
+        fn as_ref(&self) -> &Self {
+            self
+        }
+    }
+
+    impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<IpDeviceState<Instant, I>>
+        for DualStackIpDeviceState<Instant>
+    {
+        fn as_ref(&self) -> &IpDeviceState<Instant, I> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(dual_stack)| &dual_stack.ipv4.ip_state,
+                |IpInvariant(dual_stack)| &dual_stack.ipv6.ip_state,
+            )
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

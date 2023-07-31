@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, slice::Iter};
 
 use net_types::{
-    ip::{Ip, Subnet},
+    ip::{GenericOverIp, Ip, Subnet},
     SpecifiedAddr,
 };
 use thiserror::Error;
@@ -198,6 +198,7 @@ fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
 ///
 /// `ForwardingTable` maps destination subnets to the nearest IP hosts (on the
 /// local network) able to route IP packets to those subnets.
+#[derive(GenericOverIp)]
 pub struct ForwardingTable<I: Ip, D> {
     /// All the routes available to forward a packet.
     ///
@@ -365,6 +366,7 @@ pub(crate) mod testutil {
     use alloc::collections::HashSet;
 
     use derivative::Derivative;
+    use net_types::ip::{IpInvariant, Ipv4, Ipv6};
 
     use super::*;
 
@@ -424,7 +426,25 @@ pub(crate) mod testutil {
             !self.get_ref().disabled_devices.contains(device_id)
         }
     }
+
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    pub(crate) struct DualStackForwardingTable<D> {
+        v4: ForwardingTable<Ipv4, D>,
+        v6: ForwardingTable<Ipv6, D>,
+    }
+
+    impl<D, I: Ip> AsRef<ForwardingTable<I, D>> for DualStackForwardingTable<D> {
+        fn as_ref(&self) -> &ForwardingTable<I, D> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(table)| &table.v4,
+                |IpInvariant(table)| &table.v6,
+            )
+        }
+    }
 }
+
 #[cfg(test)]
 mod tests {
     use fakealloc::collections::HashSet;
