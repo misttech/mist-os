@@ -4,14 +4,14 @@
 
 #include "src/developer/shell/josh/lib/fxlog.h"
 
-#include <fuchsia/logger/cpp/fidl.h>
+#include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/process.h>
 
 #include <filesystem>
 #include <fstream>
@@ -26,38 +26,45 @@
 
 namespace shell {
 
-class LogReader : public fuchsia::logger::LogListenerSafe {
+class LogReader : public fidl::Server<fuchsia_logger::LogListenerSafe> {
  public:
   LogReader(uint32_t collect_count, fit::function<void()> all_done)
-      : collect_count_(collect_count), all_done_(std::move(all_done)), binding_(this) {
-    binding_.Bind(log_listener_.NewRequest());
-  }
+      : collect_count_(collect_count), all_done_(std::move(all_done)) {}
 
-  bool Connect(sys::ComponentContext* component_context) {
-    if (!log_listener_) {
+  bool Connect() {
+    fidl::ClientEnd<fuchsia_logger::LogListenerSafe> log_listener;
+    auto server_end = fidl::CreateEndpoints(&log_listener);
+    if (!server_end.is_ok()) {
       return false;
     }
-
+    fidl::ServerBindingRef binding_ref = fidl::BindServer<fuchsia_logger::LogListenerSafe>(
+        async_get_default_dispatcher(), std::move(server_end.value()), this);
     // Get current process koid
     zx_info_handle_basic_t info;
     zx_status_t status = zx_object_get_info(zx::process::self()->get(), ZX_INFO_HANDLE_BASIC, &info,
                                             sizeof(info), nullptr, nullptr);
     ZX_DEBUG_ASSERT(status == ZX_OK);
 
-    auto log_service = component_context->svc()->Connect<fuchsia::logger::Log>();
-    auto options = fuchsia::logger::LogFilterOptions::New();
-    options->filter_by_pid = true;
-    options->pid = info.koid;
-    options->min_severity = fuchsia::logger::LogLevelFilter::TRACE;
-    // make tags non-null.
-    options->tags.resize(0);
-    log_service->DumpLogsSafe(std::move(log_listener_), std::move(options));
-    return true;
+    zx::result<fidl::ClientEnd<fuchsia_logger::Log>> log_service =
+        component::Connect<fuchsia_logger::Log>();
+    if (log_service.is_error() || !log_service.value().is_valid()) {
+      return false;
+    }
+    fidl::Arena arena;
+    ::fuchsia_logger::wire::LogFilterOptions options;
+    options.filter_by_pid = true;
+    options.pid = info.koid;
+    options.min_severity = fuchsia_logger::LogLevelFilter::kTrace;
+    auto result = fidl::WireCall(log_service.value())
+                      ->DumpLogsSafe(std::move(log_listener),
+                                     fidl::ObjectView<::fuchsia_logger::wire::LogFilterOptions>{
+                                         arena, options});
+    return result.status() == ZX_OK;
   }
 
-  void LogMany(::std::vector<fuchsia::logger::LogMessage> Log, LogManyCallback received) override {
+  void LogMany(LogManyRequest& request, LogManyCompleter::Sync& completer) override {
     if (collect_count_ > 0) {
-      for (auto& entry : Log) {
+      for (auto& entry : request.log()) {
         messages.emplace_back(entry);
         if (--collect_count_ == 0)
           break;
@@ -66,13 +73,12 @@ class LogReader : public fuchsia::logger::LogListenerSafe {
     if (collect_count_ == 0) {
       all_done_();
     }
-    received();
+    completer.Reply();
   }
 
-  void Log(fuchsia::logger::LogMessage Log, LogCallback received) override {
+  virtual void Log(LogRequest& request, LogCompleter::Sync& completer) override {
     if (collect_count_ > 0) {
-      fuchsia::logger::LogMessage msg;
-      Log.Clone(&msg);
+      fuchsia_logger::LogMessage msg = request.log();
       messages.push_back(std::move(msg));
 
       collect_count_--;
@@ -80,18 +86,16 @@ class LogReader : public fuchsia::logger::LogListenerSafe {
     if (collect_count_ == 0) {
       all_done_();
     }
-    received();
+    completer.Reply();
   }
 
-  void Done() override { all_done_(); }
+  void Done(DoneCompleter::Sync& completer) override { all_done_(); }
 
-  std::vector<fuchsia::logger::LogMessage> messages;
+  std::vector<fuchsia_logger::LogMessage> messages;
 
  protected:
   int collect_count_;
   fit::function<void()> all_done_;
-  ::fidl::Binding<fuchsia::logger::LogListenerSafe> binding_;
-  fuchsia::logger::LogListenerSafePtr log_listener_;
 };
 
 class FxLogTest : public JsTest {
@@ -105,7 +109,7 @@ class FxLogTest : public JsTest {
       FAIL();
     }
 
-    // Builins should have fxlog setup
+    // Builtins should have fxlog setup
     InitBuiltins("/pkg/data/fidling", "/pkg/data/lib");
 
     // Enable temp filesystem
@@ -143,8 +147,7 @@ class FxLogTest : public JsTest {
         loop.Quit();
       });
 
-      auto component_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-      log_reader->Connect(component_context.get());
+      log_reader->Connect();
     });
     loop.Run();
     loop.JoinThreads();
@@ -182,20 +185,20 @@ TEST_F(FxLogTest, TestEvalLog) {
   auto reader = CollectLog(4);
   ASSERT_EQ(reader->messages.size(), 4u);
 
-  ASSERT_EQ(reader->messages[0].msg, "[batch(6)] Message1");
-  ASSERT_EQ(reader->messages[1].msg, "[batch(7)] Message2");
-  ASSERT_EQ(reader->messages[2].msg, "[batch(3)] Message3");
-  ASSERT_EQ(reader->messages[3].msg, "[batch(4)] Message4");
+  ASSERT_EQ(reader->messages[0].msg(), "[batch(6)] Message1");
+  ASSERT_EQ(reader->messages[1].msg(), "[batch(7)] Message2");
+  ASSERT_EQ(reader->messages[2].msg(), "[batch(3)] Message3");
+  ASSERT_EQ(reader->messages[3].msg(), "[batch(4)] Message4");
 
-  ASSERT_EQ(reader->messages[0].tags[0], "<eval>");
-  ASSERT_EQ(reader->messages[1].tags[0], "TestTag");
-  ASSERT_EQ(reader->messages[2].tags[0], "my_func");
-  ASSERT_EQ(reader->messages[3].tags[0], "TestTag2");
+  ASSERT_EQ(reader->messages[0].tags()[0], "<eval>");
+  ASSERT_EQ(reader->messages[1].tags()[0], "TestTag");
+  ASSERT_EQ(reader->messages[2].tags()[0], "my_func");
+  ASSERT_EQ(reader->messages[3].tags()[0], "TestTag2");
 
-  ASSERT_EQ(reader->messages[0].severity, (int32_t)fuchsia::logger::LogLevelFilter::INFO);
-  ASSERT_EQ(reader->messages[1].severity, (int32_t)fuchsia::logger::LogLevelFilter::WARN);
-  ASSERT_EQ(reader->messages[2].severity, (int32_t)fuchsia::logger::LogLevelFilter::ERROR);
-  ASSERT_EQ(reader->messages[3].severity, (int32_t)fuchsia::logger::LogLevelFilter::INFO);
+  ASSERT_EQ(reader->messages[0].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kInfo);
+  ASSERT_EQ(reader->messages[1].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kWarn);
+  ASSERT_EQ(reader->messages[2].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kError);
+  ASSERT_EQ(reader->messages[3].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kInfo);
 }
 
 TEST_F(FxLogTest, TestScriptLog) {
@@ -235,20 +238,20 @@ TEST_F(FxLogTest, TestScriptLog) {
   auto reader = CollectLog(4);
   ASSERT_EQ(reader->messages.size(), 4u);
 
-  ASSERT_EQ(reader->messages[0].msg, "[test_log.js(7)] Message1");
-  ASSERT_EQ(reader->messages[1].msg, "[test_log.js(8)] Message2");
-  ASSERT_EQ(reader->messages[2].msg, "[test_log.js(4)] Message3");
-  ASSERT_EQ(reader->messages[3].msg, "[test_log.js(5)] Message4");
+  ASSERT_EQ(reader->messages[0].msg(), "[test_log.js(7)] Message1");
+  ASSERT_EQ(reader->messages[1].msg(), "[test_log.js(8)] Message2");
+  ASSERT_EQ(reader->messages[2].msg(), "[test_log.js(4)] Message3");
+  ASSERT_EQ(reader->messages[3].msg(), "[test_log.js(5)] Message4");
 
-  ASSERT_EQ(reader->messages[0].tags[0], "<eval>");
-  ASSERT_EQ(reader->messages[1].tags[0], "TestTag");
-  ASSERT_EQ(reader->messages[2].tags[0], "my_func");
-  ASSERT_EQ(reader->messages[3].tags[0], "TestTag2");
+  ASSERT_EQ(reader->messages[0].tags()[0], "<eval>");
+  ASSERT_EQ(reader->messages[1].tags()[0], "TestTag");
+  ASSERT_EQ(reader->messages[2].tags()[0], "my_func");
+  ASSERT_EQ(reader->messages[3].tags()[0], "TestTag2");
 
-  ASSERT_EQ(reader->messages[0].severity, (int32_t)fuchsia::logger::LogLevelFilter::INFO);
-  ASSERT_EQ(reader->messages[1].severity, (int32_t)fuchsia::logger::LogLevelFilter::WARN);
-  ASSERT_EQ(reader->messages[2].severity, (int32_t)fuchsia::logger::LogLevelFilter::ERROR);
-  ASSERT_EQ(reader->messages[3].severity, (int32_t)fuchsia::logger::LogLevelFilter::INFO);
+  ASSERT_EQ(reader->messages[0].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kInfo);
+  ASSERT_EQ(reader->messages[1].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kWarn);
+  ASSERT_EQ(reader->messages[2].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kError);
+  ASSERT_EQ(reader->messages[3].severity(), (int32_t)fuchsia_logger::LogLevelFilter::kInfo);
 }
 
 }  // namespace shell

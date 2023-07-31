@@ -125,7 +125,8 @@ source_set("log_tests") {
   ]
   deps = [
     ":tests_base",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/lib/component/incoming/cpp:cpp",
   ]
   configs += [ ":tests_base_config" ]
 }
