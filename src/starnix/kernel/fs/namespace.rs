@@ -781,7 +781,12 @@ impl LookupContext {
 
     pub fn update_for_path(&mut self, path: &FsStr) {
         if path.last() == Some(&b'/') {
+            // The last path element must resolve to a directory. This is because a trailing slash
+            // was found in the path.
             self.must_be_directory = true;
+            // If the last path element is a symlink, we should follow it.
+            // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+            self.symlink_mode = SymlinkMode::Follow;
         }
     }
 }

@@ -1464,14 +1464,6 @@ impl CurrentTask {
         path: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
         let (parent, basename) = self.lookup_parent(context, dir, path)?;
-
-        // The child must resolve to a directory. This is because a trailing slash
-        // was found in the path. If the child is a symlink, we should follow it.
-        // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
-        if context.must_be_directory {
-            *context = context.with(SymlinkMode::Follow);
-        }
-
         parent.lookup_child(self, context, basename)
     }
 
