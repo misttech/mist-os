@@ -13,6 +13,10 @@ pub struct ListCommand {
     #[argh(positional)]
     pub far_file: PathBuf,
 
-    #[argh(switch, short = 'l', description = "show detailed information for each entry")]
+    #[argh(
+        switch,
+        short = 'l',
+        description = "show detailed information for each entry (does nothing if --machine json is specified, which shows everything)"
+    )]
     pub long_format: bool,
 }
