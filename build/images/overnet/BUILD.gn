@@ -5,11 +5,18 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
+import("//build/product.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/sys/core/build/core.gni")
 
-assert(images_config_label != false,
-       "images_config_label must be defined for the build")
+assert(images_config_label != false || fuchsia_filesystem_config != false,
+       "Need to define fuchsia_filesystem_config for cuckoo tests")
+if (fuchsia_filesystem_config != false) {
+  _images_config = fuchsia_filesystem_config
+} else {
+  _images_config = images_config_label
+}
+
 assert(board_information_for_assembly != false,
        "board_information_for_assembly must be defined for the build")
 
@@ -19,7 +26,7 @@ core_realm_definition("core") {
 
 assembled_system("overnet") {
   testonly = true
-  assembly_images_config_label = images_config_label
+  assembly_images_config_label = _images_config
   product_assembly_config_label = "//build/assembly:default_product_config"
   board_config = board_information_for_assembly
   use_bringup_platform_bundles_only = true

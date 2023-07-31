@@ -5,6 +5,7 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
+import("//build/product.gni")
 import("//build/testing/zbi_test.gni")
 
 cuckoo_kernel_zbi_test_params = {
@@ -43,13 +44,17 @@ template("_cuckoo_kernel_zbi_test") {
   assert(current_toolchain == default_toolchain)
   assert(defined(invoker.kernel_zbi))
 
+  _images_config = "//boards/images:default"
   if (has_board) {
-    assert(images_config_label != false,
-           "Need to define images_config_label for cuckoo tests")
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-  } else {
-    images_config_label = "//boards/images:default"
+    assert(images_config_label != false || fuchsia_filesystem_config != false,
+           "Need to define fuchsia_filesystem_config for cuckoo tests")
+    if (fuchsia_filesystem_config != false) {
+      _images_config = fuchsia_filesystem_config
+    } else {
+      _images_config = images_config_label
+    }
   }
 
   cuckoo_target_name = target_name
@@ -80,7 +85,7 @@ template("_cuckoo_kernel_zbi_test") {
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
-    assembly_images_config_label = images_config_label
+    assembly_images_config_label = _images_config
     product_assembly_config_label =
         "//build/testing:cuckoo-product-configuration"
     board_config = board_information_for_assembly

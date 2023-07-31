@@ -253,19 +253,25 @@ if (is_fuchsia) {
     }
   }
 
+  _images_config = "//boards/images:default"
+  _partitions_config = "//boards/partitions:default"
   if (has_board) {
-    assert(images_config_label != false, "Need to define images_config_label")
     assert(partitions_config_label != false,
            "Need to define partitions_config_label")
     assert(board_information_for_assembly != false,
-           "board_information_for_assembly must be defined for the build")
-  } else {
-    images_config_label = "//boards/images:default"
-    partitions_config_label = "//boards/partitions:default"
+           "Need to define board_information_for_assembly for cuckoo tests")
+    assert(images_config_label != false || fuchsia_filesystem_config != false,
+           "Need to define fuchsia_filesystem_config for cuckoo tests")
+    _partitions_config = partitions_config_label
+    if (fuchsia_filesystem_config != false) {
+      _images_config = fuchsia_filesystem_config
+    } else {
+      _images_config = images_config_label
+    }
   }
   _partitions_config_file =
-      get_label_info(partitions_config_label, "target_out_dir") + "/" +
-      get_label_info(partitions_config_label, "name") + ".json"
+      get_label_info(_partitions_config, "target_out_dir") + "/" +
+      get_label_info(_partitions_config, "name") + ".json"
 
   assembled_system("fuchsia_assembly") {
     forward_variables_from(fuchsia_base, "*")
@@ -275,7 +281,7 @@ if (is_fuchsia) {
     create_legacy_aib_package = create_legacy_aib_archive
     create_legacy_aib_archive = create_legacy_aib_archive
 
-    assembly_images_config_label = images_config_label
+    assembly_images_config_label = _images_config
     image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
     must_exist_deps = must_exist
   }
@@ -286,7 +292,7 @@ if (is_fuchsia) {
     deps = [
       ":fuchsia_assembly",
       "//build/info:latest-commit-date",
-      partitions_config_label,
+      _partitions_config,
       recovery_label,
     ]
     partitions = _partitions_config_file
@@ -303,7 +309,7 @@ if (is_fuchsia) {
     deps = [
       ":fuchsia_assembly",
       "//build/info:latest-commit-date",
-      partitions_config_label,
+      _partitions_config,
       recovery_label,
     ]
 
@@ -456,7 +462,7 @@ if (is_fuchsia) {
     forward_variables_from(fuchsia_base, "*")
     ramdisk_in_zbi = true
 
-    assembly_images_config_label = images_config_label
+    assembly_images_config_label = _images_config
     board_config = board_information_for_assembly
     image_metadata_overrides = {
       zbi = {

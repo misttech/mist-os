@@ -7,6 +7,7 @@ import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/paths.gni")
+import("//build/product.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -56,12 +57,17 @@ if (labels.images == "//build/images/bringup") {
 } else {
   # In all other builds, define the guest assembly.
 
+  _images_config = "//boards/images:default"
   if (has_board) {
-    assert(images_config_label != false, "Need to define images_config_label")
     assert(board_information_for_assembly != false,
-           "Need to define board_information_for_assembly")
-  } else {
-    images_config_label = "//boards/images:default"
+           "Need to define board_information_for_assembly for cuckoo tests")
+    assert(images_config_label != false || fuchsia_filesystem_config != false,
+           "Need to define fuchsia_filesystem_config for cuckoo tests")
+    if (fuchsia_filesystem_config != false) {
+      _images_config = fuchsia_filesystem_config
+    } else {
+      _images_config = images_config_label
+    }
   }
 
   # Guest's specific core realm (not based on core_realm_shards).
@@ -91,7 +97,7 @@ if (labels.images == "//build/images/bringup") {
 
     namespace = "guest"
     image_name = "fuchsia"
-    assembly_images_config_label = images_config_label
+    assembly_images_config_label = _images_config
     product_assembly_config_label = ":product_assembly_config"
     board_config = board_information_for_assembly
 

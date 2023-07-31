@@ -3,4 +3,4 @@
 # found in the LICENSE file.
 
 import("//products/core.gni")
-# TODO(b/291975381): Move Fxfs images config here from //boards/x64-fxfs.gni.
+fuchsia_filesystem_config = "//boards/images:default-fxfs"

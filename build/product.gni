@@ -40,6 +40,12 @@ declare_args() {
   # The product assembly config used to configure the main Fuchsia image.
   fuchsia_product_assembly_config_label = false
 
+  # The filesystem config to pass to product assembly.
+  # This should point to a generated_images_config() target.
+  # TODO(b/292181325): Delete this once the filesystems configs are moved into
+  # the product assembly config.
+  fuchsia_filesystem_config = false
+
   # TODO(fxbug.dev/94051): move to board definitions.
   # Adds a prefix to the start of the virtual device name. Used to distinguish
   # between similar virtual device's using different configuration's such as
