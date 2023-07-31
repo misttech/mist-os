@@ -333,6 +333,10 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #   * basic_abi, configs, non_test_deps, testonly_deps
 #     - Optional: See libc_source_set().
 #
+#   * sources, public
+#     - Optional: See libc_source_set().
+#      These are combined with entries derived from `functions` et al.
+#
 #   * deps
 #     - Optional: See llvm_libc_group().
 #
@@ -341,13 +345,8 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #
 template("llvm_libc_source_set") {
   main_target = target_name
-  target_dir = get_path_info(target_out_dir, "name")
-
-  if (target_name == target_dir) {
-    test_target = "unittests"
-  } else {
-    test_target = "$target_name.unittests"
-  }
+  target_dir = rebase_path(".", libc)
+  test_target = "$target_name.unittests"
 
   if (defined(invoker.dir)) {
     # This doesn't affect the logic above, but overrides the subdir used below.
@@ -357,16 +356,16 @@ template("llvm_libc_source_set") {
   cpu_functions = []
   if (defined(invoker.cpu_functions)) {
     cpu_functions = invoker.cpu_functions
-    assert(cpu_functions + invoker.functions - invoker.functions == [],
-           "cpu_functions must be a subset of functions")
   }
+  assert(cpu_functions + invoker.functions - invoker.functions == [],
+         "cpu_functions must be a subset of functions")
 
   no_test_functions = []
   if (defined(invoker.no_test_functions)) {
     no_test_functions = invoker.no_test_functions
-    assert(no_test_functions + invoker.functions - invoker.functions == [],
-           "no_test_functions must be a subset of functions")
   }
+  assert(no_test_functions + invoker.functions - invoker.functions == [],
+         "no_test_functions must be a subset of functions")
 
   libc_source_set(main_target) {
     forward_variables_from(invoker,
@@ -376,13 +375,20 @@ template("llvm_libc_source_set") {
                              "defines",
                              "non_test_deps",
                              "non_test_vars",
+                             "public",
+                             "sources",
                              "testonly_deps",
                              "visibility",
                            ])
 
     dir = "$llvm_libc/src/$target_dir"
-    public = []
-    sources = []
+
+    if (!defined(invoker.public)) {
+      public = []
+    }
+    if (!defined(invoker.sources)) {
+      sources = []
+    }
 
     foreach(function, invoker.functions) {
       public += [ "$function.h" ]
@@ -404,6 +410,10 @@ template("llvm_libc_source_set") {
         testonly_deps = []
       }
       foreach(label, invoker.deps) {
+        assert(get_label_info(label, "label_with_toolchain") ==
+               get_label_info(label, "label_no_toolchain") +
+               "($current_toolchain)")
+        label = get_label_info(label, "label_no_toolchain")
         non_test_deps += [ "$label" ]
         testonly_deps += [ "$label.testonly" ]
       }
@@ -421,8 +431,19 @@ template("llvm_libc_source_set") {
 
     if (defined(invoker.deps)) {
       foreach(label, invoker.deps) {
+        assert(get_label_info(label, "label_with_toolchain") ==
+               get_label_info(label, "label_no_toolchain") +
+               "($current_toolchain)")
+        label = get_label_info(label, "label_no_toolchain")
         deps += [ "$label.unittests" ]
       }
+    }
+  }
+
+  if (target_name == get_path_info(target_dir, "file")) {
+    group("unittests") {
+      testonly = true
+      public_deps = [ ":$test_target" ]
     }
   }
 }
@@ -447,7 +468,7 @@ template("llvm_libc_source_set") {
 #
 template("llvm_libc_group") {
   group_name = target_name
-  target_dir = get_path_info(target_out_dir, "name")
+  target_dir = rebase_path(".", libc)
 
   foreach(suffix,
           [
@@ -464,17 +485,27 @@ template("llvm_libc_group") {
         testonly = true
       }
       deps = []
-      foreach(label, invoker.deps) {
-        if (suffix != "") {
-          label += ".$suffix"
+      if (defined(invoker.deps)) {
+        foreach(label, invoker.deps) {
+          assert(get_label_info(label, "label_with_toolchain") ==
+                 get_label_info(label, "label_no_toolchain") +
+                 "($current_toolchain)")
+          label = get_label_info(label, "label_no_toolchain")
+          if (suffix != "") {
+            label += ".$suffix"
+          }
+          deps += [ label ]
         }
-        deps += [ label ]
       }
       if (suffix == "" && defined(invoker.non_test_deps)) {
         deps += invoker.non_test_deps
       }
       if (suffix != "" && defined(invoker.testonly_deps)) {
         foreach(label, invoker.testonly_deps) {
+          assert(get_label_info(label, "label_with_toolchain") ==
+                 get_label_info(label, "label_no_toolchain") +
+                 "($current_toolchain)")
+          label = get_label_info(label, "label_no_toolchain")
           label += ".$suffix"
           deps += [ label ]
         }
@@ -482,7 +513,7 @@ template("llvm_libc_group") {
     }
   }
 
-  if (group_name == target_dir) {
+  if (group_name == get_path_info(target_dir, "file")) {
     group("unittests") {
       testonly = true
       public_deps = [ ":$group_name.unittests" ]

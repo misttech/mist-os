@@ -1,0 +1,41 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../libc.gni")
+
+llvm_libc_source_set("printf_core") {
+  public = [ "printf_main.h" ]
+  sources = [ "printf_main.cpp" ]
+  functions = []
+  deps = [ ":core" ]
+}
+
+# These aren't really functions, but they follow the pattern of the actual libc
+# function implementations in each having a corresponding header file and test
+# file in the usual places.
+llvm_libc_source_set("core") {
+  visibility = [ ":*" ]
+
+  defines = [
+    # Never support %n.
+    "LIBC_COPT_PRINTF_DISABLE_WRITE_INT",
+  ]
+
+  # Don't support FP types in minimal environments.
+  if (is_kernel || toolchain_environment == "user.basic") {
+    defines += [ "LIBC_COPT_PRINTF_DISABLE_FLOAT" ]
+  }
+
+  # TODO(https://reviews.llvm.org/D156630): upstream code not yet clean
+  configs = [ "//build/config:Wno-conversion" ]
+
+  functions = [
+    "converter",
+    "parser",
+    "writer",
+  ]
+
+  # TODO(fxbug.dev/62780): tests need full libc framework
+  no_test_functions = [ "parser" ]
+}

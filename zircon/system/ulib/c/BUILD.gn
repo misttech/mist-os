@@ -25,6 +25,7 @@ libc_components = [
   "math",
   "pthread",
   "scudo",
+  "stdio",
   "stdlib",
 ]
 
