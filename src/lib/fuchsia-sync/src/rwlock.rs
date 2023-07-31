@@ -76,7 +76,7 @@ const READER_MASK: i32 = !0b0111;
 ///
 /// * If a reader tries to acquire the lock => Shared access (unblocked)
 /// * If a writer tries to acquire the lock => Exclusive access (unblocked)
-/// * If a previously blocked writer acquires the lock => Exclusive access (writer blocked)
+/// * If a previously blocked writer acquires the lock => Exclusive access (writers blocked)
 ///
 /// ## Shared access (unblocked)
 ///
@@ -86,10 +86,10 @@ const READER_MASK: i32 = !0b0111;
 /// Additional readers can acquire shared access to the lock without entering the kernel.
 ///
 /// * If a reader tries to acquire the lock => Shared access (unblocked)
-/// * If a writer tries to acquire the lock => Shared access (writer blocked)
+/// * If a writer tries to acquire the lock => Shared access (writers blocked)
 /// * If the last reader releases the lock => Initial
 ///
-/// ## Shared access (writer blocked)
+/// ## Shared access (writers blocked)
 ///
 /// In this state, `state & READER_MASK` is non-zero, WRITER_BLOCKED_BIT is set, and other bits are
 /// unset. A non-zero number of threads have shared access to the lock and a non-zero number of
@@ -98,8 +98,8 @@ const READER_MASK: i32 = !0b0111;
 /// The lock is contended and requires kernel coordination to wake the blocked threads.
 ///
 /// * If a reader tries to acquire the lock => Shared access (readers and writers blocked)
-/// * If a writer tries to acquire the lock => Shared access (writer blocked)
-/// * If the last reader releases the lock => Exclusive access (writer blocked)
+/// * If a writer tries to acquire the lock => Shared access (writers blocked)
+/// * If the last reader releases the lock => Exclusive access (writers blocked)
 ///
 /// ## Shared access (readers and writers blocked)
 ///
@@ -122,10 +122,11 @@ const READER_MASK: i32 = !0b0111;
 /// The writer can release the lock without entering the kernel.
 ///
 /// * If a reader tries to acquire the lock => Exclusive access (readers and writers blocked)
-/// * If a writer tries to acquire the lock => Exclusive access (writer blocked)
+/// * If a writer tries to acquire the lock => Exclusive access (writers blocked)
+/// * If a writer tries to downgrade the lock => Shared access (unblocked)
 /// * If the writer releases the lock => Initial
 ///
-/// ## Exclusive access (writer blocked)
+/// ## Exclusive access (writers blocked)
 ///
 /// In this state, WRITER_BIT and WRITER_BLOCKED_BIT are set and other bits are unset. Exactly one
 /// thread has exclusive access to the lock and zero or more writers are waiting for exclusive
@@ -133,11 +134,12 @@ const READER_MASK: i32 = !0b0111;
 ///
 /// When the writer release the lock, the state transitions to the "Initial state" and then the
 /// lock wakes up one of the writers, if any exist. If this previously waiting writer succeeds in
-/// acquiring the lock, the state machine returns to the "Exclusive access (writer blocked)" state
+/// acquiring the lock, the state machine returns to the "Exclusive access (writers blocked)" state
 /// because we do not know how many writers are blocked waiting for exclusive access.
 ///
 /// * If a reader tries to acquire the lock => Exclusive access (readers and writers blocked)
-/// * If a writer tries to acquire the lock => Exclusive access (writer blocked)
+/// * If a writer tries to acquire the lock => Exclusive access (writers blocked)
+/// * If a writer tries to downgrade the lock => Shared access (writers blocked)
 /// * If the writer releases the lock => Initial
 ///
 /// ## Exclusive access (readers blocked)
@@ -151,6 +153,7 @@ const READER_MASK: i32 = !0b0111;
 ///
 /// * If a reader tries to acquire the lock => Exclusive access (readers blocked)
 /// * If a writer tries to acquire the lock => Exclusive access (readers and writers blocked)
+/// * If a writer tries to downgrade the lock => Unique reader (readers blocked)
 /// * If the writer releases the lock => Initial
 ///
 /// ## Exclusive access (readers and writers blocked)
@@ -163,6 +166,7 @@ const READER_MASK: i32 = !0b0111;
 ///
 /// * If a reader tries to acquire the lock => Exclusive access (readers and writers blocked)
 /// * If a writer tries to acquire the lock => Exclusive access (readers and writers blocked)
+/// * If a writer tries to downgrade the lock => Unique reader (readers and writers blocked)
 /// * If the writer releases the lock => Unlocked (readers blocked)
 ///
 /// ## Unlocked (readers blocked)
@@ -176,6 +180,35 @@ const READER_MASK: i32 = !0b0111;
 /// * If a reader tries to acquire the lock => Unlocked (readers blocked)
 /// * If a writer tries to acquire the lock => Exclusive access (readers blocked)
 /// * Otherwise => Initial
+///
+/// ## Unique reader (readers blocked)
+///
+/// In this state, there is exactly one reader, who is running on the current thread, the
+/// READER_BLOCKED_BIT is set and and other bits are unset. A non-zero number of readers are
+/// waiting for shared access.
+///
+/// This state is transitory and the state machine will leave this state without outside
+/// intervention by moving to the "Shared access (unblocked)" state and waking any blocked
+/// readers.
+///
+/// * If a reader tries to acquire the lock => Unique reader (readers blocked)
+/// * If a writer tries to acquire the lock => Unique reader (readers and writers blocked)
+/// * Otherwise => Shared access (unblocked)
+///
+/// ## Unique reader (readers and writers blocked)
+///
+/// In this state, there is exactly one reader, who is running on the current thread, and the
+/// READER_BLOCKED_BIT and the WRITER_BLOCKED_BIT are set. Zero or more writers are waiting for
+/// exclusive access, and a non-zero number of readers are waiting for shared access.
+///
+/// This state is transitory and the state machine will leave this state without outside
+/// intervention by moving to the "Shared access (writers blocked)" state and waking any blocked
+/// readers.
+///
+///
+/// * If a reader tries to acquire the lock => Unique reader (readers and writers blocked)
+/// * If a writer tries to acquire the lock => Unique reader (readers and writers blocked)
+/// * Otherwise => Shared access (writers blocked)
 
 fn is_locked_exclusive(state: i32) -> bool {
     state & WRITER_BIT != 0
@@ -388,8 +421,34 @@ impl RawSyncRwLock {
                 .is_ok()
             {
                 // Wake up all the readers.
-                unsafe {
-                    zx_futex_wake(self.state_ptr(), u32::MAX);
+                self.wake_readers();
+            }
+        }
+    }
+
+    #[cold]
+    fn downgrade_slow(&self, mut state: i32) {
+        debug_assert!(has_blocked_reader(state));
+        loop {
+            if !has_blocked_reader(state) {
+                // Someone else must have woken up the readers.
+                return;
+            }
+
+            match self.state.compare_exchange(
+                state,
+                state - READER_BLOCKED_BIT,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    // We cleared the READER_BLOCKED_BIT, so we need to wake the readers.
+                    self.wake_readers();
+                    return;
+                }
+                Err(observed_state) => {
+                    state = observed_state;
+                    continue;
                 }
             }
         }
@@ -400,6 +459,12 @@ impl RawSyncRwLock {
         // TODO: Track which thread owns this futex for priority inheritance.
         unsafe {
             zx_futex_wake(self.writer_queue_ptr(), 1);
+        }
+    }
+
+    fn wake_readers(&self) {
+        unsafe {
+            zx_futex_wake(self.state_ptr(), u32::MAX);
         }
     }
 }
@@ -469,6 +534,17 @@ unsafe impl lock_api::RawRwLock for RawSyncRwLock {
     }
 }
 
+unsafe impl lock_api::RawRwLockDowngrade for RawSyncRwLock {
+    #[inline]
+    unsafe fn downgrade(&self) {
+        let state = self.state.fetch_add(READER_UNIT - WRITER_BIT, Ordering::Release);
+
+        if has_blocked_reader(state) {
+            self.downgrade_slow(state);
+        }
+    }
+}
+
 pub type RwLock<T> = lock_api::RwLock<RawSyncRwLock, T>;
 pub type RwLockReadGuard<'a, T> = lock_api::RwLockReadGuard<'a, RawSyncRwLock, T>;
 pub type RwLockWriteGuard<'a, T> = lock_api::RwLockWriteGuard<'a, RawSyncRwLock, T>;
@@ -506,6 +582,22 @@ mod test {
         let _write_guard = value.write();
         assert!(value.try_write().is_none());
         assert!(value.try_read().is_none());
+    }
+
+    #[test]
+    fn test_downgrade() {
+        let value = RwLock::<u32>::new(5);
+        let mut guard = value.write();
+        assert_eq!(*guard, 5);
+        *guard = 6;
+        assert_eq!(*guard, 6);
+        assert!(value.try_write().is_none());
+        assert!(value.try_read().is_none());
+        let guard1 = RwLockWriteGuard::downgrade(guard);
+        assert_eq!(*guard1, 6);
+        assert!(value.try_write().is_none());
+        let guard2 = value.read();
+        assert_eq!(*guard2, 6);
     }
 
     #[derive(Default)]
