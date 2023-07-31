@@ -1,0 +1,141 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/drivers.gni")
+
+visibility = [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/*" ]
+
+# This BUILD.gn defines the Fuchsia-specific platform support library for the iwlwifi driver.
+
+# Platform-support library for the iwlwifi driver.
+source_set("platform") {
+  sources = [
+    "compiler.cc",
+    "debug.cc",
+    "ieee80211.cc",
+    "io_buffer.cc",
+    "irq.cc",
+    "memory.cc",
+    "module.cc",
+    "pci-fidl.cc",
+    "rcu.cc",
+    "stats.cc",
+    "task-internal.cc",
+    "task.cc",
+    "time.cc",
+    "tkip.c",
+  ]
+  public = [
+    "compiler.h",
+    "debug.h",
+    "ieee80211.h",
+    "io_buffer.h",
+    "irq.h",
+    "kernel.h",
+    "memory.h",
+    "module.h",
+    "pci-fidl.h",
+    "pci.h",
+    "rcu.h",
+    "regulatory.h",
+    "stats.h",
+    "task-internal.h",
+    "task.h",
+    "time.h",
+    "tkip.h",
+  ]
+  deps = [
+    ":driver_inspector",
+    ":rcu_manager",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/async:async-cpp",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_wire",
+    "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
+    "//src/connectivity/wlan/lib/common/cpp:common",
+    "//src/devices/lib/mmio",
+    "//zircon/system/public",
+    "//zircon/system/ulib/async",
+  ]
+  public_configs = [
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:fuchsia_config",
+  ]
+}
+
+# Support for exporting driver data from the Inspect tree.
+source_set("driver_inspector") {
+  sources = [ "driver-inspector.cc" ]
+  public = [ "driver-inspector.h" ]
+  public_deps = [
+    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/public",
+    "//zircon/system/ulib/inspect",
+  ]
+}
+
+# Support for RCU synchronization.
+source_set("rcu_manager") {
+  sources = [ "rcu-manager.cc" ]
+  public = [ "rcu-manager.h" ]
+  deps = [
+    "//zircon/system/public",
+    "//zircon/system/ulib/async:async-cpp",
+  ]
+  public_deps = [ "//zircon/system/ulib/async" ]
+}
+
+driver_bind_rules("fuchsia_bind") {
+  rules = "iwlwifi.bind"
+  tests = "iwlwifi-bind-tests.json"
+  bind_output = "iwlwifi.bindbc"
+  deps = [ "//src/devices/bind/fuchsia.pci" ]
+}
+
+# Fuchsia driver framework bindings for the iwlwifi driver.
+source_set("fuchsia_device") {
+  sources = [
+    "mvm-mlme.cc",
+    "mvm-mlme.h",
+    "mvm-sta.cc",
+    "mvm-sta.h",
+    "pcie-iwlwifi-driver.cc",
+    "pcie-iwlwifi-driver.h",
+    "scoped_utils.h",
+    "wlanphyimpl-device.cc",
+    "wlanphyimpl-device.h",
+    "wlansoftmac-device.cc",
+    "wlansoftmac-device.h",
+  ]
+  deps = [
+    ":driver_inspector",
+    ":fuchsia_bind",
+    ":platform",
+    ":rcu_manager",
+    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp_wire",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp_wire",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/cfg",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie",
+    "//src/devices/lib/driver:driver_runtime",
+    "//zircon/system/public",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+  friend =
+      [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test:*" ]
+
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+}

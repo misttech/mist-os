@@ -1,3 +1,5 @@
-Name: Intel iwlwifi
 License: BSD
 License File: LICENSE
+
+Modifications:
+ - added README.fuchsia and kept BSD license

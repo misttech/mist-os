@@ -43,9 +43,6 @@ fuchsia_product_configuration(
 
 fuchsia_product_configuration(
     name = "product_config.x64",
-    base_driver_packages = [
-        "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
-    ],
     json_config = _PRODUCT_CONFIG_BASE_JSON,
 )
 # LINT.ThenChange(//products/minimal/BUILD.gn)

@@ -1,0 +1,387 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+# Simulated transportation layer -- for unittest code.
+source_set("sim_library") {
+  testonly = true
+  sources = [
+    "fake-ucode-test.cc",
+    "inspect-host-cmd.cc",
+    "inspect-host-cmd.h",
+    "sim-mcc-update.cc",
+    "sim-mvm.cc",
+    "sim-nvm-data.inc",
+    "sim-nvm.cc",
+    "sim-scan.cc",
+    "sim-time-event.cc",
+    "sim-trans.cc",
+    "single-ap-test.cc",
+    "tkip-test.cc",
+    "tlv-fw-builder.cc",
+    "tlv-fw-builder.h",
+    "wlan-pkt-builder.cc",
+  ]
+  public = [
+    "fake-ucode-test.h",
+    "mock-trans.h",
+    "sim-mcc-update.h",
+    "sim-mvm.h",
+    "sim-nvm.h",
+    "sim-scan.h",
+    "sim-time-event.h",
+    "sim-trans.h",
+    "sim.h",
+    "single-ap-test.h",
+    "wlan-pkt-builder.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:rcu_manager",
+    "//src/devices/testing/fake-bti",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
+    "//src/connectivity/wlan/lib/common/cpp:common",
+    "//src/devices/pci/testing:pci-protocol-fake",
+    "//zircon/system/public",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+# Stub entrypoints for MVM.
+source_set("stub_mvm") {
+  testonly = true
+  sources = [ "stub-mvm.cc" ]
+  deps = [ "//zircon/system/public" ]
+  public_configs = [
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:fuchsia_config",
+  ]
+}
+
+# Test for the driver inspector.
+executable("driver_inspector_test") {
+  output_name = "driver_inspector_test"
+  testonly = true
+  sources = [ "driver-inspector-test.cc" ]
+  deps = [
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:driver_inspector",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("driver_lifecycle_test") {
+  output_name = "driver_lifecycle_test"
+  testonly = true
+  sources = [ "driver-lifecycle-test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
+    "//sdk/lib/async_patterns/testing/cpp:cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
+    "//src/devices/pci/lib/device-protocol-pci",
+    "//src/devices/testing/fake-bti",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+}
+
+# The dummy code for developer to start a new test.
+executable("dummy_test") {
+  output_name = "dummy_test"
+  testonly = true
+  sources = [ "dummy-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("fw_test") {
+  output_name = "fw_test"
+  testonly = true
+  sources = [ "fw-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("fw_dbg_test") {
+  output_name = "fw_dbg_test"
+  testonly = true
+  sources = [ "fw-dbg-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:driver_inspector",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("iwl_phy_db_test") {
+  output_name = "iwl_phy_db_test"
+  testonly = true
+  sources = [ "iwl-phy-db-test.cc" ]
+  deps = [
+    ":stub_mvm",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/lib/log/c:dfv2",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("mac80211_test") {
+  output_name = "mac80211_test"
+  testonly = true
+  sources = [ "mac80211-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("mac_ctxt_test") {
+  output_name = "mac_ctxt_test"
+  testonly = true
+  sources = [ "mac-ctxt-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+# Test code for MVM features.
+executable("mvm_test") {
+  output_name = "mvm_test"
+  testonly = true
+  sources = [ "mvm-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//src/devices/testing/fake-bti",
+    "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("notif_wait_test") {
+  output_name = "notif_wait_test"
+  testonly = true
+  sources = [ "notif-wait-test.cc" ]
+  deps = [
+    ":stub_mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("nvm_test") {
+  output_name = "nvm_test"
+  testonly = true
+  sources = [ "nvm-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("pcie_test") {
+  output_name = "pcie_test"
+  testonly = true
+  sources = [ "pcie-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
+    "//src/devices/pci/testing:pci-protocol-fake",
+    "//src/devices/testing/fake-bti",
+    "//zircon/system/public",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("phy_ctxt_test") {
+  output_name = "phy_ctxt_test"
+  testonly = true
+  sources = [ "phy-ctxt-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("platform_test") {
+  output_name = "platform_test"
+  testonly = true
+  sources = [ "platform-test.cc" ]
+  deps = [
+    ":stub_mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("rcu_manager_test") {
+  output_name = "rcu_manager_test"
+  testonly = true
+  sources = [ "rcu-manager-test.cc" ]
+  deps = [
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:rcu_manager",
+    "//zircon/system/ulib/async-testing",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("sta_test") {
+  output_name = "sta_test"
+  testonly = true
+  sources = [ "sta-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("task_test") {
+  output_name = "task_test"
+  testonly = true
+  sources = [ "task-test.cc" ]
+  deps = [
+    ":stub_mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
+    "//zircon/system/public",
+    "//zircon/system/ulib/async-testing",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("utils_test") {
+  output_name = "utils_test"
+  testonly = true
+  sources = [ "utils-test.cc" ]
+  deps = [
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("wlan_softmac_device_test") {
+  output_name = "wlan_softmac_device_test"
+  testonly = true
+  sources = [ "wlan-softmac-device-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp_wire",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
+    "//zircon/system/public",
+    "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("wlan_phy_impl_device_test") {
+  output_name = "wlan_phy_impl_device_test"
+  testonly = true
+  sources = [ "wlanphy-impl-device-test.cc" ]
+  deps = [
+    ":sim_library",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
+    "//zircon/system/public",
+    "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+_tests = [
+  "driver_inspector_test",
+  "driver_lifecycle_test",
+  "dummy_test",
+  "fw_test",
+  "fw_dbg_test",
+  "iwl_phy_db_test",
+  "mac80211_test",
+  "mac_ctxt_test",
+  "mvm_test",
+  "notif_wait_test",
+  "nvm_test",
+  "pcie_test",
+  "phy_ctxt_test",
+  "platform_test",
+  "rcu_manager_test",
+  "sta_test",
+  "task_test",
+  "utils_test",
+  "wlan_softmac_device_test",
+  "wlan_phy_impl_device_test",
+]
+
+foreach(test_name, _tests) {
+  fuchsia_unittest_component("${test_name}_component") {
+    deps = [ ":${test_name}" ]
+  }
+}
+
+fuchsia_test_package("iwlwifi_test") {
+  test_components = []
+  foreach(test_name, _tests) {
+    test_components += [ ":${test_name}_component" ]
+  }
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
