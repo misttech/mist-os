@@ -43,7 +43,7 @@ static inline int64_t page_size() { return sysconf(_SC_PAGESIZE); }
 // test thread, we lock the shared data mutex to ensure safety of memory accesses.
 class FlowControlChecker {
  public:
-  FlowControlChecker(std::shared_ptr<msd::PrimaryFidlServer> connection,
+  FlowControlChecker(std::shared_ptr<msd::internal::PrimaryFidlServer> connection,
                      std::shared_ptr<magma::PlatformConnectionClient> client_connection)
       : connection_(connection), client_connection_(client_connection) {}
 
@@ -88,7 +88,7 @@ class FlowControlChecker {
     Release();
   }
 
-  std::weak_ptr<msd::PrimaryFidlServer> connection_;
+  std::weak_ptr<msd::internal::PrimaryFidlServer> connection_;
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
   bool flow_control_checked_ = false;
   bool flow_control_skipped_ = false;
@@ -136,7 +136,7 @@ class TestPlatformConnection {
       std::shared_ptr<SharedData> shared_data = std::make_shared<SharedData>());
 
   TestPlatformConnection(std::shared_ptr<magma::PlatformConnectionClient> client_connection,
-                         std::shared_ptr<msd::PrimaryFidlServerHolder> server_holder,
+                         std::shared_ptr<msd::internal::PrimaryFidlServerHolder> server_holder,
                          std::shared_ptr<SharedData> shared_data)
       : client_connection_(client_connection),
         server_holder_(std::move(server_holder)),
@@ -483,12 +483,12 @@ class TestPlatformConnection {
 
  private:
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
-  std::shared_ptr<msd::PrimaryFidlServerHolder> server_holder_;
+  std::shared_ptr<msd::internal::PrimaryFidlServerHolder> server_holder_;
   msd::FlowControlChecker flow_control_checker_;
   std::shared_ptr<SharedData> shared_data_;
 };
 
-class TestDelegate : public msd::PrimaryFidlServer::Delegate {
+class TestDelegate : public msd::internal::PrimaryFidlServer::Delegate {
  public:
   TestDelegate(std::shared_ptr<SharedData> shared_data) : shared_data_(shared_data) {}
 
@@ -727,9 +727,9 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
   if (!notification_endpoints.is_ok())
     return MAGMA_DRETP(nullptr, "Failed to create notification endpoints");
 
-  auto connection =
-      msd::PrimaryFidlServer::Create(std::move(delegate), 1u, std::move(endpoints->server),
-                                     std::move(notification_endpoints->server));
+  auto connection = msd::internal::PrimaryFidlServer::Create(
+      std::move(delegate), 1u, std::move(endpoints->server),
+      std::move(notification_endpoints->server));
   if (!connection)
     return MAGMA_DRETP(nullptr, "failed to create PlatformConnection");
 
@@ -740,7 +740,7 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
   if (!client_connection)
     return MAGMA_DRETP(nullptr, "failed to create PlatformConnectionClient");
 
-  auto server_holder = std::make_shared<PrimaryFidlServerHolder>();
+  auto server_holder = std::make_shared<internal::PrimaryFidlServerHolder>();
   server_holder->Start(std::move(connection), nullptr, [](const char* role_profile) {});
 
   return std::make_unique<TestPlatformConnection>(std::move(client_connection),

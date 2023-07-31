@@ -39,7 +39,7 @@ std::optional<int> GetBufferOp(fuchsia_gpu_magma::BufferOp fidl_type) {
 
 }  // namespace
 
-namespace msd {
+namespace msd::internal {
 
 class FidlPerfCountPoolServer : public PerfCountPoolServer {
  public:
@@ -587,4 +587,4 @@ bool PrimaryFidlServerHolder::HandleRequest() {
   return true;
 }
 
-}  // namespace msd
+}  // namespace msd::internal

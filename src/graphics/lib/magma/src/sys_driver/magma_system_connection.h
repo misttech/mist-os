@@ -21,7 +21,7 @@ namespace msd {
 class MagmaSystemDevice;
 
 class MagmaSystemConnection : private MagmaSystemContext::Owner,
-                              public msd::PrimaryFidlServer::Delegate,
+                              public msd::internal::PrimaryFidlServer::Delegate,
                               msd::NotificationHandler {
  public:
   class Owner {

@@ -30,6 +30,8 @@
 #include "msd/msd_defs.h"
 
 namespace msd {
+class FlowControlChecker;
+class TestPlatformConnection;
 
 class PerfCountPoolServer {
  public:
@@ -40,6 +42,8 @@ class PerfCountPoolServer {
                                                          uint32_t buffer_offset, uint64_t time,
                                                          uint32_t result_flags) = 0;
 };
+
+namespace internal {
 
 class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                           public msd::NotificationHandler {
@@ -197,7 +201,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   uint64_t messages_consumed_ = 0;
   uint64_t bytes_imported_ = 0;
 
-  friend class FlowControlChecker;
+  friend class ::msd::FlowControlChecker;
   friend class PrimaryFidlServerHolder;
 };
 
@@ -239,8 +243,10 @@ class PrimaryFidlServerHolder : public std::enable_shared_from_this<PrimaryFidlS
   std::mutex server_lock_;
   std::shared_ptr<PrimaryFidlServer> server_;
 
-  friend class TestPlatformConnection;
+  friend class ::msd::TestPlatformConnection;
 };
+
+}  // namespace internal
 
 }  // namespace msd
 

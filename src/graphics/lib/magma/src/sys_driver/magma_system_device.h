@@ -23,7 +23,7 @@ namespace msd {
 class MagmaSystemBuffer;
 class MagmaSystemSemaphore;
 
-class MagmaSystemDevice final : public PrimaryFidlServerHolder::ConnectionOwnerDelegate,
+class MagmaSystemDevice final : public internal::PrimaryFidlServerHolder::ConnectionOwnerDelegate,
                                 public MagmaSystemConnection::Owner {
  public:
   // The msd::Driver instance must outlive the MagmaSystemDevice
@@ -38,14 +38,14 @@ class MagmaSystemDevice final : public PrimaryFidlServerHolder::ConnectionOwnerD
   explicit MagmaSystemDevice(msd::Driver* driver, std::unique_ptr<msd::Device> msd_dev)
       : driver_(driver), msd_dev_(std::move(msd_dev)) {
     connection_set_ =
-        std::make_unique<std::unordered_set<std::shared_ptr<PrimaryFidlServerHolder>>>();
+        std::make_unique<std::unordered_set<std::shared_ptr<internal::PrimaryFidlServerHolder>>>();
   }
 
   ~MagmaSystemDevice();
 
   // Opens a connection to the device. On success, returns the connection handle
   // to be passed to the client.
-  std::unique_ptr<msd::PrimaryFidlServer> Open(
+  std::unique_ptr<msd::internal::PrimaryFidlServer> Open(
       msd_client_id_t client_id, fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
       fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
 
@@ -60,10 +60,10 @@ class MagmaSystemDevice final : public PrimaryFidlServerHolder::ConnectionOwnerD
 
   // Called on driver thread.  |device_handle| may be used by the connection thread for
   // initialization/configuration but should not be retained.
-  void StartConnectionThread(std::unique_ptr<msd::PrimaryFidlServer> fidl_server,
+  void StartConnectionThread(std::unique_ptr<msd::internal::PrimaryFidlServer> fidl_server,
                              fit::function<void(const char*)> set_thread_priority);
 
-  void ConnectionClosed(std::shared_ptr<PrimaryFidlServerHolder> server,
+  void ConnectionClosed(std::shared_ptr<internal::PrimaryFidlServerHolder> server,
                         bool* need_detach_out) override;
 
   void DumpStatus(uint32_t dump_type) { msd_dev()->DumpStatus(dump_type); }
@@ -84,8 +84,8 @@ class MagmaSystemDevice final : public PrimaryFidlServerHolder::ConnectionOwnerD
   std::unique_ptr<msd::Device> msd_dev_;
   uint64_t perf_count_access_token_id_ = 0u;
 
-  std::unique_ptr<std::unordered_set<std::shared_ptr<PrimaryFidlServerHolder>>> connection_set_
-      FIT_GUARDED(connection_list_mutex_);
+  std::unique_ptr<std::unordered_set<std::shared_ptr<internal::PrimaryFidlServerHolder>>>
+      connection_set_ FIT_GUARDED(connection_list_mutex_);
   std::mutex connection_list_mutex_;
 };
 

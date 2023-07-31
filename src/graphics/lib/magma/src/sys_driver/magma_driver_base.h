@@ -27,7 +27,7 @@ namespace msd {
 template <typename FidlDeviceType>
 class MagmaDriverBase : public fdf::DriverBase,
                         public fidl::WireServer<FidlDeviceType>,
-                        DependencyInjectionServer::Owner {
+                        internal::DependencyInjectionServer::Owner {
  public:
   using fws = fidl::WireServer<FidlDeviceType>;
 
@@ -326,8 +326,8 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
 
-  PerformanceCountersServer perf_counter_;
-  DependencyInjectionServer dependency_injection_{this};
+  internal::PerformanceCountersServer perf_counter_;
+  internal::DependencyInjectionServer dependency_injection_{this};
 };
 
 class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice> {

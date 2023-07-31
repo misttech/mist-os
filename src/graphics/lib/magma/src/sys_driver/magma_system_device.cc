@@ -26,29 +26,29 @@ MagmaSystemDevice::~MagmaSystemDevice() {
   MAGMA_DASSERT(!connection_set_ || connection_set_->empty());
 }
 
-std::unique_ptr<msd::PrimaryFidlServer> MagmaSystemDevice::Open(
+std::unique_ptr<msd::internal::PrimaryFidlServer> MagmaSystemDevice::Open(
     msd_client_id_t client_id, fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
     fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
   std::unique_ptr<msd::Connection> msd_connection = msd_dev()->Open(client_id);
   if (!msd_connection)
     return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
-  return msd::PrimaryFidlServer::Create(
+  return msd::internal::PrimaryFidlServer::Create(
       std::make_unique<MagmaSystemConnection>(this, std::move(msd_connection)), client_id,
       std::move(primary), std::move(notification));
 }
 
 void MagmaSystemDevice::StartConnectionThread(
-    std::unique_ptr<msd::PrimaryFidlServer> fidl_server,
+    std::unique_ptr<msd::internal::PrimaryFidlServer> fidl_server,
     fit::function<void(const char*)> set_thread_priority) {
   std::lock_guard<std::mutex> lock(connection_list_mutex_);
-  auto server_holder = std::make_shared<PrimaryFidlServerHolder>();
+  auto server_holder = std::make_shared<internal::PrimaryFidlServerHolder>();
   server_holder->Start(std::move(fidl_server), this, std::move(set_thread_priority));
 
   connection_set_->insert(std::move(server_holder));
 }
 
-void MagmaSystemDevice::ConnectionClosed(std::shared_ptr<PrimaryFidlServerHolder> server,
+void MagmaSystemDevice::ConnectionClosed(std::shared_ptr<internal::PrimaryFidlServerHolder> server,
                                          bool* need_detach_out) {
   std::lock_guard<std::mutex> lock(connection_list_mutex_);
 
@@ -67,7 +67,7 @@ void MagmaSystemDevice::ConnectionClosed(std::shared_ptr<PrimaryFidlServerHolder
 }
 
 void MagmaSystemDevice::Shutdown() {
-  std::unique_ptr<std::unordered_set<std::shared_ptr<PrimaryFidlServerHolder>>> set;
+  std::unique_ptr<std::unordered_set<std::shared_ptr<internal::PrimaryFidlServerHolder>>> set;
   {
     std::lock_guard lock(connection_list_mutex_);
     set = std::move(connection_set_);
@@ -95,9 +95,9 @@ magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffe
   zx::vmo vmo;
   switch (id) {
     case MAGMA_QUERY_MAXIMUM_INFLIGHT_PARAMS:
-      *result_out = msd::PrimaryFidlServer::kMaxInflightMessages;
+      *result_out = msd::internal::PrimaryFidlServer::kMaxInflightMessages;
       *result_out <<= 32;
-      *result_out |= msd::PrimaryFidlServer::kMaxInflightMemoryMB;
+      *result_out |= msd::internal::PrimaryFidlServer::kMaxInflightMemoryMB;
       return MAGMA_STATUS_OK;
   }
   magma_status_t status = msd_dev()->Query(id, &vmo, result_out);

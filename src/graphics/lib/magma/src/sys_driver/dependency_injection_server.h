@@ -13,7 +13,7 @@
 #include "magma_util/macros.h"
 #include "src/graphics/lib/magma/include/msd/msd_defs.h"
 
-namespace msd {
+namespace msd::internal {
 class DependencyInjectionServer : public fidl::WireServer<fuchsia_gpu_magma::DependencyInjection>,
                                   public fidl::WireServer<fuchsia_memorypressure::Watcher> {
  public:
@@ -51,5 +51,5 @@ class DependencyInjectionServer : public fidl::WireServer<fuchsia_gpu_magma::Dep
   std::optional<fidl::ServerBindingRef<fuchsia_memorypressure::Watcher>> pressure_server_;
 };
 
-}  // namespace msd
+}  // namespace msd::internal
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_DEPENDENCY_INJECTION_SERVER_H_

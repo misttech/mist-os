@@ -4,7 +4,7 @@
 
 #include "performance_counters_server.h"
 
-namespace msd {
+namespace msd::internal {
 zx::result<> PerformanceCountersServer::Create(
     fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client) {
   zx_status_t status = zx::event::create(0, &event_);
@@ -57,4 +57,4 @@ void PerformanceCountersServer::GetPerformanceCountToken(
   }
 }
 
-}  // namespace msd
+}  // namespace msd::internal
