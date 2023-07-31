@@ -8,6 +8,7 @@ group("benchmarks") {
     "resource-usage:tests",
     "socket:benchmarks",
     "socket-tun:benchmarks",
+    "udp-serde:benchmarks",
   ]
 }
 
@@ -17,5 +18,6 @@ group("tests") {
     "resource-usage:tests",
     "socket:tests",
     "socket-tun:tests",
+    "udp-serde:tests",
   ]
 }

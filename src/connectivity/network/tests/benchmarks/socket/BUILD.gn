@@ -9,19 +9,6 @@ import("//build/components/fuchsia_unittest_package.gni")
 import("//build/test.gni")
 import("//build/testing/environments.gni")
 
-test("udp_serde_benchmarks") {
-  sources = [ "udp_serde_benchmarks.cc" ]
-
-  deps = [
-    "//sdk/lib/fidl/cpp/wire",
-    "//sdk/lib/syslog/cpp",
-    "//src/connectivity/network/netstack/udp_serde",
-    "//src/connectivity/network/netstack/udp_serde:udp_serde_test_util",
-    "//src/lib/fxl",
-    "//zircon/system/ulib/perftest",
-  ]
-}
-
 test("socket_benchmarks") {
   sources = [
     "../../os.h",
@@ -156,15 +143,9 @@ if (target_cpu != "riscv64") {
   ns2_test_targets = []
 }
 
-fuchsia_unittest_package("udp-serde-benchmarks") {
-  manifest = "meta/udp-serde-benchmarks.cml"
-  deps = [ ":udp_serde_benchmarks" ]
-}
-
 all_test_targets = [
                      ":socket-benchmarks-tests-netstack3",
                      ":socket-benchmarks-with-tracing-pkg-netstack3",
-                     ":udp-serde-benchmarks",
                    ] + ns2_test_targets
 
 group("tests") {
