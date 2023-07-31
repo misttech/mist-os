@@ -58,7 +58,7 @@ async fn initial_inspect_state() {
                 blob_body_timeout_seconds: 30u64,
                 blob_download_resumption_attempts_limit: 50u64,
                 blob_type: "Uncompressed",
-                delivery_blob_fallback: false,
+                delivery_blob_fallback: true,
                 queue: {},
             },
             structured_config: contains {},

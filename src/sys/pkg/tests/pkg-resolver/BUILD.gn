@@ -427,7 +427,7 @@ fuchsia_structured_config_values("pkg-resolver-config") {
   cm_label = ":pkg-resolver-manifest"
   values = {
     fetch_delivery_blob = false
-    delivery_blob_fallback = false
+    delivery_blob_fallback = true
     allow_local_mirror = false
 
     # Repository size is currently 100 KB. Allowing for 10x growth and assuming a

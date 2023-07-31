@@ -203,7 +203,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 # LINT.IfChange
 structured_config_values = {
   fetch_delivery_blob = false
-  delivery_blob_fallback = false
+  delivery_blob_fallback = true
   allow_local_mirror = false
 
   # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
@@ -236,7 +236,6 @@ fuchsia_structured_config_values("eng_config_values_from_gn") {
   cm_label = ":manifest"
 
   values = structured_config_values
-  values.delivery_blob_fallback = true
 }
 
 group("tests") {
