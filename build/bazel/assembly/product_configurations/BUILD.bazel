@@ -30,31 +30,3 @@ fuchsia_product_configuration(
         },
     },
 )
-
-# LINT.IfChange
-fuchsia_product_configuration(
-    name = "core",
-    base_packages = [
-        ":small-open-fonts-collection",
-    ],
-    json_config = {
-        "platform": {
-            "build_type": BUILD_TYPES.ENG,
-            "development_support": {
-                "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
-            },
-            "fonts": {
-                "enabled": True,
-            },
-            "input": {
-                "supported_input_devices": [
-                    INPUT_DEVICE_TYPE.BUTTON,
-                    INPUT_DEVICE_TYPE.TOUCHSCREEN,
-                ],
-            },
-        },
-    },
-
-    # TODO(https://fxbug.dev/103248): Add driver packages when they are available in Bazel.
-)
-# LINT.ThenChange(//products/core/BUILD.gn)

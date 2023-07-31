@@ -25,22 +25,10 @@ verify_product_configuration("verify_minimal_product_configuration") {
       [ "//src/fonts/asset_providers:small-open-fonts-collection-bazel" ]
 }
 
-verify_product_configuration("verify_core_product_configuration") {
-  testonly = true
-  gn_product_config_target = "//products/core"
-  bazel_product_config_target = ":core"
-
-  bazel_inputs =
-      [ "//src/fonts/asset_providers:small-open-fonts-collection-bazel" ]
-}
-
 group("verifications") {
   testonly = true
   deps = [
     ":verify_default_product_configuration",
     ":verify_minimal_product_configuration",
-
-    # TODO(jayzhuang): Add core product config verifications when driver packages are added in its Bazel target.
-    # ":verify_core_product_configuration",
   ]
 }
