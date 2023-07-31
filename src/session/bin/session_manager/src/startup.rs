@@ -4,6 +4,7 @@
 
 use {
     crate::cobalt,
+    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
     fuchsia_async as fasync, fuchsia_zircon as zx, realm_management,
     thiserror::{self, Error},
@@ -93,22 +94,24 @@ const SESSION_CHILD_COLLECTION: &str = "session";
 ///
 /// Any existing session child will be destroyed prior to launching the new session.
 ///
-/// Returns a proxy to the session component's exposed directory, or an error.
+/// Returns a controller for the session component, or an error.
 ///
 /// # Parameters
 /// - `session_url`: The URL of the session to launch.
+/// - `exposed_dir`: The server end on which to serve the session's exposed directory.
 /// - `realm`: The realm in which to launch the session.
 ///
 /// # Errors
 /// If there was a problem creating or binding to the session component instance.
 pub async fn launch_session(
     session_url: &str,
+    exposed_dir: ServerEnd<fio::DirectoryMarker>,
     realm: &fcomponent::RealmProxy,
-) -> Result<fio::DirectoryProxy, StartupError> {
+) -> Result<fcomponent::ExecutionControllerProxy, StartupError> {
     info!(session_url, "Launching session");
 
     let start_time = zx::Time::get_monotonic();
-    let exposed_dir = set_session(&session_url, realm).await?;
+    let controller = set_session(&session_url, realm, exposed_dir).await?;
     let end_time = zx::Time::get_monotonic();
 
     fasync::Task::local(async move {
@@ -120,7 +123,7 @@ pub async fn launch_session(
     })
     .detach();
 
-    Ok(exposed_dir)
+    Ok(controller)
 }
 
 /// Stops the current session, if any.
@@ -145,22 +148,18 @@ pub async fn stop_session(realm: &fcomponent::RealmProxy) -> Result<(), StartupE
 /// If an existing session is running, the session's component instance will be destroyed prior to
 /// creating the new session, effectively replacing the session.
 ///
-/// The session is launched by connecting to the fuchsia.component.Binder protocol
-/// in its exposed directory. This capability bind will trigger the component
-/// to start.
-///
-/// Returns a proxy to the session component's exposed directory, or an error.
-///
 /// # Parameters
 /// - `session_url`: The URL of the session to instantiate.
 /// - `realm`: The realm in which to create the session.
+/// - `exposed_dir`: The server end on which the session's exposed directory will be served.
 ///
 /// # Errors
 /// Returns an error if any of the realm operations fail, or the realm is unavailable.
 async fn set_session(
     session_url: &str,
     realm: &fcomponent::RealmProxy,
-) -> Result<fio::DirectoryProxy, StartupError> {
+    exposed_dir: ServerEnd<fio::DirectoryMarker>,
+) -> Result<fcomponent::ExecutionControllerProxy, StartupError> {
     realm_management::destroy_child_component(SESSION_NAME, SESSION_CHILD_COLLECTION, realm)
         .await
         .or_else(|err: fcomponent::Error| match err {
@@ -177,10 +176,17 @@ async fn set_session(
             err,
         })?;
 
+    let (controller, controller_server_end) =
+        create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let create_child_args = fcomponent::CreateChildArgs {
+        controller: Some(controller_server_end),
+        ..Default::default()
+    };
     realm_management::create_child_component(
         SESSION_NAME,
         &session_url,
         SESSION_CHILD_COLLECTION,
+        create_child_args,
         realm,
     )
     .await
@@ -191,10 +197,11 @@ async fn set_session(
         err,
     })?;
 
-    let exposed_dir = realm_management::open_child_component_exposed_dir(
+    realm_management::open_child_component_exposed_dir(
         SESSION_NAME,
         SESSION_CHILD_COLLECTION,
         realm,
+        exposed_dir,
     )
     .await
     .map_err(|err| StartupError::ExposedDirNotOpened {
@@ -204,32 +211,33 @@ async fn set_session(
         err,
     })?;
 
-    // By connecting to the fuchsia.component.Binder protocol, we instruct
-    // Component Manager to *start* the session component.
-    let _ = fuchsia_component::client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(
-        &exposed_dir,
-    )
-    .map_err(|_err| StartupError::NotLaunched {
-        name: SESSION_NAME.to_string(),
-        collection: SESSION_CHILD_COLLECTION.to_string(),
-        url: session_url.to_string(),
-        err: fcomponent::Error::InstanceCannotStart,
-    })?;
+    // Start the component.
+    let (execution_controller, execution_controller_server_end) =
+        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+    controller
+        .start(fcomponent::StartChildArgs::default(), execution_controller_server_end)
+        .await
+        .map_err(|_| fcomponent::Error::Internal)
+        .and_then(std::convert::identity)
+        .map_err(|_err| StartupError::NotLaunched {
+            name: SESSION_NAME.to_string(),
+            collection: SESSION_CHILD_COLLECTION.to_string(),
+            url: session_url.to_string(),
+            err: fcomponent::Error::InstanceCannotStart,
+        })?;
 
-    Ok(exposed_dir)
+    Ok(execution_controller)
 }
 
 #[cfg(test)]
 mod tests {
     use {
         super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME},
-        anyhow::{Context, Error},
-        fidl::endpoints::{spawn_stream_handler, Proxy},
+        anyhow::Error,
+        fidl::endpoints::{create_endpoints, spawn_stream_handler},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-        fuchsia_zircon::{self as zx, AsHandleRef},
         lazy_static::lazy_static,
-        session_testing::spawn_directory_server,
-        std::sync::mpsc,
+        session_testing::{spawn_directory_server, spawn_server},
         test_util::Counter,
     };
 
@@ -258,11 +266,20 @@ mod tests {
 
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild { collection, decl, args: _, responder } => {
+                fcomponent::RealmRequest::CreateChild { collection, decl, args, responder } => {
                     assert_eq!(NUM_REALM_REQUESTS.get(), 1);
                     assert_eq!(decl.url.unwrap(), session_url);
                     assert_eq!(decl.name.unwrap(), SESSION_NAME);
                     assert_eq!(&collection.name, SESSION_CHILD_COLLECTION);
+
+                    spawn_server(args.controller.unwrap(), move |controller_request| {
+                        match controller_request {
+                            fcomponent::ControllerRequest::Start { responder, .. } => {
+                                let _ = responder.send(Ok(()));
+                            }
+                            fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
+                        }
+                    });
 
                     let _ = responder.send(Ok(()));
                 }
@@ -279,62 +296,18 @@ mod tests {
             NUM_REALM_REQUESTS.inc();
         })?;
 
-        set_session(session_url, &realm).await?;
+        let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        let _controller = set_session(session_url, &realm, exposed_dir_server_end).await?;
 
         Ok(())
     }
 
     #[fuchsia::test]
-    async fn set_session_returns_channel_bound_to_exposed_dir() -> Result<(), Error> {
-        let session_url = "session";
-        let (exposed_dir_server_end_sender, exposed_dir_server_end_receiver) = mpsc::channel();
+    async fn set_session_starts_component() -> Result<(), Error> {
+        lazy_static! {
+            static ref NUM_START_CALLS: Counter = Counter::new(0);
+        }
 
-        let realm = spawn_stream_handler(move |realm_request| {
-            let exposed_dir_server_end_sender = exposed_dir_server_end_sender.clone();
-            async move {
-                match realm_request {
-                    fcomponent::RealmRequest::DestroyChild { responder, .. } => {
-                        let _ = responder.send(Ok(()));
-                    }
-                    fcomponent::RealmRequest::CreateChild { responder, .. } => {
-                        let _ = responder.send(Ok(()));
-                    }
-                    fcomponent::RealmRequest::OpenExposedDir { exposed_dir, responder, .. } => {
-                        exposed_dir_server_end_sender
-                            .send(exposed_dir)
-                            .expect("Failed to relay `exposed_dir`");
-                        let _ = responder.send(Ok(()));
-                    }
-                    _ => panic!("Realm handler received an unexpected request"),
-                }
-            }
-        })?;
-
-        let exposed_dir =
-            set_session(session_url, &realm).await.context("Failed to set_session()")?;
-
-        let exposed_dir_server_end = exposed_dir_server_end_receiver
-            .recv()
-            .context("Failed to read exposed_dir from relay")?;
-        exposed_dir_server_end
-            .into_channel()
-            .write(b"hello world", /* handles */ &mut vec![])
-            .context("Failed to write to server end")?;
-
-        let mut read_buf = zx::MessageBuf::new();
-        exposed_dir
-            .into_channel()
-            .unwrap()
-            .into_zx_channel()
-            .read(&mut read_buf)
-            .context("Failed to read from client end")?;
-        assert_eq!(read_buf.bytes(), b"hello world", "server and client channels do not match");
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn set_session_returns_error_if_binder_connection_fails() -> Result<(), Error> {
         let session_url = "session";
 
         let realm = spawn_stream_handler(move |realm_request| async move {
@@ -342,27 +315,28 @@ mod tests {
                 fcomponent::RealmRequest::DestroyChild { responder, .. } => {
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild { responder, .. } => {
+                fcomponent::RealmRequest::CreateChild { args, responder, .. } => {
+                    spawn_server(args.controller.unwrap(), move |controller_request| {
+                        match controller_request {
+                            fcomponent::ControllerRequest::Start { responder, .. } => {
+                                NUM_START_CALLS.inc();
+                                let _ = responder.send(Ok(()));
+                            }
+                            fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
+                        }
+                    });
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
-                    // Close the incoming channel before responding to avoid race conditions.
-                    let () = std::mem::drop(exposed_dir);
-                    let () = responder.send(Ok(())).unwrap();
+                fcomponent::RealmRequest::OpenExposedDir { responder, .. } => {
+                    let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };
         })?;
 
-        // By not implementing a handler for exposed_dir channel, the
-        // set_session function will observe a PEER_CLOSED signal.
-        let exposed_dir = set_session(session_url, &realm).await?;
-        exposed_dir
-            .into_channel()
-            .unwrap()
-            .into_zx_channel()
-            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
-            .context("exposed_dir should be closed")?;
+        let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        let _controller = set_session(session_url, &realm, exposed_dir_server_end).await?;
+        assert_eq!(NUM_START_CALLS.get(), 1);
 
         Ok(())
     }

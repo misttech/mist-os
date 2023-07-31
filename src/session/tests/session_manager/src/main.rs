@@ -7,7 +7,8 @@ mod tests {
     use {
         diagnostics_hierarchy::DiagnosticsHierarchy,
         diagnostics_reader::{ArchiveReader, Inspect},
-        fidl_fuchsia_component as fcomponent,
+        fidl::endpoints::create_proxy,
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
         fuchsia_component::client::connect_to_protocol,
         fuchsia_component_test::{ChildOptions, ChildRef, DirectoryContents, RealmBuilder},
         session_manager_lib,
@@ -26,7 +27,12 @@ mod tests {
         let session_url = String::from(SESSION_URL);
         println!("Session url: {}", &session_url);
 
-        session_manager_lib::startup::launch_session(&session_url, &realm)
+        // `launch_session()` requires an initial exposed-diretory request, so create, pass and
+        // immediately close a `Directory` channel.
+        let (_exposed_dir, exposed_dir_server_end) =
+            create_proxy::<fio::DirectoryMarker>().unwrap();
+
+        session_manager_lib::startup::launch_session(&session_url, exposed_dir_server_end, &realm)
             .await
             .expect("Failed to launch session");
     }

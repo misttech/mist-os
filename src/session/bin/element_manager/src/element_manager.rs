@@ -16,11 +16,12 @@ use {
     anyhow::{format_err, Error},
     fidl,
     fidl::endpoints::{
-        create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream, ServerEnd,
+        create_proxy, create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream,
+        ServerEnd,
     },
     fidl::AsHandleRef,
     fidl_connector::Connect,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
     fidl_fuchsia_ui_app as fuiapp,
     fuchsia_async::{self as fasync, DurationExt},
     fuchsia_component, fuchsia_scenic as scenic, fuchsia_zircon as zx,
@@ -173,16 +174,25 @@ impl ElementManager {
             "launch_v2_element"
         );
 
-        realm_management::create_child_component(&child_name, &child_url, collection, &self.realm)
-            .await
-            .map_err(|err: fcomponent::Error| {
-                ElementManagerError::not_created(child_name, collection, child_url, err)
-            })?;
+        realm_management::create_child_component(
+            &child_name,
+            &child_url,
+            collection,
+            fcomponent::CreateChildArgs::default(),
+            &self.realm,
+        )
+        .await
+        .map_err(|err: fcomponent::Error| {
+            ElementManagerError::not_created(child_name, collection, child_url, err)
+        })?;
 
-        let exposed_directory = match realm_management::open_child_component_exposed_dir(
+        let (exposed_directory, exposed_dir_server_end) =
+            create_proxy::<fio::DirectoryMarker>().unwrap();
+        match realm_management::open_child_component_exposed_dir(
             child_name,
             collection,
             &self.realm,
+            exposed_dir_server_end,
         )
         .await
         {

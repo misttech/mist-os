@@ -5,7 +5,7 @@
 use {
     crate::startup,
     anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::ServerEnd,
+    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
@@ -49,8 +49,34 @@ impl Diagnostics {
     }
 }
 
-/// State of a launched session.
-struct SessionState {
+/// State for a session that will be started in the future.
+struct PendingSession {
+    /// A proxy to the session's exposed directory.
+    ///
+    /// This proxy is not connected in the `Pending` state, and used to pipeline connections
+    /// to session protocols (svc_from_session) before the session is started.
+    ///
+    /// This is the other end of `exposed_dir_server_end`.
+    pub exposed_dir: fio::DirectoryProxy,
+
+    /// The server end on which the session's exposed directory will be served.
+    ///
+    /// This is the other end of `exposed_dir`.
+    pub exposed_dir_server_end: ServerEnd<fio::DirectoryMarker>,
+}
+
+impl PendingSession {
+    fn new() -> Self {
+        let (exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        Self { exposed_dir, exposed_dir_server_end }
+    }
+}
+
+/// State of a started session.
+///
+/// The component has been created and started, but is not guaranteed to be running since it
+/// may be stopped through external means.
+struct StartedSession {
     /// The component URL of the session.
     url: String,
 
@@ -58,21 +84,86 @@ struct SessionState {
     exposed_dir: fio::DirectoryProxy,
 }
 
+enum Session {
+    Pending(PendingSession),
+    Started(StartedSession),
+}
+
+impl Session {
+    fn new_pending() -> Self {
+        Self::Pending(PendingSession::new())
+    }
+}
+
 struct SessionManagerState {
     /// The component URL for the default session.
     default_session_url: Option<String>,
 
-    /// State of a launched session.
-    ///
-    /// If set, the component has been created and started, but is not guaranteed to be running
-    /// since it may be stopped through external means.
-    session: Option<SessionState>,
+    /// State of the session.
+    session: Session,
 
-    /// The realm in which sessions will be launched.
+    /// The realm in which session components will be created.
     realm: fcomponent::RealmProxy,
 
     /// Collection of diagnostics nodes.
     diagnostics: Diagnostics,
+}
+
+impl SessionManagerState {
+    /// Start the session with the default session component URL, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the is no default session URL or the session could not be launched.
+    async fn start_default(&mut self) -> Result<(), Error> {
+        let session_url = self
+            .default_session_url
+            .as_ref()
+            .ok_or_else(|| anyhow!("no default session URL configured"))?
+            .clone();
+        self.start(session_url).await?;
+        Ok(())
+    }
+
+    /// Start a session, replacing any already session.
+    async fn start(&mut self, url: String) -> Result<(), startup::StartupError> {
+        let session = std::mem::replace(&mut self.session, Session::new_pending());
+        let pending = match session {
+            Session::Pending(pending) => pending,
+            Session::Started(_) => PendingSession::new(),
+        };
+        let _controller =
+            startup::launch_session(&url, pending.exposed_dir_server_end, &self.realm).await?;
+        self.session = Session::Started(StartedSession { url, exposed_dir: pending.exposed_dir });
+        self.diagnostics.record_session_start();
+        Ok(())
+    }
+
+    /// Stops the session, if any.
+    async fn stop(&mut self) -> Result<(), startup::StartupError> {
+        let session = std::mem::replace(&mut self.session, Session::new_pending());
+        if let Session::Started(_) = session {
+            startup::stop_session(&self.realm).await?;
+        }
+        Ok(())
+    }
+
+    /// Opens a path in the session's exposed dir.
+    ///
+    /// If the session is in the Pending state, the request will be buffered until the session
+    /// is started.
+    fn open_exposed_dir(
+        &self,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let exposed_dir = match &self.session {
+            Session::Pending(pending) => &pending.exposed_dir,
+            Session::Started(started) => &started.exposed_dir,
+        };
+        let _ = exposed_dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
+    }
 }
 
 /// Manages the session lifecycle and provides services to control the session.
@@ -85,7 +176,7 @@ impl SessionManager {
     /// Constructs a new SessionManager.
     ///
     /// # Parameters
-    /// - `realm`: The realm in which sessions will be launched.
+    /// - `realm`: The realm in which session components will be created.
     pub fn new(
         realm: fcomponent::RealmProxy,
         inspector: &fuchsia_inspect::Inspector,
@@ -96,24 +187,23 @@ impl SessionManager {
             DIANGNOSTICS_SESSION_STARTED_AT_SIZE,
         );
         let diagnostics = Diagnostics { session_started_at };
-        let state = SessionManagerState { default_session_url, session: None, realm, diagnostics };
+        let state = SessionManagerState {
+            default_session_url,
+            session: Session::new_pending(),
+            realm,
+            diagnostics,
+        };
         SessionManager { state: Arc::new(Mutex::new(state)) }
     }
 
-    /// Launch the session with the default session component URL, if any.
+    /// Starts the session with the default session component URL, if any.
     ///
     /// # Errors
     ///
     /// Returns an error if the is no default session URL or the session could not be launched.
-    pub async fn launch_default_session(&mut self) -> Result<(), Error> {
+    pub async fn start_default_session(&mut self) -> Result<(), Error> {
         let mut state = self.state.lock().await;
-        let session_url = state
-            .default_session_url
-            .as_ref()
-            .ok_or_else(|| anyhow!("no default session URL configured"))?;
-        let exposed_dir = startup::launch_session(&session_url, &state.realm).await?;
-        state.session = Some(SessionState { url: session_url.clone(), exposed_dir });
-        state.diagnostics.record_session_start();
+        state.start_default().await?;
         Ok(())
     }
 
@@ -190,8 +280,6 @@ impl SessionManager {
 
     /// Handles a fuchsia.io.Directory/Open request for the /svc_from_session directory,
     /// forwarding the request to the session's exposed directory.
-    ///
-    /// If the session is not started, closes `server_end` with a PEER_CLOSED epitaph.
     fn open_svc_for_session(
         &self,
         scope: ExecutionScope,
@@ -202,25 +290,7 @@ impl SessionManager {
         let state = self.state.clone();
         scope.spawn(async move {
             let state = state.lock().await;
-            match state.session.as_ref() {
-                Some(session) => {
-                    let _ = session.exposed_dir.open(
-                        flags,
-                        fio::ModeType::empty(),
-                        path.as_ref(),
-                        server_end,
-                    );
-                }
-                None => {
-                    warn!(
-                        path = path.as_ref(),
-                        "Failed to open protocol exposed by session: session has not been started."
-                    );
-                    server_end
-                        .close_with_epitaph(zx::Status::PEER_CLOSED)
-                        .unwrap_or_else(|err| error!(?err, "failed to send epitaph"));
-                }
-            }
+            state.open_exposed_dir(flags, path, server_end);
         });
     }
 
@@ -317,24 +387,19 @@ impl SessionManager {
     ) -> Result<(), fsession::LaunchError> {
         let session_url = configuration.session_url.ok_or(fsession::LaunchError::InvalidArgs)?;
         let mut state = self.state.lock().await;
-        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
-            |exposed_dir| {
-                state.session = Some(SessionState { url: session_url, exposed_dir });
-                state.diagnostics.record_session_start();
-            },
-        )
+        state.start(session_url).await.map_err(Into::into)
     }
 
     /// Handles a Restarter.Restart() request.
     async fn handle_restart_request(&mut self) -> Result<(), fsession::RestartError> {
         let mut state = self.state.lock().await;
-        let session_url = &state.session.as_ref().ok_or(fsession::RestartError::NotRunning)?.url;
-        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
-            |exposed_dir| {
-                state.session.as_mut().unwrap().exposed_dir = exposed_dir;
-                state.diagnostics.record_session_start();
-            },
-        )
+        let session_url = match &state.session {
+            Session::Started(started) => Some(&started.url),
+            Session::Pending(_) => None,
+        }
+        .ok_or(fsession::RestartError::NotRunning)?
+        .clone();
+        state.start(session_url).await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Start()` request.
@@ -346,40 +411,30 @@ impl SessionManager {
         session_url: Option<String>,
     ) -> Result<(), fsession::LifecycleError> {
         let mut state = self.state.lock().await;
-        if state.session.is_some() {
-            return Err(fsession::LifecycleError::AlreadyStarted);
-        }
         let session_url = session_url
             .as_ref()
             .or(state.default_session_url.as_ref())
             .ok_or(fsession::LifecycleError::NotFound)?
             .to_owned();
-        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
-            |exposed_dir| {
-                state.session = Some(SessionState { url: session_url, exposed_dir });
-                state.diagnostics.record_session_start();
-            },
-        )
+        state.start(session_url).await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Stop()` request.
     async fn handle_lifecycle_stop_request(&mut self) -> Result<(), fsession::LifecycleError> {
         let mut state = self.state.lock().await;
-        startup::stop_session(&state.realm).await.map_err(Into::into)?;
-        state.session = None;
-        Ok(())
+        state.stop().await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Restart()` request.
     async fn handle_lifecycle_restart_request(&mut self) -> Result<(), fsession::LifecycleError> {
         let mut state = self.state.lock().await;
-        let session_url = &state.session.as_ref().ok_or(fsession::LifecycleError::NotFound)?.url;
-        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
-            |exposed_dir| {
-                state.session.as_mut().unwrap().exposed_dir = exposed_dir;
-                state.diagnostics.record_session_start();
-            },
-        )
+        let session_url = match &state.session {
+            Session::Started(started) => Some(&started.url),
+            Session::Pending(_) => None,
+        }
+        .ok_or(fsession::LifecycleError::NotFound)?
+        .to_owned();
+        state.start(session_url).await.map_err(Into::into)
     }
 }
 
@@ -388,16 +443,14 @@ mod tests {
     use {
         super::SessionManager,
         anyhow::{anyhow, Error},
-        fidl::endpoints::{
-            create_proxy_and_stream, spawn_stream_handler, DiscoverableProtocolMarker,
-        },
+        fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
         fidl_fuchsia_session as fsession,
         fuchsia_inspect::{self, assert_data_tree, testing::AnyProperty},
         futures::channel::mpsc,
         futures::prelude::*,
         lazy_static::lazy_static,
-        session_testing::{spawn_directory_server, spawn_noop_directory_server},
+        session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server},
         test_util::Counter,
         vfs::execution_scope::ExecutionScope,
     };
@@ -450,6 +503,15 @@ mod tests {
         lifecycle_proxy
     }
 
+    fn spawn_noop_controller_server(server_end: ServerEnd<fcomponent::ControllerMarker>) {
+        spawn_server(server_end, move |controller_request| match controller_request {
+            fcomponent::ControllerRequest::Start { responder, .. } => {
+                let _ = responder.send(Ok(()));
+            }
+            fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
+        });
+    }
+
     /// Verifies that Launcher.Launch creates a new session.
     #[fuchsia::test]
     async fn test_launch() {
@@ -460,13 +522,9 @@ mod tests {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild {
-                    collection: _,
-                    decl,
-                    args: _,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::CreateChild { collection: _, decl, args, responder } => {
                     assert_eq!(decl.url.unwrap(), session_url);
+                    spawn_noop_controller_server(args.controller.unwrap());
                     let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
@@ -508,13 +566,9 @@ mod tests {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild {
-                    collection: _,
-                    decl,
-                    args: _,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::CreateChild { collection: _, decl, args, responder } => {
                     assert_eq!(decl.url.unwrap(), session_url);
+                    spawn_noop_controller_server(args.controller.unwrap());
                     let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
@@ -586,13 +640,9 @@ mod tests {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild {
-                    collection: _,
-                    decl,
-                    args: _,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::CreateChild { collection: _, decl, args, responder } => {
                     assert_eq!(decl.url.unwrap(), session_url);
+                    spawn_noop_controller_server(args.controller.unwrap());
                     let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
@@ -634,13 +684,9 @@ mod tests {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild {
-                    collection: _,
-                    decl,
-                    args: _,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::CreateChild { collection: _, decl, args, responder } => {
                     assert_eq!(decl.url.unwrap(), default_session_url);
+                    spawn_noop_controller_server(args.controller.unwrap());
                     let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
@@ -685,13 +731,9 @@ mod tests {
                     NUM_DESTROY_CHILD_CALLS.inc();
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild {
-                    collection: _,
-                    decl,
-                    args: _,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::CreateChild { collection: _, decl, args, responder } => {
                     assert_eq!(decl.url.unwrap(), session_url);
+                    spawn_noop_controller_server(args.controller.unwrap());
                     let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
@@ -738,13 +780,9 @@ mod tests {
                 fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
                     let _ = responder.send(Ok(()));
                 }
-                fcomponent::RealmRequest::CreateChild {
-                    collection: _,
-                    decl,
-                    args: _,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::CreateChild { collection: _, decl, args, responder } => {
                     assert_eq!(decl.url.unwrap(), session_url);
+                    spawn_noop_controller_server(args.controller.unwrap());
                     let _ = responder.send(Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
@@ -783,9 +821,10 @@ mod tests {
         });
     }
 
-    /// Verifies that `open_svc_for_session` connects to the session's exposed dir.
+    /// Verifies that `open_svc_for_session` can open a node in the session's exposed dir
+    /// before the session is started, and that it is connected once the session is started.
     #[fuchsia::test]
-    async fn test_svc_from_session() -> Result<(), Error> {
+    async fn test_svc_from_session_before_start() -> Result<(), Error> {
         let session_url = "session";
         let svc_path = "foo";
 
@@ -806,7 +845,76 @@ mod tests {
                     fcomponent::RealmRequest::DestroyChild { responder, .. } => {
                         let _ = responder.send(Ok(()));
                     }
-                    fcomponent::RealmRequest::CreateChild { responder, .. } => {
+                    fcomponent::RealmRequest::CreateChild { args, responder, .. } => {
+                        spawn_noop_controller_server(args.controller.unwrap());
+                        let _ = responder.send(Ok(()));
+                    }
+                    fcomponent::RealmRequest::OpenExposedDir { exposed_dir, responder, .. } => {
+                        spawn_directory_server(exposed_dir, session_exposed_dir_handler);
+                        let _ = responder.send(Ok(()));
+                    }
+                    _ => panic!("Realm handler received an unexpected request"),
+                };
+            }
+        })?;
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let lifecycle = serve_lifecycle(session_manager.clone());
+
+        // Open an arbitrary node in the session's exposed dir.
+        // The actual protocol does not matter because it's not being served.
+        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+
+        let scope = ExecutionScope::new();
+        session_manager.open_svc_for_session(
+            scope,
+            fio::OpenFlags::empty(),
+            vfs::path::Path::validate_and_split(svc_path)?,
+            server_end,
+        );
+
+        // Start the session.
+        lifecycle
+            .start(&fsession::LifecycleStartRequest {
+                session_url: Some(session_url.to_string()),
+                ..Default::default()
+            })
+            .await?
+            .map_err(|err| anyhow!("failed to start: {:?}", err))?;
+
+        // The exposed dir should have received the Open request.
+        assert_eq!(path_receiver.next().await.unwrap(), svc_path);
+
+        Ok(())
+    }
+
+    /// Verifies that `open_svc_for_session` can open a node in the session's exposed dir
+    /// after the session is started.
+    #[fuchsia::test]
+    async fn test_svc_from_session_after_start() -> Result<(), Error> {
+        let session_url = "session";
+        let svc_path = "foo";
+
+        let (path_sender, mut path_receiver) = mpsc::channel(1);
+
+        let session_exposed_dir_handler = move |directory_request| match directory_request {
+            fio::DirectoryRequest::Open { path, .. } => {
+                let mut path_sender = path_sender.clone();
+                path_sender.try_send(path).unwrap();
+            }
+            _ => panic!("Directory handler received an unexpected request"),
+        };
+
+        let realm = spawn_stream_handler(move |realm_request| {
+            let session_exposed_dir_handler = session_exposed_dir_handler.clone();
+            async move {
+                match realm_request {
+                    fcomponent::RealmRequest::DestroyChild { responder, .. } => {
+                        let _ = responder.send(Ok(()));
+                    }
+                    fcomponent::RealmRequest::CreateChild { args, responder, .. } => {
+                        spawn_noop_controller_server(args.controller.unwrap());
                         let _ = responder.send(Ok(()));
                     }
                     fcomponent::RealmRequest::OpenExposedDir { exposed_dir, responder, .. } => {
@@ -829,9 +937,6 @@ mod tests {
             })
             .await?
             .map_err(|err| anyhow!("failed to start: {:?}", err))?;
-
-        // Start connects to fuchsia.component.Binder to start the component.
-        assert_eq!(path_receiver.next().await.unwrap(), fcomponent::BinderMarker::PROTOCOL_NAME);
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.

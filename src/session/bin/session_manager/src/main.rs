@@ -41,7 +41,7 @@ async fn main() -> Result<(), Error> {
         );
     } else {
         // TODO(fxbug.dev/67789): Using ? here causes errors to not be logged.
-        session_manager.launch_default_session().await.expect("failed to launch session");
+        session_manager.start_default_session().await.expect("failed to start session");
     }
     session_manager.serve(&mut fs).await.expect("failed to serve protocols");
 

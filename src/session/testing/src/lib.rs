@@ -9,6 +9,24 @@ use {
     futures::TryStreamExt,
 };
 
+/// Spawn a request handler for the provided server end.
+///
+/// This function will spawn a detached Task to handle requests. Requests will be handled using
+/// the provided `handler` function.
+pub fn spawn_server<F: 'static, P>(server_end: fidl::endpoints::ServerEnd<P>, handler: F)
+where
+    P: fidl::endpoints::ProtocolMarker,
+    F: Fn(fidl::endpoints::Request<P>) + Send,
+{
+    let mut stream = server_end.into_stream().unwrap();
+    fasync::Task::spawn(async move {
+        while let Some(request) = stream.try_next().await.unwrap() {
+            handler(request);
+        }
+    })
+    .detach();
+}
+
 /// Same as below but provides a noop request handler to the provider `directory`.
 /// This is useful if you have to provide an implementation of `fuchsia.io.Directory`
 /// for a test, but don't need to handle any individual method.
@@ -24,11 +42,5 @@ pub fn spawn_directory_server<F: 'static>(directory: ServerEnd<fio::DirectoryMar
 where
     F: Fn(fio::DirectoryRequest) + Send,
 {
-    let mut stream = directory.into_stream().unwrap();
-    fasync::Task::spawn(async move {
-        while let Some(request) = stream.try_next().await.unwrap() {
-            handler(request);
-        }
-    })
-    .detach();
+    spawn_server(directory, handler);
 }
