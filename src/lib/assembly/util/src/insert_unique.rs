@@ -454,7 +454,7 @@ mod tests {
         impl PartialOrd for TrickyType {
             // PartialOrd is only implemented on the `key_field`
             fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                self.key_field.partial_cmp(&other.key_field)
+                Some(self.cmp(other))
             }
         }
         impl PartialEq for TrickyType {
