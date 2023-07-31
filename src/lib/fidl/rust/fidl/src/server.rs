@@ -73,7 +73,7 @@ impl ServeInner {
     }
 
     /// Checks if the server has been set to shutdown.
-    pub fn check_shutdown(&self, cx: &mut Context<'_>) -> bool {
+    pub fn check_shutdown(&self, cx: &Context<'_>) -> bool {
         if self.shutdown.load(atomic::Ordering::Relaxed) {
             return true;
         }

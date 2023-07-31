@@ -1982,7 +1982,7 @@ unsafe fn encode_naturally_optional<T: TypeMarker, E: Encode<T>>(
 /// indicators should always be entirely zeros. Like `Decode::decode`, the
 /// caller is responsible for bounds checks.
 #[inline]
-fn check_for_presence(decoder: &mut Decoder<'_>, offset: usize, inline_size: usize) -> bool {
+fn check_for_presence(decoder: &Decoder<'_>, offset: usize, inline_size: usize) -> bool {
     debug_assert!(offset + inline_size <= decoder.buf.len());
     let range = unsafe { decoder.buf.get_unchecked(offset..offset + inline_size) };
     range.iter().any(|byte| *byte != 0)

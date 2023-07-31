@@ -345,7 +345,7 @@ impl MessageInterest {
 
     /// Registers the waker from `cx` if the message has not already been received, replacing any
     /// previous waker registered.
-    fn register(&mut self, cx: &mut Context<'_>) {
+    fn register(&mut self, cx: &Context<'_>) {
         if self.is_received() {
             return;
         }
@@ -527,7 +527,7 @@ impl ClientInner {
         InterestId(self.message_interests.lock().insert(MessageInterest::WillPoll))
     }
 
-    fn poll_recv_event(&self, cx: &mut Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
+    fn poll_recv_event(&self, cx: &Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
         {
             // Update the EventListener with the latest waker, remove any stale WillPoll state
             let mut lock = self.event_channel.lock();
@@ -559,7 +559,7 @@ impl ClientInner {
     fn poll_recv_msg_response(
         &self,
         txid: Txid,
-        cx: &mut Context<'_>,
+        cx: &Context<'_>,
     ) -> Poll<Result<MessageBufEtc, Error>> {
         let interest_id = InterestId::from_txid(txid);
         {
