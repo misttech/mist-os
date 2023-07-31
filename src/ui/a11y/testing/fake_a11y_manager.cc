@@ -4,6 +4,8 @@
 
 #include "src/ui/a11y/testing/fake_a11y_manager.h"
 
+#include "fuchsia/ui/pointer/cpp/fidl.h"
+
 namespace a11y_testing {
 
 FakeSemanticTree::FakeSemanticTree(
@@ -42,6 +44,20 @@ void FakeA11yManager::RegisterViewForSemantics(
   semantic_trees_.back()->SetSemanticsEnabled(false);
 }
 
+FakeMagnifier::FakeMagnifier(std::unique_ptr<a11y::FlatlandAccessibilityView> maybe_a11y_view)
+    : maybe_a11y_view_(std::move(maybe_a11y_view)) {
+  FX_LOGS(INFO) << "Starting fake magnifier";
+
+  if (maybe_a11y_view_) {
+    maybe_a11y_view_->add_scene_ready_callback([this]() {
+      // Listen for pointer events.
+      touch_source_ = maybe_a11y_view_->TakeTouchSource();
+      touch_source_->Watch({}, fit::bind_member(this, &FakeMagnifier::WatchCallback));
+      return true;
+    });
+  }
+}
+
 void FakeMagnifier::RegisterHandler(
     fidl::InterfaceHandle<fuchsia::accessibility::MagnificationHandler> handler) {
   handler_ = handler.Bind();
@@ -60,6 +76,14 @@ void FakeMagnifier::SetMagnification(float scale, float translation_x, float tra
 }
 
 void FakeMagnifier::MaybeSetClipSpaceTransform() {
+  // Flatland path.
+  if (maybe_a11y_view_) {
+    maybe_a11y_view_->SetMagnificationTransform(scale_, translation_x_, translation_y_,
+                                                std::move(callback_));
+    return;
+  }
+
+  // GFX path.
   if (!handler_.is_bound()) {
     return;
   }
@@ -79,6 +103,25 @@ FakeMagnifier::GetMagnifierHandler() {
 fidl::InterfaceRequestHandler<test::accessibility::Magnifier>
 FakeMagnifier::GetTestMagnifierHandler() {
   return test_magnifier_bindings_.GetHandler(this);
+}
+
+void FakeMagnifier::WatchCallback(
+    std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> events) {
+  // Stores the response for touch events in |events|.
+  std::vector<fuchsia::ui::pointer::TouchResponse> responses;
+  for (const auto& event : events) {
+    if (!event.touch_event.has_pointer_sample()) {
+      responses.push_back({});
+      continue;
+    }
+
+    // Reject all touch events; a11y view is only needed for magnification.
+    fuchsia::ui::pointer::TouchResponse response;
+    response.set_response_type(fuchsia::ui::pointer::TouchResponseType::NO);
+    responses.push_back(std::move(response));
+  }
+
+  touch_source_->Watch(std::move(responses), fit::bind_member(this, &FakeMagnifier::WatchCallback));
 }
 
 }  // namespace a11y_testing

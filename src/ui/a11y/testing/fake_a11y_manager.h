@@ -15,6 +15,8 @@
 
 #include <test/accessibility/cpp/fidl.h>
 
+#include "src/ui/a11y/lib/view/flatland_accessibility_view.h"
+
 namespace a11y_testing {
 
 // Trivial semantic tree implementation.
@@ -50,7 +52,7 @@ class FakeSemanticTree : public fuchsia::accessibility::semantics::SemanticTree 
 
 class FakeMagnifier : public fuchsia::accessibility::Magnifier, test::accessibility::Magnifier {
  public:
-  FakeMagnifier() = default;
+  explicit FakeMagnifier(std::unique_ptr<a11y::FlatlandAccessibilityView> maybe_a11y_view);
   ~FakeMagnifier() override = default;
 
   // |fuchsia::accessibility::Magnifier|
@@ -67,10 +69,14 @@ class FakeMagnifier : public fuchsia::accessibility::Magnifier, test::accessibil
  private:
   // Helper method to set the clip space transform.
   void MaybeSetClipSpaceTransform();
+  void WatchCallback(std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> events);
 
   fidl::BindingSet<fuchsia::accessibility::Magnifier> magnifier_bindings_;
   fidl::BindingSet<test::accessibility::Magnifier> test_magnifier_bindings_;
   fuchsia::accessibility::MagnificationHandlerPtr handler_;
+
+  std::unique_ptr<a11y::FlatlandAccessibilityView> maybe_a11y_view_;
+  fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source_;
 
   SetMagnificationCallback callback_ = {};
 

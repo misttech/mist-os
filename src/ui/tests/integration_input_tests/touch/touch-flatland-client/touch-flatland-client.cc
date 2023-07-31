@@ -19,6 +19,7 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 #include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"
 
@@ -134,66 +135,85 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
   void Watch(std::vector<fuchsia::ui::pointer::TouchEvent> events) {
     // Stores the response for touch events in |events|.
     std::vector<fuchsia::ui::pointer::TouchResponse> responses;
-    for (const auto& event : events) {
-      FX_CHECK(HasValidatedTouchSample(event)) << "precondition";
-      const auto& pointer_sample = event.pointer_sample();
-
-      // Store the view parameters received from a TouchEvent when either a new connection was
-      // formed or the view parameters were modified.
-      if (event.has_view_parameters()) {
-        view_params_ = std::move(event.view_parameters());
-      }
-
+    for (fuchsia::ui::pointer::TouchEvent& event : events) {
       if (event.has_interaction_result() &&
           event.interaction_result().status ==
               fuchsia::ui::pointer::TouchInteractionStatus::GRANTED) {
         interaction_granted_ = true;
-      }
 
-      // Respond to the touch event only if the interaction has been granted.
-      if (interaction_granted_) {
-        if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD) {
-          // Change the color of the rectangle on a tap event.
-          color_index_ = (color_index_ + 1) % kColorsRgba.size();
-          auto color = kColorsRgba[color_index_];
-          flatland_->SetSolidFill(
-              kRectId, {color[0] / 255.f, color[1] / 255.f, color[2] / 255.f, color[3] / 255.f},
-              {width_, height_});
-          Present();
+        // Report any queued events now that the interaction has been granted.
+        for (fuchsia::ui::pointer::TouchEvent& pending_event : pending_events_before_granted_) {
+          ReportEvent(pending_event);
         }
-        if (touch_input_listener_) {
-          fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
-          // Only report ADD/CHANGE/REMOVE events for minimality; add more if necessary.
-          if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD ||
-              pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::CHANGE ||
-              pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
-            auto logical = ViewportToViewCoordinates(pointer_sample.position_in_viewport(),
-                                                     view_params_->viewport_to_view_transform);
-
-            // The raw pointer event's coordinates are in pips (logical pixels). The test
-            // expects coordinates in physical pixels. The former is transformed into the latter
-            // with the DPR values received from |GetLayout|.
-            request.set_local_x(logical[0] * device_pixel_ratio_.x)
-                .set_local_y(logical[1] * device_pixel_ratio_.y)
-                .set_phase(pointer_sample.phase())
-                .set_time_received(zx_clock_get_monotonic())
-                .set_component_name("touch-flatland-client");
-            touch_input_listener_->ReportTouchInput(std::move(request));
-          }
-        }
-      }
-
-      // Reset |interaction_granted_| as the current interaction has ended.
-      if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
-        interaction_granted_ = false;
+        pending_events_before_granted_.clear();
       }
 
       fuchsia::ui::pointer::TouchResponse response;
+      if (!HasValidatedTouchSample(event)) {
+        responses.push_back(std::move(response));
+        continue;
+      }
+
+      // Report the touch event only if the interaction has been granted.
+      // If the interaction is not yet granted, queue the event for later.
+      if (interaction_granted_) {
+        ReportEvent(event);
+      } else {
+        pending_events_before_granted_.push_back(std::move(event));
+      }
+
       response.set_response_type(fuchsia::ui::pointer::TouchResponseType::YES);
       responses.push_back(std::move(response));
     }
 
     touch_source_->Watch(std::move(responses), fit::bind_member(this, &TouchFlatlandClient::Watch));
+  }
+
+  void ReportEvent(fuchsia::ui::pointer::TouchEvent& event) {
+    FX_CHECK(interaction_granted_) << "only report events with interaction status of granted";
+    const auto& pointer_sample = event.pointer_sample();
+
+    // Store the view parameters received from a TouchEvent when either a new connection was
+    // formed or the view parameters were modified.
+    if (event.has_view_parameters()) {
+      view_params_ = std::move(event.view_parameters());
+    }
+
+    if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD) {
+      // Change the color of the rectangle on a tap event.
+      color_index_ = (color_index_ + 1) % kColorsRgba.size();
+      auto color = kColorsRgba[color_index_];
+      flatland_->SetSolidFill(
+          kRectId, {color[0] / 255.f, color[1] / 255.f, color[2] / 255.f, color[3] / 255.f},
+          {width_, height_});
+      Present();
+    }
+    if (touch_input_listener_) {
+      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
+      // Only report ADD/CHANGE/REMOVE events for minimality; add more if necessary.
+      if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD ||
+          pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::CHANGE ||
+          pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
+        auto logical = ViewportToViewCoordinates(pointer_sample.position_in_viewport(),
+                                                 view_params_->viewport_to_view_transform);
+
+        // The raw pointer event's coordinates are in pips (logical pixels). The test
+        // expects coordinates in physical pixels. The former is transformed into the
+        // latter with the DPR values received from |GetLayout|.
+        request.set_local_x(logical[0] * device_pixel_ratio_.x)
+            .set_local_y(logical[1] * device_pixel_ratio_.y)
+            .set_phase(pointer_sample.phase())
+            .set_time_received(zx_clock_get_monotonic())
+            .set_component_name("touch-flatland-client");
+        touch_input_listener_->ReportTouchInput(std::move(request));
+      }
+    }
+
+    // Reset |interaction_granted_| as the current interaction has ended.
+    if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
+      interaction_granted_ = false;
+      pending_events_before_granted_.clear();
+    }
   }
 
   bool HasValidatedTouchSample(const fuchsia::ui::pointer::TouchEvent& event) {
@@ -271,6 +291,10 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
 
   // Indicates whether the latest touch interaction has been granted to the client.
   bool interaction_granted_ = false;
+
+  // Any events that have been received before the touch has been granted;
+  // these will be processed once the gesture has been granted to the client.
+  std::vector<fuchsia::ui::pointer::TouchEvent> pending_events_before_granted_ = {};
 };
 }  // namespace touch_flatland_client
 

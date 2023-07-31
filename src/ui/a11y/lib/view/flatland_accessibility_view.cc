@@ -513,7 +513,7 @@ void FlatlandAccessibilityView::SetMagnificationTransform(
       fuchsia::math::VecF{.x = scale, .y = scale});
 
   // HACK HACK HACK
-  // TODO(fxbug.dev/95570): Remove this when we move to the new gesture disambiguation protocols.
+  // TODO(fxbug.dev/131440): Remove this when we move to the new gesture disambiguation protocols.
   // The input to this method is not properly adjusted for display rotation
   // (https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/scenic/config/display_rotation)
   // We adjust it here for the default display rotation value of 270 degrees, but this won't be

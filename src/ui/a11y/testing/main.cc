@@ -9,8 +9,6 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <cstring>
-
 #include "src/ui/a11y/lib/view/flatland_accessibility_view.h"
 #include "src/ui/a11y/testing/fake_a11y_manager.h"
 
@@ -52,7 +50,8 @@ int run_a11y_manager(int argc, const char** argv) {
   a11y_testing::FakeA11yManager fake_a11y_manager;
   context->outgoing()->AddPublicService(fake_a11y_manager.GetHandler());
 
-  a11y_testing::FakeMagnifier fake_magnifier;
+  a11y_testing::FakeMagnifier fake_magnifier =
+      a11y_testing::FakeMagnifier(std::move(maybe_a11y_view));
   context->outgoing()->AddPublicService(fake_magnifier.GetTestMagnifierHandler());
   context->outgoing()->AddPublicService(fake_magnifier.GetMagnifierHandler());
 

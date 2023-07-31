@@ -4,7 +4,6 @@
 
 #include <fuchsia/input/injection/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -87,17 +86,12 @@
 
 namespace {
 
-using ScenicEvent = fuchsia::ui::scenic::Event;
-using GfxEvent = fuchsia::ui::gfx::Event;
-
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
-using component_testing::LocalComponentHandles;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
-using component_testing::Route;
 using RealmBuilder = component_testing::RealmBuilder;
 
 // Alias for Component child name as provided to Realm Builder.
@@ -205,9 +199,13 @@ class PointerInjectorConfigTest
 
     ui_testing::UITestRealm::Config config;
     config.display_rotation = test_data.display_rotation;
+    config.use_flatland = true;
     config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
+    config.ui_to_client_services = {
+        fuchsia::ui::composition::Allocator::Name_,
+        fuchsia::ui::composition::Flatland::Name_,
+    };
     ui_test_manager_.emplace(std::move(config));
 
     // Assemble realm.
@@ -315,8 +313,31 @@ class PointerInjectorConfigTest
         kTapRetryInterval);
   }
 
-  void SetClipSpaceTransform(float scale, float x, float y) {
-    fake_magnifier_->SetMagnification(scale, x, y);
+  void SetClipSpaceTransform(float scale, float x, float y, int display_rotation) {
+    // HACK HACK HACK
+    // TODO(fxbug.dev/131440): Remove this when we move to the new gesture
+    // disambiguation protocols.
+    //
+    // Because the FlatlandAcessibilityView::SetMagnificationTransform
+    // hardcodes translation values at a display rotation of 270, this test
+    // must normalize the values given the non-270 display rotations
+    // config values.
+    switch (display_rotation) {
+      case 0:
+        // Since a display rotation of 270 uses (x, y) as (y, -x), pass
+        // in (y, -x), which will yield (x, y) to get an effective display
+        // rotation of 0.
+        fake_magnifier_->SetMagnification(scale, y, -x);
+        break;
+      case 90:
+        // Since a display rotation of 270 uses (x, y) as (y, -x), pass
+        // in (-x, -y), which will yield (-y, x) to get an effective display
+        // rotation of 90.
+        fake_magnifier_->SetMagnification(scale, -x, -y);
+        break;
+      default:
+        FX_NOTREACHED();
+    }
   }
 
   // Guaranteed to be initialized after SetUp().
@@ -339,18 +360,19 @@ class PointerInjectorConfigTest
       return std::make_unique<ResponseListenerServer>(d, s);
     });
 
-    realm()->AddChild(kCppGfxClient, kCppGfxClientUrl);
+    realm()->AddChild(kCppFlatlandClient, kCppFlatlandClientUrl);
 
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                       .source = ChildRef{kCppGfxClient},
+                       .source = ChildRef{kCppFlatlandClient},
                        .targets = {ParentRef()}});
     realm()->AddRoute(
         {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
          .source = ChildRef{kMockResponseListener},
-         .targets = {ChildRef{kCppGfxClient}}});
-    realm()->AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
+         .targets = {ChildRef{kCppFlatlandClient}}});
+    realm()->AddRoute({.capabilities = {Protocol{fuchsia::ui::composition::Allocator::Name_},
+                                        Protocol{fuchsia::ui::composition::Flatland::Name_}},
                        .source = ParentRef(),
-                       .targets = {ChildRef{kCppGfxClient}}});
+                       .targets = {ChildRef{kCppFlatlandClient}}});
 
     ui_test_manager_->BuildRealm();
 
@@ -373,8 +395,8 @@ class PointerInjectorConfigTest
 
   test::accessibility::MagnifierSyncPtr fake_magnifier_;
 
-  static constexpr auto kCppGfxClient = "gfx_client";
-  static constexpr auto kCppGfxClientUrl = "#meta/touch-gfx-client.cm";
+  static constexpr auto kCppFlatlandClient = "client";
+  static constexpr auto kCppFlatlandClientUrl = "#meta/touch-flatland-client.cm";
 };
 
 // Declare test data.
@@ -432,7 +454,7 @@ INSTANTIATE_TEST_SUITE_P(PointerInjectorConfigTestWithParams, PointerInjectorCon
                                            kTestDataRotateAndScale, kTestDataScaleAndTranslate,
                                            kTestDataScaleTranslateRotate));
 
-TEST_P(PointerInjectorConfigTest, CppGfxClientTapTest) {
+TEST_P(PointerInjectorConfigTest, CppClientTapTest) {
   auto test_data = GetParam();
 
   FX_LOGS(INFO) << "Starting test with params: display_rotation=" << test_data.display_rotation
@@ -443,7 +465,7 @@ TEST_P(PointerInjectorConfigTest, CppGfxClientTapTest) {
                 << ", expected_y=" << test_data.expected_y;
 
   SetClipSpaceTransform(test_data.clip_scale, test_data.clip_translation_x,
-                        test_data.clip_translation_y);
+                        test_data.clip_translation_y, test_data.display_rotation);
 
   TryInjectRepeatedly(TapLocation::kTopLeft);
 
@@ -452,13 +474,13 @@ TEST_P(PointerInjectorConfigTest, CppGfxClientTapTest) {
       WaitForAResponseMeetingExpectations(
           /*expected_x=*/display_width() * test_data.expected_x,
           /*expected_y=*/display_height() * test_data.expected_y,
-          /*component_name=*/"touch-gfx-client");
+          /*component_name=*/"touch-flatland-client");
       break;
     case 90:
       WaitForAResponseMeetingExpectations(
           /*expected_x=*/display_height() * test_data.expected_x,
           /*expected_y=*/display_width() * test_data.expected_y,
-          /*component_name=*/"touch-gfx-client");
+          /*component_name=*/"touch-flatland-client");
       break;
     default:
       FX_NOTREACHED();

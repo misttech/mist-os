@@ -16,7 +16,6 @@ executable("bin") {
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/ui/a11y/lib/view",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
@@ -34,6 +33,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//src/ui/a11y/lib/magnifier",
+    "//src/ui/a11y/lib/view",
     "//src/ui/a11y/testing/fidl:test.accessibility_hlcpp",
   ]
 }

@@ -132,9 +132,7 @@ fuchsia_test_component("pointerinjector-config-test-component") {
 
 fuchsia_test_package("pointerinjector-config-test") {
   test_components = [ ":pointerinjector-config-test-component" ]
-  deps = [
-    "//src/ui/tests/integration_input_tests/touch/touch-gfx-client:component",
-  ]
+  deps = [ "//src/ui/tests/integration_input_tests/touch/touch-flatland-client:component" ]
   test_specs = {
     log_settings = {
       # TODO(fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
