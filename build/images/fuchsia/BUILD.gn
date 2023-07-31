@@ -260,14 +260,10 @@ if (is_fuchsia) {
            "Need to define partitions_config_label")
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-    assert(images_config_label != false || fuchsia_filesystem_config != false,
+    assert(fuchsia_filesystem_config != false,
            "Need to define fuchsia_filesystem_config for cuckoo tests")
     _partitions_config = partitions_config_label
-    if (fuchsia_filesystem_config != false) {
-      _images_config = fuchsia_filesystem_config
-    } else {
-      _images_config = images_config_label
-    }
+    _images_config = fuchsia_filesystem_config
   }
   _partitions_config_file =
       get_label_info(_partitions_config, "target_out_dir") + "/" +

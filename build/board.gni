@@ -106,26 +106,6 @@ declare_args() {
   board_is_emu = false
   board_is_phys = true
 
-  # The images config information used during assembly.
-  images_config_label = false
-
-  # The images config information used for zedboot images.
-  zedboot_images_config_label = false
-
-  # The images config information used for bringup images.
-  bringup_images_config_label = false
-
-  # The images config information used for recovery images, including
-  # recovery-fdr and recovery-ota.
-  #
-  # NOTE: Only one recovery image can be selected for a build configuration.
-  # However, images config is selected based on board, while recovery images are
-  # selected based on product, so the build system doesn't always have full
-  # information to match them. Also this is expected to be temporary until we
-  # fully migrate assembly to Bazel.
-  recovery_fdr_images_config_label = false
-  recovery_ota_images_config_label = false
-
   # The partitions config information used to create an update package and
   # product bundle.
   partitions_config_label = false

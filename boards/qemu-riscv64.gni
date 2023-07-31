@@ -17,5 +17,4 @@ board_package_labels += [ "//src/factory/factory_store_providers/config/qemu" ]
 board_is_emu = true
 board_is_phys = false
 
-images_config_label = "//boards/images:default"
 partitions_config_label = "//boards/partitions:qemu-riscv64"

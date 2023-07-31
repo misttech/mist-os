@@ -61,13 +61,9 @@ if (labels.images == "//build/images/bringup") {
   if (has_board) {
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-    assert(images_config_label != false || fuchsia_filesystem_config != false,
+    assert(fuchsia_filesystem_config != false,
            "Need to define fuchsia_filesystem_config for cuckoo tests")
-    if (fuchsia_filesystem_config != false) {
-      _images_config = fuchsia_filesystem_config
-    } else {
-      _images_config = images_config_label
-    }
+    _images_config = fuchsia_filesystem_config
   }
 
   # Guest's specific core realm (not based on core_realm_shards).
