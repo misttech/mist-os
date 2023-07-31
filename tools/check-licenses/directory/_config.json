@@ -258,6 +258,7 @@
             {
                 "paths": [
                     ".clang-format",
+                    ".cache",
                     ".git",
                     ".build_id",
                     ".versions",
