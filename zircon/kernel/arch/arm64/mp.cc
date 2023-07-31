@@ -27,13 +27,9 @@ namespace {
 // Mask the MPIDR register to only leave the AFFx ids.
 constexpr uint64_t kMpidAffMask = 0xFF00FFFFFF;
 
-struct MpidCpuidPair {
-  uint64_t mpid;
-  uint cpu_id;
-};
-
-MpidCpuidPair arm64_cpu_list[SMP_MAX_CPUS];
-size_t arm64_cpu_list_count = 0;
+// A list of mpids, indexed by cpu_id.
+// We can leave this zero-initialized as MPID 0 is only valid on CPU 0.
+uint64_t arm64_cpu_list[SMP_MAX_CPUS];
 
 }  // namespace
 
@@ -54,18 +50,18 @@ void arch_register_mpid(uint cpu_id, uint64_t mpid) {
 
   arm64_percpu_array[cpu_id].cpu_num = cpu_id;
 
-  arm64_cpu_list[arm64_cpu_list_count++] = {.mpid = mpid, .cpu_id = cpu_id};
+  arm64_cpu_list[cpu_id] = mpid;
 }
 
 cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr) {
   mpidr &= kMpidAffMask;
-  for (size_t i = 0; i < arm64_cpu_list_count; ++i) {
-    if (arm64_cpu_list[i].mpid == mpidr) {
-      return arm64_cpu_list[i].cpu_id;
+  for (cpu_num_t i = 0; i < arm_num_cpus; ++i) {
+    if (arm64_cpu_list[i] == mpidr) {
+      return i;
     }
   }
 
-  if (arm64_cpu_list_count == 0) {
+  if (arm_num_cpus == 0) {
     // The only time we shouldn't find a cpu is when the list isn't
     // defined yet during early boot, in this case the only processor up is 0
     // so returning 0 is correct.
@@ -140,7 +136,46 @@ zx_status_t arch_mp_cpu_unplug(cpu_num_t cpu_id) {
   return ZX_OK;
 }
 
-zx_status_t arch_mp_cpu_hotplug(cpu_num_t cpu_id) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t arch_mp_cpu_hotplug(cpu_num_t cpu_id) {
+  DEBUG_ASSERT(cpu_id != 0);
+
+  if (cpu_id >= arm_num_cpus) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (mp_is_cpu_online(cpu_id)) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  uint64_t mpid = arm64_cpu_list[cpu_id];
+  // Create a stack for the thread running on the CPU.
+  zx_status_t status = arm64_create_secondary_stack(cpu_id, mpid);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // Start the CPU.
+  status = platform_start_cpu(cpu_id, mpid);
+  if (status != ZX_OK) {
+    // Start failed, so free the stack.
+    [[maybe_unused]] zx_status_t free_stack_status = arm64_free_secondary_stack(cpu_id);
+    DEBUG_ASSERT(free_stack_status == ZX_OK);
+    return status;
+  }
+
+  // Poll the CPU till it comes online, waiting up to 5 seconds for this to happen.
+  // TODO(https://fxbug.dev/130793): Don't hard code the deadline for mp_hotplug CPU startup.
+  const auto deadline = Deadline::after(ZX_SEC(5));
+  while (current_time() < deadline.when()) {
+    if (mp_is_cpu_online(cpu_id)) {
+      return ZX_OK;
+    }
+    Thread::Current::SleepRelative(ZX_MSEC(10));
+  }
+  printf("timed out waiting for cpu-%u to come online\n", cpu_id);
+
+  // If we got here, the CPU never came online.
+  return ZX_ERR_BAD_STATE;
+}
 
 // If there are any A73 cores in this system, then we need the clock read
 // mitigation.
@@ -156,6 +191,7 @@ bool arch_quirks_needs_arm_erratum_858921_mitigation() {
 
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu* percpu) {
   arm64_percpu* arch_percpu = &arm64_percpu_array[cpu_num];
-  DEBUG_ASSERT(arch_percpu->high_level_percpu == nullptr);
+  DEBUG_ASSERT(arch_percpu->high_level_percpu == nullptr ||
+               arch_percpu->high_level_percpu == percpu);
   arch_percpu->high_level_percpu = percpu;
 }

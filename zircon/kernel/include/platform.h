@@ -118,6 +118,7 @@ __END_CDECLS
 
 #include <lib/arch/ticks.h>
 
+#include <kernel/cpu.h>
 #include <ktl/string_view.h>
 
 namespace affine {
@@ -141,6 +142,9 @@ zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample);
 // to safely ensure that the panic message will be visible to the user.
 enum class PanicStartHaltOtherCpus { No = 0, Yes };
 void platform_panic_start(PanicStartHaltOtherCpus option = PanicStartHaltOtherCpus::Yes);
+
+/* start the given cpu in a way the platform finds appropriate */
+zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid);
 
 #endif  // __cplusplus
 

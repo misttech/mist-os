@@ -149,7 +149,7 @@ void platform_halt_cpu(void) {
   panic("power_cpu_off returned %u\n", result);
 }
 
-static zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
+zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   // Issue memory barrier before starting to ensure previous stores will be visible to new CPU.
   arch::ThreadMemoryBarrier();
 

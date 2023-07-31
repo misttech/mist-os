@@ -51,9 +51,9 @@ static unsigned get_num_cpus_online() {
 [[maybe_unused]] static bool mp_hotplug_test() {
   BEGIN_TEST;
 
-// Hotplug is only implemented for x64.
-#if !defined(__x86_64__)
-  printf("skipping test mp_hotplug, hotplug only suported on x64\n");
+// Hotplug is only implemented on x86_64 and arm64.
+#if !defined(__x86_64__) && !defined(__aarch64__)
+  printf("skipping test mp_hotplug, hotplug only suported on x64 and arm64\n");
   END_TEST;
 #endif
   uint num_cores = get_num_cpus_online();
@@ -64,13 +64,13 @@ static unsigned get_num_cpus_online() {
   Thread::Current::MigrateToCpu(BOOT_CPU_ID);
   // "Unplug" online secondary (non-BOOT) cores
   Thread* leaked_threads[SMP_MAX_CPUS] = {};
-  ASSERT_EQ(unplug_all_cores(leaked_threads), ZX_OK, "unplugging all cores failed");
+  ASSERT_OK(unplug_all_cores(leaked_threads), "unplugging all cores failed");
   for (cpu_num_t i = 0; i < num_cores; i++) {
     if (i == BOOT_CPU_ID) {
       continue;
     }
     // hotplug this core.
-    ASSERT_EQ(hotplug_core(i), ZX_OK, "hotplugging core failed");
+    ASSERT_OK(hotplug_core(i), "hotplugging core failed");
     // Create a thread, affine it to the core just hotplugged
     // and make sure the thread does get scheduled there.
     cpu_num_t running_core;
@@ -80,7 +80,7 @@ static unsigned get_num_cpus_online() {
     nt->SetCpuAffinity(cpu_num_to_mask(i));
     nt->SetMigrateFn([](auto...) {});
     nt->Resume();
-    ASSERT_EQ(nt->Join(nullptr, ZX_TIME_INFINITE), ZX_OK, "thread join failed");
+    ASSERT_OK(nt->Join(nullptr, ZX_TIME_INFINITE), "thread join failed");
     ASSERT_EQ(i, running_core, "Thread not running on hotplugged core");
   }
 

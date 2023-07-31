@@ -90,8 +90,8 @@ static volatile int secondaries_to_init = 0;
 // one for each secondary CPU, indexed by (cpu_num - 1).
 static Thread _init_thread[SMP_MAX_CPUS - 1];
 
-// one for each CPU
-arm64_sp_info_t arm64_secondary_sp_list[SMP_MAX_CPUS];
+// one for each secondary CPU, indexed by (cpu_num - 1).
+arm64_sp_info_t arm64_secondary_sp_list[SMP_MAX_CPUS - 1];
 
 extern uint64_t arch_boot_el;  // Defined in start.S.
 
@@ -121,15 +121,6 @@ zx_status_t arm64_create_secondary_stack(cpu_num_t cpu_num, uint64_t mpid) {
   shadow_call_sp = reinterpret_cast<uintptr_t*>(stack->shadow_call_base());
 #endif
 
-  // Find an empty slot for the low-level stack info.
-  uint32_t i = 0;
-  while ((i < SMP_MAX_CPUS) && (arm64_secondary_sp_list[i].mpid != 0)) {
-    i++;
-  }
-  if (i == SMP_MAX_CPUS) {
-    return ZX_ERR_NO_RESOURCES;
-  }
-
   // Store it.
   LTRACEF("set mpid 0x%lx sp to %p\n", mpid, sp);
 #if __has_feature(safe_stack)
@@ -138,11 +129,11 @@ zx_status_t arm64_create_secondary_stack(cpu_num_t cpu_num, uint64_t mpid) {
 #if __has_feature(shadow_call_stack)
   LTRACEF("set mpid 0x%lx shadow-call-sp to %p\n", mpid, shadow_call_sp);
 #endif
-  arm64_secondary_sp_list[i].mpid = mpid;
-  arm64_secondary_sp_list[i].sp = sp;
-  arm64_secondary_sp_list[i].stack_guard = Thread::Current::Get()->arch().stack_guard;
-  arm64_secondary_sp_list[i].unsafe_sp = unsafe_sp;
-  arm64_secondary_sp_list[i].shadow_call_sp = shadow_call_sp;
+  arm64_secondary_sp_list[cpu_num - 1].mpid = mpid;
+  arm64_secondary_sp_list[cpu_num - 1].sp = sp;
+  arm64_secondary_sp_list[cpu_num - 1].stack_guard = Thread::Current::Get()->arch().stack_guard;
+  arm64_secondary_sp_list[cpu_num - 1].unsafe_sp = unsafe_sp;
+  arm64_secondary_sp_list[cpu_num - 1].shadow_call_sp = shadow_call_sp;
 
   return ZX_OK;
 }
