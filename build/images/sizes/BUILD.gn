@@ -79,6 +79,7 @@ action("elf_sizes.json") {
     images = [
       {
         name = "elf_sizes.json"
+        label = get_label_info(":elf_sizes.json", "label_with_toolchain")
         type = "manifest"
         path = rebase_path(_output, root_build_dir)
       },
