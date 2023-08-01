@@ -255,7 +255,7 @@ if (is_fuchsia) {
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
     assert(fuchsia_filesystem_config != false,
-           "Need to define fuchsia_filesystem_config")
+           "Need to define fuchsia_filesystem_config for cuckoo tests")
     _partitions_config = partitions_config_label
     _images_config = fuchsia_filesystem_config
   }
