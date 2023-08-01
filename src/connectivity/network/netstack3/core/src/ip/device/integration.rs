@@ -38,7 +38,7 @@ use crate::{
             del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
             is_ip_forwarding_enabled, join_ip_multicast_with_config,
             leave_ip_multicast_with_config,
-            nud::NudIpHandler,
+            nud::{ConfirmationFlags, NudIpHandler},
             route_discovery::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
                 Ipv6RouteDiscoveryState,
@@ -1416,10 +1416,11 @@ where
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         link_addr: &[u8],
+        flags: ConfirmationFlags,
     ) {
         let Self { config: _, sync_ctx } = self;
         NudIpHandler::<I, C>::handle_neighbor_confirmation(
-            sync_ctx, ctx, device_id, neighbor, link_addr,
+            sync_ctx, ctx, device_id, neighbor, link_addr, flags,
         )
     }
 

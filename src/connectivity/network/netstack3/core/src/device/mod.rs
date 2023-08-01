@@ -61,7 +61,10 @@ use crate::{
     ip::{
         device::{
             integration::SyncCtxWithIpDeviceConfiguration,
-            nud::{BufferNudHandler, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
+            nud::{
+                BufferNudHandler, ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler,
+                NudIpHandler,
+            },
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, DualStackIpDeviceState,
                 IpDeviceFlags, Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration,
@@ -784,6 +787,7 @@ where
         device_id: &DeviceId<C>,
         neighbor: SpecifiedAddr<I::Addr>,
         link_addr: &[u8],
+        flags: ConfirmationFlags,
     ) {
         match device_id {
             DeviceId::Ethernet(id) => {
@@ -794,7 +798,7 @@ where
                         &id,
                         neighbor,
                         link_addr,
-                        DynamicNeighborUpdateSource::Confirmation,
+                        DynamicNeighborUpdateSource::Confirmation(flags),
                     )
                 }
             }

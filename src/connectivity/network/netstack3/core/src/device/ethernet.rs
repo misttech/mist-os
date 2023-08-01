@@ -868,7 +868,13 @@ pub(super) fn receive_frame<
             };
             match types {
                 (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
-                    ArpPacketHandler::handle_packet(sync_ctx, ctx, device_id.clone(), buffer)
+                    ArpPacketHandler::handle_packet(
+                        sync_ctx,
+                        ctx,
+                        device_id.clone(),
+                        frame_dst,
+                        buffer,
+                    )
                 }
             }
         }

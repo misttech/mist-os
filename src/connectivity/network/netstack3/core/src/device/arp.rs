@@ -19,10 +19,10 @@ use tracing::{debug, trace, warn};
 
 use crate::{
     context::{CounterContext, SendFrameContext, TimerContext},
-    device::{link::LinkDevice, DeviceIdContext},
+    device::{link::LinkDevice, DeviceIdContext, FrameDestination},
     ip::device::nud::{
-        BufferNudContext, BufferNudSenderContext, DynamicNeighborUpdateSource, NudContext,
-        NudHandler, NudState, NudTimerId,
+        BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
+        NudContext, NudHandler, NudState, NudTimerId,
     },
 };
 
@@ -229,7 +229,13 @@ impl<
 pub(crate) trait ArpPacketHandler<B: BufferMut, D: ArpDevice, C>:
     DeviceIdContext<D>
 {
-    fn handle_packet(&mut self, ctx: &mut C, device_id: Self::DeviceId, buffer: B);
+    fn handle_packet(
+        &mut self,
+        ctx: &mut C,
+        device_id: Self::DeviceId,
+        frame_dst: FrameDestination,
+        buffer: B,
+    );
 }
 
 impl<
@@ -242,8 +248,14 @@ impl<
     > ArpPacketHandler<B, D, C> for SC
 {
     /// Handles an inbound ARP packet.
-    fn handle_packet(&mut self, ctx: &mut C, device_id: Self::DeviceId, buffer: B) {
-        handle_packet(self, ctx, device_id, buffer)
+    fn handle_packet(
+        &mut self,
+        ctx: &mut C,
+        device_id: Self::DeviceId,
+        frame_dst: FrameDestination,
+        buffer: B,
+    ) {
+        handle_packet(self, ctx, device_id, frame_dst, buffer)
     }
 }
 
@@ -258,6 +270,7 @@ fn handle_packet<
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: SC::DeviceId,
+    frame_dst: FrameDestination,
     mut buffer: B,
 ) {
     // TODO(wesleyac) Add support for probe.
@@ -275,9 +288,14 @@ fn handle_packet<
         }
     };
 
-    let source = match packet.operation() {
-        ArpOp::Request => DynamicNeighborUpdateSource::Probe,
-        ArpOp::Response => DynamicNeighborUpdateSource::Confirmation,
+    enum ValidArpOp {
+        Request,
+        Response,
+    }
+
+    let op = match packet.operation() {
+        ArpOp::Request => ValidArpOp::Request,
+        ArpOp::Response => ValidArpOp::Response,
         ArpOp::Other(o) => {
             debug!("dropping arp packet with op = {:?}", o);
             return;
@@ -365,7 +383,27 @@ fn handle_packet<
             //   match any ARP Request transmitted by the receiving node [16].
             (DynamicNeighborUpdateSource::Probe, PacketKind::Gratuitous)
         }
-        (false, true) => (source, PacketKind::AddressedToMe),
+        (false, true) => {
+            // Consider ARP replies as solicited if they were unicast directly to us, and
+            // unsolicited otherwise.
+            let solicited = match frame_dst {
+                FrameDestination::Individual { local } => local,
+                FrameDestination::Broadcast | FrameDestination::Multicast => false,
+            };
+            let source = match op {
+                ValidArpOp::Request => DynamicNeighborUpdateSource::Probe,
+                ValidArpOp::Response => {
+                    DynamicNeighborUpdateSource::Confirmation(ConfirmationFlags {
+                        solicited_flag: solicited,
+                        // ARP does not have the concept of an override flag in a neighbor
+                        // confirmation; if the link address that's received does not match the one
+                        // in the neighbor cache, the entry should always go to STALE.
+                        override_flag: false,
+                    })
+                }
+            };
+            (source, PacketKind::AddressedToMe)
+        }
         (false, false) => {
             trace!(
                 "non-gratuitous ARP packet not targetting us; sender = {}, target={}",
@@ -416,7 +454,7 @@ fn handle_packet<
                     .into_serializer_with(buffer),
                 );
             }
-            DynamicNeighborUpdateSource::Confirmation => {}
+            DynamicNeighborUpdateSource::Confirmation(_flags) => {}
         },
     }
 }
@@ -497,8 +535,11 @@ mod tests {
             testutil::{FakeDeviceId, FakeWeakDeviceId},
         },
         ip::device::nud::{
-            testutil::{assert_dynamic_neighbor_with_addr, assert_neighbor_unknown},
-            BufferNudHandler,
+            testutil::{
+                assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
+                assert_neighbor_unknown,
+            },
+            BufferNudHandler, DynamicNeighborState,
         },
         testutil::assert_empty,
     };
@@ -641,6 +682,7 @@ mod tests {
         target_ipv4: Ipv4Addr,
         sender_mac: Mac,
         target_mac: Mac,
+        frame_dst: FrameDestination,
     ) {
         let buf = ArpPacketBuilder::new(op, sender_mac, sender_ipv4, target_mac, target_ipv4)
             .into_serializer()
@@ -650,7 +692,7 @@ mod tests {
         assert_eq!(hw, ArpHardwareType::Ethernet);
         assert_eq!(proto, ArpNetworkType::Ipv4);
 
-        handle_packet::<_, _, _, _>(sync_ctx, ctx, FakeLinkDeviceId, buf);
+        handle_packet::<_, _, _, _>(sync_ctx, ctx, FakeLinkDeviceId, frame_dst, buf);
     }
 
     // Validate that buf is an ARP packet with the specific op, local_ipv4,
@@ -704,6 +746,7 @@ mod tests {
             TEST_REMOTE_IPV4,
             TEST_REMOTE_MAC,
             TEST_INVALID_MAC,
+            FrameDestination::Individual { local: false },
         );
 
         // We should have cached the sender's address information.
@@ -732,6 +775,7 @@ mod tests {
             TEST_REMOTE_IPV4,
             TEST_REMOTE_MAC,
             TEST_REMOTE_MAC,
+            FrameDestination::Individual { local: false },
         );
 
         // We should have cached the sender's address information.
@@ -779,6 +823,7 @@ mod tests {
             TEST_REMOTE_IPV4,
             TEST_REMOTE_MAC,
             TEST_REMOTE_MAC,
+            FrameDestination::Individual { local: false },
         );
 
         // The response should now be in our cache.
@@ -810,6 +855,7 @@ mod tests {
             TEST_LOCAL_IPV4,
             TEST_REMOTE_MAC,
             TEST_LOCAL_MAC,
+            FrameDestination::Individual { local: true },
         );
 
         // Make sure we cached the sender's address information.
@@ -952,7 +998,7 @@ mod tests {
         // Step once to deliver the ARP request to the remotes.
         let res = network.step(
             |FakeCtx { sync_ctx, non_sync_ctx }, device_id, buf| {
-                handle_packet(sync_ctx, non_sync_ctx, device_id, buf)
+                handle_packet(sync_ctx, non_sync_ctx, device_id, FrameDestination::Broadcast, buf)
             },
             |FakeCtx { sync_ctx, non_sync_ctx }, _ctx, id| {
                 TimerHandler::handle_timer(sync_ctx, non_sync_ctx, id)
@@ -993,7 +1039,13 @@ mod tests {
         // Step once to deliver the ARP response to the local.
         let res = network.step(
             |FakeCtx { sync_ctx, non_sync_ctx }, device_id, buf| {
-                handle_packet(sync_ctx, non_sync_ctx, device_id, buf)
+                handle_packet(
+                    sync_ctx,
+                    non_sync_ctx,
+                    device_id,
+                    FrameDestination::Individual { local: true },
+                    buf,
+                )
             },
             |FakeCtx { sync_ctx, non_sync_ctx }, _ctx, id| {
                 TimerHandler::handle_timer(sync_ctx, non_sync_ctx, id)
@@ -1030,6 +1082,65 @@ mod tests {
                     },
                 )
             },
+        );
+    }
+
+    #[test_case(FrameDestination::Individual { local: true }, true; "unicast to us is solicited")]
+    #[test_case(
+        FrameDestination::Individual { local: false },
+        false;
+        "unicast to other addr is unsolicited"
+    )]
+    #[test_case(FrameDestination::Multicast, false; "multicast reply is unsolicited")]
+    #[test_case(FrameDestination::Broadcast, false; "broadcast reply is unsolicited")]
+    fn only_unicast_reply_treated_as_solicited(
+        frame_dst: FrameDestination,
+        expect_solicited: bool,
+    ) {
+        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtx::with_sync_ctx(FakeCtxImpl::default());
+
+        // Trigger link resolution.
+        assert_neighbor_unknown(
+            &mut sync_ctx,
+            FakeLinkDeviceId,
+            SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
+        );
+        assert_eq!(
+            BufferNudHandler::send_ip_packet_to_neighbor(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &FakeLinkDeviceId,
+                SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
+                Buf::new([1], ..),
+            ),
+            Ok(())
+        );
+
+        // Now send a confirmation with the specified frame destination.
+        send_arp_packet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            ArpOp::Response,
+            TEST_REMOTE_IPV4,
+            TEST_LOCAL_IPV4,
+            TEST_REMOTE_MAC,
+            TEST_LOCAL_MAC,
+            frame_dst,
+        );
+
+        // If the confirmation was interpreted as solicited, the entry should be
+        // marked as REACHABLE; otherwise, it should have transitioned to STALE.
+        let expected_state = if expect_solicited {
+            DynamicNeighborState::Reachable { link_address: TEST_REMOTE_MAC }
+        } else {
+            DynamicNeighborState::Stale { link_address: TEST_REMOTE_MAC }
+        };
+        assert_dynamic_neighbor_state(
+            &mut sync_ctx,
+            FakeLinkDeviceId,
+            SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
+            expected_state,
         );
     }
 }
