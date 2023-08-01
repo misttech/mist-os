@@ -21,6 +21,9 @@
                 // link_test
                 "LinkTest.LinkDoesNotFollowSymlinks",
                 "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
+
+                // xattr_test
+                "XattrTest.LXattrOnSymlink",
             ],
         },
         {
@@ -34,11 +37,9 @@
                 "AllUnixDomainSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
                 "Renameat2Test.NoReplaceSuccess",
 
-                // epoll_test - this test panics
+                // epoll_test - this test causes a starnix kernel panic because it uses an invalid
+                // watch handle and unwraps the result.
                 "EpollTest.RegularFiles",
-
-                // inotify_test - these tests hang
-                "Inotify.SymlinkGeneratesCreateEvent",
 
                 // msync_test
                 // Test 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23 fails
@@ -47,12 +48,6 @@
                 "All/MsyncFullParamTest.NormallySucceeds/*",
                 "All/MsyncFullParamTest.UnalignedAddressFails/*",
                 "All/MsyncFullParamTest.UnalignedLengthSucceeds/*",
-
-                // mmap_test - this test panics because of a "memory stomping bug"
-                "MMapFileTest.WriteSharedBeyondEnd",
-
-                // mount_test - these tests hang
-                "MountTest.UmountNoFollow",
 
                 // pty_test - flaky
                 // Specifically, the following tests were identified as flaky when running on Fxfs.
@@ -68,24 +63,9 @@
                 // watch handle and unwraps the result.
                 "SelectTest.SetrlimitCallNOFILE",
 
-                // sendfile_test - these tests hang
-                "SendFileTest.SendFileToPipe",
-
                 // socket_inet_loopback_isolated_test - these tests flake TODO(fxbug.dev/128640)
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/TCP",
-
-                // stat_test - these tests hang
-                "StatTest.LstatELOOPPath",
-
-                // sticky_test - these tests hang
-                "StickyTest.StickyBitCapFOWNER",
-                "StickyTest.StickyBitPermDenied",
-                "StickyTest.StickyBitSameUID",
-
-                // xattr_test - these tests hang
-                "XattrTest.LXattrOnSymlink",
-                "XattrTest.XattrOnSymlink",
             ],
         },
     ],
