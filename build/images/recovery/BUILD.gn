@@ -214,31 +214,6 @@ if (is_fuchsia) {
   recovery_fdr_packages -= [ "//src/recovery/system:system_recovery" ]
   recovery_fdr_packages += [ "//src/recovery/system:system_recovery_fdr" ]
 
-  if (!fxfs_blob) {
-    _storage_config = {
-      storage = {
-        filesystems = {
-          volume = {
-            fvm = {
-              data = {
-              }
-              blob = {
-              }
-            }
-          }
-        }
-      }
-    }
-  } else {
-    _storage_config = {
-      storage = {
-        filesystems = {
-          volume = "fxfs"
-        }
-      }
-    }
-  }
-
   product_assembly_configuration("for-eng") {
     platform = {
       build_type = "eng"
@@ -254,7 +229,6 @@ if (is_fuchsia) {
           legacy_privacy_support = true
         }
       }
-      forward_variables_from(_storage_config, "*")
     }
     product = {
     }
@@ -286,7 +260,6 @@ if (is_fuchsia) {
           legacy_privacy_support = true
         }
       }
-      forward_variables_from(_storage_config, "*")
     }
     product = {
     }
@@ -359,7 +332,6 @@ if (is_fuchsia) {
     platform = {
       build_type = "user"
       feature_set_level = "utility"
-      forward_variables_from(_storage_config, "*")
     }
     product = {
     }
@@ -438,7 +410,6 @@ if (is_fuchsia) {
           publish_fuchsia_dev_wired_service = false
         }
       }
-      forward_variables_from(_storage_config, "*")
     }
     product = {
     }

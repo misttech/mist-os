@@ -24,18 +24,6 @@ product_assembly_configuration("cuckoo-product-configuration") {
   platform = {
     #feature_set_level = "minimal"
     build_type = "eng"
-    storage = {
-      filesystems = {
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
-        }
-      }
-    }
   }
   product = {
   }

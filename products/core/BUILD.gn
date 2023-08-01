@@ -31,7 +31,7 @@ _base_driver_packages = [
 # LINT.IfChange
 
 # This is the base platform configuration used by core
-_platform_configuration_base = {
+platform_configuration_base = {
   build_type = "eng"
   input = {
     supported_input_devices = [
@@ -54,55 +54,10 @@ _platform_configuration_base = {
   }
 }
 
-_storage_default = {
-  storage = {
-    filesystems = {
-      volume = {
-        fvm = {
-          data = {
-          }
-          blob = {
-          }
-        }
-      }
-    }
-  }
-}
-
-_storage_fxfs = {
-  storage = {
-    filesystems = {
-      volume = "fxfs"
-    }
-  }
-}
-
 product_assembly_configuration("core") {
   testonly = true
   platform = {
-    forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_default, "*")
-
-    # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
-    # Netstack3 CI builders have been transitioned to use the
-    # core_with_netstack3 target below.
-    connectivity = {
-      network = {
-        force_netstack3 = use_netstack3
-      }
-    }
-  }
-  product = {
-  }
-
-  base_driver_packages = _base_driver_packages
-}
-
-product_assembly_configuration("core_with_fxfs") {
-  testonly = true
-  platform = {
-    forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_fxfs, "*")
+    forward_variables_from(platform_configuration_base, "*")
 
     # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
     # Netstack3 CI builders have been transitioned to use the
@@ -124,8 +79,7 @@ product_assembly_configuration("core_with_fxfs") {
 product_assembly_configuration("core_with_netstack3") {
   testonly = true
   platform = {
-    forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_storage_default, "*")
+    forward_variables_from(platform_configuration_base, "*")
 
     connectivity = {
       network = {

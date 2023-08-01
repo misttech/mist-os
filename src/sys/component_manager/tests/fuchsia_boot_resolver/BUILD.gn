@@ -4,7 +4,6 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/generated_images_config.gni")
-import("//build/assembly/product_assembly_configuration.gni")
 import("//build/component/config.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/testing/host_test_data.gni")
@@ -50,26 +49,11 @@ if (current_toolchain == default_toolchain) {
     }
   }
 
-  product_assembly_configuration("product_config") {
-    platform = {
-      build_type = "eng"
-      feature_set_level = "bootstrap"
-      storage = {
-        filesystems = {
-          image_name = "test_zbi"
-          volume = "none"
-        }
-      }
-    }
-    product = {
-    }
-  }
-
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
     assembly_images_config_label = ":images_config"
-    product_assembly_config_label = ":product_config"
+    product_assembly_config_label = "//build/assembly:default_product_config"
     board_config = files.board_config
     deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true

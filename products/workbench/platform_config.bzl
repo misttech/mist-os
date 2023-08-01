@@ -36,16 +36,6 @@ workbench_platform_config = {
     "storage": {
         "configure_fshost": True,
         "live_usb_enabled": False,
-        "filesystems": {
-            "volume": {
-                "fvm": {
-                    "data": {
-                    },
-                    "blob": {
-                    },
-                },
-            },
-        },
     },
     "session": {
         "enabled": True,

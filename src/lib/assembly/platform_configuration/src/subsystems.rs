@@ -4,7 +4,6 @@
 
 use anyhow::{bail, Context};
 use assembly_config_schema::{AssemblyConfig, BoardInformation, BuildType, ExampleConfig};
-use assembly_images_config::ProductFilesystemConfig;
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
 
@@ -58,7 +57,6 @@ const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";
 pub fn define_configuration(
     config: &AssemblyConfig,
     board_info: &BoardInformation,
-    filesystems: &ProductFilesystemConfig,
 ) -> anyhow::Result<CompletedConfiguration> {
     let icu_config = &config.platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config);
@@ -76,7 +74,7 @@ pub fn define_configuration(
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
         let context =
-            ConfigurationContext { feature_set_level, build_type, board_info, filesystems };
+            ConfigurationContext { feature_set_level, build_type, board_info: board_info };
 
         // Call the configuration functions for each subsystem.
         configure_subsystems(&context, config, &mut builder)?;
@@ -331,11 +329,7 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        let result = define_configuration(
-            &config,
-            &BoardInformation::default(),
-            &ProductFilesystemConfig::default(),
-        );
+        let result = define_configuration(&config, &BoardInformation::default());
 
         assert!(result.is_err());
     }

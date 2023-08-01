@@ -68,12 +68,6 @@ if (is_fuchsia) {
     platform = {
       feature_set_level = "empty"
       build_type = "eng"
-      storage = {
-        filesystems = {
-          image_name = "assembly"
-          volume = "none"
-        }
-      }
     }
   }
 

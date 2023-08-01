@@ -73,18 +73,6 @@ if (labels.images == "//build/images/bringup") {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
-      storage = {
-        filesystems = {
-          volume = {
-            fvm = {
-              data = {
-              }
-              blob = {
-              }
-            }
-          }
-        }
-      }
     }
   }
 
