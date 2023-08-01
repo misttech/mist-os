@@ -78,8 +78,25 @@ impl VirtualDeviceManifest {
     }
 
     /// Return a vector of the Virtual Device names listed in this manifest.
+    /// Placing the recommended device at position 0.
     pub fn device_names(&self) -> Vec<String> {
-        self.device_paths.keys().cloned().collect()
+        if let Some(recommended_device) = &self.recommended {
+            let mut devices = vec![];
+            devices.push(recommended_device.clone());
+            devices.extend(self.device_paths.keys().into_iter().filter_map(|name| {
+                if name != recommended_device {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            }));
+            devices[1..].sort_unstable();
+            devices
+        } else {
+            let mut devices: Vec<String> = self.device_paths.keys().cloned().collect();
+            devices.sort_unstable();
+            devices
+        }
     }
 
     /// Given the name of a Virtual Device, look up the path to that device in the manifest and
@@ -164,6 +181,26 @@ mod tests {
         assert!(result.contains(&"device2".into()));
         assert!(result.contains(&"device3".into()));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_names_recommended() -> Result<()> {
+        let manifest = VirtualDeviceManifest {
+            recommended: Some("device2".into()),
+            device_paths: [
+                ("device1".into(), Utf8PathBuf::new()),
+                ("device2".into(), Utf8PathBuf::new()),
+                ("device3".into(), Utf8PathBuf::new()),
+            ]
+            .into(),
+            parent_dir_path: Utf8PathBuf::new(),
+        };
+
+        let result = manifest.device_names();
+        assert!(!result.is_empty());
+        assert_eq!(result.len(), 3);
+        assert_eq!(result, vec!["device2", "device1", "device3"]);
         Ok(())
     }
 
