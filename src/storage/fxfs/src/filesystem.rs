@@ -143,6 +143,9 @@ pub trait Filesystem: TransactionHandler {
 
     /// Returns the filesystem options.
     fn options(&self) -> &Options;
+
+    /// Spawns a new task that runs `future` to completion in the background.
+    fn spawn_background_task(&self, future: futures::future::BoxFuture<'static, ()>);
 }
 
 /// The context in which a transaction is being applied.
@@ -256,6 +259,7 @@ pub struct FxFilesystemBuilder {
     on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
     on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>,
     fsck_after_every_transaction: bool,
+    background_task_spawner: Box<dyn Fn(futures::future::BoxFuture<'static, ()>) + Send + Sync>,
 }
 
 impl FxFilesystemBuilder {
@@ -268,6 +272,7 @@ impl FxFilesystemBuilder {
             on_new_allocator: None,
             on_new_store: None,
             fsck_after_every_transaction: false,
+            background_task_spawner: Box::new(Self::default_background_task_spawner),
         }
     }
 
@@ -352,6 +357,18 @@ impl FxFilesystemBuilder {
         self
     }
 
+    /// Sets the function to use to spawn background tasks.
+    pub fn background_task_spawner(
+        mut self,
+        background_task_spawner: impl Fn(futures::future::BoxFuture<'static, ()>)
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        self.background_task_spawner = Box::new(background_task_spawner);
+        self
+    }
+
     /// Constructs an `FxFilesystem` object with the specified settings.
     pub async fn open(self, device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
         let read_only = self.options.read_only;
@@ -397,6 +414,7 @@ impl FxFilesystemBuilder {
             options: filesystem_options,
             in_flight_transactions: AtomicU64::new(0),
             event: Event::new(),
+            background_task_spawner: self.background_task_spawner,
         });
 
         if let Some(fsck_after_every_transaction) = fsck_after_every_transaction {
@@ -454,6 +472,10 @@ impl FxFilesystemBuilder {
         filesystem.closed.store(false, Ordering::SeqCst);
         Ok(filesystem.into())
     }
+
+    fn default_background_task_spawner(future: futures::future::BoxFuture<'static, ()>) {
+        fasync::Task::spawn(future).detach();
+    }
 }
 
 pub struct FxFilesystem {
@@ -475,6 +497,8 @@ pub struct FxFilesystem {
     // An event that is used to wake up tasks that are blocked due to the in-flight transaction
     // limit.
     event: Event,
+
+    background_task_spawner: Box<dyn Fn(futures::future::BoxFuture<'static, ()>) + Send + Sync>,
 
     // NOTE: This *must* go last so that when users take the device from a closed filesystem, the
     // filesystem has dropped all other members first (Rust drops members in declaration order).
@@ -653,6 +677,10 @@ impl Filesystem for FxFilesystem {
 
     fn options(&self) -> &Options {
         &self.options
+    }
+
+    fn spawn_background_task(&self, future: futures::future::BoxFuture<'static, ()>) {
+        (self.background_task_spawner)(future);
     }
 }
 

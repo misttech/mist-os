@@ -18,13 +18,12 @@ use {
         node::OpenNode,
         object_request::Representation,
         path::Path,
-        temp_clone::TempClonable,
         ObjectRequestRef, ProtocolsExt,
     },
     anyhow::Error,
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio,
     fuchsia_zircon::{
         self as zx,
         sys::{ZX_ERR_NOT_SUPPORTED, ZX_OK},
@@ -88,10 +87,10 @@ trait IoOpHandler: Send + Sync {
     /// Writes `data` to the file starting at the connect's seek offset and advances the seek
     /// offset. If the connection is in append mode then the seek offset is moved to the end of the
     /// file before writing. Returns the number of bytes written.
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status>;
+    async fn write(&mut self, data: &[u8]) -> Result<u64, zx::Status>;
 
     /// Writes `data` to the file starting at `offset`. Returns the number of bytes written.
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status>;
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status>;
 
     /// Modifies the connection's seek offset. Returns the connections new seek offset.
     async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status>;
@@ -176,9 +175,9 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
         Ok(buffer)
     }
 
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn write(&mut self, data: &[u8]) -> Result<u64, zx::Status> {
         if self.is_append {
-            let (bytes, offset) = self.file.append(&data).await?;
+            let (bytes, offset) = self.file.append(data).await?;
             self.seek = offset;
             Ok(bytes)
         } else {
@@ -188,7 +187,7 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
         }
     }
 
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status> {
         self.file.write_at(offset, &data).await
     }
 
@@ -273,12 +272,12 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for R
         self.file.read_at(offset, count).await
     }
 
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status> {
-        self.file.write(&data).await
+    async fn write(&mut self, data: &[u8]) -> Result<u64, zx::Status> {
+        self.file.write(data).await
     }
 
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status> {
-        self.file.write_at(offset, &data).await
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status> {
+        self.file.write_at(offset, data).await
     }
 
     async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
@@ -305,7 +304,7 @@ pub struct StreamIoConnection<T: 'static + File> {
     file: OpenNode<T>,
 
     /// The stream backing the connection that all read, write, and seek calls are forwarded to.
-    stream: TempClonable<zx::Stream>,
+    stream: zx::Stream,
 }
 
 impl<T: 'static + File> Deref for StreamIoConnection<T> {
@@ -338,8 +337,7 @@ impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
     {
         let file = OpenNode::new(file);
         let options = protocols.to_file_options()?;
-        let stream =
-            TempClonable::new(zx::Stream::create(options.to_stream_options(), file.get_vmo(), 0)?);
+        let stream = zx::Stream::create(options.to_stream_options(), file.get_vmo(), 0)?;
         create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
     }
 }
@@ -347,43 +345,27 @@ impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
 #[async_trait]
 impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, zx::Status> {
-        let stream = self.stream.temp_clone();
-        fasync::unblock(move || {
-            let mut data = vec![0u8; count as usize];
-            let actual = stream.readv(zx::StreamReadOptions::empty(), &[&mut data])?;
-            data.truncate(actual);
-            Ok(data)
-        })
-        .await
+        let mut data = vec![0u8; count as usize];
+        let actual = self.stream.readv(zx::StreamReadOptions::empty(), &[&mut data])?;
+        data.truncate(actual);
+        Ok(data)
     }
 
     async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
-        let stream = self.stream.temp_clone();
-        fasync::unblock(move || {
-            let mut data = vec![0u8; count as usize];
-            let actual = stream.readv_at(zx::StreamReadOptions::empty(), offset, &[&mut data])?;
-            data.truncate(actual);
-            Ok(data)
-        })
-        .await
+        let mut data = vec![0u8; count as usize];
+        let actual = self.stream.readv_at(zx::StreamReadOptions::empty(), offset, &[&mut data])?;
+        data.truncate(actual);
+        Ok(data)
     }
 
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, zx::Status> {
-        let stream = self.stream.temp_clone();
-        fasync::unblock(move || {
-            let actual = stream.writev(zx::StreamWriteOptions::empty(), &[&data])?;
-            Ok(actual as u64)
-        })
-        .await
+    async fn write(&mut self, data: &[u8]) -> Result<u64, zx::Status> {
+        let actual = self.stream.writev(zx::StreamWriteOptions::empty(), &[data])?;
+        Ok(actual as u64)
     }
 
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, zx::Status> {
-        let stream = self.stream.temp_clone();
-        fasync::unblock(move || {
-            let actual = stream.writev_at(zx::StreamWriteOptions::empty(), offset, &[&data])?;
-            Ok(actual as u64)
-        })
-        .await
+    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, zx::Status> {
+        let actual = self.stream.writev_at(zx::StreamWriteOptions::empty(), offset, &[data])?;
+        Ok(actual as u64)
     }
 
     async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
@@ -602,7 +584,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::Write { data, responder } => {
                 fuchsia_trace::duration!("storage", "File::Write", "bytes" => data.len() as u64);
-                let result = self.handle_write(data).await;
+                let result = self.handle_write(&data).await;
                 responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::WriteAt { offset, data, responder } => {
@@ -612,7 +594,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     "offset" => offset,
                     "bytes" => data.len() as u64
                 );
-                let result = self.handle_write_at(offset, data).await;
+                let result = self.handle_write_at(offset, &data).await;
                 responder.send(result.map_err(zx::Status::into_raw))?;
             }
             fio::FileRequest::Seek { origin, offset, responder } => {
@@ -719,14 +701,14 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         self.file.read_at(offset, count).await
     }
 
-    async fn handle_write(&mut self, content: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn handle_write(&mut self, content: &[u8]) -> Result<u64, zx::Status> {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
             return Err(zx::Status::BAD_HANDLE);
         }
         self.file.write(content).await
     }
 
-    async fn handle_write_at(&self, offset: u64, content: Vec<u8>) -> Result<u64, zx::Status> {
+    async fn handle_write_at(&self, offset: u64, content: &[u8]) -> Result<u64, zx::Status> {
         if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
             return Err(zx::Status::BAD_HANDLE);
         }

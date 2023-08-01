@@ -9,7 +9,7 @@ use {
         volume::FxVolume,
     },
     anyhow::{ensure, Context, Error},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fxfs::{
         debug_assert_not_too_long,
         errors::FxfsError,
@@ -32,7 +32,6 @@ use {
         sync::{Arc, Mutex},
     },
     storage_device::buffer::Buffer,
-    vfs::temp_clone::TempClonable,
 };
 
 /// How much data each sync transaction in a given flush will cover.
@@ -50,7 +49,7 @@ const SPARE_SIZE: u64 = TRANSACTION_METADATA_MAX_AMOUNT;
 
 pub struct PagedObjectHandle {
     inner: Mutex<Inner>,
-    vmo: TempClonable<zx::Vmo>,
+    vmo: zx::Vmo,
     handle: DataObjectHandle<FxVolume>,
 }
 
@@ -224,9 +223,7 @@ impl PagedObjectHandle {
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Self {
         let size = handle.get_size();
         Self {
-            vmo: TempClonable::new(
-                handle.owner().pager().create_vmo(handle.object_id(), size).unwrap(),
-            ),
+            vmo: handle.owner().pager().create_vmo(handle.object_id(), size).unwrap(),
             handle,
             inner: Mutex::new(Inner {
                 dirty_crtime: DirtyTimestamp::None,
@@ -721,16 +718,11 @@ impl PagedObjectHandle {
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
         let old_vmo_size = self.vmo.get_size()?;
-
-        let vmo = self.vmo.temp_clone();
-        fasync::unblock(move || {
-            if new_size > old_vmo_size {
-                vmo.set_size(new_size)
-            } else {
-                vmo.set_content_size(&new_size)
-            }
-        })
-        .await?;
+        if new_size > old_vmo_size {
+            self.vmo.set_size(new_size)?;
+        } else {
+            self.vmo.set_content_size(&new_size)?;
+        }
 
         let previous_content_size = self.handle.get_size();
         let mut inner = self.inner.lock().unwrap();
@@ -1234,16 +1226,13 @@ mod tests {
         let stream: zx::Stream = info.stream.unwrap();
 
         // Touch enough pages that 3 transaction will be required.
-        fasync::unblock(move || {
-            let page_size = zx::system_get_page_size() as u64;
-            let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
-            for i in 0..write_count {
-                stream
-                    .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&[0, 1, 2, 3, 4]])
-                    .expect("write should succeed");
-            }
-        })
-        .await;
+        let page_size = zx::system_get_page_size() as u64;
+        let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
+        for i in 0..write_count {
+            stream
+                .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&[0, 1, 2, 3, 4]])
+                .expect("write should succeed");
+        }
 
         transaction_count.store(0, Ordering::Relaxed);
         file.sync().await.unwrap().unwrap();
@@ -1282,16 +1271,13 @@ mod tests {
         let info = file.describe().await.unwrap();
         let stream: zx::Stream = info.stream.unwrap();
         // Touch enough pages that 3 transaction will be required.
-        fasync::unblock(move || {
-            let page_size = zx::system_get_page_size() as u64;
-            let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
-            for i in 0..write_count {
-                stream
-                    .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&i.to_le_bytes()])
-                    .expect("write should succeed");
-            }
-        })
-        .await;
+        let page_size = zx::system_get_page_size() as u64;
+        let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
+        for i in 0..write_count {
+            stream
+                .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&i.to_le_bytes()])
+                .expect("write should succeed");
+        }
 
         // Succeed the multi_write call from the first transaction and fail the multi_write call
         // from the second transaction. The metadata from all of the transactions doesn't get
@@ -1328,56 +1314,31 @@ mod tests {
         )
         .await;
         let info = file.describe().await.expect("describe failed");
-        let stream = Arc::new(info.stream.unwrap());
+        let stream: zx::Stream = info.stream.unwrap();
 
         let page_size = zx::system_get_page_size() as u64;
+        // Dirty lots of pages so multiple transactions are required.
         let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
-
-        {
-            let stream = stream.clone();
-            fasync::unblock(move || {
-                // Dirty lots of pages so multiple transactions are required.
-                for i in 0..(write_count * 2) {
-                    stream
-                        .writev_at(
-                            zx::StreamWriteOptions::empty(),
-                            i * page_size,
-                            &[&[0, 1, 2, 3, 4]],
-                        )
-                        .unwrap();
-                }
-            })
-            .await;
+        for i in 0..(write_count * 2) {
+            stream
+                .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&[0, 1, 2, 3, 4]])
+                .unwrap();
         }
         // Sync the file to mark all of pages as clean.
         file.sync().await.unwrap().unwrap();
         // Set the file size to 0 to mark all of the cleaned pages as zero pages.
         file.resize(0).await.unwrap().unwrap();
-
-        {
-            let stream = stream.clone();
-            fasync::unblock(move || {
-                // Write to every other page to force alternating zero and dirty pages.
-                for i in 0..write_count {
-                    stream
-                        .writev_at(
-                            zx::StreamWriteOptions::empty(),
-                            i * page_size * 2,
-                            &[&[0, 1, 2, 3, 4]],
-                        )
-                        .unwrap();
-                }
-            })
-            .await;
+        // Write to every other page to force alternating zero and dirty pages.
+        for i in 0..write_count {
+            stream
+                .writev_at(zx::StreamWriteOptions::empty(), i * page_size * 2, &[&[0, 1, 2, 3, 4]])
+                .unwrap();
         }
         // Sync to mark everything as clean again.
         file.sync().await.unwrap().unwrap();
 
         // Touch a single page so another flush is required.
-        fasync::unblock(move || {
-            stream.writev_at(zx::StreamWriteOptions::empty(), 0, &[&[0, 1, 2, 3, 4]]).unwrap()
-        })
-        .await;
+        stream.writev_at(zx::StreamWriteOptions::empty(), 0, &[&[0, 1, 2, 3, 4]]).unwrap();
 
         // If writeback_begin and writeback_end weren't called in the correct order in the previous
         // sync then not all of the pages will have been marked clean. If not all of the pages were
@@ -1519,15 +1480,12 @@ mod tests {
         let info = file.describe().await.unwrap();
         let stream: zx::Stream = info.stream.unwrap();
 
-        fasync::unblock(move || {
-            stream
-                .writev_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE - 1, &[&[1]])
-                .expect("write should succeed");
-            stream
-                .writev_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE, &[&[1]])
-                .expect_err("write should fail");
-        })
-        .await;
+        stream
+            .writev_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE - 1, &[&[1]])
+            .expect("write should succeed");
+        stream
+            .writev_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE, &[&[1]])
+            .expect_err("write should fail");
         assert_eq!(get_attrs_checked(&file).await.content_size, MAX_FILE_SIZE);
 
         file.resize(MAX_FILE_SIZE).await.unwrap().expect("resize should succeed");

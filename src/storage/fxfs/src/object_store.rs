@@ -66,7 +66,6 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
     fprint::TypeFingerprint,
-    fuchsia_async as fasync,
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
     fxfs_crypto::{ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
@@ -830,7 +829,7 @@ impl ObjectStore {
             match store.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::NotFound)? {
                 Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => {
                     let (keys, task) = KeyUnwrapper::new_from_wrapped(object_id, crypt, keys);
-                    fasync::Task::spawn(task).detach();
+                    store.filesystem().spawn_background_task(Box::pin(task));
                     Some(keys)
                 }
                 _ => {
