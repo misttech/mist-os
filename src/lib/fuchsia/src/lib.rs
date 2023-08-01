@@ -184,7 +184,7 @@ where
     fuchsia_async::test_support::run_test(f, num_threads)
 }
 
-/// Run an async test function until it stalls.
+/// Run an async test function until it stalls. The executor will also use fake time.
 #[doc(hidden)]
 #[cfg(target_os = "fuchsia")]
 pub fn test_until_stalled<F, Fut, R>(f: F) -> R
@@ -193,7 +193,10 @@ where
     Fut: 'static + Future<Output = R>,
     R: fuchsia_async::test_support::TestResult,
 {
-    fuchsia_async::test_support::run_until_stalled_test(&mut fuchsia_async::TestExecutor::new(), f)
+    fuchsia_async::test_support::run_until_stalled_test(
+        &mut fuchsia_async::TestExecutor::new_with_fake_time(),
+        f,
+    )
 }
 
 //

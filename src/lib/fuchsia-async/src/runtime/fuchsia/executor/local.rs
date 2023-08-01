@@ -4,20 +4,24 @@
 
 use super::super::timer::TimerHeap;
 use super::{
-    common::{with_local_timer_heap, ExecutorTime, Inner},
+    common::{with_local_timer_heap, EHandle, ExecutorTime, Inner},
     time::Time,
 };
 use futures::{
-    task::{FutureObj, LocalFutureObj},
+    future::{self, Either},
+    task::{AtomicWaker, FutureObj, LocalFutureObj},
     FutureExt,
 };
 use pin_utils::pin_mut;
 use std::{
     fmt,
-    future::Future,
+    future::{poll_fn, Future},
     marker::Unpin,
-    sync::{atomic::AtomicI64, Arc},
-    task::Poll,
+    sync::{
+        atomic::{AtomicBool, AtomicI64, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
 };
 
 /// A single-threaded port-based executor for Fuchsia OS.
@@ -179,7 +183,28 @@ impl TestExecutor {
         let main_future = main_future.map(|r| result = Some(r));
         pin_mut!(main_future);
 
-        self.local.run::</* UNTIL_STALLED: */ true>(LocalFutureObj::new(main_future));
+        // Set up an instance of UntilStalledData that works with `poll_until_stalled`.
+        struct Cleanup(Arc<Inner>);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                *self.0.owner_data.lock() = None;
+            }
+        }
+        let _cleanup = Cleanup(self.local.inner.clone());
+        *self.local.inner.owner_data.lock() = Some(Box::new(UntilStalledData { watcher: None }));
+
+        loop {
+            self.local.run::</* UNTIL_STALLED: */ true>(LocalFutureObj::new(main_future.as_mut()));
+            // If a waker was set by `poll_until_stalled`, disarm, wake, and loop.
+            if let Some(watcher) = with_data(|data| data.watcher.take()) {
+                watcher.waker.wake();
+                // Relaxed ordering is fine here because this atomic is only ever access from the
+                // main thread.
+                watcher.done.store(true, Ordering::Relaxed);
+            } else {
+                break;
+            }
+        }
 
         if let Some(result) = result {
             Poll::Ready(result)
@@ -238,6 +263,107 @@ impl TestExecutor {
     pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
         self.local.inner.collector.snapshot()
     }
+
+    /// Waits for the executor to stall and then sets the fake time to a given value. This will only
+    /// work if the executor is being run via `TestExecutor::run_until_stalled` and can only be
+    /// called by one task at a time. When this returns, the caller should not assume that any tasks
+    /// awoken by newly expired timers have been polled; the caller can force this by calling
+    /// `until_stalled`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the executor was not created with fake time, and for the same reasons
+    /// `poll_until_stalled` can below.
+    pub async fn when_stalled_set_fake_time(time: Time) {
+        let _: Poll<_> = Self::poll_until_stalled(future::pending::<()>()).await;
+        EHandle::local().inner.set_fake_time(time);
+    }
+
+    /// Runs the future until it is ready or the executor is stalled. Returns the state of the
+    /// future.
+    ///
+    /// This will only work if the executor is being run via `TestExecutor::run_until_stalled` and
+    /// can only be called by one task at a time.
+    ///
+    /// This can be used in tests to assert that a future should be pending:
+    /// ```
+    /// assert!(
+    ///     TestExecutor::poll_until_stalled(my_fut).await.is_pending(),
+    ///     "my_fut should not be ready!"
+    /// );
+    /// ```
+    ///
+    /// If you just want to know when the executor is stalled, you can do:
+    /// ```
+    /// let _: Poll<()> = TestExecutor::poll_until_stalled(future::pending::<()>()).await;
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if another task is currently trying to use `run_until_stalled`, or the executor is
+    /// not using `TestExecutor::run_until_stalled`.
+    pub async fn poll_until_stalled<T>(fut: impl Future<Output = T> + Unpin) -> Poll<T> {
+        let watcher =
+            Arc::new(StalledWatcher { waker: AtomicWaker::new(), done: AtomicBool::new(false) });
+
+        assert!(
+            with_data(|data| data.watcher.replace(watcher.clone())).is_none(),
+            "Error: Another task has called `poll_until_stalled`."
+        );
+
+        struct Watcher(Arc<StalledWatcher>);
+
+        // Make sure we clean up if we're dropped.
+        impl Drop for Watcher {
+            fn drop(&mut self) {
+                if !self.0.done.swap(true, Ordering::Relaxed) {
+                    with_data(|data| data.watcher = None);
+                }
+            }
+        }
+
+        let watcher = Watcher(watcher);
+
+        let poll_fn = poll_fn(|cx: &mut Context<'_>| {
+            if watcher.0.done.load(Ordering::Relaxed) {
+                Poll::Ready(())
+            } else {
+                watcher.0.waker.register(cx.waker());
+                Poll::Pending
+            }
+        });
+        match future::select(poll_fn, fut).await {
+            Either::Left(_) => Poll::Pending,
+            Either::Right((value, _)) => Poll::Ready(value),
+        }
+    }
+}
+
+struct StalledWatcher {
+    waker: AtomicWaker,
+    done: AtomicBool,
+}
+
+struct UntilStalledData {
+    watcher: Option<Arc<StalledWatcher>>,
+}
+
+/// Calls `f` with `&mut UntilStalledData` that is stored in `owner_data`.
+///
+/// # Panics
+///
+/// Panics if `owner_data` isn't an instance of `UntilStalledData`.
+fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
+    const MESSAGE: &str = "poll_until_stalled only works if the executor is being run \
+                           with TestExecutor::run_until_stalled";
+    f(&mut EHandle::local()
+        .inner
+        .owner_data
+        .lock()
+        .as_mut()
+        .expect(MESSAGE)
+        .downcast_mut::<UntilStalledData>()
+        .expect(MESSAGE))
 }
 
 #[cfg(test)]
@@ -455,5 +581,38 @@ mod tests {
     fn many_wakeups() {
         let mut executor = LocalExecutor::new();
         executor.run_singlethreaded(multi_wake(4096 * 2));
+    }
+
+    #[test]
+    fn test_async_fake_time() {
+        // Test the EHandle set_fake_time method.
+        let mut executor = TestExecutor::new_with_fake_time();
+        executor.set_fake_time(Time::from_nanos(0));
+
+        let fut = async {
+            let timer_fired = Arc::new(AtomicBool::new(false));
+            futures::join!(
+                async {
+                    Timer::new(1.seconds()).await;
+                    timer_fired.store(true, Ordering::SeqCst);
+                },
+                async {
+                    assert!(!timer_fired.load(Ordering::SeqCst));
+                    TestExecutor::when_stalled_set_fake_time(Time::after(500.millis())).await;
+                    // Timer still shouldn't be fired.
+                    assert!(!timer_fired.load(Ordering::SeqCst));
+                    TestExecutor::when_stalled_set_fake_time(Time::after(500.millis())).await;
+
+                    // The timer should fire now but we don't know when the future will run, so wait
+                    // until the executor has stalled.
+                    let _: Poll<_> =
+                        TestExecutor::poll_until_stalled(future::pending::<()>()).await;
+
+                    assert!(timer_fired.load(Ordering::SeqCst));
+                }
+            )
+        };
+        pin_mut!(fut);
+        assert!(executor.run_until_stalled(&mut fut).is_ready());
     }
 }

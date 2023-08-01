@@ -17,6 +17,7 @@ use futures::{
 };
 use parking_lot::Mutex;
 use std::{
+    any::Any,
     cell::RefCell,
     collections::HashMap,
     fmt,
@@ -92,6 +93,9 @@ pub(super) struct Inner {
     pub(super) threads_state: AtomicU16,
     pub(super) num_threads: u8,
     pub(super) polled: AtomicU64,
+    // Data that belongs to the user that can be accessed via EHandle::local(). See
+    // `TestExecutor::poll_until_stalled`.
+    pub(super) owner_data: Mutex<Option<Box<dyn Any + Send>>>,
 }
 
 impl Inner {
@@ -117,6 +121,7 @@ impl Inner {
             threads_state: AtomicU16::new(0),
             num_threads,
             polled: AtomicU64::new(0),
+            owner_data: Mutex::new(None),
         }
     }
 
