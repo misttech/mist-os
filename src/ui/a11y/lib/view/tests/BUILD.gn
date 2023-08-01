@@ -15,6 +15,7 @@ group("integration-tests") {
     ":flatland-a11y-view-test",
     ":flatland-scene-integration-test",
     ":gfx-a11y-view-test",
+    ":gfx-scene-integration-test",
   ]
 }
 

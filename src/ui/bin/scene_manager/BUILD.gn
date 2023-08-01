@@ -40,6 +40,8 @@ icu_rustc_binary("scene_manager_bin") {
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_rust",
     "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_rust",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
+    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
@@ -57,6 +59,7 @@ icu_rustc_binary("scene_manager_bin") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//src/lib/ui/fuchsia-scenic",
     "//src/ui/lib/scene_management:scene_management_mocks",
     "//third_party/rust_crates:assert_matches",
