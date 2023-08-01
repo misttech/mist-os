@@ -142,11 +142,26 @@ Cannot guess archive format from file name %r; use --format.
 def write_archive(outfile, images, board_name, additional_bootserver_arguments):
     # Synthesize a sanitized form of the input.
     path_images = []
+    dedupe = {}
     for image in images:
         path = image['path']
         if 'archive' in image:
             del image['archive']
-        image['path'] = image['name'] + '.' + image['type']
+
+        target_path = image['name'] + '.' + image['type']
+        image['path'] = target_path
+
+        if target_path in dedupe:
+            dupe1 = dedupe[target_path]['label']
+            dupe2 = image['label']
+            raise Exception(
+                f"Found two targets providing image {target_path}:\n"
+                f"  * {dupe1}\n"
+                f"  * {dupe2}\n",
+            )
+
+        dedupe[target_path] = image
+
         path_images.append((path, image))
 
     # Generate scripts that use the sanitized file names.
