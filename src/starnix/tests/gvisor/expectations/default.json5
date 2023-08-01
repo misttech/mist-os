@@ -613,6 +613,9 @@
                 // socket_ipv6_udp_unbound_loopback_test
                 "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
 
+                // mount_test
+                "MountTest.MountNamespacePropagation",
+
                 // socket_netdevice_test
                 "NetdeviceTest.InterfaceName",
                 "NetdeviceTest.InterfaceQLEN",
