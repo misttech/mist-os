@@ -10,6 +10,6 @@ fuchsia.git so they can be changed together with their GN counterparts.
 ZEDBOOT_IMAGE_ARGS = {
     "legacy_aib": "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     "platform_aibs": "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    "product_config": "//build/bazel/assembly/product_configurations:default",
+    "product_config": "//build/bazel/assembly/product_configurations:zedboot",
     "create_system_mode": "bootfs",
 }
