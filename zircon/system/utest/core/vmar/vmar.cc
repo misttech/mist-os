@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <lib/fit/defer.h>
 #include <lib/fzl/memory-probe.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/job.h>
@@ -554,29 +555,29 @@ TEST(Vmar, AlignmentVmarMapTest) {
   ASSERT_EQ(MakeManualAlignedVmar(vmar_size, vmar_alignment, &vmar), ZX_OK);
 
   // Specific base + offset does not meet the alignment, so it fails.
-  zx_vaddr_t dummy;
+  zx_vaddr_t addr;
   EXPECT_EQ(
       zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALIGN_64KB | ZX_VM_SPECIFIC,
-                  4096, vmo, 0, size, &dummy),
+                  4096, vmo, 0, size, &addr),
       ZX_ERR_INVALID_ARGS);
 
   // Specific base + offset meets alignment, it should succeed.
   EXPECT_EQ(
       zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALIGN_64KB | ZX_VM_SPECIFIC,
-                  64 * 1024, vmo, 0, size, &dummy),
+                  64 * 1024, vmo, 0, size, &addr),
       ZX_OK);
-  ASSERT_EQ(zx_vmar_unmap(vmar, dummy, 64 * 1024), ZX_OK);
+  ASSERT_EQ(zx_vmar_unmap(vmar, addr, size), ZX_OK);
 
   // Minimum supported alignments range is 2^10 to 2^32
   zx_vm_option_t bad_align_low = (9u << ZX_VM_ALIGN_BASE);
   zx_vm_option_t bad_align_high = (33u << ZX_VM_ALIGN_BASE);
 
-  EXPECT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | bad_align_low, 0, vmo, 0, size,
-                        &dummy),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | bad_align_low, 0, vmo, 0, size, &addr),
+      ZX_ERR_INVALID_ARGS);
 
   EXPECT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | bad_align_high, 0, vmo, 0, size,
-                        &dummy),
+                        &addr),
             ZX_ERR_INVALID_ARGS);
 
   // Test all supported alignments.
@@ -607,31 +608,31 @@ TEST(Vmar, AlignmentVmarAllocateTest) {
   ASSERT_EQ(MakeManualAlignedVmar(vmar_size, vmar_alignment, &vmar), ZX_OK);
 
   // Specific base + offset does not meet the alignment, so it fails.
-  zx_vaddr_t dummy_a;
-  zx_handle_t dummy_h;
+  zx_vaddr_t addr;
+  zx_handle_t sub_vmar;
   EXPECT_EQ(zx_vmar_allocate(
                 vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_ALIGN_64KB | ZX_VM_SPECIFIC,
-                4096, size, &dummy_h, &dummy_a),
+                4096, size, &sub_vmar, &addr),
             ZX_ERR_INVALID_ARGS);
 
   // Specific base + offset meets alignment, it should succeed.
   EXPECT_EQ(zx_vmar_allocate(
                 vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_ALIGN_64KB | ZX_VM_SPECIFIC,
-                64 * 1024, size, &dummy_h, &dummy_a),
+                64 * 1024, size, &sub_vmar, &addr),
             ZX_OK);
-  ASSERT_EQ(zx_vmar_destroy(dummy_h), ZX_OK);
-  ASSERT_EQ(zx_handle_close(dummy_h), ZX_OK);
+  ASSERT_EQ(zx_vmar_destroy(sub_vmar), ZX_OK);
+  ASSERT_EQ(zx_handle_close(sub_vmar), ZX_OK);
 
   // Minimum supported alignments range is 2^10 to 2^32
   const zx_vm_option_t bad_align_low = (9u << ZX_VM_ALIGN_BASE);
   const zx_vm_option_t bad_align_high = (33u << ZX_VM_ALIGN_BASE);
 
   EXPECT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | bad_align_low, 0,
-                             size, &dummy_h, &dummy_a),
+                             size, &sub_vmar, &addr),
             ZX_ERR_INVALID_ARGS);
 
   EXPECT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | bad_align_high, 0,
-                             size, &dummy_h, &dummy_a),
+                             size, &sub_vmar, &addr),
             ZX_ERR_INVALID_ARGS);
 
   // Test all supported alignments.
@@ -2007,7 +2008,8 @@ TEST(Vmar, RangeOpCommitVmoPages) {
   EXPECT_EQ(zx_handle_close(readonly_vmo), ZX_OK);
 
   // Clean up the test VMAR and VMO.
-  EXPECT_EQ(zx_vmar_unmap(zx_vmar_root_self(), vmar_base, kVmoSize), ZX_OK);
+  EXPECT_EQ(zx_vmar_unmap(vmar, vmar_base, kVmoSize), ZX_OK);
+  EXPECT_EQ(zx_vmar_destroy(vmar), ZX_OK);
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
   EXPECT_EQ(zx_handle_close(vmar), ZX_OK);
 }
@@ -2065,6 +2067,7 @@ TEST(Vmar, RangeOpMapRange) {
             ZX_OK);
 
   EXPECT_EQ(zx_vmar_unmap(vmar, map_base, vmo_size), ZX_OK);
+  EXPECT_EQ(zx_vmar_destroy(vmar), ZX_OK);
   EXPECT_EQ(zx_handle_close(vmar), ZX_OK);
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
 }
@@ -2076,6 +2079,11 @@ TEST(Vmar, RangeOpSubRegions) {
   uintptr_t addr;
   ASSERT_OK(zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
                                             zx_system_get_page_size(), &vmar, &addr));
+
+  auto destroy = fit::defer([&]() {
+    // Cleanup the VMAR later.
+    vmar.destroy();
+  });
 
   zx::vmar child_vmar;
   uintptr_t child_addr;
@@ -2270,6 +2278,11 @@ TEST(Vmar, PartialUnmapWithVmarOffset) {
   ASSERT_EQ(zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, kOffset,
                         kVmoSize - kOffset, &mapping_addr),
             ZX_OK);
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(mapping_addr, kVmoSize - kOffset);
+  });
+
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
 
   char* ptr = (char*)mapping_addr;
@@ -2341,6 +2354,11 @@ TEST(Vmar, ConcurrentUnmapReadMemory) {
                                 zx_system_get_page_size() * 4, &child_vmar, &addr),
             ZX_OK);
 
+  auto destroy = fit::defer([&]() {
+    // Cleanup the VMAR later.
+    child_vmar.destroy();
+  });
+
   std::atomic<bool> running = true;
   std::thread t = std::thread([addr, &running] {
     auto self = zx::process::self();
@@ -2388,6 +2406,11 @@ TEST(Vmar, OpOnRangeWithChildVmarNextToIt) {
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmoSize * 2, &vmar_parent, &vmar_parent_base));
 
+  auto destroy = fit::defer([&]() {
+    // Cleanup the VMAR.
+    vmar_parent.destroy();
+  });
+
   zx::vmar vmar_a;
   uintptr_t vmar_a_base;
   ASSERT_OK(vmar_parent.allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
@@ -2423,6 +2446,11 @@ TEST(Vmar, RangeOpCommitVmoPages2) {
                              ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
                              kVmoSize, &vmar, &vmar_base),
             ZX_OK);
+
+  auto destroy = fit::defer([&]() {
+    // Cleanup the VMAR.
+    zx_vmar_destroy(vmar);
+  });
 
   // Create one mapping in the VMAR
   const size_t kMappingSize = 5 * zx_system_get_page_size();
@@ -2463,6 +2491,11 @@ TEST(Vmar, BadRangeOpNestedVmar) {
                                 0, zx_system_get_page_size() * 8, &intermediate_vmar, &addr),
             ZX_OK);
 
+  auto destroy = fit::defer([&]() {
+    // Cleanup the VMAR.
+    intermediate_vmar.destroy();
+  });
+
   // Place mapping in the intermediate vmar.
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -2490,6 +2523,11 @@ TEST(Vmar, RangeOpCommit) {
   const uint64_t kVmarSize = 20 * zx_system_get_page_size();
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmarSize, &vmar, &base_addr));
+
+  auto destroy = fit::defer([&]() {
+    // Cleanup the VMAR.
+    vmar.destroy();
+  });
 
   // Create two sub-VMARs to hold the mappings.
   zx::vmar sub_vmar1, sub_vmar2;
@@ -2585,6 +2623,11 @@ TEST(Vmar, ProtectCowWritable) {
   ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, clone, 0,
                                        zx_system_get_page_size() * 2, &addr));
 
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, zx_system_get_page_size() * 2);
+  });
+
   // Protect it read-only.
   EXPECT_OK(zx::vmar::root_self()->protect(ZX_VM_PERM_READ, addr, zx_system_get_page_size() * 2));
 
@@ -2618,6 +2661,11 @@ TEST(Vmar, MapReadIfXomUnsupported) {
   ASSERT_EQ(
       zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED, 0, vmo, 0, size, &addr),
       ZX_OK);
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, size);
+  });
+
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
 
   uint32_t features = 0;
@@ -2635,6 +2683,11 @@ TEST(Vmar, ProtectReadIfXomUnsupported) {
 
   uintptr_t addr;
   ASSERT_EQ(zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &addr), ZX_OK);
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, size);
+  });
+
   EXPECT_EQ(zx_handle_close(vmo), ZX_OK);
 
   ASSERT_OK(probe_for_read(reinterpret_cast<void*>(addr)));
