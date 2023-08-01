@@ -69,6 +69,7 @@ template("generated_images_config") {
 
     contents = {
       image_name = invoker_zbi.name
+      format_data_on_corruption = false
       if (defined(invoker.fvm)) {
         volume = {
           fvm = {
