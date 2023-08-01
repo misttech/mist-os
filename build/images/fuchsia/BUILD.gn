@@ -82,12 +82,6 @@ if (is_fuchsia) {
         get_label_info(fuchsia_product_assembly_config_label, "name") +
         "/product_assembly_config.json"
 
-    # Recovery currently should use the bootable user config.
-    recovery_product_assembly_config_file =
-        get_label_info("//build/assembly:bootable_product_config",
-                       "target_out_dir") +
-        "/bootable_product_config/product_assembly_config.json"
-
     # Outputs of recovery.
     recovery_name = get_label_info(recovery_label, "name")
     recovery_outdir =

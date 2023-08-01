@@ -34,15 +34,6 @@ if (is_fuchsia) {
     product = {
     }
   }
-
-  product_assembly_configuration("bootable_product_config") {
-    platform = {
-      build_type = "user"
-      feature_set_level = "bootstrap"
-    }
-    product = {
-    }
-  }
 }
 
 if (is_host) {
