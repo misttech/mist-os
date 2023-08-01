@@ -77,7 +77,7 @@ __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_
     if (frame.fatal_error) {
       source += "\nunwinding aborted: " + frame.error.msg();
     }
-    fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s}}} %s\n", n, pc, frame.pc_is_return_address ? "ra" : "pc",
+    fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s:%s}}}\n", n, pc, frame.pc_is_return_address ? "ra" : "pc",
             source.c_str());
     n++;
   }
@@ -89,7 +89,6 @@ __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_
 
 __EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
   // We should dump all modules instead of only used ones. See fxbug.dev/125728.
-  fprintf(f, "{{{reset}}}\n");
   elf_search::ForEachModule(
       *zx::unowned_process{process}, [f, count = 0u](const elf_search::ModuleInfo& info) mutable {
         const size_t kPageSize = zx_system_get_page_size();

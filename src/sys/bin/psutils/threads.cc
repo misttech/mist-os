@@ -149,6 +149,7 @@ void dump_all_threads(uint64_t pid, zx_handle_t process, FILE* out) {
 
   fprintf(out, "%zu thread(s)\n", num_threads);
 
+  fprintf(out, "{{{reset}}}\n");
   inspector_print_markup_context(out, process);
 
   // TODO(dje): Move inspector's DebugInfoCache here, so that we can use it

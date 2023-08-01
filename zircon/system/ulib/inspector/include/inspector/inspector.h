@@ -36,6 +36,8 @@ void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t 
 
 // Print markup context to |f|. This includes every module and every mapped
 // region of memory derived from those modules.
+//
+// Note this function will not print the reset line for you.
 void inspector_print_markup_context(FILE* f, zx_handle_t process);
 
 // Fetch the general registers of |thread|.

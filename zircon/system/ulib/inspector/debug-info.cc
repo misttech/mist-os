@@ -405,10 +405,9 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
 
 __EXPORT void inspector_print_debug_info(FILE* out, zx_handle_t process_handle,
                                          zx_handle_t thread_handle) {
+  fprintf(out, "{{{reset:begin}}}\n");
   inspector_print_debug_info_impl(out, process_handle, thread_handle, false);
-
-  // Print one last reset to clear all symbolizer contextual state for the process.
-  fprintf(out, "{{{reset}}}\n");
+  fprintf(out, "{{{reset:end}}}\n");
 }
 
 // The approach of |inspector_print_debug_info_for_all_threads| is to suspend the process, obtain
@@ -489,6 +488,8 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
   // Ensure only the first thread has markup context printed.
   bool skip_markup_context = false;
 
+  fprintf(out, "{{{reset:begin}}}\n");
+
   // Print the threads in an exception first.
   for (size_t i = 0; i < actual; i++) {
     zx::thread& child = thread_handles[i];
@@ -545,5 +546,5 @@ __EXPORT void inspector_print_debug_info_for_all_threads(FILE* out, zx_handle_t 
   }
 
   // Print one last reset to clear all symbolizer contextual state for the process.
-  fprintf(out, "{{{reset}}}\n");
+  fprintf(out, "{{{reset:end}}}\n");
 }
