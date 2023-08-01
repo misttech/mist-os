@@ -5,7 +5,12 @@
 use bitflags::bitflags;
 use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 
-use crate::{fs::*, lock::Mutex, task::Task, types::*};
+use crate::{
+    fs::*,
+    lock::Mutex,
+    task::{CurrentTask, Task},
+    types::*,
+};
 
 bitflags! {
     pub struct FdFlags: u32 {
@@ -315,15 +320,6 @@ impl FdTable {
         }
     }
 
-    /// Drop the fd table, closing any files opened exclusively by this table.
-    // TODO(fxb/122600) This will be unneeded once the live state of a task is deleted as soon as
-    // the task dies, instead of relying on Drop.
-    pub fn drop_local(&self) {
-        // Replace the file table with an empty one. Extract it first so that the drop happens
-        // without the lock in case a file call back to the table when it is closed.
-        let _internal_state = { std::mem::take(self.table.lock().deref_mut()) };
-    }
-
     pub fn get_fd_flags(&self, fd: FdNumber) -> Result<FdFlags, Errno> {
         self.get_with_flags(fd).map(|(_file, flags)| flags)
     }
@@ -364,6 +360,16 @@ impl FdTable {
     }
 }
 
+impl Releasable for FdTable {
+    type Context = CurrentTask;
+    /// Drop the fd table, closing any files opened exclusively by this table.
+    fn release(&self, _current_task: &CurrentTask) {
+        // Replace the file table with an empty one. Extract it first so that the drop happens
+        // without the lock in case a file call back to the table when it is closed.
+        let _internal_state = { std::mem::take(self.table.lock().deref_mut()) };
+    }
+}
+
 impl Clone for FdTable {
     fn clone(&self) -> Self {
         FdTable { table: Mutex::new(self.table.lock().clone()) }
@@ -398,6 +404,8 @@ mod test {
         assert!(Arc::ptr_eq(&files.get(fd0).unwrap(), &file));
         assert!(Arc::ptr_eq(&files.get(fd1).unwrap(), &file));
         assert_eq!(files.get(FdNumber::from_raw(fd1.raw() + 1)).map(|_| ()), error!(EBADF));
+
+        files.release(&current_task);
     }
 
     #[::fuchsia::test]
@@ -420,6 +428,8 @@ mod test {
         files.set_fd_flags(fd0, FdFlags::CLOEXEC).unwrap();
         assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags(fd0).unwrap());
         assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags(fd0).unwrap());
+
+        files.release(&current_task);
     }
 
     #[::fuchsia::test]
@@ -440,6 +450,8 @@ mod test {
 
         assert!(files.get(fd0).is_err());
         assert!(files.get(fd1).is_ok());
+
+        files.release(&current_task);
     }
 
     #[::fuchsia::test]
@@ -463,5 +475,7 @@ mod test {
         // The next FD we insert fills in the hole we created.
         let another_fd = add(&current_task, &files, file).unwrap();
         assert_eq!(another_fd.raw(), 0);
+
+        files.release(&current_task);
     }
 }

@@ -1157,13 +1157,11 @@ impl Task {
 impl Releasable for Task {
     type Context = CurrentTask;
 
-    fn release(&self, _: &CurrentTask) {
+    fn release(&self, current_task: &CurrentTask) {
         self.thread_group.remove(self);
 
         // Release the fd table.
-        // TODO(https://fxbug.dev/122600#c12) This will be unneeded once the live state of a task is deleted as soon
-        // as the task dies, instead of relying on Drop.
-        self.files.drop_local();
+        self.files.release(current_task);
 
         self.signal_vfork();
     }
