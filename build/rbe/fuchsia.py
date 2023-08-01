@@ -178,19 +178,19 @@ def remote_rustc_shlibs(root_rel: Path) -> Iterable[Path]:
         yield from (root_rel / REMOTE_RUSTC_SUBDIR / 'lib').glob(g)
 
 
-def remote_clang_runtime_libdirs(root_rel: Path,
-                                 target_triple: str) -> Sequence[Path]:
-    """Locate clang runtime libdir from the current directory."""
-    return (root_rel / REMOTE_CLANG_SUBDIR / 'lib' / 'clang').glob(
+def clang_runtime_libdirs(clang_dir_rel: Path,
+                          target_triple: str) -> Sequence[Path]:
+    """Locate clang runtime libdir from the given toolchain directory."""
+    return (clang_dir_rel / 'lib' / 'clang').glob(
         os.path.join(
             '*',  # a clang version number, like '14.0.0' or '17'
             'lib',
             target_triple))
 
 
-def remote_clang_libcxx_static(clang_lib_triple: str) -> str:
+def clang_libcxx_static(clang_dir_rel: Path, clang_lib_triple: str) -> str:
     """Location of libc++.a"""
-    return REMOTE_CLANG_SUBDIR / 'lib' / clang_lib_triple / 'libc++.a'
+    return clang_dir_rel / 'lib' / clang_lib_triple / 'libc++.a'
 
 
 def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:

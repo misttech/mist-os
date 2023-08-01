@@ -117,13 +117,13 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         if clang_rt_libdir:
             yield mock.patch.object(
                 fuchsia,
-                'remote_clang_runtime_libdirs',
+                'clang_runtime_libdirs',
                 return_value=[clang_rt_libdir])
 
         if libcxx_static:
             yield mock.patch.object(
                 fuchsia,
-                'remote_clang_libcxx_static',
+                'clang_libcxx_static',
                 return_value=libcxx_static or '')
 
         # expected to be called through _rust_stdlib_libunwind_inputs()
@@ -397,7 +397,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             depfile_contents=depfile_contents,
             compiler_shlibs=[shlib_rel],
             clang_rt_libdir=clang_rt_libdir,
-            libcxx_static=libcxx,
+            libcxx_static=exec_root_rel / libcxx,
         )
         with contextlib.ExitStack() as stack:
             for m in mocks:

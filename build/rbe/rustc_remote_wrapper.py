@@ -343,6 +343,24 @@ class RustRemoteAction(object):
         return self._rust_action.linker
 
     @property
+    def local_clang_toolchain_dir(self) -> Path:
+        """Infer the clang toolchain dir based on the linker location.
+
+        Returns:
+          Path to a toolchain dir, relative to the working dir.
+        """
+        linker = self.linker  # a relative path
+        if not linker:
+            return self.exec_root_rel / fuchsia.REMOTE_CLANG_SUBDIR
+        # We want TOOLDIR from a path like TOOLDIR/bin/TOOL.
+        # This follows a typical clang install structure.
+        return linker.parent.parent
+
+    @property
+    def remote_clang_toolchain_dir(self) -> Path:  # relative
+        return fuchsia.remote_executable(self.local_clang_toolchain_dir)
+
+    @property
     def depfile(self) -> Optional[Path]:
         return self._rust_action.depfile
 
@@ -696,8 +714,8 @@ class RustRemoteAction(object):
                     'remote clang -fuse-ld', self.remote_ld_path)
 
     def _remote_libcxx(self, clang_lib_triple: str) -> Iterable[Path]:
-        libcxx_remote = self.exec_root_rel / fuchsia.remote_clang_libcxx_static(
-            clang_lib_triple)
+        libcxx_remote = fuchsia.clang_libcxx_static(
+            self.remote_clang_toolchain_dir, clang_lib_triple)
         if _libcxx_isfile(libcxx_remote):
             yield self.value_verbose('remote libc++', libcxx_remote)
 
@@ -705,8 +723,8 @@ class RustRemoteAction(object):
                                    clang_lib_triple: str) -> Iterable[Path]:
         # clang runtime lib dir
         rt_libdir_remote = list(
-            fuchsia.remote_clang_runtime_libdirs(
-                self.exec_root_rel, clang_lib_triple))
+            fuchsia.clang_runtime_libdirs(
+                self.remote_clang_toolchain_dir, clang_lib_triple))
         # if none found, that's ok.
         if len(rt_libdir_remote) == 1:
             yield self.value_verbose(
