@@ -2351,6 +2351,8 @@ go_library("gvisor.dev/gvisor") {
     "pkg/sync/runtime.go",
     "pkg/sync/runtime_amd64.go",
     "pkg/sync/runtime_constants.go",
+    "pkg/sync/runtime_go121_unsafe.go",
+    "pkg/sync/runtime_not_go121_unsafe.go",
     "pkg/sync/runtime_other.go",
     "pkg/sync/runtime_spinning_amd64.s",
     "pkg/sync/runtime_spinning_other.s",

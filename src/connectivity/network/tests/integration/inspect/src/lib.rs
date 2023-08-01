@@ -858,6 +858,7 @@ async fn inspect_stat_counters<N: Netstack>(name: &str) {
             FailedPortReservations: AnyProperty,
             FastRecovery: AnyProperty,
             FastRetransmit: AnyProperty,
+            ForwardMaxInFlightDrop: AnyProperty,
             InvalidSegmentsReceived: AnyProperty,
             ListenOverflowAckDrop: AnyProperty,
             ListenOverflowInvalidSynCookieRcvd: AnyProperty,
