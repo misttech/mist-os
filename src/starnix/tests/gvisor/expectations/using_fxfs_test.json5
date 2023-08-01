@@ -54,9 +54,6 @@
                 // select_test - this test causes a starnix kernel panic because it uses an invalid
                 // watch handle and unwraps the result.
                 "SelectTest.SetrlimitCallNOFILE",
-
-                // socket_inet_loopback_isolated_test - these tests flake TODO(fxbug.dev/128640)
-                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/TCP",
             ],
         },
     ],
