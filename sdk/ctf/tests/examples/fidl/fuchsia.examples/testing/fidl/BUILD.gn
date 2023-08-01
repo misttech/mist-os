@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("test.example") {
-  sdk_category = "experimental"
+  sdk_category = "internal"
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.testing.harness" ]
   enable_hlcpp = true
