@@ -106,11 +106,13 @@ pub fn set_zx_name(obj: &impl zx::AsHandleRef, name: &[u8]) {
 /// created to execute a user-level task, and should only be called once at the start of that
 /// thread's execution.
 pub fn set_current_task_info(current_task: &CurrentTask) {
+    let name = current_task.task.command();
+    set_zx_name(&fuchsia_runtime::thread_self(), name.as_bytes());
     CURRENT_TASK_INFO.with(|task_info| {
         *task_info.borrow_mut() = TaskDebugInfo::User {
             pid: current_task.task.thread_group.leader,
             tid: current_task.id,
-            command: current_task.task.command().to_string_lossy().to_string(),
+            command: name.to_string_lossy().to_string(),
         };
     });
 }

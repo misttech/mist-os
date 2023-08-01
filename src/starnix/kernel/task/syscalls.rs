@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::AsHandleRef;
-
 use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use static_assertions::const_assert;
@@ -719,10 +717,6 @@ pub fn sys_prctl(
             let string_end = name.iter().position(|&c| c == 0).unwrap();
 
             let name_str = CString::new(&mut name[0..string_end]).map_err(|_| errno!(EINVAL))?;
-            let thread = current_task.thread.read();
-            if let Some(thread) = &*thread {
-                thread.set_name(&name_str).map_err(|_| errno!(EINVAL))?;
-            }
             current_task.set_command_name(name_str);
             crate::logging::set_current_task_info(current_task);
             Ok(0.into())

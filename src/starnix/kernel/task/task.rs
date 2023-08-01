@@ -1115,6 +1115,15 @@ impl Task {
     }
 
     pub fn set_command_name(&self, name: CString) {
+        // Set the name on the Linux thread.
+        if let Some(thread) = self.thread.read().as_ref() {
+            set_zx_name(thread, name.as_bytes());
+        }
+        // If this is the thread group leader, use this name for the process too.
+        if self.get_pid() == self.get_tid() {
+            set_zx_name(&self.thread_group.process, name.as_bytes());
+        }
+
         // Truncate to 16 bytes, including null byte.
         let bytes = name.to_bytes();
         self.persistent_info.lock().command = if bytes.len() > 15 {
@@ -1585,8 +1594,6 @@ impl CurrentTask {
         } else {
             path
         };
-        set_zx_name(&fuchsia_runtime::thread_self(), basename.as_bytes());
-        set_zx_name(&self.thread_group.process, basename.as_bytes());
         self.set_command_name(basename);
         crate::logging::set_current_task_info(self);
 
