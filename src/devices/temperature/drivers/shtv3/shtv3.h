@@ -10,6 +10,8 @@
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/zx/result.h>
 
+#include <string>
+
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 
@@ -21,25 +23,26 @@ using DeviceType = ddk::Device<Shtv3Device, ddk::Messageable<temperature_fidl::D
 
 class Shtv3Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TEMPERATURE> {
  public:
-  Shtv3Device(zx_device_t* parent, ddk::I2cChannel i2c)
-      : DeviceType(parent), i2c_(std::move(i2c)) {}
+  Shtv3Device(zx_device_t* parent, ddk::I2cChannel i2c, std::string name)
+      : DeviceType(parent), i2c_(std::move(i2c)), name_(std::move(name)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   void DdkRelease();
 
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
-  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
 
   // Visible for testing.
   zx_status_t Init();
-  zx::result<float> ReadTemperature();
 
  private:
+  zx::result<float> ReadTemperature();
   zx::result<uint16_t> Read16();
   zx_status_t Write16(uint16_t value);
 
   ddk::I2cChannel i2c_;
+  const std::string name_;
 };
 
 }  // namespace temperature

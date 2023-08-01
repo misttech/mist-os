@@ -56,6 +56,8 @@ test("shtv3-test-bin") {
   ]
   deps = [
     ":common",
+    "//sdk/lib/driver/runtime/testing/cpp",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/i2c/testing/fake-i2c",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

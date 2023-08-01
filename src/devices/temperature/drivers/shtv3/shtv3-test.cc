@@ -6,7 +6,11 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/fake-i2c/fake-i2c.h>
+
+#include <optional>
+#include <string_view>
 
 #include <zxtest/zxtest.h>
 
@@ -65,26 +69,83 @@ class FakeShtv3Device : public fake_i2c::FakeI2c {
   State state_ = kNeedReset;
 };
 
-TEST(Shtv3Test, ReadTemperature) {
-  FakeShtv3Device fake_i2c_;
-  EXPECT_EQ(fake_i2c_.state(), FakeShtv3Device::kNeedReset);
+class Shtv3Test : public zxtest::Test {
+ public:
+  void SetUp() override {
+    EXPECT_OK(i2c_loop_.StartThread());
+
+    ASSERT_OK(fdf::RunOnDispatcherSync(i2c_loop_.dispatcher(), [this]() {
+      fake_i2c_.emplace();
+      auto server = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>(&i2c_client_);
+      EXPECT_TRUE(server.is_ok());
+      fidl::BindServer(i2c_loop_.dispatcher(), std::move(server.value()), &*fake_i2c_);
+    }));
+  }
+
+  void TearDown() override {
+    ASSERT_OK(fdf::RunOnDispatcherSync(i2c_loop_.dispatcher(), [this]() { fake_i2c_.reset(); }));
+  }
+
+ protected:
+  fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_client_;
+  std::optional<FakeShtv3Device> fake_i2c_;
+  async::Loop i2c_loop_{&kAsyncLoopConfigNeverAttachToThread};
+};
+
+TEST_F(Shtv3Test, ReadTemperature) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
+  Shtv3Device dut(nullptr, std::move(i2c_client_), {});
+  EXPECT_OK(dut.Init());
+
+  ASSERT_OK(fdf::RunOnDispatcherSync(
+      i2c_loop_.dispatcher(), [this]() { EXPECT_EQ(fake_i2c_->state(), FakeShtv3Device::kIdle); }));
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
+  EXPECT_TRUE(endpoints.is_ok());
+
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &dut);
+
+  fidl::WireClient<fuchsia_hardware_temperature::Device> client(std::move(endpoints->client),
+                                                                loop.dispatcher());
+
+  client->GetTemperatureCelsius().Then([&loop](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_OK(result->status);
+    EXPECT_TRUE(FloatNear(result->temp, 20.5f));
+    loop.Quit();
+  });
+
+  loop.Run();
+
+  ASSERT_OK(fdf::RunOnDispatcherSync(
+      i2c_loop_.dispatcher(), [this]() { EXPECT_EQ(fake_i2c_->state(), FakeShtv3Device::kIdle); }));
+}
+
+TEST_F(Shtv3Test, GetSensorName) {
+  constexpr char kSensorName[] = "sensor name";
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
+  Shtv3Device dut(nullptr, std::move(i2c_client_), kSensorName);
+  EXPECT_OK(dut.Init());
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
   EXPECT_TRUE(endpoints.is_ok());
 
-  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &fake_i2c_);
-  EXPECT_OK(loop.StartThread());
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &dut);
 
-  Shtv3Device dut(nullptr, std::move(endpoints->client));
-  EXPECT_OK(dut.Init());
-  EXPECT_EQ(fake_i2c_.state(), FakeShtv3Device::kIdle);
+  fidl::WireClient<fuchsia_hardware_temperature::Device> client(std::move(endpoints->client),
+                                                                loop.dispatcher());
 
-  const zx::result<float> status = dut.ReadTemperature();
-  EXPECT_TRUE(status.is_ok());
-  EXPECT_TRUE(FloatNear(status.value(), 20.5f));
-  EXPECT_EQ(fake_i2c_.state(), FakeShtv3Device::kIdle);
+  client->GetSensorName().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    const std::string_view name(result->name.data(), result->name.size());
+    EXPECT_STREQ(name, kSensorName);
+    loop.Quit();
+  });
+
+  loop.Run();
 }
 
 }  // namespace temperature

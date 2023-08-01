@@ -36,7 +36,12 @@ zx_status_t Shtv3Device::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  auto dev = std::make_unique<Shtv3Device>(parent, std::move(i2c));
+  std::string name;
+  if (auto result = i2c.GetName(); result.ok()) {
+    name = std::string(result.value()->name.data(), result.value()->name.size());
+  }
+
+  auto dev = std::make_unique<Shtv3Device>(parent, std::move(i2c), std::move(name));
   zx_status_t status = dev->Init();
   if (status != ZX_OK) {
     return status;
@@ -56,6 +61,10 @@ void Shtv3Device::DdkRelease() { delete this; }
 void Shtv3Device::GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) {
   const zx::result<float> status = ReadTemperature();
   completer.Reply(status.is_error() ? status.error_value() : ZX_OK, status.value_or(0.0f));
+}
+
+void Shtv3Device::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+  completer.Reply(fidl::StringView::FromExternal(name_));
 }
 
 zx_status_t Shtv3Device::Init() {
