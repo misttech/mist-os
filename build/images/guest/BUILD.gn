@@ -57,13 +57,9 @@ if (labels.images == "//build/images/bringup") {
 } else {
   # In all other builds, define the guest assembly.
 
-  _images_config = "//boards/images:default"
   if (has_board) {
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-    assert(fuchsia_filesystem_config != false,
-           "Need to define fuchsia_filesystem_config for cuckoo tests")
-    _images_config = fuchsia_filesystem_config
   }
 
   # Guest's specific core realm (not based on core_realm_shards).
@@ -84,16 +80,14 @@ if (labels.images == "//build/images/bringup") {
   assembled_system("guest") {
     testonly = true
 
-    # The guest image always needs to have either an FVM or Fxfs, because it has base packages.
-    generate_fvm = !fxfs_blob
-    generate_fxfs = fxfs_blob
-    generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot
-    generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
+    generate_fvm = true
+    generate_fvm_fastboot = assembly_generate_fvm_fastboot
+    generate_fvm_nand = assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
 
     namespace = "guest"
     image_name = "fuchsia"
-    assembly_images_config_label = _images_config
+    assembly_images_config_label = "//boards/images:default"
     product_assembly_config_label = ":product_assembly_config"
     board_config = board_information_for_assembly
 
