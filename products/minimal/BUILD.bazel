@@ -32,6 +32,16 @@ _PRODUCT_CONFIG_BASE_JSON = {
         "storage": {
             "configure_fshost": True,
             "live_usb_enabled": False,
+            "filesystems": {
+                "volume": {
+                    "fvm": {
+                        "data": {
+                        },
+                        "blob": {
+                        },
+                    },
+                },
+            },
         },
     },
 }

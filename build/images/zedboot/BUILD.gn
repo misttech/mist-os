@@ -5,6 +5,7 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
@@ -26,6 +27,21 @@ generated_images_config("images_config") {
   }
 }
 
+product_assembly_configuration("product_config") {
+  platform = {
+    build_type = "eng"
+    feature_set_level = "bootstrap"
+    storage = {
+      filesystems = {
+        image_name = "zedboot"
+        volume = "none"
+      }
+    }
+  }
+  product = {
+  }
+}
+
 # Note: This ZBI output is also used by a script in //scripts/verify_cmdline_params.
 assembled_system("zedboot_assembly") {
   testonly = true
@@ -38,7 +54,7 @@ assembled_system("zedboot_assembly") {
   use_bringup_platform_bundles_only = true
 
   assembly_images_config_label = ":images_config"
-  product_assembly_config_label = "//build/assembly:default_product_config"
+  product_assembly_config_label = ":product_config"
   board_config = board_information_for_assembly
 
   base_packages = []

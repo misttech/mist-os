@@ -25,6 +25,12 @@ fuchsia_product_configuration(
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
+            "storage": {
+                "filesystems": {
+                    "image_name": "zedboot",
+                    "volume": "none",
+                },
+            },
         },
     },
 )
@@ -35,6 +41,18 @@ fuchsia_product_configuration(
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
+            "storage": {
+                "filesystems": {
+                    "volume": {
+                        "fvm": {
+                            "data": {
+                            },
+                            "blob": {
+                            },
+                        },
+                    },
+                },
+            },
         },
     },
 )

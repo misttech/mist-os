@@ -27,6 +27,16 @@ product_assembly_configuration("minimal") {
     storage = {
       configure_fshost = true
       live_usb_enabled = false
+      filesystems = {
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
     }
 
     # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path

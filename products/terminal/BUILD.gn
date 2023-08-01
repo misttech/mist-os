@@ -19,6 +19,19 @@ product_assembly_configuration("terminal") {
       ]
     }
 
+    storage = {
+      filesystems = {
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
+
     # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
     # as part of the platform configuration.
     if (authorized_ssh_keys_path != false) {

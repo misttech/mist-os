@@ -18,6 +18,20 @@ product_assembly_configuration("minimal_boot_user") {
         "/core/session-manager/session:session",
       ]
     }
+    storage = {
+      configure_fshost = true
+      live_usb_enabled = false
+      filesystems = {
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
   }
   product = {
     session_url =
