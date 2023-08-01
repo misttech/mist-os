@@ -125,7 +125,7 @@ void PrettyStackManager::LoadDefaultMatchers() {
   // Rust startup code. The "call_once()" in function.rs is present in debug mode but not release.
   matchers.push_back(StackGlob(
       "Rust startup",
-      {PrettyFrameGlob::File("rustlib/src/rust/library/core/src/ops/function.rs"),
+      {PrettyFrameGlob::File("library/core/src/ops/function.rs"),
        PrettyFrameGlob::Func("std::sys_common::backtrace::__rust_begin_short_backtrace<*>"),
        PrettyFrameGlob::Wildcard(0, 16),
        libc_start}));

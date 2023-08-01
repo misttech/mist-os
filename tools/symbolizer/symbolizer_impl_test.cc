@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -26,62 +27,65 @@ using ::testing::ContainerEq;
 
 class SymbolizerImplTest : public ::testing::Test {
  public:
-  SymbolizerImplTest() : printer_(ss_), symbolizer_(&printer_, options_) {}
+  SymbolizerImplTest() : symbolizer_(options_) {}
 
  protected:
+  Symbolizer::OutputFn GetOutputFn() {
+    return [this](std::string_view s) { ss_ << s << '\n'; };
+  }
+
   std::stringstream ss_;
-  Printer printer_;
   CommandLineOptions options_;
   SymbolizerImpl symbolizer_;
 };
 
 TEST_F(SymbolizerImplTest, Reset) {
-  symbolizer_.Reset(false);
+  symbolizer_.Reset(false, Symbolizer::ResetType::kUnknown, GetOutputFn());
   ASSERT_TRUE(ss_.str().empty());
 
-  symbolizer_.Reset(false);
+  symbolizer_.Reset(false, Symbolizer::ResetType::kUnknown, GetOutputFn());
   ASSERT_TRUE(ss_.str().empty());
 }
 
 TEST_F(SymbolizerImplTest, MMap) {
-  symbolizer_.Module(0, "some_module", "deadbeef");
-  symbolizer_.MMap(0x1000, 0x2000, 0, "r", 0x0);
+  symbolizer_.Module(0, "some_module", "deadbeef", GetOutputFn());
+  symbolizer_.MMap(0x1000, 0x2000, 0, "r", 0x0, GetOutputFn());
   ASSERT_EQ(ss_.str(), "[[[ELF module #0x0 \"some_module\" BuildID=deadbeef 0x1000]]]\n");
 
   ss_.str("");
-  symbolizer_.MMap(0x3000, 0x1000, 0, "r", 0x2000);
+  symbolizer_.MMap(0x3000, 0x1000, 0, "r", 0x2000, GetOutputFn());
   ASSERT_TRUE(ss_.str().empty()) << ss_.str();
 
-  symbolizer_.MMap(0x3000, 0x1000, 0, "r", 0x1000);
+  symbolizer_.MMap(0x3000, 0x1000, 0, "r", 0x1000, GetOutputFn());
   ASSERT_EQ(ss_.str(), "symbolizer: Inconsistent base address.\n");
 
   ss_.str("");
-  symbolizer_.MMap(0x5000, 0x1000, 1, "r", 0x0);
+  symbolizer_.MMap(0x5000, 0x1000, 1, "r", 0x0, GetOutputFn());
   ASSERT_EQ(ss_.str(), "symbolizer: Invalid module id.\n");
 }
 
 TEST_F(SymbolizerImplTest, Backtrace) {
-  symbolizer_.Module(0, "some_module", "deadbeef");
-  symbolizer_.MMap(0x1000, 0x2000, 0, "r", 0x0);
+  symbolizer_.Module(0, "some_module", "deadbeef", GetOutputFn());
+  symbolizer_.MMap(0x1000, 0x2000, 0, "r", 0x0, GetOutputFn());
 
   ss_.str("");
-  symbolizer_.Backtrace(0, 0x1004, Symbolizer::AddressType::kProgramCounter, "");
+  symbolizer_.Backtrace(0, 0x1004, Symbolizer::AddressType::kProgramCounter, "", GetOutputFn());
   ASSERT_EQ(ss_.str(), "   #0    0x0000000000001004 in <some_module>+0x4\n");
 
   ss_.str("");
-  symbolizer_.Backtrace(1, 0x5000, Symbolizer::AddressType::kUnknown, "");
+  symbolizer_.Backtrace(1, 0x5000, Symbolizer::AddressType::kUnknown, "", GetOutputFn());
   ASSERT_EQ(ss_.str(), "   #1    0x0000000000005000 is not covered by any module\n");
 }
 
 TEST(SymbolizerImpl, OmitModuleLines) {
   std::stringstream ss;
-  Printer printer(ss);
   CommandLineOptions options;
   options.omit_module_lines = true;
-  SymbolizerImpl symbolizer(&printer, options);
+  SymbolizerImpl symbolizer(options);
+  auto output = [&](std::string_view s) { ss << s << '\n'; };
 
-  symbolizer.Module(0, "some_module", "deadbeef");
-  symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0);
+  symbolizer.Module(0, "some_module", "deadbeef", output);
+  symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0, output);
   ASSERT_EQ(ss.str(), "");
 }
 
@@ -93,14 +97,14 @@ TEST(SymbolizerImpl, DumpFile) {
 
   {
     std::stringstream ss;
-    Printer printer(ss);
     CommandLineOptions options;
     options.dumpfile_output = temp_file;
-    SymbolizerImpl symbolizer(&printer, options);
+    SymbolizerImpl symbolizer(options);
+    auto output = [&](std::string_view s) { ss << s << '\n'; };
 
-    symbolizer.Module(0, "some_module", "deadbeef");
-    symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0);
-    symbolizer.DumpFile("type", "name");
+    symbolizer.Module(0, "some_module", "deadbeef", output);
+    symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0, output);
+    symbolizer.DumpFile("type", "name", output);
 
     // Triggers the destructor of symbolizer.
   }
@@ -134,21 +138,21 @@ TEST(SymbolizerImpl, DumpFile) {
 
 TEST(SymbolizerImpl, Analytics) {
   std::stringstream ss;
-  Printer printer(ss);
   CommandLineOptions options;
   std::string measurement_json;
   auto sender = [&measurement_json](const std::string& body) { measurement_json = body; };
   auto deferred_cleanup_analytics = fit::defer(Analytics::CleanUp);
   Analytics::InitTestingClient(std::move(sender));
 
-  SymbolizerImpl symbolizer(&printer, options);
+  SymbolizerImpl symbolizer(options);
+  auto output = [&](std::string_view s) { ss << s << '\n'; };
 
-  symbolizer.Reset(false);
-  symbolizer.Module(0, "some_module", "deadbeef");
-  symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0);
-  symbolizer.Backtrace(0, 0x1010, Symbolizer::AddressType::kUnknown, "");
-  symbolizer.Backtrace(1, 0x7010, Symbolizer::AddressType::kUnknown, "");
-  symbolizer.Reset(false);
+  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, output);
+  symbolizer.Module(0, "some_module", "deadbeef", output);
+  symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0, output);
+  symbolizer.Backtrace(0, 0x1010, Symbolizer::AddressType::kUnknown, "", output);
+  symbolizer.Backtrace(1, 0x7010, Symbolizer::AddressType::kUnknown, "", output);
+  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, output);
 
   rapidjson::Document measurement;
   measurement.Parse(measurement_json);

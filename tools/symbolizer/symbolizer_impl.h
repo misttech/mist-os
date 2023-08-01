@@ -15,13 +15,14 @@
 
 #include "src/developer/debug/shared/message_loop_poll.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
+#include "src/developer/debug/zxdb/client/pretty_stack_manager.h"
 #include "src/developer/debug/zxdb/client/session.h"
+#include "src/developer/debug/zxdb/client/source_file_provider_impl.h"
 #include "src/developer/debug/zxdb/client/system.h"
 #include "src/developer/debug/zxdb/client/system_observer.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols.h"
 #include "tools/symbolizer/analytics.h"
 #include "tools/symbolizer/command_line_options.h"
-#include "tools/symbolizer/printer.h"
 #include "tools/symbolizer/symbolizer.h"
 
 namespace symbolizer {
@@ -32,17 +33,18 @@ class SymbolizerImpl : public Symbolizer,
                        public zxdb::DownloadObserver,
                        public zxdb::SystemObserver {
  public:
-  SymbolizerImpl(Printer* printer, const CommandLineOptions& options);
+  explicit SymbolizerImpl(const CommandLineOptions& options);
   ~SymbolizerImpl() override;
 
   // |Symbolizer| implementation.
-  void Reset(bool symbolizing_dart) override;
-  void Module(uint64_t id, std::string_view name, std::string_view build_id) override;
+  void Reset(bool symbolizing_dart, ResetType type, OutputFn output) override;
+  void Module(uint64_t id, std::string_view name, std::string_view build_id,
+              OutputFn output) override;
   void MMap(uint64_t address, uint64_t size, uint64_t module_id, std::string_view flags,
-            uint64_t module_offset) override;
-  void Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
-                 std::string_view message) override;
-  void DumpFile(std::string_view type, std::string_view name) override;
+            uint64_t module_offset, OutputFn output) override;
+  void Backtrace(uint64_t frame_id, uint64_t address, AddressType type, std::string_view message,
+                 OutputFn output) override;
+  void DumpFile(std::string_view type, std::string_view name, OutputFn output) override;
 
   // |DownloadObserver| implementation.
   void OnDownloadsStarted() override;
@@ -59,11 +61,14 @@ class SymbolizerImpl : public Symbolizer,
   // Resets dumpfile_current_object_.
   void ResetDumpfileCurrentObject();
 
+  // Output the backtrace in batch mode.
+  void OutputBatchedBacktrace();
+
   // Helper to convert a string_view to a rapidjson string.
   rapidjson::Value ToJSONString(std::string_view str);
 
-  // Non-owning.
-  Printer* printer_;
+  // Whether prettify is enabled.
+  bool prettify_enabled_ = false;
 
   // The main message loop.
   debug::MessageLoopPoll loop_;
@@ -151,6 +156,22 @@ class SymbolizerImpl : public Symbolizer,
 
   // Whether we're symbolizing a Dart stack trace.
   bool symbolizing_dart_ = false;
+
+  // These are used to prettify backtraces and require initialization.
+  fxl::RefPtr<zxdb::PrettyStackManager> pretty_stack_manager_;
+  std::unique_ptr<zxdb::SourceFileProviderImpl> source_file_provider_;
+
+  // Whether we're processing in batch mode. The batch mode is triggered by {{{reset:begin}}} and
+  // will cause all the inputs to be cached so that multi-line optimization could be performed.
+  bool in_batch_mode_ = false;
+
+  // The frames cached if we're in batch mode.
+  struct Frame {
+    uint64_t address;
+    AddressType type;
+    OutputFn output;
+  };
+  std::deque<Frame> frames_in_batch_mode_;
 };
 
 }  // namespace symbolizer
