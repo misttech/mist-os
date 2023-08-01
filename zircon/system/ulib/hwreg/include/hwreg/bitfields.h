@@ -252,7 +252,7 @@ class RegisterAddr {
   // Instantiate a RegisterBase using the value of the register read from
   // MMIO.
   template <typename T>
-  RegType ReadFrom(T* reg_io) {
+  RegType ReadFrom(T* reg_io) const {
     RegType reg;
     reg.set_reg_addr(reg_addr_);
     reg.ReadFrom(reg_io);
@@ -260,7 +260,7 @@ class RegisterAddr {
   }
 
   // Instantiate a RegisterBase using the given value for the register.
-  RegType FromValue(typename RegType::ValueType value) {
+  RegType FromValue(typename RegType::ValueType value) const {
     RegType reg;
     reg.set_reg_addr(reg_addr_);
     reg.set_reg_value(value);
