@@ -6,7 +6,6 @@ load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "fuchsia_filesystem_blobfs",
     "fuchsia_filesystem_empty_data",
-    "fuchsia_filesystem_reserved",
     "fuchsia_fvm_sparse",
     "fuchsia_fvm_standard",
     "fuchsia_fxfs",
@@ -93,7 +92,6 @@ fuchsia_fvm_standard(
     filesystems = [
         ":empty_data",
         ":blobfs_qemu-x64",
-        ":internal_reserved",
     ],
     fvm_standard_name = "fvm",
 )
@@ -103,7 +101,6 @@ fuchsia_fvm_sparse(
     filesystems = [
         ":empty_data",
         ":blobfs_qemu-x64",
-        ":internal_reserved",
     ],
     fvm_sparse_name = "fvm.sparse",
 )
@@ -113,7 +110,6 @@ fuchsia_fvm_standard(
     filesystems = [
         ":empty_data",
         ":blobfs",
-        ":internal_reserved",
     ],
     fvm_standard_name = "fvm",
 )
@@ -123,7 +119,6 @@ fuchsia_fvm_sparse(
     filesystems = [
         ":empty_data",
         ":blobfs",
-        ":internal_reserved",
     ],
     fvm_sparse_name = "fvm.sparse",
 )
@@ -136,7 +131,6 @@ fuchsia_fvm_standard(
     filesystems = [
         ":empty_data",
         ":blobfs",
-        ":internal_reserved",
     ],
     fvm_standard_name = "fvm.fastboot",
     resize_image_file_to_fit = True,
@@ -157,7 +151,6 @@ fuchsia_fvm_standard(
     filesystems = [
         ":empty_data",
         ":blobfs",
-        ":internal_reserved",
     ],
     fvm_standard_name = "fvm.fastboot",
     resize_image_file_to_fit = True,
@@ -176,11 +169,6 @@ fuchsia_filesystem_blobfs(
 fuchsia_filesystem_empty_data(
     name = "empty_data",
     empty_data_name = "empty-data",
-)
-
-fuchsia_filesystem_reserved(
-    name = "internal_reserved",
-    slices = "0",
 )
 
 fuchsia_fxfs(
