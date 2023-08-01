@@ -227,6 +227,9 @@
                 "stack_unwinding.unwind_through_signal_frame",
                 "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
 
+                // These tests are skipped on both arm64 and x86_64.
+                "sys_hwprobe.__riscv_hwprobe",
+
                 // These tests are arm32 specific
                 "aeabi.read_tp",
                 "getauxval.arm_has_AT_HWCAP2",
