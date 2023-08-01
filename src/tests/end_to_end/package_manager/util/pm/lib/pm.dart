@@ -97,7 +97,20 @@ class PackageManagerRepo {
     await stopServer();
     await ffx(
         ['repository', 'add-from-pm', _repoPath, '--repository', repoName]);
-    await ffx(['repository', 'server', 'start', '--address', '[::]:$port']);
+
+    final start_result = await Process.run(_ffxPath, [
+      '--isolate-dir',
+      _ffxIsolateDir,
+      'repository',
+      'server',
+      'start',
+      '--address',
+      '[::]:$port'
+    ]);
+    if (start_result.exitCode != 0) {
+      _log.info('ffx repository server start failed: ${start_result.stderr}');
+      return false;
+    }
 
     final status = await serverStatus();
     expect(status['state'], 'running');
@@ -112,10 +125,7 @@ class PackageManagerRepo {
         ['http://localhost:${_servePort.value}/$repoName/targets.json'], 200,
         logger: _log);
     _log.info('curl return code: $curlStatus');
-    if (curlStatus != 0) {
-      return false;
-    }
-    return true;
+    return curlStatus == 0;
   }
 
   /// Start a package server using `ffx repository server` with serve-selected
