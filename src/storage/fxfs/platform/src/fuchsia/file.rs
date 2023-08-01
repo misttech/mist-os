@@ -22,7 +22,10 @@ use {
         filesystem::SyncOptions,
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::{DataObjectHandle, Timestamp},
+        object_store::{
+            transaction::{LockKey, Options},
+            DataObjectHandle, Timestamp,
+        },
         round::{round_down, round_up},
     },
     once_cell::sync::Lazy,
@@ -36,9 +39,13 @@ use {
     vfs::{
         attributes,
         common::rights_to_posix_mode_bits,
-        directory::entry::{DirectoryEntry, EntryInfo},
+        directory::{
+            entry::{DirectoryEntry, EntryInfo},
+            entry_container::MutableDirectory,
+        },
         execution_scope::ExecutionScope,
         file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
+        name::Name,
         path::Path,
         ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
@@ -295,6 +302,33 @@ impl vfs::node::Node for FxFile {
 
     fn close(self: Arc<Self>) {
         self.open_count_sub_one();
+    }
+
+    async fn link_into(
+        self: Arc<Self>,
+        destination_dir: Arc<dyn MutableDirectory>,
+        name: Name,
+    ) -> Result<(), zx::Status> {
+        let dir = destination_dir.into_any().downcast::<FxDirectory>().unwrap();
+        let store = self.handle.store();
+        let object_id = self.object_id();
+        let transaction = store
+            .filesystem()
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store.store_object_id(), object_id),
+                    LockKey::object(store.store_object_id(), dir.object_id()),
+                ],
+                Options::default(),
+            )
+            .await
+            .map_err(map_to_status)?;
+        // Check that we're not unlinked.
+        if self.open_count.load(Ordering::Relaxed) & PURGED != 0 {
+            return Err(zx::Status::NOT_FOUND);
+        }
+        dir.link_object(transaction, &name, object_id).await
     }
 }
 

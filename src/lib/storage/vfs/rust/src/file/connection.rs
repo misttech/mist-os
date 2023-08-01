@@ -14,6 +14,7 @@ use {
             common::{get_backing_memory_validate_flags, new_connection_validate_options},
             File, FileIo, FileOptions, RawFileIoConnection, SyncMode,
         },
+        name::parse_name,
         node::OpenNode,
         object_request::Representation,
         path::Path,
@@ -493,8 +494,10 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     ..Default::default()
                 })?;
             }
-            fio::FileRequest::LinkInto { responder, .. } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            fio::FileRequest::LinkInto { dst_parent_token, dst, responder } => {
+                responder.send(
+                    self.handle_link_into(dst_parent_token, dst).await.map_err(|s| s.into_raw()),
+                )?;
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetConnectionInfo");
@@ -804,6 +807,31 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
 
     async fn handle_remove_extended_attribute(&mut self, name: Vec<u8>) -> Result<(), zx::Status> {
         self.file.remove_extended_attribute(name).await
+    }
+
+    async fn handle_link_into(
+        &mut self,
+        target_parent_token: zx::Event,
+        target_name: String,
+    ) -> Result<(), zx::Status> {
+        let target_name = parse_name(target_name).map_err(|_| zx::Status::INVALID_ARGS)?;
+
+        if !self.options.rights.contains(
+            fio::Operations::READ_BYTES
+                | fio::Operations::WRITE_BYTES
+                | fio::Operations::GET_ATTRIBUTES
+                | fio::Operations::UPDATE_ATTRIBUTES,
+        ) {
+            return Err(zx::Status::ACCESS_DENIED);
+        }
+
+        let (target_parent, _flags) = self
+            .scope
+            .token_registry()
+            .get_owner(target_parent_token.into())?
+            .ok_or(Err(zx::Status::NOT_FOUND))?;
+
+        self.file.clone().link_into(target_parent, target_name).await
     }
 }
 

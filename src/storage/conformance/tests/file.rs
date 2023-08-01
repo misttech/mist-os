@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod get_backing_memory;
+mod link_into;
 mod read;
 mod resize;
 mod write;

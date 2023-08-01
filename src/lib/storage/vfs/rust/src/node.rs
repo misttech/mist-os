@@ -5,9 +5,13 @@
 //! Implementation of a (limited) node connection.
 
 use crate::{
-    common::inherit_rights_for_clone, directory::entry::DirectoryEntry,
-    execution_scope::ExecutionScope, object_request::Representation, path::Path, ObjectRequestRef,
-    ProtocolsExt, ToObjectRequest,
+    common::inherit_rights_for_clone,
+    directory::{entry::DirectoryEntry, entry_container::MutableDirectory},
+    execution_scope::ExecutionScope,
+    name::Name,
+    object_request::Representation,
+    path::Path,
+    ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
 
 use {
@@ -45,6 +49,14 @@ pub trait Node: DirectoryEntry {
 
     /// Called when the node is closed.
     fn close(self: Arc<Self>) {}
+
+    async fn link_into(
+        self: Arc<Self>,
+        _destination_dir: Arc<dyn MutableDirectory>,
+        _name: Name,
+    ) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
 }
 
 /// Represents a FIDL (limited) node connection.

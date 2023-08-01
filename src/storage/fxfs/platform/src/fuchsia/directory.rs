@@ -243,6 +243,28 @@ impl FxDirectory {
     pub(crate) fn did_add(&self, name: &str) {
         self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::added(name));
     }
+
+    pub(crate) async fn link_object(
+        &self,
+        mut transaction: Transaction<'_>,
+        name: &str,
+        source_id: u64,
+    ) -> Result<(), zx::Status> {
+        let store = self.store();
+        if self.is_deleted() {
+            return Err(zx::Status::ACCESS_DENIED);
+        }
+        if self.directory.lookup(&name).await.map_err(map_to_status)?.is_some() {
+            return Err(zx::Status::ALREADY_EXISTS);
+        }
+        self.directory
+            .insert_child(&mut transaction, &name, source_id, ObjectDescriptor::File)
+            .await
+            .map_err(map_to_status)?;
+        store.adjust_refs(&mut transaction, source_id, 1).await.map_err(map_to_status)?;
+        transaction.commit_with_callback(|_| self.did_add(&name)).await.map_err(map_to_status)?;
+        Ok(())
+    }
 }
 
 impl Drop for FxDirectory {
@@ -288,9 +310,6 @@ impl MutableDirectory for FxDirectory {
         let source_dir = source_dir.downcast::<Self>().unwrap();
         let store = self.store();
         let fs = store.filesystem().clone();
-        if self.is_deleted() {
-            return Err(zx::Status::ACCESS_DENIED);
-        }
         let source_id =
             match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
                 Some((object_id, ObjectDescriptor::File)) => object_id,
@@ -301,7 +320,7 @@ impl MutableDirectory for FxDirectory {
         // same as the destination directory). We just need a lock on the source object to ensure
         // that it hasn't been simultaneously unlinked. We need that lock anyway to update the ref
         // count.
-        let mut transaction = fs
+        let transaction = fs
             .new_transaction(
                 &[
                     LockKey::object(store.store_object_id(), self.object_id()),
@@ -317,16 +336,7 @@ impl MutableDirectory for FxDirectory {
             None => return Err(zx::Status::NOT_FOUND),
             _ => return Err(zx::Status::NOT_SUPPORTED),
         };
-        if self.directory.lookup(&name).await.map_err(map_to_status)?.is_some() {
-            return Err(zx::Status::ALREADY_EXISTS);
-        }
-        self.directory
-            .insert_child(&mut transaction, &name, source_id, ObjectDescriptor::File)
-            .await
-            .map_err(map_to_status)?;
-        store.adjust_refs(&mut transaction, source_id, 1).await.map_err(map_to_status)?;
-        transaction.commit_with_callback(|_| self.did_add(&name)).await.map_err(map_to_status)?;
-        Ok(())
+        self.link_object(transaction, &name, source_id).await
     }
 
     async fn unlink(

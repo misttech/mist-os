@@ -96,6 +96,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_open2: Some(true),
                     supports_get_attributes: Some(true),
                     supports_update_attributes: Some(true),
+                    supports_link_into: Some(true),
                     ..Default::default()
                 })?;
             }

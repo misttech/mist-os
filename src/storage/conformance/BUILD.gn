@@ -78,6 +78,7 @@ rustc_test("io1_conformance_test") {
     "tests/directory/unlink.rs",
     "tests/file.rs",
     "tests/file/get_backing_memory.rs",
+    "tests/file/link_into.rs",
     "tests/file/read.rs",
     "tests/file/resize.rs",
     "tests/file/write.rs",
