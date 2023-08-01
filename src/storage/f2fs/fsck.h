@@ -17,6 +17,7 @@ namespace f2fs {
 
 struct FsckOptions {
   bool repair = false;
+  bool verbose = false;
 };
 
 struct OrphanInfo {
@@ -77,8 +78,6 @@ struct DumpOption {
 };
 #endif
 
-constexpr uint32_t kDefaultDirTreeLen = 256;
-
 struct TraverseResult {
   uint64_t block_count;  // number of blocks occupied by the inode subtree structure.
   uint32_t link_count;   // number of child directories (valid only for directories).
@@ -91,8 +90,7 @@ class FsckWorker {
   FsckWorker &operator=(const FsckWorker &) = delete;
   FsckWorker(FsckWorker &&) = delete;
   FsckWorker &operator=(FsckWorker &&) = delete;
-  FsckWorker(std::unique_ptr<Bcache> bc, const FsckOptions &options)
-      : fsck_options_(options), tree_mark_(kDefaultDirTreeLen) {
+  FsckWorker(std::unique_ptr<Bcache> bc, const FsckOptions &options) : fsck_options_(options) {
     bc_ = std::move(bc);
   }
   ~FsckWorker() { DoUmount(); }
@@ -139,9 +137,7 @@ class FsckWorker {
   void PrintRawSuperblockInfo();
   void PrintCheckpointInfo();
   void PrintInodeInfo(Inode &inode);
-  void PrintDentry(uint32_t depth, std::string_view name, const uint8_t *dentry_bitmap,
-                   const DirEntry &dentry, uint32_t index, uint32_t last_block,
-                   uint32_t max_entries);
+  void PrintNodeInfo(Node &node_block);
 
   // Fsck checks f2fs consistency as below.
   // 1. It loads a valid superblock, and it obtains valid node/inode/block count information.
@@ -283,7 +279,6 @@ class FsckWorker {
   std::unique_ptr<NodeManager> node_manager_;
   std::unique_ptr<SegmentManager> segment_manager_;
   std::unique_ptr<Bcache> bc_;
-  std::vector<char> tree_mark_;
 
   bool mounted_ = false;
 

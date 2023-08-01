@@ -914,7 +914,7 @@ zx::result<PageList> SegmentManager::GetBlockAddrsForDirtyDataPages(std::vector<
     ZX_DEBUG_ASSERT(page->IsUptodate());
     ZX_ASSERT_MSG(
         vnode.GetPageType() == PageType::kData,
-        "[f2fs] Failed to allocate blocks for vnode %u that should not have any dirty data Pages.",
+        "failed to allocate blocks for vnode %u that should not have any dirty data Pages.",
         vnode.Ino());
     if (!is_reclaim || fs_->CanReclaim()) {
       auto addr_or = vnode.GetBlockAddrForDirtyDataPage(page, is_reclaim);
@@ -922,7 +922,7 @@ zx::result<PageList> SegmentManager::GetBlockAddrsForDirtyDataPages(std::vector<
         if (page->IsUptodate() && addr_or.status_value() != ZX_ERR_NOT_FOUND) {
           // In case of failure, redirty it.
           page.SetDirty();
-          FX_LOGS(WARNING) << "[f2fs] Failed to allocate a block: " << addr_or.status_value();
+          FX_LOGS(WARNING) << "failed to allocate a block: " << addr_or.status_value();
         }
         page->ClearWriteback();
       } else {

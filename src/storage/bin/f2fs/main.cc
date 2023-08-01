@@ -81,7 +81,7 @@ int usage(const std::vector<Command>& commands) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetLogSettings({}, {"fshost", "f2fs"});
+  fuchsia_logging::SetLogSettings({}, {"f2fs"});
   f2fs::MountOptions options;
   const std::vector<Command> commands = {
       Command{kComponentCommand, StartComponent, "start a f2fs component"},

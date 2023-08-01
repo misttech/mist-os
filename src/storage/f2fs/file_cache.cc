@@ -728,7 +728,7 @@ pgoff_t FileCache::Writeback(WritebackOperation &operation) {
         if (page->IsUptodate() && addr_or.status_value() != ZX_ERR_NOT_FOUND) {
           // In case of failure, we just redirty it.
           page.SetDirty();
-          FX_LOGS(WARNING) << "[f2fs] Allocating a block address failed." << addr_or.status_value();
+          FX_LOGS(WARNING) << "failed to allocate a block." << addr_or.status_value();
         }
         page->ClearWriteback();
       } else {

@@ -65,7 +65,7 @@ TEST(Teardown, ShutdownOnNoConnections) {
   auto fs_or = F2fs::Create(nullptr, std::move(bc), options, (*vfs_or).get());
   ASSERT_TRUE(fs_or.is_ok());
   auto fs = (*fs_or).get();
-  auto on_unmount = []() { FX_LOGS(INFO) << "[f2fs] Shutdown complete"; };
+  auto on_unmount = []() { FX_LOGS(INFO) << "shutdown complete"; };
   vfs_or->SetUnmountCallback(std::move(on_unmount));
   ASSERT_EQ(loop.StartThread(), ZX_OK);
 

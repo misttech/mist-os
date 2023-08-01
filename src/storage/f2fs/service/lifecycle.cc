@@ -25,7 +25,7 @@ void LifecycleServer::Stop(StopCompleter::Sync& completer) {
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "shutdown failed: " << zx_status_get_string(status);
     } else {
-      FX_LOGS(INFO) << "f2fs shutdown complete";
+      FX_LOGS(INFO) << "shutdown complete";
     }
     completer.Close(status);
   });

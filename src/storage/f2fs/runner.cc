@@ -121,7 +121,7 @@ void Runner::OnNoConnections() {
     return;
   }
   Shutdown([](zx_status_t status) mutable {
-    ZX_ASSERT_MSG(status == ZX_OK, "[f2fs] Filesystem shutdown failed on OnNoConnections(): %s",
+    ZX_ASSERT_MSG(status == ZX_OK, "Filesystem shutdown failed on OnNoConnections(): %s",
                   zx_status_get_string(status));
   });
 }

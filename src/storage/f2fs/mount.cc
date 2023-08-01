@@ -36,7 +36,7 @@ zx::result<> Mount(const MountOptions& options, std::unique_ptr<f2fs::Bcache> bc
 
   auto on_unmount = [&loop]() {
     loop.Quit();
-    FX_LOGS(INFO) << "[f2fs] Unmounted successfully";
+    FX_LOGS(INFO) << "unmounted successfully";
   };
 
   auto runner_or = Runner::Create(loop.dispatcher(), std::move(bc), options);
@@ -50,7 +50,7 @@ zx::result<> Mount(const MountOptions& options, std::unique_ptr<f2fs::Bcache> bc
 
   runner_or->SetUnmountCallback(std::move(on_unmount));
 
-  FX_LOGS(INFO) << "[f2fs] Mounted successfully";
+  FX_LOGS(INFO) << "mounted successfully";
 
   ZX_ASSERT(loop.Run() == ZX_ERR_CANCELED);
   return zx::ok();
@@ -64,7 +64,7 @@ zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
   std::unique_ptr<ComponentRunner> runner(new ComponentRunner(loop.dispatcher()));
   runner->SetUnmountCallback([&loop]() {
     loop.Quit();
-    FX_LOGS(INFO) << "[f2fs] Unmounted successfully";
+    FX_LOGS(INFO) << "unmounted successfully";
   });
   auto status = runner->ServeRoot(std::move(root), std::move(lifecycle));
   if (status.is_error()) {

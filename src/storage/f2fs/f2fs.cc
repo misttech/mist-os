@@ -72,7 +72,7 @@ zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::Bcache& bc) {
       return zx::ok(std::move(superblock));
     }
   }
-  FX_LOGS(ERROR) << "[f2fs] failed to read superblock." << status;
+  FX_LOGS(ERROR) << "failed to read superblock." << status;
   return zx::error(status);
 }
 

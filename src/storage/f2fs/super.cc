@@ -73,7 +73,7 @@ void F2fs::ScheduleWriteback(size_t num_pages) {
 void F2fs::SyncFs(bool bShutdown) {
   // TODO:: Consider !superblock_info_.IsDirty()
   if (bShutdown) {
-    FX_LOGS(INFO) << "[f2fs] Prepare for shutdown";
+    FX_LOGS(INFO) << "prepare for shutdown";
     // Stop writeback before umount.
     FlagAcquireGuard flag(&stop_reclaim_flag_);
     ZX_DEBUG_ASSERT(flag.IsAcquired());
