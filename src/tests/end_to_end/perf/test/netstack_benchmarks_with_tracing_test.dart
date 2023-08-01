@@ -56,22 +56,22 @@ void main() {
   test(
       'loopback_socket_benchmarks_with_tracing',
       () => runBenchmarksWithTracing(
-          'socket-benchmarks-with-tracing-pkg-netstack2',
-          'socket-benchmarks-with-tracing'),
+          'loopback-socket-benchmarks-with-tracing-pkg-netstack2',
+          'loopback-socket-benchmarks-with-tracing'),
       timeout: Timeout.none);
 
   test(
       'loopback_socket_benchmarks_with_fast_udp_tracing',
       () => runBenchmarksWithTracing(
-          'socket-benchmarks-with-tracing-pkg-netstack2',
-          'socket-benchmarks-with-fast-udp-tracing'),
+          'loopback-socket-benchmarks-with-tracing-pkg-netstack2',
+          'loopback-socket-benchmarks-with-fast-udp-tracing'),
       timeout: Timeout.none);
 
   test(
       'loopback_socket_benchmarks_with_netstack3_tracing',
       () => runBenchmarksWithTracing(
-          'socket-benchmarks-with-tracing-pkg-netstack3',
-          'socket-benchmarks-with-netstack3-tracing'),
+          'loopback-socket-benchmarks-with-tracing-pkg-netstack3',
+          'loopback-socket-benchmarks-with-netstack3-tracing'),
       timeout: Timeout.none);
 
   test(

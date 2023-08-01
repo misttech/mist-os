@@ -38,7 +38,7 @@ test("loopback_socket_benchmarks") {
   }
 }
 
-fuchsia_unittest_component("socket-benchmarks-with-netstack3") {
+fuchsia_unittest_component("loopback-socket-benchmarks-with-netstack3") {
   manifest = "meta/loopback-socket-benchmarks-with-netstack3.cml"
   deps = [
     ":loopback_socket_benchmarks",
@@ -46,11 +46,12 @@ fuchsia_unittest_component("socket-benchmarks-with-netstack3") {
   ]
 }
 
-fuchsia_test_package("socket-benchmarks-tests-netstack3") {
-  test_components = [ ":socket-benchmarks-with-netstack3" ]
+fuchsia_test_package("loopback-socket-benchmarks-tests-netstack3") {
+  test_components = [ ":loopback-socket-benchmarks-with-netstack3" ]
 }
 
-fuchsia_unittest_component("socket-benchmarks-with-netstack3-tracing") {
+fuchsia_unittest_component(
+    "loopback-socket-benchmarks-with-netstack3-tracing") {
   manifest = "meta/loopback-socket-benchmarks-with-netstack3-tracing.cml"
   deps = [
     ":loopback_socket_benchmarks",
@@ -59,8 +60,8 @@ fuchsia_unittest_component("socket-benchmarks-with-netstack3-tracing") {
   test_type = "system"
 }
 
-fuchsia_test_package("socket-benchmarks-with-tracing-pkg-netstack3") {
-  test_components = [ ":socket-benchmarks-with-netstack3-tracing" ]
+fuchsia_test_package("loopback-socket-benchmarks-with-tracing-pkg-netstack3") {
+  test_components = [ ":loopback-socket-benchmarks-with-netstack3-tracing" ]
 
   # Prevent this test from being run as a target-side test, since it's kicked
   # off by the dart wrapper.
@@ -71,7 +72,7 @@ fuchsia_test_package("socket-benchmarks-with-tracing-pkg-netstack3") {
 
 # The Go runtime on Fuchsia does not support RISC-V.
 if (target_cpu != "riscv64") {
-  fuchsia_unittest_component("socket-benchmarks") {
+  fuchsia_unittest_component("loopback-socket-benchmarks") {
     manifest = "meta/loopback-socket-benchmarks.cml"
     deps = [
       ":loopback_socket_benchmarks",
@@ -79,7 +80,7 @@ if (target_cpu != "riscv64") {
     ]
   }
 
-  fuchsia_unittest_component("socket-benchmarks-with-fast-udp") {
+  fuchsia_unittest_component("loopback-socket-benchmarks-with-fast-udp") {
     manifest = "meta/loopback-socket-benchmarks-with-fast-udp.cml"
     deps = [
       ":loopback_socket_benchmarks",
@@ -87,7 +88,7 @@ if (target_cpu != "riscv64") {
     ]
   }
 
-  fuchsia_unittest_component("socket-benchmarks-with-fake-netstack") {
+  fuchsia_unittest_component("loopback-socket-benchmarks-with-fake-netstack") {
     manifest = "meta/loopback-socket-benchmarks-with-fake-netstack.cml"
     deps = [
       ":loopback_socket_benchmarks",
@@ -95,15 +96,15 @@ if (target_cpu != "riscv64") {
     ]
   }
 
-  fuchsia_test_package("socket-benchmarks-tests-netstack2") {
+  fuchsia_test_package("loopback-socket-benchmarks-tests-netstack2") {
     test_components = [
-      ":socket-benchmarks",
-      ":socket-benchmarks-with-fast-udp",
-      ":socket-benchmarks-with-fake-netstack",
+      ":loopback-socket-benchmarks",
+      ":loopback-socket-benchmarks-with-fast-udp",
+      ":loopback-socket-benchmarks-with-fake-netstack",
     ]
   }
 
-  fuchsia_unittest_component("socket-benchmarks-with-tracing") {
+  fuchsia_unittest_component("loopback-socket-benchmarks-with-tracing") {
     manifest = "meta/loopback-socket-benchmarks-with-tracing.cml"
     deps = [
       ":loopback_socket_benchmarks",
@@ -113,7 +114,8 @@ if (target_cpu != "riscv64") {
   }
 
   # TODO(https://fxbug.dev/117883): Delete this once Fast UDP is the default.
-  fuchsia_unittest_component("socket-benchmarks-with-fast-udp-tracing") {
+  fuchsia_unittest_component(
+      "loopback-socket-benchmarks-with-fast-udp-tracing") {
     manifest = "meta/loopback-socket-benchmarks-with-fast-udp-tracing.cml"
     deps = [
       ":loopback_socket_benchmarks",
@@ -122,10 +124,11 @@ if (target_cpu != "riscv64") {
     test_type = "system"
   }
 
-  fuchsia_test_package("socket-benchmarks-with-tracing-pkg-netstack2") {
+  fuchsia_test_package(
+      "loopback-socket-benchmarks-with-tracing-pkg-netstack2") {
     test_components = [
-      ":socket-benchmarks-with-tracing",
-      ":socket-benchmarks-with-fast-udp-tracing",
+      ":loopback-socket-benchmarks-with-tracing",
+      ":loopback-socket-benchmarks-with-fast-udp-tracing",
     ]
 
     # Prevent this test from being run as a target-side test, since it's kicked
@@ -136,16 +139,16 @@ if (target_cpu != "riscv64") {
   }
 
   ns2_test_targets = [
-    ":socket-benchmarks-tests-netstack2",
-    ":socket-benchmarks-with-tracing-pkg-netstack2",
+    ":loopback-socket-benchmarks-tests-netstack2",
+    ":loopback-socket-benchmarks-with-tracing-pkg-netstack2",
   ]
 } else {
   ns2_test_targets = []
 }
 
 all_test_targets = [
-                     ":socket-benchmarks-tests-netstack3",
-                     ":socket-benchmarks-with-tracing-pkg-netstack3",
+                     ":loopback-socket-benchmarks-tests-netstack3",
+                     ":loopback-socket-benchmarks-with-tracing-pkg-netstack3",
                    ] + ns2_test_targets
 
 group("tests") {
