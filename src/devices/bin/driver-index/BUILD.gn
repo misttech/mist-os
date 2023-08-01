@@ -82,6 +82,8 @@ rustc_binary("bin") {
 
   sources = [
     "src/composite_node_spec_manager.rs",
+    "src/indexer.rs",
+    "src/load_driver.rs",
     "src/main.rs",
     "src/match_common.rs",
     "src/resolved_driver.rs",
