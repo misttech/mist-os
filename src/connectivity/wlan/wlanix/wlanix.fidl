@@ -8,26 +8,93 @@ using zx;
 /// Protocol used to proxy Wlanix requests from Starnix into Fuchsia.
 @discoverable
 open protocol Wlanix {
-    flexible GetWifi(resource struct {
-        wifi server_end:Wifi;
-    }) -> () error zx.Status;
+    /// Register the channel to make WiFi request to.
+    flexible GetWifi(resource table {
+        1: wifi server_end:Wifi;
+    });
 };
 
 open protocol Wifi {
-    flexible GetChip(resource struct {
-        chip_id uint32;
-        chip server_end:WifiChip;
+    /// Register a callback to be notified of future events (such when WiFi has
+    /// started or stopped)
+    flexible RegisterEventCallback(resource table {
+        1: callback client_end:WifiEventCallback;
+    });
+    /// Start WiFi. If this operation is not successful, return an error status.
+    /// If this operation is successful, the `started` state is now true and all
+    /// registered callbacks will be notified with an `OnStart` event.
+    flexible Start() -> () error zx.Status;
+    /// Stop WiFi. If this operation is not successful, return an error status.
+    /// If this operation is successful, the `started` state is now false and all
+    /// registered callbacks will be notified with an `OnStop` event.
+    flexible Stop() -> () error zx.Status;
+    /// Return a boolean based on whether WiFi is `started` or not.
+    flexible GetState() -> (table {
+        1: is_started bool;
+    });
+    /// Get the IDs of all the WiFi chips on the device.
+    flexible GetChipIds() -> (table {
+        1: chip_ids vector<uint32>:MAX;
+    });
+    /// Register the channel to make request to the `WifiChip` with the given
+    /// `chip_id`
+    flexible GetChip(resource table {
+        1: chip_id uint32;
+        2: chip server_end:WifiChip;
     }) -> () error zx.Status;
+};
+
+open protocol WifiEventCallback {
+    flexible OnStart();
+    flexible OnStop();
+};
+
+type ChipMode = table {
+    1: id uint32;
+    2: available_combinations vector<ChipConcurrencyCombination>:MAX;
+};
+
+type ChipConcurrencyCombination = table {
+    1: limits vector<ChipConcurrencyCombinationLimit>:MAX;
+};
+
+type ChipConcurrencyCombinationLimit = table {
+    1: types vector<IfaceConcurrencyType>:MAX;
+    2: max_ifaces uint32;
+};
+
+type IfaceConcurrencyType = flexible enum {
+    STA = 1;
+    AP = 2;
+    AP_BRIDGED = 3;
+    P2P = 4;
+    NAN_IFACE = 5;
 };
 
 open protocol WifiChip {
-    flexible CreateStaIface(resource struct {
-        iface server_end:WifiStaIface;
+    /// Request the chip to create a STA iface.
+    flexible CreateStaIface(resource table {
+        1: iface server_end:WifiStaIface;
     }) -> () error zx.Status;
+    /// Get a set of operation modes that the chip supports.
+    /// This combination encodes what iface types and how many can be created,
+    /// and which ones can run concurrently.
+    flexible GetAvailableModes() -> (table {
+        1: chip_modes vector<ChipMode>:MAX;
+    });
+    /// Get the current mode that the chip is in.
+    flexible GetMode() -> (table {
+        1: mode uint32;
+    });
+    /// Get capabilities supported by this chip.
+    flexible GetCapabilities() -> (table {
+        1: capabilities_mask uint32;
+    });
 };
 
 open protocol WifiStaIface {
-    flexible GetName() -> (struct {
-        iface_name string:16;
+    /// Get the name of this iface.
+    flexible GetName() -> (table {
+        1: iface_name string:16;
     });
 };

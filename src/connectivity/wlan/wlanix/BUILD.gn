@@ -22,16 +22,23 @@ rustc_binary("wlanix_bin") {
   deps = [
     ":fuchsia.wlan.wlanix_rust",
     "//src/lib/diagnostics/log/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:netlink-packet-generic",
     "//third_party/rust_crates:netlink-packet-utils",
+    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//third_party/rust_crates:test-case" ]
+  test_deps = [
+    "//src/connectivity/wlan/lib/common/rust/:wlan-common",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:test-case",
+  ]
 
   sources = [
     "src/main.rs",
