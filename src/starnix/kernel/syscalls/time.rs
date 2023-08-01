@@ -404,6 +404,7 @@ mod test {
     use super::*;
     use crate::{mm::PAGE_SIZE, testing::*};
     use fuchsia_zircon::HandleBased;
+    use test_util::{assert_geq, assert_leq};
 
     #[::fuchsia::test]
     async fn test_nanosleep_without_remainder() {
@@ -485,12 +486,15 @@ mod test {
             UserRef::new(addr)
         };
 
-        // Interrupt the sleep roughly halfway through.
+        // Interrupt the sleep roughly halfway through. The actual interruption might be before the
+        // sleep starts, during the sleep, or after.
+        let interruption_target = zx::Time::get_monotonic() + zx::Duration::from_seconds(1);
+
         let thread_group = std::sync::Arc::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()
             .name("clock_nanosleep_interruptor".to_string())
             .spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                interruption_target.sleep();
                 if let Some(thread_group) = thread_group.upgrade() {
                     let signal_info = crate::signals::SignalInfo::default(signals::SIGALRM);
                     let signal_target = thread_group
@@ -510,6 +514,7 @@ mod test {
 
         let result =
             super::clock_nanosleep_relative_to_utc(&mut current_task, tv, false, remaining);
+
         // We can't know deterministically if our interrupter thread will be able to interrupt our sleep.
         // If it did, result should be ERESTART_RESTARTBLOCK and |remaining| will be populated.
         // If it didn't, the result will be OK and |remaining| will not be touched.
@@ -521,15 +526,16 @@ mod test {
                 mm.read_object(remaining).unwrap()
             };
         }
-        assert!(
-            duration_from_timespec(remaining_written).unwrap() <= zx::Duration::from_seconds(1)
+        assert_leq!(
+            duration_from_timespec(remaining_written).unwrap(),
+            zx::Duration::from_seconds(2)
         );
         let elapsed = test_clock.read().unwrap() - before;
         thread_join_handle.join().unwrap();
 
-        assert!(
-            elapsed + duration_from_timespec(remaining_written).unwrap()
-                >= zx::Duration::from_seconds(2)
+        assert_geq!(
+            elapsed + duration_from_timespec(remaining_written).unwrap(),
+            zx::Duration::from_seconds(2)
         );
     }
 }
