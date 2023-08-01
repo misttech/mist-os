@@ -888,7 +888,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .tree()
             .find(&ObjectKey::extended_attribute(self.object_id(), name))
             .await?
-            .ok_or(FxfsError::NotFound)?;
+            .ok_or(anyhow!(FxfsError::NotFound))?;
         match item.value {
             ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value)) => Ok(value),
             // TODO(fxbug.dev/122123): support reading from an attribute for large values.

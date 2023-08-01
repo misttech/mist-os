@@ -103,30 +103,3 @@ mod fuchsia {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use {
-        super::FxfsError,
-        anyhow::{anyhow, Context},
-    };
-
-    #[test]
-    fn test_matches() {
-        // We make heavy use of Context, so make sure that works.
-        let err: anyhow::Error = FxfsError::AlreadyBound.into();
-        let result: Result<(), anyhow::Error> = Err(err);
-        let result = result.context("Foo");
-        let err = result.err().unwrap();
-        assert!(FxfsError::AlreadyBound.matches(&err));
-
-        // `anyhow!` will plumb through source, so this should work just fine.
-        let err = anyhow!(FxfsError::AlreadyBound).context("Foo");
-        assert!(FxfsError::AlreadyBound.matches(&err));
-
-        // `bail!(anyhow!(...).context("blah"))` is quite common and boils down to
-        // `anyhow!(anyhow!(..))`, so check that too.
-        let err = anyhow!(anyhow!(FxfsError::AlreadyBound).context("Foo"));
-        assert!(FxfsError::AlreadyBound.matches(&err));
-    }
-}
