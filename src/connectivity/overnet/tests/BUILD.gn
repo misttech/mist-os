@@ -4,10 +4,7 @@
 
 group("tests") {
   testonly = true
-  deps = [
-    ":e2e_tests",
-    ":tests_no_e2e",
-  ]
+  deps = [ ":tests_no_e2e" ]
 }
 
 group("tests_no_e2e") {
@@ -20,12 +17,4 @@ group("tests_no_e2e") {
     "integration:tests",
     "stress:tests",
   ]
-}
-
-group("e2e_tests") {
-  testonly = true
-
-  # TODO(fxbug.dev/80059): Serial e2e tests disabled
-  # deps = [ "serial:tests" ]
-  deps = []
 }

@@ -13,15 +13,7 @@ group("overnet") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":e2e_tests",
-    ":tests_no_e2e",
-  ]
-}
-
-group("e2e_tests") {
-  testonly = true
-  deps = [ "tests:e2e_tests" ]
+  deps = [ ":tests_no_e2e" ]
 }
 
 group("tests_no_e2e") {
