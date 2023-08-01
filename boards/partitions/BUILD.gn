@@ -51,14 +51,10 @@ generated_partitions_config("x64") {
   vbmeta_a = "vbmeta_a"
   vbmeta_b = "vbmeta_b"
   vbmeta_r = "vbmeta_r"
+
+  # At most one of either a fvm of fxfs will be generated, but the board
+  # supports either configuration.
   fvm = "fvm"
-}
-
-generated_partitions_config("x64-fxfs") {
-  forward_variables_from(_gigaboot, "*")
-  hw_revision = "x64"
-
-  forward_variables_from(_standard_names, "*", [ "fvm" ])
   fxfs = "fvm"
 }
 
@@ -92,6 +88,5 @@ group("partitions") {
     ":qemu-x64",
     ":vim3",
     ":x64",
-    ":x64-fxfs",
   ]
 }

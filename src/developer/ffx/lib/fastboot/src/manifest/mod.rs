@@ -305,7 +305,7 @@ fn get_mapped_partitions(
     // Assign the images to particular partitions. If |is_recovery|, then we use the recovery
     // images for all slots.
     for p in partitions {
-        let (partition, name, slot) = match p {
+        let (partition_name, image_type, slot) = match p {
             Partition::ZBI { name, slot } => (name, ImageType::ZBI, slot),
             Partition::VBMeta { name, slot } => (name, ImageType::VBMeta, slot),
 
@@ -322,10 +322,10 @@ fn get_mapped_partitions(
             true => image_map.get(&Slot::R),
             false => image_map.get(slot),
         } {
-            if let Some(path) = slot.get(&name) {
+            if let Some(image_path) = slot.get(&image_type) {
                 mapped_partitions.push(v3::Partition {
-                    name: partition.to_string(),
-                    path: path.to_string(),
+                    name: partition_name.to_string(),
+                    path: image_path.to_string(),
                     condition: None,
                 });
             }
@@ -714,6 +714,68 @@ mod test {
                 v3::Partition { name: "part1".into(), path: "zbi_a".into(), condition: None },
                 v3::Partition { name: "part2".into(), path: "vbmeta_a".into(), condition: None },
                 v3::Partition { name: "part3".into(), path: "fvm_a".into(), condition: None },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_get_mapped_partitions_fvm_and_fxfs() {
+        let partitions = vec![
+            Partition::ZBI { name: "part1".into(), slot: Slot::A },
+            Partition::VBMeta { name: "part2".into(), slot: Slot::A },
+            Partition::FVM { name: "part3".into() },
+            Partition::Fxfs { name: "part4".into() },
+        ];
+        let image_map_fvm: ImageMap = btreemap! {
+            Slot::A => btreemap!{
+                ImageType::ZBI => "zbi_a".into(),
+                ImageType::VBMeta => "vbmeta_a".into(),
+                ImageType::FVM => "fvm_a".into(),
+            },
+            Slot::B => btreemap!{
+                ImageType::ZBI => "zbi_b".into(),
+                ImageType::VBMeta => "vbmeta_b".into(),
+                ImageType::FVM => "fvm_b".into(),
+            },
+            Slot::R => btreemap!{
+                ImageType::ZBI => "zbi_r".into(),
+                ImageType::VBMeta => "vbmeta_r".into(),
+            },
+        };
+        let image_map_fxfs: ImageMap = btreemap! {
+            Slot::A => btreemap!{
+                ImageType::ZBI => "zbi_a".into(),
+                ImageType::VBMeta => "vbmeta_a".into(),
+                ImageType::Fxfs => "fxfs_a".into(),
+            },
+            Slot::B => btreemap!{
+                ImageType::ZBI => "zbi_b".into(),
+                ImageType::VBMeta => "vbmeta_b".into(),
+                ImageType::Fxfs => "fxfs_b".into(),
+            },
+            Slot::R => btreemap!{
+                ImageType::ZBI => "zbi_r".into(),
+                ImageType::VBMeta => "vbmeta_r".into(),
+            },
+        };
+        let mapped =
+            get_mapped_partitions(&partitions, &image_map_fvm, /*is_recovery=*/ false);
+        assert_eq!(
+            mapped,
+            vec![
+                v3::Partition { name: "part1".into(), path: "zbi_a".into(), condition: None },
+                v3::Partition { name: "part2".into(), path: "vbmeta_a".into(), condition: None },
+                v3::Partition { name: "part3".into(), path: "fvm_a".into(), condition: None },
+            ]
+        );
+        let mapped =
+            get_mapped_partitions(&partitions, &image_map_fxfs, /*is_recovery=*/ false);
+        assert_eq!(
+            mapped,
+            vec![
+                v3::Partition { name: "part1".into(), path: "zbi_a".into(), condition: None },
+                v3::Partition { name: "part2".into(), path: "vbmeta_a".into(), condition: None },
+                v3::Partition { name: "part4".into(), path: "fxfs_a".into(), condition: None },
             ]
         );
     }

@@ -11,4 +11,3 @@ delivery_blob_type = 1  # Fxblob only supports delivery blobs.
 
 fvm_partition = ""
 fxfs_partition = "fvm"
-partitions_config_label = "//boards/partitions:x64-fxfs"
