@@ -151,8 +151,8 @@ async fn main() -> Result<(), Error> {
     // See https://fxbug.dev/126111 for more discussion.
     // TODO(https://fxbug.dev/93344): Once it's practical to do so we should report a STARTING_UP
     // state in inspect's health node until we are ready to start accepting requests.
-    log_debug!("Waiting for UTC clock to start...");
-    time::utc::wait_for_utc_clock_to_start().await;
+    log_debug!("Starting UTC clock.");
+    time::utc::start_utc_clock().await;
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
