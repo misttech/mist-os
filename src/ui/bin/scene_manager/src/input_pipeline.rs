@@ -63,9 +63,6 @@ use {
 /// - `focus_chain_publisher`: Forwards focus chain changes to downstream watchers.
 /// - `light_sensor_configuration`: An optional configuration used for light sensor requests.
 pub async fn handle_input(
-    // If this is false, it means we're using the legacy Scenic Gfx API, instead of the
-    // new Flatland API.
-    use_flatland: bool,
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     input_device_registry_request_stream_receiver: futures::channel::mpsc::UnboundedReceiver<
         InputDeviceRegistryRequestStream,
@@ -146,7 +143,6 @@ pub async fn handle_input(
     let input_pipeline = InputPipeline::new(
         supported_input_devices.clone(),
         build_input_pipeline_assembly(
-            use_flatland,
             scene_manager,
             icu_data_loader,
             &node,
@@ -314,7 +310,6 @@ async fn register_keyboard_related_input_handlers(
 /// Installs the handlers for mouse input.
 async fn register_mouse_related_input_handlers(
     assembly: InputPipelineAssembly,
-    use_flatland: bool,
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     input_pipeline_node: &inspect::Node,
     input_handlers_node: &inspect::Node,
@@ -356,20 +351,14 @@ async fn register_mouse_related_input_handlers(
         metrics_logger.clone(),
     );
 
-    if use_flatland {
-        assembly = add_mouse_handler(
-            scene_manager.clone(),
-            assembly,
-            sender,
-            input_handlers_node,
-            metrics_logger,
-        )
-        .await;
-    } else {
-        // We don't have mouse support for GFX. But that's okay,
-        // because the devices still using GFX don't support mice
-        // anyway.
-    }
+    assembly = add_mouse_handler(
+        scene_manager.clone(),
+        assembly,
+        sender,
+        input_handlers_node,
+        metrics_logger,
+    )
+    .await;
 
     let scene_manager = scene_manager.clone();
     fasync::Task::spawn(async move {
@@ -388,7 +377,6 @@ async fn register_mouse_related_input_handlers(
 }
 
 async fn build_input_pipeline_assembly(
-    use_flatland: bool,
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     icu_data_loader: icu_data::Loader,
     node: &inspect::Node,
@@ -442,7 +430,6 @@ async fn build_input_pipeline_assembly(
             info!("Registering mouse-related input handlers.");
             assembly = register_mouse_related_input_handlers(
                 assembly,
-                use_flatland,
                 scene_manager.clone(),
                 node,
                 &input_handlers_node,

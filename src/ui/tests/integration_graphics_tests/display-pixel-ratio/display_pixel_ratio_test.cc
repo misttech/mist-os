@@ -32,17 +32,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
   std::vector<ui_testing::UITestRealm::Config> configs;
   std::vector<std::string> protocols_required = {fuchsia::ui::scenic::Scenic::Name_};
 
-  // GFX x scene manager
-  {
-    ui_testing::UITestRealm::Config config;
-    config.use_scene_owner = true;
-    config.ui_to_client_services = protocols_required;
-    for (auto dpr : pixel_densities) {
-      config.device_pixel_ratio = dpr;
-      configs.push_back(config);
-    }
-  }
-
   // Flatland x scene manager
   {
     ui_testing::UITestRealm::Config config;
