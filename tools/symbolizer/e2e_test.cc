@@ -28,14 +28,14 @@ class TestCase : public testing::Test {
   void TestBody() override {
     symbolizer::CommandLineOptions options;
     options.build_id_dirs.push_back(kSymbolsDir);
-    options.prettify_backtrace = true;
 
     std::stringstream output;
-    symbolizer::SymbolizerImpl symbolizer(options);
+    symbolizer::Printer printer(output);
+    symbolizer::SymbolizerImpl symbolizer(&printer, options);
 
     std::ifstream input(kTestCasesDir / (name_ + ".in"));
     std::ifstream expected_output(kTestCasesDir / (name_ + ".out"));
-    symbolizer::LogParser parser(input, output, &symbolizer);
+    symbolizer::LogParser parser(input, &printer, &symbolizer);
 
     while (parser.ProcessNextLine()) {
       std::string got;

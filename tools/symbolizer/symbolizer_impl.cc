@@ -6,23 +6,19 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <filesystem>
 #include <fstream>
-#include <memory>
 #include <string>
-#include <utility>
 
 #include <rapidjson/ostreamwrapper.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/rapidjson.h>
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/client_object.h"
 #include "src/developer/debug/zxdb/client/frame.h"
-#include "src/developer/debug/zxdb/client/pretty_stack_manager.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
-#include "src/developer/debug/zxdb/client/source_file_provider_impl.h"
 #include "src/developer/debug/zxdb/client/stack.h"
 #include "src/developer/debug/zxdb/client/symbol_server.h"
 #include "src/developer/debug/zxdb/client/system.h"
@@ -36,9 +32,7 @@
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
 #include "src/developer/debug/zxdb/symbols/system_symbols.h"
 #include "src/developer/debug/zxdb/symbols/target_symbols.h"
-#include "src/lib/fxl/memory/ref_ptr.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "tools/symbolizer/symbolizer.h"
 
 namespace symbolizer {
 
@@ -95,8 +89,8 @@ std::string FormatFrameIdAndAddress(uint64_t frame_id, uint64_t inline_index, ui
 
 }  // namespace
 
-SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
-    : prettify_enabled_(options.prettify_backtrace), omit_module_lines_(options.omit_module_lines) {
+SymbolizerImpl::SymbolizerImpl(Printer* printer, const CommandLineOptions& options)
+    : printer_(printer), omit_module_lines_(options.omit_module_lines) {
   // Hook observers.
   session_.system().AddObserver(this);
   session_.AddDownloadObserver(this);
@@ -127,11 +121,6 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
     dumpfile_document_.SetArray();
     ResetDumpfileCurrentObject();
   }
-
-  pretty_stack_manager_ = fxl::MakeRefCounted<zxdb::PrettyStackManager>();
-  pretty_stack_manager_->LoadDefaultMatchers();
-
-  source_file_provider_ = std::make_unique<zxdb::SourceFileProviderImpl>(target_->settings());
 }
 
 SymbolizerImpl::~SymbolizerImpl() {
@@ -147,12 +136,7 @@ SymbolizerImpl::~SymbolizerImpl() {
   }
 }
 
-void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn output) {
-  // Try to output upon reset first.
-  if (!frames_in_batch_mode_.empty()) {
-    OutputBatchedBacktrace();
-  }
-
+void SymbolizerImpl::Reset(bool symbolizing_dart) {
   symbolizing_dart_ = symbolizing_dart;
 
   modules_.clear();
@@ -175,13 +159,9 @@ void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn outpu
   if (!dumpfile_output_.empty()) {
     ResetDumpfileCurrentObject();
   }
-
-  // Enable batch mode only on {{{reset:begin}}}.
-  in_batch_mode_ = type == Symbolizer::ResetType::kBegin;
 }
 
-void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id,
-                            OutputFn output) {
+void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id) {
   modules_[id].name = name;
   modules_[id].build_id = build_id;
 
@@ -196,10 +176,10 @@ void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view
 }
 
 void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
-                          std::string_view flags, uint64_t module_offset, OutputFn output) {
+                          std::string_view flags, uint64_t module_offset) {
   if (modules_.find(module_id) == modules_.end()) {
     analytics_builder_.SetAtLeastOneInvalidInput();
-    output("symbolizer: Invalid module id.");
+    printer_->OutputWithContext("symbolizer: Invalid module id.");
     return;
   }
 
@@ -211,7 +191,7 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
     if (module.printed) {
       if (module.base != 0 || module.negative_base != module_offset - address) {
         analytics_builder_.SetAtLeastOneInvalidInput();
-        output("symbolizer: Inconsistent base address.");
+        printer_->OutputWithContext("symbolizer: Inconsistent base address.");
       }
     } else {
       base = address;  // for printing only
@@ -225,7 +205,7 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
     if (module.printed) {
       if (module.base != base) {
         analytics_builder_.SetAtLeastOneInvalidInput();
-        output("symbolizer: Inconsistent base address.");
+        printer_->OutputWithContext("symbolizer: Inconsistent base address.");
       }
     } else {
       module.base = base;
@@ -236,8 +216,9 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
   }
 
   if (!omit_module_lines_ && !symbolizing_dart_ && !module.printed) {
-    output(fxl::StringPrintf("[[[ELF module #0x%" PRIx64 " \"%s\" BuildID=%s 0x%" PRIx64 "]]]",
-                             module_id, module.name.c_str(), module.build_id.c_str(), base));
+    printer_->OutputWithContext(
+        fxl::StringPrintf("[[[ELF module #0x%" PRIx64 " \"%s\" BuildID=%s 0x%" PRIx64 "]]]",
+                          module_id, module.name.c_str(), module.build_id.c_str(), base));
     module.printed = true;
   }
 
@@ -254,15 +235,7 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
 }
 
 void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
-                               std::string_view message, OutputFn output) {
-  if (prettify_enabled_ && in_batch_mode_) {
-    if (frame_id < frames_in_batch_mode_.size()) {
-      OutputBatchedBacktrace();
-    }
-    frames_in_batch_mode_.push_back(Frame{address, type, std::move(output)});
-    return;
-  }
-
+                               std::string_view message) {
   InitProcess();
   analytics_builder_.IncreaseNumberOfFrames();
 
@@ -286,7 +259,7 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
     }
     analytics_builder_.IncreaseNumberOfFramesInvalid();
     analytics_builder_.TotalTimerStop();
-    return output(out);
+    return printer_->OutputWithContext(out);
   }
 
   uint64_t call_address = address;
@@ -342,7 +315,7 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
       out += " " + std::string(message);
     }
 
-    output(out);
+    printer_->OutputWithContext(out);
   }
 
   // One physical frame could be symbolized to multiple inlined frames. We're only counting the
@@ -353,90 +326,7 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
   analytics_builder_.TotalTimerStop();
 }
 
-// Consume frames_in_batch_mode_ and output.
-void SymbolizerImpl::OutputBatchedBacktrace() {
-  InitProcess();
-
-  std::vector<debug_ipc::StackFrame> input_frames;
-  input_frames.reserve(frames_in_batch_mode_.size());
-  for (auto& frame : frames_in_batch_mode_) {
-    // TODO(fxbug.dev/130879): type is not used.
-    input_frames.emplace_back(frame.address, 0);
-  }
-  zxdb::Stack& stack = target_->GetProcess()->GetThreads()[0]->GetStack();
-  stack.SetFrames(debug_ipc::ThreadRecord::StackAmount::kFull, input_frames);
-
-  for (auto& entry : pretty_stack_manager_->ProcessStack(stack)) {
-    std::string out = "  #" + std::to_string(entry.begin_index);
-    if (entry.match) {
-      out += "…" + std::to_string(entry.begin_index + entry.frames.size()) + " «" +
-             entry.match.description + "»";
-    } else {
-      bool symbolized = false;
-
-      // Function name.
-      auto& frame = entry.frames[0];
-      auto& location = frame->GetLocation();
-      if (location.symbol().is_valid()) {
-        symbolized = true;
-        auto symbol = location.symbol().Get();
-        auto function = symbol->As<zxdb::Function>();
-        if (function) {
-          zxdb::FormatFunctionNameOptions options;
-          options.params = zxdb::FormatFunctionNameOptions::kElideParams;
-          out += " " + zxdb::FormatFunctionName(function, options).AsString();
-        } else {
-          out += " " + symbol->GetFullName();
-        }
-      }
-
-      // FileLine info.
-      if (location.file_line().is_valid()) {
-        symbolized = true;
-        std::string file = location.file_line().file();
-        auto file_data = source_file_provider_->GetFileData(file, location.file_line().comp_dir());
-        if (file_data.ok()) {
-          // Convert the path to a relative one from cwd for better readability.
-          file = std::filesystem::proximate(file_data.value().full_path);
-        }
-        out += " • " + file + ":" + std::to_string(location.file_line().line());
-      }
-
-      // If non of them exists, print the PC, relative PC, and module build id.
-      if (!symbolized) {
-        const ModuleInfo* module = nullptr;
-        uint64_t address = frame->GetAddress();
-        if (auto next = address_to_module_id_.upper_bound(address);
-            next != address_to_module_id_.begin()) {
-          next--;
-          const auto& module_id = next->second;
-          const auto& prev = modules_[module_id];
-          if (address - prev.base <= prev.size) {
-            module = &prev;
-          }
-        }
-
-        out += fxl::StringPrintf(" 0x%012" PRIx64, address);
-        if (!module) {
-          out += " is not covered by any module";
-        } else {
-          out += fxl::StringPrintf(" %s(%s)+0x%" PRIx64, module->name.c_str(),
-                                   module->build_id.c_str(),
-                                   address - module->base + module->negative_base);
-        }
-      }
-    }
-    frames_in_batch_mode_.front().output(out);
-    for (auto frame : entry.frames) {
-      if (!frame->IsInline()) {
-        frames_in_batch_mode_.pop_front();
-      }
-    }
-  }
-  FX_CHECK(frames_in_batch_mode_.empty());
-}
-
-void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name, OutputFn output) {
+void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name) {
   if (!dumpfile_output_.empty()) {
     dumpfile_current_object_.AddMember("type", ToJSONString(type),
                                        dumpfile_document_.GetAllocator());

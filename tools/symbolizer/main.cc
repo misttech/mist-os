@@ -14,7 +14,7 @@
 #include "tools/symbolizer/analytics.h"
 #include "tools/symbolizer/command_line_options.h"
 #include "tools/symbolizer/log_parser.h"
-#include "tools/symbolizer/symbolizer.h"
+#include "tools/symbolizer/printer.h"
 #include "tools/symbolizer/symbolizer_impl.h"
 
 namespace symbolizer {
@@ -83,15 +83,16 @@ int Main(int argc, const char* argv[]) {
     return AuthMode();
   }
 
-  SymbolizerImpl symbolizer(options);
-  LogParser parser(std::cin, std::cout, &symbolizer);
+  Printer printer(std::cout);
+  SymbolizerImpl symbolizer(&printer, options);
+  LogParser parser(std::cin, &printer, &symbolizer);
 
   while (parser.ProcessNextLine()) {
     // until the eof in the input.
   }
 
   // Calling Reset at the end to make sure symbolize event is sent.
-  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, {});
+  symbolizer.Reset(false);
 
   return EXIT_SUCCESS;
 }

@@ -6,14 +6,11 @@
 
 #include <charconv>
 #include <cstdint>
-#include <string>
 #include <string_view>
 
-#include "lib/fit/defer.h"
-#include "lib/syslog/cpp/macros.h"
+#include "lib/stdcompat/string_view.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/trim.h"
-#include "tools/symbolizer/symbolizer.h"
 
 namespace symbolizer {
 
@@ -58,8 +55,8 @@ bool LogParser::ProcessNextLine() {
   }
   if (end != std::string::npos) {
     std::string_view line_view(line);
-    auto output = CreateOutputFn(line_view.substr(0, start), line_view.substr(end + 3));
-    if (ProcessMarkup(line_view.substr(start + 3, end - start - 3), std::move(output))) {
+    printer_->SetContext(line_view.substr(0, start), line_view.substr(end + 3));
+    if (ProcessMarkup(line_view.substr(start + 3, end - start - 3))) {
       // Skip outputting only if we have the starting and the ending braces and the markup is valid.
       return true;
     }
@@ -69,17 +66,17 @@ bool LogParser::ProcessNextLine() {
   if (line == kDartStackTraceMagic) {
     symbolizing_dart_ = true;
   } else if (symbolizing_dart_) {
-    if (ProcessDart(line, CreateOutputFn("", ""))) {
+    if (ProcessDart(line)) {
       return true;
     }
     symbolizing_dart_ = false;
   }
 
-  OutputRaw(line);
+  printer_->OutputRaw(line);
   return true;
 }
 
-bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn output) {
+bool LogParser::ProcessMarkup(std::string_view markup) {
   auto splitted = fxl::SplitString(markup, ":", fxl::kKeepWhitespace, fxl::kSplitWantAll);
   if (splitted.empty()) {
     return false;
@@ -88,15 +85,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
   auto tag = splitted[0];
 
   if (tag == "reset") {
-    auto type = Symbolizer::ResetType::kUnknown;
-    if (splitted.size() >= 2) {
-      if (splitted[1] == "begin") {
-        type = Symbolizer::ResetType::kBegin;
-      } else if (splitted[1] == "end") {
-        type = Symbolizer::ResetType::kEnd;
-      }
-    }
-    symbolizer_->Reset(false, type, std::move(output));
+    symbolizer_->Reset(false);
     return true;
   }
 
@@ -109,7 +98,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
     if (!ParseInt(splitted[1], id) || splitted[3] != "elf")
       return false;
 
-    symbolizer_->Module(id, splitted[2], splitted[4], std::move(output));
+    symbolizer_->Module(id, splitted[2], splitted[4]);
     return true;
   }
 
@@ -128,7 +117,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
         splitted[3] != "load")
       return false;
 
-    symbolizer_->MMap(address, size, module_id, splitted[5], module_offset, std::move(output));
+    symbolizer_->MMap(address, size, module_id, splitted[5], module_offset);
     return true;
   }
 
@@ -158,7 +147,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
         message = splitted[4];
       }
     }
-    symbolizer_->Backtrace(frame_id, address, type, message, std::move(output));
+    symbolizer_->Backtrace(frame_id, address, type, message);
     return true;
   }
 
@@ -167,7 +156,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
     if (splitted.size() < 3)
       return false;
 
-    symbolizer_->DumpFile(splitted[1], splitted[2], std::move(output));
+    symbolizer_->DumpFile(splitted[1], splitted[2]);
     return true;
   }
 
@@ -175,7 +164,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
 }
 
 // If returning true, we're responsible to output the line.
-bool LogParser::ProcessDart(std::string_view line, Symbolizer::OutputFn output) {
+bool LogParser::ProcessDart(std::string_view line) {
   constexpr uint64_t kModuleId = 0;
   constexpr uint64_t kModuleSize = 0x800000000;  // 32 GB should be big enough.
 
@@ -184,18 +173,17 @@ bool LogParser::ProcessDart(std::string_view line, Symbolizer::OutputFn output) 
   if (splitted.size() == 6 && splitted[0] == "pid:") {
     // pid: 12, tid: 30221, name some.ui
     dart_process_name_ = splitted[5];
-    symbolizer_->Reset(true, Symbolizer::ResetType::kUnknown, std::move(output));
+    symbolizer_->Reset(true);
   } else if (splitted.size() == 2 && splitted[0] == "build_id:") {
     // build_id: '0123456789abcdef'
-    symbolizer_->Module(kModuleId, dart_process_name_, fxl::TrimString(splitted[1], "'"),
-                        std::move(output));
+    symbolizer_->Module(kModuleId, dart_process_name_, fxl::TrimString(splitted[1], "'"));
   } else if (splitted.size() == 4 && splitted[0] == "isolate_dso_base:") {
     // isolate_dso_base: f2e4c8000, vm_dso_base: f2e4c8000
     uint64_t address;
     if (!ParseInt(splitted[3], address, 16)) {
       return false;
     }
-    symbolizer_->MMap(address, kModuleSize, kModuleId, "", 0, std::move(output));
+    symbolizer_->MMap(address, kModuleSize, kModuleId, "", 0);
   } else if (!splitted.empty() &&
              (splitted[0] == "os:" || splitted[0] == "isolate_instructions:")) {
     // os: fuchsia arch: arm64 comp: no sim: no
@@ -210,43 +198,15 @@ bool LogParser::ProcessDart(std::string_view line, Symbolizer::OutputFn output) 
     if (!ParseInt(splitted[2], address, 16)) {
       return false;
     }
-    symbolizer_->Backtrace(frame_id, address, Symbolizer::AddressType::kUnknown, "",
-                           std::move(output));
+    symbolizer_->Backtrace(frame_id, address, Symbolizer::AddressType::kUnknown, "");
     return true;
   } else {
     return false;
   }
 
   // Don't forget to output the context as is.
-  OutputRaw(line);
+  printer_->OutputRaw(line);
   return true;
-}
-
-Symbolizer::OutputFn LogParser::CreateOutputFn(std::string_view prefix, std::string_view suffix) {
-  // Our design requires that the output must be in the same order of the input, which means the
-  // the destruction of OutputFn must be in the same order of the construction.
-  output_buffers_.emplace_back();
-  // Use a pointer to the buffer as a guard to ensure such order, because std::deque won't
-  // invalidate reference on resizing.
-  std::string *buffer = &output_buffers_.back();
-  auto on_drop = fit::defer([this, buffer]() {
-    FX_CHECK(buffer == &output_buffers_.front());
-    output_ << output_buffers_.front();
-    output_buffers_.pop_front();
-  });
-  return [this, prefix = std::string(prefix), suffix = std::string(suffix),
-          on_drop = std::move(on_drop)](std::string_view content) {
-    output_ << prefix << content << suffix << '\n';
-  };
-}
-
-void LogParser::OutputRaw(std::string_view message) {
-  if (!output_buffers_.empty()) {
-    output_buffers_.back() += message;
-    output_buffers_.back() += '\n';
-  } else {
-    output_ << message << '\n';
-  }
 }
 
 }  // namespace symbolizer

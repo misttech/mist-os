@@ -33,9 +33,6 @@ struct CommandLineOptions {
   // Whether to omit the "[[[ELF module..." lines in the output.
   bool omit_module_lines = false;
 
-  // Whether to prettify backtraces..
-  bool prettify_backtrace = false;
-
   // Analytics options
   AnalyticsOption analytics = AnalyticsOption::kUnspecified;
   bool analytics_show = false;

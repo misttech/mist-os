@@ -14,16 +14,16 @@ stack backtrace:
    #2    0x0000034db419e690 in std::io::Write::write_fmt<std::sys::unix::stdio::Stderr>(std::sys::unix::stdio::Stderr*, core::fmt::Arguments) library/std/src/io/mod.rs:1510 <libstd-771befcd97ac0955.so>+0xa6690
    #3.2  0x0000034db41afa1c in std::sys_common::backtrace::_print(std::io::&mut Write, std::backtrace_rs::print::PrintFmt) library/std/src/sys_common/backtrace.rs:61 <libstd-771befcd97ac0955.so>+0xb7a1c
    #3.1  0x0000034db41afa1c in std::sys_common::backtrace::print(std::io::&mut Write, std::backtrace_rs::print::PrintFmt) library/std/src/sys_common/backtrace.rs:48 <libstd-771befcd97ac0955.so>+0xb7a1c
-   #3    0x0000034db41afa1c in std::panicking::default_hook::$({{closure}})(std::io::&mut Write) library/std/src/panicking.rs:200 <libstd-771befcd97ac0955.so>+0xb7a1c
+   #3    0x0000034db41afa1c in λ(std::io::&mut Write) library/std/src/panicking.rs:200 <libstd-771befcd97ac0955.so>+0xb7a1c
    #4    0x0000034db41af738 in std::panicking::default_hook(core::panic::PanicInfo*) library/std/src/panicking.rs:219 <libstd-771befcd97ac0955.so>+0xb7738
    #5    0x0000034db41b01d8 in std::panicking::rust_panic_with_hook(core::panic::&mut BoxMeUp, core::option::Option<&core::fmt::Arguments>, core::panic::Location*) library/std/src/panicking.rs:569 <libstd-771befcd97ac0955.so>+0xb81d8
-   #6    0x00000075701d2070 in std::panicking::begin_panic::$({{closure}}<&str>)() /b/s/w/ir/k/rust/library/std/src/panicking.rs:498 <>+0x1070
+   #6    0x00000075701d2070 in λ() /b/s/w/ir/k/rust/library/std/src/panicking.rs:498 <>+0x1070
    #7    0x00000075701d2034 in std::sys_common::backtrace::__rust_end_short_backtrace<closure-0, !>(std::panicking::begin_panic::closure-0) /b/s/w/ir/k/rust/library/std/src/sys_common/backtrace.rs:153 <>+0x1034
    #8    0x00000075701d20a4 in std::panicking::begin_panic<&str>(&str) /b/s/w/ir/k/rust/library/std/src/panicking.rs:497 <>+0x10a4
    #9    0x00000075701d2150 in rust_crasher::main() ../../src/developer/forensics/crasher/rust/src/main.rs:6 <>+0x1150
    #10.1 0x00000075701d2040 in core::ops::function::FnOnce::call_once<fn(), ()>(void (*)(), ()) /b/s/w/ir/k/rust/library/core/src/ops/function.rs:233 <>+0x1040
    #10   0x00000075701d2040 in std::sys_common::backtrace::__rust_begin_short_backtrace<fn(), ()>(void (*)()) /b/s/w/ir/k/rust/library/std/src/sys_common/backtrace.rs:137 <>+0x1040
-   #11   0x00000075701d21b0 in std::rt::lang_start::$({{closure}}<()>)() /b/s/w/ir/k/rust/library/std/src/rt.rs:66 <>+0x11b0
+   #11   0x00000075701d21b0 in λ() /b/s/w/ir/k/rust/library/std/src/rt.rs:66 <>+0x11b0
    #12.4 0x0000034db41b03d8 in core::ops::function::impls::$({{impl}})::call_once<(), Fn<()>>(core::ops::function::&Fn<()>, ()) /b/s/w/ir/k/rust/library/core/src/ops/function.rs:265 <libstd-771befcd97ac0955.so>+0xb83d8
    #12.3 0x0000034db41b03d8 in std::panicking::try::do_call<&Fn<()>, i32>(u8*) library/std/src/panicking.rs:373 <libstd-771befcd97ac0955.so>+0xb83d8
    #12.2 0x0000034db41b03d8 in std::panicking::try<i32, &Fn<()>>(core::ops::function::&Fn<()>) library/std/src/panicking.rs:337 <libstd-771befcd97ac0955.so>+0xb83d8

@@ -76,9 +76,6 @@ const char kAuthHelp[] = R"(  --auth [deprecated]
 const char kOmitModuleLinesHelp[] = R"(  --omit-module-lines
       Omit the "[[[ELF module ...]]]" lines from the output.)";
 
-const char kPrettifyBacktraceHelp[] = R"(  --prettify-backtrace
-      Try to prettify backtraces.)";
-
 const char kDumpfileOutputHelp[] = R"(  --dumpfile-output=<path>
       Write the dumpfile output to the given file.)";
 
@@ -104,8 +101,6 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
   parser.AddSwitch("version", 'v', kVersionHelp, &CommandLineOptions::requested_version);
   parser.AddSwitch("omit-module-lines", 0, kOmitModuleLinesHelp,
                    &CommandLineOptions::omit_module_lines);
-  parser.AddSwitch("prettify-backtrace", 0, kPrettifyBacktraceHelp,
-                   &CommandLineOptions::prettify_backtrace);
   parser.AddSwitch("dumpfile-output", 0, kDumpfileOutputHelp, &CommandLineOptions::dumpfile_output);
   parser.AddSwitch("analytics", 0, kAnalyticsHelp, &CommandLineOptions::analytics);
   parser.AddSwitch("analytics-show", 0, kAnalyticsShowHelp, &CommandLineOptions::analytics_show);
