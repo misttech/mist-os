@@ -107,6 +107,9 @@ class NodeManager {
   void DestroyNodeManager();
   zx::result<LockedPage> ReadNodePage(LockedPage page, nid_t nid, int type);
   zx_status_t GetNodePage(nid_t nid, LockedPage *out);
+  // If the node page at |start| doesn't hit in the cache, do readahead node pages
+  // from |start| in |parent|.
+  void ReadaheadNodePages(NodePage &parent, size_t start);
 
   zx::result<bool> IsSameDnode(VnodeF2fs &vnode, pgoff_t index, uint32_t node_offset);
   // If indices use the same node page, read the node page once and reuse it. This

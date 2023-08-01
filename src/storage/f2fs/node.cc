@@ -520,6 +520,7 @@ zx_status_t NodeManager::FindLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Lo
     if (i < level) {
       NodePage &node = node_page.GetPage<NodePage>();
       nid = node.GetNid(offset[i]);
+      ReadaheadNodePages(node, offset[i]);
     } else {
       *out = std::move(node_page);
     }
@@ -564,6 +565,7 @@ zx_status_t NodeManager::GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Loc
     if (i < level) {
       NodePage &node = node_page.GetPage<NodePage>();
       nid = node.GetNid(offset[i]);
+      ReadaheadNodePages(node, offset[i]);
       parent = std::move(node_page);
     } else {
       *out = std::move(node_page);
@@ -936,16 +938,51 @@ zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
   return ZX_OK;
 }
 
-// TODO(https://fxbug.dev/119886): Readahead a node page
-#if 0  // porting needed
-void NodeManager::RaNodePage(nid_t nid) {
+void NodeManager::ReadaheadNodePages(NodePage &parent, size_t start) {
+  {
+    LockedPage page;
+    nid_t nid = parent.GetNid(start);
+    if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
+      ZX_ASSERT_MSG(0, "failed to get a node page. nid: %u", nid);
+      return;
+    }
+    if (page->IsUptodate()) {
+      return;
+    }
+  }
+  uint32_t max_offset = 0;
+  if (parent.IsInode()) {
+    max_offset = kNodeDir1Block + kNidsPerInode;
+  } else {
+    max_offset = kNidsPerBlock;
+  }
+  std::vector<LockedPage> pages;
+  std::vector<block_t> addrs;
+  pages.reserve(kDefaultReadaheadSize);
+  addrs.reserve(kDefaultReadaheadSize);
+  size_t num_nids = 0;
+  for (; start < max_offset && num_nids < kDefaultReadaheadSize; ++start) {
+    nid_t nid = parent.GetNid(start);
+    if (!nid) {
+      continue;
+    }
+    LockedPage page;
+    zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page);
+    ZX_ASSERT_MSG(ret == ZX_OK, "failed to get a node page. %s", zx_status_get_string(ret));
+    // If |page| is not uptodate, retrieve its block addr to populate cache.
+    if (!page->IsUptodate()) {
+      NodeInfo ni;
+      GetNodeInfo(nid, ni);
+      addrs.push_back(ni.blk_addr);
+      pages.push_back(std::move(page));
+      ++num_nids;
+    }
+  }
+  if (num_nids) {
+    auto ret = fs_->MakeReadOperations(pages, addrs, PageType::kNode);
+    ZX_ASSERT_MSG(ret.is_ok(), "failed to read-ahead node pages. %s", ret.status_string());
+  }
 }
-// Return a locked page for the desired node page.
-// And, readahead kMaxRaNode number of node pages.
-Page *NodeManager::GetNodePageRa(Page *parent, int start) {
-  return nullptr;
-}
-#endif
 
 pgoff_t NodeManager::FlushDirtyNodePages(WritebackOperation &operation) {
   if (superblock_info_->GetPageCount(CountType::kDirtyNodes) == 0 && !operation.bReleasePages) {
