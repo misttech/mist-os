@@ -8,7 +8,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "baz_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/baz_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/baz_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/baz_fuzzer_test"
     }
   },
@@ -21,7 +21,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "overflow_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/overflow_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/overflow_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/overflow_fuzzer_test"
     }
   },
@@ -34,7 +34,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "trap_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/trap_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/trap_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/trap_fuzzer_test"
     }
   },
@@ -47,7 +47,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "fuzzed_data_provider_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/fuzzed_data_provider_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/fuzzed_data_provider_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/fuzzed_data_provider_fuzzer_test"
     }
   },
@@ -60,7 +60,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "corpus_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/corpus_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/corpus_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/corpus_fuzzer_test"
     }
   },
@@ -73,7 +73,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "oom_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/oom_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/oom_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/oom_fuzzer_test"
     }
   },
@@ -86,7 +86,7 @@
       "label": "//examples/fuzzer:example_fuzzers_pkg(//build/toolchain/fuchsia:arm64)",
       "name": "rust_fuzzer_test",
       "os": "fuchsia",
-      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/rust_fuzzer_test.cmx",
+      "package_url": "fuchsia-pkg://fuchsia.com/example_fuzzers#meta/rust_fuzzer_test.cm",
       "path": "/pkgfs/packages/example_fuzzers/0/test/rust_fuzzer_test"
     }
   }

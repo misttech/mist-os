@@ -46,10 +46,6 @@ namespace runtests {
 
 namespace {
 
-// Path to helper binary which can run test as a component. This binary takes
-// component url as its parameter.
-constexpr char kRunTestComponentPath[] = "/bin/run-test-component";
-
 // Path to helper binary which can run test as a v2 component. This binary takes
 // component url as its parameter.
 constexpr char kRunTestSuitePath[] = "/bin/run-test-suite";
@@ -69,9 +65,7 @@ fbl::String RootName(const fbl::String& path) {
 bool SetUpForTestComponent(const char* test_path, fbl::String* out_component_executor) {
   if (IsFuchsiaPkgURI(test_path)) {
     const char* last_three_chars_of_url = &(test_path[strlen(test_path) - 3]);
-    if (0 == strncmp(last_three_chars_of_url, "cmx", 3)) {  // v1 component
-      *out_component_executor = kRunTestComponentPath;
-    } else if (0 == strncmp(last_three_chars_of_url, ".cm", 3)) {  // v2
+    if (0 == strncmp(last_three_chars_of_url, ".cm", 3)) {  // v2
       *out_component_executor = kRunTestSuitePath;
     } else {
       fprintf(stderr, "FAILURE: component URL has unexpected format: %s\n", test_path);

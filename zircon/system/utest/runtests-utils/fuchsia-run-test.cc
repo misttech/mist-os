@@ -23,13 +23,6 @@
 namespace runtests {
 namespace {
 
-TEST(SetUpForTestComponent, SetUpForTestComponentCMX) {
-  fbl::String component_executor;
-  EXPECT_TRUE(SetUpForTestComponent("fuchsia-pkg://fuchsia.com/foo-tests#meta/bar.cmx",
-                                    &component_executor));
-  EXPECT_GT(component_executor.length(), 0);
-}
-
 TEST(SetUpForTestComponent, SetUpForTestComponentCM) {
   fbl::String component_executor;
   EXPECT_TRUE(SetUpForTestComponent("fuchsia-pkg://fuchsia.com/foo-tests#meta/bar.cm",

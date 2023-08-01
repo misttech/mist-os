@@ -19,7 +19,7 @@ struct ComponentInfo {
   fbl::String manifest_path;
 };
 
-// If tests are in this path, they can run as a component if corresponding cmx
+// If tests are in this path, they can run as a component if corresponding manifest
 // file is present.
 //
 // https://fuchsia.dev/fuchsia-src/concepts/storage/package_metadata#component_manifest

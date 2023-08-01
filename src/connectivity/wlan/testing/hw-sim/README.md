@@ -25,13 +25,13 @@ The most convenient way to run this test locally is to run it in a QEMU instance
 1. In the QEMU command prompt, run the tests individually in the `test` directory. For example:
 
     ```sh
-    run-test-component simulate_scan
+    run-test-suite simulate_scan
     ```
 
 1. Rust tests hides `stdout` when tests pass. To force displaying `stdout`, run the test with `--nocapture`
 
     ````sh
-    run-test-component simulate_scan --nocapture
+    run-test-suite simulate_scan --nocapture
     ````
 
 1. After the test finishes, exit QEMU by
@@ -108,5 +108,5 @@ Often when debugging flakiness, it is more helpful to run the tests repeatedly. 
 1. Run the test in the emulator command prompt:
 
      ```sh
-     for i in $(seq 1 1000); do run-test-component simulate_scan || break; echo success: attempt $i; done;
+     for i in $(seq 1 1000); do run-test-suite simulate_scan || break; echo success: attempt $i; done;
      ```
