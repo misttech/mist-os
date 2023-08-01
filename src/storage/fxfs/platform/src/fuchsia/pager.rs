@@ -3,53 +3,31 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Error},
+    anyhow::Error,
     async_trait::async_trait,
     bitflags::bitflags,
-    event_listener::{Event, EventListener},
+    event_listener::EventListener,
     fuchsia_async as fasync,
     fuchsia_zircon::{
         self as zx,
-        sys::{
-            zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ},
-            zx_system_get_num_cpus,
-        },
+        sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ},
         AsHandleRef, PacketContents, PagerPacket, SignalPacket,
     },
-    futures::channel::oneshot,
     fxfs::{drop_event::DropEvent, log::*},
-    once_cell::sync::OnceCell,
     std::{
         collections::{hash_map::Entry, HashMap},
         marker::{Send, Sync},
         mem::MaybeUninit,
         ops::Range,
         sync::{Arc, Mutex, Weak},
-        thread::JoinHandle,
     },
 };
 
-/// A multi-threaded Fuchsia async executor for handling pager requests coming from the kernel. This
-/// is separate from the primary executor. All pager requests must be handled on this executor, so
-/// that re-entrant calls to the kernel cannot deadlock the threads in the primary executor.
-///
-/// This executor can be safely shared across multiple [`Pager`]s.
-pub struct PagerExecutor {
-    /// Join handle to the main thread that starts and runs the executor.
-    primary_thread_handle: Option<JoinHandle<()>>,
-
-    /// A handle to the async executor.
-    executor_handle: fasync::EHandle,
-
-    /// An event to signal when the executor should terminate.
-    terminate_event: Event,
-}
-
-/// A thread owned by [`PagerExecutor`] dedicated to pulling packets out of a port.
+/// A thread dedicated to pulling packets out of a port.
 ///
 /// If [`PortThread::terminate()`] is not called, dropping this struct will join the thread.
 struct PortThread {
-    /// An listener that fires when the thread has terminated.
+    /// A listener that fires when the thread has terminated.
     terminate_wait: Mutex<Option<EventListener>>,
 
     /// The port on which the thread is polling.
@@ -140,83 +118,14 @@ impl From<Weak<dyn PagerBackedVmo>> for FileHolder {
     }
 }
 
-impl Drop for PagerExecutor {
-    fn drop(&mut self) {
-        self.terminate_event.notify(usize::MAX);
-
-        if let Some(handle) = self.primary_thread_handle.take() {
-            handle
-                .join()
-                .unwrap_or_else(|_| error!("Error occurred joining primary pager executor thread"));
-        }
-    }
-}
-
-impl PagerExecutor {
-    pub fn global_instance() -> Arc<Self> {
-        static INSTANCE: OnceCell<Arc<PagerExecutor>> = OnceCell::new();
-        INSTANCE
-            .get_or_init(|| Arc::new(futures::executor::block_on(PagerExecutor::start()).unwrap()))
-            .clone()
-    }
-
-    pub async fn start() -> Result<Self, Error> {
-        let (ehandle_tx, ehandle_rx) = oneshot::channel();
-
-        let terminate_event = Event::new();
-        let terminate_wait = terminate_event.listen();
-        let primary_thread_handle = std::thread::spawn(move || {
-            let mut executor = fasync::SendExecutor::new(Self::get_num_threads());
-            executor.run(PagerExecutor::executor_worker_lifecycle(ehandle_tx, terminate_wait));
-        });
-
-        let executor_handle =
-            ehandle_rx.await.context("Failed to setup newly created PagerExecutor")?;
-
-        Ok(Self {
-            primary_thread_handle: Some(primary_thread_handle),
-            executor_handle,
-            terminate_event,
-        })
-    }
-
-    /// Gets the number of threads to run the executor with.
-    fn get_num_threads() -> usize {
-        let num_cpus = unsafe { zx_system_get_num_cpus() };
-
-        std::cmp::max(num_cpus, 1) as usize
-    }
-
-    async fn executor_worker_lifecycle(
-        ehandle_tx: oneshot::Sender<fasync::EHandle>,
-        terminate_wait: EventListener,
-    ) {
-        let executor_handle = fasync::EHandle::local();
-
-        // Reply to creator with executor handle, ignoring errors.
-        ehandle_tx.send(executor_handle.clone()).unwrap_or(());
-
-        debug!("Pager executor started successfully");
-
-        // Keep executor alive until termination is signalled.
-        terminate_wait.await;
-
-        debug!("Pager executor received terminate signal and will terminate");
-    }
-
-    /// Returns the handle for the executor.
-    pub fn executor_handle(&self) -> &fasync::EHandle {
-        &self.executor_handle
-    }
-}
-
 impl PortThread {
-    fn start(executor: Arc<PagerExecutor>, inner: Arc<Mutex<Inner>>) -> Result<Self, Error> {
+    fn start(inner: Arc<Mutex<Inner>>) -> Result<Self, Error> {
         let port = Arc::new(zx::Port::create());
         let port_clone = port.clone();
 
         let terminate_event = Arc::new(DropEvent::new());
         let terminate_wait = Mutex::new(Some(terminate_event.listen()));
+        let executor = fasync::EHandle::local();
         std::thread::spawn(move || {
             Self::thread_lifecycle(executor, port_clone, inner, terminate_event)
         });
@@ -229,7 +138,7 @@ impl PortThread {
     }
 
     fn thread_lifecycle(
-        executor: Arc<PagerExecutor>,
+        executor: fasync::EHandle,
         port: Arc<zx::Port>,
         inner: Arc<Mutex<Inner>>,
         terminate_event: Arc<DropEvent>,
@@ -244,7 +153,7 @@ impl PortThread {
                             Self::receive_pager_packet(
                                 packet.key(),
                                 contents,
-                                &executor.executor_handle,
+                                &executor,
                                 inner.clone(),
                                 &terminate_event,
                             );
@@ -346,10 +255,10 @@ impl Drop for PortThread {
 
 /// Pager handles page requests. It is a per-volume object.
 impl Pager {
-    pub fn new(executor: Arc<PagerExecutor>) -> Result<Self, Error> {
+    pub fn new() -> Result<Self, Error> {
         let pager = zx::Pager::create(zx::PagerOptions::empty())?;
         let inner = Arc::new(Mutex::new(Inner { files: HashMap::default() }));
-        let port_thread = PortThread::start(executor, inner.clone())?;
+        let port_thread = PortThread::start(inner.clone())?;
 
         Ok(Pager { pager, inner, port_thread })
     }
@@ -399,8 +308,6 @@ impl Pager {
             // Should never fail because watch_for_zero_children should be called from `file`.
             let strong = weak.upgrade().unwrap();
 
-            // Watching for zero children isn't required to be done on the pager executor but it can
-            // be cleanly and efficiently (memory and thread usage) muxed onto it, so we do so here.
             watch_for_zero_children(self.port_thread.port(), strong.as_ref())?;
 
             *file = FileHolder::Strong(strong);
@@ -689,9 +596,7 @@ impl Drop for TransferBuffer<'_> {
 mod tests {
     use {
         super::*,
-        fuchsia_async as fasync,
         futures::{channel::mpsc, StreamExt as _},
-        std::sync::atomic::{AtomicBool, Ordering},
     };
 
     struct MockFile {
@@ -732,8 +637,7 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_do_not_unregister_a_file_that_has_been_replaced() {
         const PAGER_KEY: u64 = 1234;
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new().unwrap());
 
         let file1 = Arc::new(MockFile::new(pager.clone(), PAGER_KEY));
         assert_eq!(pager.register_file(&file1), PAGER_KEY);
@@ -751,66 +655,6 @@ mod tests {
 
         pager.unregister_file(file2.as_ref());
         pager.terminate().await;
-    }
-
-    #[fuchsia::test(threads = 10)]
-    async fn test_pager_packets_are_handled_on_a_separate_executor() {
-        struct ExecutorValidatingFile {
-            vmo: zx::Vmo,
-            pager_key: u64,
-            pager: Arc<Pager>,
-            expected_ehandle: fasync::EHandle,
-            was_page_in_checked: AtomicBool,
-            was_mark_dirty_checked: AtomicBool,
-        }
-
-        #[async_trait]
-        impl PagerBackedVmo for ExecutorValidatingFile {
-            fn pager_key(&self) -> u64 {
-                self.pager_key
-            }
-
-            fn vmo(&self) -> &zx::Vmo {
-                &self.vmo
-            }
-
-            async fn page_in(self: Arc<Self>, range: Range<u64>) {
-                assert_eq!(fasync::EHandle::local().port(), self.expected_ehandle.port());
-                self.was_page_in_checked.store(true, Ordering::Relaxed);
-
-                let aux_vmo = zx::Vmo::create(range.end - range.start).unwrap();
-                self.pager.supply_pages(&self.vmo, range, &aux_vmo, 0);
-            }
-
-            async fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
-                assert_eq!(fasync::EHandle::local().port(), self.expected_ehandle.port());
-                self.was_mark_dirty_checked.store(true, Ordering::Relaxed);
-
-                self.pager.dirty_pages(&self.vmo, range);
-            }
-
-            fn on_zero_children(self: Arc<Self>) {}
-        }
-
-        const PAGER_KEY: u64 = 1234;
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let expected_ehandle = pager_executor.executor_handle().clone();
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
-        let file = Arc::new(ExecutorValidatingFile {
-            vmo: pager.create_vmo(PAGER_KEY, zx::system_get_page_size().into()).unwrap(),
-            pager_key: PAGER_KEY,
-            pager: pager.clone(),
-            expected_ehandle,
-            was_page_in_checked: AtomicBool::new(false),
-            was_mark_dirty_checked: AtomicBool::new(false),
-        });
-        assert_eq!(pager.register_file(&file), PAGER_KEY);
-        file.vmo().write(&[0, 1, 2, 3, 4], 0).unwrap();
-        pager.unregister_file(file.as_ref());
-        pager.terminate().await;
-
-        assert!(file.was_page_in_checked.load(Ordering::Relaxed));
-        assert!(file.was_mark_dirty_checked.load(Ordering::Relaxed));
     }
 
     struct OnZeroChildrenFile {
@@ -852,8 +696,7 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_watch_for_zero_children() {
         let (sender, mut receiver) = mpsc::unbounded();
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new().unwrap());
         let file = Arc::new(OnZeroChildrenFile::new(&pager, 1234, sender));
         assert_eq!(pager.register_file(&file), file.pager_key());
         {
@@ -877,8 +720,7 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_multiple_watch_for_zero_children_calls() {
         let (sender, mut receiver) = mpsc::unbounded();
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new().unwrap());
         let file = Arc::new(OnZeroChildrenFile::new(&pager, 1234, sender));
         assert_eq!(pager.register_file(&file), file.pager_key());
         {
@@ -938,8 +780,7 @@ mod tests {
         }
 
         const PAGER_KEY: u64 = 1234;
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new().unwrap());
         let file = Arc::new(StatusCodeFile {
             vmo: pager.create_vmo(PAGER_KEY, zx::system_get_page_size().into()).unwrap(),
             pager_key: PAGER_KEY,
@@ -973,8 +814,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_query_vmo_stats() {
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new().unwrap());
         let file = Arc::new(MockFile::new(pager.clone(), 1234));
         assert_eq!(pager.register_file(&file), file.pager_key());
 
@@ -1001,8 +841,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_query_dirty_ranges() {
-        let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new().unwrap());
         let file = Arc::new(MockFile::new(pager.clone(), 1234));
         assert_eq!(pager.register_file(&file), file.pager_key());
 

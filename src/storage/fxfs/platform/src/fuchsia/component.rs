@@ -4,7 +4,7 @@
 
 use {
     crate::fuchsia::{
-        errors::map_to_status, memory_pressure::MemoryPressureMonitor, pager::PagerExecutor,
+        errors::map_to_status, memory_pressure::MemoryPressureMonitor,
         volumes_directory::VolumesDirectory,
     },
     anyhow::{Context, Error},
@@ -55,21 +55,7 @@ pub fn map_to_raw_status(e: Error) -> zx::sys::zx_status_t {
 }
 
 pub async fn new_block_client(remote: ClientEnd<BlockMarker>) -> Result<RemoteBlockClient, Error> {
-    // The `RemoteBlockClient` must not be created on the main executor because the main
-    // executor may block on syscalls that re-enter the filesystem via the pager
-    // executor and pager executor tasks can depend on the block client. This creates
-    // potential deadlock scenarios. Instead, run the  `RemoteBlockClient` on the pager
-    // executor, which will never make re-entrant syscalls.
-    fasync::Task::spawn_on(PagerExecutor::global_instance().executor_handle(), async {
-        let remote = remote.into_proxy()?;
-        RemoteBlockClient::new(remote).await
-    })
-    .await
-}
-
-/// Spawns tasks on the pager's executor.
-pub fn spawn_on_pager_executor(future: futures::future::BoxFuture<'static, ()>) {
-    fasync::Task::spawn_on(PagerExecutor::global_instance().executor_handle(), future).detach();
+    RemoteBlockClient::new(remote.into_proxy()?).await
 }
 
 /// Runs Fxfs as a component.
@@ -293,7 +279,6 @@ impl Component {
         let fs = FxFilesystemBuilder::new()
             .fsck_after_every_transaction(options.fsck_after_every_transaction)
             .read_only(options.read_only)
-            .background_task_spawner(spawn_on_pager_executor)
             .open(DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?))
             .await?;
         let root_volume = root_volume(fs.clone()).await?;

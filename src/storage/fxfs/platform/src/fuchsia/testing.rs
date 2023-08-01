@@ -4,14 +4,13 @@
 
 use {
     crate::fuchsia::{
-        component::spawn_on_pager_executor, directory::FxDirectory, file::FxFile,
-        fxblob::BlobDirectory, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
-        volumes_directory::VolumesDirectory,
+        directory::FxDirectory, file::FxFile, fxblob::BlobDirectory, pager::PagerBackedVmo,
+        volume::FxVolumeAndRoot, volumes_directory::VolumesDirectory,
     },
     anyhow::Context,
     anyhow::Error,
     fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, Status},
     fxfs::{
         filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem},
@@ -73,12 +72,7 @@ impl TestFixture {
 
     pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
         let (filesystem, volume, volumes_directory) = if options.format {
-            let filesystem = FxFilesystemBuilder::new()
-                .background_task_spawner(spawn_on_pager_executor)
-                .format(true)
-                .open(device)
-                .await
-                .unwrap();
+            let filesystem = FxFilesystemBuilder::new().format(true).open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
                 .new_volume(
@@ -101,11 +95,7 @@ impl TestFixture {
             };
             (filesystem, vol, volumes_directory)
         } else {
-            let filesystem = FxFilesystemBuilder::new()
-                .background_task_spawner(spawn_on_pager_executor)
-                .open(device)
-                .await
-                .unwrap();
+            let filesystem = FxFilesystemBuilder::new().open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
                 .volume(
@@ -311,10 +301,14 @@ pub async fn open_dir_checked(
 }
 
 /// Utility function to write to an `FxFile`.
-pub fn write_at(file: &FxFile, offset: u64, content: &[u8]) -> Result<usize, Error> {
+pub async fn write_at(file: &FxFile, offset: u64, content: &[u8]) -> Result<usize, Error> {
     let stream = zx::Stream::create(zx::StreamOptions::MODE_WRITE, file.vmo(), 0)
         .context("stream create failed")?;
-    stream
-        .writev_at(zx::StreamWriteOptions::empty(), offset, &[content])
-        .context("stream write failed")
+    let content = content.to_vec();
+    fasync::unblock(move || {
+        stream
+            .writev_at(zx::StreamWriteOptions::empty(), offset, &[&content])
+            .context("stream write failed")
+    })
+    .await
 }

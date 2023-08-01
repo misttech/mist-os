@@ -10,7 +10,7 @@ use {
         fxblob::blob::FxBlob,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         node::{FxNode, GetResult, NodeCache},
-        pager::{Pager, PagerExecutor},
+        pager::Pager,
         symlink::FxSymlink,
         vmo_data_buffer::VmoDataBuffer,
         volumes_directory::VolumesDirectory,
@@ -113,7 +113,7 @@ impl FxVolume {
             parent,
             cache: NodeCache::new(),
             store,
-            pager: Pager::new(PagerExecutor::global_instance())?,
+            pager: Pager::new()?,
             executor: fasync::EHandle::local(),
             flush_task: Mutex::new(None),
             fs_id,
@@ -911,7 +911,7 @@ mod tests {
                 .expect("Not a file");
 
             // Write some data to the file, which will only go to the cache for now.
-            write_at(&file, 0, &[123u8]).expect("write_at failed");
+            write_at(&file, 0, &[123u8]).await.expect("write_at failed");
 
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
@@ -990,7 +990,7 @@ mod tests {
                 .expect("Not a file");
 
             // Write some data to the file, which will only go to the cache for now.
-            write_at(&file, 0, &[123u8]).expect("write_at failed");
+            write_at(&file, 0, &[123u8]).await.expect("write_at failed");
 
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
@@ -1087,7 +1087,7 @@ mod tests {
                 .expect("Not a file");
 
             // Write some data to the file, which will only go to the cache for now.
-            write_at(&file, 0, &[123u8]).expect("write_at failed");
+            write_at(&file, 0, &[123u8]).await.expect("write_at failed");
 
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
