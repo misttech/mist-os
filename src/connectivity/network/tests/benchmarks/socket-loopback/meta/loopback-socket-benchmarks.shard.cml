@@ -7,7 +7,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "test/socket_benchmarks",
+        binary: "test/loopback_socket_benchmarks",
     },
     use: [
         {

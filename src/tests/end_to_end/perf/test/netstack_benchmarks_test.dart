@@ -13,7 +13,7 @@ import 'helpers.dart';
 void main() {
   enableLoggingOutput();
 
-  test('socket_benchmarks', () async {
+  test('loopback_socket_benchmarks', () async {
     await runTestComponent(
         packageName: 'socket-benchmarks-tests-netstack2',
         componentName: 'socket-benchmarks.cm',
@@ -21,7 +21,7 @@ void main() {
         expectedMetricNamesFile: 'fuchsia.network.socket.loopback.txt');
   }, timeout: Timeout.none);
 
-  test('socket_benchmarks_with_fast_udp', () async {
+  test('loopback_socket_benchmarks_with_fast_udp', () async {
     await runTestComponent(
         packageName: 'socket-benchmarks-tests-netstack2',
         componentName: 'socket-benchmarks-with-fast-udp.cm',
@@ -29,7 +29,7 @@ void main() {
         expectedMetricNamesFile: 'fuchsia.network.socket.loopback.fastudp.txt');
   }, timeout: Timeout.none);
 
-  test('socket_benchmarks_with_netstack3', () async {
+  test('loopback_socket_benchmarks_with_netstack3', () async {
     await runTestComponent(
         packageName: 'socket-benchmarks-tests-netstack3',
         componentName: 'socket-benchmarks-with-netstack3.cm',
@@ -38,7 +38,7 @@ void main() {
             'fuchsia.network.socket.loopback.netstack3.txt');
   }, timeout: Timeout.none);
 
-  test('socket_benchmarks_with_fake_netstack', () async {
+  test('loopback_socket_benchmarks_with_fake_netstack', () async {
     await runTestComponent(
         packageName: 'socket-benchmarks-tests-netstack2',
         componentName: 'socket-benchmarks-with-fake-netstack.cm',

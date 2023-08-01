@@ -54,21 +54,21 @@ void main() {
   enableLoggingOutput();
 
   test(
-      'socket_benchmarks_with_tracing',
+      'loopback_socket_benchmarks_with_tracing',
       () => runBenchmarksWithTracing(
           'socket-benchmarks-with-tracing-pkg-netstack2',
           'socket-benchmarks-with-tracing'),
       timeout: Timeout.none);
 
   test(
-      'socket_benchmarks_with_fast_udp_tracing',
+      'loopback_socket_benchmarks_with_fast_udp_tracing',
       () => runBenchmarksWithTracing(
           'socket-benchmarks-with-tracing-pkg-netstack2',
           'socket-benchmarks-with-fast-udp-tracing'),
       timeout: Timeout.none);
 
   test(
-      'socket_benchmarks_with_netstack3_tracing',
+      'loopback_socket_benchmarks_with_netstack3_tracing',
       () => runBenchmarksWithTracing(
           'socket-benchmarks-with-tracing-pkg-netstack3',
           'socket-benchmarks-with-netstack3-tracing'),
