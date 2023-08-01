@@ -76,6 +76,12 @@ impl<T: Releasable> OwnedRef<T> {
     }
 }
 
+impl<T: Releasable + std::fmt::Debug> std::fmt::Debug for OwnedRef<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("OwnedRef").field(&self.inner.value).finish()
+    }
+}
+
 impl<T: Releasable> Clone for OwnedRef<T> {
     /// Clone the `OwnedRef`. Both the current and the new reference needs to be `release`d.
     fn clone(&self) -> Self {

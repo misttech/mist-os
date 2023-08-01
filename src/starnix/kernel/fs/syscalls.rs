@@ -63,7 +63,7 @@ pub fn sys_close_range(
         return error!(EINVAL);
     }
     if flags & CLOSE_RANGE_UNSHARE != 0 {
-        current_task.files.unshare();
+        current_task.files.unshare(current_task);
     }
     let in_range = |fd: FdNumber| fd.raw() as u32 >= first && fd.raw() as u32 <= last;
     if flags & CLOSE_RANGE_CLOEXEC != 0 {

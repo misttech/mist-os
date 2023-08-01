@@ -1286,7 +1286,7 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
     }
 
     if (flags & CLONE_FILES) != 0 {
-        current_task.files.unshare();
+        current_task.files.unshare(current_task);
     }
 
     if (flags & CLONE_NEWNS) != 0 {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
-use std::{collections::HashMap, ops::DerefMut, sync::Arc};
+use std::{collections::HashMap, ops::DerefMut};
 
 use crate::{
     fs::*,
@@ -135,23 +135,28 @@ impl FdTableInner {
         FdTableId::new(&self.map_handle.lock().map as *const HashMap<FdNumber, FdTableEntry>)
     }
 
-    fn unshare(&self) -> FdTableInner {
+    fn unshare(&self) -> OwnedRef<FdTableInner> {
         let inner = {
             let new_fdmap = self.map_handle.lock().clone();
             FdTableInner { map_handle: Mutex::new(new_fdmap) }
         };
         let id = inner.id();
         inner.map_handle.lock().map.values_mut().for_each(|entry| entry.fd_table_id = id);
-        inner
+        OwnedRef::new(inner)
+    }
+}
+
+impl Releasable for FdTableInner {
+    type Context = CurrentTask;
+
+    fn release(&self, _current_task: &CurrentTask) {
+        *self.map_handle.lock() = FdMap::default();
     }
 }
 
 #[derive(Debug, Default)]
 pub struct FdTable {
-    // TODO(fxb/122600) The external mutex is only used to be able to drop the file descriptor
-    // while keeping the table itself. It will be unneeded once the live state of a task is deleted
-    // as soon as the task dies, instead of relying on Drop.
-    table: Mutex<Arc<FdTableInner>>,
+    table: Mutex<OwnedRef<FdTableInner>>,
 }
 
 pub enum TargetFdNumber {
@@ -171,20 +176,17 @@ impl FdTable {
     }
 
     pub fn fork(&self) -> FdTable {
-        let inner = self.table.lock().unshare();
-        FdTable { table: Mutex::new(Arc::new(inner)) }
+        let table = Mutex::new(self.table.lock().unshare());
+        FdTable { table }
     }
 
-    pub fn unshare(&self) {
-        let doomed_inner;
-        {
-            let mut inner = self.table.lock();
-            doomed_inner = inner.clone();
-            let unshared_inner = inner.unshare();
-            *inner = Arc::new(unshared_inner);
-        }
-        // Drop the doomed inner table after we release the table lock.
-        std::mem::drop(doomed_inner);
+    pub fn unshare(&self, current_task: &CurrentTask) {
+        let old_table = {
+            let mut table = self.table.lock();
+            let new_table = table.unshare();
+            std::mem::replace(table.deref_mut(), new_table)
+        };
+        old_table.release(current_task);
     }
 
     pub fn exec(&self) {
@@ -363,10 +365,8 @@ impl FdTable {
 impl Releasable for FdTable {
     type Context = CurrentTask;
     /// Drop the fd table, closing any files opened exclusively by this table.
-    fn release(&self, _current_task: &CurrentTask) {
-        // Replace the file table with an empty one. Extract it first so that the drop happens
-        // without the lock in case a file call back to the table when it is closed.
-        let _internal_state = { std::mem::take(self.table.lock().deref_mut()) };
+    fn release(&self, current_task: &CurrentTask) {
+        self.table.lock().release(current_task);
     }
 }
 
@@ -379,6 +379,7 @@ impl Clone for FdTable {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::sync::Arc;
 
     use crate::{fs::fuchsia::SyslogFile, task::*, testing::*};
 
@@ -429,6 +430,7 @@ mod test {
         assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags(fd0).unwrap());
         assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags(fd0).unwrap());
 
+        forked.release(&current_task);
         files.release(&current_task);
     }
 
