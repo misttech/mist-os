@@ -90,7 +90,6 @@ completion of the OTA the device will reboot.
 ## Just the commands
 
 * `fx serve -v` (to run the update server for both build-push and ota)
-* `fx run <component-url>` (each time a change is made you want to run)
 * `fx test <component-url>` (to build and run tests)
 * `fx ota` (to trigger a full system update and reboot)
 
@@ -113,10 +112,10 @@ If the package being updated hosts a service managed by Fuchsia that service
 may need to be restarted. Rebooting is undesirable both because it is slow and
 because the package will revert to the version paved on the device. Typically
 a user can terminate one or more running components on the system, either by
-asking the component to terminate gracefully, or by forceufully stopping the
-component using `fx shell killall <component-name>`. Upon reconnection to the
-component services, or by invocation via `fx run` or `fx test`, new versions
-available in the package server will be cached before launch.
+asking the component to terminate gracefully, or by forcefully stopping the
+component using `ffx component stop <component-moniker>`. Upon reconnection to
+the component services, or by invocation via `ffx component start` or `fx test`,
+new versions available in the package server will be cached before launch.
 
 ### Packaging code outside the Fuchsia tree
 

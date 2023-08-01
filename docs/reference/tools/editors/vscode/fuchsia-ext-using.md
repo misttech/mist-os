@@ -367,7 +367,7 @@ To create a debugging profile:
    * `request`: Specify `launch`. This is the only valid option.
    * `launchcommand`: Specify the alias or path to the ffx binary and append
      any options and parameters. In most cases, this will be a `ffx component
-     run ....`. For more information, see [`ffx run`][ffx-run-ref].
+     run ....`. For more information, see [Run components][run-components].
    * `process`: Specify the name of the component that you are debugging.
 
    Note: If you have not set a system alias for the `ffx` tool, you need to
@@ -440,7 +440,7 @@ Once you have started the debugger:
 [log-severity]: /docs/development/diagnostics/logs/severity.md
 [monitor-device-logs]: /docs/development/sdk/ffx/view-device-logs.md#monitor-device-logs
 [zxdb-docs]: /docs/development/debugging/debugging.md
-[ffx-run-ref]: https://fuchsia.dev/reference/tools/sdk/ffx#run
+[run-components]: /docs/development/components/run.md#run
 [zxdb-commands-docs]: /docs/development/debugger/commands.md
 [vscode-debug-actions]: https://code.visualstudio.com/docs/editor/debugging#_debug-actions
 [fidl-docs]: /docs/concepts/fidl/overview.md

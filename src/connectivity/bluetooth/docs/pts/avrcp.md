@@ -11,8 +11,8 @@ Target command-line tools used to pass AVRCP tests in PTS, invoked from the shel
 * `bt-cli`
 
 Target components, invoked from the host when specified in the instructions:
-* `bt-avrcp-target.cmx`
-* `example_player.cmx`
+* `bt-avrcp-target`
+* `example_player`
 
 ## IXIT Non-Default Values
 * `TSPX_player_feature_bitmask` = 000000000000B701EF02000000000000 *(note this value will change in releases that include https://fxrev.dev/688451)*
@@ -22,8 +22,8 @@ Target components, invoked from the host when specified in the instructions:
 ### Target (TG) tests
 1. (target shell 1) `bt-cli`
 2. (target shell 2) `bt-avdtp-tool -d 500`
-3. (host shell 1) `fx run fuchsia-pkg://fuchsia.com/bt-avrcp-target#meta/bt-avrcp-target.cmx`
-4. (host shell 2) `fx run fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cmx`
+3. (host 1) `ffx component start /core/bt-a2dp/bt-avrcp-target`
+4. (host 2) `ffx component run /core/mediasession-examples:player fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cm`
 5. *Start test*
 
 ### Control (CT) tests
@@ -37,7 +37,7 @@ Target components, invoked from the host when specified in the instructions:
 ### AVRCP/TG/CEC/BV-01-I
 1. (target shell 1) `bt-cli`
 2. (target shell 2) `bt-avdtp-tool -d 500`
-3. (host shell) `fx run fuchsia-pkg://fuchsia.com/bt-avrcp-target#meta/bt-avrcp-target.cmx`
+3. (host) `ffx component start /core/bt-a2dp/bt-avrcp-target`
 4. *Start test*
 
 ### AVRCP/TG/CEC/BV-02-I
@@ -84,7 +84,7 @@ Target components, invoked from the host when specified in the instructions:
 ### AVRCP/TG/MPS/BV-01-I
 1. (target shell 1) `bt-cli`
 2. (target shell 2) `bt-avdtp-tool -d 500`
-3. (host shell 1) `fx run fuchsia-pkg://fuchsia.com/bt-avrcp-target#meta/bt-avrcp-target.cmx`
+3. (host) `ffx component start /core/bt-a2dp/bt-avrcp-target`
 4. *Start test*
 5. *Verify list of media players available on the IUT*
 
@@ -115,7 +115,7 @@ Target components, invoked from the host when specified in the instructions:
 1. (target shell 1) `bt-avdtp-tool -d 500`
 2. (target shell 2) `bt-cli`
 3. (target shell 3) `bt-avrcp-controller <peer-id>`
-4. (host shell) `fx run fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cmx`
+4. (host) `ffx component run /core/mediasession-examples:player fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cm`
 5. *Start test*
 6. PTS: *"Create an AVDTP signaling channel."*
 7. (bt-cli) `connect <peer-id>`
@@ -124,14 +124,14 @@ Target components, invoked from the host when specified in the instructions:
 1. (target shell 1) `bt-avdtp-tool -d 500`
 2. (target shell 2) `bt-cli`
 3. (target shell 3) `bt-avrcp-controller <peer-id>`
-4. (host shell) `fx run fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cmx`
+4. (host) `ffx component run /core/mediasession-examples:player fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cm`
 5. *Start test*
 
 ### AVRCP/CT/CRC/BV-01-I
 1. (target shell 1) `bt-avdtp-tool -d 500`
 2. (target shell 2) `bt-cli`
 3. (target shell 3) `bt-avrcp-controller <peer-id>`
-4. (host shell) `fx run fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cmx`
+4. (host) `ffx component run /core/mediasession-examples:player fuchsia-pkg://fuchsia.com/example_player#meta/example_player.cm`
 5. *Start test*
 6. PTS: *"Take action to disconnect all A2DP and/or AVRCP connections."*
 7. (bt-cli) `disconnect <peer-id>`
