@@ -12,7 +12,7 @@ use crate::{task::*, types::*};
 /// Entities identified by a pid.
 #[derive(Default)]
 struct PidEntry {
-    task: Option<Weak<Task>>,
+    task: Option<WeakRef<Task>>,
     group: Option<Weak<ThreadGroup>>,
     process_group: Option<Weak<ProcessGroup>>,
 }
@@ -44,14 +44,14 @@ impl PidTable {
         self.last_pid
     }
 
-    pub fn get_task(&self, pid: pid_t) -> Option<Arc<Task>> {
-        self.get_entry(pid).and_then(|entry| entry.task.as_ref()).and_then(|task| task.upgrade())
+    pub fn get_task(&self, pid: pid_t) -> WeakRef<Task> {
+        self.get_entry(pid).and_then(|entry| entry.task.clone()).unwrap_or_else(WeakRef::new)
     }
 
-    pub fn add_task(&mut self, task: &Arc<Task>) {
+    pub fn add_task(&mut self, task: &TempRef<'_, Task>) {
         let entry = self.get_entry_mut(task.id);
         assert!(entry.task.is_none());
-        self.get_entry_mut(task.id).task = Some(Arc::downgrade(task));
+        self.get_entry_mut(task.id).task = Some(WeakRef::from(task));
     }
 
     pub fn remove_task(&mut self, pid: pid_t) {

@@ -5,12 +5,11 @@
 use crate::{
     bpf::BpfFs,
     device::BinderFs,
-    fs::buffers::InputBuffer,
     fs::{
-        devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs,
-        tracefs::trace_fs, FileSystemOptions, FsStr,
+        buffers::InputBuffer, devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem,
+        fuse::new_fuse_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
+        FileSystemOptions, FsStr,
     },
-    fs::{ext4::ExtFilesystem, fuse::new_fuse_fs},
     lock::{Mutex, RwLock},
     mutable_state::*,
     selinux::selinux_fs,
@@ -569,7 +568,7 @@ impl CurrentTask {
     }
 }
 
-struct ProcMountsFileSource(Weak<Task>);
+struct ProcMountsFileSource(WeakRef<Task>);
 
 impl DynamicFileSource for ProcMountsFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
@@ -601,7 +600,7 @@ pub struct ProcMountsFile {
 }
 
 impl ProcMountsFile {
-    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
         SimpleFileNode::new(move || {
             Ok(Self { dynamic_file: DynamicFile::new(ProcMountsFileSource(task.clone())) })
         })
@@ -644,9 +643,9 @@ impl FileOps for ProcMountsFile {
 }
 
 #[derive(Clone)]
-pub struct ProcMountinfoFile(Weak<Task>);
+pub struct ProcMountinfoFile(WeakRef<Task>);
 impl ProcMountinfoFile {
-    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
         DynamicFile::new_node(Self(task))
     }
 }

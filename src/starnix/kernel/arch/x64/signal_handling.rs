@@ -428,7 +428,7 @@ mod tests {
     }
 
     /// Creates a kernel and initial task, giving the task a stack.
-    fn create_kernel_and_task_with_stack() -> (Arc<Kernel>, CurrentTask) {
+    fn create_kernel_and_task_with_stack() -> (Arc<Kernel>, AutoReleasableTask) {
         let (kernel, mut current_task) = create_kernel_and_task();
 
         const STACK_SIZE: usize = 0x1000;

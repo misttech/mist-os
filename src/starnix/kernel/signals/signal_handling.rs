@@ -98,7 +98,8 @@ fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAc
 
 /// Dequeues and handles a pending signal for `current_task`.
 pub fn dequeue_signal(current_task: &mut CurrentTask) {
-    let task = current_task.task_arc_clone();
+    let weak_task = current_task.weak_task();
+    let task = weak_task.upgrade().unwrap();
     let mut task_state = task.write();
 
     let mask = task_state.signals.mask();

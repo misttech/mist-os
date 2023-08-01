@@ -221,7 +221,8 @@ pub fn sys_nanosleep(
 ///
 /// Returns EINVAL if no such task can be found.
 fn get_thread_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
-    let task = current_task.get_task(pid).ok_or_else(|| errno!(EINVAL))?;
+    let weak_task = current_task.get_task(pid);
+    let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
     let thread = task.thread.read();
     Ok(thread
         .as_ref()
@@ -237,7 +238,8 @@ fn get_thread_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Er
 ///
 /// Returns EINVAL if no such process can be found.
 fn get_process_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
-    let task = current_task.get_task(pid).ok_or_else(|| errno!(EINVAL))?;
+    let weak_task = current_task.get_task(pid);
+    let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
     Ok(task
         .thread_group
         .process
@@ -407,14 +409,16 @@ mod test {
     async fn test_nanosleep_without_remainder() {
         let (_kernel, mut current_task) = create_kernel_and_task();
 
-        let task_clone = current_task.task_arc_clone();
-
-        let thread = std::thread::spawn(move || {
-            // Wait until the task is in nanosleep, and interrupt it.
-            while !task_clone.read().signals.waiter.is_valid() {
-                std::thread::sleep(std::time::Duration::from_millis(10));
+        let thread = std::thread::spawn({
+            let task = current_task.weak_task();
+            move || {
+                let task = task.upgrade().expect("task must be alive");
+                // Wait until the task is in nanosleep, and interrupt it.
+                while !task.read().signals.waiter.is_valid() {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                task.interrupt();
             }
-            task_clone.interrupt();
         });
 
         let duration = timespec_from_duration(zx::Duration::from_seconds(60));
@@ -489,10 +493,16 @@ mod test {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 if let Some(thread_group) = thread_group.upgrade() {
                     let signal_info = crate::signals::SignalInfo::default(signals::SIGALRM);
-                    let signal_target =
-                        thread_group.read().get_signal_target(&signal_info.signal.into());
-                    if let Some(task) = &signal_target {
-                        crate::signals::send_signal(task, signal_info);
+                    let signal_target = thread_group
+                        .read()
+                        .get_signal_target(&signal_info.signal.into())
+                        .map(|task| {
+                            // SAFETY: signal_target is kept on the stack. The static is required
+                            // to ensure the lock on ThreadGroup can be dropped.
+                            unsafe { TempRef::into_static(task) }
+                        });
+                    if let Some(task) = signal_target {
+                        crate::signals::send_signal(&task, signal_info);
                     }
                 }
             })

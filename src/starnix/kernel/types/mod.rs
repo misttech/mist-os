@@ -34,6 +34,7 @@ pub use errno::*;
 pub use file_mode::*;
 pub use mount_flags::*;
 pub use open_flags::*;
+pub use ownership::*;
 pub use personality::*;
 pub use resource_limits::*;
 pub use seal_flags::*;

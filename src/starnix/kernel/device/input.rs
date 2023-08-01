@@ -707,7 +707,7 @@ mod test {
     use crate::{
         fs::buffers::VecOutputBuffer,
         task::Kernel,
-        testing::{create_kernel_and_task, map_memory},
+        testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
     };
     use anyhow::anyhow;
     use assert_matches::assert_matches;
@@ -783,7 +783,9 @@ mod test {
         (input_file, keyboard_stream, relay_thread)
     }
 
-    fn make_kernel_objects(file: Arc<InputFile>) -> (Arc<Kernel>, CurrentTask, Arc<FileObject>) {
+    fn make_kernel_objects(
+        file: Arc<InputFile>,
+    ) -> (Arc<Kernel>, AutoReleasableTask, Arc<FileObject>) {
         let (kernel, current_task) = create_kernel_and_task();
         let file_object = FileObject::new(
             Box::new(file),

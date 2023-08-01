@@ -6,13 +6,7 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    ffi::CStr,
-    ops::Range,
-    sync::{Arc, Weak},
-};
+use std::{collections::HashMap, convert::TryInto, ffi::CStr, ops::Range, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
@@ -2220,9 +2214,9 @@ pub struct MemoryStats {
 }
 
 #[derive(Clone)]
-pub struct ProcMapsFile(Weak<Task>);
+pub struct ProcMapsFile(WeakRef<Task>);
 impl ProcMapsFile {
-    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
         DynamicFile::new_node(Self(task))
     }
 }
@@ -2247,9 +2241,9 @@ impl SequenceFileSource for ProcMapsFile {
 }
 
 #[derive(Clone)]
-pub struct ProcSmapsFile(Weak<Task>);
+pub struct ProcSmapsFile(WeakRef<Task>);
 impl ProcSmapsFile {
-    pub fn new_node(task: Weak<Task>) -> impl FsNodeOps {
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
         DynamicFile::new_node(Self(task))
     }
 }

@@ -33,7 +33,7 @@ pub struct KernelThreads {
     pub pool: DynamicThreadPool,
 
     /// A task object for the kernel threads.
-    system_task: OnceCell<Arc<CurrentTask>>,
+    system_task: OnceCell<OwnedRef<CurrentTask>>,
 }
 
 impl Default for KernelThreads {
@@ -49,10 +49,17 @@ impl Default for KernelThreads {
     }
 }
 
+impl Drop for KernelThreads {
+    fn drop(&mut self) {
+        let system_task = self.system_task.take().unwrap();
+        system_task.release(&());
+    }
+}
+
 impl KernelThreads {
     pub fn init(&self, kernel: &Arc<Kernel>, fs: Arc<FsContext>) -> Result<(), Errno> {
         self.system_task
-            .set(Arc::new(Task::create_kernel_task(
+            .set(OwnedRef::new(Task::create_kernel_task(
                 kernel,
                 CString::new("[kthreadd]").unwrap(),
                 fs,
@@ -61,8 +68,12 @@ impl KernelThreads {
         Ok(())
     }
 
-    pub fn system_task(&self) -> &Arc<CurrentTask> {
-        self.system_task.get().unwrap()
+    pub fn system_task(&self) -> &CurrentTask {
+        self.system_task.get().as_ref().unwrap()
+    }
+
+    pub fn weak_system_task(&self) -> WeakRef<CurrentTask> {
+        self.system_task.get().unwrap().into()
     }
 
     pub fn dispatch<F>(&self, f: F)

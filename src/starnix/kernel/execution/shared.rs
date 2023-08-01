@@ -263,15 +263,18 @@ mod tests {
         // Stop the task.
         task.thread_group.set_stopped(true, SignalInfo::default(SIGSTOP));
 
-        let cloned_task = task.task_arc_clone();
-        let thread = std::thread::spawn(move || {
-            // Wait for the task to have a waiter.
-            while !cloned_task.read().signals.waiter.is_valid() {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
+        let thread = std::thread::spawn({
+            let task = task.weak_task();
+            move || {
+                let task = task.upgrade().expect("task must be alive");
+                // Wait for the task to have a waiter.
+                while !task.read().signals.waiter.is_valid() {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
 
-            // Continue the task.
-            cloned_task.thread_group.set_stopped(false, SignalInfo::default(SIGCONT));
+                // Continue the task.
+                task.thread_group.set_stopped(false, SignalInfo::default(SIGCONT));
+            }
         });
 
         // Block until continued.
@@ -294,15 +297,18 @@ mod tests {
         // Stop the task.
         task.thread_group.set_stopped(true, SignalInfo::default(SIGSTOP));
 
-        let cloned_task = task.task_arc_clone();
-        let thread = std::thread::spawn(move || {
-            // Wait for the task to have a waiter.
-            while !cloned_task.read().signals.waiter.is_valid() {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
+        let thread = std::thread::spawn({
+            let task = task.weak_task();
+            move || {
+                let task = task.upgrade().expect("task must be alive");
+                // Wait for the task to have a waiter.
+                while !task.read().signals.waiter.is_valid() {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
 
-            // exit the task.
-            cloned_task.thread_group.exit(ExitStatus::Exit(1));
+                // exit the task.
+                task.thread_group.exit(ExitStatus::Exit(1));
+            }
         });
 
         // Block until continued.

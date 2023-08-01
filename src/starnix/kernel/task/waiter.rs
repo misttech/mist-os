@@ -261,6 +261,10 @@ impl Waiter {
 
     /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
     fn wait_internal(&self, deadline: zx::Time) -> Result<(), Errno> {
+        // This method can block arbitrarily long, possibly waiting for another process. The
+        // current thread should not own any local ref that might delay the release of a resource
+        // while doing so.
+        debug_assert_no_local_temp_ref();
         match self.0.port.wait(deadline) {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {

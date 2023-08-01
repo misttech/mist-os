@@ -780,11 +780,8 @@ impl FileAsyncOwner {
     pub fn validate(self, current_task: &CurrentTask) -> Result<(), Errno> {
         match self {
             FileAsyncOwner::Unowned => (),
-            FileAsyncOwner::Thread(tid) => {
-                current_task.get_task(tid).ok_or_else(|| errno!(ESRCH))?;
-            }
-            FileAsyncOwner::Process(pid) => {
-                current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))?;
+            FileAsyncOwner::Thread(id) | FileAsyncOwner::Process(id) => {
+                Task::from_weak(&current_task.get_task(id))?;
             }
             FileAsyncOwner::ProcessGroup(pgid) => {
                 current_task
@@ -1378,8 +1375,10 @@ impl fmt::Debug for FileObject {
 mod tests {
     use crate::{
         auth::FsCred,
-        fs::buffers::{VecInputBuffer, VecOutputBuffer},
-        fs::tmpfs::TmpFs,
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            tmpfs::TmpFs,
+        },
         testing::*,
         types::{DeviceType, FileMode, OpenFlags},
     };

@@ -334,7 +334,8 @@ where
     let process_handle = current_task.thread_group.process.raw_handle();
     let old_process_handle = unsafe { thrd_set_zx_process(process_handle) };
 
-    let task = current_task.task.clone();
+    let weak = current_task.weak_task();
+    let task = weak.upgrade().unwrap();
     // Hold a lock on the task's thread slot until we have a chance to initialize it.
     let mut task_thread_guard = task.thread.write();
 
@@ -354,7 +355,7 @@ where
                 ok => ok,
             };
 
-            current_task.signal_vfork();
+            current_task.release(&());
             task_complete(run_result);
         })
         .expect("able to spawn threads");

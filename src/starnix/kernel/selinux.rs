@@ -13,11 +13,7 @@ use crate::{
     types::*,
 };
 use derivative::Derivative;
-use std::{
-    borrow::Cow,
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 use zerocopy::AsBytes;
 
 /// The version of selinux_status_t this kernel implements.
@@ -311,7 +307,7 @@ pub struct SeLinuxThreadGroupState {
     pub exec_context: FsString,
 }
 
-pub fn selinux_proc_attrs(task: &Arc<Task>, dir: &mut StaticDirectoryBuilder<'_>) {
+pub fn selinux_proc_attrs(task: &TempRef<'_, Task>, dir: &mut StaticDirectoryBuilder<'_>) {
     use SeLinuxContextAttr::*;
     dir.entry(b"current", Current.new_node(task), mode!(IFREG, 0o666));
     dir.entry(b"fscreate", FsCreate.new_node(task), mode!(IFREG, 0o666));
@@ -325,8 +321,8 @@ enum SeLinuxContextAttr {
 }
 
 impl SeLinuxContextAttr {
-    fn new_node(self, task: &Arc<Task>) -> impl FsNodeOps {
-        BytesFile::new_node(AttrNode { attr: self, task: Arc::downgrade(task) })
+    fn new_node(self, task: &TempRef<'_, Task>) -> impl FsNodeOps {
+        BytesFile::new_node(AttrNode { attr: self, task: WeakRef::from(task) })
     }
 
     fn access_on_task<R, F: FnOnce(&mut FsString) -> R>(&self, task: &Task, f: F) -> R {
@@ -341,7 +337,7 @@ impl SeLinuxContextAttr {
 
 struct AttrNode {
     attr: SeLinuxContextAttr,
-    task: Weak<Task>,
+    task: WeakRef<Task>,
 }
 impl BytesFileOps for AttrNode {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {

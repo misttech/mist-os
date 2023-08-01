@@ -35,24 +35,27 @@ pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, 
         UserRef::<pid_t>::new(UserAddress::from(args.parent_tid)),
         UserRef::<pid_t>::new(UserAddress::from(args.child_tid)),
     )?;
-    let tid = new_task.id;
+    let (tid, task_ref) = release_on_error!(new_task, &(), {
+        let tid = new_task.id;
 
-    // Clone the registers, setting the result register to 0 for the return value from clone in the
-    // cloned process.
-    new_task.registers = current_task.registers;
-    new_task.registers.set_return_register(0);
+        // Clone the registers, setting the result register to 0 for the return value from clone in the
+        // cloned process.
+        new_task.registers = current_task.registers;
+        new_task.registers.set_return_register(0);
 
-    if args.stack != 0 {
-        // In clone() the `stack` argument points to the top of the stack, while in clone3()
-        // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
-        // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
-        new_task.registers.set_stack_pointer_register(args.stack.wrapping_add(args.stack_size));
-    }
-    if args.flags & (CLONE_SETTLS as u64) != 0 {
-        new_task.registers.set_thread_pointer_register(args.tls);
-    }
+        if args.stack != 0 {
+            // In clone() the `stack` argument points to the top of the stack, while in clone3()
+            // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
+            // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
+            new_task.registers.set_stack_pointer_register(args.stack.wrapping_add(args.stack_size));
+        }
+        if args.flags & (CLONE_SETTLS as u64) != 0 {
+            new_task.registers.set_thread_pointer_register(args.tls);
+        }
 
-    let task_ref = Arc::downgrade(&new_task.task); // Keep reference for later waiting.
+        let task_ref = WeakRef::from(&new_task.task); // Keep reference for later waiting.
+        Ok((tid, task_ref))
+    });
 
     execute_task(new_task, |_| {});
 
@@ -262,35 +265,43 @@ fn get_task_if_owner_or_has_capabilities(
     current_task: &CurrentTask,
     pid: pid_t,
     capabilities: Capabilities,
-) -> Result<Arc<Task>, Errno> {
-    let task = current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))?;
+) -> Result<WeakRef<Task>, Errno> {
+    let weak = current_task.get_task(pid);
+    let task_creds = Task::from_weak(&weak)?.creds();
     let current_creds = current_task.creds();
-    if task.creds().euid == current_creds.euid || current_creds.has_capability(capabilities) {
-        Ok(task)
+    if task_creds.euid == current_creds.euid || current_creds.has_capability(capabilities) {
+        Ok(weak)
     } else {
         error!(EPERM)
     }
 }
 
-fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> Result<Arc<Task>, Errno> {
+fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> {
     if pid == 0 {
-        Ok(current_task.task_arc_clone())
+        WeakRef::from(&current_task.task)
     } else {
         // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
-        current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))
+        current_task.get_task(pid)
     }
 }
 
 pub fn sys_getsid(current_task: &CurrentTask, pid: pid_t) -> Result<pid_t, Errno> {
-    Ok(get_task_or_current(current_task, pid)?.thread_group.read().process_group.session.leader)
+    let weak = get_task_or_current(current_task, pid);
+    let task = Task::from_weak(&weak)?;
+    let sid = task.thread_group.read().process_group.session.leader;
+    Ok(sid)
 }
 
 pub fn sys_getpgid(current_task: &CurrentTask, pid: pid_t) -> Result<pid_t, Errno> {
-    Ok(get_task_or_current(current_task, pid)?.thread_group.read().process_group.leader)
+    let weak = get_task_or_current(current_task, pid);
+    let task = Task::from_weak(&weak)?;
+    let pgid = task.thread_group.read().process_group.leader;
+    Ok(pgid)
 }
 
 pub fn sys_setpgid(current_task: &CurrentTask, pid: pid_t, pgid: pid_t) -> Result<(), Errno> {
-    let task = get_task_or_current(current_task, pid)?;
+    let weak = get_task_or_current(current_task, pid);
+    let task = Task::from_weak(&weak)?;
     current_task.thread_group.setpgid(&task, pgid)?;
     Ok(())
 }
@@ -517,7 +528,8 @@ pub fn sys_sched_getscheduler(current_task: &CurrentTask, pid: pid_t) -> Result<
         return error!(EINVAL);
     }
 
-    let target_task = get_task_or_current(current_task, pid)?;
+    let weak = get_task_or_current(current_task, pid);
+    let target_task = Task::from_weak(&weak)?;
     let current_policy = target_task.read().scheduler_policy;
     Ok(current_policy.raw_policy())
 }
@@ -532,7 +544,8 @@ pub fn sys_sched_setscheduler(
         return error!(EINVAL);
     }
 
-    let target_task = get_task_or_current(current_task, pid)?;
+    let weak = get_task_or_current(current_task, pid);
+    let target_task = Task::from_weak(&weak)?;
     let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
     let param: sched_param = current_task.read_object(param.into())?;
@@ -573,7 +586,8 @@ pub fn sys_sched_getaffinity(
         return error!(EINVAL);
     }
 
-    let _task = get_task_or_current(current_task, pid)?;
+    let weak = get_task_or_current(current_task, pid);
+    let _task = Task::from_weak(&weak)?;
 
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
     let mask = get_default_cpumask();
@@ -593,7 +607,8 @@ pub fn sys_sched_setaffinity(
     if pid < 0 {
         return error!(EINVAL);
     }
-    let _task = get_task_or_current(current_task, pid)?;
+    let weak = get_task_or_current(current_task, pid);
+    let _task = Task::from_weak(&weak)?;
 
     if cpusetsize < CPU_AFFINITY_MASK_SIZE {
         return error!(EINVAL);
@@ -620,7 +635,8 @@ pub fn sys_sched_getparam(
         return error!(EINVAL);
     }
 
-    let target_task = get_task_or_current(current_task, pid)?;
+    let weak = get_task_or_current(current_task, pid);
+    let target_task = Task::from_weak(&weak)?;
     let param_value = target_task.read().scheduler_policy.raw_params();
     current_task.write_object(param.into(), &param_value)?;
     Ok(())
@@ -989,7 +1005,8 @@ pub fn sys_capget(
     if header.pid < 0 {
         return error!(EINVAL);
     }
-    let target_task = get_task_or_current(current_task, header.pid)?;
+    let weak = get_task_or_current(current_task, header.pid);
+    let target_task = Task::from_weak(&weak)?;
 
     let (permitted, effective, inheritable) = {
         let creds = &target_task.creds();
@@ -1041,7 +1058,8 @@ pub fn sys_capset(
     if header.pid != 0 && header.pid != current_task.id {
         return error!(EPERM);
     }
-    let target_task = get_task_or_current(current_task, header.pid)?;
+    let weak = get_task_or_current(current_task, header.pid);
+    let target_task = Task::from_weak(&weak)?;
 
     let (new_permitted, new_effective, new_inheritable) = match header.version {
         _LINUX_CAPABILITY_VERSION_1 => {
@@ -1202,7 +1220,8 @@ pub fn sys_getpriority(current_task: &CurrentTask, which: u32, who: i32) -> Resu
         _ => return error!(EINVAL),
     }
     // TODO(tbodt): check permissions
-    let target_task = get_task_or_current(current_task, who)?;
+    let weak = get_task_or_current(current_task, who);
+    let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
     Ok(state.priority)
 }
@@ -1218,7 +1237,8 @@ pub fn sys_setpriority(
         _ => return error!(EINVAL),
     }
     // TODO(tbodt): check permissions
-    let target_task = get_task_or_current(current_task, who)?;
+    let weak = get_task_or_current(current_task, who);
+    let target_task = Task::from_weak(&weak)?;
     // The priority passed into setpriority is actually in the -19...20 range and is not
     // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
     // be lying anymore by the time you read this.)
@@ -1325,8 +1345,10 @@ pub fn sys_kcmp(
     index1: u64,
     index2: u64,
 ) -> Result<u32, Errno> {
-    let task1 = get_task_if_owner_or_has_capabilities(current_task, pid1, CAP_SYS_PTRACE)?;
-    let task2 = get_task_if_owner_or_has_capabilities(current_task, pid2, CAP_SYS_PTRACE)?;
+    let weak1 = get_task_if_owner_or_has_capabilities(current_task, pid1, CAP_SYS_PTRACE)?;
+    let task1 = Task::from_weak(&weak1)?;
+    let weak2 = get_task_if_owner_or_has_capabilities(current_task, pid2, CAP_SYS_PTRACE)?;
+    let task2 = Task::from_weak(&weak2)?;
     let resource_type = KcmpResource::from_raw(resource_type)?;
 
     // Output encoding (see <https://man7.org/linux/man-pages/man2/kcmp.2.html>):
@@ -1346,11 +1368,11 @@ pub fn sys_kcmp(
 
     match resource_type {
         KcmpResource::FILE => {
-            fn get_file(task: Arc<Task>, index: u64) -> Result<FileHandle, Errno> {
+            fn get_file(task: &Task, index: u64) -> Result<FileHandle, Errno> {
                 task.files.get(FdNumber::from_raw(index.try_into().map_err(|_| errno!(EBADF))?))
             }
-            let file1 = get_file(task1, index1)?;
-            let file2 = get_file(task2, index2)?;
+            let file1 = get_file(&task1, index1)?;
+            let file2 = get_file(&task2, index2)?;
             Ok(encode_ordering(obfuscate_arc(&file1).cmp(&obfuscate_arc(&file2))))
         }
         KcmpResource::FILES => Ok(encode_ordering(

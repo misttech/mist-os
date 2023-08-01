@@ -164,13 +164,16 @@ fn create_task_with_pty(
     window_size: uapi::winsize,
 ) -> Result<(CurrentTask, FileHandle), Errno> {
     let mut current_task = Task::create_init_child_process(kernel, &binary_path)?;
-    let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
-    current_task.exec(executable, binary_path, argv, environ)?;
-    let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
-    let fd_flags = FdFlags::empty();
-    assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
-    assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
-    assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
+    let pty = release_on_error!(current_task, &(), {
+        let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+        current_task.exec(executable, binary_path, argv, environ)?;
+        let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
+        let fd_flags = FdFlags::empty();
+        assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
+        assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
+        assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
+        Ok(pty)
+    });
     Ok((current_task, pty))
 }
 
@@ -182,34 +185,52 @@ fn forward_to_pty(
 ) -> Result<(), Error> {
     // Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
     const BUFFER_CAPACITY: usize = 8192;
-    let system_task = container.kernel.kthreads.system_task();
 
     let mut rx = fuchsia_async::Socket::from_socket(console_in)?;
     let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
     let kernel = &container.kernel;
-    let current_task = system_task.clone();
     let pty_sink = pty.clone();
-    kernel.kthreads.pool.dispatch(move || {
-        let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
-            let mut buffer = vec![0u8; BUFFER_CAPACITY];
-            loop {
-                let bytes = rx.read(&mut buffer[..]).await?;
-                pty_sink.write(&current_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
-            }
-        });
+    kernel.kthreads.pool.dispatch({
+        let current_task = container.kernel.kthreads.weak_system_task();
+        move || {
+            let _result: Result<(), Error> =
+                fasync::LocalExecutor::new().run_singlethreaded(async {
+                    let mut buffer = vec![0u8; BUFFER_CAPACITY];
+                    loop {
+                        let bytes = rx.read(&mut buffer[..]).await?;
+                        let current_task = if let Some(task) = current_task.upgrade() {
+                            task
+                        } else {
+                            return Ok(());
+                        };
+                        pty_sink
+                            .write(&current_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
+                    }
+                });
+        }
     });
 
-    let current_task = system_task.clone();
     let pty_source = pty;
-    kernel.kthreads.pool.dispatch(move || {
-        let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
-            let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
-            loop {
-                buffer.reset();
-                pty_source.read(&current_task, &mut buffer)?;
-                tx.write_all(buffer.data()).await?;
-            }
-        });
+    kernel.kthreads.pool.dispatch({
+        let current_task = container.kernel.kthreads.weak_system_task();
+        move || {
+            let _result: Result<(), Error> =
+                fasync::LocalExecutor::new().run_singlethreaded(async {
+                    let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
+                    loop {
+                        buffer.reset();
+                        {
+                            let current_task = if let Some(task) = current_task.upgrade() {
+                                task
+                            } else {
+                                return Ok(());
+                            };
+                            pty_source.read(&current_task, &mut buffer)?;
+                        }
+                        tx.write_all(buffer.data()).await?;
+                    }
+                });
+        }
     });
 
     Ok(())

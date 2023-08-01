@@ -2411,8 +2411,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
         let flags: fbinder::FileFlags = file.flags().into();
-        let system_task = self.kernel.kthreads.system_task();
-        let handle = file.to_handle(system_task)?;
+        let handle = file.to_handle(self.kernel.kthreads.system_task())?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..Default::default()
@@ -2469,36 +2468,6 @@ impl ResourceAccessor for Task {
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
         self
-    }
-}
-
-impl MemoryAccessor for Task {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        log_trace!("Reading {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory_to_slice(addr, bytes)
-    }
-
-    fn read_memory_partial_to_slice(
-        &self,
-        addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        log_trace!("Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
-        self.mm.read_memory_partial_to_slice(addr, bytes)
-    }
-
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        log_trace!("Writing {} bytes to {:?}", bytes.len(), addr);
-        self.mm.write_memory(addr, bytes)
-    }
-
-    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        log_trace!("Writing up to {} bytes to {:?}", bytes.len(), addr);
-        self.mm.write_memory_partial(addr, bytes)
-    }
-
-    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.mm.zero(addr, length)
     }
 }
 
@@ -2866,23 +2835,6 @@ impl BinderDriver {
         result
     }
 
-    /// Returns a task with the given pid.
-    fn get_target_task(
-        &self,
-        kernel: &Arc<Kernel>,
-        pid: pid_t,
-    ) -> Result<Arc<Task>, TransactionError> {
-        let pids = kernel.pids.read();
-        if let Some(task) = pids.get_task(pid) {
-            Ok(task)
-        } else if let Some(thread_group) = pids.get_thread_group(pid) {
-            std::mem::drop(pids);
-            thread_group.read().get_live_task().map_err(|_| TransactionError::Dead)
-        } else {
-            Err(TransactionError::Dead)
-        }
-    }
-
     /// A binder thread is starting a transaction on a remote binder object.
     fn handle_transaction(
         &self,
@@ -2904,7 +2856,8 @@ impl BinderDriver {
             }
         };
 
-        let target_task = self.get_target_task(current_task.kernel(), target_proc.pid)?;
+        let weak_task = current_task.get_task(target_proc.pid);
+        let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
         let security_context: Option<FsString> = if object.flags
             & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
             == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
@@ -3037,7 +2990,8 @@ impl BinderDriver {
         // Find the process and thread that initiated the transaction. This reply is for them.
         let (target_proc, target_thread) = binder_thread.lock().pop_transaction_caller()?;
 
-        let target_task = self.get_target_task(current_task.kernel(), target_proc.pid)?;
+        let weak_task = current_task.get_task(target_proc.pid);
+        let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
 
         // Copy the transaction data to the target process.
         let (buffers, transaction_state) = self.copy_transaction_buffers(
@@ -3878,6 +3832,7 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
+    use std::ops::Deref;
     use zerocopy::FromZeroes;
 
     const BASE_ADDR: UserAddress = UserAddress::const_from(0x0000000000000100);
@@ -3887,12 +3842,27 @@ pub mod tests {
         _kernel: Arc<Kernel>,
         driver: Arc<BinderDriver>,
 
-        sender_task: CurrentTask,
+        sender_task: AutoReleasableTask,
         sender_proc: Arc<BinderProcess>,
         sender_thread: Arc<BinderThread>,
 
-        receiver_task: CurrentTask,
+        receiver_task: AutoReleasableTask,
         receiver_proc: Arc<BinderProcess>,
+    }
+
+    impl ResourceAccessor for AutoReleasableTask {
+        fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
+            self.deref().close_fd(fd)
+        }
+        fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+            self.deref().get_file_with_flags(fd)
+        }
+        fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+            self.deref().add_file_with_flags(file, flags)
+        }
+        fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
+            self.deref().as_memory_accessor()
+        }
     }
 
     impl TranslateHandlesTestFixture {
@@ -5834,9 +5804,14 @@ pub mod tests {
         let binder_proc = binder_connection.proc(&current_task).unwrap();
         let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.pid);
 
-        let task = Arc::clone(&current_task.task);
+        let task = current_task.weak_task();
         let binder_proc_for_thread = Arc::clone(&binder_proc);
-        std::thread::spawn(move || {
+        let thread = std::thread::spawn(move || {
+            let task = if let Some(task) = task.upgrade() {
+                task
+            } else {
+                return;
+            };
             // Wait for the task to start waiting.
             while !task.read().signals.waiter.is_valid() {
                 std::thread::sleep(std::time::Duration::from_millis(10));
@@ -5855,6 +5830,7 @@ pub mod tests {
             )
             .unwrap();
         assert_eq!(bytes_read, 0);
+        thread.join().expect("join");
     }
 
     #[fuchsia::test]

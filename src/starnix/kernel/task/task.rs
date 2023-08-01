@@ -10,7 +10,7 @@ use std::{
     convert::TryFrom,
     ffi::CString,
     fmt,
-    sync::{atomic::Ordering, Arc, Weak},
+    sync::{atomic::Ordering, Arc},
 };
 
 use crate::{
@@ -57,7 +57,7 @@ const DEFAULT_TASK_PRIORITY: u8 = 20;
 /// See also `Task` for more information about tasks.
 pub struct CurrentTask {
     /// The underlying task object.
-    pub task: Arc<Task>,
+    pub task: OwnedRef<Task>,
 
     /// A copy of the registers associated with the Zircon thread. Up-to-date values can be read
     /// from `self.handle.read_state_general_regs()`. To write these values back to the thread, call
@@ -76,16 +76,13 @@ pub struct CurrentTask {
 type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
-impl std::ops::Drop for CurrentTask {
-    fn drop(&mut self) {
+impl Releasable for CurrentTask {
+    type Context = ();
+
+    fn release(&self, _: &()) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
-        self.thread_group.remove(&self.task);
-
-        // Release the fd table.
-        // TODO(https://fxbug.dev/122600#c12) This will be unneeded once the live state of a task is deleted as soon
-        // as the task dies, instead of relying on Drop.
-        self.files.drop_local();
+        self.task.release(self);
     }
 }
 
@@ -513,9 +510,8 @@ pub struct PageFaultExceptionReport {
 }
 
 impl Task {
-    /// Upgrade a weak reference to a Task, returning a ESRCH errno if the weak reference cannot be
-    /// upgraded.
-    pub fn from_weak(weak: &Weak<Task>) -> Result<Arc<Task>, Errno> {
+    /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
+    pub fn from_weak(weak: &WeakRef<Task>) -> Result<TempRef<'_, Task>, Errno> {
         weak.upgrade().ok_or_else(|| errno!(ESRCH))
     }
 
@@ -633,7 +629,8 @@ impl Task {
         kernel: &Arc<Kernel>,
         binary_path: &CString,
     ) -> Result<CurrentTask, Errno> {
-        let init_task = kernel.pids.read().get_task(1).ok_or_else(|| errno!(EINVAL))?;
+        let weak_init = kernel.pids.read().get_task(1);
+        let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let task = Self::create_process_without_parent(
             kernel,
             binary_path.clone(),
@@ -743,10 +740,14 @@ impl Task {
             UserAddress::NULL.into(),
             default_timerslack,
         ));
-        current_task.thread_group.add(&current_task.task)?;
+        release_on_error!(current_task, &(), {
+            let temp_task = current_task.temp_task();
+            current_task.thread_group.add(&temp_task)?;
 
-        pids.add_task(&current_task.task);
-        pids.add_thread_group(&current_task.thread_group);
+            pids.add_task(&temp_task);
+            pids.add_thread_group(&current_task.thread_group);
+            Ok(())
+        });
         Ok(current_task)
     }
 
@@ -921,51 +922,54 @@ impl Task {
             timerslack_ns,
         ));
 
-        // Drop the pids lock as soon as possible after creating the child. Destroying the child
-        // and removing it from the pids table itself requires the pids lock, so if an early exit
-        // takes place we have a self deadlock.
-        pids.add_task(&child.task);
-        if !clone_thread {
-            pids.add_thread_group(&child.thread_group);
-        }
-        std::mem::drop(pids);
-
-        // Child lock must be taken before this lock. Drop the lock on the task, take a writable
-        // lock on the child and take the current state back.
-
-        #[cfg(any(test, debug_assertions))]
-        {
-            // Take the lock on the thread group and its child in the correct order to ensure any wrong ordering
-            // will trigger the tracing-mutex at the right call site.
+        release_on_error!(child, &(), {
+            let child_task = TempRef::from(&child.task);
+            // Drop the pids lock as soon as possible after creating the child. Destroying the child
+            // and removing it from the pids table itself requires the pids lock, so if an early exit
+            // takes place we have a self deadlock.
+            pids.add_task(&child_task);
             if !clone_thread {
-                let _l1 = self.thread_group.read();
-                let _l2 = child.thread_group.read();
+                pids.add_thread_group(&child.thread_group);
             }
-        }
+            std::mem::drop(pids);
 
-        if clone_thread {
-            self.thread_group.add(&child.task)?;
-        } else {
-            child.thread_group.add(&child.task)?;
-            let mut child_state = child.write();
-            let state = self.read();
-            child_state.signals.alt_stack = state.signals.alt_stack;
-            child_state.signals.set_mask(state.signals.mask());
-            self.mm.snapshot_to(&child.mm)?;
-        }
+            // Child lock must be taken before this lock. Drop the lock on the task, take a writable
+            // lock on the child and take the current state back.
 
-        if flags & (CLONE_PARENT_SETTID as u64) != 0 {
-            self.mm.write_object(user_parent_tid, &child.id)?;
-        }
+            #[cfg(any(test, debug_assertions))]
+            {
+                // Take the lock on the thread group and its child in the correct order to ensure any wrong ordering
+                // will trigger the tracing-mutex at the right call site.
+                if !clone_thread {
+                    let _l1 = self.thread_group.read();
+                    let _l2 = child.thread_group.read();
+                }
+            }
 
-        if flags & (CLONE_CHILD_CLEARTID as u64) != 0 {
-            child.write().clear_child_tid = user_child_tid;
-        }
+            if clone_thread {
+                self.thread_group.add(&child_task)?;
+            } else {
+                child.thread_group.add(&child_task)?;
+                let mut child_state = child.write();
+                let state = self.read();
+                child_state.signals.alt_stack = state.signals.alt_stack;
+                child_state.signals.set_mask(state.signals.mask());
+                self.mm.snapshot_to(&child.mm)?;
+            }
 
-        if flags & (CLONE_CHILD_SETTID as u64) != 0 {
-            child.mm.write_object(user_child_tid, &child.id)?;
-        }
+            if flags & (CLONE_PARENT_SETTID as u64) != 0 {
+                self.mm.write_object(user_parent_tid, &child.id)?;
+            }
 
+            if flags & (CLONE_CHILD_CLEARTID as u64) != 0 {
+                child.write().clear_child_tid = user_child_tid;
+            }
+
+            if flags & (CLONE_CHILD_SETTID as u64) != 0 {
+                child.mm.write_object(user_child_tid, &child.id)?;
+            }
+            Ok(())
+        });
         Ok(child)
     }
 
@@ -980,7 +984,7 @@ impl Task {
 
     /// Blocks the caller until the task has exited or executed execve(). This is used to implement
     /// vfork() and clone(... CLONE_VFORK, ...). The task musy have created with CLONE_EXECVE.
-    pub fn wait_for_execve(&self, task_to_wait: Weak<Task>) -> Result<(), Errno> {
+    pub fn wait_for_execve(&self, task_to_wait: WeakRef<Task>) -> Result<(), Errno> {
         let event = task_to_wait.upgrade().and_then(|t| t.vfork_event.clone());
         if let Some(event) = event {
             event
@@ -993,7 +997,11 @@ impl Task {
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
     /// exit signal as in clone().
     #[cfg(test)]
-    pub fn clone_task_for_test(&self, flags: u64, exit_signal: Option<Signal>) -> CurrentTask {
+    pub fn clone_task_for_test(
+        &self,
+        flags: u64,
+        exit_signal: Option<Signal>,
+    ) -> crate::testing::AutoReleasableTask {
         let result = self
             .clone_task(flags, exit_signal, UserRef::default(), UserRef::default())
             .expect("failed to create task in test");
@@ -1005,7 +1013,7 @@ impl Task {
             let _l2 = result.read();
         }
 
-        result
+        result.into()
     }
 
     /// If needed, clear the child tid for this task.
@@ -1032,7 +1040,7 @@ impl Task {
         Ok(())
     }
 
-    pub fn get_task(&self, pid: pid_t) -> Option<Arc<Task>> {
+    pub fn get_task(&self, pid: pid_t) -> WeakRef<Task> {
         self.thread_group.kernel.pids.read().get_task(pid)
     }
 
@@ -1146,10 +1154,25 @@ impl Task {
     }
 }
 
+impl Releasable for Task {
+    type Context = CurrentTask;
+
+    fn release(&self, _: &CurrentTask) {
+        self.thread_group.remove(self);
+
+        // Release the fd table.
+        // TODO(https://fxbug.dev/122600#c12) This will be unneeded once the live state of a task is deleted as soon
+        // as the task dies, instead of relying on Drop.
+        self.files.drop_local();
+
+        self.signal_vfork();
+    }
+}
+
 impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
         CurrentTask {
-            task: Arc::new(task),
+            task: OwnedRef::new(task),
             registers: RegisterState::default(),
             extended_pstate: ExtendedPstateState::default(),
             syscall_restart_func: None,
@@ -1160,8 +1183,12 @@ impl CurrentTask {
         &self.thread_group.kernel
     }
 
-    pub fn task_arc_clone(&self) -> Arc<Task> {
-        Arc::clone(&self.task)
+    pub fn weak_task(&self) -> WeakRef<Task> {
+        WeakRef::from(&self.task)
+    }
+
+    pub fn temp_task(&self) -> TempRef<'_, Task> {
+        TempRef::from(&self.task)
     }
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
@@ -1685,7 +1712,7 @@ impl CurrentTask {
     // we fail to walk it.
     // TODO(fxbug.dev/128610): This only sets the FUTEX_OWNER_DIED bit; it does
     // not wake up a waiter.
-    pub fn notify_robust_list(&mut self) {
+    pub fn notify_robust_list(&self) {
         let task_state = self.write();
         let robust_list_addr = task_state.robust_list_head.addr();
         if robust_list_addr == UserAddress::NULL {
@@ -1805,6 +1832,32 @@ impl CurrentTask {
     }
 }
 
+impl MemoryAccessor for Task {
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.mm.read_memory_to_slice(addr, bytes)
+    }
+
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.mm.read_memory_partial_to_slice(addr, bytes)
+    }
+
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.write_memory(addr, bytes)
+    }
+
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.write_memory_partial(addr, bytes)
+    }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm.zero(addr, length)
+    }
+}
+
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -1854,10 +1907,10 @@ mod test {
         assert_eq!(another_current.get_tid(), 3);
 
         let pids = kernel.pids.read();
-        assert_eq!(pids.get_task(1).unwrap().get_tid(), 1);
-        assert_eq!(pids.get_task(2).unwrap().get_tid(), 2);
-        assert_eq!(pids.get_task(3).unwrap().get_tid(), 3);
-        assert!(pids.get_task(4).is_none());
+        assert_eq!(pids.get_task(1).upgrade().unwrap().get_tid(), 1);
+        assert_eq!(pids.get_task(2).upgrade().unwrap().get_tid(), 2);
+        assert_eq!(pids.get_task(3).upgrade().unwrap().get_tid(), 3);
+        assert!(pids.get_task(4).upgrade().is_none());
     }
 
     #[::fuchsia::test]

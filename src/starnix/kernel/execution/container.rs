@@ -289,50 +289,51 @@ async fn create_container(
 
     let mut init_task = create_init_task(&kernel, config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
-    let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)
-        .source_context("creating FsContext")?;
-    init_task.set_fs(fs_context.clone());
-    kernel.kthreads.init(&kernel, fs_context).source_context("initializing kthreads")?;
-    let system_task = kernel.kthreads.system_task();
+    release_on_error!(init_task, &(), {
+        let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)
+            .source_context("creating FsContext")?;
+        init_task.set_fs(fs_context.clone());
+        kernel.kthreads.init(&kernel, fs_context).source_context("initializing kthreads")?;
+        let system_task = kernel.kthreads.system_task();
 
-    // Register common devices and add them in sysfs and devtmpfs.
-    init_common_devices(&kernel);
+        // Register common devices and add them in sysfs and devtmpfs.
+        init_common_devices(&kernel);
 
-    mount_filesystems(system_task, config, &pkg_dir_proxy)
-        .source_context("mounting filesystems")?;
+        mount_filesystems(system_task, config, &pkg_dir_proxy)
+            .source_context("mounting filesystems")?;
 
-    // Run all common features that were specified in the .cml.
-    run_features(&config.features, &kernel)
-        .with_source_context(|| format!("initializing features: {:?}", &config.features))?;
+        // Run all common features that were specified in the .cml.
+        run_features(&config.features, &kernel)
+            .with_source_context(|| format!("initializing features: {:?}", &config.features))?;
 
-    let startup_file_path = if config.startup_file_path.is_empty() {
-        None
-    } else {
-        Some(config.startup_file_path.clone())
-    };
+        // If there is an init binary path, run it, optionally waiting for the
+        // startup_file_path to be created. The task struct is still used
+        // to initialize the system up until this point, regardless of whether
+        // or not there is an actual init to be run.
+        let argv = if config.init.is_empty() {
+            vec![DEFAULT_INIT.to_string()]
+        } else {
+            config.init.clone()
+        }
+        .iter()
+        .map(|s| to_cstr(s))
+        .collect::<Vec<_>>();
 
-    // If there is an init binary path, run it, optionally waiting for the
-    // startup_file_path to be created. The task struct is still used
-    // to initialize the system up until this point, regardless of whether
-    // or not there is an actual init to be run.
-    let argv =
-        if config.init.is_empty() { vec![DEFAULT_INIT.to_string()] } else { config.init.clone() }
-            .iter()
-            .map(|s| to_cstr(s))
-            .collect::<Vec<_>>();
-
-    let executable = init_task
-        .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
-        .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
-    init_task
-        .exec(executable, argv[0].clone(), argv.clone(), vec![])
-        .with_source_context(|| format!("executing init: {:?}", &argv))?;
+        let executable = init_task
+            .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
+            .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
+        init_task
+            .exec(executable, argv[0].clone(), argv.clone(), vec![])
+            .with_source_context(|| format!("executing init: {:?}", &argv))?;
+        Ok(())
+    });
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
         let _ = task_complete.send(result);
     });
-    if let Some(startup_file_path) = startup_file_path {
-        wait_for_init_file(&startup_file_path, system_task).await?;
+
+    if !config.startup_file_path.is_empty() {
+        wait_for_init_file(&config.startup_file_path, kernel.kthreads.system_task()).await?;
     };
 
     Ok(Container { kernel, _node: node })
@@ -411,8 +412,11 @@ fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<Curr
         CString::new(config.init[0].clone())?
     };
     let task = Task::create_process_without_parent(kernel, initial_name, None)?;
-    task.set_creds(credentials);
-    set_rlimits(&task, &config.rlimits)?;
+    release_on_error!(task, &(), {
+        task.set_creds(credentials);
+        set_rlimits(&task, &config.rlimits)?;
+        Ok(())
+    });
     Ok(task)
 }
 

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
-
 //! This crates introduces a framework to handle explicit ownership.
 //!
 //! Explicit ownership is used for object that needs to be cleaned, but cannot use `Drop` because

@@ -296,7 +296,9 @@ impl ThreadGroup {
 
         // Interrupt each task. Unlock the group because send_signal will lock the group in order
         // to call set_stopped.
-        let tasks = state.tasks().collect::<Vec<_>>();
+        // SAFETY: tasks is kept on the stack. The static is required to ensure the lock on
+        // ThreadGroup can be dropped.
+        let tasks = state.tasks().map(|x| unsafe { TempRef::into_static(x) }).collect::<Vec<_>>();
         drop(state);
         for task in tasks {
             task.write().exit_status = Some(exit_status.clone());
@@ -304,7 +306,7 @@ impl ThreadGroup {
         }
     }
 
-    pub fn add(self: &Arc<Self>, task: &Arc<Task>) -> Result<(), Errno> {
+    pub fn add(self: &Arc<Self>, task: &TempRef<'_, Task>) -> Result<(), Errno> {
         let mut state = self.write();
         if state.terminating {
             return error!(EINVAL);
@@ -313,7 +315,7 @@ impl ThreadGroup {
         Ok(())
     }
 
-    pub fn remove(self: &Arc<Self>, task: &Arc<Task>) {
+    pub fn remove(self: &Arc<Self>, task: &Task) {
         let mut pids = self.kernel.pids.write();
         let mut state = self.write();
 
@@ -808,7 +810,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         })
     }
 
-    pub fn tasks(&self) -> impl Iterator<Item = Arc<Task>> + '_ {
+    pub fn tasks(&self) -> impl Iterator<Item = TempRef<'_, Task>> + '_ {
         self.tasks.values().flat_map(|t| t.upgrade())
     }
 
@@ -985,7 +987,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     }
 
     /// Returns a task in the current thread group.
-    pub fn get_live_task(&self) -> Result<Arc<Task>, Errno> {
+    pub fn get_live_task(&self) -> Result<TempRef<'_, Task>, Errno> {
         self.tasks
             .get(&self.leader())
             .and_then(|t| t.upgrade())
@@ -994,7 +996,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     }
 
     /// Return the appropriate task in |thread_group| to send the given signal.
-    pub fn get_signal_target(&self, _signal: &UncheckedSignal) -> Option<Arc<Task>> {
+    pub fn get_signal_target(&self, _signal: &UncheckedSignal) -> Option<TempRef<'_, Task>> {
         // TODO(fxb/96632): Consider more than the main thread or the first thread in the thread group
         // to dispatch the signal.
         self.get_live_task().ok()
@@ -1006,11 +1008,11 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
 /// moment where the task is not yet released, yet the weak pointer is not upgradeable anymore.
 /// During this time, it is still necessary to access the persistent info to compute the state of
 /// the thread for the different wait syscalls.
-struct TaskContainer(Weak<Task>, TaskPersistentInfo);
+struct TaskContainer(WeakRef<Task>, TaskPersistentInfo);
 
-impl From<&Arc<Task>> for TaskContainer {
-    fn from(task: &Arc<Task>) -> Self {
-        Self(Arc::downgrade(task), task.persistent_info.clone())
+impl From<&TempRef<'_, Task>> for TaskContainer {
+    fn from(task: &TempRef<'_, Task>) -> Self {
+        Self(WeakRef::from(task), task.persistent_info.clone())
     }
 }
 
@@ -1021,7 +1023,7 @@ impl From<TaskContainer> for TaskPersistentInfo {
 }
 
 impl TaskContainer {
-    fn upgrade(&self) -> Option<Arc<Task>> {
+    fn upgrade(&self) -> Option<TempRef<'_, Task>> {
         self.0.upgrade()
     }
 
@@ -1104,30 +1106,9 @@ mod test {
     #[::fuchsia::test]
     async fn test_adopt_children() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let task1 = current_task
-            .clone_task(
-                0,
-                None,
-                UserRef::new(UserAddress::default()),
-                UserRef::new(UserAddress::default()),
-            )
-            .expect("clone process");
-        let task2 = task1
-            .clone_task(
-                0,
-                None,
-                UserRef::new(UserAddress::default()),
-                UserRef::new(UserAddress::default()),
-            )
-            .expect("clone process");
-        let task3 = task2
-            .clone_task(
-                0,
-                None,
-                UserRef::new(UserAddress::default()),
-                UserRef::new(UserAddress::default()),
-            )
-            .expect("clone process");
+        let task1 = current_task.clone_task_for_test(0, None);
+        let task2 = task1.clone_task_for_test(0, None);
+        let task3 = task2.clone_task_for_test(0, None);
 
         assert_eq!(task3.thread_group.read().get_ppid(), task2.id);
 

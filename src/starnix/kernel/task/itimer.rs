@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::lock::Mutex;
-use crate::signals::{send_signal, SignalInfo};
-use crate::time::utc;
+use crate::{
+    lock::Mutex,
+    signals::{send_signal, SignalInfo},
+    time::utc,
+    types::TempRef,
+};
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use std::sync::{Arc, Weak};
@@ -55,8 +58,14 @@ impl Itimer {
                 }
                 if let Some(thread_group) = thread_group.upgrade() {
                     let signal_info = SignalInfo::default(crate::types::signals::SIGALRM);
-                    let signal_target =
-                        thread_group.read().get_signal_target(&signal_info.signal.into());
+                    let signal_target = thread_group
+                        .read()
+                        .get_signal_target(&signal_info.signal.into())
+                        .map(|task| {
+                            // SAFETY: signal_target is kept on the stack. The static is required
+                            // to ensure the lock on ThreadGroup can be dropped.
+                            unsafe { TempRef::into_static(task) }
+                        });
                     if let Some(task) = &signal_target {
                         send_signal(task, signal_info);
                     }

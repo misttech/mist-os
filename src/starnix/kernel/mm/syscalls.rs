@@ -15,6 +15,7 @@ use crate::{
     logging::*,
     mm::*,
     syscalls::*,
+    task::Task,
 };
 
 // Returns any platform-specific mmap flags. This is a separate function because as of this writing
@@ -226,7 +227,8 @@ pub fn sys_process_vm_readv(
         return Ok(0);
     }
 
-    let task = current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))?;
+    let weak_task = current_task.get_task(pid);
+    let task = Task::from_weak(&weak_task)?;
     // When this check is loosened to allow reading memory from other processes, the check should
     // be like checking if the current process is allowed to debug the other process.
     if !Arc::ptr_eq(&task.thread_group, &current_task.thread_group) {
@@ -354,16 +356,11 @@ pub fn sys_get_robust_list(
     if pid != 0 && !current_task.creds().has_capability(CAP_SYS_PTRACE) {
         return error!(EPERM);
     }
-    let task = if pid == 0 { Some(current_task.task.clone()) } else { current_task.get_task(pid) };
-
-    match task {
-        Some(t) => {
-            current_task.write_object(user_head_ptr, &t.read().robust_list_head)?;
-            current_task.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
-            Ok(())
-        }
-        None => error!(ESRCH),
-    }
+    let task = if pid == 0 { current_task.weak_task() } else { current_task.get_task(pid) };
+    let task = Task::from_weak(&task)?;
+    current_task.write_object(user_head_ptr, &task.read().robust_list_head)?;
+    current_task.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
+    Ok(())
 }
 
 pub fn sys_set_robust_list(

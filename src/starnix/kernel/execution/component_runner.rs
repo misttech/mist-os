@@ -16,12 +16,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::{
-    ffi::CString,
-    os::unix::ffi::OsStrExt,
-    path::Path,
-    sync::{Arc, Weak},
-};
+use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path};
 
 use crate::{
     auth::Credentials,
@@ -119,63 +114,73 @@ pub async fn start_component(
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
     let binary_path = CString::new(binary_path.to_owned())?;
 
-    let rlimits = get_program_strvec(&start_info, "rlimits").cloned().unwrap_or_default();
-
+    let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
-    set_rlimits(&current_task, &rlimits)?;
+    release_on_error!(current_task, &(), {
+        let rlimits = get_program_strvec(&start_info, "rlimits").cloned().unwrap_or_default();
+        set_rlimits(&current_task, &rlimits)?;
 
-    let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
-    let cwd = current_task
-        .lookup_path(&mut LookupContext::default(), current_task.fs().root(), cwd_path.as_bytes())
-        .map_err(|e| anyhow!("Could not find package directory: {:?}", e))?;
-    current_task
-        .fs()
-        .chdir(&current_task, cwd)
-        .map_err(|e| anyhow!("Failed to set cwd to package directory: {:?}", e))?;
+        let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
+        let cwd = current_task
+            .lookup_path(
+                &mut LookupContext::default(),
+                current_task.fs().root(),
+                cwd_path.as_bytes(),
+            )
+            .map_err(|e| anyhow!("Could not find package directory: {:?}", e))?;
+        current_task
+            .fs()
+            .chdir(&current_task, cwd)
+            .map_err(|e| anyhow!("Failed to set cwd to package directory: {:?}", e))?;
 
-    let uid = get_program_string(&start_info, "uid").unwrap_or("42").parse()?;
-    let mut credentials = Credentials::with_ids(uid, uid);
-    if let Some(caps) = get_program_strvec(&start_info, "capabilities") {
-        let mut capabilities = Capabilities::empty();
-        for cap in caps {
-            capabilities |= cap.parse()?;
+        let uid = get_program_string(&start_info, "uid").unwrap_or("42").parse()?;
+        let mut credentials = Credentials::with_ids(uid, uid);
+        if let Some(caps) = get_program_strvec(&start_info, "capabilities") {
+            let mut capabilities = Capabilities::empty();
+            for cap in caps {
+                capabilities |= cap.parse()?;
+            }
+            credentials.cap_permitted = capabilities;
+            credentials.cap_effective = capabilities;
+            credentials.cap_inheritable = capabilities;
         }
-        credentials.cap_permitted = capabilities;
-        credentials.cap_effective = capabilities;
-        credentials.cap_inheritable = capabilities;
-    }
-    current_task.set_creds(credentials);
+        current_task.set_creds(credentials);
 
-    if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {
-        for mount in local_mounts.iter() {
-            let (mount_point, child_fs) =
-                create_filesystem_from_spec(current_task.kernel(), &pkg, mount)?;
-            let mount_point = current_task.lookup_path_from_root(mount_point)?;
-            mount_record.mount(mount_point, WhatToMount::Fs(child_fs), MountFlags::empty())?;
+        if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {
+            for mount in local_mounts.iter() {
+                let (mount_point, child_fs) =
+                    create_filesystem_from_spec(current_task.kernel(), &pkg, mount)?;
+                let mount_point = current_task.lookup_path_from_root(mount_point)?;
+                mount_record.mount(mount_point, WhatToMount::Fs(child_fs), MountFlags::empty())?;
+            }
         }
-    }
 
-    parse_numbered_handles(&current_task, start_info.numbered_handles, &current_task.files)?;
+        parse_numbered_handles(&current_task, start_info.numbered_handles, &current_task.files)?;
 
-    let mut argv = vec![binary_path.clone()];
-    argv.extend(args);
+        let mut argv = vec![binary_path.clone()];
+        argv.extend(args);
 
-    let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
-    current_task.exec(executable, binary_path, argv, environ)?;
+        let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+        current_task.exec(executable, binary_path, argv, environ)?;
 
-    run_component_features(&component_features, &container.kernel, &mut start_info.outgoing_dir)
+        run_component_features(
+            &component_features,
+            &container.kernel,
+            &mut start_info.outgoing_dir,
+        )
         .unwrap_or_else(|e| {
             log_error!("failed to set component features for {} - {:?}", url, e);
         });
 
-    let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let controller = controller.into_stream()?;
-    fasync::Task::local(serve_component_controller(
-        controller,
-        Arc::downgrade(&current_task.task),
-        task_complete,
-    ))
-    .detach();
+        let controller = controller.into_stream()?;
+        fasync::Task::local(serve_component_controller(
+            controller,
+            WeakRef::from(&current_task.task),
+            task_complete,
+        ))
+        .detach();
+        Ok(())
+    });
 
     execute_task(current_task, move |result| {
         // If the component controller server has gone away, there is nobody for us to
@@ -200,7 +205,7 @@ type TaskResult = Result<ExitStatus, Error>;
 /// If the task has completed, it will also close the controller channel.
 async fn serve_component_controller(
     controller: ComponentControllerRequestStream,
-    task: Weak<Task>,
+    task: WeakRef<Task>,
     task_complete: oneshot::Receiver<TaskResult>,
 ) {
     let controller_handle = controller.control_handle();
@@ -234,7 +239,7 @@ async fn serve_component_controller(
                 Ok(ComponentControllerRequest::Kill { .. }) => {
                     if let Some(task) = task.upgrade() {
                         signals::send_signal(
-                            task.as_ref(),
+                            &task,
                             signals::SignalInfo::new(
                                 SIGKILL,
                                 SI_KERNEL,

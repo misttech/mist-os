@@ -977,11 +977,12 @@ mod tests {
             )
             .expect("mount");
 
-            let task = Task::create_init_child_process(
+            let task: AutoReleasableTask = Task::create_init_child_process(
                 &kernel,
                 &CString::new("remote_binder".to_string()).expect("CString"),
             )
-            .expect("Task");
+            .expect("Task")
+            .into();
 
             let remote_binder_handle =
                 RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task.thread_group);

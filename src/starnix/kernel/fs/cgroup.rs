@@ -7,7 +7,7 @@
 //! There is no support for actual resource constraints, or any operations outside of adding tasks
 //! to a control group (for the duration of their lifetime).
 
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use crate::{
     auth::FsCred,
@@ -25,7 +25,7 @@ type ControlGroupHandle = Arc<Mutex<ControlGroup>>;
 
 struct ControlGroup {
     /// The tasks that are part of this control group.
-    tasks: Vec<Weak<Task>>,
+    tasks: Vec<WeakRef<Task>>,
 }
 
 impl ControlGroup {
@@ -144,18 +144,18 @@ struct ControlGroupFileSource {
 }
 impl DynamicFileSource for ControlGroupFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let remaining_tasks = {
-            let control_group = &mut *self.control_group.lock();
-            let remaining_tasks: Vec<Arc<Task>> =
-                control_group.tasks.iter().flat_map(|t| t.upgrade()).collect();
-            // Filter out the tasks that have been dropped.
-            control_group.tasks = remaining_tasks.iter().map(Arc::downgrade).collect();
+        let mut pids: Vec<pid_t> = vec![];
+        self.control_group.lock().tasks.retain(|t| {
+            if let Some(t) = t.upgrade() {
+                pids.push(t.get_pid());
+                true
+            } else {
+                // Filter out the tasks that have been dropped.
+                false
+            }
+        });
 
-            remaining_tasks
-        };
-
-        for task in remaining_tasks {
-            let pid = task.get_pid();
+        for pid in pids {
             write!(sink, "{pid}")?;
         }
         Ok(())
@@ -190,11 +190,12 @@ impl FileOps for ControlGroupFile {
 
         let pid_string = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
         let pid = pid_string.parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
-        let task = current_task.get_task(pid).ok_or_else(|| errno!(EINVAL))?;
+        let weak_task = current_task.get_task(pid);
+        let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
 
         // TODO(lindkvist): The task needs to be removed form any existing control group before
         // being added to a new one.
-        self.control_group.lock().tasks.push(Arc::downgrade(&task));
+        self.control_group.lock().tasks.push(WeakRef::from(&task));
 
         Ok(bytes.len())
     }

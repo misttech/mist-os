@@ -313,7 +313,8 @@ mod test {
             }
         });
         let tid = receiver.recv().expect("recv");
-        let other_task = kernel.pids.read().get_task(tid).expect("task");
+        let other_task_weak = kernel.pids.read().get_task(tid);
+        let other_task = other_task_weak.upgrade().expect("task");
         loop {
             let other_task_waiting = other_task.read().signals.waiter.is_valid();
             if other_task_waiting {
@@ -322,6 +323,8 @@ mod test {
             thread::sleep(std::time::Duration::from_millis(10));
         }
         other_task.interrupt();
+        // Drop other_task to let the thread release it.
+        std::mem::drop(other_task);
         t.join().expect("join");
         std::mem::drop(guard);
         assert_eq!(*value.lock(&task).expect("lock"), 0);
