@@ -35,6 +35,9 @@ template("fuchsia_package_with_test") {
   }
 
   test_spec("${target_name}_test") {
+    if (defined(invoker.test_specs)) {
+      forward_variables_from(invoker.test_specs, "*")
+    }
     target = get_label_info(":$target_name", "label_with_toolchain")
     package_label = get_label_info(":$package_name", "label_with_toolchain")
     package_url = "fuchsia-pkg://fuchsia.com/$package_name#meta/$component_name"
