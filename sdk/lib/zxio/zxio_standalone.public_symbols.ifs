@@ -28,6 +28,7 @@ Symbols:
   - { Name: zxio_getsockopt, Type: Func }
   - { Name: zxio_isatty, Type: Func }
   - { Name: zxio_link, Type: Func }
+  - { Name: zxio_link_into, Type: Func }
   - { Name: zxio_listen, Type: Func }
   - { Name: zxio_open, Type: Func }
   - { Name: zxio_open2, Type: Func }

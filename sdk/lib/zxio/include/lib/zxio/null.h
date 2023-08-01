@@ -59,6 +59,8 @@ zx_status_t zxio_default_rename(zxio_t* io, const char* old_path, size_t old_pat
                                 zx_handle_t dst_token, const char* new_path, size_t new_path_len);
 zx_status_t zxio_default_link(zxio_t* io, const char* src_path, size_t src_path_len,
                               zx_handle_t dst_token, const char* dst_path, size_t dst_path_len);
+zx_status_t zxio_default_link_into(zxio_t* object, zx_handle_t dst_directory_token,
+                                   const char* dst_path, size_t dst_path_len);
 zx_status_t zxio_default_dirent_iterator_init(zxio_t* directory, zxio_dirent_iterator_t* iterator);
 zx_status_t zxio_default_dirent_iterator_next(zxio_t* io, zxio_dirent_iterator_t* iterator,
                                               zxio_dirent_t* inout_entry);
@@ -142,6 +144,7 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .token_get = zxio_default_token_get,
     .rename = zxio_default_rename,
     .link = zxio_default_link,
+    .link_into = zxio_default_link_into,
     .dirent_iterator_init = zxio_default_dirent_iterator_init,
     .dirent_iterator_next = zxio_default_dirent_iterator_next,
     .dirent_iterator_rewind = zxio_default_dirent_iterator_rewind,

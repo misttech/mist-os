@@ -26,6 +26,7 @@
 		zxio_getsockopt;
 		zxio_isatty;
 		zxio_link;
+		zxio_link_into;
 		zxio_listen;
 		zxio_open;
 		zxio_open2;

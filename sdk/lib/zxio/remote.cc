@@ -432,6 +432,8 @@ class Remote : public HasIo {
   zx_status_t Link(const char* src_path, size_t src_path_len, zx_handle_t dst_token,
                    const char* dst_path, size_t dst_path_len);
 
+  zx_status_t LinkInto(zx_handle_t dst_token, const char* dst_path, size_t dst_path_len);
+
   zx_status_t DirentIteratorInit(zxio_dirent_iterator_t* iterator);
 
   zx_status_t DirentIteratorNext(zxio_dirent_iterator_t* iterator, zxio_dirent_t* inout_entry);
@@ -1172,6 +1174,26 @@ zx_status_t Remote<Protocol>::Link(const char* src_path, size_t src_path_len, zx
 }
 
 template <typename Protocol>
+zx_status_t Remote<Protocol>::LinkInto(zx_handle_t dst_token_handle, const char* dst_path,
+                                       size_t dst_path_len) {
+  zx::event dst_token(dst_token_handle);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  const fidl::WireResult result = client()->LinkInto(
+      std::move(dst_token), fidl::StringView::FromExternal(dst_path, dst_path_len));
+  if (!result.ok()) {
+    return result.status();
+  }
+  const auto& response = result.value();
+  if (response.is_error()) {
+    return response.error_value();
+  }
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
+template <typename Protocol>
 zx_status_t Remote<Protocol>::DirentIteratorInit(zxio_dirent_iterator_t* iterator) {
   new (iterator) DirentIteratorImpl(io());
   return ZX_OK;
@@ -1765,6 +1787,9 @@ constexpr zxio_ops_t File::kOps = ([]() {
   ops.xattr_get = Adaptor::From<&File::XattrGet>;
   ops.xattr_set = Adaptor::From<&File::XattrSet>;
   ops.xattr_remove = Adaptor::From<&File::XattrRemove>;
+
+  ops.link_into = Adaptor::From<&File::LinkInto>;
+
   return ops;
 })();
 

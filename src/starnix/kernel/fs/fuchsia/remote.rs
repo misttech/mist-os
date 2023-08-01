@@ -576,6 +576,22 @@ impl FsNodeOps for RemoteNode {
             .map(ValueOrSize::from)
             .map_err(|status| from_status_like_fdio!(status))
     }
+
+    fn link(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
+        let Some(child) = child.downcast_ops::<RemoteNode>() else {
+            return error!(EXDEV);
+        };
+        child
+            .zxio
+            .link_into(&self.zxio, get_name_str(name)?)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
 }
 
 struct RemoteSpecialNode {

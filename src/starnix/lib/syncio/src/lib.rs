@@ -1148,6 +1148,14 @@ impl Zxio {
     pub fn xattr_remove(&self, name: &[u8]) -> Result<(), zx::Status> {
         zx::ok(unsafe { zxio::zxio_xattr_remove(self.as_ptr(), name.as_ptr(), name.len()) })
     }
+
+    pub fn link_into(&self, target_dir: &Zxio, name: &str) -> Result<(), zx::Status> {
+        let mut handle = zx::sys::ZX_HANDLE_INVALID;
+        zx::ok(unsafe { zxio::zxio_token_get(target_dir.as_ptr(), &mut handle) })?;
+        zx::ok(unsafe {
+            zxio::zxio_link_into(self.as_ptr(), handle, name.as_ptr() as *const c_char, name.len())
+        })
+    }
 }
 
 impl Drop for Zxio {

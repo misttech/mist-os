@@ -70,6 +70,8 @@ typedef struct zxio_ops {
                         zx_handle_t dst_token, const char* new_path, size_t new_path_len);
   zx_status_t (*link)(zxio_t* io, const char* src_path, size_t src_path_len, zx_handle_t dst_token,
                       const char* dst_path, size_t dst_path_len);
+  zx_status_t (*link_into)(zxio_t* object, zx_handle_t dst_directory_token, const char* dst_path,
+                           size_t dst_path_len);
   zx_status_t (*dirent_iterator_init)(zxio_t* io, zxio_dirent_iterator_t* iterator);
   zx_status_t (*dirent_iterator_next)(zxio_t* io, zxio_dirent_iterator_t* iterator,
                                       zxio_dirent_t* inout_entry);

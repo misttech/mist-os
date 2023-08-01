@@ -467,6 +467,15 @@ ZXIO_EXPORT zx_status_t zxio_link(zxio_t* src_directory, const char* src_path, s
                                   zx_handle_t dst_directory_token, const char* dst_path,
                                   size_t dst_path_len);
 
+// EXPERIMENTAL: This is not widely supported.
+//
+// Attempts to link |object| to |dst_path| relative to the directory represented by
+// |dst_directory_token|.
+//
+// |object| and |dst_directory_token| may be aliased.
+ZXIO_EXPORT zx_status_t zxio_link_into(zxio_t* object, zx_handle_t dst_directory_token,
+                                       const char* dst_path, size_t dst_path_len);
+
 // Directory iterator
 
 // Initializes a |zxio_dirent_iterator_t| for the given |directory|.

@@ -126,6 +126,12 @@ zx_status_t zxio_default_link(zxio_t* io, const char* src_path, size_t src_path_
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+zx_status_t zxio_default_link_into(zxio_t* object, zx_handle_t dst_directory_token,
+                                   const char* dst_path, size_t dst_path_len) {
+  zx_handle_close(dst_directory_token);
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 zx_status_t zxio_default_dirent_iterator_init(zxio_t* directory, zxio_dirent_iterator_t* iterator) {
   iterator->io = directory;
   return ZX_ERR_NOT_SUPPORTED;

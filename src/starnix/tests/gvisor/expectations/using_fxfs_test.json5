@@ -19,15 +19,8 @@
                 "AllocateTest.Fallocate",
 
                 // link_test
-                "LinkTest.AbsPathsNonDirFDsWithOpath",
-                "LinkTest.AbsPathsWithNonDirFDs",
-                "LinkTest.CanCreateLinkFile",
                 "LinkTest.LinkDoesNotFollowSymlinks",
                 "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
-                "LinkTest.LinkatWithSymlinkFollow",
-                "LinkTest.NewDirFDWithOpath",
-                "LinkTest.WithNewDirFD",
-                "LinkTest.WithOldDirFD",
             ],
         },
         {

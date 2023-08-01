@@ -395,6 +395,16 @@ zx_status_t zxio_link(zxio_t* src_directory, const char* src_path, size_t src_pa
                         dst_path_len);
 }
 
+zx_status_t zxio_link_into(zxio_t* object, zx_handle_t dst_directory_token, const char* dst_path,
+                           size_t dst_path_len) {
+  if (!zxio_is_valid(object)) {
+    zx_handle_close(dst_directory_token);
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(object);
+  return zio->ops->link_into(object, dst_directory_token, dst_path, dst_path_len);
+}
+
 zx_status_t zxio_dirent_iterator_init(zxio_dirent_iterator_t* iterator, zxio_t* directory) {
   if (!zxio_is_valid(directory)) {
     return ZX_ERR_BAD_HANDLE;
