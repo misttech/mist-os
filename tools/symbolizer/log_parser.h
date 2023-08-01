@@ -5,10 +5,10 @@
 #ifndef TOOLS_SYMBOLIZER_LOG_PARSER_H_
 #define TOOLS_SYMBOLIZER_LOG_PARSER_H_
 
+#include <deque>
 #include <iostream>
 #include <string_view>
 
-#include "tools/symbolizer/printer.h"
 #include "tools/symbolizer/symbolizer.h"
 
 namespace symbolizer {
@@ -36,8 +36,8 @@ namespace symbolizer {
 class LogParser {
  public:
   // Initializes the LogParser. All of the parameters must outlive this LogParser.
-  LogParser(std::istream& input, Printer* printer, Symbolizer* symbolizer)
-      : input_(input), printer_(printer), symbolizer_(symbolizer) {}
+  LogParser(std::istream& input, std::ostream& output, Symbolizer* symbolizer)
+      : input_(input), output_(output), symbolizer_(symbolizer) {}
 
   // Reads the next line from the input, sends it to the symbolizer or writes to the output.
   // Returns false if there's no more line in the input.
@@ -45,18 +45,30 @@ class LogParser {
 
  private:
   // Processes one markup. Returns whether the markup could be processed successfully.
-  bool ProcessMarkup(std::string_view markup);
+  bool ProcessMarkup(std::string_view markup, Symbolizer::OutputFn output);
 
   // Processes one line of Dart stack traces. Return false if it's not valid.
-  bool ProcessDart(std::string_view line);
+  bool ProcessDart(std::string_view line, Symbolizer::OutputFn output);
+
+  // Create an async output function for the symbolizer.
+  Symbolizer::OutputFn CreateOutputFn(std::string_view prefix, std::string_view suffix);
+
+  // Output a raw message. If there's no async output pending, output directly. Otherwise, append
+  // the output to the output buffer.
+  void OutputRaw(std::string_view message);
 
   std::istream& input_;
-  Printer* printer_;
+  std::ostream& output_;
   Symbolizer* symbolizer_;
 
   // Whether we're symbolizing Dart stack traces. Triggered by the "***" line.
   bool symbolizing_dart_ = false;
   std::string dart_process_name_;
+
+  // To facilitate async output of the symbolizer while keeping the same order, we cache input lines
+  // following the symbolization markups if they are pending. It's a deque because there might be
+  // multiple pending symbolization markups. See the comments in |CreateOutputFn|.
+  std::deque<std::string> output_buffers_;
 };
 
 }  // namespace symbolizer

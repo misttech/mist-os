@@ -17,6 +17,7 @@ if (is_host) {
       "symbolizer_impl.cc",
     ]
     public_deps = [
+      "//sdk/lib/fit",
       "//src/developer/debug/zxdb/client",
       "//src/developer/debug/zxdb/console",
       "//src/developer/debug/zxdb/symbols",
