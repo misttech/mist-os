@@ -1418,9 +1418,6 @@ func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duratio
 		if timeout > 0 {
 			command = append(command, "-i", fmt.Sprintf("%d", int64(timeout.Seconds())))
 		}
-		if test.RealmLabel != "" {
-			command = append(command, "--realm-label", test.RealmLabel)
-		}
 		if test.Path != "" {
 			command = append(command, test.Path)
 		} else {

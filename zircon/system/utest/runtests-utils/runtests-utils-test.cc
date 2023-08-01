@@ -202,7 +202,7 @@ TEST(RunTest, RunTestSuccess) {
   PackagedScriptFile script_file("succeed.sh");
   fbl::String test_name = script_file.path();
   const char* argv[] = {test_name.c_str(), nullptr};
-  std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0, nullptr);
+  std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0);
   EXPECT_STREQ(argv[0], result->name.c_str());
   EXPECT_EQ(SUCCESS, result->launch_status);
   EXPECT_EQ(0, result->return_code);
@@ -213,8 +213,7 @@ TEST(RunTest, RunTestTimeout) {
   PackagedScriptFile inf_loop_file("test-inf-loop.sh");
   fbl::String inf_loop_name = inf_loop_file.path();
   const char* inf_loop_argv[] = {inf_loop_name.c_str(), nullptr};
-  std::unique_ptr<Result> result =
-      RunTest(inf_loop_argv, nullptr, inf_loop_name.c_str(), 1, nullptr);
+  std::unique_ptr<Result> result = RunTest(inf_loop_argv, nullptr, inf_loop_name.c_str(), 1);
   EXPECT_STREQ(inf_loop_argv[0], result->name.c_str());
   EXPECT_EQ(TIMED_OUT, result->launch_status);
   EXPECT_EQ(0, result->return_code);
@@ -223,7 +222,7 @@ TEST(RunTest, RunTestTimeout) {
   PackagedScriptFile success_file("succeed.sh");
   fbl::String succeed_name = success_file.path();
   const char* succeed_argv[] = {succeed_name.c_str(), nullptr};
-  result = RunTest(succeed_argv, nullptr, succeed_name.c_str(), 100000, nullptr);
+  result = RunTest(succeed_argv, nullptr, succeed_name.c_str(), 100000);
   EXPECT_STREQ(succeed_argv[0], result->name.c_str());
   EXPECT_EQ(SUCCESS, result->launch_status);
   EXPECT_EQ(0, result->return_code);
@@ -235,7 +234,7 @@ TEST(RunTest, RunTestFailure) {
   fbl::String test_name = script_file.path();
   const char* argv[] = {test_name.c_str(), nullptr};
 
-  std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0, nullptr);
+  std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0);
 
   EXPECT_STREQ(argv[0], result->name.c_str());
   EXPECT_EQ(FAILED_NONZERO_RETURN_CODE, result->launch_status);
@@ -245,7 +244,7 @@ TEST(RunTest, RunTestFailure) {
 TEST(RunTest, RunTestFailureToLoadFile) {
   const char* argv[] = {"i/do/not/exist/", nullptr};
 
-  std::unique_ptr<Result> result = RunTest(argv, nullptr, argv[0], 0, nullptr);
+  std::unique_ptr<Result> result = RunTest(argv, nullptr, argv[0], 0);
   EXPECT_STREQ(argv[0], result->name.c_str());
   EXPECT_EQ(FAILED_TO_LAUNCH, result->launch_status);
 }
@@ -315,8 +314,7 @@ TEST(RunTests, RunTestsWithArguments) {
   fbl::Vector<fbl::String> args{"first", "second", "third", "-4", "--", "-", "seventh"};
   const fbl::String output_dir = JoinPath(test_dir.path(), "output");
   ASSERT_EQ(0, MkDirAll(output_dir));
-  EXPECT_TRUE(RunTests({succeed_file_name}, args, 1, 0, output_dir.c_str(), nullptr, &num_failed,
-                       &results));
+  EXPECT_TRUE(RunTests({succeed_file_name}, args, 1, 0, output_dir.c_str(), &num_failed, &results));
   EXPECT_EQ(0, num_failed);
   EXPECT_EQ(1, results.size());
 }

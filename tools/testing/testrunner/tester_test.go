@@ -1044,17 +1044,6 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"runtests", "-i", "1", "/path/to/test"},
 		},
 		{
-			name:        "use runtests realm-label",
-			useRuntests: true,
-			test: testsharder.Test{
-				Test: build.Test{
-					Path: "/path/to/test",
-				},
-				RealmLabel: "testrealm",
-			},
-			expected: []string{"runtests", "--realm-label", "testrealm", "/path/to/test"},
-		},
-		{
 			name:        "system path",
 			useRuntests: false,
 			test: testsharder.Test{

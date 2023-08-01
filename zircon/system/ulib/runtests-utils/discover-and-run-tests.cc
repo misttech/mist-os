@@ -92,7 +92,6 @@ int DiscoverAndRunTests(int argc, const char* const* argv,
   fbl::Vector<fbl::String> test_args;
   fbl::Vector<fbl::String> test_paths;
   const char* output_dir = nullptr;
-  const char* realm_label = nullptr;
   unsigned int timeout_seconds = 0;
   int repeat = 1;
   bool dry_run = false;
@@ -134,15 +133,6 @@ int DiscoverAndRunTests(int argc, const char* const* argv,
         return EXIT_FAILURE;
       }
       output_dir = argv[optind++];
-      continue;
-    }
-
-    if (arg == "--realm-label") {
-      if (optind >= argc) {
-        fprintf(stderr, "Missing argument for %s\n", arg.c_str());
-        return EXIT_FAILURE;
-      }
-      realm_label = argv[optind++];
       continue;
     }
 
@@ -227,7 +217,7 @@ int DiscoverAndRunTests(int argc, const char* const* argv,
   fbl::Vector<std::unique_ptr<Result>> results;
   if (!RunTests(test_paths, test_args, repeat,
                 static_cast<int64_t>(timeout_seconds) * static_cast<int64_t>(1000), output_dir,
-                realm_label, &failed_count, &results)) {
+                &failed_count, &results)) {
     return EXIT_FAILURE;
   }
 

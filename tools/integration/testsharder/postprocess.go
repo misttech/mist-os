@@ -707,15 +707,6 @@ func normalizeTestName(name string) string {
 	return strings.ReplaceAll(trimmedName, "/", "_")
 }
 
-// Applies the realm label to all tests on all shards provided.
-func ApplyRealmLabel(shards []*Shard, realmLabel string) {
-	for _, shard := range shards {
-		for i := range shard.Tests {
-			shard.Tests[i].RealmLabel = realmLabel
-		}
-	}
-}
-
 // ApplyTestTimeouts sets the timeout field on every test to the specified
 // duration. Timeouts already declared for tests in tests.json take precedence.
 func ApplyTestTimeouts(shards []*Shard, perTestTimeout time.Duration) {

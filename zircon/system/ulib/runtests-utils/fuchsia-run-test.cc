@@ -97,7 +97,7 @@ zx_status_t RunLoopUntilSignalOrDeadline(async::Loop& loop, zx::time deadline, z
 }
 
 std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, const char* test_name,
-                                int64_t timeout_msec, const char* realm_label) {
+                                int64_t timeout_msec) {
   // The arguments passed to fdio_spawn_etc. May be overridden.
   const char** args = argv;
   // calculate size of argv
@@ -108,16 +108,12 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
 
   const char* path = argv[0];
   fbl::String component_executor;
-  fbl::String realm_label_arg;
 
   if (!SetUpForTestComponent(path, &component_executor)) {
     return std::make_unique<Result>(path, FAILED_TO_LAUNCH, 0, 0);
   }
 
-  const char* component_launch_args[argc + 4];
-  if (realm_label != nullptr) {
-    realm_label_arg = fbl::String::Concat({"--realm-label=", realm_label});
-  }
+  const char* component_launch_args[argc + 3];
   if (component_executor.length() > 0) {
     // Check whether the executor is present and print a more helpful error, rather than failing
     // later in the fdio_spawn_etc call.
@@ -131,10 +127,6 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
     }
     component_launch_args[0] = component_executor.c_str();
     int j = 1;
-    if (realm_label != nullptr) {
-      component_launch_args[j] = realm_label_arg.c_str();
-      j++;
-    }
     component_launch_args[j] = path;
     j++;
     for (size_t i = 1; i <= argc; i++) {

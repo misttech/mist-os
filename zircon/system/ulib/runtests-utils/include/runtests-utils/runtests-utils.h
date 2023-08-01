@@ -65,11 +65,8 @@ struct Result {
 // |test_name| is used to populate Result and in log messages.
 // |timeout_msec| is a number of milliseconds to wait for the test. If 0,
 //   will wait indefinitely.
-// |realm_label| is the realm label to be applied to calls to underlying test executor.
-//   The test will run in that realm and its run artifacts will not be cleaned up automatically
-//   after the completion of the test.
 std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, const char* test_name,
-                                int64_t timeout_msec, const char* realm_label);
+                                int64_t timeout_msec);
 
 // A means of measuring how long it takes to run tests.
 class Stopwatch {
@@ -131,17 +128,14 @@ int ResolveGlobs(const fbl::Vector<fbl::String>& globs, fbl::Vector<fbl::String>
 //   ignored if 0.
 // |output_dir| is the directory for all the tests' debug data sinks. May be nullptr, in
 //   which case debug data will not be captured.
-// |realm_label| is the realm label to be applied to calls to underlying test executor.
-//   The test will run in that realm and its run artifacts will not be cleaned up automatically
-//   after the completion of the test.
 // |failed_count| is an output parameter which will be set to the number of test
 //   binaries that failed.
 // |results| is an output parameter to which run results will be appended.
 //
 // Returns false if any test binary failed, true otherwise.
 bool RunTests(const fbl::Vector<fbl::String>& test_paths, const fbl::Vector<fbl::String>& test_args,
-              int repeat, int64_t timeout_msec, const char* output_dir, const char* realm_label,
-              int* failed_count, fbl::Vector<std::unique_ptr<Result>>* results);
+              int repeat, int64_t timeout_msec, const char* output_dir, int* failed_count,
+              fbl::Vector<std::unique_ptr<Result>>* results);
 
 // Expands |dir_globs| and searches those directories for files.
 //

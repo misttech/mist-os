@@ -66,7 +66,7 @@ TEST(RunTests, RunTestDontPublishData) {
   fbl::String test_name = PublishDataHelperBin();
 
   const char* argv[] = {test_name.c_str(), nullptr};
-  std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0, nullptr);
+  std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0);
   EXPECT_STREQ(argv[0], result->name.c_str());
   EXPECT_EQ(SUCCESS, result->launch_status);
   EXPECT_EQ(0, result->return_code);
@@ -80,7 +80,7 @@ TEST(RunTests, RunTestPublishData) {
   const char* argv[] = {test_name.c_str(), nullptr};
   const fbl::String output_dir = JoinPath(test_dir.path(), "output");
   ASSERT_EQ(0, MkDirAll(output_dir));
-  std::unique_ptr<Result> result = RunTest(argv, output_dir.c_str(), test_name.c_str(), 0, nullptr);
+  std::unique_ptr<Result> result = RunTest(argv, output_dir.c_str(), test_name.c_str(), 0);
   EXPECT_STREQ(argv[0], result->name.c_str());
   EXPECT_EQ(SUCCESS, result->launch_status);
   EXPECT_EQ(0, result->return_code);
@@ -94,7 +94,7 @@ TEST(RunTests, RunTestsPublishData) {
   fbl::Vector<std::unique_ptr<Result>> results;
   const fbl::String output_dir = JoinPath(test_dir.path(), "output");
   ASSERT_EQ(0, MkDirAll(output_dir));
-  EXPECT_TRUE(RunTests({test_name}, {}, 1, 0, output_dir.c_str(), nullptr, &num_failed, &results));
+  EXPECT_TRUE(RunTests({test_name}, {}, 1, 0, output_dir.c_str(), &num_failed, &results));
   EXPECT_EQ(0, num_failed);
   EXPECT_EQ(1, results.size());
   EXPECT_LE(1, results[0]->data_sinks.size());
@@ -107,8 +107,8 @@ TEST(RunTests, RunDuplicateTestsPublishData) {
   fbl::Vector<std::unique_ptr<Result>> results;
   const fbl::String output_dir = JoinPath(test_dir.path(), "output");
   ASSERT_EQ(0, MkDirAll(output_dir));
-  EXPECT_TRUE(RunTests({test_name, test_name, test_name}, {}, 1, 0, output_dir.c_str(), nullptr,
-                       &num_failed, &results));
+  EXPECT_TRUE(RunTests({test_name, test_name, test_name}, {}, 1, 0, output_dir.c_str(), &num_failed,
+                       &results));
   EXPECT_EQ(0, num_failed);
   EXPECT_EQ(3, results.size());
   EXPECT_STREQ(test_name.c_str(), results[0]->name.c_str());
@@ -173,8 +173,8 @@ TEST(RunTests, RunProfileMergeData) {
   ASSERT_EQ(0, MkDirAll(output_dir));
 
   // Run the test for the first time.
-  ASSERT_TRUE(RunTests({test_name, test_name}, {}, 1, 0, output_dir.c_str(), nullptr, &num_failed,
-                       &results));
+  ASSERT_TRUE(
+      RunTests({test_name, test_name}, {}, 1, 0, output_dir.c_str(), &num_failed, &results));
   EXPECT_EQ(0, num_failed);
   ASSERT_EQ(2, results.size());
   auto llvm_profile0 = results[0]->data_sinks.find("llvm-profile");
@@ -182,7 +182,7 @@ TEST(RunTests, RunProfileMergeData) {
   ASSERT_EQ(1, llvm_profile0->second.size());
 
   // Run the test for the second time.
-  ASSERT_TRUE(RunTests({test_name}, {}, 1, 0, output_dir.c_str(), nullptr, &num_failed, &results));
+  ASSERT_TRUE(RunTests({test_name}, {}, 1, 0, output_dir.c_str(), &num_failed, &results));
   EXPECT_EQ(0, num_failed);
   ASSERT_EQ(3, results.size());
   auto llvm_profile1 = results[1]->data_sinks.find("llvm-profile");
@@ -208,7 +208,7 @@ TEST(RunTests, RunTestRootDir) {
 
   // Run a test and confirm TEST_ROOT_DIR gets passed along.
   {
-    std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0, nullptr);
+    std::unique_ptr<Result> result = RunTest(argv, nullptr, test_name.c_str(), 0);
 
     EXPECT_STREQ(argv[0], result->name.c_str());
     EXPECT_EQ(SUCCESS, result->launch_status);
