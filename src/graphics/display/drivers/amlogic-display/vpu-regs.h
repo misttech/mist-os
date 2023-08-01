@@ -230,29 +230,41 @@ class VdinCoef22Reg : public hwreg::RegisterBase<VdinCoef22Reg, uint32_t> {
   static auto Get() { return hwreg::RegisterAddr<VdinCoef22Reg>(VPU_VDIN1_COEF22); }
 };
 
+// VDIN1_MATRIX_OFFSET0_1
+// A311D datasheet, section 10.2.3 "Video Output" > "Register Description",
+// page 1113.
 class VdinOffset0_1Reg : public hwreg::RegisterBase<VdinOffset0_1Reg, uint32_t> {
  public:
-  DEF_FIELD(28, 16, offset0);
-  DEF_FIELD(12, 0, offset1);
+  DEF_FIELD(26, 16, offset0);
+  DEF_FIELD(10, 0, offset1);
   static auto Get() { return hwreg::RegisterAddr<VdinOffset0_1Reg>(VPU_VDIN1_OFFSET0_1); }
 };
 
+// VDIN1_MATRIX_OFFSET2
+// A311D datasheet, section 10.2.3 "Video Output" > "Register Description",
+// page 1113.
 class VdinOffset2Reg : public hwreg::RegisterBase<VdinOffset2Reg, uint32_t> {
  public:
-  DEF_FIELD(12, 0, offset2);
+  DEF_FIELD(10, 0, offset2);
   static auto Get() { return hwreg::RegisterAddr<VdinOffset2Reg>(VPU_VDIN1_OFFSET2); }
 };
 
+// VDIN1_MATRIX_PRE_OFFSET0_1
+// A311D datasheet, section 10.2.3 "Video Output" > "Register Description",
+// page 1114.
 class VdinPreOffset0_1Reg : public hwreg::RegisterBase<VdinPreOffset0_1Reg, uint32_t> {
  public:
-  DEF_FIELD(28, 16, preoffset0);
-  DEF_FIELD(12, 0, preoffset1);
+  DEF_FIELD(26, 16, preoffset0);
+  DEF_FIELD(10, 0, preoffset1);
   static auto Get() { return hwreg::RegisterAddr<VdinPreOffset0_1Reg>(VPU_VDIN1_PRE_OFFSET0_1); }
 };
 
+// VDIN1_MATRIX_PRE_OFFSET2
+// A311D datasheet, section 10.2.3 "Video Output" > "Register Description",
+// page 1114.
 class VdinPreOffset2Reg : public hwreg::RegisterBase<VdinPreOffset2Reg, uint32_t> {
  public:
-  DEF_FIELD(12, 0, preoffset2);
+  DEF_FIELD(10, 0, preoffset2);
   static auto Get() { return hwreg::RegisterAddr<VdinPreOffset2Reg>(VPU_VDIN1_PRE_OFFSET2); }
 };
 

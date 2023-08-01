@@ -40,7 +40,7 @@ constexpr int16_t YUV709l_to_RGB709_coeff12[24] = {
 //    -128     1.164  2.115  0      0
 constexpr uint32_t capture_yuv2rgb_coeff[3][3] = {
     {0x04a8, 0x0000, 0x072c}, {0x04a8, 0x1f26, 0x1ddd}, {0x04a8, 0x0876, 0x0000}};
-constexpr uint32_t capture_yuv2rgb_preoffset[3] = {0xfc0, 0xe00, 0xe00};
+constexpr uint32_t capture_yuv2rgb_preoffset[3] = {0x7c0, 0x600, 0x600};
 constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 
 constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInputModule1;
