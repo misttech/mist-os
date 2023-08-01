@@ -12,7 +12,7 @@ class Tile(abc.ABC):
 
     @abc.abstractmethod
     def add_tile_from_view_provider(self, url: str) -> int:
-        """Add Instantiates a component by its URL and adds a tile backed by
+        """Instantiates a component by its URL and adds a tile backed by
            that component's ViewProvider.
 
         Args:
@@ -20,7 +20,7 @@ class Tile(abc.ABC):
 
         Returns:
             a key for the tile that can be used for resizing or removing the
-            tile, or 0 on failure.
+            tile, or raise an exception on failure.
         """
 
     @abc.abstractmethod
