@@ -494,7 +494,7 @@ impl<S: HandleOwner> Directory<S> {
             .tree()
             .find(&ObjectKey::object(self.object_id()))
             .await?
-            .ok_or(anyhow!(FxfsError::NotFound))?;
+            .ok_or(FxfsError::NotFound)?;
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::Directory { sub_dirs },
