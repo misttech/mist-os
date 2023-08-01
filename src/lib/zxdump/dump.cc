@@ -1245,6 +1245,16 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
           dump.filesz = segment.filesz;
         }
 
+        // If this mapping covers past the end of the VMO, trim the excess away. Note that we have
+        // to handle overflows because the vmo_offset could be greater than the VMO size.
+        uint64_t vmo_size_after_offset;
+        if (sub_overflow(vmo.size_bytes, info.u.mapping.vmo_offset, &vmo_size_after_offset)) {
+          vmo_size_after_offset = 0;
+        }
+        if (dump.filesz > vmo_size_after_offset) {
+          dump.filesz = vmo_size_after_offset;
+        }
+
         // Let the callback decide about this segment.
         if (auto result = prune_segment(dump, info, vmo); result.is_error()) {
           return result.take_error();

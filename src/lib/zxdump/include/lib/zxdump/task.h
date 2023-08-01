@@ -361,10 +361,7 @@ class Object {
 
   static fit::result<Error> wait_many(WaitItemVector& wait_items);
 
-  // Turn a live task into a postmortem task.  The postmortem task holds only
-  // the basic information (KOID, type) and whatever has been cached by past
-  // get_info or get_property calls.
-  LiveHandle Reap() { return std::exchange(live_, {}); }
+  bool is_live() const { return live_.is_valid(); }
 
   // As a convenience, TaskHolder::root_resource() is proxied by every Object.
   Resource& root_resource();

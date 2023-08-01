@@ -201,18 +201,32 @@ int main(int argc, char** argv) {
         continue;
       }
 
+#ifdef __Fuchsia__
       case 'p': {
-        size_t size = static_cast<size_t>(strtoul(optarg, nullptr, 0));
-        ZX_ASSERT(size > 0);
-        void* mapped = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-        ZX_ASSERT_MSG(mapped != MAP_FAILED, "mmap: %s", strerror(errno));
-        cpp20::span<uint8_t> contents(static_cast<uint8_t*>(mapped), size);
-        for (size_t i = 0; i < size; ++i) {
-          contents[i] = static_cast<uint8_t>(i);
+        size_t allocated_size, reserved_size;
+        ZX_ASSERT(sscanf(optarg, "%zu,%zu", &allocated_size, &reserved_size) == 2);
+
+        size_t mapped_size = allocated_size + reserved_size;
+        ZX_ASSERT(mapped_size > 0);
+
+        zx::vmo vmo;
+        zx_status_t status = zx::vmo::create(allocated_size, 0, &vmo);
+        ZX_ASSERT_MSG(status == ZX_OK, "zx_vmo_create: %s", zx_status_get_string(status));
+
+        zx_vaddr_t vaddr;
+        status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALLOW_FAULTS,
+                                            0, vmo, 0, mapped_size, &vaddr);
+        ZX_ASSERT_MSG(status == ZX_OK, "zx_vmar_map: %s", zx_status_get_string(status));
+
+        uint8_t* mapped = reinterpret_cast<uint8_t*>(vaddr);
+        for (size_t i = 0; i < allocated_size; ++i) {
+          mapped[i] = static_cast<uint8_t>(i);
         }
+
         printf("%p\n", mapped);
         continue;
       }
+#endif
 
       case 't':
         thread_count = atoi(optarg);

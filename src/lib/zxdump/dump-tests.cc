@@ -311,6 +311,10 @@ void TestProcessForMemory::StartChild() {
     });
   }
 
+  const std::array<int, 2> memory_sizes = {
+      2 * static_cast<int>(zx_system_get_page_size()), /* allocated pages */
+      static_cast<int>(zx_system_get_page_size()) /* reserved pages */,
+  };
   ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild({
       "-m",
       kMemoryText.data(),
@@ -319,7 +323,7 @@ void TestProcessForMemory::StartChild() {
       "-w",
       kMemoryText.data(),
       "-p",
-      std::to_string(2 * zx_system_get_page_size()).c_str(),
+      IntsString(cpp20::span(memory_sizes)).c_str(),
   }));
 
   // The test-child wrote the pointers where the -m text and -M int array
@@ -430,10 +434,21 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
     }
   }
 
+  // Test that reading the non-allocated page returns either an error or zero bytes.
+  {
+    constexpr size_t kSampleSize = 20;
+    ASSERT_TRUE(pages_ptr_ % zx_system_get_page_size() == 0) << std::hex << pages_ptr_;
+    const uint64_t ptr = pages_ptr_ + 2 * zx_system_get_page_size();
+    auto memory_result = read_process.read_memory<uint8_t>(ptr, kSampleSize);
+    if (read_process.is_live()) {
+      EXPECT_TRUE(memory_result.is_error()) << "Read " << memory_result->size_bytes() << " bytes";
+    } else {
+      ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+      EXPECT_EQ(memory_result->size(), 0u);
+    }
+  }
+
   // Test a read that can return less than requested.
-  //
-  // Note that this makes read_process unusable for live access in later tests,
-  // so this should be its last use in the test function.
   {
     constexpr size_t kSampleSize = 20;
     const uint64_t ptr = pages_ptr_ + zx_system_get_page_size() - (kSampleSize / 2);
@@ -442,7 +457,7 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
     const size_t sample_size = std::min(kSampleSize, memory_result->size());
     ASSERT_NO_FATAL_FAILURE(test_memory_pages(ptr, sample_size, **memory_result));
     if (!memory_elided) {
-      if (auto live_process = read_process.Reap()) {
+      if (read_process.is_live()) {
         // A live read should have been truncated to keep it in the one page.
         EXPECT_EQ(sample_size, kSampleSize / 2);
       } else {
