@@ -70,6 +70,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // NodeManager interface
   // Shutdown hooks called by the shutdown manager
   void ShutdownAllDrivers(fit::callback<void()> callback) override {
+    LOGF(INFO, "Driver Runner invokes shutdown all drivers");
     removal_tracker_.set_all_callback(std::move(callback));
     root_node_->Remove(RemovalSet::kAll, &removal_tracker_);
     removal_tracker_.FinishEnumeration();

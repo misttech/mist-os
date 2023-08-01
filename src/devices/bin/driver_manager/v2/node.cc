@@ -456,6 +456,10 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 }
 
 Node::~Node() {
+  if (node_state_ != NodeState::kStopping) {
+    LOGF(INFO, "Node deallocating while at state %s", State2String(node_state_));
+  }
+
   CloseIfExists(controller_ref_);
   CloseIfExists(node_ref_);
   if (pending_bind_completer_.has_value()) {
@@ -578,7 +582,7 @@ void Node::CheckForRemoval() {
 }
 
 void Node::FinishRemoval() {
-  LOGF(DEBUG, "Node: %s Finishing removal", name().c_str());
+  LOGF(INFO, "Node: %s Finishing removal", name().c_str());
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
                 "FinishRemoval called in invalid node state: %s", State2String(node_state_));
 
@@ -593,7 +597,7 @@ void Node::FinishRemoval() {
   driver_component_.reset();
   for (auto& parent : parents()) {
     if (auto ptr = parent.lock(); ptr) {
-      ptr->RemoveChild(shared_from_this());
+      ptr->RemoveChild(this_node);
       continue;
     }
     LOGF(WARNING, "Parent freed before child %s could be removed from it", name().c_str());
