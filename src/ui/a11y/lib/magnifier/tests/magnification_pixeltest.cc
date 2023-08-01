@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/accessibility/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -17,13 +18,11 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
-#include "src/ui/testing/util/gfx_test_view.h"
+#include "src/ui/testing/util/flatland_test_view.h"
 
 namespace integration_tests {
 
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
-using component_testing::LocalComponentHandles;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -49,25 +48,29 @@ class MagnificationPixelTest : public gtest::RealLoopFixture {
   // |testing::Test|
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
+    config.use_flatland = true;
     config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
+    config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_};
     ui_test_manager_.emplace(std::move(config));
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
     realm_ = ui_test_manager_->AddSubrealm();
 
-    test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
     // Add a test view provider.
-    realm_->AddLocalChild(kViewProvider, [d = dispatcher(), a = test_view_access_]() {
-      return std::make_unique<ui_testing::GfxTestView>(
+    test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
+    component_testing::LocalComponentFactory test_view = [d = dispatcher(),
+                                                          a = test_view_access_]() {
+      return std::make_unique<ui_testing::FlatlandTestView>(
           d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
-    });
+    };
+    realm_->AddLocalChild(kViewProvider, std::move(test_view));
+
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
-    realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
+    realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_}},
                            .source = ParentRef(),
                            .targets = {ChildRef{kViewProvider}}});
 
@@ -89,7 +92,18 @@ class MagnificationPixelTest : public gtest::RealLoopFixture {
   }
 
   void SetClipSpaceTransform(float scale, float x, float y) {
-    fake_magnifier_->SetMagnification(scale, x, y, [this]() { QuitLoop(); });
+    // HACK HACK HACK
+    // TODO(fxbug.dev/131440): Remove this when we move to the new gesture
+    // disambiguation protocols.
+    //
+    // Because the FlatlandAcessibilityView::SetMagnificationTransform
+    // hardcodes translation values at a display rotation of 270, this test
+    // must normalize the values given the display rotation of 0.
+    //
+    // Since a display rotation of 270 uses (x, y) as (y, -x), pass
+    // in (y, -x), which will yield (x, y) to get an effective display
+    // rotation of 0.
+    fake_magnifier_->SetMagnification(scale, y, -x, [this]() { QuitLoop(); });
 
     RunLoop();
   }
