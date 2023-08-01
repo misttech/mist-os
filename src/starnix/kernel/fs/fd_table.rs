@@ -366,7 +366,10 @@ impl Releasable for FdTable {
     type Context = CurrentTask;
     /// Drop the fd table, closing any files opened exclusively by this table.
     fn release(&self, current_task: &CurrentTask) {
-        self.table.lock().release(current_task);
+        let table = OwnedRef::take(&self.table.lock());
+        if let Some(table) = table {
+            table.release(current_task);
+        }
     }
 }
 

@@ -74,6 +74,20 @@ impl<T: Releasable> OwnedRef<T> {
     pub fn temp(this: &Self) -> TempRef<'_, T> {
         TempRef::new(this.inner.clone())
     }
+
+    /// Take the releasable from the `OwnedRef`. Returns None if the `OwnedRef` is not the last
+    /// reference to the data.
+    pub fn take(this: &Self) -> Option<impl Releasable<Context = T::Context>> {
+        this.drop_guard.disarm();
+        let previous_count = this.inner.owned_refs_count.fetch_sub(1, Ordering::Release);
+        if previous_count == 1 {
+            fence(Ordering::Acquire);
+            this.inner.wait_for_no_ref();
+            Some(Arc::clone(&this.inner))
+        } else {
+            None
+        }
+    }
 }
 
 impl<T: Releasable + std::fmt::Debug> std::fmt::Debug for OwnedRef<T> {
@@ -97,12 +111,8 @@ impl<T: Releasable> Releasable for OwnedRef<T> {
     /// Release the `OwnedRef`. If this is the last instance, this method will block until all
     /// `TempRef` instances are dropped, and will release the underlying object.
     fn release(&self, c: &Self::Context) {
-        self.drop_guard.disarm();
-        let previous_count = self.inner.owned_refs_count.fetch_sub(1, Ordering::Release);
-        if previous_count == 1 {
-            fence(Ordering::Acquire);
-            self.inner.wait_for_no_ref();
-            self.inner.value.release(c);
+        if let Some(value) = OwnedRef::take(self) {
+            value.release(c);
         }
     }
 }
@@ -316,6 +326,13 @@ struct RefInner<T> {
     // module reimplemented all of Arc/Weak. This can be changed without changing the API if this
     // becomes a performance issue.
     temp_refs_count: zx::sys::zx_futex_t,
+}
+
+impl<T: Releasable> Releasable for Arc<RefInner<T>> {
+    type Context = T::Context;
+    fn release(&self, c: &Self::Context) {
+        self.value.release(c);
+    }
 }
 
 #[cfg(any(test, debug_assertions))]
