@@ -3,6 +3,7 @@ load(
     "fuchsia_bind_cc_library",
     "fuchsia_fidl_library",
     "fuchsia_fidl_bind_library",
+    "fuchsia_fidl_hlcpp_library",
     "fuchsia_fidl_llcpp_library",
 )
 
@@ -35,6 +36,17 @@ fuchsia_fidl_bind_library(
 fuchsia_bind_cc_library(
     name = "{{name}}_bindlib_cc",
     library = ":{{name}}_bindlib",
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
+)
+
+# LEGACY: This target will soon be deprecated
+fuchsia_fidl_hlcpp_library(
+    name = "{{name}}_cc",
+    library = ":{{name}}",
+    deps = [
+        "{{parent_sdk}}//pkg/fidl_cpp",
+        {{cc_deps}}
+    ],
     target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
 

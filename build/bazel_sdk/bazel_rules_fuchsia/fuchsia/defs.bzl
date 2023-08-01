@@ -42,6 +42,7 @@ load(
 )
 load(
     "//fuchsia/private:legacy_fuchsia_fidl_cc_library.bzl",
+    _fuchsia_fidl_hlcpp_library = "fuchsia_fidl_hlcpp_library",
     _fuchsia_fidl_llcpp_library = "fuchsia_fidl_llcpp_library",
 )
 load(
@@ -132,6 +133,7 @@ fuchsia_emulator = _fuchsia_emulator
 fuchsia_fidl_library = _fuchsia_fidl_library
 fuchsia_fidl_bind_library = _fuchsia_fidl_bind_library
 fuchsia_bind_cc_library = _fuchsia_bind_cc_library
+fuchsia_fidl_hlcpp_library = _fuchsia_fidl_hlcpp_library
 fuchsia_fidl_llcpp_library = _fuchsia_fidl_llcpp_library
 fuchsia_package = _fuchsia_package
 fuchsia_test_package = _fuchsia_test_package

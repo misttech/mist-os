@@ -26,8 +26,8 @@ fuchsia_cc_binary(
         "@internal_sdk//third_party/re2_re2",
         # the fidl libraries below are not effectively used in the hello world sample, they are here just to validate that
         # the Bazel build can include FIDL dependencies from both internal and partner SDK correctly:
-        "@fuchsia_sdk//fidl/fuchsia.component.config:fuchsia.component.config_cpp",
-        "@internal_sdk//fidl/fuchsia.exception:fuchsia.exception_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.component.config:fuchsia.component.config_cc",
+        "@internal_sdk//fidl/fuchsia.exception:fuchsia.exception_cc",
     ],
 )
 
