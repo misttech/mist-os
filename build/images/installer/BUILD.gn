@@ -5,8 +5,8 @@ import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/paths.gni")
 
-if (use_bringup_assembly) {
-  # The installer requires either a FVM or Fxfs.
+if (use_bringup_assembly || fvm_partition == "") {
+  # The installer doesn't work without an FVM image.
   group("installer") {
   }
 } else {
@@ -58,6 +58,7 @@ if (use_bringup_assembly) {
 
     inputs = [
       "$root_build_dir/host-tools/cgpt",
+      files.fvm_sparse,
       files.final_zbi,
       files.final_vbmeta,
       files.final_recovery_zbi,
@@ -66,12 +67,6 @@ if (use_bringup_assembly) {
       files.installer_vbmeta,
       input_images_json_file,
     ]
-
-    if (fxfs_blob) {
-      inputs += [ files.fxfs_sparse ]
-    } else {
-      inputs += [ files.fvm_sparse ]
-    }
 
     if (defined(files.esp)) {
       inputs += [ files.esp ]

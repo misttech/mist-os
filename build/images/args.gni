@@ -239,6 +239,9 @@ sign_zbi = custom_signing_script != "" || use_vboot
 # change. See: src/sys/pkg/bin/system-updater/epoch/playbook.md
 update_platform_epoch = 1
 
+assert(fxfs_partition == "" || fvm_partition == "",
+       "only one of fxfs_partition/fvm_partition can be specified")
+
 # bazel_product_bundle_target is not empty when both
 # bazel_product_bundle_{prefix,board} are defined and will point
 # to the label of a fuchsia_product_bundle() in the Bazel graph.
