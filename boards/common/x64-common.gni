@@ -13,6 +13,9 @@ _imports = {  # Import into hidden scope, to avoid importing into args.gn.
 
 has_board = true
 
+# We also use this board for virtualization
+add_qemu_to_build_archives = true
+
 target_cpu = "x64"
 
 # Drivers and tools to include on bootfs.
