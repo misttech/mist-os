@@ -102,9 +102,9 @@ Set up the VIM3 to communicate with your host:
 
    * GND to pin 17.
 
-   * RX (in to VIM3) to pin 18.
+   * TX (out from VIM3) to pin 18.
 
-   * TX (out from VIM3) to pin 19.
+   * RX (into VIM3) to pin 19.
 
    * Don't connect the power wire of your serial cable to any VIM3 GPIO.
      The VIM3 is getting power through the USB cable.
@@ -118,6 +118,8 @@ Set up the VIM3 to communicate with your host:
 
    See [Serial Debugging Tool] for an example image of how your serial wires
    should be connected to the VIM3.
+
+1. Connect the USB end of the serial cable to your host.
 
 #### Verify the serial connection {#serial}
 
