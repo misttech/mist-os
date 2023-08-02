@@ -39,15 +39,14 @@ use netstack3_core::{
         segment::Payload,
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
-            get_bound_info, get_connection_error, get_connection_info, get_handshake_status,
-            get_listener_info, listen, receive_buffer_size, remove_bound, remove_unbound,
-            reuseaddr, send_buffer_size, set_bound_device, set_connection_device,
-            set_listener_device, set_receive_buffer_size, set_reuseaddr_bound,
-            set_reuseaddr_listener, set_reuseaddr_unbound, set_send_buffer_size,
-            set_unbound_device, shutdown_conn, shutdown_listener, with_socket_options,
-            with_socket_options_mut, AcceptError, BoundInfo, ConnectError, ConnectionId,
-            ConnectionInfo, HandshakeStatus, ListenError, ListenerNotifier, NoConnection,
-            SetReuseAddrError, SocketAddr, SocketId,
+            get_connection_error, get_handshake_status, get_info, listen, receive_buffer_size,
+            remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_bound_device,
+            set_connection_device, set_listener_device, set_receive_buffer_size,
+            set_reuseaddr_bound, set_reuseaddr_listener, set_reuseaddr_unbound,
+            set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
+            with_socket_options, with_socket_options_mut, AcceptError, BoundInfo, ConnectError,
+            ConnectionId, ConnectionInfo, HandshakeStatus, ListenError, ListenerNotifier,
+            NoConnection, SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -761,19 +760,12 @@ where
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        let fidl = match *id {
-            SocketId::Unbound(_) => return Err(fposix::Errno::Einval),
-            SocketId::Bound(id) => {
-                let BoundInfo { addr, port, device: _ } = get_bound_info::<I, _>(sync_ctx, id);
+        let fidl = match get_info::<I, _>(sync_ctx, *id) {
+            SocketInfo::Unbound(_) => return Err(fposix::Errno::Einval),
+            SocketInfo::Bound(BoundInfo { addr, port, device: _ }) => {
                 (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
             }
-            SocketId::Listener(id) => {
-                let BoundInfo { addr, port, device: _ } = get_listener_info::<I, _>(sync_ctx, id);
-                (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
-            }
-            SocketId::Connection(id) => {
-                let ConnectionInfo { local_addr, remote_addr: _, device: _ } =
-                    get_connection_info::<I, _>(sync_ctx, id);
+            SocketInfo::Connection(ConnectionInfo { local_addr, remote_addr: _, device: _ }) => {
                 local_addr.try_into_fidl_with_ctx(non_sync_ctx)
             }
         }
@@ -785,13 +777,10 @@ where
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match *id {
-            SocketId::Unbound(_) | SocketId::Bound(_) | SocketId::Listener(_) => {
-                Err(fposix::Errno::Enotconn)
-            }
-            SocketId::Connection(id) => Ok({
-                get_connection_info::<I, _>(sync_ctx, id)
-                    .remote_addr
+        match get_info::<I, _>(sync_ctx, *id) {
+            SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
+            SocketInfo::Connection(info) => Ok({
+                info.remote_addr
                     .try_into_fidl_with_ctx(non_sync_ctx)
                     .map_err(IntoErrno::into_errno)?
                     .into_sock_addr()
