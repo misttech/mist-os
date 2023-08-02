@@ -36,29 +36,28 @@ if (is_fuchsia) {
   assert(current_toolchain == default_toolchain,
          "//build/images/* are only valid in the Fuchsia toolchain")
 
-  _images_config = "//boards/images:default"
   if (has_board) {
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-    assert(fuchsia_filesystem_config != false,
-           "Need to define fuchsia_filesystem_config for cuckoo tests")
-    _images_config = fuchsia_filesystem_config
   }
 
   # Parameters shared between recovery-eng and recovery-installer
   recovery_base = {
     testonly = true
     image_name = "fuchsia"
-    generate_fvm = !bootfs_only && !fxfs_blob
-    generate_fxfs = !bootfs_only && fxfs_blob
-
-    generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
-    generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
 
     ramdisk_in_zbi = true
 
-    assembly_images_config_label = _images_config
+    if (!fxfs_blob) {
+      assembly_images_config_label = "//boards/images:default"
+      generate_fvm = !bootfs_only
+      generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
+      generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
+    } else {
+      assembly_images_config_label = "//boards/images:default-fxfs"
+      generate_fxfs = !bootfs_only
+    }
     board_config = board_information_for_assembly
 
     include_component_id_index = true
@@ -344,12 +343,17 @@ if (is_fuchsia) {
 
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
-    generate_fvm = !bootfs_only && !fxfs_blob
-    generate_fxfs = !bootfs_only && fxfs_blob
-
-    generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
-    generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
+
+    if (!fxfs_blob) {
+      assembly_images_config_label = "//boards/images:default"
+      generate_fvm = !bootfs_only
+      generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
+      generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
+    } else {
+      assembly_images_config_label = "//boards/images:default-fxfs"
+      generate_fxfs = !bootfs_only
+    }
 
     ramdisk_in_zbi = true
 
@@ -358,7 +362,6 @@ if (is_fuchsia) {
     additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = []
 
-    assembly_images_config_label = _images_config
     product_assembly_config_label = ":for-fdr"
     board_config = board_information_for_assembly
 

@@ -44,13 +44,9 @@ template("_cuckoo_kernel_zbi_test") {
   assert(current_toolchain == default_toolchain)
   assert(defined(invoker.kernel_zbi))
 
-  _images_config = "//boards/images:default"
   if (has_board) {
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-    assert(fuchsia_filesystem_config != false,
-           "Need to define fuchsia_filesystem_config for cuckoo tests")
-    _images_config = fuchsia_filesystem_config
   }
 
   cuckoo_target_name = target_name
@@ -81,15 +77,21 @@ template("_cuckoo_kernel_zbi_test") {
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
-    assembly_images_config_label = _images_config
     product_assembly_config_label =
         "//build/testing:cuckoo-product-configuration"
     board_config = board_information_for_assembly
     allow_eng_platform_bundle_use = true
-    generate_fvm = !fxfs_blob
-    generate_fxfs = fxfs_blob
-    generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot
-    generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
+
+    if (!fxfs_blob) {
+      assembly_images_config_label = "//boards/images:default"
+      generate_fvm = !bootfs_only
+      generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
+      generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
+    } else {
+      assembly_images_config_label = "//boards/images:default-fxfs"
+      generate_fxfs = !bootfs_only
+    }
+
     generate_vbmeta = use_vbmeta
   }
 
