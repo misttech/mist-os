@@ -31,6 +31,8 @@ inline constexpr auto kPhdrTypeName<ElfPhdrType::kNote> = ConstString("PT_NOTE")
 template <>
 inline constexpr auto kPhdrTypeName<ElfPhdrType::kTls> = ConstString("PT_TLS");
 template <>
+inline constexpr auto kPhdrTypeName<ElfPhdrType::kPhdr> = ConstString("PT_PHDR");
+template <>
 inline constexpr auto kPhdrTypeName<ElfPhdrType::kEhFrameHdr> = ConstString("PT_GNU_EH_FRAME");
 template <>
 inline constexpr auto kPhdrTypeName<ElfPhdrType::kStack> = ConstString("PT_GNU_STACK");

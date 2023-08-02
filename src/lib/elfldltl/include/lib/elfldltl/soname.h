@@ -46,6 +46,15 @@ class Soname {
     return {name_.get(), size_};
   }
 
+  // This can only be used if the std::string_view used in construction is
+  // known to point to a NUL-terminated string, such as a string literal or a
+  // DT_STRTAB entry.
+  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
+  constexpr const char* c_str() const {
+    assert(name_.get()[size_] == '\0');
+    return name_.get();
+  }
+
   constexpr uint32_t hash() const { return hash_; }
 
   template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>

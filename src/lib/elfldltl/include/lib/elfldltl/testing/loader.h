@@ -120,6 +120,7 @@ class LoadTests : public ::testing::Test {
   struct LoadResult {
     Loader loader;
     typename elfldltl::NewArrayFromFile<Phdr>::Result phdrs;
+    Addr phoff;
     Addr entry;
     LoadInfo info;
   };
@@ -143,6 +144,7 @@ class LoadTests : public ::testing::Test {
     result = LoadResult{
         .loader = Traits::MakeLoader(std::forward<LoaderArgs>(loader_args)...),
         .phdrs = std::move(phdrs_result),
+        .phoff = ehdr.phoff,
         .entry = ehdr.entry,
     };
 

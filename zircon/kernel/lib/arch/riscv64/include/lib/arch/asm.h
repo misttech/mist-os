@@ -32,7 +32,7 @@
 
 // Standard prologue sequence for FP setup, with CFI.
 .macro .prologue.fp frame_extra_size=0
-  sub sp, sp, 16 + \frame_extra_size
+  add sp, sp, -(16 + \frame_extra_size)
   // The CFA is still computed relative to the SP so code will
   // continue to use .cfi_adjust_cfa_offset for pushes and pops.
   .cfi_adjust_cfa_offset 16 + \frame_extra_size
@@ -71,7 +71,7 @@
 #if __has_feature(shadow_call_stack)
   ld ra, -8(shadow_call_sp)
   .cfi_same_value ra
-  sub shadow_call_sp, shadow_call_sp, 8
+  add shadow_call_sp, shadow_call_sp, -8
   .cfi_same_value shadow_call_sp
 #endif
 .endm

@@ -271,7 +271,7 @@ class PhdrStackObserver : public PhdrSingletonObserver<Elf, ElfPhdrType::kStack>
 
  public:
   // There is only one constructor, but its signature is dependent on
-  //`CanBeExecutable`.
+  // `CanBeExecutable`.
 
   template <bool E = CanBeExecutable, typename = std::enable_if_t<!E>>
   explicit PhdrStackObserver(std::optional<size_type>& size) : Base(phdr_), size_(size) {}

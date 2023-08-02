@@ -50,6 +50,8 @@ class FdFile : public FdFileBase<Diagnostics> {
   FdFile& operator=(const FdFile&) noexcept = default;
 
   FdFile& operator=(FdFile&&) noexcept = default;
+
+  int borrow() const { return this->get(); }
 };
 
 // Deduction guide.
@@ -71,6 +73,8 @@ class UniqueFdFile : public UniqueFdFileBase<Diagnostics> {
   UniqueFdFile& operator=(UniqueFdFile&&) noexcept = default;
 
   int get() const { return Base::get().get(); }
+
+  int borrow() const { return get(); }
 };
 
 // Deduction guide.

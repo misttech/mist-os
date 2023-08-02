@@ -24,6 +24,8 @@ class MmapLoader {
  public:
   MmapLoader() = default;
 
+  explicit MmapLoader(size_t page_size) : page_size_(page_size) {}
+
   ~MmapLoader() {
     if (!image().empty()) {
       munmap(image().data(), image().size());
@@ -41,7 +43,7 @@ class MmapLoader {
     return *this;
   }
 
-  [[gnu::const]] static size_t page_size() { return sysconf(_SC_PAGESIZE); }
+  [[gnu::const]] size_t page_size() const { return page_size_; }
 
   // This takes a LoadInfo object describing segments to be mapped in and an opened fd
   // from which the file contents should be mapped. It returns true on success and false otherwise,
@@ -93,7 +95,7 @@ class MmapLoader {
     // immediately cause a page fault and spend time zero'ing a page when the OS may already have
     // copied this page for us.
     auto mapper = [base = reinterpret_cast<std::byte*>(map), vaddr_start = load_info.vaddr_start(),
-                   prot, fd, &diag](const auto& segment) {
+                   prot, fd, &diag, this](const auto& segment) {
       std::byte* addr = base + (segment.vaddr() - vaddr_start);
       size_t map_size = segment.filesz();
       size_t zero_size = 0;
@@ -170,6 +172,7 @@ class MmapLoader {
   uintptr_t base() const { return memory_.base(); }
 
   DirectMemory memory_;
+  size_t page_size_ = sysconf(_SC_PAGESIZE);
 };
 
 }  // namespace elfldltl

@@ -13,7 +13,11 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 # code.  It provides access to additional <lib/ld/...> headers for support code
 # that isn't itself part of of the passive ABI.
 library_headers("headers") {
-  headers = []
+  headers = [
+    "lib/ld/load-module.h",
+    "lib/ld/load.h",
+    "lib/ld/memory.h",
+  ]
 
   public_deps = [ ":abi-headers" ]
 }
@@ -43,6 +47,10 @@ library_headers("abi-headers") {
 abi_soname = "ld.so.1"
 config("abi-soname") {
   ldflags = [ "-Wl,-soname=$abi_soname" ]
+}
+
+config("abi-interp") {
+  ldflags = [ "-Wl,-dynamic-linker=${toolchain_variant.libprefix}$abi_soname" ]
 }
 
 # `verify_ld_abi(ld) {}` defines "$ld.verify-abi" to check that the
@@ -116,7 +124,7 @@ source_set("bootstrap") {
 # eagerly link unused code into the standalone binary and rely on linker GC to
 # remove it, which is suboptimal.
 static_library("standalone") {
-  visibility = [ ":*" ]
+  visibility = [ "./*" ]
 
   complete_static_lib = true
 
@@ -131,15 +139,25 @@ static_library("standalone") {
 }
 
 config("standalone.config") {
-  visibility = [ ":*" ]
+  visibility = [ "./*" ]
+  ldflags = []
   if (toolchain_environment != "user.basic") {
     # The user.basic environment doesn't have implicit dependencies or libc.
     # Other environments like host need the compiler driver's defaults disabled
     # to build something that doesn't use the system libc.
-    ldflags = [
+    ldflags += [
       "-nostartfiles",
       "-nolibc",
     ]
+  }
+  if (!is_gcc) {
+    # The standard profiling runtime can't be used in the minimal standalone
+    # context of ld.so.
+    #
+    # TODO(fxbug.dev/130542): The instrumentation works fine to collect data,
+    # but the data needs to be plumbed out somewhere using a custom
+    # runtime. For now, the data is just ignored.
+    ldflags += [ "-noprofilelib" ]
   }
 }
 
@@ -150,20 +168,27 @@ source_set("posix-header") {
 shared_library("ld-startup") {
   configs += [ ":abi-soname" ]
 
-  sources = []
+  sources = [ "startup-load.h" ]
   deps = [
     ":allocator",
     ":bootstrap",
     ":diagnostics",
     ":standalone",
     "//src/lib/elfldltl",
+    "//zircon/system/ulib/fbl",
   ]
 
   if (is_fuchsia) {
-    sources += [ "zircon-startup.cc" ]
+    sources += [
+      "procargs.cc",
+      "zircon-startup.S",
+      "zircon-startup.cc",
+    ]
     deps += [
+      "//sdk/lib/stdcompat",
       "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
+      "//zircon/kernel/lib/arch",
       "//zircon/system/ulib/processargs",
       "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
@@ -185,34 +210,24 @@ shared_library("ld-startup") {
     configs += [ "//build/config:no_profile" ]
   }
 
-  if (!is_gcc) {
-    # The standard profiling runtime can't be used in the minimal standalone
-    # context of ld.so.
-    #
-    # TODO(fxbug.dev/130542): The instrumentation works fine to collect data,
-    # but the data needs to be plumbed out somewhere using a custom
-    # runtime. For now, the data is just ignored.
-    ldflags = [ "-noprofilelib" ]
-  }
-
   if (is_fuchsia) {
     output_path = "$root_out_dir/lib$target_name.so"
-    test_libname = "test/${toolchain_variant.libprefix}$abi_soname"
 
     metadata = {
       distribution_entries = [
         {
-          destination = "lib/$test_libname"
+          destination = "lib/${toolchain_variant.libprefix}$abi_soname"
           source = rebase_path(output_path, root_build_dir)
           label = get_label_info(target_name, "label_with_toolchain")
         },
       ]
 
-      # This is collected by ld-startup-test-switches.rsp, below.  The
+      # This is collected by test:ld-startup-test-switches.rsp.  The
       # user_basic_redirect may wind up in a different variant than the one
       # requested, if the test's variant isn't available in user.basic, so we
       # don't know statically which libprefix the test should load from.
-      ld_startup_test_switches = [ "'-DLD_STARTUP_TEST_LIB=\"$test_libname\"'" ]
+      ld_startup_test_switches =
+          [ "'-DLD_STARTUP_TEST_LIBPREFIX=\"${toolchain_variant.libprefix}\"'" ]
     }
   }
 }
@@ -227,7 +242,10 @@ source_set("diagnostics") {
 source_set("allocator") {
   visibility = [ ":*" ]
   public = [ "allocator.h" ]
-  public_deps = [ "//src/lib/trivial-allocator" ]
+  public_deps = [
+    ":diagnostics",
+    "//src/lib/trivial-allocator",
+  ]
   deps = [ "//src/lib/trivial-allocator:stub-delete" ]
 }
 

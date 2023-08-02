@@ -26,7 +26,7 @@
 template("host_test_data") {
   assert(defined(invoker.sources), "sources are required")
   assert(
-      is_host,
+      !is_fuchsia,
       "host_test_data should only be used on host, to fix this, wrap you target with `if (is_host) { ... }`")
 
   main_target_name = target_name

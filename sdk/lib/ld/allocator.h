@@ -7,10 +7,13 @@
 
 #include <lib/trivial-allocator/basic-leaky-allocator.h>
 #include <lib/trivial-allocator/basic-owning-allocator.h>
+#include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/page-allocator.h>
 #include <lib/trivial-allocator/sealed-page-allocator.h>
 
 #include <utility>
+
+#include "diagnostics.h"
 
 namespace ld {
 
@@ -41,6 +44,14 @@ inline auto MakeInitialExecAllocator(Memory memory) {
   };
 
   return InitialExecAllocator{std::move(memory)};
+}
+
+inline void CheckAlloc(Diagnostics& diag, fbl::AllocChecker& ac, std::string_view what) {
+  if (ac.check()) [[likely]] {
+    return;
+  }
+  diag.SystemError("out of memory allocating ", what);
+  __builtin_trap();
 }
 
 }  // namespace ld

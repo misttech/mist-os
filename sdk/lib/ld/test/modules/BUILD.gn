@@ -1,0 +1,91 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/host_test_data.gni")
+
+# This only gets instantiated in the environment where the test modules are
+# meant to be built.
+
+executables = [ ":ret17" ]
+libs = []
+modules = []
+
+if (is_fuchsia) {
+  group("modules") {
+    testonly = true
+
+    deps = executables + libs + modules
+  }
+} else {
+  host_test_data("modules") {
+    deps = []
+    sources = []
+    outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+
+    foreach(label, executables) {
+      name = get_label_info(label, "name")
+
+      deps += [ label ]
+      sources += [ "$root_out_dir/$name" ]
+    }
+
+    # shlib_out_dir = get_label_info(".($shlib_toolchain)", "root_out_dir")
+
+    foreach(label, libs) {
+      name = get_label_info(label, "name")
+
+      deps += [ "$label($shlib_toolchain)" ]
+      sources += [ "$shlib_out_dir/lib$file.so" ]
+    }
+
+    foreach(label, modules) {
+      name = get_label_info(label, "name")
+
+      deps += [ "$label($shlib_toolchain)" ]
+      sources += [ "$shlib_out_dir/$file.so" ]
+    }
+  }
+}
+
+template("test_executable") {
+  executable(target_name) {
+    testonly = true
+
+    deps = []
+    forward_variables_from(invoker, "*", [ "testonly" ])
+    deps += [ ":test-executable" ]
+
+    # This is needed in the non-Zircon (host/Linux) toolchains to avoid having
+    # any implicit deps injected.
+    disable_syslog_backend = true
+
+    exclude_toolchain_tags = [ "instrumentation-runtime" ]
+  }
+}
+
+# The test executables declare an `extern "C" ... TestStart(...)` entry point.
+# For Fuchsia, link the test executables with -e TestStart.  For POSIX, link
+# with an assembly implementation of _start that tail-calls TestStart.
+source_set("test-executable") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  public_deps = [ "//sdk/lib/ld:standalone" ]
+  public_configs = [ "//sdk/lib/ld:abi-interp" ]
+  if (is_fuchsia) {
+    public_configs += [ ":test-executable.config" ]
+  } else {
+    sources = [ "posix-test-start.S" ]
+    deps = [ "//zircon/kernel/lib/arch" ]
+  }
+}
+
+config("test-executable.config") {
+  visibility = [ ":*" ]
+  ldflags = [ "-Wl,-e,TestStart" ]
+}
+
+test_executable("ret17") {
+  sources = [ "ret17.cc" ]
+}

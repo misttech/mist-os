@@ -301,7 +301,6 @@ class VmarLoader {
   // The VMAR handle must be preserved because some Fuchsia syscalls that act
   // on VMARs, like modifying protections, cannot be applied through parent
   // regions.
-  // TODO(fxbug.dev/91206): ProtectRelro will use this.
   zx::vmar load_image_vmar_;
 
   // This is the root VMAR that the mapping is placed into.

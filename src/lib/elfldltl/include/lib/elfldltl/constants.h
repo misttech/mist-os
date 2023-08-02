@@ -66,6 +66,7 @@ enum class ElfPhdrType : uint32_t {
   kDynamic = 2,
   kInterp = 3,
   kNote = 4,
+  kPhdr = 6,
   kTls = 7,
   kEhFrameHdr = 0x6474e550,  // PT_GNU_EH_FRAME
   kStack = 0x6474e551,       // PT_GNU_STACK

@@ -617,6 +617,31 @@ template <class Elf, class AbiTraits, template <class, class> class SymbolInfo, 
 DynamicNeededObserver(SymbolInfo<Elf, AbiTraits>& info, Callback)
     -> DynamicNeededObserver<Elf, SymbolInfo<Elf, AbiTraits>, Callback>;
 
+// This provides a trivial observer that simply counts how many occurrences of
+// any of the given tags appear.
+template <class Elf, ElfDynTag... Tag>
+class DynamicTagCountObserver
+    : public DynamicTagObserver<DynamicTagCountObserver<Elf, Tag...>, Tag...> {
+ public:
+  size_t count() const { return count_; }
+
+  template <class DiagnosticsType, class Memory, ElfDynTag Match>
+  constexpr bool Observe(DiagnosticsType&, Memory&, DynamicTagMatch<Match>,
+                         typename Elf::size_type val) {
+    static_assert(((Match == Tag) || ...));
+    ++count_;
+    return true;
+  }
+
+  template <class DiagnosticsType, class Memory>
+  constexpr bool Finish(DiagnosticsType&, Memory&) {
+    return true;
+  }
+
+ private:
+  size_t count_ = 0;
+};
+
 }  // namespace elfldltl
 
 #endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_

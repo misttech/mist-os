@@ -210,18 +210,18 @@ class DirectMemory {
  public:
   DirectMemory() = default;
 
-  // This type could easily be copyable.  But the template APIs should always
-  // use Memory types only be reference.  So make this type uncopyable and
-  // unmovable just so using it enforces API constraints other implementations
-  // might actually need to rely on.
-  DirectMemory(const DirectMemory&) = delete;
-  DirectMemory(DirectMemory&&) = delete;
+  // The Memory API is always used by lvalue reference, so Memory objects don't
+  // need to be either copyable or movable.  But DirectMemory is really just a
+  // pointer holder, so it can be easily copied.
+  DirectMemory(const DirectMemory&) = default;
 
   // This takes a memory image and the file-relative address it corresponds to.
   // The one-argument form can be used to use the File API before the base is
   // known.  Then set_base must be called before using the Memory API.
   explicit DirectMemory(cpp20::span<std::byte> image, uintptr_t base = ~uintptr_t{})
       : image_(image), base_(base) {}
+
+  DirectMemory& operator=(const DirectMemory&) = default;
 
   cpp20::span<std::byte> image() const { return image_; }
   void set_image(cpp20::span<std::byte> image) { image_ = image; }

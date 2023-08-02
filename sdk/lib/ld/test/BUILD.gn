@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_unittest_package.gni")
+import("//build/dist/distribution_manifest.gni")
 import("//build/test.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 is_elf = current_os != "mac" && current_os != "win"
 
@@ -39,7 +41,12 @@ generated_file("ld-startup-test-switches.rsp") {
   output_conversion = "list lines"
   data_keys = [ "ld_startup_test_switches" ]
   outputs = [ "$target_gen_dir/$target_name" ]
-  data_deps = [ "..:ld-startup.basic" ]
+  data_deps = [ ":load-test-data" ]
+  metadata = {
+    # Don't let manifests roll up ld.so.1 from here just because test code
+    # depends on this target.
+    distribution_entries_barrier = []
+  }
 }
 
 source_set("load-tests") {
@@ -48,6 +55,7 @@ source_set("load-tests") {
 
   sources = [ "ld-startup-tests.cc" ]
   deps = [
+    "..:abi-headers",
     "..:posix-header",
     "//src/lib/elfldltl",
     "//src/lib/elfldltl:elfldltl-testutils",
@@ -60,46 +68,77 @@ source_set("load-tests") {
     ]
   }
 
-  if (is_fuchsia) {
-    # Plumb in the switch via the response file to give the name under lib/
-    # that the test can pass to fuchsia.ldsvc.Loader/LoadObject.
-    deps += [ ":ld-startup-test-switches.rsp" ]
-    inputs = get_target_outputs(":ld-startup-test-switches.rsp")
-    cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
-  } else {
-    defines = [ "LD_STARTUP_TEST_LIB=\"libld-startup.so\"" ]
-  }
+  # Plumb in the switch via the response file to give the libprefix.
+  deps += [ ":ld-startup-test-switches.rsp" ]
+  inputs = get_target_outputs(":ld-startup-test-switches.rsp")
+  cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
 
   data_deps = [ ":load-test-data" ]
 }
 
 if (is_host) {
+  # For host tests, the test binaries must be packaged in host_test_data() at
+  # the expected path where elfldltl::testing::GetTestLib will find them.
+
+  test_tc = ""
   test_shlib_tc = ""
   test_shlib_out_dir = root_out_dir
+
   if (is_linux) {
     # The linux_$cpu (vs host_$cpu) handles shared libraries.
+    test_tc = "(//build/toolchain:linux_$current_cpu)"
     test_shlib_tc = "(//build/toolchain:linux_$current_cpu-shared)"
     test_shlib_out_dir = get_label_info(":here$test_shlib_tc", "root_out_dir")
   }
 
-  # For host tests, the test binaries must be packaged in host_test_data() at
-  # the expected path where elfldltl::testing::GetTestLib will find them.
-  host_test_data("load-test-data") {
-    visibility = [ ":*" ]
+  group("load-test-data") {
+    testonly = true
+    deps = [
+      ":ld-startup.test-data",
+      "modules$test_tc",
+    ]
+  }
 
-    deps = []
-    sources = []
-    outputs = [ "$root_out_dir/test_data/elfldltl/{{source_file_part}}" ]
-
-    deps += [ "..:ld-startup$test_shlib_tc" ]
-    sources += [ "$test_shlib_out_dir/libld-startup.so" ]
+  host_test_data("ld-startup.test-data") {
+    visibility = [ "./*" ]
+    deps = [ "..:ld-startup$test_shlib_tc" ]
+    sources = [ "$test_shlib_out_dir/libld-startup.so" ]
+    outputs = [ "$root_out_dir/test_data/elfldltl/ld.so.1" ]
   }
 } else {
-  # On Fuchsia these are just included in /pkg/lib implicitly by dint
-  # of being in data_deps of the test code.
-  group("load-test-data") {
+  # On Fuchsia these are just included in /pkg/... implicitly by dint of being
+  # in data_deps of the test code.  But we want to repackage those deps to put
+  # them into /pkg/lib/test/... instead so they can be fetched as executable
+  # via fuchsia.ldsvc.
+
+  distribution_manifest("load-test-data") {
     visibility = [ ":*" ]
     testonly = true
-    deps = [ "..:ld-startup.basic" ]
+
+    # This will collect the files from deps that would go into /pkg/... and
+    # rewrite their manifest entries to use /pkg/lib/test/... instead.
+    prefix = "lib/test"
+
+    deps = [
+      ":modules.basic",
+      "..:ld-startup.basic",
+    ]
+
+    # Make this manifest itself an input for collections via deps on this.
+    outputs = [ "$target_gen_dir/$target_name.json" ]
+    metadata = {
+      distribution_entries_files = [
+        {
+          file = rebase_path(outputs[0], root_build_dir)
+          label = get_label_info(":$target_name", "label_with_toolchain")
+        },
+      ]
+    }
+  }
+
+  user_basic_redirect("modules.basic") {
+    visibility = [ ":*" ]
+    testonly = true
+    public_deps = [ "modules" ]
   }
 }

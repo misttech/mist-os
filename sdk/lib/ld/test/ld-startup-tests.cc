@@ -10,6 +10,7 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/loader.h>
+#include <lib/ld/abi.h>
 #include <lib/stdcompat/functional.h>
 #include <unistd.h>
 
@@ -22,8 +23,10 @@
 #include <sys/mman.h>
 #endif
 
+#include <filesystem>
 #include <initializer_list>
 #include <numeric>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -39,8 +42,6 @@
 
 namespace {
 
-constexpr std::string_view kLdStartupName = LD_STARTUP_TEST_LIB;
-
 // The in-process tests here work by doing ELF loading approximately as the
 // system program loader would, but into this process that's running the test.
 // Once the dynamic linker has been loaded, the InProcessTestLaunch object
@@ -48,9 +49,6 @@ constexpr std::string_view kLdStartupName = LD_STARTUP_TEST_LIB;
 // collecting the information to be passed to the dynamic linker, and then
 // doing the call into its entry point to emulate what it would expect from the
 // program loader starting an initial thread.
-//
-// The simple first version just takes a single argument string that the
-// dynamic linker will receive.
 
 #ifdef __Fuchsia__
 
@@ -69,7 +67,7 @@ class InProcessTestLaunch {
   // InProcessTestLaunch object goes out of scope.
   static constexpr size_t kVmarSize = 1 << 30;
 
-  void Init(std::initializer_list<std::string_view> args) {
+  void Init(std::initializer_list<std::string_view> args = {}) {
     zx_vaddr_t test_base;
     ASSERT_EQ(zx::vmar::root_self()->allocate(
                   ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE, 0, kVmarSize,
@@ -98,6 +96,14 @@ class InProcessTestLaunch {
 
     // Pass along that handle in the bootstrap message.
     procargs_.AddHandle(PA_VMAR_LOADED, std::move(load_image_vmar));
+  }
+
+  template <class Test>
+  void SendExecutable(std::string_view name, Test& test) {
+    const std::string path = std::filesystem::path("test") / "bin" / name;
+    zx::vmo vmo = elfldltl::testing::GetTestLibVmo(path);
+    ASSERT_TRUE(vmo);
+    ASSERT_NO_FATAL_FAILURE(procargs().AddHandle(PA_VMO_EXECUTABLE, std::move(vmo)));
   }
 
   ld::testing::TestProcessArgs& procargs() { return procargs_; }
@@ -212,7 +218,7 @@ class InProcessTestLaunch {
   // process, not in-process tests.
   static constexpr bool kHasLog = false;
 
-  void Init(std::initializer_list<std::string_view> args) {
+  void Init(std::initializer_list<std::string_view> args = {}) {
     ASSERT_NO_FATAL_FAILURE(AllocateStack());
     ASSERT_NO_FATAL_FAILURE(PopulateStack(args, {}));
   }
@@ -224,6 +230,33 @@ class InProcessTestLaunch {
   // object so it gets destroyed when this InProcessTestLaunch object is
   // destroyed.  That will clean up the mappings it made.
   void AfterLoad(elfldltl::MmapLoader loader) { loader_ = std::move(loader); }
+
+  template <class Test>
+  void SendExecutable(std::string_view name, Test& test) {
+    ASSERT_TRUE(auxv_);  // Called after Init calls PopulateStack.
+    std::optional<typename Test::LoadResult> exec;
+    ASSERT_NO_FATAL_FAILURE(test.Load(name, exec));
+
+    // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
+    cpp20::span phdrs = exec->phdrs.get();
+    auxv_->phnum.back() = phdrs.size();
+    exec->info.VisitSegments([load_bias = exec->loader.load_bias(), offset = exec->phoff(),
+                              filesz = phdrs.size_bytes(), this](const auto& segment) {
+      if (segment.offset() <= offset && offset - segment.offset() < segment.filesz() &&
+          segment.filesz() - (offset - segment.offset()) >= filesz) {
+        auxv_->phdr.back() = offset - segment.offset() + segment.vaddr() + load_bias;
+        return false;
+      }
+      return true;
+    });
+    ASSERT_NE(auxv_->phdr.back(), 0u);
+
+    // Set AT_ENTRY to the executable's entry point.
+    auxv_->entry.back() = exec->entry + exec->loader.load_bias();
+
+    // Save the second Loader object to keep the mappings alive.
+    exec_loader_ = std::move(exec->loader);
+  }
 
   int Call(uintptr_t entry) { return CallOnStack(entry, sp_); }
 
@@ -295,7 +328,7 @@ class InProcessTestLaunch {
     // Next, leave space for the auxv block, which can be filled in later.
     static_assert(sizeof(AuxvBlock) % 16 == 0);
     sp -= sizeof(AuxvBlock);
-    AuxvBlock& auxv = *new (sp) AuxvBlock{};
+    auxv_ = new (sp) AuxvBlock;
 
     // Finally, the argc and pointers form what's seen right at the SP.
     sp -= (1 + ptrs) * sizeof(uintptr_t);
@@ -317,17 +350,14 @@ class InProcessTestLaunch {
     ASSERT_TRUE(string_ptrs.empty());
     ASSERT_TRUE(string_space.empty());
 
-    // Fill in other auxv values specific to this test.
-    // TODO(mcgrathr): this is where the loaded executable would be described
-    auxv.entry.back() = 0;
-
     ASSERT_EQ(reinterpret_cast<uintptr_t>(sp) % 16, 0u);
     sp_ = sp;
   }
 
-  elfldltl::MmapLoader loader_;
+  elfldltl::MmapLoader loader_, exec_loader_;
   void* stack_ = nullptr;
   void* sp_ = nullptr;
+  AuxvBlock* auxv_ = nullptr;
 };
 
 #endif  // __Fuchsia__
@@ -340,22 +370,34 @@ class LdStartupTests : public elfldltl::testing::LoadTests<LoaderTraits> {
   using typename Base::LoadResult;
 
   template <class Launch>
-  void Load(Launch&& launch) {
+  void LaunchExecutable(std::string_view executable_name, Launch&& launch) {
     std::optional<LoadResult> result;
     ASSERT_NO_FATAL_FAILURE(std::apply(
         [this, &result](auto&&... args) {
-          this->Base::Load(kLdStartupName, result,
-                           // LoaderArgs() gives args for LoaderTraits::MakeLoader().
-                           std::forward<decltype(args)>(args)...);
+          this->Load(kLdStartupName, result,
+                     // LoaderArgs() gives args for LoaderTraits::MakeLoader().
+                     std::forward<decltype(args)>(args)...);
         },
         launch.LoaderArgs()));
     entry_ = result->entry + result->loader.load_bias();
     ASSERT_NO_FATAL_FAILURE(launch.AfterLoad(std::move(result->loader)));
+    ASSERT_NO_FATAL_FAILURE(launch.SendExecutable(executable_name, *this));
   }
 
-  uintptr_t entry() const { return entry_; }
+  template <class Launch>
+  int Invoke(Launch&& launch) {
+    return std::forward<Launch>(launch).Call(entry_);
+  }
 
  private:
+#ifdef __Fuchsia__
+  static constexpr std::string_view kLibprefix = LD_STARTUP_TEST_LIBPREFIX;
+  inline static const std::string kLdStartupName =
+      std::string("test/lib/") + std::string(kLibprefix) + std::string(ld::abi::kInterp);
+#else
+  static constexpr std::string_view kLdStartupName = ld::abi::kInterp;
+#endif
+
   uintptr_t entry_ = 0;
 };
 
@@ -370,23 +412,17 @@ using LoaderTypes = elfldltl::testing::LoaderTypes;
 TYPED_TEST_SUITE(LdStartupTests, LoaderTypes);
 
 TYPED_TEST(LdStartupTests, Basic) {
-  // The skeletal dynamic linker is hard-coded now to read its argument string
-  // and return its length.
-  constexpr std::string_view kArg1 = "Lorem ipsum dolor sit amet";
-  constexpr std::string_view kArg2 = "consectetur adipiscing elit";
-  const std::string expected_log = std::string(kArg1) + '\n' +  //
-                                   std::string(kArg2) + '\n';
-  constexpr int kReturnValue = static_cast<int>(kArg1.size() + kArg2.size());
+  constexpr int kReturnValue = 17;
 
   InProcessTestLaunch launch;
-  ASSERT_NO_FATAL_FAILURE(launch.Init({kArg1, kArg2}));
+  ASSERT_NO_FATAL_FAILURE(launch.Init());
 
-  ASSERT_NO_FATAL_FAILURE(this->Load(launch));
+  ASSERT_NO_FATAL_FAILURE(this->LaunchExecutable("ret17", launch));
 
-  EXPECT_EQ(launch.Call(this->entry()), kReturnValue);
+  EXPECT_EQ(this->Invoke(launch), kReturnValue);
 
   if constexpr (InProcessTestLaunch::kHasLog) {
-    EXPECT_EQ(launch.CollectLog(), expected_log);
+    EXPECT_EQ(launch.CollectLog(), "");
   }
 }
 
