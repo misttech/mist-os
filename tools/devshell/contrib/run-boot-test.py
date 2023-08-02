@@ -44,7 +44,6 @@ class BootTest(object):
 
         self.name = test["name"]
         self.label = test["label"]
-        self.path = test["path"]
 
         images = test_json["image_overrides"]
 
