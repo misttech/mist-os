@@ -12,6 +12,7 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <climits>
@@ -87,7 +88,9 @@ AcpiMemoryRegion::~AcpiMemoryRegion() {
   if (region_vmo_.is_valid()) {
     const zx_vaddr_t region_base = reinterpret_cast<zx_vaddr_t>(region_data_.data());
     auto [first_page_address, vmo_size] = RoundToPageBoundaries(region_base, region_data_.size());
-    zx::vmar::root_self()->unmap(region_base, vmo_size);
+
+    zx_status_t unmap_status = zx::vmar::root_self()->unmap(region_base, vmo_size);
+    ZX_DEBUG_ASSERT(unmap_status == ZX_OK);
   }
 }
 
