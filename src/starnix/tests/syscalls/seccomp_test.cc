@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <sys/ioctl.h>
@@ -53,7 +54,7 @@ void install_filter_block(uint32_t syscall_nr, uint32_t action) {
       BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, syscall_nr, 1, 0),
       // allow: return SECCOMP_RET_ALLOW
       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-      // kill: return SECCOMP_RET_KILL_PROCESS
+      // kill: return the provided action
       BPF_STMT(BPF_RET | BPF_K, action),
   };
   sock_fprog prog = {.len = ARRAY_SIZE(filter), .filter = filter};
@@ -335,6 +336,21 @@ TEST(SeccompTest, GetActionsAvailProc) {
   std::stringstream buffer;
   buffer << t.rdbuf();
   EXPECT_EQ("kill_process kill_thread trap errno user_notif trace log allow\n", buffer.str());
+}
+
+// Read-only test.  There is a test in starnix/task/seccomp.rs that exercises the ability to
+// write to this file; it isn't here, because we don't want to change a global config.
+TEST(SeccompTest, ActionsLoggedProc) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Skipped ActionsLoggedProc because not running as root";
+  }
+  int fd = open("/proc/sys/kernel/seccomp/actions_logged", O_RDWR);
+  EXPECT_LT(0, fd);
+  // Make sure you can't write nonsense to it.
+  const char nonsense[] = "How doth the little crocodile improve its shining tail";
+  EXPECT_GT(0, write(fd, nonsense, strlen(nonsense)));
+  EXPECT_EQ(EINVAL, errno);
+  close(fd);
 }
 
 TEST(SeccompTest, ErrnoIsMaxFFF) {

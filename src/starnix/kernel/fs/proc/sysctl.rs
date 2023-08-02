@@ -39,6 +39,7 @@ pub fn sysctl_directory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHa
                 BytesFile::new_node(SeccompAction::get_actions_avail_file()),
                 mode!(IFREG, 0o444),
             );
+            dir.entry(b"actions_logged", SeccompActionsLogged::new_node(), mode);
         });
     });
     dir.node(b"net", sysctl_net_diretory(fs, kernel));
@@ -192,4 +193,25 @@ fn sysctl_net_diretory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHan
         );
     });
     dir.build()
+}
+
+struct SeccompActionsLogged {}
+
+impl SeccompActionsLogged {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
+    }
+}
+
+impl BytesFileOps for SeccompActionsLogged {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            return error!(EPERM);
+        }
+        SeccompAction::set_actions_logged(current_task.kernel(), &data)?;
+        Ok(())
+    }
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(SeccompAction::get_actions_logged(current_task.kernel()).into())
+    }
 }

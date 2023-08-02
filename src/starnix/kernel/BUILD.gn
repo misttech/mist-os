@@ -112,6 +112,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:futures",

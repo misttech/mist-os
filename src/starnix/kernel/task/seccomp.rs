@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bstr::ByteSlice;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
@@ -18,7 +19,7 @@ use crate::{
     mm::MemoryAccessorExt,
     signals::{send_signal, SignalDetail, SignalInfo},
     syscalls::{decls::Syscall, SyscallArg, SyscallResult},
-    task::{CurrentTask, EventHandler, ExitStatus, Task, WaitCanceler, WaitQueue, Waiter},
+    task::{CurrentTask, EventHandler, ExitStatus, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
     types::*,
 };
 
@@ -26,7 +27,7 @@ pub struct SeccompFilter {
     /// The BPF program associated with this filter.
     program: EbpfProgram,
 
-    /// The unique-to-this-process id of this filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
+    /// The unique-to-this-process id of thi1s filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
     /// threads in this process have filters that are a prefix of the filters of the thread
     /// attempting to do the TSYNC. Identical filters attached in separate seccomp calls are treated
     /// as different from each other for this purpose, so we need a way of distinguishing them.
@@ -34,6 +35,9 @@ pub struct SeccompFilter {
 
     /// The next cookie (unique id for this syscall), as used by SECCOMP_RET_USER_NOTIF
     cookie: AtomicU64,
+
+    // Whether to log the results of this filter
+    log: bool,
 }
 
 /// The result of running a set of seccomp filters.
@@ -49,7 +53,11 @@ pub struct SeccompFilterResult {
 impl SeccompFilter {
     /// Creates a SeccompFilter object from the given sock_filter.  Associates the user-provided
     /// id with it, which is intended to be unique to this process.
-    pub fn from_cbpf(code: &Vec<sock_filter>, maybe_unique_id: u64) -> Result<Self, Errno> {
+    pub fn from_cbpf(
+        code: &Vec<sock_filter>,
+        maybe_unique_id: u64,
+        should_log: bool,
+    ) -> Result<Self, Errno> {
         // If an instruction loads from / stores to an absolute address, that address has to be
         // 32-bit aligned and inside the struct seccomp_data passed in.
         for insn in code {
@@ -62,9 +70,12 @@ impl SeccompFilter {
         }
 
         match EbpfProgram::from_cbpf(code) {
-            Ok(program) => {
-                Ok(SeccompFilter { program, unique_id: maybe_unique_id, cookie: AtomicU64::new(0) })
-            }
+            Ok(program) => Ok(SeccompFilter {
+                program,
+                unique_id: maybe_unique_id,
+                cookie: AtomicU64::new(0),
+                log: should_log,
+            }),
             Err(errmsg) => {
                 log_warn!("{}", errmsg);
                 error!(EINVAL)
@@ -312,6 +323,36 @@ impl SeccompState {
         None
     }
 
+    // This is supposed to be put in the audit log, but starnix does not yet have an
+    // audit log.  Also, it does not match the Linux format.  Still, the machinery
+    // is in place for when we have to support it for real.
+    fn log_action(task: &CurrentTask, syscall: &Syscall) {
+        let creds = task.creds();
+        let uid = creds.uid;
+        let gid = creds.gid;
+        let comm_r = task.command();
+        let comm = if let Ok(c) = comm_r.to_str() { c } else { "???" };
+
+        let arch = if cfg!(target_arch = "x86_64") {
+            "x86_64"
+        } else if cfg!(target_arch = "aarch64") {
+            "aarch64"
+        } else {
+            "unknown"
+        };
+        crate::logging::log_info!(
+            "type=SECCOMP: uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
+            uid,
+            gid,
+            task.thread_group.leader,
+            comm,
+            syscall.decl.number,
+            task.registers.instruction_pointer_register(),
+            arch,
+            syscall.decl.name
+        );
+    }
+
     /// Take the given |action| on the given |task|.  The action is one of the SECCOMP_RET values
     /// (ALLOW, LOG, KILL, KILL_PROCESS, TRAP, ERRNO, USER_NOTIF, TRACE).  |task| is the thread that
     /// invoked the syscall, and |syscall| is the syscall that was invoked.
@@ -325,6 +366,11 @@ impl SeccompState {
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
         let action = result.action;
+        if let Some(filter) = result.filter.as_ref() {
+            if action.is_logged(current_task.kernel(), filter.log) {
+                Self::log_action(current_task, syscall);
+            }
+        }
         match action {
             SeccompAction::Allow => None,
             SeccompAction::Errno(code) => Some(Err(errno_from_code!(code as i16))),
@@ -347,30 +393,7 @@ impl SeccompState {
                 Some(Err(errno_from_code!(0)))
             }
             SeccompAction::Log => {
-                let creds = current_task.creds();
-                let uid = creds.uid;
-                let gid = creds.gid;
-                let comm_r = current_task.command();
-                let comm = if let Ok(c) = comm_r.to_str() { c } else { "???" };
-
-                let arch = if cfg!(target_arch = "x86_64") {
-                    "x86_64"
-                } else if cfg!(target_arch = "aarch64") {
-                    "aarch64"
-                } else {
-                    "unknown"
-                };
-                crate::logging::log_info!(
-                    "uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
-                    uid,
-                    gid,
-                    current_task.thread_group.leader,
-                    comm,
-                    syscall.decl.number,
-                    current_task.registers.instruction_pointer_register(),
-                    arch,
-                    syscall.decl.name
-                );
+                Self::log_action(current_task, syscall);
                 None
             }
             SeccompAction::Trace => {
@@ -402,7 +425,8 @@ impl SeccompState {
             }
             SeccompAction::UserNotif => {
                 if let Some(notifier) = current_task.get_seccomp_notifier() {
-                    let cookie = result.filter.unwrap().cookie.fetch_add(1, Ordering::Relaxed);
+                    let cookie =
+                        result.filter.as_ref().unwrap().cookie.fetch_add(1, Ordering::Relaxed);
                     let msg = seccomp_notif {
                         id: cookie,
                         pid: current_task.id as u32,
@@ -518,7 +542,7 @@ impl SeccompAction {
         }
     }
 
-    pub fn get_string(&self) -> &'static str {
+    pub fn canonical_name(self) -> &'static str {
         match self {
             Self::Allow => &"allow",
             Self::Errno(_) => &"errno",
@@ -563,12 +587,88 @@ impl SeccompAction {
         if all_actions.len() == 0 {
             return vec![];
         }
-        let mut result = String::from(all_actions[0].get_string());
+        let mut result = String::from(all_actions[0].canonical_name());
         for i in 1..all_actions.len() {
             result.push_str(" ");
-            result.push_str(all_actions[i].get_string());
+            result.push_str(all_actions[i].canonical_name());
         }
         result.push('\n');
+        result.into_bytes()
+    }
+
+    fn logged_bit_offset(&self) -> u32 {
+        match self {
+            Self::Allow => 1,
+            Self::Errno(_) => 2,
+            Self::KillProcess => 3,
+            Self::KillThread => 4,
+            Self::Log => 5,
+            Self::Trace => 6,
+            Self::Trap(_) => 7,
+            Self::UserNotif => 8,
+        }
+    }
+
+    fn set_logged_bit(&self, dst: &mut u16) {
+        *dst |= 1 << self.logged_bit_offset();
+    }
+
+    pub fn is_logged(&self, kernel: &Arc<Kernel>, filter_flag: bool) -> bool {
+        if kernel.actions_logged.load(Ordering::Relaxed) & (1 << self.logged_bit_offset()) != 0 {
+            match self {
+                // Per the documentation on audit logging of seccomp actions in
+                // seccomp(2), just because it is listed as logged, that doesn't
+                // mean we actually log it.
+
+                // If it is KILL_PROCESS or KILL_THREAD, return true
+                Self::KillProcess | Self::KillThread => true,
+                // If it is one of these and the filter flag was set, return true.
+                Self::Errno(_) | Self::Log | Self::Trap(_) | Self::UserNotif => filter_flag,
+                // Never log ALLOW
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    pub fn set_actions_logged(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
+        let mut new_actions_logged: u16 = 0;
+        for action_res in data.fields_with(|c| c.is_ascii_whitespace()).collect::<Vec<_>>() {
+            if let Ok(action) = action_res.to_str() {
+                match action {
+                    "errno" => Self::Errno(0).set_logged_bit(&mut new_actions_logged),
+                    "kill_process" => Self::KillProcess.set_logged_bit(&mut new_actions_logged),
+                    "kill_thread" => Self::KillThread.set_logged_bit(&mut new_actions_logged),
+                    "log" => Self::Log.set_logged_bit(&mut new_actions_logged),
+                    "trace" => Self::Trace.set_logged_bit(&mut new_actions_logged),
+                    "trap" => Self::Trap(0).set_logged_bit(&mut new_actions_logged),
+                    "user_notif" => Self::UserNotif.set_logged_bit(&mut new_actions_logged),
+                    // Not allowed to write anything other than the approved actions to that list.
+                    _ => return Err(errno!(EINVAL)),
+                }
+            } else {
+                return Err(errno!(EINVAL));
+            }
+        }
+        kernel.actions_logged.store(new_actions_logged, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub fn get_actions_logged(kernel: &Arc<Kernel>) -> Vec<u8> {
+        let al = kernel.actions_logged.load(Ordering::Relaxed);
+        let mut result: String = "".to_string();
+        for action in Self::all_actions() {
+            if (al & (1 << action.logged_bit_offset())) != 0 {
+                result.push_str(action.canonical_name());
+                result.push(' ');
+            }
+        }
+        if !result.is_empty() {
+            // remove trailing whitespace.
+            result.pop();
+        }
+
         result.into_bytes()
     }
 }
@@ -871,5 +971,34 @@ impl FileOps for SeccompNotifierFileObject {
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         Ok(self.notifier.lock().get_fd_notifications())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::task::SeccompAction;
+    use crate::testing::create_kernel_and_task;
+
+    #[::fuchsia::test]
+    async fn test_actions_logged_accepts_legal_string() {
+        let (kernel, _) = create_kernel_and_task();
+        let mut actions = SeccompAction::get_actions_avail_file();
+        // This is a test in Rust instead of a syscall test because we don't want to change the
+        // global config in a test.
+        assert!(
+            SeccompAction::set_actions_logged(&kernel, &actions[..]).is_err(),
+            "Should not be able to write allow to actions_logged file"
+        );
+        let action_string = std::string::String::from_utf8(actions.clone()).unwrap();
+        if let Some(action_index) = action_string.find("allow") {
+            actions.drain(action_index..action_index + "allow".len());
+        }
+        let write_result = SeccompAction::set_actions_logged(&kernel, &actions[..]);
+        assert!(
+            write_result.is_ok(),
+            "Could not write legal string \"{}\" to actions_logged file: error {}",
+            std::string::String::from_utf8(actions.clone()).unwrap(),
+            write_result.unwrap_err()
+        );
     }
 }

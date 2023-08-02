@@ -12,7 +12,7 @@ use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
-    sync::{Arc, Weak},
+    sync::{atomic::AtomicU16, Arc, Weak},
 };
 
 use crate::{
@@ -157,6 +157,14 @@ pub struct Kernel {
 
     /// Diagnostics information about crashed tasks.
     pub core_dumps: CoreDumpList,
+
+    // The kinds of seccomp action that gets logged, stored as a bit vector.
+    // Each potential SeccompAction gets a bit in the vector, as specified by
+    // SeccompAction::logged_bit_offset.  If the bit is set, that means the
+    // action should be logged when it is taken, subject to the caveats
+    // described in seccomp(2).  The value of the bit vector is exposed to users
+    // in a text form in the file /proc/sys/kernel/seccomp/actions_logged.
+    pub actions_logged: AtomicU16,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -248,6 +256,7 @@ impl Kernel {
             network_netlink: OnceCell::new(),
             inspect_node,
             core_dumps,
+            actions_logged: AtomicU16::new(0),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
