@@ -16,10 +16,13 @@ source_set("fake_battery_driver_lib") {
   sources = [
     "driver.cc",
     "power_source_protocol_server.cc",
+    "power_source_state.cc",
+    "simulator_impl.cc",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
+    "//sdk/fidl/fuchsia.hardware.powersource.test:fuchsia.hardware.powersource.test_cpp",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",

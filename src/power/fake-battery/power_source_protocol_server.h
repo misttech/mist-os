@@ -5,16 +5,23 @@
 #ifndef SRC_POWER_FAKE_BATTERY_POWER_SOURCE_PROTOCOL_SERVER_H_
 #define SRC_POWER_FAKE_BATTERY_POWER_SOURCE_PROTOCOL_SERVER_H_
 
+#include <fidl/fuchsia.hardware.powersource/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
-#include <fidl/fuchsia.power.battery/cpp/wire.h>
+#include <lib/zx/event.h>
+#include <zircon/types.h>
+
+#include "src/power/fake-battery/power_source_state.h"
 
 namespace fake_battery {
 
+class PowerSourceState;
+
 // Protocol served to client components over devfs.
-class PowerSourceProtocolServer : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
+class PowerSourceProtocolServer : public fidl::Server<fuchsia_hardware_powersource::Source>,
+                                  public Observer {
  public:
-  explicit PowerSourceProtocolServer() { zx::event::create(0, &state_event_); }
+  explicit PowerSourceProtocolServer(std::shared_ptr<PowerSourceState> state);
+  ~PowerSourceProtocolServer() override;
 
   // Sets a signal on state_event_, notifying clients that power source state has changed.
   zx_status_t SignalClient();
@@ -29,7 +36,10 @@ class PowerSourceProtocolServer : public fidl::WireServer<fuchsia_hardware_power
 
   void GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) override;
 
+  void Notify() override { SignalClient(); }
+
  private:
+  std::shared_ptr<PowerSourceState> state_;
   zx::event state_event_;
 };
 

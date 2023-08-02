@@ -15,26 +15,42 @@
 
 #include <utility>
 
+#include "power_source_state.h"
+
 namespace fake_battery {
 
 Driver::Driver(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("fake-battery", std::move(start_args), std::move(driver_dispatcher)),
-      devfs_connector_(fit::bind_member<&Driver::Serve>(this)) {}
+      devfs_connector_source_(fit::bind_member<&Driver::Serve>(this)),
+      devfs_connector_sim_(fit::bind_member<&Driver::ServeSimulator>(this)) {}
 
 zx::result<> Driver::Start() {
   node_.Bind(std::move(node()));
-  auto result = AddChild(name());
+  auto result = AddChild(name(), "power", devfs_connector_source_);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child node", KV("status", result.status_string()));
+    FDF_SLOG(ERROR, "Failed to add child node fake battery", KV("status", result.status_string()));
     return result.take_error();
   }
+
+  // (TODO:fxbug.dev/131463) To allow the power-simulator to be found in /dev/class/power-simulator,
+  // a line needs to be added to src/lib/ddk/include/lib/ddk/protodefs.h
+  result = AddChild("power-simulator", "power-sim", devfs_connector_sim_);
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to add child node battery simulator",
+             KV("status", result.status_string()));
+    return result.take_error();
+  }
+
   return zx::ok();
 }
 
-zx::result<> Driver::AddChild(std::string_view node_name) {
+// Add a child device node and offer the service capabilities.
+template <typename Protocol>
+zx::result<> Driver::AddChild(std::string_view node_name, std::string_view class_name,
+                              driver_devfs::Connector<Protocol>& devfs_connector) {
   fidl::Arena arena;
-  zx::result connector = devfs_connector_.Bind(dispatcher());
+  zx::result connector = devfs_connector.Bind(dispatcher());
 
   if (connector.is_error()) {
     return connector.take_error();
@@ -42,7 +58,7 @@ zx::result<> Driver::AddChild(std::string_view node_name) {
 
   auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
                    .connector(std::move(connector.value()))
-                   .class_name("power");
+                   .class_name(class_name);
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, node_name)
@@ -61,13 +77,26 @@ zx::result<> Driver::AddChild(std::string_view node_name) {
     FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
     return zx::error(result.status());
   }
-  controller_.Bind(std::move(endpoints->client));
-
+  controllers_.emplace_back(std::move(endpoints->client));
   return zx::ok();
 }
 
 void Driver::Serve(fidl::ServerEnd<fuchsia_hardware_powersource::Source> server) {
-  auto server_impl = std::make_unique<PowerSourceProtocolServer>();
+  if (!fake_data_) {
+    fake_data_ = std::make_shared<PowerSourceState>();
+  }
+
+  auto server_impl = std::make_unique<PowerSourceProtocolServer>(fake_data_);
+  fidl::BindServer(dispatcher(), std::move(server), std::move(server_impl));
+}
+
+void Driver::ServeSimulator(
+    fidl::ServerEnd<fuchsia_hardware_powersource_test::SourceSimulator> server) {
+  if (!fake_data_) {
+    fake_data_ = std::make_shared<PowerSourceState>();
+  }
+
+  auto server_impl = std::make_unique<SimulatorImpl>(fake_data_);
   fidl::BindServer(dispatcher(), std::move(server), std::move(server_impl));
 }
 

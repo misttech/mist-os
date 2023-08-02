@@ -8,18 +8,29 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
-using fuchsia_hardware_powersource::wire::BatteryInfo;
-using fuchsia_hardware_powersource::wire::BatteryUnit;
-using fuchsia_hardware_powersource::wire::PowerType;
-using fuchsia_hardware_powersource::wire::SourceInfo;
+using fuchsia_hardware_powersource::PowerType;
+using fuchsia_hardware_powersource::SourceInfo;
 
 namespace fake_battery {
+
+PowerSourceProtocolServer::PowerSourceProtocolServer(std::shared_ptr<PowerSourceState> state)
+    : state_(std::move(state)) {
+  zx::event::create(0, &state_event_);
+}
+
+PowerSourceProtocolServer::~PowerSourceProtocolServer() { state_->RemoveObserver(this); }
 
 zx_status_t PowerSourceProtocolServer::ClearSignal() {
   zx_status_t status = state_event_.signal(ZX_USER_SIGNAL_0, 0);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to clear signal on event: %s", zx_status_get_string(status));
   }
+  // For now, a client calls GetStateChangeEvent and then waits
+  // Add to observers_ so it can be notified later when the fake data changes.
+  // At that time, SignalClient will be called to unblock client so the client can call
+  // GetStateChangeEvent again...
+  // It will make better sense to use Hanging Get.
+  state_->AddObserver(this);
   return status;
 }
 
@@ -28,14 +39,15 @@ zx_status_t PowerSourceProtocolServer::SignalClient() {
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to set signal on event: %s", zx_status_get_string(status));
   }
+  state_->RemoveObserver(this);
   return status;
 }
 
+// TODO(fxbug.dev/131463): when a cli is being developed, this will be made adjustable.
 void PowerSourceProtocolServer::GetPowerInfo(GetPowerInfoCompleter::Sync& completer) {
-  SourceInfo source_info{PowerType::kBattery,  // PowerType::kAc,
-                         fuchsia_hardware_powersource::kPowerStateCharging |
-                             fuchsia_hardware_powersource::kPowerStateOnline};
-  completer.Reply(ZX_OK, source_info);
+  SourceInfo source_info{PowerType::kBattery, fuchsia_hardware_powersource::kPowerStateCharging |
+                                                  fuchsia_hardware_powersource::kPowerStateOnline};
+  completer.Reply({ZX_OK, source_info});
 }
 
 void PowerSourceProtocolServer::GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) {
@@ -45,25 +57,11 @@ void PowerSourceProtocolServer::GetStateChangeEvent(GetStateChangeEventCompleter
     // Clear signal before returning.
     ClearSignal();
   }
-  completer.Reply(status, std::move(clone));
+  completer.Reply({status, std::move(clone)});
 }
 
 void PowerSourceProtocolServer::GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) {
-  BatteryInfo battery_info{
-      .unit = BatteryUnit::kMa,
-      .design_capacity = 3000,
-      .last_full_capacity = 2950,
-      .design_voltage = 3000,  // mV
-      .capacity_warning = 800,
-      .capacity_low = 500,
-      .capacity_granularity_low_warning = 20,
-      .capacity_granularity_warning_full = 1,
-  };
-
-  battery_info.present_rate = 2;
-  battery_info.remaining_capacity = 45;
-  battery_info.present_voltage = 2900;
-  completer.Reply(ZX_OK, battery_info);
+  completer.Reply({ZX_OK, state_->battery_info()});
 }
 
 }  // namespace fake_battery

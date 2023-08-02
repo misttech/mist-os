@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.powersource.test/cpp/markers.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -17,9 +18,11 @@
 #include <gtest/gtest.h>
 
 #include "driver.h"
+#include "power_source_protocol_server.h"
 
 namespace fake_battery::testing {
 namespace {
+using fuchsia_hardware_powersource::wire::BatteryInfo;
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;
 
@@ -105,6 +108,77 @@ TEST_F(FakeBatteryDriverTest, CanGetInfo) {
       ASSERT_EQ(result.value().status, ZX_OK);
       const auto& info = result.value().info;
       ASSERT_EQ(info.present_rate, 2);
+    }
+  });
+}
+
+TEST_F(FakeBatteryDriverTest, CatGetEvent) {
+  // Safe to touch the driver from here since the driver_dispatcher is the default.
+  // Dispatcher allows sync calls from the driver so we use the sync version.
+  zx::result device_result = node_server().SyncCall([](fdf_testing::TestNode* root_node) {
+    return root_node->children().at("fake-battery").ConnectToDevice();
+  });
+  ASSERT_EQ(ZX_OK, device_result.status_value());
+
+  fidl::ClientEnd<fuchsia_hardware_powersource::Source> device_client_end(
+      std::move(device_result.value()));
+
+  fidl::WireSyncClient<fuchsia_hardware_powersource::Source> client(std::move(device_client_end));
+
+  device_result = node_server().SyncCall([](fdf_testing::TestNode* root_node) {
+    return root_node->children().at("power-simulator").ConnectToDevice();
+  });
+  ASSERT_EQ(ZX_OK, device_result.status_value());
+
+  fidl::ClientEnd<fuchsia_hardware_powersource_test::SourceSimulator> test_client_end(
+      std::move(device_result.value()));
+
+  fidl::WireSyncClient<fuchsia_hardware_powersource_test::SourceSimulator> test_client(
+      std::move(test_client_end));
+
+  RunSyncClientTask([this_client = std::move(client), test_client = std::move(test_client)]() {
+    {
+      fidl::WireResult result = this_client->GetBatteryInfo();
+      ASSERT_EQ(result.status(), ZX_OK);
+      ASSERT_EQ(result.value().status, ZX_OK);
+      const auto& info = result.value().info;
+      ASSERT_EQ(info.remaining_capacity, 2900u);
+    }
+    {
+      fidl::WireResult result = this_client->GetStateChangeEvent();
+      ASSERT_EQ(result.status(), ZX_OK);
+      ASSERT_EQ(result.value().status, ZX_OK);
+      auto event = std::move(result.value().handle);
+      zx_signals_t pending = 0;
+      ASSERT_EQ(event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite_past(), &pending),
+                ZX_ERR_TIMED_OUT);
+      ASSERT_EQ(pending, 0u);
+
+      BatteryInfo battery_info{
+          /* unit */ BatteryUnit::kMa,
+          /* design_capacity */ 3000,
+          /* last_full_capacity */ 2950,
+          /* design_voltage */ 3000,  // mV
+          /* capacity_warning */ 800,
+          /* capacity_low */ 500,
+          /* capacity_granularity_low_warning */ 20,
+          /* capacity_granularity_warning_full */ 1,
+          /* present_rate */ 2,
+          /* remaining_capacity */ 45,  // Only changed this value
+          /* present_voltage */ 2900,
+      };
+      auto result2 = test_client->SetBatteryInfo(battery_info);
+      ASSERT_EQ(result2.status(), ZX_OK);
+
+      ASSERT_EQ(event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), &pending), ZX_OK);
+      ASSERT_EQ(pending, ZX_USER_SIGNAL_0);
+    }
+    {
+      fidl::WireResult result = this_client->GetBatteryInfo();
+      ASSERT_EQ(result.status(), ZX_OK);
+      ASSERT_EQ(result.value().status, ZX_OK);
+      const auto& info = result.value().info;
+      ASSERT_EQ(info.remaining_capacity, 45u);
     }
   });
 }
