@@ -9,8 +9,6 @@ board_information_for_assembly = "//boards/qemu-x64/board_information.json5"
 
 board_name = "qemu-x64"
 
-board_package_labels += [ "//src/factory/factory_store_providers/config/qemu" ]
-
 # Supports only virtual devices.
 board_is_emu = true
 board_is_phys = false
