@@ -8,6 +8,7 @@
 #include <lib/elfldltl/diagnostics.h>
 
 #include <cassert>
+#include <cstdarg>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -30,17 +31,10 @@ struct StartupDiagnosticsFlags {
   [[no_unique_address]] std::false_type extra_checking;
 };
 
-// This function gets wrapped to make a Diagnostics object.  It's responsible
-// for the actual printing, which might need to use the StartupData.
-//
-// TODO(mcgrathr): for now, it just takes the main string. later probably wire
-// up the printf engine and use PrintfDiagnosticsReport.
-void ReportError(StartupData& startup, std::string_view str);
-
-// This provides the Report callable object for Diagnostics.  It just calls
-// ReportError with the captured StartupData reference.  But it also holds a
-// current module name that can be changed; when set, it's used as a prefix on
-// error messages.
+// This provides the Report callable object for Diagnostics.  It uses the
+// printf engine to ultimately call StartupMessage with the captured
+// StartupData reference.  But it also holds a current module name that can
+// be changed; when set, it's used as a prefix on error messages.
 class DiagnosticsReport {
  public:
   constexpr explicit DiagnosticsReport(StartupData& startup) : startup_(startup) {}
@@ -52,22 +46,24 @@ class DiagnosticsReport {
   constexpr void clear_module() { module_ = {}; }
 
   template <typename... Args>
-  bool operator()(std::string_view str, Args&&... args) const {
+  bool operator()(Args&&... args) const {
+    auto report = [&](auto... prefix) {
+      auto printf = [this](auto... args) { this->Printf(args...); };
+      auto report = elfldltl::PrintfDiagnosticsReport(printf, prefix...);
+      report(std::forward<Args>(args)...);
+    };
     if (module_.empty()) {
-      Report(str, std::forward<Args>(args)...);
+      report();
     } else {
       constexpr std::string_view kColon = ": ";
-      Report(module_, kColon, std::forward<Args>(args)...);
+      report(module_, kColon);
     }
     return true;
   }
 
  private:
-  template <typename... Args>
-  void Report(std::string_view str, Args&&... args) const {
-    // TODO(mcgrathr): drop the extra args for now
-    ReportError(startup_, str);
-  }
+  void Printf(const char* format, ...) const;
+  void Printf(const char* format, va_list args) const;
 
   StartupData& startup_;
   std::string_view module_;

@@ -4,15 +4,24 @@
 
 #include "diagnostics.h"
 
+#include <cstdarg>
+
 namespace ld {
+
+void DiagnosticsReport::Printf(const char* format, ...) const {
+  va_list args;
+  va_start(args, format);
+  Printf(format, args);
+  va_end(args);
+}
 
 void CheckErrors(Diagnostics& diag) {
   if (diag.errors() == 0) [[likely]] {
     return;
   }
 
-  diag.report()("startup dynamic linking failed with", diag.errors(), "errors and", diag.warnings(),
-                "warnings");
+  diag.report()("startup dynamic linking failed with", diag.errors(), " errors and",
+                diag.warnings(), " warnings");
   __builtin_trap();
 }
 

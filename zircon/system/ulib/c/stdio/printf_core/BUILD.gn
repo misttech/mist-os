@@ -8,13 +8,18 @@ llvm_libc_source_set("printf_core") {
   public = [ "printf_main.h" ]
   sources = [ "printf_main.cpp" ]
   functions = []
-  deps = [ ":core" ]
+  deps = [
+    ":converter",
+    ":parser",
+    ":writer",
+  ]
 }
 
 # These aren't really functions, but they follow the pattern of the actual libc
 # function implementations in each having a corresponding header file and test
 # file in the usual places.
-llvm_libc_source_set("core") {
+
+llvm_libc_source_set("converter") {
   visibility = [ ":*" ]
 
   defines = [
@@ -30,12 +35,26 @@ llvm_libc_source_set("core") {
   # TODO(https://reviews.llvm.org/D156630): upstream code not yet clean
   configs = [ "//build/config:Wno-conversion" ]
 
-  functions = [
-    "converter",
-    "parser",
-    "writer",
-  ]
+  functions = [ "converter" ]
+
+  deps = [ ":writer" ]
+}
+
+llvm_libc_source_set("parser") {
+  visibility = [ ":*" ]
+
+  functions = [ "parser" ]
 
   # TODO(fxbug.dev/62780): tests need full libc framework
   no_test_functions = [ "parser" ]
+}
+
+llvm_libc_source_set("writer") {
+  functions = [ "writer" ]
+}
+
+source_set("wrapper") {
+  public = [ "wrapper.h" ]
+  public_configs = [ "../..:llvm-libc.config" ]
+  deps = [ ":printf_core" ]
 }

@@ -165,6 +165,10 @@ source_set("posix-header") {
   public = [ "posix.h" ]
 }
 
+source_set("zircon-header") {
+  public = [ "zircon.h" ]
+}
+
 shared_library("ld-startup") {
   configs += [ ":abi-soname" ]
 
@@ -185,6 +189,8 @@ shared_library("ld-startup") {
       "zircon-startup.cc",
     ]
     deps += [
+      ":zircon-diagnostics",
+      ":zircon-header",
       "//sdk/lib/stdcompat",
       "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
@@ -199,6 +205,7 @@ shared_library("ld-startup") {
       "posix-startup.cc",
     ]
     deps += [
+      ":posix-diagnostics",
       ":posix-header",
       "//zircon/kernel/lib/arch:headers",
     ]
@@ -237,6 +244,28 @@ source_set("diagnostics") {
   public = [ "diagnostics.h" ]
   public_deps = [ "//src/lib/elfldltl" ]
   sources = [ "diagnostics.cc" ]
+}
+
+source_set("posix-diagnostics") {
+  visibility = [ ":*" ]
+  sources = [ "posix-diagnostics.cc" ]
+  deps = [
+    ":diagnostics",
+    ":posix-header",
+    "//zircon/system/ulib/c/stdio:snprintf",
+    "//zircon/system/ulib/c/stdio/printf_core:wrapper",
+  ]
+}
+
+source_set("zircon-diagnostics") {
+  visibility = [ ":*" ]
+  sources = [ "zircon-diagnostics.cc" ]
+  deps = [
+    ":diagnostics",
+    ":zircon-header",
+    "//zircon/system/ulib/c/stdio/printf_core:wrapper",
+    "//zircon/system/ulib/zx",
+  ]
 }
 
 source_set("allocator") {

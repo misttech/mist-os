@@ -435,7 +435,12 @@ template("llvm_libc_source_set") {
                get_label_info(label, "label_no_toolchain") +
                "($current_toolchain)")
         label = get_label_info(label, "label_no_toolchain")
-        deps += [ "$label.unittests" ]
+        deps += [
+          # Depend directly on the .testonly targets as well as on their tests,
+          # in case this target's test code uses headers from its dependencies.
+          "$label.testonly",
+          "$label.unittests",
+        ]
       }
     }
   }

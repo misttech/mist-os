@@ -21,6 +21,8 @@ struct FileOffset;
 template <typename T>
 struct FileAddress;
 
+class SymbolName;
+
 namespace internal {
 
 // This only exists to be specialized.  The interface is shown here.
@@ -111,6 +113,9 @@ struct PrintfType<std::string_view> {
     return std::make_tuple(static_cast<int>(str.size()), str.data());
   }
 };
+
+template <>
+struct PrintfType<SymbolName> : public PrintfType<std::string_view> {};
 
 template <typename T>
 struct PrintfType<FileOffset<T>> {

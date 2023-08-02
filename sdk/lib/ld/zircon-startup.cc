@@ -200,28 +200,4 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   return {.arg = bootstrap.release(), .entry = main.entry};
 }
 
-void ReportError(StartupData& startup, std::string_view str) {
-  // If we have a debuglog handle, use that.
-  if (startup.debuglog) {
-    startup.debuglog.write(0, str.data(), str.size());
-  }
-
-  // We might instead (or also?) have a socket, where the messages are easier
-  // to capture at the other end.
-  if (startup.log_socket) {
-    while (true) {
-      size_t wrote = 0;
-      zx_status_t status = startup.log_socket.write(0, str.data(), str.size(), &wrote);
-      if (status != ZX_OK) {
-        break;
-      }
-      str.remove_prefix(wrote);
-      if (str.empty()) {
-        startup.log_socket.write(0, "\n", 1, nullptr);
-        break;
-      }
-    }
-  }
-}
-
 }  // namespace ld

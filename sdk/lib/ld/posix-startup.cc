@@ -8,8 +8,6 @@
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/posix.h>
 #include <sys/mman.h>
-#include <sys/uio.h>
-#include <unistd.h>
 
 #include <array>
 #include <cassert>
@@ -219,14 +217,6 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   // TODO(mcgrathr): Populate _ld_abi.
 
   return entry;
-}
-
-void ReportError(StartupData& startup, std::string_view str) {
-  const std::array iov = {
-      iovec{const_cast<char*>(str.data()), str.size()},
-      iovec{const_cast<char*>("\n"), 1},
-  };
-  writev(STDERR_FILENO, iov.data(), iov.size());
 }
 
 }  // namespace ld
