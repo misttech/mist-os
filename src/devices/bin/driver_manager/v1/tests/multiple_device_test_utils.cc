@@ -222,6 +222,14 @@ void DeviceState::CheckResumeReceivedAndReply(SystemPowerState target_state,
   SendResumeReply(return_status);
 }
 
+void DeviceState::CheckSignalMadeVisible() {
+  ASSERT_FALSE(made_visible_);
+  continue_dispatch_ = false;
+  Dispatch();
+  ASSERT_TRUE(made_visible_);
+  continue_dispatch_ = true;
+}
+
 void MultipleDeviceTestCase::SetUp() {
   coordinator_for_test_ = std::make_unique<CoordinatorForTest>(
       CreateConfig(mock_server_loop_.dispatcher(), &boot_args_, &args_client_),

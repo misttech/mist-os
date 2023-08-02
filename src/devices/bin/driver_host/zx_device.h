@@ -256,6 +256,15 @@ struct zx_device
     completion.Wait();
   }
 
+  void MadeVisibleOp() {
+    // Unlike other operations, we don't need to block until this is done.
+    async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
+      TraceLabelBuffer trace_label;
+      TRACE_DURATION("driver_host:driver-hooks", get_trace_label("made_visible", &trace_label));
+      Dispatch(ops_.made_visible);
+    });
+  }
+
   void set_bind_conn(fit::callback<void(zx_status_t)>);
   fit::callback<void(zx_status_t)> take_bind_conn();
 

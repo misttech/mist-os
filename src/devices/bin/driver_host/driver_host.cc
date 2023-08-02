@@ -376,6 +376,8 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
       if (child->ops().init) {
         // Mark child as invisible until the init function is replied.
         child->set_flag(DEV_FLAG_INVISIBLE);
+      } else {
+        child->MadeVisibleOp();
       }
     } else {
       call_status = response->error_value();

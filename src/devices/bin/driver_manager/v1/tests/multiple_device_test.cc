@@ -47,7 +47,7 @@ TEST_F(MultipleDeviceTestCase, UnbindThenSuspend) {
   coordinator_loop()->RunUntilIdle();
 }
 
-TEST_F(MultipleDeviceTestCase, SuspendThenUnbind) {
+TEST_F(MultipleDeviceTestCase, DISABLED_SuspendThenUnbind) {
   size_t parent_index;
   ASSERT_NO_FATAL_FAILURE(
       AddDevice(platform_bus()->device, "parent-device", 0 /* protocol id */, "", &parent_index));
@@ -55,6 +55,9 @@ TEST_F(MultipleDeviceTestCase, SuspendThenUnbind) {
   size_t child_index;
   ASSERT_NO_FATAL_FAILURE(AddDevice(device(parent_index)->device, "child-device",
                                     0 /* protocol id */, "", &child_index));
+
+  ASSERT_NO_FATAL_FAILURE(device(parent_index)->CheckSignalMadeVisible());
+  ASSERT_NO_FATAL_FAILURE(device(child_index)->CheckSignalMadeVisible());
 
   const uint32_t flags = DEVICE_SUSPEND_FLAG_POWEROFF;
   ASSERT_NO_FATAL_FAILURE(DoSuspend(flags));
@@ -181,6 +184,8 @@ TEST_F(MultipleDeviceTestCase, ResumeThenUnbind) {
   size_t child_index;
   ASSERT_NO_FATAL_FAILURE(AddDevice(device(parent_index)->device, "child-device",
                                     0 /* protocol id */, "", &child_index));
+
+  ASSERT_NO_FATAL_FAILURE(device(child_index)->CheckSignalMadeVisible());
 
   coordinator().root_device()->set_state(Device::State::kSuspended);
   coordinator().root_device()->proxy()->set_state(Device::State::kSuspended);

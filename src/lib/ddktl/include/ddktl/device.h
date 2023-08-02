@@ -75,6 +75,8 @@
 // |                            |                          uint8_t* out_state)       |
 // |                            |                                                    |
 // | ddk::Rxrpcable             | zx_status_t DdkRxrpc(zx_handle_t channel)          |
+// |                            |                                                    |
+// | ddk::MadeVisible           | zx_status_t DdkMadeVisible()                       |
 // +----------------------------+----------------------------------------------------+
 //
 // :: Example ::
@@ -284,6 +286,18 @@ class ChildPreReleaseable : public base_mixin {
   static void ChildPreRelease(void* ctx, void* child_ctx) {
     static_cast<D*>(ctx)->DdkChildPreRelease(child_ctx);
   }
+};
+
+template <typename D>
+class MadeVisibleable : public base_mixin {
+ protected:
+  static constexpr void MadeVisibleOp(zx_protocol_device_t* proto) {
+    internal::CheckMadeVisibleable<D>();
+    proto->made_visible = MadeVisible;
+  }
+
+ private:
+  static void MadeVisible(void* ctx) { static_cast<D*>(ctx)->DdkMadeVisible(); }
 };
 
 class MetadataList {

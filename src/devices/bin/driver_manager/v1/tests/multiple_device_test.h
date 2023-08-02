@@ -81,6 +81,10 @@ class DeviceState : public fidl::testing::WireTestBase<fdm::DeviceController> {
   void SendResumeReply(zx_status_t return_status);
   void CheckResumeReceivedAndReply(SystemPowerState target_state, zx_status_t return_status);
 
+  void CheckSignalMadeVisible();
+
+  void Dispatch();
+
   // The representation in the coordinator of the device
   fbl::RefPtr<Device> device;
   // The remote end of the channel that the coordinator is talking to
@@ -89,8 +93,6 @@ class DeviceState : public fidl::testing::WireTestBase<fdm::DeviceController> {
   fidl::ServerEnd<fdm::DeviceController> controller_server;
 
  private:
-  void Dispatch();
-
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     ADD_FAILURE("%s is unimplemented and should not be called", name.c_str());
   }
@@ -114,6 +116,12 @@ class DeviceState : public fidl::testing::WireTestBase<fdm::DeviceController> {
   void CompleteRemoval(CompleteRemovalCompleter::Sync& completer) override {
     remove_completer_ = completer.ToAsync();
   }
+  void SignalMadeVisible(SignalMadeVisibleCompleter::Sync& completer) override {
+    made_visible_ = true;
+    if (continue_dispatch_) {
+      Dispatch();
+    }
+  }
 
   std::optional<BindDriverCompleter::Async> bind_completer_;
   std::string bind_driver_path_;
@@ -124,6 +132,8 @@ class DeviceState : public fidl::testing::WireTestBase<fdm::DeviceController> {
   std::optional<ResumeCompleter::Async> resume_completer_;
   std::optional<UnbindCompleter::Async> unbind_completer_;
   std::optional<CompleteRemovalCompleter::Async> remove_completer_;
+  bool continue_dispatch_ = true;
+  bool made_visible_ = false;
 };
 
 class MultipleDeviceTestCase : public zxtest::Test {

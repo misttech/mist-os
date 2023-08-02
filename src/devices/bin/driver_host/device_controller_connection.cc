@@ -238,6 +238,10 @@ void DeviceControllerConnection::CompleteRemoval(CompleteRemovalCompleter::Sync&
   driver_host_context_->DeviceCompleteRemoval(this->dev());
 }
 
+void DeviceControllerConnection::SignalMadeVisible(SignalMadeVisibleCompleter::Sync& completer) {
+  this->dev()->MadeVisibleOp();
+}
+
 DeviceControllerConnection::DeviceControllerConnection(
     DriverHostContext* ctx, fbl::RefPtr<zx_device> dev,
     fidl::WireSharedClient<fuchsia_device_manager::Coordinator> coordinator_client)

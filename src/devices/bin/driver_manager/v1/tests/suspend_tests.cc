@@ -52,6 +52,11 @@ void SuspendTestCase::SuspendTest(uint32_t flags) {
     ASSERT_NO_FATAL_FAILURE(AddDevice(parent, desc.name, 0 /* protocol id */, "", &desc.index));
   }
 
+  ASSERT_NO_FATAL_FAILURE(platform_bus()->CheckSignalMadeVisible());
+  for (size_t i = 0; i < std::size(devices); i++) {
+    ASSERT_NO_FATAL_FAILURE(device(i)->CheckSignalMadeVisible());
+  }
+
   ASSERT_NO_FATAL_FAILURE(DoSuspend(flags));
 
   size_t num_to_suspend = std::size(devices);

@@ -547,6 +547,7 @@ TEST_F(CompositeTestCase, AddCompositeWithoutMatchingDriver) {
   // Check each composite fragment to ensure that they're unbound.
   for (auto& device_idx : device_indexes) {
     auto device_state = device(device_idx);
+    ASSERT_NO_FATAL_FAILURE(device_state->CheckSignalMadeVisible());
     ASSERT_FALSE(device_state->HasPendingMessages());
   }
 
@@ -833,6 +834,11 @@ TEST_F(CompositeTestCase, SuspendOrder) {
   ASSERT_NO_FATAL_FAILURE(CheckCompositeCreation(kCompositeDevName, device_indexes,
                                                  std::size(device_indexes), fragment_device_indexes,
                                                  &composite));
+
+  ASSERT_NO_FATAL_FAILURE(platform_bus()->CheckSignalMadeVisible());
+  for (auto idx : fragment_device_indexes) {
+    ASSERT_NO_FATAL_FAILURE(device(idx)->CheckSignalMadeVisible());
+  }
 
   const uint32_t suspend_flags = DEVICE_SUSPEND_FLAG_POWEROFF;
   ASSERT_NO_FATAL_FAILURE(DoSuspend(suspend_flags));

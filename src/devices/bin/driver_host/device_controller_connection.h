@@ -53,6 +53,7 @@ class DeviceControllerConnection
   void Resume(ResumeRequestView request, ResumeCompleter::Sync& _completer) override;
   void Unbind(UnbindCompleter::Sync& _completer) override;
   void CompleteRemoval(CompleteRemovalCompleter::Sync& _completer) override;
+  void SignalMadeVisible(SignalMadeVisibleCompleter::Sync& _completer) override;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_HOST_DEVICE_CONTROLLER_CONNECTION_H_

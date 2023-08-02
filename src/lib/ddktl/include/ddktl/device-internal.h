@@ -320,6 +320,17 @@ constexpr void CheckChildPreReleaseable() {
                 "'void DdkChildPreRelease(void*)'.");
 }
 
+DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_made_visible, DdkMadeVisible);
+
+template <typename D>
+constexpr void CheckMadeVisibleable() {
+  static_assert(has_ddk_made_visible<D>::value,
+                "MadeVisableable classes must implement DdkMadeVisible");
+  static_assert(std::is_same_v<decltype(&D::DdkMadeVisible), void (D::*)()>,
+                "DdkMadeVisible must be a public non-static member function with signature "
+                "'void DdkMadeVisible()'.");
+}
+
 // all_mixins
 //
 // Checks a list of types to ensure that all of them are ddk mixins (i.e., they inherit from the

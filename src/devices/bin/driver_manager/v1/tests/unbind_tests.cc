@@ -137,6 +137,11 @@ void UnbindTestCase::UnbindTest(DeviceDesc devices[], size_t num_devices,
     }
   }
 
+  coordinator_loop()->RunUntilIdle();
+  for (size_t i = 0; i < num_devices; i++) {
+    ASSERT_NO_FATAL_FAILURE(device(i)->CheckSignalMadeVisible());
+  }
+
   auto& desc = devices[target_device_index];
   if (unbind_children_only) {
     // Skip removal of the target device.

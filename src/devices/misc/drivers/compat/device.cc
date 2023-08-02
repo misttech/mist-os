@@ -602,6 +602,8 @@ zx_status_t Device::CreateNode() {
                 FDF_LOGL(ERROR, *logger_, "Failed to add device: NodeError: '%s': %u", Name(),
                          static_cast<unsigned int>(*error));
               }
+            } else if (HasOp(ops_, &zx_protocol_device_t::made_visible)) {
+              ops_->made_visible(compat_symbol_.context);
             }
           })
           .wrap_with(scope_);

@@ -213,6 +213,9 @@ closed protocol DeviceController {
     }) -> (struct {
         status zx.Status;
     });
+
+    /// Informs the driver that it has been made visible in devfs.
+    strict SignalMadeVisible();
 };
 
 const FRAGMENT_NAME_MAX uint32 = 32;

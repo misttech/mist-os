@@ -294,6 +294,14 @@ typedef struct zx_protocol_device {
   // thread.
   void (*child_pre_release)(void* ctx, void* child_ctx);
 
+  //@ ## made_visible
+  // The made_visible hook is used to signal that the device has been made
+  // visible in devfs. It can be used as a synchornization point to inform
+  // clients that they may try and open the device.
+  //
+  // This hook will only be executed on the devhost's main thread.
+  void (*made_visible)(void* ctx);
+
 } zx_protocol_device_t;
 
 // protocols look like:
