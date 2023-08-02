@@ -382,6 +382,7 @@ pub trait IcmpIpExt: packet_formats::ip::IpExt + packet_formats::icmp::IcmpIpExt
     /// [`Icmpv6ErrorCode`].
     type ErrorCode: Debug
         + Copy
+        + PartialEq
         + GenericOverIp<Self, Type = Self::ErrorCode>
         + GenericOverIp<Ipv4, Type = Icmpv4ErrorCode>
         + GenericOverIp<Ipv6, Type = Icmpv6ErrorCode>
