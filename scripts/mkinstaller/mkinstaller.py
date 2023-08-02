@@ -111,7 +111,10 @@ IMAGES_RECOVERY_INSTALLER = [
         'zircon-a.signed', [WORKSTATION_INSTALLER_GPT_GUID], 'zbi.signed'),
 
     # Common partitions - installed everywhere.
+    # Only one of these should exist at a time.
     ManifestImage('storage-sparse', [WORKSTATION_INSTALLER_GPT_GUID], 'blk'),
+    ManifestImage(
+        'storage-sparse', [WORKSTATION_INSTALLER_GPT_GUID], 'fxfs-blk'),
 ]
 
 # This is the list of images for running recovery-eng, which offers userspace

@@ -5,6 +5,7 @@
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/images/args.gni")
+import("//build/product.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
 
@@ -14,8 +15,8 @@ group("tests") {
   deps = []
 
   # //tools/emulator only works on linux.
-  # The installer only works on x64 targets which use FVM.
-  if (host_os == "linux" && target_cpu == "x64" && fvm_partition != "") {
+  # The installer only works on x64 targets which use FVM or Fxfs.
+  if (host_os == "linux" && target_cpu == "x64" && !use_bringup_assembly) {
     deps += [ ":installer_test($host_toolchain)" ]
   }
 }
