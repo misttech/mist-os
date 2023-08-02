@@ -43,6 +43,7 @@ async fn main() {
     let mut all_expected_entries = hashmap! {
         "normal".to_string() => vec![ftest::TriggerMarker::PROTOCOL_NAME.to_string()],
         "nested".to_string() => vec![format!("inner/{}", ftest::TriggerMarker::PROTOCOL_NAME).to_string()],
+        "insufficient_rights".to_string() => vec![ftest::TriggerMarker::PROTOCOL_NAME.to_string()],
     };
 
     for _ in 0..2 {

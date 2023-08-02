@@ -79,30 +79,6 @@ fn example_cml_integration_test() {
     fancy_assert_eq(&cm_decl.program.as_ref(), &Some(&program));
 
     let uses = vec![
-        Use::Service(UseService {
-            dependency_type: Some(DependencyType::Strong),
-            source: Some(Ref::Parent(ParentRef {})),
-            source_name: Some("fuchsia.fonts.Provider".to_string()),
-            target_path: Some("/svc/fuchsia.fonts.Provider".to_string()),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Use::Protocol(UseProtocol {
-            dependency_type: Some(DependencyType::Strong),
-            source: Some(Ref::Parent(ParentRef {})),
-            source_name: Some("fuchsia.fonts.LegacyProvider".to_string()),
-            target_path: Some("/svc/fuchsia.fonts.OldProvider".to_string()),
-            availability: Some(Availability::Optional),
-            ..Default::default()
-        }),
-        Use::Protocol(UseProtocol {
-            dependency_type: Some(DependencyType::Strong),
-            source: Some(Ref::Debug(DebugRef {})),
-            source_name: Some("fuchsia.log.LegacyLog".to_string()),
-            target_path: Some("/svc/fuchsia.log.LegacyLog".to_string()),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
         Use::EventStream(UseEventStream {
             source_name: Some("events".to_string()),
             source: Some(Ref::Parent(ParentRef {})),
@@ -146,8 +122,32 @@ fn example_cml_integration_test() {
         Use::Protocol(UseProtocol {
             dependency_type: Some(DependencyType::Strong),
             source: Some(Ref::Parent(ParentRef {})),
+            source_name: Some("fuchsia.fonts.LegacyProvider".to_string()),
+            target_path: Some("/svc/fuchsia.fonts.OldProvider".to_string()),
+            availability: Some(Availability::Optional),
+            ..Default::default()
+        }),
+        Use::Protocol(UseProtocol {
+            dependency_type: Some(DependencyType::Strong),
+            source: Some(Ref::Debug(DebugRef {})),
+            source_name: Some("fuchsia.log.LegacyLog".to_string()),
+            target_path: Some("/svc/fuchsia.log.LegacyLog".to_string()),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Use::Protocol(UseProtocol {
+            dependency_type: Some(DependencyType::Strong),
+            source: Some(Ref::Parent(ParentRef {})),
             source_name: Some("fuchsia.logger.LogSink".to_string()),
             target_path: Some("/svc/fuchsia.logger.LogSink".to_string()),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Use::Service(UseService {
+            dependency_type: Some(DependencyType::Strong),
+            source: Some(Ref::Parent(ParentRef {})),
+            source_name: Some("fuchsia.fonts.Provider".to_string()),
+            target_path: Some("/svc/fuchsia.fonts.Provider".to_string()),
             availability: Some(Availability::Required),
             ..Default::default()
         }),
@@ -155,22 +155,6 @@ fn example_cml_integration_test() {
     fancy_assert_eq(&cm_decl.uses.as_ref(), &Some(&uses));
 
     let exposes = vec![
-        Expose::Service(ExposeService {
-            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            source_name: Some("fuchsia.logger.Log".to_string()),
-            target_name: Some("fuchsia.logger.Log".to_string()),
-            target: Some(Ref::Parent(ParentRef {})),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Expose::Protocol(ExposeProtocol {
-            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
-            target_name: Some("fuchsia.logger.OldLog".to_string()),
-            target: Some(Ref::Parent(ParentRef {})),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
         Expose::Directory(ExposeDirectory {
             source: Some(Ref::Self_(SelfRef {})),
             source_name: Some("blobfs".to_string()),
@@ -189,6 +173,14 @@ fn example_cml_integration_test() {
             rights: None,
             subdir: Some("blob".to_string()),
             availability: Some(Availability::Optional),
+            ..Default::default()
+        }),
+        Expose::Protocol(ExposeProtocol {
+            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
+            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
+            target_name: Some("fuchsia.logger.OldLog".to_string()),
+            target: Some(Ref::Parent(ParentRef {})),
+            availability: Some(Availability::Required),
             ..Default::default()
         }),
         Expose::Protocol(ExposeProtocol {
@@ -215,27 +207,18 @@ fn example_cml_integration_test() {
             availability: Some(Availability::Optional),
             ..Default::default()
         }),
+        Expose::Service(ExposeService {
+            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
+            source_name: Some("fuchsia.logger.Log".to_string()),
+            target_name: Some("fuchsia.logger.Log".to_string()),
+            target: Some(Ref::Parent(ParentRef {})),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
     ];
     fancy_assert_eq(&cm_decl.exposes.as_ref(), &Some(&exposes));
 
     let offers = vec![
-        Offer::Service(OfferService {
-            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            source_name: Some("fuchsia.logger.Log".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
-            target_name: Some("fuchsia.logger.Log".to_string()),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
-            target_name: Some("fuchsia.logger.OldLog".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
         Offer::EventStream(OfferEventStream {
             source_name: Some("directory_ready".to_string()),
             source: Some(Ref::Parent(ParentRef {})),
@@ -276,6 +259,15 @@ fn example_cml_integration_test() {
             ..Default::default()
         }),
         Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
+            source_name: Some("fuchsia.logger.LegacyLog".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
+            target_name: Some("fuchsia.logger.OldLog".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
             source: Some(Ref::VoidType(VoidRef {})),
             source_name: Some("fuchsia.logger.LegacyLog2".to_string()),
             target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
@@ -302,11 +294,28 @@ fn example_cml_integration_test() {
             availability: Some(Availability::Optional),
             ..Default::default()
         }),
+        Offer::Service(OfferService {
+            source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
+            source_name: Some("fuchsia.logger.Log".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
+            target_name: Some("fuchsia.logger.Log".to_string()),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
         Offer::Protocol(OfferProtocol {
             source: Some(Ref::Parent(ParentRef)),
             source_name: Some("fuchsia.inspect.InspectSink".to_string()),
             target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
             target_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.logger.LogSink".to_string()),
+            target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
+            target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
             ..Default::default()
@@ -322,6 +331,15 @@ fn example_cml_integration_test() {
         }),
         Offer::Protocol(OfferProtocol {
             source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.logger.LogSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "explicit_dynamic".to_string() })),
+            target_name: Some("fuchsia.logger.LogSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
             source_name: Some("fuchsia.inspect.InspectSink".to_string()),
             target: Some(Ref::Collection(CollectionRef { name: "explicit_static".to_string() })),
             target_name: Some("fuchsia.inspect.InspectSink".to_string()),
@@ -331,9 +349,27 @@ fn example_cml_integration_test() {
         }),
         Offer::Protocol(OfferProtocol {
             source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.logger.LogSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "explicit_static".to_string() })),
+            target_name: Some("fuchsia.logger.LogSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
             source_name: Some("fuchsia.inspect.InspectSink".to_string()),
             target: Some(Ref::Collection(CollectionRef { name: "long_child_names".to_string() })),
             target_name: Some("fuchsia.inspect.InspectSink".to_string()),
+            dependency_type: Some(DependencyType::Strong),
+            availability: Some(Availability::Required),
+            ..Default::default()
+        }),
+        Offer::Protocol(OfferProtocol {
+            source: Some(Ref::Parent(ParentRef)),
+            source_name: Some("fuchsia.logger.LogSink".to_string()),
+            target: Some(Ref::Collection(CollectionRef { name: "long_child_names".to_string() })),
+            target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
             ..Default::default()
@@ -343,42 +379,6 @@ fn example_cml_integration_test() {
             source_name: Some("fuchsia.inspect.InspectSink".to_string()),
             target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
             target_name: Some("fuchsia.inspect.InspectSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.logger.LogSink".to_string()),
-            target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            target_name: Some("fuchsia.logger.LogSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.logger.LogSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "explicit_dynamic".to_string() })),
-            target_name: Some("fuchsia.logger.LogSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.logger.LogSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "explicit_static".to_string() })),
-            target_name: Some("fuchsia.logger.LogSink".to_string()),
-            dependency_type: Some(DependencyType::Strong),
-            availability: Some(Availability::Required),
-            ..Default::default()
-        }),
-        Offer::Protocol(OfferProtocol {
-            source: Some(Ref::Parent(ParentRef)),
-            source_name: Some("fuchsia.logger.LogSink".to_string()),
-            target: Some(Ref::Collection(CollectionRef { name: "long_child_names".to_string() })),
-            target_name: Some("fuchsia.logger.LogSink".to_string()),
             dependency_type: Some(DependencyType::Strong),
             availability: Some(Availability::Required),
             ..Default::default()
@@ -396,16 +396,6 @@ fn example_cml_integration_test() {
     fancy_assert_eq(&cm_decl.offers.as_ref(), &Some(&offers));
 
     let capabilities = vec![
-        Capability::Service(Service {
-            name: Some("fuchsia.logger.Log".to_string()),
-            source_path: Some("/svc/fuchsia.logger.Log".to_string()),
-            ..Default::default()
-        }),
-        Capability::Protocol(Protocol {
-            name: Some("fuchsia.logger.Log2".to_string()),
-            source_path: Some("/svc/fuchsia.logger.Log2".to_string()),
-            ..Default::default()
-        }),
         Capability::Directory(Directory {
             name: Some("blobfs".to_string()),
             source_path: Some("/volumes/blobfs".to_string()),
@@ -421,12 +411,14 @@ fn example_cml_integration_test() {
             ),
             ..Default::default()
         }),
-        Capability::Storage(Storage {
-            name: Some("minfs".to_string()),
-            source: Some(Ref::Parent(ParentRef {})),
-            backing_dir: Some("data".to_string()),
-            subdir: None,
-            storage_id: Some(StorageId::StaticInstanceIdOrMoniker),
+        Capability::Protocol(Protocol {
+            name: Some("fuchsia.logger.Log2".to_string()),
+            source_path: Some("/svc/fuchsia.logger.Log2".to_string()),
+            ..Default::default()
+        }),
+        Capability::Resolver(Resolver {
+            name: Some("pkg_resolver".to_string()),
+            source_path: Some("/svc/fuchsia.pkg.Resolver".to_string()),
             ..Default::default()
         }),
         Capability::Runner(Runner {
@@ -434,9 +426,17 @@ fn example_cml_integration_test() {
             source_path: Some("/svc/fuchsia.sys2.Runner".to_string()),
             ..Default::default()
         }),
-        Capability::Resolver(Resolver {
-            name: Some("pkg_resolver".to_string()),
-            source_path: Some("/svc/fuchsia.pkg.Resolver".to_string()),
+        Capability::Service(Service {
+            name: Some("fuchsia.logger.Log".to_string()),
+            source_path: Some("/svc/fuchsia.logger.Log".to_string()),
+            ..Default::default()
+        }),
+        Capability::Storage(Storage {
+            name: Some("minfs".to_string()),
+            source: Some(Ref::Parent(ParentRef {})),
+            backing_dir: Some("data".to_string()),
+            subdir: None,
+            storage_id: Some(StorageId::StaticInstanceIdOrMoniker),
             ..Default::default()
         }),
     ];
@@ -453,10 +453,10 @@ fn example_cml_integration_test() {
 
     let collections = vec![
         Collection {
-            name: Some("modular".to_string()),
+            name: Some("explicit_dynamic".to_string()),
             durability: Some(Durability::Transient),
             environment: None,
-            allowed_offers: None,
+            allowed_offers: Some(AllowedOffers::StaticAndDynamic),
             allow_long_names: None,
             persistent_storage: None,
             ..Default::default()
@@ -471,20 +471,20 @@ fn example_cml_integration_test() {
             ..Default::default()
         },
         Collection {
-            name: Some("explicit_dynamic".to_string()),
-            durability: Some(Durability::Transient),
-            environment: None,
-            allowed_offers: Some(AllowedOffers::StaticAndDynamic),
-            allow_long_names: None,
-            persistent_storage: None,
-            ..Default::default()
-        },
-        Collection {
             name: Some("long_child_names".to_string()),
             durability: Some(Durability::Transient),
             environment: None,
             allowed_offers: None,
             allow_long_names: Some(true),
+            persistent_storage: None,
+            ..Default::default()
+        },
+        Collection {
+            name: Some("modular".to_string()),
+            durability: Some(Durability::Transient),
+            environment: None,
+            allowed_offers: None,
+            allow_long_names: None,
             persistent_storage: None,
             ..Default::default()
         },

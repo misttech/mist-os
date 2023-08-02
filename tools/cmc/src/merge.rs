@@ -51,6 +51,7 @@ pub fn merge(
             document.merge_from(&mut d, &file)?;
         }
     }
+    document.canonicalize();
 
     let json_str = serde_json::to_string_pretty(&document)?;
     if let Some(output_path) = &output {
@@ -101,8 +102,7 @@ mod tests {
         File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
         let expected_json = json!({
             "use": [
-                {"protocol": ["bar"]},
-                {"protocol": "foo"},
+                {"protocol": ["bar", "foo"]},
             ]
         });
         assert_eq!(buffer, format!("{:#}", expected_json));
@@ -132,9 +132,7 @@ mod tests {
         File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
         let expected_json = json!({
             "use": [
-                {"protocol": ["bar"]},
-                {"protocol": ["baz"]},
-                {"protocol": "foo"},
+                {"protocol": ["bar", "baz", "foo"]},
             ]
         });
         assert_eq!(buffer, format!("{:#}", expected_json));
@@ -189,9 +187,7 @@ mod tests {
         File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
         let expected_json = json!({
             "use": [
-                {"protocol": ["bar"]},
-                {"protocol": ["foo"]},
-                {"protocol": ["baz"]},
+                {"protocol": ["bar", "baz", "foo"]},
             ]
         });
         assert_eq!(buffer, format!("{:#}", expected_json));
