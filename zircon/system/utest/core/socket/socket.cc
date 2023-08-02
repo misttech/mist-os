@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/zx/socket.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -835,6 +836,11 @@ TEST(SocketTest, ReadIntoBadBuffer) {
   // Note, no options means the buffer is not writable.
   ASSERT_OK(zx::vmar::root_self()->map(0, 0, vmo, 0, kSize, &addr));
 
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, kSize);
+  });
+
   size_t actual = 99;
   void* buffer = reinterpret_cast<void*>(addr);
   ASSERT_NE(nullptr, buffer);
@@ -870,6 +876,11 @@ TEST(SocketTest, WriteFromBadBuffer) {
   // Note, no options means the buffer is not readable.
   ASSERT_OK(zx::vmar::root_self()->map(0, 0, vmo, 0, kSize, &addr));
 
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, kSize);
+  });
+
   void* buffer = reinterpret_cast<void*>(addr);
   ASSERT_NE(nullptr, buffer);
 
@@ -891,6 +902,11 @@ TEST(SocketTest, WriteFromPartialBadBuffer) {
 
   ASSERT_OK(
       zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
+
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, kVmoSize);
+  });
 
   void* buffer = reinterpret_cast<void*>(addr);
   ASSERT_NE(nullptr, buffer);
@@ -922,6 +938,11 @@ TEST(SocketTest, ReadToPartialBadBuffer) {
 
   ASSERT_OK(
       zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
+
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, kVmoSize);
+  });
 
   void* buffer = reinterpret_cast<void*>(addr);
   ASSERT_NE(nullptr, buffer);
