@@ -62,15 +62,15 @@ const GET_IFACE_STATS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 // through the policy API, it is likely that a user intended to restart WLAN connections.
 const USER_RESTART_TIME_THRESHOLD: zx::Duration = zx::Duration::from_seconds(5);
 // Short duration connection for metrics purposes.
-const METRICS_SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(90);
+pub const METRICS_SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(90);
 // Minimum connection duration for logging average connection score deltas.
 pub const AVERAGE_SCORE_DELTA_MINIMUM_DURATION: zx::Duration = zx::Duration::from_seconds(30);
 
 #[derive(Clone, Debug, PartialEq)]
 // Connection score and the time at which it was calculated.
 pub struct TimestampedConnectionScore {
-    score: u8,
-    time: fasync::Time,
+    pub score: u8,
+    pub time: fasync::Time,
 }
 impl TimestampedConnectionScore {
     pub fn new(score: u8, time: fasync::Time) -> Self {
@@ -322,6 +322,9 @@ pub enum TelemetryEvent {
     ScanEvent {
         inspect_data: ScanEventInspectData,
         scan_defects: Vec<ScanIssue>,
+    },
+    LongDurationConnectionScoreAverage {
+        scores: Vec<TimestampedConnectionScore>,
     },
 }
 
@@ -1166,37 +1169,15 @@ impl Telemetry {
                                 state.network_is_likely_hidden,
                             )
                             .await;
-                        // Logs user requested connection during short duration connection, which indicates
-                        // that the we did not successfully select the user's preferred connection.
+                        // Log metrics if connection had a short duration.
                         if info.connected_duration < METRICS_SHORT_CONNECT_DURATION {
-                            match info.disconnect_source {
-                                fidl_sme::DisconnectSource::User(
-                                    fidl_sme::UserDisconnectReason::FidlConnectRequest,
+                            self.stats_logger
+                                .log_short_duration_connection_metrics(
+                                    info.connection_scores.clone(),
+                                    info.disconnect_source,
+                                    info.previous_connect_reason,
                                 )
-                                | fidl_sme::DisconnectSource::User(
-                                    fidl_sme::UserDisconnectReason::NetworkUnsaved,
-                                ) => {
-                                    let metric_events = vec![
-                                MetricEvent {
-                                    metric_id: metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
-                                    event_codes: vec![],
-                                    payload: MetricEventPayload::Count(1),
-                                },
-                                MetricEvent {
-                                    metric_id: metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
-                                    event_codes: vec![info.previous_connect_reason as u32],
-                                    payload: MetricEventPayload::Count(1),
-                                }
-                            ];
-
-                                    log_cobalt_1dot1_batch!(
-                                        self.stats_logger.cobalt_1dot1_proxy,
-                                        &metric_events,
-                                        "log_fidl_connect_request_during_short_duration",
-                                    );
-                                }
-                                _ => {}
-                            }
+                                .await;
                         }
                     }
                     _ => {
@@ -1328,6 +1309,14 @@ impl Telemetry {
                 for defect in scan_defects {
                     self.stats_logger.log_scan_issue(defect).await;
                 }
+            }
+            TelemetryEvent::LongDurationConnectionScoreAverage { scores } => {
+                self.stats_logger
+                    .log_connection_score_average(
+                        metrics::ConnectionScoreAverageMetricDimensionDuration::LongDuration as u32,
+                        scores,
+                    )
+                    .await;
             }
         }
     }
@@ -3134,6 +3123,47 @@ impl StatsLogger {
         }
     }
 
+    async fn log_short_duration_connection_metrics(
+        &mut self,
+        scores: HistoricalList<TimestampedConnectionScore>,
+        disconnect_source: fidl_sme::DisconnectSource,
+        previous_connect_reason: client::types::ConnectReason,
+    ) {
+        self.log_connection_score_average(
+            metrics::ConnectionScoreAverageMetricDimensionDuration::ShortDuration as u32,
+            scores.get_before(fasync::Time::now()),
+        )
+        .await;
+        // Logs user requested connection during short duration connection, which indicates that we
+        // did not successfully select the user's preferred connection.
+        match disconnect_source {
+            fidl_sme::DisconnectSource::User(
+                fidl_sme::UserDisconnectReason::FidlConnectRequest,
+            )
+            | fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::NetworkUnsaved) => {
+                let metric_events = vec![
+                    MetricEvent {
+                        metric_id: metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::Count(1),
+                    },
+                    MetricEvent {
+                        metric_id: metrics::POLICY_FIDL_CONNECTION_ATTEMPTS_DURING_SHORT_CONNECTION_DETAILED_METRIC_ID,
+                        event_codes: vec![previous_connect_reason as u32],
+                        payload: MetricEventPayload::Count(1),
+                    }
+                ];
+
+                log_cobalt_1dot1_batch!(
+                    self.cobalt_1dot1_proxy,
+                    &metric_events,
+                    "log_short_duration_connection_metrics",
+                );
+            }
+            _ => {}
+        }
+    }
+
     async fn log_network_selection_metrics(
         &mut self,
         connection_state: &mut ConnectionState,
@@ -3304,6 +3334,24 @@ impl StatsLogger {
             &metric_events,
             "log_bss_selection_cobalt_metrics",
         );
+    }
+
+    async fn log_connection_score_average(
+        &mut self,
+        duration_dim: u32,
+        scores: Vec<TimestampedConnectionScore>,
+    ) {
+        if !scores.is_empty() {
+            log_cobalt_1dot1!(
+                self.cobalt_1dot1_proxy,
+                log_integer,
+                metrics::CONNECTION_SCORE_AVERAGE_METRIC_ID,
+                scores.iter().map(|t| t.score as i64).sum::<i64>() / scores.len() as i64,
+                &[duration_dim],
+            );
+        } else {
+            warn!("Connection score list is unexpectedly empty.");
+        }
     }
 }
 
@@ -5482,13 +5530,18 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_fidl_connect_request_during_short_duration() {
+    fn test_log_short_duration_connection_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
+        let now = fasync::Time::now();
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         let channel = generate_random_channel();
         let ap_state = random_bss_description!(Wpa2, channel: channel).into();
+        let mut connection_scores = HistoricalList::new(5);
+        connection_scores.add(TimestampedConnectionScore::new(10, now));
+        connection_scores.add(TimestampedConnectionScore::new(20, now));
+        connection_scores.add(TimestampedConnectionScore::new(30, now));
         // Log disconnect with reason FidlConnectRequest during short duration
         let info = DisconnectInfo {
             connected_duration: METRICS_SHORT_CONNECT_DURATION - 1.second(),
@@ -5496,6 +5549,7 @@ mod tests {
                 fidl_sme::UserDisconnectReason::FidlConnectRequest,
             ),
             ap_state,
+            connection_scores,
             ..fake_disconnect_info()
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
@@ -5543,6 +5597,15 @@ mod tests {
         );
         assert_eq!(logged_metrics.len(), 2);
         assert_eq!(logged_metrics[0].event_codes, vec![info.previous_connect_reason as u32]);
+
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECTION_SCORE_AVERAGE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 2);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![metrics::ConnectionScoreAverageMetricDimensionDuration::ShortDuration as u32]
+        );
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(20));
     }
 
     #[fuchsia::test]
@@ -7502,6 +7565,42 @@ mod tests {
         assert!(test_helper
             .get_logged_metrics(metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID)
             .is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_log_connection_score_average_long_duration() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        let now = fasync::Time::now();
+        let scores = vec![
+            TimestampedConnectionScore::new(10, now),
+            TimestampedConnectionScore::new(20, now),
+            TimestampedConnectionScore::new(30, now),
+            TimestampedConnectionScore::new(40, now),
+            TimestampedConnectionScore::new(50, now),
+        ];
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::LongDurationConnectionScoreAverage { scores });
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECTION_SCORE_AVERAGE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![metrics::ConnectionScoreAverageMetricDimensionDuration::LongDuration as u32]
+        );
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(30));
+
+        // Ensure an empty score list would not cause an arithmetic error.
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::LongDurationConnectionScoreAverage { scores: vec![] });
+        test_helper.drain_cobalt_events(&mut test_fut);
+        assert_eq!(
+            test_helper.get_logged_metrics(metrics::CONNECTION_SCORE_AVERAGE_METRIC_ID).len(),
+            1
+        );
     }
 
     struct TestHelper {

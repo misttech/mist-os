@@ -14,7 +14,7 @@ use {
         mode_management::{Defect, IfaceFailure},
         telemetry::{
             DisconnectInfo, TelemetryEvent, TelemetrySender, TimestampedConnectionScore,
-            AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
+            AVERAGE_SCORE_DELTA_MINIMUM_DURATION, METRICS_SHORT_CONNECT_DURATION,
         },
         util::{
             historical_list::HistoricalList,
@@ -57,7 +57,7 @@ const MIN_RSSI_CHANGE_TO_ROAM_SCAN: i8 = 5;
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
 const CONNECT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(30);
-const NUM_PAST_SCORES: usize = 35; // number of past periodic connection scores to store
+const NUM_PAST_SCORES: usize = 91; // number of past periodic connection scores to store for metrics
 
 type State = state_machine::State<ExitReason>;
 type ReqStream = stream::Fuse<mpsc::Receiver<ManualRequest>>;
@@ -598,8 +598,14 @@ async fn connected_state(
     let mut avg_rssi = SignalStrengthAverage::new();
 
     // Timer to log post-connection scores metrics.
-    let timer = fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
-    fasync::pin_mut!(timer);
+    let post_connect_metric_timer =
+        fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
+    fasync::pin_mut!(post_connect_metric_timer);
+
+    // Timer when duration has lapsed from short duration to long duration, for metrics purposes.
+    let connect_duration_metric_timer =
+        fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()).fuse();
+    fasync::pin_mut!(connect_duration_metric_timer);
 
     loop {
         select! {
@@ -797,10 +803,16 @@ async fn connected_state(
                     None => return handle_none_request(),
                 };
             },
-            () = timer => {
+            () = post_connect_metric_timer => {
                 // Log the score deltas since connection.
                 common_options.telemetry_sender.send(
                     TelemetryEvent::PostConnectionScores { connect_time: connect_start_time, score_at_connect: initial_score, scores: options.past_connection_scores.clone() }
+                );
+            },
+            () = connect_duration_metric_timer => {
+                // Log the average connection score metric for a long duration connection.
+                common_options.telemetry_sender.send(
+                    TelemetryEvent::LongDurationConnectionScoreAverage{ scores: options.past_connection_scores.get_before(fasync::Time::now()) }
                 );
             }
         }
@@ -1899,11 +1911,28 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         pin_mut!(sme_fut);
 
+        let disconnect_time = fasync::Time::after(12.hours());
+
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        let disconnect_time = fasync::Time::after(12.hours());
+        // Run forward to get post connection score metrics
+        exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+        });
+
+        // Run forward to get long duration score metrics
+        exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+        });
+
+        // Run forward to disconnect time
         exec.set_fake_time(disconnect_time);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a disconnect request
         let mut client = Client::new(test_values.client_req_sender);
@@ -2112,17 +2141,28 @@ mod tests {
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
 
+        let disconnect_time = fasync::Time::after(12.hours());
+
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        exec.set_fake_time(fasync::Time::after(12.hours()));
-
-        // Receive PostConnectionScores first.
+        // Run forward to get post connection score metrics
+        exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
-            telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::PostConnectionScores { .. }))
-        );
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+        });
+
+        // Run forward to get long duration score metrics
+        exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+        });
+
+        // Run forward to disconnect time
+        exec.set_fake_time(disconnect_time);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // SME notifies Policy of disconnection with SME-initiated reconnect
         let is_sme_reconnecting = true;
@@ -2338,11 +2378,28 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         pin_mut!(sme_fut);
 
+        let disconnect_time = fasync::Time::after(12.hours());
+
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        let disconnect_time = fasync::Time::after(12.hours());
+        // Run forward to get post connection score metrics
+        exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+        });
+
+        // Run forward to get long duration score metrics
+        exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+        });
+
+        // Run forward to disconnect time
         exec.set_fake_time(disconnect_time);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a different connect request
         let mut client = Client::new(test_values.client_req_sender);
@@ -2895,8 +2952,6 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_should_not_roam_scan_frequently() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let mut time = fasync::Time::from_nanos(0);
-        exec.set_fake_time(time);
 
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2961,16 +3016,26 @@ mod tests {
         poll_telemetry_signal_report_event(&mut telemetry_receiver);
         assert_variant!(telemetry_receiver.try_next(), Err(_));
 
-        // Check that after a while even without a change in RSSI there would be a roam scan.
-        time = time + fasync::Duration::from_minutes(20);
-        exec.set_fake_time(time);
-
-        // Receive PostConnectionScores first.
+        // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(
-            telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::PostConnectionScores { .. }))
-        );
+
+        // Run forward to get post connection score metrics
+        exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+        });
+
+        // Run forward to get long duration score metrics
+        exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+        });
+
+        // Check that after a while even without a change in RSSI there would be a roam scan.
+        exec.set_fake_time(fasync::Time::after(20.minutes()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         send_signal_report(rssi_1, snr, &connect_txn_handle);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2981,8 +3046,7 @@ mod tests {
         // Check that after more than the minimum amount of time, if the RSSI has changed
         // significantly from the last roam scan, another scan can happen.
         let rssi_2 = rssi_1 - 10;
-        time = time + MIN_TIME_BETWEEN_ROAM_SCANS + fasync::Duration::from_minutes(2);
-        exec.set_fake_time(time);
+        exec.set_fake_time(fasync::Time::after(2.minutes()));
         send_signal_report(rssi_2, snr, &connect_txn_handle);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2991,8 +3055,7 @@ mod tests {
 
         // Check that after a moderately short amount of time without a change in RSSI, there is
         // not another scan.
-        time = time + MIN_TIME_BETWEEN_ROAM_SCANS + fasync::Duration::from_minutes(2);
-        exec.set_fake_time(time);
+        exec.set_fake_time(fasync::Time::after(2.minutes()));
         send_signal_report(rssi_2, snr, &connect_txn_handle);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
