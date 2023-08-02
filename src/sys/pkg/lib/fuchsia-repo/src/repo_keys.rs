@@ -6,6 +6,7 @@ use {
     data_encoding::HEXLOWER,
     mundane::public::ed25519 as mundane_ed25519,
     serde::{Deserialize, Deserializer, Serialize, Serializer},
+    serde_json::json,
     std::{fmt, fs::File, io, io::Write, path::Path},
     tuf::crypto::{Ed25519PrivateKey, KeyType, PrivateKey, PublicKey, SignatureScheme},
 };
@@ -38,6 +39,10 @@ pub enum ParseError {
     /// The key type and signature scheme is unsupported.
     #[error("unsupported generation for key type {keytype:?}")]
     UnsupportedKeyTypeGeneration { keytype: KeyType },
+
+    /// The keys file is encrypted, which is not supported.
+    #[error("The keys file is encrypted, which is not supported")]
+    EncryptedKeys,
 }
 
 /// Hold all the private keys for a repository.
@@ -69,7 +74,7 @@ impl fmt::Debug for RepoKeys {
 }
 
 impl RepoKeys {
-    /// Generates a set of [RoleKeys], writing the following files to the passed `dir`:
+    /// Generates a set of [RoleKey]s, writing the following files to the passed `dir`:
     /// * root.json
     /// * targets.json
     /// * snapshot.json
@@ -150,10 +155,13 @@ impl RepoKeys {
         let timestamp_key = generate_rolekey(DEFAULT_KEYTYPE_GENERATION).unwrap();
 
         for (rolekeys_filename, rolekeys) in [
-            ("root.json", RoleKeys { data: vec![root_key.clone()] }),
-            ("targets.json", RoleKeys { data: vec![targets_key.clone()] }),
-            ("snapshot.json", RoleKeys { data: vec![snapshot_key.clone()] }),
-            ("timestamp.json", RoleKeys { data: vec![timestamp_key.clone()] }),
+            ("root.json", RoleKeys { encrypted: false, data: json! { [root_key.clone()] } }),
+            ("targets.json", RoleKeys { encrypted: false, data: json! {[targets_key.clone()] } }),
+            ("snapshot.json", RoleKeys { encrypted: false, data: json! {[snapshot_key.clone()] } }),
+            (
+                "timestamp.json",
+                RoleKeys { encrypted: false, data: json! {[timestamp_key.clone()] } },
+            ),
         ] {
             write_rolekeys(dir, rolekeys_filename, rolekeys)?;
         }
@@ -301,8 +309,14 @@ fn parse_keys_if_exists(path: &Path) -> Result<Vec<Box<dyn PrivateKey>>, ParseEr
 fn parse_keys(f: File) -> Result<Vec<Box<dyn PrivateKey>>, ParseError> {
     let role_keys: RoleKeys = serde_json::from_reader(f)?;
 
-    let mut keys = Vec::with_capacity(role_keys.data.len());
-    for RoleKey { keytype, scheme, keyid_hash_algorithms, keyval } in role_keys.data {
+    if role_keys.encrypted {
+        return Err(ParseError::EncryptedKeys);
+    }
+
+    let role_keys: Vec<RoleKey> = serde_json::from_value(role_keys.data)?;
+
+    let mut keys = Vec::with_capacity(role_keys.len());
+    for RoleKey { keytype, scheme, keyid_hash_algorithms, keyval } in role_keys {
         match (keytype, scheme) {
             (KeyType::Ed25519, SignatureScheme::Ed25519) => {
                 let (public, private) = if let Some(keyid_hash_algorithms) = keyid_hash_algorithms {
@@ -343,7 +357,17 @@ fn parse_keys(f: File) -> Result<Vec<Box<dyn PrivateKey>>, ParseError> {
 
 #[derive(Serialize, Deserialize)]
 struct RoleKeys {
-    data: Vec<RoleKey>,
+    #[serde(default = "default_false", skip_serializing_if = "bool_is_false")]
+    encrypted: bool,
+    data: serde_json::Value,
+}
+
+fn default_false() -> bool {
+    false
+}
+
+fn bool_is_false(b: &bool) -> bool {
+    *b == false
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -385,10 +409,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::test_utils, assert_matches::assert_matches, camino::Utf8Path,
-        serde_json::json,
-    };
+    use {super::*, crate::test_utils, assert_matches::assert_matches, camino::Utf8Path};
 
     macro_rules! assert_keys {
         ($actual:expr, $expected:expr) => {
@@ -725,6 +746,37 @@ mod tests {
                         .decode(b"b3ef3423402006eba0775f51f1fa4b38b70297098a0f40d699e984d76a6b83fb")
                         .unwrap(),
                 ).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_parsing_keys_rejects_encrypted_keys() {
+        let json_keys = json!({
+            "encrypted": true,
+            "data": {
+                "kdf": {
+                    "name": "scrypt",
+                    "params": {
+                        "N": 32768,
+                        "r": 8,
+                        "p": 1
+                    },
+                    "salt": "abc",
+                },
+                "cipher": {
+                    "name": "nacl/secretbox",
+                    "nonce": "def",
+                },
+                "ciphertext": "efg",
+            }
+        });
+
+        let (file, temp_path) = tempfile::NamedTempFile::new().unwrap().into_parts();
+        serde_json::to_writer(file, &json_keys).unwrap();
+
+        assert_matches!(
+            RepoKeys::builder().load_root_keys(&temp_path),
+            Err(ParseError::EncryptedKeys)
         );
     }
 }
