@@ -9,7 +9,7 @@ use {
     },
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{self as fpkg, BlobInfo, BlobInfoIteratorMarker, NeededBlobsMarker},
+    fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker},
     fidl_fuchsia_pkg_ext::{self as fpkg_ext, BlobId},
     fuchsia_merkle::MerkleTree,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
@@ -306,16 +306,6 @@ async fn get_package_already_present_on_fs() {
     assert_matches!(
         needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await,
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. })
-    );
-
-    // The remote end sends the epitaph, and then at some point later, closes the channel.
-    // We check for both here to account for the channel not yet being closed when the
-    // `GetMissingBlobs` call occurs.
-    let (_blob_iterator, blob_iterator_server_end) =
-        fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
-    assert_matches!(
-        needed_blobs.get_missing_blobs(blob_iterator_server_end),
-        Ok(()) | Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. })
     );
 
     let () = get_fut.await.unwrap().unwrap();

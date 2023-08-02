@@ -224,7 +224,6 @@ fn parse_url<S: AsRef<str> + Display>(url: S) -> Result<Url, zx::Status> {
 
 fn stop_provider(url: &Url, provider: fuzz::ControllerProviderProxy) -> Result<(), zx::Status> {
     match provider.stop() {
-        Err(fidl::Error::ClientChannelClosed { .. }) => Ok(()),
         Err(e) => {
             warn!("failed to stop {}: {:?}", url, e);
             Err(zx::Status::INTERNAL)
