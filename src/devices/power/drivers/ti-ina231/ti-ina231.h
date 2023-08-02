@@ -11,6 +11,8 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
 
+#include <string>
+
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 
@@ -26,11 +28,13 @@ using DeviceType =
 
 class Ina231Device : public DeviceType {
  public:
-  Ina231Device(zx_device_t* parent, uint32_t shunt_resistor_uohms, ddk::I2cChannel i2c)
+  Ina231Device(zx_device_t* parent, uint32_t shunt_resistor_uohms, ddk::I2cChannel i2c,
+               std::string name)
       : DeviceType(parent),
         shunt_resistor_uohms_(shunt_resistor_uohms),
         loop_(&kAsyncLoopConfigNeverAttachToThread),
-        i2c_(std::move(i2c)) {}
+        i2c_(std::move(i2c)),
+        name_(std::move(name)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -40,7 +44,7 @@ class Ina231Device : public DeviceType {
 
   void GetPowerWatts(GetPowerWattsCompleter::Sync& completer) override;
   void GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) override;
-  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
 
   // Visible for testing.
   zx_status_t Init(const Ina231Metadata& metadata);
@@ -56,6 +60,7 @@ class Ina231Device : public DeviceType {
   fbl::Mutex i2c_lock_;
   ddk::I2cChannel i2c_ TA_GUARDED(i2c_lock_);
   fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
+  const std::string name_;
 };
 
 }  // namespace power_sensor

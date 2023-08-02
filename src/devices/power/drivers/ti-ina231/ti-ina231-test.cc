@@ -7,6 +7,7 @@
 #include <lib/fake-i2c/fake-i2c.h>
 
 #include <memory>
+#include <string_view>
 
 #include <zxtest/zxtest.h>
 
@@ -90,7 +91,7 @@ class TiIna231Test : public zxtest::Test {
 };
 
 TEST_F(TiIna231Test, GetPowerWatts) {
-  auto dut = std::make_unique<Ina231Device>(root(), 10'000, TakeI2cClient());
+  auto dut = std::make_unique<Ina231Device>(root(), 10'000, TakeI2cClient(), std::string{});
 
   constexpr Ina231Metadata kMetadata = {
       .mode = Ina231Metadata::kModeShuntAndBusContinuous,
@@ -144,7 +145,7 @@ TEST_F(TiIna231Test, GetPowerWatts) {
 }
 
 TEST_F(TiIna231Test, SetAlertLimit) {
-  Ina231Device dut(root(), 10'000, TakeI2cClient());
+  Ina231Device dut(root(), 10'000, TakeI2cClient(), {});
 
   constexpr Ina231Metadata kMetadata = {
       .mode = Ina231Metadata::kModeShuntAndBusContinuous,
@@ -164,7 +165,7 @@ TEST_F(TiIna231Test, SetAlertLimit) {
 }
 
 TEST_F(TiIna231Test, BanjoClients) {
-  Ina231Device dut(root(), 10'000, TakeI2cClient());
+  Ina231Device dut(root(), 10'000, TakeI2cClient(), {});
 
   constexpr Ina231Metadata kMetadata = {
       .mode = Ina231Metadata::kModeShuntAndBusContinuous,
@@ -207,7 +208,7 @@ TEST_F(TiIna231Test, BanjoClients) {
 }
 
 TEST_F(TiIna231Test, GetVoltageVolts) {
-  auto dut = std::make_unique<Ina231Device>(root(), 10'000, TakeI2cClient());
+  auto dut = std::make_unique<Ina231Device>(root(), 10'000, TakeI2cClient(), std::string{});
 
   constexpr Ina231Metadata kMetadata = {
       .mode = Ina231Metadata::kModeShuntAndBusContinuous,
@@ -253,6 +254,39 @@ TEST_F(TiIna231Test, GetVoltageVolts) {
     ASSERT_TRUE(response.ok());
     ASSERT_FALSE(response->is_error());
     EXPECT_TRUE(FloatNear(response->value()->voltage, 81.91875f));
+  }
+  dut.release();  // Owned by mock-ddk.
+}
+
+TEST_F(TiIna231Test, GetSensorName) {
+  constexpr char kSensorName[] = "sensor name";
+
+  auto dut = std::make_unique<Ina231Device>(root(), 10'000, TakeI2cClient(), kSensorName);
+
+  constexpr Ina231Metadata kMetadata = {
+      .mode = Ina231Metadata::kModeShuntAndBusContinuous,
+      .shunt_voltage_conversion_time = Ina231Metadata::kConversionTime332us,
+      .bus_voltage_conversion_time = Ina231Metadata::kConversionTime332us,
+      .averages = Ina231Metadata::kAverages1024,
+      .shunt_resistance_microohm = 10'000,
+      .alert = Ina231Metadata::kAlertNone,
+  };
+
+  EXPECT_OK(dut->Init(kMetadata));
+
+  EXPECT_OK(dut->DdkAdd("ti-ina231"));
+
+  auto endpoints = fidl::CreateEndpoints<power_sensor_fidl::Device>();
+  ASSERT_OK(endpoints.status_value());
+  ASSERT_OK(dut->PowerSensorConnectServer(endpoints->server.TakeChannel()));
+  fidl::WireSyncClient client{
+      fidl::ClientEnd<power_sensor_fidl::Device>{std::move(endpoints->client)}};
+
+  {
+    auto response = client->GetSensorName();
+    ASSERT_TRUE(response.ok());
+    const std::string_view name(response->name.data(), response->name.size());
+    EXPECT_STREQ(name, kSensorName);
   }
   dut.release();  // Owned by mock-ddk.
 }

@@ -57,6 +57,11 @@ zx_status_t Ina231Device::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
+  std::string name;
+  if (auto result = i2c.GetName(); result.ok()) {
+    name = std::string(result.value()->name.data(), result.value()->name.size());
+  }
+
   Ina231Metadata metadata = {};
   size_t actual = 0;
   zx_status_t status =
@@ -74,8 +79,8 @@ zx_status_t Ina231Device::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto dev =
-      std::make_unique<Ina231Device>(parent, metadata.shunt_resistance_microohm, std::move(i2c));
+  auto dev = std::make_unique<Ina231Device>(parent, metadata.shunt_resistance_microohm,
+                                            std::move(i2c), std::move(name));
   if ((status = dev->Init(metadata)) != ZX_OK) {
     return status;
   }
@@ -143,6 +148,10 @@ void Ina231Device::GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) {
   }
 
   completer.ReplySuccess(static_cast<float>(voltage_reg.value()) / kVoltsPerBit);
+}
+
+void Ina231Device::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+  completer.Reply(fidl::StringView::FromExternal(name_));
 }
 
 zx_status_t Ina231Device::Init(const Ina231Metadata& metadata) {
