@@ -8,7 +8,7 @@ use std::{convert::TryFrom, sync::Arc};
 
 use super::signalfd::*;
 use crate::{
-    fs::*,
+    fs::{pidfd::PidFdFileObject, *},
     logging::not_implemented,
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{restore_from_signal_handler, *},
@@ -587,7 +587,7 @@ pub fn sys_waitid(
     options: u32,
     user_rusage: UserRef<rusage>,
 ) -> Result<(), Errno> {
-    let waiting_options = WaitingOptions::new_for_waitid(options)?;
+    let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
     let task_selector = match id_type {
         P_PID => ProcessSelector::Pid(id),
@@ -598,8 +598,13 @@ pub fn sys_waitid(
             id
         }),
         P_PIDFD => {
-            not_implemented!("unsupported waitpid id_type {:?}", id_type);
-            return error!(ENOSYS);
+            let fd = FdNumber::from_raw(id);
+            let file = current_task.files.get(fd)?;
+            if file.flags().contains(OpenFlags::NONBLOCK) {
+                waiting_options.block = false;
+            }
+            let pidfd = file.downcast_file::<PidFdFileObject>().ok_or_else(|| errno!(EINVAL))?;
+            ProcessSelector::Pid(pidfd.pid)
         }
         _ => return error!(EINVAL),
     };
@@ -622,6 +627,16 @@ pub fn sys_waitid(
             let siginfo = waitable_process.as_signal_info();
             current_task.write_memory(user_info, &siginfo.as_siginfo_bytes())?;
         }
+    } else if id_type == P_PIDFD {
+        // From <https://man7.org/linux/man-pages/man2/pidfd_open.2.html>:
+        //
+        //   PIDFD_NONBLOCK
+        //     Return a nonblocking file descriptor.  If the process
+        //     referred to by the file descriptor has not yet terminated,
+        //     then an attempt to wait on the file descriptor using
+        //     waitid(2) will immediately return the error EAGAIN rather
+        //     than blocking.
+        return error!(EAGAIN);
     }
 
     Ok(())

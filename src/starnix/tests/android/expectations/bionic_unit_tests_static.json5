@@ -19,7 +19,6 @@
                 "pidfd_DeathTest.pidfd_send_signal",
                 "fdtrack.pidfd_getfd",
                 "pidfd.pidfd_getfd",
-                "pidfd.pidfd_open",
 
                 // These tests expect /proc/version to exist
                 "dirent.scandir_filter",

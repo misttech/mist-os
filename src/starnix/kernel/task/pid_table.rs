@@ -40,6 +40,8 @@ impl PidTable {
 
     pub fn allocate_pid(&mut self) -> pid_t {
         // TODO: wrap the pid number and check for collisions
+        // If/when we re-use pids, we need to check that PidFdFileObject is holding onto the task
+        // correctly.
         self.last_pid += 1;
         self.last_pid
     }

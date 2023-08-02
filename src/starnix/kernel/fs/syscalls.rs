@@ -1474,11 +1474,11 @@ pub fn sys_pidfd_open(
     if pid <= 0 {
         return error!(EINVAL);
     }
-    let task = current_task.get_task(pid);
-    Task::from_weak(&task)?;
+    // Validate that the pid exists.
+    Task::from_weak(&current_task.get_task(pid))?;
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
-    let file = new_pidfd(current_task, task, open_flags);
+    let file = new_pidfd(current_task, pid, open_flags);
     let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
     Ok(fd)
 }
