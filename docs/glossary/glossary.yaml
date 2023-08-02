@@ -107,17 +107,6 @@
                    "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
-- term: "Binding"
-  short_description: "In v2 components, a component instance binds to component instances that provided
-  capabilities."
-  full_description: "In Components v2, a
-  <a href=\"/docs/glossary#component-instance\">component instance</a>
-  binds to another component instance when it connects to a capability provided by the other
-  component instance. This is the most common reason for a component to start."
-  see_also: [""]
-  related_guides: [""]
-  area: ["Component Framework"]
-
 - term: "Board"
   short_description: "A board is a complete computer hardware platform with a CPU,
   memory, peripherals, and so on."
@@ -342,7 +331,8 @@
   is described, sandboxed, and executed on a Fuchsia system."
   full_description: "Components are the common abstraction that defines how all software
   (regardless of source, programming language, or runtime) is described, sandboxed,
-  and executed on a Fuchsia system."
+  and executed on a Fuchsia system. Components may specify a binary executable, and may be
+  composed of multiple child components."
   see_also: ["<a href=\"/docs/concepts/components/v2/introduction.md\">Components</a>"]
   related_guides: [""]
   area: ["Component Framework"]
@@ -385,8 +375,7 @@
   that includes information about a <a href=\"/docs/glossary#component\">component</a>’s
   runtime configuration, <a href=\"/docs/glossary#capability\">capabilities</a> it
   <a href=\"/docs/glossary#expose\">exposes</a>, <a href=\"/docs/glossary#offer\">offers</a>,
-  and <a href=\"/docs/glossary#use\">uses</a>, and
-  <a href=\"/docs/glossary#component-manifest-facet\">facets</a>."
+  and <a href=\"/docs/glossary#use\">uses</a>."
   see_also: ["<a href=\"/docs/concepts/components/v2/introduction.md\">Components</a>"]
   related_guides: [""]
   area: ["Component Framework"]
@@ -401,8 +390,9 @@
   area: ["Component Framework"]
 
 - term: "Component instance"
-  short_description: "One of possibly many instances of a particular
-  <a href=\"/docs/glossary#component\">components</a> at runtime."
+  short_description: "A specific runtime instantiation of a particular
+  <a href=\"/docs/glossary#component\">component</a> at a specific location in the component
+  instance tree at runtime."
   full_description: ""
   see_also: ["<a href=\"/docs/concepts/components/v2/introduction.md\">Components</a>"]
   related_guides: [""]
@@ -411,7 +401,7 @@
 - term: "Component instance tree"
   short_description: "A tree structure that represents the runtime state of parent-child relationships
   <a href=\"/docs/glossary#component-instance\">component instances</a>."
-  full_description: "Component instance tree is a <a href=\"/docs/concepts/components/v2/introduction.md\">components v2</a> concept. A tree
+  full_description: "A tree
   structure that represents the runtime state of parent-child relationships
   between <a href=\"/docs/glossary#component-instance\">component instances</a>. If instance
   A launches instance B then in the tree A will be the parent of B. The component instance
@@ -432,8 +422,7 @@
   <a href=\"/docs/glossary#component-instance\">component instances</a> manage
   their children and <a href=\"/docs/glossary#capability-routing\">capability routing</a> between them,
   thus implementing the <a href=\"/docs/glossary#component-instance-tree\">component instancetree</a>.
-  Component manager is the system service that implements the
-  <a href=\"/docs/glossary#components-v2\">components v2</a> runtime."
+  Component manager is the system service that implements the component runtime."
   see_also: ["<a href=\"/docs/concepts/components/v2/introduction.md\">Components</a>"]
   related_guides: [""]
   area: ["Component Framework"]
@@ -441,7 +430,9 @@
 - term: "Component manifest"
   short_description: "A binary file ending in <code>.cm</code> that encodes a
   <a href=\"/docs/glossary#component-declaration\">component declaration</a>,
-  often distributed as part of a <a href=\"/docs/glossary#package\">package</a>."
+  often distributed as part of a <a href=\"/docs/glossary#package\">package</a>. The term is
+  sometimes used interchangeably with
+  <a href=\"/docs/glossary#component-manifest-source\">component manifest source</a>."
   full_description: "A binary file ending in <code>.cm</code> that encodes a
   <a href=\"/docs/glossary#component-declaration\">component declaration</a>,
   often distributed as part of a <a href=\"/docs/glossary#package\">package</a>.
@@ -452,16 +443,13 @@
   area: ["Component Framework"]
 
 - term: "Component manifest source"
-  short_description: "A JSON5 file ending with a <code>.cml</code> extension
-  that describes a component and its capabilities."
-  full_description: "In <a href=\"/docs/glossary#components-v2\">components v2</a>,
-  a component manifest is a file with a <code>.cml</code> extension, that encodes
-  a <a href=\"/docs/glossary#component-declaration\">component declaration</a>.
+  short_description: "A JSON5 file with a <code>.cml</code> extension that describes a component's declaration,
+  and is compiled by [cmc] to produce a [component manifest]."
+  full_description: "A JSON5 file with a <code>.cml</code> extension that describes a component's declaration,
+  and is compiled by [cmc] to produce a [component manifest].
 
-  <p>It is a JSON file that contains information about
-  a <a href=\"/docs/glossary#component\">component</a>’s runtime configuration,
-  services and directories it receives in its <a href=\"/docs/glossary#namespace\">namespace</a>,
-  and <a href=\"/docs/glossary#component-manifest-facet\">facets</a>.</p>"
+  <p>The file contains information about a [component]'s executable and runtime configuration (if any),
+  any child [component]s, as well as [capability routing] between itself, its parent, and its children.</p>"
   see_also: ["<a href=\"/docs/concepts/components/v2/component_manifests.md\">Component manifests</a>"]
   related_guides: [""]
   area: ["Component Framework"]
@@ -482,7 +470,7 @@
   to key a component's persistent resources, if it has any. While a component
   instance's moniker may change, its instance ID remains the same.
   <p>Instance IDs are assigned to component instances using a
-   <a href=\"/docs/development/components/component_id_index.md\">component ID index</a>.</p>"
+  <a href=\"/docs/development/components/component_id_index.md\">component ID index</a>.</p>"
   see_also: ["<a href=\"/docs/concepts/components/v2/introduction.md\">Components</a>"]
   related_guides: [""]
   area: ["Component Framework"]
@@ -503,18 +491,6 @@
   that identifies a component, most often used when instantiating a component, for example
   <code>fuchsia-pkg://fuchsia.com/stash#meta/stash_secure.cm</code>."
   see_also: ["<a href=\"/docs/glossary#fuchsia-pkg-url\">fuchsia-pkg URL</a>"]
-  related_guides: [""]
-  area: ["Component Framework"]
-
-- term: "Components v2"
-  short_description: "The modern component architecture of Fuchsia."
-  full_description: "A shorthand for the
-  <a href=\"/docs/glossary#component\">component</a> architecture in its modern
-  implementation. Includes a runtime as implemented by
-  <a href=\"/docs/glossary#component-manager\">component_manager</a>, protocols
-  and types as defined in <a href=\"/sdk/fidl/fuchsia.sys2/\">fuchsia.sys2</a>,
-  and build-time tools such as <a href=\"/docs/reference/tools/sdk/cmc\">cmc</a>."
-  see_also: [""]
   related_guides: [""]
   area: ["Component Framework"]
 
@@ -633,14 +609,12 @@
 
 - term: "Directory capability"
   short_description: "A
-  <a href=\"/docs/glossary#components-v2\">Components v2</a> concept. A
-  <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
+  A <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
   directory by adding it to the <a href=\"/docs/glossary#namespace\">namespace</a> of the
   <a href=\"/docs/glossary#component-instance\">component instance</a>
   that <a href=\"/docs/glossary#use\">uses</a> it."
   full_description: "A
-  <a href=\"/docs/glossary#components-v2\">Components v2</a>concept. A
-  <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
+  A <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem
   directory by adding it to the <a href=\"/docs/glossary#namespace\">namespace</a> of the
   <a href=\"/docs/glossary#component-instance\">component instance</a>
   that <a href=\"/docs/glossary#use\">uses</a> it. If multiple
@@ -1810,9 +1784,9 @@
 - term: "Protocol"
   short_description: "In <a href=\"/docs/glossary#fidl\">FIDL</a>, a protocol groups methods
   and events to describe how one process interacts with another."
-  full_description: "In <a href=\"/docs/glossary#components-v2\">components v2</a>, a protocol
-  is used and routed to other components as a
-  <a href=\"/docs/glossary#protocol-capability\">protocol capability</a>."
+  full_description: "In the component runtime, protocols are routed to and used by
+  other components as
+  <a href=\"/docs/glossary#protocol-capability\">protocol capabilities</a>."
   see_also: ["<a href=\"/docs/glossary#protocol-capability\">Protocol capability</a>"]
   related_guides: ["<a href=\"/docs/concepts/fidl/protocols.md\">FIDL protocols</a>"]
   area: ["Component Framework", "FIDL"]
@@ -1827,16 +1801,14 @@
   capability. The client end of the channel is given to the
   <a href=\"/docs/glossary#component-instance\">component instance</a> that
   <a href=\"/docs/glossary#use\">uses</a> the capability."
-  see_also: ["<a href=\"/docs/glossary#capability-routing\">Capability routing</a>",
-             "<a href=\"/docs/glossary#components-v2\">Components v2</a>"]
+  see_also: ["<a href=\"/docs/glossary#capability-routing\">Capability routing</a>"]
   related_guides: ["<a href=\"/docs/concepts/components/v2/capabilities/protocol.md\">Protocol capabilities</a>"]
   area: ["Component Framework"]
 
 - term: "Realm"
-  short_description: "In <a href=\"/docs/glossary#components-v2\">Components v2</a>, a realm is a
-  subtree of component instances in the
+  short_description: "A subtree of component instances in the
   <a href=\"/docs/glossary#component-instance-tree\">component instance tree</a>.
-  It acts as a container for component instances and capabilities in the subtree."
+  Acts as a container for component instances and capabilities in the subtree."
   full_description: ""
   see_also: ["<a href=\"/docs/concepts/components/v2/realms.md\">Realms</a>"]
   related_guides: [""]
@@ -1937,8 +1909,7 @@
   the capability. The client end of the channel is given to the
   <a href=\"/docs/glossary#component-instance\">component instance</a> that
   <a href=\"/docs/glossary#use\">uses</a> the capability."
-  see_also: ["<a href=\"/docs/glossary#capability-routing\">Capability routing</a>",
-             "<a href=\"/docs/glossary#components-v2\">Components v2</a>"]
+  see_also: ["<a href=\"/docs/glossary#capability-routing\">Capability routing</a>"]
   related_guides: ["<a href=\"/docs/concepts/components/v2/capabilities/service.md\">Service capabilities</a>"]
   area: ["Component Framework"]
 
@@ -2027,9 +1998,7 @@
    <li><b>Meta</b>: A directory is allocated to be used by component manager, where it
     will store metadata to enable features like persistent
     <a href=\"/docs/glossary#component-collection\">component collections</a>.</li>
-  </ul>
-
-  Storage capability is a <a href=\"/docs/glossary#components-v2\">components v2</a> concept."
+  </ul>"
   see_also: ["<a href=\"/docs/glossary#capability-routing\">Capability routing</a>", "<a href=\"/docs/concepts/components/v2/capabilities/storage.md\">Storage capabilities</a>"]
   related_guides: [""]
   area: ["General"]
