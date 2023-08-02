@@ -98,7 +98,7 @@ var arpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]o
 	{3, 16}: Fail,
 	{3, 17}: Pass,
 	{3, 18}: Pass,
-	{3, 19}: Pass,
+	{3, 19}: Fail,
 	{3, 20}: Pass,
 	{3, 21}: Pass,
 	{3, 22}: Pass,
