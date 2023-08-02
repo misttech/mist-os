@@ -519,6 +519,8 @@ impl DirEntry {
     fn destroy(self: DirEntryHandle) {
         self.node.fs().will_destroy_dir_entry(&self);
         self.state.write().is_dead = true;
+        // Need to notify Inotify's to destroy handles to this DirEntry.
+        self.notify(InotifyMask::DELETE_SELF);
     }
 
     /// Returns whether this entry is a descendant of |other|.
@@ -797,10 +799,18 @@ impl DirEntry {
         }
     }
 
-    // Notifies watchers on the current node and its parent about an event.
+    /// Notifies watchers on the current node and its parent about an event.
     pub fn notify(&self, event_mask: InotifyMask) {
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(event_mask, &self.local_name(), self.node.info().mode);
+            if event_mask == InotifyMask::DELETE_SELF {
+                parent.node.watchers.notify(
+                    InotifyMask::DELETE,
+                    &self.local_name(),
+                    self.node.info().mode,
+                );
+            } else {
+                parent.node.watchers.notify(event_mask, &self.local_name(), self.node.info().mode);
+            }
         }
         self.node.watchers.notify(event_mask, &FsString::default(), self.node.info().mode);
     }
