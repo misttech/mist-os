@@ -49,6 +49,7 @@
 #include <linux/netlink.h>
 #include <linux/oom.h>
 #include <linux/personality.h>
+#include <linux/pidfd.h>
 #include <linux/poll.h>
 #include <linux/prctl.h>
 #include <linux/random.h>

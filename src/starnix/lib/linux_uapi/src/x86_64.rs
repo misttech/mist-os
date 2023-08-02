@@ -3525,6 +3525,7 @@ pub const OOM_SCORE_ADJ_MAX: u32 = 1000;
 pub const OOM_DISABLE: i32 = -17;
 pub const OOM_ADJUST_MIN: i32 = -16;
 pub const OOM_ADJUST_MAX: u32 = 15;
+pub const PIDFD_NONBLOCK: u32 = 2048;
 pub const PR_SET_PDEATHSIG: u32 = 1;
 pub const PR_GET_PDEATHSIG: u32 = 2;
 pub const PR_GET_DUMPABLE: u32 = 3;
