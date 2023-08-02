@@ -2040,10 +2040,10 @@ mod test {
         data_structures::socketmap::SocketMap,
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
-            device::state::IpDeviceStateIpExt,
-            socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx},
-            testutil::FakeIpDeviceIdCtx,
-            IpLayerIpExt, SendIpPacketMeta, DEFAULT_HOP_LIMITS,
+            device::state::{IpDeviceState, IpDeviceStateIpExt},
+            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx},
+            testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
+            IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
         socket::{
             Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult,
@@ -2191,26 +2191,105 @@ mod test {
         }
     }
 
-    type FakeBoundSockets<I, D> =
-        BoundSockets<I, FakeWeakDeviceId<D>, FakeAddrSpec, (FakeStateSpec, I, FakeWeakDeviceId<D>)>;
+    #[derive(Derivative, GenericOverIp)]
+    #[derivative(Default(bound = ""))]
+    struct FakeBoundSockets<D: FakeStrongDeviceId> {
+        v4: BoundSockets<
+            Ipv4,
+            FakeWeakDeviceId<D>,
+            FakeAddrSpec,
+            (FakeStateSpec, Ipv4, FakeWeakDeviceId<D>),
+        >,
+        v6: BoundSockets<
+            Ipv6,
+            FakeWeakDeviceId<D>,
+            FakeAddrSpec,
+            (FakeStateSpec, Ipv6, FakeWeakDeviceId<D>),
+        >,
+    }
+
+    impl<D: FakeStrongDeviceId, I: IpExt>
+        AsRef<
+            BoundSockets<
+                I,
+                FakeWeakDeviceId<D>,
+                FakeAddrSpec,
+                (FakeStateSpec, I, FakeWeakDeviceId<D>),
+            >,
+        > for FakeBoundSockets<D>
+    {
+        fn as_ref(
+            &self,
+        ) -> &BoundSockets<
+            I,
+            FakeWeakDeviceId<D>,
+            FakeAddrSpec,
+            (FakeStateSpec, I, FakeWeakDeviceId<D>),
+        > {
+            #[derive(GenericOverIp)]
+            struct Wrap<'a, I: Ip + IpExt, D: FakeStrongDeviceId>(
+                &'a BoundSockets<
+                    I,
+                    FakeWeakDeviceId<D>,
+                    FakeAddrSpec,
+                    (FakeStateSpec, I, FakeWeakDeviceId<D>),
+                >,
+            );
+            let Wrap(state) = I::map_ip(self, |state| Wrap(&state.v4), |state| Wrap(&state.v6));
+            state
+        }
+    }
+
+    impl<D: FakeStrongDeviceId, I: IpExt>
+        AsMut<
+            BoundSockets<
+                I,
+                FakeWeakDeviceId<D>,
+                FakeAddrSpec,
+                (FakeStateSpec, I, FakeWeakDeviceId<D>),
+            >,
+        > for FakeBoundSockets<D>
+    {
+        fn as_mut(
+            &mut self,
+        ) -> &mut BoundSockets<
+            I,
+            FakeWeakDeviceId<D>,
+            FakeAddrSpec,
+            (FakeStateSpec, I, FakeWeakDeviceId<D>),
+        > {
+            #[derive(GenericOverIp)]
+            struct Wrap<'a, I: Ip + IpExt, D: FakeStrongDeviceId>(
+                &'a mut BoundSockets<
+                    I,
+                    FakeWeakDeviceId<D>,
+                    FakeAddrSpec,
+                    (FakeStateSpec, I, FakeWeakDeviceId<D>),
+                >,
+            );
+            let Wrap(state) =
+                I::map_ip(self, |state| Wrap(&mut state.v4), |state| Wrap(&mut state.v6));
+            state
+        }
+    }
 
     type FakeSocketsState<I, D> = SocketsState<I, FakeWeakDeviceId<D>, FakeStateSpec>;
 
-    type FakeInnerSyncCtx<I, D> = crate::context::testutil::FakeSyncCtx<
-        FakeIpSocketCtx<I, D>,
-        SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>,
+    type FakeInnerSyncCtx<D> = crate::context::testutil::FakeSyncCtx<
+        FakeDualStackIpSocketCtx<D>,
+        DualStackSendIpPacketMeta<D>,
         D,
     >;
 
     type FakeSyncCtx<I, D> =
-        Wrapped<FakeSocketsState<I, D>, Wrapped<FakeBoundSockets<I, D>, FakeInnerSyncCtx<I, D>>>;
+        Wrapped<FakeSocketsState<I, D>, Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>>;
 
-    impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static> FakeSyncCtx<I, D> {
-        fn new_with_sockets(state: FakeSocketsState<I, D>, bound: FakeBoundSockets<I, D>) -> Self {
+    impl<I: IpExt, D: FakeStrongDeviceId + 'static> FakeSyncCtx<I, D> {
+        fn new_with_sockets(state: FakeSocketsState<I, D>, bound: FakeBoundSockets<D>) -> Self {
             Self {
                 outer: state,
                 inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                    FakeIpSocketCtx::default(),
+                    FakeDualStackIpSocketCtx::default(),
                     bound,
                 ),
             }
@@ -2220,7 +2299,7 @@ mod test {
     impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
         DatagramStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec> for FakeSyncCtx<I, D>
     {
-        type SocketsStateCtx<'a> = Wrapped<FakeBoundSockets<I, D>, FakeInnerSyncCtx<I, D>>;
+        type SocketsStateCtx<'a> = Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>;
 
         fn with_sockets_state<
             O,
@@ -2253,9 +2332,9 @@ mod test {
 
     impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
         DatagramBoundStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
-        for Wrapped<FakeBoundSockets<I, D>, FakeInnerSyncCtx<I, D>>
+        for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
     {
-        type IpSocketsCtx<'a> = FakeInnerSyncCtx<I, D>;
+        type IpSocketsCtx<'a> = FakeInnerSyncCtx<D>;
         type LocalIdAllocator = ();
 
         fn with_bound_sockets<
@@ -2274,7 +2353,7 @@ mod test {
             cb: F,
         ) -> O {
             let Self { outer, inner } = self;
-            cb(inner, outer)
+            cb(inner, outer.as_ref())
         }
         fn with_bound_sockets_mut<
             O,
@@ -2293,7 +2372,7 @@ mod test {
             cb: F,
         ) -> O {
             let Self { outer, inner } = self;
-            cb(inner, outer, &mut ())
+            cb(inner, outer.as_mut(), &mut ())
         }
 
         fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -2373,7 +2452,7 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, _> {
             outer: FakeSocketsState::default(),
             inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeIpSocketCtx::new([FakeDeviceConfig {
+                FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
                     device: FakeDeviceId,
                     local_ips: Default::default(),
                     remote_ips: Default::default(),
@@ -2389,9 +2468,10 @@ mod test {
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
-            let ip_socket_ctx: &FakeIpSocketCtx<_, _> = sync_ctx.inner.inner.get_ref().as_ref();
-            let mut default_hop_limit =
-                ip_socket_ctx.get_device_state(&FakeDeviceId).default_hop_limit.write();
+            let ip_socket_ctx = sync_ctx.inner.inner.get_ref();
+            let device_state: &IpDeviceState<_, I> =
+                ip_socket_ctx.get_device_state(&FakeDeviceId).as_ref();
+            let mut default_hop_limit = device_state.default_hop_limit.write();
             let default_hop_limit = default_hop_limit.deref_mut();
             assert_ne!(*default_hop_limit, unicast);
             *default_hop_limit = unicast;
@@ -2472,7 +2552,7 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId> {
             outer: Default::default(),
             inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeIpSocketCtx::new([FakeDeviceConfig {
+                FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: vec![I::FAKE_CONFIG.local_ip],
                     remote_ips: vec![I::FAKE_CONFIG.remote_ip],
@@ -2506,7 +2586,7 @@ mod test {
         let mut sync_ctx = FakeSyncCtx::<I, _> {
             outer: Default::default(),
             inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeIpSocketCtx::new([FakeDeviceConfig {
+                FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: vec![I::FAKE_CONFIG.local_ip],
                     remote_ips: vec![],
