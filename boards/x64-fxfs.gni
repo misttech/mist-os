@@ -1,7 +1,0 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# TODO(b/291975381): Move Fxfs images config to //products/core_with_fxblob.gni and delete this.
-
-import("x64.gni")
