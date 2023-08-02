@@ -30,12 +30,6 @@ ctf_executable("fdio-spawn-tests-bin") {
   ]
 }
 
-ctf_fuchsia_component("fdio-spawn-tests-component") {
-  testonly = true
-  manifest = "meta/fdio-spawn-tests-component.cml"
-  deps = [ ":fdio-spawn-tests-bin" ]
-}
-
 # A test utility used to test various features of fdio_spawn, extensively in spawn_test.cc.
 ctf_executable("spawn-child-util-bin") {
   testonly = true
@@ -260,11 +254,20 @@ ctf_fuchsia_component("use-shebang-from-resolve-component") {
   deps = [ ":use-shebang-from-resolve-bin" ]
 }
 
-ctf_fuchsia_test_package("fdio-spawn-tests") {
-  package_name = "fdio-spawn-tests"
-  test_components = [ ":fdio-spawn-tests-component" ]
+ctf_fuchsia_component("fdio-spawn-test") {
+  testonly = true
+  manifest = "meta/fdio-spawn-test.cml"
+  deps = [ ":fdio-spawn-tests-bin" ]
+}
 
+ctf_fuchsia_package("fdio-spawn-tests") {
+  testonly = true
+  package_name = "fdio-spawn-tests"
   deps = [
+    # test component
+    ":fdio-spawn-test",
+
+    # helper components
     ":attempt-use-shell-outside-package-component",
     ":echo-arguments-bin-component",
     ":fake-launcher-util-component",
@@ -283,7 +286,20 @@ ctf_fuchsia_test_package("fdio-spawn-tests") {
   ]
 }
 
+fuchsia_test_component("test-root") {
+  manifest = "meta/fdio-spawn-tests-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fdio-spawn-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [ ":fdio-spawn-tests" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":fdio-spawn-tests" ]
+  deps = [
+    ":fdio-spawn-tests-package",
+    ":fdio-spawn-tests_archive",
+  ]
 }

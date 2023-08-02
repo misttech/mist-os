@@ -20,6 +20,11 @@
     "package_name": "fuchsia-settings-tests"
   },
   {
+    "archive_gn_label": "//sdk/ctf/tests/pkg/fdio:fdio-spawn-tests_archive_copy",
+    "archive_name": "fdio-spawn-tests",
+    "package_name": "fdio-spawn-tests"
+  },
+  {
     "archive_gn_label": "//sdk/ctf/tests/pkg/vulkan:vulkan-loader-tests_archive_copy",
     "archive_name": "vulkan-loader-tests",
     "package_name": "vulkan-loader-tests"
