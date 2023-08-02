@@ -16,12 +16,7 @@ import stat
 import subprocess
 import sys
 
-from typing import List, Optional, Tuple
-
-_SCRIPT_DIR = os.path.dirname(__file__)
-
-# NOTE: Assume this script is located under build/bazel/scripts/
-_FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..', '..'))
+from typing import Dict, List, Optional
 
 # A list of built-in Bazel workspaces like @bazel_tools// which are actually
 # stored in the prebuilt Bazel install_base directory with a timestamp *far* in
@@ -299,7 +294,7 @@ def depfile_quote(path: str) -> str:
 
     Args:
        path: input file path.
-    Retursn:
+    Returns:
        The input file path with proper quoting to be included
        directly in a depfile.
     """
@@ -315,14 +310,10 @@ def is_hexadecimal_string(s: str) -> bool:
 
 
 _BUILD_ID_PREFIX = '.build-id/'
-_BUILD_ID_PREFIX_LEN = len(_BUILD_ID_PREFIX)
 
 
 def is_likely_build_id_path(path: str) -> bool:
     """Return True if path is a .build-id/xx/yyyy* file name."""
-    size = len(path)
-    plen = _BUILD_ID_PREFIX_LEN
-
     # Look for .build-id/XX/ where XX is an hexadecimal string.
     pos = path.find(_BUILD_ID_PREFIX)
     if pos < 0:
@@ -817,9 +808,6 @@ def main():
         default=[],
         nargs='*',
         help='Ninja output paths relative to current directory.')
-    parser.add_argument(
-        '--fuchsia-dir',
-        help='Path to Fuchsia source directory, auto-detected.')
     parser.add_argument('--depfile', help='Ninja depfile output path.')
     parser.add_argument(
         "--allow-directory-in-outputs",
@@ -853,7 +841,7 @@ def main():
 
     if args.extra_bazel_args and args.extra_bazel_args[0] != '--':
         return parser.error(
-            'Extra bazel args should be seperate with script args using --')
+            'Extra bazel args should be separated from script args using --')
     args.extra_bazel_args = args.extra_bazel_args[1:]
 
     if not os.path.exists(args.workspace_dir):
@@ -876,13 +864,7 @@ def main():
                                                  args.bazel_targets):
         return 1
 
-    if args.fuchsia_dir:
-        fuchsia_dir = os.path.abspath(args.fuchsia_dir)
-    else:
-        fuchsia_dir = _FUCHSIA_DIR
-
     current_dir = os.getcwd()
-    source_dir = os.path.relpath(fuchsia_dir, current_dir)
 
     legacy_inputs_repository_dir = os.path.relpath(
         os.path.realpath(
@@ -1034,7 +1016,7 @@ def main():
         #
         # Bazel only generates repositories on demand, and if this is the
         # first bazel build command being performed in a clean build, that
-        # directory might not be generated yet. To enfore this, run
+        # directory might not be generated yet. To enforce this, run
         # `bazel build @legacy_ninja_build_outputs//:BUILD.bazel`
         #
         # Use --ui_event_filters=-info,-warning to remove a warning that is

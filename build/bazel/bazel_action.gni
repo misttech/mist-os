@@ -353,8 +353,6 @@ template("bazel_action") {
            ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
            [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
            [
-             "--fuchsia-dir",
-             rebase_path("//", root_build_dir),
              "--depfile",
              rebase_path(depfile, root_build_dir),
              "--path-mapping",
