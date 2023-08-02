@@ -5,11 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-visibility = [
-  "//src/sys/component_manager/*",
-  "//src/sys/lib/elf_runner/*",
-]
-
 group("tests") {
   testonly = true
   deps = [ ":sandbox-unittests" ]
@@ -48,6 +43,11 @@ rustc_library("sandbox") {
     "src/handle.rs",
     "src/lib.rs",
     "src/open.rs",
+  ]
+
+  visibility = [
+    "//src/sys/component_manager/*",
+    "//src/sys/lib/elf_runner/*",
   ]
 }
 
