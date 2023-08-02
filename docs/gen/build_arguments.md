@@ -218,7 +218,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/x64.gni:64
+From //boards/x64.gni:72
 
 **Overridden from the default:** `""`
 
@@ -238,7 +238,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/x64.gni:62
+From //boards/x64.gni:70
 
 **Overridden from the default:** `""`
 
@@ -625,7 +625,7 @@ From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:79
+From //boards/x64.gni:87
 
 **Overridden from the default:** `false`
 
@@ -980,7 +980,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:59
+From //boards/x64.gni:67
 
 **Overridden from the default:** `false`
 
@@ -5390,7 +5390,7 @@ From //build/board.gni:112
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:82
+From //boards/x64.gni:90
 
 **Overridden from the default:** `[]`
 
@@ -5411,7 +5411,7 @@ From //build/board.gni:111
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:81
+From //boards/x64.gni:89
 
 **Overridden from the default:** `false`
 
@@ -8304,7 +8304,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:60
+From //boards/x64.gni:68
 
 **Overridden from the default:** `false`
 
@@ -8480,7 +8480,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:58
+From //boards/x64.gni:66
 
 **Overridden from the default:** `false`
 
