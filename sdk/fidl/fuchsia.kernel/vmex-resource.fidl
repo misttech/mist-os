@@ -6,7 +6,7 @@ library fuchsia.kernel;
 using zx;
 
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
-/// `ZX_SYS_RSRC_BASE_VMEX` to programs that should be able to mark VMOs as
+/// `ZX_RSRC_SYSTEM_VMEX_BASE` to programs that should be able to mark VMOs as
 /// executable.
 @discoverable
 closed protocol VmexResource {
