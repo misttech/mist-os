@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/ctf/meta/test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/intl_services_system_test_bin",
+        binary: "bin/fuchsia_intl_test",
     },
     use: [
         {

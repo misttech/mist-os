@@ -54,6 +54,18 @@ template("generate_vulkan-loader-tests") {
   }
 }
 
+template("generate_fuchsia-intl-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "test-root.cm"
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.intl:test-root"
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+  }
+}
+
 template("generate_fuchsia-driver-test_tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
@@ -74,11 +86,11 @@ template("generate_fuchsia-settings-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
     test_component_name = "test-root.cm"
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
     ]
-    test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
   }
 }
 

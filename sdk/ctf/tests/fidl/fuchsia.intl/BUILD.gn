@@ -4,10 +4,11 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_rustc_test("intl-services-system-test-bin") {
+ctf_rustc_test("fuchsia-intl-test-bin") {
   edition = "2018"
-  source_root = "src/intl_services_system_test.rs"
-  sources = [ "src/intl_services_system_test.rs" ]
+  name = "fuchsia_intl_test"
+  source_root = "src/fuchsia_intl_test.rs"
+  sources = [ "src/fuchsia_intl_test.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
@@ -19,19 +20,34 @@ ctf_rustc_test("intl-services-system-test-bin") {
   ]
 }
 
-ctf_fuchsia_component("intl-services-system-test-component") {
+ctf_fuchsia_component("fuchsia-intl-test-component") {
   testonly = true
-  manifest = "meta/intl_services_system_test.cml"
-  deps = [ ":intl-services-system-test-bin" ]
+  component_name = "fuchsia-intl-test"
+  manifest = "meta/fuchsia-intl-test.cml"
+  deps = [ ":fuchsia-intl-test-bin" ]
 }
 
-ctf_fuchsia_test_package("intl-services-system-test") {
-  plasa_element = "fidl/fuchsia.intl/PropertyProvider"
-  package_name = "intl-services-system-test"
-  test_components = [ ":intl-services-system-test-component" ]
+ctf_fuchsia_package("fuchsia-intl-tests") {
+  package_name = "fuchsia-intl-tests"
+  testonly = true
+  deps = [ ":fuchsia-intl-test-component" ]
+}
+
+fuchsia_test_component("test-root") {
+  testonly = true
+  manifest = "meta/fuchsia-intl-test-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fuchsia-intl-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [ ":fuchsia-intl-tests" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":intl-services-system-test" ]
+  deps = [
+    ":fuchsia-intl-tests-package",
+    ":fuchsia-intl-tests_archive",
+  ]
 }

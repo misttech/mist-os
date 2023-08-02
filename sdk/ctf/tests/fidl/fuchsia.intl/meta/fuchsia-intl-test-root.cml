@@ -1,0 +1,28 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    children: [
+        {
+            name: "test_suite",
+            url: "fuchsia-intl-tests#meta/fuchsia-intl-test.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.intl.PropertyProvider",
+                "fuchsia.settings.Intl",
+            ],
+            from: "parent",
+            to: "#test_suite",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
+        },
+    ],
+}
