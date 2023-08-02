@@ -240,6 +240,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/mod.rs",
     "fs/namespace.rs",
     "fs/path.rs",
+    "fs/pidfd.rs",
     "fs/pipe.rs",
     "fs/proc/fs.rs",
     "fs/proc/mod.rs",

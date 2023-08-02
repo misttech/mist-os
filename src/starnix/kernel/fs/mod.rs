@@ -42,6 +42,7 @@ pub mod fuse;
 pub mod kobject;
 pub mod layeredfs;
 pub mod path;
+pub mod pidfd;
 pub mod pipe;
 pub mod proc;
 pub mod socket;

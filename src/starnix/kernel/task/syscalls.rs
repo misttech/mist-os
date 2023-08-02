@@ -276,7 +276,7 @@ fn get_task_if_owner_or_has_capabilities(
 
 fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> {
     if pid == 0 {
-        WeakRef::from(&current_task.task)
+        current_task.weak_task()
     } else {
         // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
         current_task.get_task(pid)

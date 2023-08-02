@@ -6,7 +6,7 @@ use std::{cmp::Ordering, convert::TryInto, sync::Arc, usize};
 
 use crate::{
     arch::uapi::epoll_event,
-    fs::{buffers::*, eventfd::*, fuchsia::*, inotify::*, pipe::*, *},
+    fs::{buffers::*, eventfd::*, fuchsia::*, inotify::*, pidfd::*, pipe::*, *},
     lock::Mutex,
     logging::*,
     mm::{MemoryAccessor, MemoryAccessorExt},
@@ -1460,6 +1460,26 @@ pub fn sys_eventfd2(current_task: &CurrentTask, value: u32, flags: u32) -> Resul
     let file = new_eventfd(current_task, value, eventfd_type, blocking);
     let fd_flags = if flags & EFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let fd = current_task.add_file(file, fd_flags)?;
+    Ok(fd)
+}
+
+pub fn sys_pidfd_open(
+    current_task: &CurrentTask,
+    pid: pid_t,
+    flags: u32,
+) -> Result<FdNumber, Errno> {
+    if flags & !PIDFD_NONBLOCK != 0 {
+        return error!(EINVAL);
+    }
+    if pid <= 0 {
+        return error!(EINVAL);
+    }
+    let task = current_task.get_task(pid);
+    Task::from_weak(&task)?;
+    let blocking = (flags & PIDFD_NONBLOCK) == 0;
+    let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
+    let file = new_pidfd(current_task, task, open_flags);
+    let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
     Ok(fd)
 }
 
