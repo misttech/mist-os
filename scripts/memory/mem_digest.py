@@ -198,8 +198,10 @@ def get_arg_parser():
     parser.add_argument("-d", "--digest")
     parser.add_argument(
         "-o", "--output", default="human", choices=["csv", "human", "html"])
-    parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("-vv", "--extra_verbose", action="store_true")
+    parser.add_argument("-v", "--verbose",
+                        action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("-vv", "--extra_verbose",
+                        action=argparse.BooleanOptionalAction, default=False)
     return parser
 
 

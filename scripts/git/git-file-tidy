@@ -166,13 +166,13 @@ def main():
     parser.add_argument(
         "--all",
         dest="all",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="process all files in the repo under current working directory")
     parser.add_argument(
         "--fix",
         dest="fix",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="automatically generate fixes when possible")
     parser.add_argument("--checks", help="overrides the list of checks to use")
@@ -181,13 +181,13 @@ def main():
         help="Output directory, needed to generate compilation db for clang.")
     parser.add_argument(
         "--no-parallel",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="Process one file at a time")
     parser.add_argument(
         "--verbose",
         dest="verbose",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="tell me what you're doing")
     args = parser.parse_args()

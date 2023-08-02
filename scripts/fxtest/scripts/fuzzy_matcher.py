@@ -80,16 +80,16 @@ def command(args: argparse.Namespace):
 
     for suggestion in all_matches[: args.max_results]:
         styled_name = color_output(
-            [Fore.WHITE, Style.BRIGHT], suggestion.matched_name, not args.no_color
+            [Fore.WHITE, Style.BRIGHT], suggestion.matched_name, args.color
         )
         similarity_color = Fore.GREEN if suggestion.similarity > 0.85 else Fore.YELLOW
         styled_similarity = color_output(
             [similarity_color, Style.BRIGHT],
             f"{100*suggestion.similarity:.2f}%",
-            not args.no_color,
+            args.color,
         )
         styled_suggestion = color_output(
-            [Style.DIM], suggestion.full_suggestion, not args.no_color
+            [Style.DIM], suggestion.full_suggestion, args.color
         )
         print(
             f"{styled_name} ({styled_similarity} similar)" f"\n    {styled_suggestion}"
@@ -99,7 +99,7 @@ def command(args: argparse.Namespace):
         remaining_matches_line = (
             f"({len(all_matches) - args.max_results} more matches not shown)"
         )
-        print(f"{color_output(Style.DIM, remaining_matches_line, not args.no_color)}")
+        print(f"{color_output(Style.DIM, remaining_matches_line, args.color)}")
 
     if args.debug:
         TimingTracker.print_timings()
@@ -591,21 +591,21 @@ def main(args_list=None):
     )
     parser.add_argument(
         "--omit-test-file",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="If true, do not include suggestions from tests.json",
     )
     parser.add_argument(
         "--debug",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="If true, print verbose timings for debugging.",
     )
     parser.add_argument(
-        "--no-color",
-        action="store_true",
+        "--color",
+        action=argparse.BooleanOptionalAction,
         default=False,
-        help="If set, do not use color output.",
+        help="If set, use color output.",
     )
 
     args = parser.parse_args(args_list)

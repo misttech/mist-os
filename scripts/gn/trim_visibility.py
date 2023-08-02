@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--target", help="Target with visibility")
     parser.add_argument(
         "--verbose",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="Print progress and stats")
     args = parser.parse_args()

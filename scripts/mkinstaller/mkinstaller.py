@@ -598,12 +598,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '-c',
         '--create',
-        action='store_true',
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help='Create a disk image instead of writing to an existing disk.')
     parser.add_argument(
         '-f',
         '--force',
-        action='store_true',
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help=
         'Force writing to an image that already exists or a disk that might not be a USB.'
     )
@@ -617,7 +619,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '-v',
         '--verbose',
-        action='store_true',
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help='Be verbose while creating disk images.')
     parser.add_argument(
         '--cgpt-path',
@@ -646,11 +649,13 @@ if __name__ == '__main__':
         'Only write an existing installer image at this path to the out path.')
     parser.add_argument(
         '--new-installer',
-        action='store_true',
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help='DEPRECATED. Has no effect.')
     parser.add_argument(
         '--recovery-fastboot',
-        action='store_true',
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help='Create a bootable recovery-eng image with userspace fastboot.')
     parser.add_argument(
         'host',
@@ -668,13 +673,19 @@ if __name__ == '__main__':
     # and exits, so we don't have to re-implement all the commandline parsing
     # in the mkinstaller-remote shell script.
     parser.add_argument(
-        '--print-host-args-only', action='store_true', help=argparse.SUPPRESS)
+        '--print-host-args-only',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=argparse.SUPPRESS)
     # --temp-remote-image-only is similar to --create, but it ignores the |FILE|
     # argument and instead creates a new image in /tmp then prints the resulting
     # path. Used by mkinstaller-remote to override the local |FILE| argument on
     # the remote host.
     parser.add_argument(
-        '--temp-remote-image-only', action='store_true', help=argparse.SUPPRESS)
+        '--temp-remote-image-only',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=argparse.SUPPRESS)
 
     argv = parser.parse_args()
 

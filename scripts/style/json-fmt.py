@@ -40,22 +40,12 @@ def main():
         type=argparse.FileType('r+'),
         nargs='+',
         help='JSON file to be pretty-printed.')
-
-    # Create a --sort-keys flag such that usage is consistent with Python 3.9's
-    # argparse.BooleanOptionalAction.
     parser.add_argument(
         '--sort-keys',
         default=True,
-        action='store_true',
+        action=argparse.BooleanOptionalAction,
         dest='sort_keys',
-        help=
-        'Indicates whether object keys should be sorted. Specify --no-sort-keys to disable.'
-    )
-    parser.add_argument(
-        '--no-sort-keys',
-        action='store_false',
-        dest='sort_keys',
-        help='See --sort-keys.')
+        help='Indicates whether object keys should be sorted.')
 
     args = parser.parse_args()
     for json_file in args.file:

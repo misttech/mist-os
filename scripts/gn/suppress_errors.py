@@ -170,7 +170,7 @@ def main():
     parser.add_argument(
         "--confirm",
         help="If true, pause after each step in the script to review changes",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
     )
     parser.add_argument(
@@ -178,7 +178,7 @@ def main():
         help=
         "If true, attempt to produce a complete annotation by attributing errors "
         "in unreferenced headers to source files that include that header.",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
     )
     parser.add_argument(

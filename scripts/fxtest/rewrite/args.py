@@ -88,13 +88,13 @@ def parse_args(cli_args: typing.Optional[typing.List[str]] = None) -> Flags:
     build = parser.add_argument_group("Build Options")
     build.add_argument(
         "--build",
-        action=arg_option.BooleanOptionalAction,
+        action=argparse.BooleanOptionalAction,
         help="Invoke `fx build` before running the test suite (defaults to on)",
         default=True,
     )
     build.add_argument(
         "--updateifinbase",
-        action=arg_option.BooleanOptionalAction,
+        action=argparse.BooleanOptionalAction,
         help="Invoke `fx update-if-in-base` before running device tests (defaults to on)",
         default=True,
     )
@@ -149,13 +149,13 @@ def parse_args(cli_args: typing.Optional[typing.List[str]] = None) -> Flags:
     )
     output.add_argument(
         "--style",
-        action=arg_option.BooleanOptionalAction,
+        action=argparse.BooleanOptionalAction,
         default=None,
         help="Remove color and decoration from output. Does not disable pretty status printing. Default is to only style for TTY output.",
     )
     output.add_argument(
         "--log",
-        action=arg_option.BooleanOptionalAction,
+        action=argparse.BooleanOptionalAction,
         help="Emit command events to a file. Turned on when running real tests unless `--no-log` is passed.",
         default=True,
     )
@@ -173,7 +173,7 @@ def parse_args(cli_args: typing.Optional[typing.List[str]] = None) -> Flags:
     )
     output.add_argument(
         "--status",
-        action=arg_option.BooleanOptionalAction,
+        action=argparse.BooleanOptionalAction,
         default=None,
         help="Toggle interactive status printing to console. Default is to vary behavior depending on if output is to a TTY. Setting to True on a non-TTY is an error.",
     )

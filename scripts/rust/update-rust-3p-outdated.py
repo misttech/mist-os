@@ -38,20 +38,22 @@ def error(str):
 def main():
     parser = argparse.ArgumentParser(
         prog="fx update-rust-3p-outdated",
-        description="Updates external Rust dependencies with latest from crates.io",
+        description=
+        "Updates external Rust dependencies with latest from crates.io",
     )
 
     parser.add_argument(
         "--no-build",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="Don't build update_crates or cargo-gnaw, use cached versions.",
     )
     parser.add_argument(
         "--no-vendor",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
-        help="Don't run `fx update-rustc-third-party` after updating crate versions.",
+        help=
+        "Don't run `fx update-rustc-third-party` after updating crate versions.",
     )
     parser.add_argument(
         "--fuchsia-dir",
@@ -133,7 +135,8 @@ def main():
     if not args.no_vendor:
         print("Running vendor script")
         try:
-            subprocess.check_call(["fx", "update-rustc-third-party", skip_build_arg])
+            subprocess.check_call(
+                ["fx", "update-rustc-third-party", skip_build_arg])
         except subprocess.CalledProcessError:
             error("Failed to run vendor script.")
             return 1

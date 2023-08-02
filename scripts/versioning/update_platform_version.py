@@ -209,7 +209,9 @@ def main():
     parser.add_argument("--root-build-dir", default="out/default")
     parser.add_argument("--root-source-dir")
     parser.add_argument("--stamp-file")
-    parser.add_argument("--revert-on-error", action="store_true", default=False)
+    parser.add_argument("--revert-on-error",
+                        action=argparse.BooleanOptionalAction,
+                        default=False)
 
     args = parser.parse_args()
 

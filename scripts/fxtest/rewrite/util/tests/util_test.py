@@ -13,33 +13,6 @@ from util import command
 
 
 class TestArgOptions(unittest.TestCase):
-    def test_boolean_optional_action(self):
-        """Test BooleanOptionalAction.
-
-        This test ensures that a flag --build is set to True when --build
-        is passed, False when --no-build is passed, and None if not
-        specified.
-        """
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "--build", action=arg_option.BooleanOptionalAction, default=None
-        )
-
-        self.assertEqual(parser.parse_args([]).build, None)
-        self.assertEqual(parser.parse_args(["--build"]).build, True)
-        self.assertEqual(parser.parse_args(["--no-build"]).build, False)
-
-    def test_boolean_optional_action_failure(self):
-        """Test that setting nargs raises an error."""
-
-        parser = argparse.ArgumentParser()
-        self.assertRaises(
-            ValueError,
-            lambda: parser.add_argument(
-                "--foo", action=arg_option.BooleanOptionalAction, nargs=1
-            ),
-        )
 
     def test_selection_action(self):
         """Test SelectionAction.
@@ -51,11 +24,15 @@ class TestArgOptions(unittest.TestCase):
 
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            "-m", "--main-option", action=arg_option.SelectionAction, dest="option"
-        )
+            "-m",
+            "--main-option",
+            action=arg_option.SelectionAction,
+            dest="option")
         parser.add_argument(
-            "-a", "--alt-option", action=arg_option.SelectionAction, dest="option"
-        )
+            "-a",
+            "--alt-option",
+            action=arg_option.SelectionAction,
+            dest="option")
         parser.add_argument("option", action=arg_option.SelectionAction)
 
         args = parser.parse_args(["-m", "one", "two", "-a", "three", "four"])
@@ -73,6 +50,7 @@ class TestArgOptions(unittest.TestCase):
 
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):
+
     def assertStdout(self, event: command.CommandEvent, line: bytes):
         """Helper to assert on contents of a StdoutEvent.
 
@@ -121,7 +99,8 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
 
             cmd = await command.AsyncCommand.create("ls", ".", env={"CWD": td})
             events = []
-            complete = await cmd.run_to_completion(lambda event: events.append(event))
+            complete = await cmd.run_to_completion(
+                lambda event: events.append(event))
             self.assertEqual(len(events), 2, f"Events was actually {events}")
 
             self.assertStdout(events[0], b"temp-file.txt\n")
@@ -138,8 +117,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         """
         with TemporaryDirectory() as td:
             cmd = await command.AsyncCommand.create(
-                "ls", os.path.join(td, "does-not-exist")
-            )
+                "ls", os.path.join(td, "does-not-exist"))
             complete = await cmd.run_to_completion()
             self.assertEqual(complete.stdout, "")
             self.assertNotEqual(complete.stderr, "")
@@ -189,8 +167,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out.return_code, -9)
 
         cmd = await command.AsyncCommand.create(
-            "sleep", "100000", symbolizer_args=["sleep", "100000"]
-        )
+            "sleep", "100000", symbolizer_args=["sleep", "100000"])
         task = asyncio.create_task(cmd.run_to_completion())
         cmd.terminate()
         out = await task
@@ -198,8 +175,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out.wrapper_return_code, -15)
 
         cmd = await command.AsyncCommand.create(
-            "sleep", "100000", symbolizer_args=["sleep", "100000"]
-        )
+            "sleep", "100000", symbolizer_args=["sleep", "100000"])
         task = asyncio.create_task(cmd.run_to_completion())
         cmd.kill()
         out = await task

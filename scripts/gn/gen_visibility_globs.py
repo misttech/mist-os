@@ -36,7 +36,7 @@ def main():
         required=True)
     parser.add_argument(
         "--verbose",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="Print progress and stats")
     parser.add_argument(
