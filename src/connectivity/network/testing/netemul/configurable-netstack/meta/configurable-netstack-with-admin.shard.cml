@@ -1,0 +1,19 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Care should be taken if using this shard in a situation where multiple
+// tests are running concurrently as it allows for the modification of
+// administrative state which is shared.
+{
+    include: [ "//src/connectivity/network/testing/netemul/configurable-netstack/meta/configurable-netstack.shard.cml" ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.net.routes.admin.SetProviderV4",
+                "fuchsia.net.routes.admin.SetProviderV6",
+            ],
+            from: "#netstack",
+        },
+    ],
+}

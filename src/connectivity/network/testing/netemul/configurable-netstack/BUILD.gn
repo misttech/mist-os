@@ -61,6 +61,15 @@ fuchsia_component("configurable-netstack-netstack3") {
   ]
 }
 
+fuchsia_component("configurable-netstack-with-admin") {
+  testonly = true
+  manifest = "meta/configurable-netstack-with-admin.cml"
+  deps = [
+    ":bin",
+    "//src/connectivity/network/netstack:component-debug",
+  ]
+}
+
 fuchsia_unittest_package("configurable-netstack-unit-tests") {
   deps = [ ":bin_test" ]
 }
