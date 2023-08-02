@@ -23,14 +23,14 @@ struct KeyUnwrapperInner {
     //   - `event` is signalled and `keys` is set: keys are unwrapped.
     //   - `event` is signalled and `keys` is not set: unwrapping the keys failed.
     event: Event,
-    keys: OnceCell<XtsCipherSet>,
+    keys: OnceCell<UnwrappedKeys>,
 }
 
 impl KeyUnwrapper {
     /// Creates an instance with the keys already unwrapped. No background task is spawned.
     pub fn new_from_unwrapped(keys: UnwrappedKeys) -> Self {
         let once = OnceCell::new();
-        once.get_or_init(|| XtsCipherSet::new(&keys));
+        once.get_or_init(move || keys);
         Self { inner: Arc::new(KeyUnwrapperInner { event: Event::new(), keys: once }) }
     }
 
@@ -46,7 +46,7 @@ impl KeyUnwrapper {
         let future = async move {
             match crypt.unwrap_keys(&keys, object_id).await {
                 Ok(keys) => {
-                    inner2.keys.get_or_init(|| XtsCipherSet::new(&keys));
+                    inner2.keys.get_or_init(move || keys);
                 }
                 Err(e) => {
                     error!(error=?e, oid=object_id, "Failed to unwrap keys");
@@ -57,15 +57,19 @@ impl KeyUnwrapper {
         (Self { inner }, future)
     }
 
-    pub async fn keys(&self) -> Result<&XtsCipherSet, Error> {
+    pub async fn keys(&self) -> Result<XtsCipherSet, Error> {
         match self.inner.keys.get() {
-            Some(keys) => Ok(keys),
+            Some(keys) => Ok(XtsCipherSet::new(keys)),
             None => {
                 // If the keys are not already unwrapped then wait for the event to be signalled. If
                 // the event is signalled and the keys still aren't present then the unwrapping
                 // failed.
                 self.inner.event.wait().await;
-                self.inner.keys.get().ok_or_else(|| anyhow!("Failed to unwrap keys"))
+                self.inner
+                    .keys
+                    .get()
+                    .ok_or_else(|| anyhow!("Failed to unwrap keys"))
+                    .map(XtsCipherSet::new)
             }
         }
     }
