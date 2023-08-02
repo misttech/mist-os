@@ -7,6 +7,7 @@
 package fidlconv
 
 import (
+	"errors"
 	"fmt"
 
 	fuchsianet "fidl/fuchsia/net"
@@ -95,6 +96,21 @@ const (
 	RouteInvalidUnknownAction
 )
 
+func (result *RouteValidationResult) ToError() error {
+	switch *result {
+	case RouteOk:
+		return nil
+	case RouteInvalidDestinationSubnet:
+		return errors.New("invalid destination subnet")
+	case RouteInvalidNextHop:
+		return errors.New("invalid next hop")
+	case RouteInvalidUnknownAction:
+		return errors.New("unknown route action")
+	default:
+		panic(fmt.Sprintf("Unknown validation result variant: %d", *result))
+	}
+}
+
 // validateSubnet returns true if the prefix length is valid and no
 // address bits are set beyond the prefix length.
 func validateSubnet(subnet fuchsianet.Subnet) bool {
@@ -128,6 +144,70 @@ func FromFidlRouteV4(route fidlRoutes.RouteV4) (Route[fuchsianet.Ipv4Address], R
 		Properties: fromFidlSpecifiedRouteProperties(route.Properties.SpecifiedProperties),
 	}
 	return r, r.Validate()
+}
+
+func ToFidlRouteV4(route Route[fuchsianet.Ipv4Address]) (fidlRoutes.RouteV4, error) {
+	var result fidlRoutes.RouteV4
+
+	switch route.Action.RouteActionType {
+	case RouteActionTypeForward:
+		result.Action.SetForward(func() fidlRoutes.RouteTargetV4 {
+			var target fidlRoutes.RouteTargetV4
+			target.OutboundInterface = route.Action.Forward.OutboundInterface
+			if route.Action.Forward.NextHopPresent {
+				nextHop := route.Action.Forward.NextHop
+				target.NextHop = &nextHop
+			}
+			return target
+		}())
+	case RouteActionTypeUnknown:
+		return result, fmt.Errorf("unknown RouteActionType in %#v", route)
+	}
+
+	result.Destination = fuchsianet.Ipv4AddressWithPrefix{
+		Addr:      route.Destination.Addr,
+		PrefixLen: route.Destination.PrefixLen,
+	}
+
+	result.Properties.SetSpecifiedProperties(
+		fidlRoutes.SpecifiedRouteProperties{
+			Metric:        route.Properties.Metric,
+			MetricPresent: route.Properties.MetricPresent,
+		},
+	)
+	return result, nil
+}
+
+func ToFidlRouteV6(route Route[fuchsianet.Ipv6Address]) (fidlRoutes.RouteV6, error) {
+	var result fidlRoutes.RouteV6
+
+	switch route.Action.RouteActionType {
+	case RouteActionTypeForward:
+		result.Action.SetForward(func() fidlRoutes.RouteTargetV6 {
+			var target fidlRoutes.RouteTargetV6
+			target.OutboundInterface = route.Action.Forward.OutboundInterface
+			if route.Action.Forward.NextHopPresent {
+				nextHop := route.Action.Forward.NextHop
+				target.NextHop = &nextHop
+			}
+			return target
+		}())
+	case RouteActionTypeUnknown:
+		return result, fmt.Errorf("unknown RouteActionType in %#v", route)
+	}
+
+	result.Destination = fuchsianet.Ipv6AddressWithPrefix{
+		Addr:      route.Destination.Addr,
+		PrefixLen: route.Destination.PrefixLen,
+	}
+
+	result.Properties.SetSpecifiedProperties(
+		fidlRoutes.SpecifiedRouteProperties{
+			Metric:        route.Properties.Metric,
+			MetricPresent: route.Properties.MetricPresent,
+		},
+	)
+	return result, nil
 }
 
 func FromFidlRouteV6(route fidlRoutes.RouteV6) (Route[fuchsianet.Ipv6Address], RouteValidationResult) {

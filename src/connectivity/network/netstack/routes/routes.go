@@ -15,6 +15,7 @@ import (
 
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
@@ -137,11 +138,41 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preferenc
 		presentInTableAndInSet
 	)
 
+	newEr := routetypes.ExtendedRoute{
+		Route:                 route,
+		Prf:                   prf,
+		Metric:                metric,
+		MetricTracksInterface: tracksInterface,
+		Dynamic:               dynamic,
+		Enabled:               enabled,
+		OwningSets: map[*routetypes.RouteSetId]struct{}{
+			addingSet: {},
+		},
+	}
+
+	incomingKey, err := fidlconv.ToRouteComparisonKey(newEr)
+	if err != nil {
+		_ = syslog.ErrorTf(tag, "RouteTable:conversion of route-to-be-added %#v to comparison key failed: %s", newEr, err)
+		return AddResult{
+			NewlyAddedToTable: false,
+			NewlyAddedToSet:   false,
+		}
+	}
+
 	result := foldMapRoutesLocked[foldResult](
 		rt,
 		func(er *routetypes.ExtendedRoute) (bool, foldResult) {
-			if er.Route == route && er.Prf == prf && er.Metric == metric && er.MetricTracksInterface == tracksInterface && er.Dynamic == dynamic && er.Enabled == enabled {
-				// Routes match exactly.
+			existingKey, err := fidlconv.ToRouteComparisonKey(*er)
+			if err != nil {
+				panic(fmt.Sprintf("existing route in table %#v is invalid and thus cannot be converted to a comparison key: %s", *er, err))
+			}
+			if er.Route == route && replaceMatchingGvisorRoutes {
+				// Remove the route from the table, because we're going to re-add it.
+				return false, neitherPresentInTableNorInSet
+			} else if existingKey == incomingKey {
+				// Routes match. Make sure that the route is only treated as dynamic
+				// if all instances of it are dynamic.
+				er.Dynamic = er.Dynamic && newEr.Dynamic
 				if !addingSet.IsGlobal() {
 					if er.IsMemberOfRouteSet(addingSet) {
 						return true, presentInTableAndInSet
@@ -154,9 +185,6 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preferenc
 					// equivalent to being present in the set.
 					return true, presentInTableAndInSet
 				}
-			} else if er.Route == route && replaceMatchingGvisorRoutes {
-				// Remove the route from the table, because we're going to re-add it.
-				return false, neitherPresentInTableNorInSet
 			} else {
 				// This route is unrelated, so we keep it.
 				return true, neitherPresentInTableNorInSet
@@ -190,18 +218,6 @@ func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preferenc
 	case neitherPresentInTableNorInSet:
 	default:
 		panic(fmt.Sprintf("unknown foldResult value: %d", result))
-	}
-
-	newEr := routetypes.ExtendedRoute{
-		Route:                 route,
-		Prf:                   prf,
-		Metric:                metric,
-		MetricTracksInterface: tracksInterface,
-		Dynamic:               dynamic,
-		Enabled:               enabled,
-		OwningSets: map[*routetypes.RouteSetId]struct{}{
-			addingSet: {},
-		},
 	}
 
 	// Find the target position for the new route in the table so it remains
@@ -328,10 +344,31 @@ type DelResult struct {
 func (rt *RouteTable) DelRouteExactMatchLocked(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface bool, set *routetypes.RouteSetId) DelResult {
 	syslog.DebugTf(tag, "RouteTable:Deleting route %s requiring exact match for prf=%d metric=%d tracksInterface=%t", route, prf, metric, tracksInterface)
 
+	delEr := routetypes.ExtendedRoute{
+		Route:                 route,
+		Prf:                   prf,
+		Metric:                metric,
+		MetricTracksInterface: tracksInterface,
+	}
+
+	incomingKey, err := fidlconv.ToRouteComparisonKey(delEr)
+	if err != nil {
+		_ = syslog.ErrorTf(tag, "RouteTable:conversion of route-to-be-deleted %#v to comparison key failed: %s", delEr, err)
+		return DelResult{
+			NewlyRemovedFromTable: false,
+			NewlyRemovedFromSet:   false,
+		}
+	}
+
 	delResult := foldMapRoutesLocked[DelResult](
 		rt,
 		func(er *routetypes.ExtendedRoute) (bool, DelResult) {
-			if route == er.Route && prf == er.Prf && (tracksInterface || (metric == er.Metric)) && tracksInterface == er.MetricTracksInterface && er.IsMemberOfRouteSet(set) {
+			existingKey, err := fidlconv.ToRouteComparisonKey(*er)
+			if err != nil {
+				panic(fmt.Sprintf("existing route in table %#v is invalid and thus cannot be converted to a comparison key: %s", *er, err))
+			}
+
+			if existingKey == incomingKey && er.IsMemberOfRouteSet(set) {
 				delete(er.OwningSets, set)
 				if len(er.OwningSets) == 0 {
 					return false, DelResult{

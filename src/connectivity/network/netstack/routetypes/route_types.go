@@ -125,6 +125,10 @@ func (er *ExtendedRoute) String() string {
 }
 
 func (er *ExtendedRoute) IsMemberOfRouteSet(id *RouteSetId) bool {
+	if id == GlobalRouteSet() {
+		return true
+	}
+
 	_, ok := er.OwningSets[id]
 	return ok
 }

@@ -159,7 +159,7 @@ type routesGetWatcherRequest interface {
 	serve(
 		ctx context.Context,
 		cancel context.CancelFunc,
-		existingRoutes map[unboxedInstalledRoute]struct{},
+		existingRoutes map[installedRouteComparisonKey]struct{},
 		eventsChan chan eventUnion,
 		onClose chan<- routeInterrupt,
 		metrics *fidlRoutesWatcherMetrics,
@@ -187,7 +187,7 @@ type getWatcherV6Request struct {
 func (r *getWatcherV4Request) serve(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	existingRoutes map[unboxedInstalledRoute]struct{},
+	existingRoutes map[installedRouteComparisonKey]struct{},
 	eventsChan chan eventUnion,
 	onClose chan<- routeInterrupt,
 	metrics *fidlRoutesWatcherMetrics,
@@ -234,7 +234,7 @@ func (r *getWatcherV4Request) serve(
 func (r *getWatcherV6Request) serve(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	existingRoutes map[unboxedInstalledRoute]struct{},
+	existingRoutes map[installedRouteComparisonKey]struct{},
 	eventsChan chan eventUnion,
 	onClose chan<- routeInterrupt,
 	metrics *fidlRoutesWatcherMetrics,
@@ -311,13 +311,17 @@ func makeRoutesWatcherImplInner(
 	cancel context.CancelFunc,
 	eventsChan chan eventUnion,
 	filter func(*eventUnion) bool,
-	existingRoutes map[unboxedInstalledRoute]struct{},
+	existingRoutes map[installedRouteComparisonKey]struct{},
 	idleEvent eventUnion,
 ) routesWatcherImplInner {
 	// Create the existing events.
 	var existingEvents []eventUnion
-	for route := range existingRoutes {
-		event := toEvent(existingEvent, box(route))
+	for key := range existingRoutes {
+		installedRoute, err := fromInstalledRouteComparisonKey(key)
+		if err != nil {
+			panic(fmt.Sprintf("observed error while attempting to construct route from comparison key %#v: %s", key, err))
+		}
+		event := toEvent(existingEvent, installedRoute)
 		if filter(&event) {
 			existingEvents = append(existingEvents, event)
 		}
@@ -546,7 +550,7 @@ func routesWatcherEventLoop(
 	// This allows us to push existing events to new watcher clients without
 	// having to call into the system Routing table, which may introduce race
 	// conditions.
-	currentRoutes := make(map[unboxedInstalledRoute]struct{})
+	currentRoutes := make(map[installedRouteComparisonKey]struct{})
 
 	// Keep track of the active Watcher implementations
 	currentWatchers := make(map[*routesWatcherImplInner]struct{})
@@ -571,27 +575,30 @@ func routesWatcherEventLoop(
 			switch interrupt := interrupt.(type) {
 			case *routingTableChange:
 				route := fidlconv.ToInstalledRoute(interrupt.Route)
-				unboxedRoute := unbox(route)
+				key, err := toInstalledRouteComparisonKey(route)
+				if err != nil {
+					panic(fmt.Sprintf("observed error while attempting to compute comparison key for %#v: %s", route, err))
+				}
 				var eventType eventTag
 				// Updates routes based on the received change.
 				switch interrupt.Change {
 				case routetypes.RouteAdded:
-					if _, present := currentRoutes[unboxedRoute]; present {
+					if _, present := currentRoutes[key]; present {
 						panic(fmt.Sprintf(
 							"received duplicate add event for route: %+v",
 							interrupt.Route,
 						))
 					}
-					currentRoutes[unboxedRoute] = struct{}{}
+					currentRoutes[key] = struct{}{}
 					eventType = addedEvent
 				case routetypes.RouteRemoved:
-					if _, present := currentRoutes[unboxedRoute]; !present {
+					if _, present := currentRoutes[key]; !present {
 						panic(fmt.Sprintf(
 							"received remove event for non-existent route: %+v",
 							interrupt.Route,
 						))
 					}
-					delete(currentRoutes, unboxedRoute)
+					delete(currentRoutes, key)
 					eventType = removedEvent
 				default:
 					panic(fmt.Sprintf(
@@ -823,44 +830,68 @@ func intoLogString(e eventUnion) string {
 	)
 }
 
-// unboxedInstalledRoute is an alternative to InstalledRoute whose boxed members
-// are defined out-of-band at the top level. Two unboxedInstalledRoutes can be
+// installedRouteComparisonKey is an alternative to InstalledRoute whose boxed members
+// are defined out-of-band at the top level. Two installedRouteComparisonKeys can be
 // checked for equality, whereas two InstalledRoutes cannot (since their boxed
 // members are behind a pointer, leading to address comparisons, not value
 // comparisons).
-type unboxedInstalledRoute struct {
-	installedRoute fidlconv.InstalledRoute
-	hasV4NextHop   bool
-	v4NextHop      net.Ipv4Address
-	hasV6NextHop   bool
-	v6NextHop      net.Ipv6Address
+type installedRouteComparisonKey struct {
+	fidlconv.RouteComparisonKey
+	Version                         routetypes.IpProtoTag
+	EffectiveRoutePropertiesPresent bool
+	EffectiveRouteProperties        fnetRoutes.EffectiveRouteProperties
 }
 
-// unbox converts an InstalledRoute to an unboxedInstalledRoute.
-func unbox(r fidlconv.InstalledRoute) unboxedInstalledRoute {
-	var result unboxedInstalledRoute
-	if r.V4.Route.Action.Forward.NextHop != nil {
-		result.hasV4NextHop = true
-		result.v4NextHop = *(r.V4.Route.Action.Forward.NextHop)
-		r.V4.Route.Action.Forward.NextHop = nil
+// toInstalledRouteComparisonKey converts an InstalledRoute to an installedRouteComparisonKey.
+func toInstalledRouteComparisonKey(r fidlconv.InstalledRoute) (installedRouteComparisonKey, error) {
+	key, err := r.ToRouteComparisonKey()
+	if err != nil {
+		return installedRouteComparisonKey{}, err
 	}
-	if r.V6.Route.Action.Forward.NextHop != nil {
-		result.hasV6NextHop = true
-		result.v6NextHop = *(r.V6.Route.Action.Forward.NextHop)
-		r.V6.Route.Action.Forward.NextHop = nil
-	}
-	result.installedRoute = r
-	return result
+
+	present, props := func() (bool, fnetRoutes.EffectiveRouteProperties) {
+		switch r.Version {
+		case routetypes.IPv4:
+			return r.V4.EffectivePropertiesPresent, r.V4.EffectiveProperties
+		case routetypes.IPv6:
+			return r.V6.EffectivePropertiesPresent, r.V6.EffectiveProperties
+		default:
+			panic(fmt.Sprintf("unknown IP Version tag %d", r.Version))
+		}
+	}()
+
+	return installedRouteComparisonKey{
+		RouteComparisonKey:              key,
+		Version:                         r.Version,
+		EffectiveRoutePropertiesPresent: present,
+		EffectiveRouteProperties:        props,
+	}, nil
 }
 
-// box converts an unboxedInstalledRoute to an InstalledRoute.
-func box(r unboxedInstalledRoute) fidlconv.InstalledRoute {
-	result := r.installedRoute
-	if r.hasV4NextHop {
-		result.V4.Route.Action.Forward.NextHop = &r.v4NextHop
+// fromInstalledRouteComparisonKey converts an installedRouteComparisonKey to an InstalledRoute.
+func fromInstalledRouteComparisonKey(r installedRouteComparisonKey) (fidlconv.InstalledRoute, error) {
+	var result fidlconv.InstalledRoute
+	result.Version = r.Version
+
+	switch r.Version {
+	case routetypes.IPv4:
+		route, err := fidlconv.ToFidlRouteV4(r.V4)
+		if err != nil {
+			return result, err
+		}
+		result.V4.SetRoute(route)
+		result.V4.EffectivePropertiesPresent = r.EffectiveRoutePropertiesPresent
+		result.V4.EffectiveProperties = r.EffectiveRouteProperties
+	case routetypes.IPv6:
+		route, err := fidlconv.ToFidlRouteV6(r.V6)
+		if err != nil {
+			return result, err
+		}
+		result.V6.SetRoute(route)
+		result.V6.EffectivePropertiesPresent = r.EffectiveRoutePropertiesPresent
+		result.V6.EffectiveProperties = r.EffectiveRouteProperties
+	default:
+		panic(fmt.Sprintf("unknown IP Version tag %d", r.Version))
 	}
-	if r.hasV6NextHop {
-		result.V6.Route.Action.Forward.NextHop = &r.v6NextHop
-	}
-	return result
+	return result, nil
 }

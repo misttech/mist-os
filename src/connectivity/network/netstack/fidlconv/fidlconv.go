@@ -423,3 +423,42 @@ func ToInstalledRoute(route routetypes.ExtendedRoute) InstalledRoute {
 		panic(fmt.Sprintf("invalid IP protocol for address: I_ipAddressTag=%d", dst.I_ipAddressTag))
 	}
 }
+
+type RouteComparisonKey struct {
+	V4 Route[net.Ipv4Address]
+	V6 Route[net.Ipv6Address]
+}
+
+// Converts the given `InstalledRoute` to a `RouteComparisonKey` such that if
+// this route's `RouteComparisonKey` is equal to another route's
+// `RouteComparisonKey`, the two routes should be considered identical for the
+// purposes of adding or removing a matching route in the routing table.
+func (installedRoute InstalledRoute) ToRouteComparisonKey() (RouteComparisonKey, error) {
+	var key RouteComparisonKey
+	switch installedRoute.Version {
+	case routetypes.IPv4:
+		route, validationResult := FromFidlRouteV4(installedRoute.V4.GetRoute())
+		if err := validationResult.ToError(); err != nil {
+			return key, err
+		}
+		key.V4 = route
+		return key, nil
+	case routetypes.IPv6:
+		route, validationResult := FromFidlRouteV6(installedRoute.V6.GetRoute())
+		if err := validationResult.ToError(); err != nil {
+			return key, err
+		}
+		key.V6 = route
+		return key, nil
+	default:
+		panic("unknown IpProtoTag")
+	}
+}
+
+// Converts the given `ExtendedRoute` to a `RouteComparisonKey` such that if
+// this route's `RouteComparisonKey` is equal to another route's
+// `RouteComparisonKey`, the two routes should be considered identical for the
+// purposes of adding or removing a matching route in the routing table.
+func ToRouteComparisonKey(route routetypes.ExtendedRoute) (RouteComparisonKey, error) {
+	return ToInstalledRoute(route).ToRouteComparisonKey()
+}
