@@ -30,9 +30,15 @@ ext4_to_pkg("system_image") {
   prefix = "data/system"
 }
 
-fuchsia_package_with_single_component("debian_package") {
+fuchsia_component("debian_container") {
   manifest = "meta/debian_container.cml"
-  package_name = "debian"
   component_name = "debian_container"
-  deps = [ ":container_resources" ]
+}
+
+fuchsia_package("debian_package") {
+  package_name = "debian"
+  deps = [
+    ":container_resources",
+    ":debian_container",
+  ]
 }

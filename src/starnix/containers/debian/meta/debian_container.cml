@@ -2,24 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/starnix/containers/container.shard.cml" ],
+    include: [
+        "//src/starnix/containers/container.shard.cml",
+        "//src/starnix/containers/debian/meta/debian_container.shard.cml",
+    ],
     program: {
         runner: "starnix",
-        features: [],
-        init: [],
-        kernel_cmdline: "",
-        mounts: [
-            "/:remote_bundle:data/system",
-            "/data:remotefs:data",
-            "/dev:devtmpfs",
-            "/dev/pts:devpts",
-            "/proc:proc",
-            "/sys:sysfs",
-            "/sys/fs/bpf:bpf",
-            "/tmp:tmpfs",
-        ],
-        rlimits: [ "RLIMIT_NOFILE=131072" ],
-        name: "debian",
-        startup_file_path: "",
     },
 }

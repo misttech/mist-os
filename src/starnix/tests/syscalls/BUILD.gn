@@ -213,6 +213,7 @@ starnix_linux_test_component("syscalls_test") {
     ":fuse_overlayfs",
     ":simple_ext4_image",
     ":syscall_test_exec_child_resource($target_linux_toolchain)",
+    "//src/starnix/containers/debian:debian_container",
   ]
   uses_expectations = true
   test_type = "starnix"

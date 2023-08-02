@@ -22,7 +22,7 @@
             "/tmp:tmpfs",
         ],
         rlimits: [ "RLIMIT_NOFILE=131072" ],
-        name: "debian_test",
+        name: "debian",
         startup_file_path: "",
     },
 }

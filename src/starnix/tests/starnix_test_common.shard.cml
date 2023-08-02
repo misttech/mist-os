@@ -11,6 +11,10 @@
     },
     children: [
         {
+            name: "kernel",
+            url: "starnix_kernel#meta/starnix_kernel.cm",
+        },
+        {
             name: "ui",
             url: "test-ui-stack#meta/test-ui-stack.cm",
         },
@@ -20,6 +24,9 @@
         },
     ],
     collections: [
+        // TODO(fxbug.dev/131564): This collection is going away in favor of
+        // a single `#kernel` child component. In the transition period, we'll
+        // offer the same capabilities to both `#kernel` and `#kernels`.
         {
             name: "kernels",
             durability: "single_run",
@@ -48,7 +55,10 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: [ "#kernels" ],
+            to: [
+                "#kernel",
+                "#kernels",
+            ],
         },
         {
             protocol: [
@@ -69,7 +79,10 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
-            to: [ "#kernels" ],
+            to: [
+                "#kernel",
+                "#kernels",
+            ],
         },
         {
             protocol: [
@@ -84,17 +97,35 @@
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#netstack",
-            to: "#kernels",
+            to: [
+                "#kernel",
+                "#kernels",
+            ],
         },
         {
             directory: "dev-gpu",
             from: "parent",
-            to: [ "#kernels" ],
+            to: [
+                "#kernel",
+                "#kernels",
+            ],
         },
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: "#netstack",
+        },
+    ],
+    environments: [
+        {
+            name: "starnix_runner_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "starnix",
+                    from: "#kernel",
+                },
+            ],
         },
     ],
 }

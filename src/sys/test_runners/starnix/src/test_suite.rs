@@ -13,8 +13,11 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
     fidl_fuchsia_test::{self as ftest},
+    frunner::ComponentStartInfo,
+    frunner::{ComponentRunnerMarker, ComponentRunnerProxy},
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::TryStreamExt,
+    runner::component::ComponentNamespace,
     rust_measure_tape_for_case::Measurable as _,
     test_runners_lib::elf::SuiteServerError,
     tracing::debug,
@@ -36,6 +39,57 @@ fn get_test_type(program: &fdata::Dictionary) -> Result<TestType, Error> {
     }
 }
 
+enum Container {
+    External(ComponentRunnerProxy),
+    Internal(TestContainer),
+}
+
+impl Container {
+    async fn new(start_info: ComponentStartInfo) -> Result<Container, Error> {
+        let program = start_info
+            .program
+            .as_ref()
+            .ok_or_else(|| anyhow!("start info does not have program"))?;
+        if let Ok(Some(val)) = get_opt_str_value_from_dict(program, "external_container") {
+            if val == "true" {
+                debug!("use component runner from namespace");
+                let ns =
+                    start_info.ns.ok_or_else(|| anyhow!("start info does not have namespace"))?;
+                let ns = ComponentNamespace::try_from(ns)?;
+                let svc = &ns
+                    .items()
+                    .iter()
+                    .find(|e| e.0 == "/svc")
+                    .ok_or_else(|| anyhow!("test component namespace does not have /svc"))?
+                    .1;
+                return Ok(Container::External(
+                    fuchsia_component::client::connect_to_protocol_at_dir_root::<
+                        ComponentRunnerMarker,
+                    >(svc)?,
+                ));
+            }
+        }
+        // TODO(fxbug.dev/131564): After all tests migrate to using a component runner capability,
+        // the test runner should stop creating a container itself.
+        debug!("use component runner from newly created container");
+        Ok(Container::Internal(TestContainer::create(start_info).await?))
+    }
+
+    async fn destroy(self: Self) -> Result<(), Error> {
+        match self {
+            Container::External(_) => Ok(()),
+            Container::Internal(container) => container.destroy().await,
+        }
+    }
+
+    fn runner(self: &Self) -> &frunner::ComponentRunnerProxy {
+        match self {
+            Container::External(runner) => runner,
+            Container::Internal(container) => &container.component_runner,
+        }
+    }
+}
+
 /// Handles a single `ftest::SuiteRequestStream`.
 ///
 /// # Parameters
@@ -51,11 +105,7 @@ pub async fn handle_suite_requests(
     // The kernel start info is largely the same as that of the test component. The main difference
     // is that the `container_start_info` does not contain the outgoing directory of the test component.
     let container_start_info = clone_start_info(&mut start_info)?;
-
-    // Instantiates a Starnix container in the test component's realm. Running the Starnix kernel
-    // in the test realm allows coverage data to be collected for the kernel itself, during the
-    // execution of the test.
-    let container = TestContainer::create(container_start_info).await?;
+    let container = Container::new(container_start_info).await?;
 
     while let Some(event) = stream.try_next().await? {
         let mut test_start_info = clone_start_info(&mut start_info)?;
@@ -67,12 +117,8 @@ pub async fn handle_suite_requests(
 
                 let test_cases = match test_type {
                     TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => {
-                        get_cases_list_for_gtests(
-                            test_start_info,
-                            &container.component_runner,
-                            test_type,
-                        )
-                        .await?
+                        get_cases_list_for_gtests(test_start_info, &container.runner(), test_type)
+                            .await?
                     }
                     TestType::Ltp => get_cases_list_for_ltp(test_start_info).await?,
                     TestType::BinderLatency | TestType::Gbenchmark | TestType::SingleTest => {
@@ -116,7 +162,7 @@ pub async fn handle_suite_requests(
                             tests,
                             test_start_info,
                             &run_listener_proxy,
-                            &container.component_runner,
+                            &container.runner(),
                             test_type,
                         )
                         .await?;
@@ -126,7 +172,7 @@ pub async fn handle_suite_requests(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
-                            &container.component_runner,
+                            &container.runner(),
                         )
                         .await?
                     }
@@ -135,7 +181,7 @@ pub async fn handle_suite_requests(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
-                            &container.component_runner,
+                            &container.runner(),
                         )
                         .await?
                     }
@@ -144,7 +190,7 @@ pub async fn handle_suite_requests(
                             tests,
                             test_start_info,
                             &run_listener_proxy,
-                            &container.component_runner,
+                            &container.runner(),
                         )
                         .await?
                     }
@@ -153,7 +199,7 @@ pub async fn handle_suite_requests(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,
-                            &container.component_runner,
+                            &container.runner(),
                         )
                         .await?
                     }
