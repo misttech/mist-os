@@ -89,8 +89,11 @@ pub enum MappingName {
     /// This mapping is the heap.
     Heap,
 
-    /// This ampping is the vdso.
+    /// This mapping is the vdso.
     Vdso,
+
+    /// This mapping is the vvar.
+    Vvar,
 
     /// The file backing this mapping.
     File(NamespaceNode),
@@ -2171,6 +2174,10 @@ fn write_map(
         MappingName::Vdso => {
             fill_to_name(sink);
             sink.write(b"[vdso]");
+        }
+        MappingName::Vvar => {
+            fill_to_name(sink);
+            sink.write(b"[vvar]");
         }
         MappingName::File(name) => {
             fill_to_name(sink);

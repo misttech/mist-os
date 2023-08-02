@@ -8,13 +8,10 @@
 #define VDSO_CONSTANTS_ALIGN 8
 
 // The manifest for the constants size is currently...
-// + 2 32-bit integers
-// |++ ticks to mono ratio (2)
-// |
 // + 1 64-bit integer
-// | raw_ticks to ticks offset (1)
+// | Offset from base of vdso_constants to base of vvar
 //
-#define VDSO_CONSTANTS_SIZE ((2 * 4) + 8)
+#define VDSO_CONSTANTS_SIZE (1 * 8)
 
 #ifndef __ASSEMBLER__
 
@@ -26,6 +23,11 @@
 extern "C"
 #endif
     struct vdso_constants {
+  // Offset from base of vdso_constants to base of vvar
+  uint64_t vvar_offset;
+};
+
+struct vvar_data {
   // Offset for converting from the raw system timer to zx_ticks_t
   int64_t raw_ticks_to_ticks_offset;
 

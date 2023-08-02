@@ -349,3 +349,13 @@ TEST_F(VdsoProcTest, VdsoModificationsBeforeForkingDontAffectOtherPrograms) {
     EXPECT_EQ(WEXITSTATUS(status), 0);
   }
 }
+
+TEST(VdsoDeathTest, VvarCantWrite) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "We cannot assume that this test works on Linux in CQ";
+  }
+  uint8_t* vdso_base = reinterpret_cast<uint8_t*>(getauxval(AT_SYSINFO_EHDR));
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  uint8_t* base_of_vvar = vdso_base - page_size;
+  ASSERT_DEATH({ *(base_of_vvar + 2) = 3; }, "");
+}

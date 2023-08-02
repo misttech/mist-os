@@ -4637,7 +4637,7 @@ pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
 pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_default\0") };
 pub const VDSO_CONSTANTS_ALIGN: u32 = 8;
-pub const VDSO_CONSTANTS_SIZE: u32 = 16;
+pub const VDSO_CONSTANTS_SIZE: u32 = 8;
 pub const SPLICE_F_MOVE: u32 = 1;
 pub const SPLICE_F_NONBLOCK: u32 = 2;
 pub const SPLICE_F_MORE: u32 = 4;
@@ -11801,6 +11801,11 @@ pub struct sockaddr_vm {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct vdso_constants {
+    pub vvar_offset: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct vvar_data {
     pub raw_ticks_to_ticks_offset: i64,
     pub ticks_to_mono_numerator: u32,
     pub ticks_to_mono_denominator: u32,

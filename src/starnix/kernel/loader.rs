@@ -423,29 +423,53 @@ pub fn load_executable(
     );
 
     let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso.vmo {
-        let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
-        let prot_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
+        let vvar_vmo = current_task
+            .kernel()
+            .vdso
+            .vvar_readonly
+            .clone()
+            .expect("Couldn't find vvar in vdso struct");
 
-        // Create a private mapping of each
+        let vdso_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
+        const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
+
+        let vvar_size = vvar_vmo.get_size().map_err(|_| errno!(EINVAL))?;
+        const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
+
+        // Create a private clone of the starnix kernel vDSO
         let vdso_clone = vdso_vmo
-            .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vmo_size)
+            .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
             .map_err(|status| from_status_like_fdio!(status))?;
 
         let vdso_executable = vdso_clone
             .replace_as_executable(&VMEX_RESOURCE)
             .map_err(|status| from_status_like_fdio!(status))?;
 
-        let map_result = current_task.mm.map(
+        // Memory map the vvar vmo, mapping a space the size of (size of vvar + size of vDSO)
+        let vvar_map_result = current_task.mm.map(
             DesiredAddress::Any,
+            vvar_vmo,
+            0,
+            (vvar_size as usize) + (vdso_size as usize),
+            VVAR_PROT_FLAGS,
+            MappingOptions::empty(),
+            MappingName::Vvar,
+            FileWriteGuardRef(None),
+        )?;
+
+        // Overwrite the second part of the vvar mapping to contain the vDSO clone
+        let vdso_map_result = current_task.mm.map(
+            DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
             Arc::new(vdso_executable),
             0,
-            vmo_size as usize,
-            prot_flags,
+            vdso_size as usize,
+            VDSO_PROT_FLAGS,
             MappingOptions::empty(),
             MappingName::Vdso,
             FileWriteGuardRef(None),
         )?;
-        map_result.ptr() as u64
+
+        vdso_map_result.ptr() as u64
     } else {
         0
     };

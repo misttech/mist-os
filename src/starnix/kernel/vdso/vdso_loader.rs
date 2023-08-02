@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
+use fidl::AsHandleRef;
+use fuchsia_zircon::{self as zx, HandleBased};
 use std::sync::Arc;
 
 use crate::{
-    arch::vdso::{get_sigreturn_offset, set_vdso_constants, HAS_VDSO},
+    arch::vdso::{get_sigreturn_offset, set_vdso_constants, set_vvar_data, HAS_VDSO},
+    mm::PAGE_SIZE,
     types::{errno, from_status_like_fdio, Errno},
 };
 
@@ -14,6 +16,8 @@ use crate::{
 pub struct Vdso {
     pub vmo: Option<Arc<zx::Vmo>>,
     pub sigreturn_offset: Option<u64>,
+    pub vvar_writeable: Option<Arc<zx::Vmo>>,
+    pub vvar_readonly: Option<Arc<zx::Vmo>>,
 }
 
 impl Vdso {
@@ -24,8 +28,43 @@ impl Vdso {
             None => Ok(None),
         }
         .expect("Couldn't find signal trampoline code in vDSO");
-        Self { vmo: vdso_vmo, sigreturn_offset: sigreturn }
+
+        let (vvar_vmo_writeable, vvar_vmo_readonly) = if HAS_VDSO {
+            let (writeable_vvar, readonly_vvar) = create_vvar_and_handles();
+            (Some(writeable_vvar), Some(readonly_vvar))
+        } else {
+            (None, None)
+        };
+
+        Self {
+            vmo: vdso_vmo,
+            sigreturn_offset: sigreturn,
+            vvar_writeable: vvar_vmo_writeable,
+            vvar_readonly: vvar_vmo_readonly,
+        }
     }
+}
+
+fn create_vvar_and_handles() -> (Arc<zx::Vmo>, Arc<zx::Vmo>) {
+    // Creating a vvar vmo which has a handle which is writeable.
+    // Starnix will use this handle to write to vvar
+    let vvar_vmo_writeable =
+        Arc::new(zx::Vmo::create(*PAGE_SIZE as u64).expect("Couldn't create vvar vvmo"));
+    let _ = set_vvar_data(&vvar_vmo_writeable).expect("Couldn't write data in vvar");
+    let vvar_writeable_rights = vvar_vmo_writeable
+        .basic_info()
+        .expect("Couldn't get rights of writeable vvar handle")
+        .rights;
+    // Create a duplicate handle to this vvar vmo which doesn't have write permission
+    // This handle is used to map vvar into linux userspace
+    let vvar_readable_rights = vvar_writeable_rights.difference(zx::Rights::WRITE);
+    let vvar_vmo_readonly = Arc::new(
+        vvar_vmo_writeable
+            .as_ref()
+            .duplicate_handle(vvar_readable_rights)
+            .expect("couldn't duplicate vvar handle"),
+    );
+    (vvar_vmo_writeable, vvar_vmo_readonly)
 }
 
 fn sync_open_in_namespace(
