@@ -45,7 +45,6 @@ pub fn compile_container_manifest(
             {
                 "protocol": [
                     "fuchsia.component.runner.ComponentRunner",
-                    "fuchsia.starnix.binder.DevBinder",
                     "fuchsia.starnix.container.Controller",
                 ],
             },
