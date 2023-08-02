@@ -2,11 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@legacy_ninja_build_outputs//:build_args.bzl", "authorized_ssh_keys_label")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
-    "INPUT_DEVICE_TYPE",
     "fuchsia_product_configuration",
 )
 
@@ -19,6 +17,16 @@ package(default_visibility = [
 py_binary(
     name = "diff_json",
     srcs = ["diff_json.py"],
+)
+
+fuchsia_product_configuration(
+    name = "zedboot",
+    json_config = {
+        "platform": {
+            "build_type": BUILD_TYPES.ENG,
+            "feature_set_level": "bootstrap",
+        },
+    },
 )
 
 fuchsia_product_configuration(

@@ -138,7 +138,7 @@ fuchsia_product_image(
     image = ":recovery_images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    product_config = "//build/bazel/assembly/product_configurations:default",
+    product_config = "//build/bazel/assembly/product_configurations:zedboot",
 )
 
 fuchsia_product_image(
@@ -157,7 +157,7 @@ fuchsia_product_image(
     image = ":recovery_images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    product_config = "//build/bazel/assembly/product_configurations:default",
+    product_config = "//build/bazel/assembly/product_configurations:zedboot",
 )
 
 fuchsia_product_image(
@@ -185,7 +185,7 @@ fuchsia_product_image(
     image = "//build/bazel/assembly/images_configurations:zedboot_vim3",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    product_config = "//build/bazel/assembly/product_configurations:default",
+    product_config = "//build/bazel/assembly/product_configurations:zedboot",
 )
 
 fuchsia_elf_sizes(
