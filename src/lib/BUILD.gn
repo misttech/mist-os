@@ -140,6 +140,7 @@ group("tests") {
     "process_builder:tests",
     "product_description:tests($host_toolchain)",
     "pty:tests",
+    "replace-with:tests",
     "rust_url:tests",
     "scoped_task:tests",
     "security:tests",
