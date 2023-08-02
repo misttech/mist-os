@@ -934,6 +934,23 @@ impl NamespaceNode {
         Ok(self.with_new_entry(self.entry.create_symlink(current_task, name, target, owner)?))
     }
 
+    /// Creates an anonymous file.
+    ///
+    /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
+    ///
+    /// Used by O_TMPFILE.
+    pub fn create_tmpfile(
+        &self,
+        current_task: &CurrentTask,
+        mode: FileMode,
+        flags: OpenFlags,
+    ) -> Result<NamespaceNode, Errno> {
+        self.check_readonly_filesystem()?;
+        let owner = current_task.as_fscred();
+        let mode = current_task.fs().apply_umask(mode);
+        Ok(self.with_new_entry(self.entry.create_tmpfile(current_task, mode, owner, flags)?))
+    }
+
     pub fn unlink(
         &self,
         current_task: &CurrentTask,

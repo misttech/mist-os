@@ -1386,6 +1386,10 @@ impl CurrentTask {
             flags &= ALLOWED_FLAGS;
         }
 
+        if flags.contains(OpenFlags::TMPFILE) && !flags.can_write() {
+            return error!(EINVAL);
+        }
+
         let nofollow = flags.contains(OpenFlags::NOFOLLOW);
         let must_create = flags.contains(OpenFlags::CREAT) && flags.contains(OpenFlags::EXCL);
 
@@ -1396,35 +1400,52 @@ impl CurrentTask {
         context.must_be_directory = flags.contains(OpenFlags::DIRECTORY);
         let (name, created) = self.resolve_open_path(&mut context, dir, path, mode, flags)?;
 
-        // Be sure not to reference the mode argument after this point.
-        let mode = name.entry.node.info().mode;
-        if nofollow && mode.is_lnk() {
-            return error!(ELOOP);
-        }
+        let name = if flags.contains(OpenFlags::TMPFILE) {
+            name.create_tmpfile(self, mode.with_type(FileMode::IFREG), flags)?
+        } else {
+            let mode = name.entry.node.info().mode;
 
-        if mode.is_dir() {
-            if flags.can_write()
-                || flags.contains(OpenFlags::CREAT)
-                || flags.contains(OpenFlags::TRUNC)
-            {
-                return error!(EISDIR);
-            }
-            if flags.contains(OpenFlags::DIRECT) {
-                return error!(EINVAL);
-            }
-        } else if context.must_be_directory {
-            return error!(ENOTDIR);
-        }
+            // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
+            // file we are opening. With `O_TMPFILE`, that file is the regular file we just
+            // created rather than the node we found by resolving the path.
+            //
+            // For example, we do not need to produce `ENOTDIR` when `must_be_directory` is set
+            // because `must_be_directory` refers to the node we found by resolving the path.
+            // If that node was not a directory, then `create_tmpfile` will produce an error.
+            //
+            // Similarly, we never need to call `truncate` because `O_TMPFILE` is newly created
+            // and therefor already an empty file.
 
-        if flags.contains(OpenFlags::TRUNC) && mode.is_reg() && !created {
-            // You might think we should check file.can_write() at this
-            // point, which is what the docs suggest, but apparently we
-            // are supposed to truncate the file if this task can write
-            // to the underlying node, even if we are opening the file
-            // as read-only. See OpenTest.CanTruncateReadOnly.
-            name.check_readonly_filesystem()?;
-            name.entry.node.truncate(self, 0)?;
-        }
+            if nofollow && mode.is_lnk() {
+                return error!(ELOOP);
+            }
+
+            if mode.is_dir() {
+                if flags.can_write()
+                    || flags.contains(OpenFlags::CREAT)
+                    || flags.contains(OpenFlags::TRUNC)
+                {
+                    return error!(EISDIR);
+                }
+                if flags.contains(OpenFlags::DIRECT) {
+                    return error!(EINVAL);
+                }
+            } else if context.must_be_directory {
+                return error!(ENOTDIR);
+            }
+
+            if flags.contains(OpenFlags::TRUNC) && mode.is_reg() && !created {
+                // You might think we should check file.can_write() at this
+                // point, which is what the docs suggest, but apparently we
+                // are supposed to truncate the file if this task can write
+                // to the underlying node, even if we are opening the file
+                // as read-only. See OpenTest.CanTruncateReadOnly.
+                name.check_readonly_filesystem()?;
+                name.entry.node.truncate(self, 0)?;
+            }
+
+            name
+        };
 
         // If the node has been created, the open operation should not verify access right:
         // From <https://man7.org/linux/man-pages/man2/open.2.html>

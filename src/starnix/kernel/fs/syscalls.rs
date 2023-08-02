@@ -750,7 +750,10 @@ pub fn sys_linkat(
         return error!(EINVAL);
     }
 
-    // TODO: AT_EMPTY_PATH requires CAP_DAC_READ_SEARCH.
+    if flags & AT_EMPTY_PATH != 0 && !current_task.creds().has_capability(CAP_DAC_READ_SEARCH) {
+        return error!(ENOENT);
+    }
+
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_FOLLOW)?;
     let target = lookup_at(current_task, old_dir_fd, old_user_path, flags)?;
     lookup_parent_at(current_task, new_dir_fd, new_user_path, |context, parent, basename| {

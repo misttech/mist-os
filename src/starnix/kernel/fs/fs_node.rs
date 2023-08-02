@@ -19,6 +19,18 @@ use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::{Arc, Weak};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FsNodeLinkBehavior {
+    Allowed,
+    Disallowed,
+}
+
+impl Default for FsNodeLinkBehavior {
+    fn default() -> Self {
+        FsNodeLinkBehavior::Allowed
+    }
+}
+
 pub struct FsNode {
     /// The FsNodeOps for this FsNode.
     ///
@@ -71,6 +83,11 @@ pub struct FsNode {
 
     /// Records locks associated with this node.
     record_locks: RecordLocks,
+
+    /// Whether this node can be linked into a directory.
+    ///
+    /// Only set for nodes created with `O_TMPFILE`.
+    link_behavior: OnceCell<FsNodeLinkBehavior>,
 
     /// Tracks lock state for this file.
     pub write_guard_state: Mutex<FileWriteGuardState>,
@@ -476,6 +493,21 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         error!(ENOTDIR)
     }
 
+    /// Creates an anonymous file.
+    ///
+    /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
+    ///
+    /// Used by O_TMPFILE.
+    fn create_tmpfile(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _mode: FileMode,
+        _owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
     /// Reads the symlink from this node.
     fn readlink(
         &self,
@@ -804,6 +836,7 @@ impl FsNode {
                 append_lock: Default::default(),
                 flock_info: Default::default(),
                 record_locks: Default::default(),
+                link_behavior: Default::default(),
                 watchers: Default::default(),
                 write_guard_state: Default::default(),
             };
@@ -966,6 +999,19 @@ impl FsNode {
         self.ops().create_symlink(self, current_task, name, target, owner)
     }
 
+    pub fn create_tmpfile(
+        &self,
+        current_task: &CurrentTask,
+        mode: FileMode,
+        owner: FsCred,
+        link_behavior: FsNodeLinkBehavior,
+    ) -> Result<FsNodeHandle, Errno> {
+        self.check_access(current_task, Access::WRITE)?;
+        let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
+        node.link_behavior.set(link_behavior).unwrap();
+        Ok(node)
+    }
+
     // This method does not attempt to update the atime of the node.
     // Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
     pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
@@ -980,6 +1026,10 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
+
+        if matches!(child.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
+            return error!(ENOENT);
+        }
 
         // Check that `current_task` has permission to create the hard link.
         //

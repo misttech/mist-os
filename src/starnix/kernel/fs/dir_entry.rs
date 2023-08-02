@@ -336,14 +336,48 @@ impl DirEntry {
         })
     }
 
-    fn create_node_fn(
+    /// Creates an anonymous file.
+    ///
+    /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
+    ///
+    /// Used by O_TMPFILE.
+    pub fn create_tmpfile(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
-        name: &FsStr,
         mut mode: FileMode,
-        dev: DeviceType,
         mut owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
+        flags: OpenFlags,
+    ) -> Result<DirEntryHandle, Errno> {
+        // Only directories can have children.
+        if !self.node.is_dir() {
+            return error!(ENOTDIR);
+        }
+        assert!(mode.is_reg());
+        self.update_metadata_for_child(current_task, &mut mode, &mut owner);
+
+        // From <https://man7.org/linux/man-pages/man2/open.2.html>:
+        //
+        //   Specifying O_EXCL in conjunction with O_TMPFILE prevents a
+        //   temporary file from being linked into the filesystem in
+        //   the above manner.  (Note that the meaning of O_EXCL in
+        //   this case is different from the meaning of O_EXCL
+        //   otherwise.)
+        let link_behavior = if flags.contains(OpenFlags::EXCL) {
+            FsNodeLinkBehavior::Disallowed
+        } else {
+            FsNodeLinkBehavior::Allowed
+        };
+
+        let node = self.node.create_tmpfile(current_task, mode, owner, link_behavior)?;
+        Ok(DirEntry::new_unrooted(node))
+    }
+
+    fn update_metadata_for_child(
+        &self,
+        current_task: &CurrentTask,
+        mode: &mut FileMode,
+        owner: &mut FsCred,
+    ) {
         // The setgid bit on a directory causes the gid to be inherited by new children and the
         // setgid bit to be inherited by new child directories. See SetgidDirTest in gvisor.
         {
@@ -351,14 +385,12 @@ impl DirEntry {
             if self_info.mode.contains(FileMode::ISGID) {
                 owner.gid = self_info.gid;
                 if mode.is_dir() {
-                    mode |= FileMode::ISGID;
+                    *mode |= FileMode::ISGID;
                 }
             }
         }
 
-        if mode.is_dir() {
-            self.node.mkdir(current_task, name, mode, owner)
-        } else {
+        if !mode.is_dir() {
             // https://man7.org/linux/man-pages/man7/inode.7.html says:
             //
             //   For an executable file, the set-group-ID bit causes the
@@ -372,9 +404,24 @@ impl DirEntry {
                 && owner.gid != creds.egid
                 && !creds.is_in_group(owner.gid)
             {
-                mode &= !FileMode::ISGID;
+                *mode &= !FileMode::ISGID;
             }
+        }
+    }
 
+    fn create_node_fn(
+        self: &DirEntryHandle,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        mut mode: FileMode,
+        dev: DeviceType,
+        mut owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        self.update_metadata_for_child(current_task, &mut mode, &mut owner);
+
+        if mode.is_dir() {
+            self.node.mkdir(current_task, name, mode, owner)
+        } else {
             // https://man7.org/linux/man-pages/man2/mknod.2.html says:
             //
             //   mode requested creation of something other than a regular
@@ -383,6 +430,7 @@ impl DirEntry {
             //   CAP_MKNOD capability); also returned if the filesystem
             //   containing pathname does not support the type of node
             //   requested.
+            let creds = current_task.creds();
             if !creds.has_capability(CAP_MKNOD) {
                 if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
                     return error!(EPERM);
@@ -390,6 +438,7 @@ impl DirEntry {
             }
 
             let node = self.node.mknod(current_task, name, mode, dev, owner)?;
+
             if mode.is_sock() {
                 node.set_socket(Socket::new(
                     current_task,

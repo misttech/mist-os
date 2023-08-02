@@ -144,6 +144,33 @@ impl TmpfsDirectory {
     }
 }
 
+fn create_child_node(
+    parent: &FsNode,
+    mode: FileMode,
+    dev: DeviceType,
+    owner: FsCred,
+) -> Result<FsNodeHandle, Errno> {
+    let ops: Box<dyn FsNodeOps> = match mode.fmt() {
+        FileMode::IFREG => Box::new(VmoFileNode::new()?),
+        FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
+            Box::new(TmpfsSpecialNode::new())
+        }
+        _ => return error!(EACCES),
+    };
+    let child = parent.fs().create_node_box(ops, move |id| {
+        let mut info = FsNodeInfo::new(id, mode, owner);
+        info.rdev = dev;
+        // blksize is PAGE_SIZE for in memory node.
+        info.blksize = *PAGE_SIZE as usize;
+        info
+    });
+    if mode.fmt() == FileMode::IFREG {
+        // For files created in tmpfs, forbid sealing, by sealing the seal operation.
+        child.write_guard_state.lock().enable_sealing(SealFlags::SEAL);
+    }
+    Ok(child)
+}
+
 impl FsNodeOps for TmpfsDirectory {
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
@@ -191,28 +218,9 @@ impl FsNodeOps for TmpfsDirectory {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let ops: Box<dyn FsNodeOps> = match mode.fmt() {
-            FileMode::IFREG => Box::new(VmoFileNode::new()?),
-            FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
-                Box::new(TmpfsSpecialNode::new())
-            }
-            _ => return error!(EACCES),
-        };
+        let child = create_child_node(node, mode, dev, owner)?;
         *self.child_count.lock() += 1;
-        let node = node.fs().create_node_box(ops, move |id| {
-            let mut info = FsNodeInfo::new(id, mode, owner);
-            info.rdev = dev;
-            // blksize is PAGE_SIZE for in memory node.
-            info.blksize = *PAGE_SIZE as usize;
-            info
-        });
-
-        if mode.fmt() == FileMode::IFREG {
-            // For files created in tmpfs, forbid sealing, by sealing the seal operation.
-            node.write_guard_state.lock().enable_sealing(SealFlags::SEAL);
-        }
-
-        Ok(node)
+        Ok(child)
     }
 
     fn create_symlink(
@@ -228,6 +236,17 @@ impl FsNodeOps for TmpfsDirectory {
             SymlinkNode::new(target),
             FsNodeInfo::new_factory(mode!(IFLNK, 0o777), owner),
         ))
+    }
+
+    fn create_tmpfile(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        mode: FileMode,
+        owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        assert!(mode.is_reg());
+        create_child_node(node, mode, DeviceType::NONE, owner)
     }
 
     fn link(

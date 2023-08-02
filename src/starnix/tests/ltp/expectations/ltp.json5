@@ -200,8 +200,6 @@
                 "munlock01",
                 "munlock02",
                 "munlockall01",
-                "open14",
-                "openat03",
                 "openat201",
                 "openat202",
                 "openat203",
