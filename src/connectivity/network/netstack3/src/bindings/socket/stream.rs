@@ -25,7 +25,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::{FutureExt as _, StreamExt as _};
 use net_types::{
-    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
+    ip::{IpAddress, IpVersion, Ipv4, Ipv6},
     ZonedAddr,
 };
 use netstack3_core::{
@@ -45,9 +45,9 @@ use netstack3_core::{
             set_listener_device, set_receive_buffer_size, set_reuseaddr_bound,
             set_reuseaddr_listener, set_reuseaddr_unbound, set_send_buffer_size,
             set_unbound_device, shutdown_conn, shutdown_listener, with_socket_options,
-            with_socket_options_mut, AcceptError, BoundId, BoundInfo, ConnectError, ConnectionId,
-            ConnectionInfo, HandshakeStatus, ListenError, ListenerId, ListenerNotifier,
-            NoConnection, SetReuseAddrError, SocketAddr, UnboundId,
+            with_socket_options_mut, AcceptError, BoundInfo, ConnectError, ConnectionId,
+            ConnectionInfo, HandshakeStatus, ListenError, ListenerNotifier, NoConnection,
+            SetReuseAddrError, SocketAddr, SocketId,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -75,14 +75,6 @@ use crate::bindings::{
 const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
 const MAX_TCP_KEEPINTVL_SECS: u64 = 32767;
 const MAX_TCP_KEEPCNT: u8 = 127;
-
-#[derive(Debug)]
-enum SocketId<I: Ip> {
-    Unbound(UnboundId<I>),
-    Bound(BoundId<I>),
-    Connection(ConnectionId<I>),
-    Listener(ListenerId<I>),
-}
 
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
