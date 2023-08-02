@@ -1827,6 +1827,7 @@ constexpr zxio_ops_t Symlink::kOps = ([]() {
   ops.attr_get = Adaptor::From<&Symlink::AttrGet>;
   ops.flags_get = Adaptor::From<&Symlink::FlagsGet>;
   ops.read_link = Adaptor::From<&Symlink::ReadLink>;
+  ops.link_into = Adaptor::From<&Symlink::LinkInto>;
   return ops;
 })();
 

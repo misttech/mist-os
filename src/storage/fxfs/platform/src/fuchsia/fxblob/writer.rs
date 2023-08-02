@@ -25,9 +25,9 @@ use {
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, WriteObjectHandle},
         object_store::{
-            directory::{replace_child_with_object, ObjectDescriptor, ReplacedChild},
+            directory::{replace_child_with_object, ReplacedChild},
             transaction::{LockKey, Options},
-            DataObjectHandle, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
+            DataObjectHandle, ObjectDescriptor, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::{round_down, round_up},
         serialized_types::BlobMetadata,

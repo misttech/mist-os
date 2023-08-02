@@ -12,8 +12,8 @@ use {
         object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID},
         object_store::{
             object_record::{
-                ChildValue, ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind,
-                ObjectValue, PosixAttributes, Timestamp,
+                ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
+                ObjectKeyData, ObjectKind, ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{LockKey, Mutation, Options, Transaction},
             DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
@@ -32,9 +32,6 @@ use {
         },
     },
 };
-
-// ObjectDescriptor is exposed in Directory::lookup.
-pub use crate::object_store::object_record::ObjectDescriptor;
 
 /// A directory stores name to child object mappings.
 pub struct Directory<S: HandleOwner> {

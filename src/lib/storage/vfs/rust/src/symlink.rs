@@ -11,6 +11,8 @@ use {
         },
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
+        name::parse_name,
+        node::Node,
         object_request::Representation,
         path::Path,
         ObjectRequest, ProtocolsExt, ToObjectRequest,
@@ -23,21 +25,13 @@ use {
 };
 
 #[async_trait]
-pub trait Symlink: Send + Sync {
+pub trait Symlink: Node {
     async fn read_target(&self) -> Result<Vec<u8>, zx::Status>;
-
-    /// Returns node attributes (io2).
-    async fn get_attributes(
-        &self,
-        _requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
 }
 
 pub struct Connection {
-    symlink: Arc<dyn Symlink>,
     scope: ExecutionScope,
+    symlink: Arc<dyn Symlink>,
 }
 
 pub struct SymlinkOptions;
@@ -74,7 +68,7 @@ impl Connection {
         _options: SymlinkOptions,
         object_request: ObjectRequest,
     ) {
-        let mut connection = Connection { symlink, scope };
+        let mut connection = Connection { scope, symlink };
         if let Ok(mut requests) = object_request.into_request_stream(&connection).await {
             while let Some(Ok(request)) = requests.next().await {
                 let Some(_guard) = connection.scope.try_active_guard() else { break };
@@ -104,8 +98,10 @@ impl Connection {
                 responder.send(Ok(()))?;
                 return Ok(true);
             }
-            fio::SymlinkRequest::LinkInto { responder, .. } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            fio::SymlinkRequest::LinkInto { dst_parent_token, dst, responder } => {
+                responder.send(
+                    self.handle_link_into(dst_parent_token, dst).await.map_err(|s| s.into_raw()),
+                )?;
             }
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
@@ -203,6 +199,22 @@ impl Connection {
             modification_time: 0,
         })
     }
+
+    async fn handle_link_into(
+        &mut self,
+        target_parent_token: zx::Event,
+        target_name: String,
+    ) -> Result<(), zx::Status> {
+        let target_name = parse_name(target_name).map_err(|_| zx::Status::INVALID_ARGS)?;
+
+        let (target_parent, _flags) = self
+            .scope
+            .token_registry()
+            .get_owner(target_parent_token.into())?
+            .ok_or(Err(zx::Status::NOT_FOUND))?;
+
+        self.symlink.clone().link_into(target_parent, target_name).await
+    }
 }
 
 impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
@@ -254,7 +266,7 @@ mod tests {
     use {
         super::{Connection, Symlink},
         crate::{
-            common::rights_to_posix_mode_bits, execution_scope::ExecutionScope,
+            common::rights_to_posix_mode_bits, execution_scope::ExecutionScope, node::Node,
             symlink::SymlinkOptions, ProtocolsExt, ToObjectRequest,
         },
         assert_matches::assert_matches,
@@ -271,6 +283,20 @@ mod tests {
     impl Symlink for TestSymlink {
         async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
             Ok(b"target".to_vec())
+        }
+    }
+
+    #[async_trait]
+    impl Node for TestSymlink {
+        async fn get_attributes(
+            &self,
+            _requested_attributes: fio::NodeAttributesQuery,
+        ) -> Result<fio::NodeAttributes2, zx::Status> {
+            unreachable!();
+        }
+
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            unreachable!();
         }
     }
 

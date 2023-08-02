@@ -13,11 +13,15 @@ use {
         errors::FxfsError,
         object_handle::ObjectProperties,
         object_store::{
-            transaction::LockKey, ObjectAttributes, ObjectKey, ObjectKind, ObjectValue,
+            transaction::{LockKey, Options},
+            ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
         },
     },
     std::sync::Arc,
-    vfs::{attributes, symlink::Symlink},
+    vfs::{
+        attributes, directory::entry_container::MutableDirectory, name::Name, node::Node,
+        symlink::Symlink,
+    },
 };
 
 pub struct FxSymlink {
@@ -36,7 +40,10 @@ impl Symlink for FxSymlink {
     async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
         self.volume.store().read_symlink(self.object_id).await.map_err(map_to_status)
     }
+}
 
+#[async_trait]
+impl Node for FxSymlink {
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -61,6 +68,32 @@ impl Symlink for FxSymlink {
                 id: self.object_id,
             }
         ))
+    }
+
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
+
+    async fn link_into(
+        self: Arc<Self>,
+        destination_dir: Arc<dyn MutableDirectory>,
+        name: Name,
+    ) -> Result<(), zx::Status> {
+        let dir = destination_dir.into_any().downcast::<FxDirectory>().unwrap();
+        let store = self.volume.store();
+        let transaction = store
+            .filesystem()
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store.store_object_id(), self.object_id),
+                    LockKey::object(store.store_object_id(), dir.object_id()),
+                ],
+                Options::default(),
+            )
+            .await
+            .map_err(map_to_status)?;
+        dir.link_object(transaction, &name, self.object_id, ObjectDescriptor::Symlink).await
     }
 }
 

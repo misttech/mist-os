@@ -584,13 +584,17 @@ impl FsNodeOps for RemoteNode {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let Some(child) = child.downcast_ops::<RemoteNode>() else {
-            return error!(EXDEV);
+        let name = get_name_str(name)?;
+        let link_into = |zxio: &syncio::Zxio| {
+            zxio.link_into(&self.zxio, name).map_err(|status| from_status_like_fdio!(status))
         };
-        child
-            .zxio
-            .link_into(&self.zxio, get_name_str(name)?)
-            .map_err(|status| from_status_like_fdio!(status))
+        if let Some(child) = child.downcast_ops::<RemoteNode>() {
+            link_into(&child.zxio)
+        } else if let Some(child) = child.downcast_ops::<RemoteSymlink>() {
+            link_into(&child.zxio)
+        } else {
+            error!(EXDEV)
+        }
     }
 }
 

@@ -35,9 +35,8 @@ use {
         filesystem::{self, SyncOptions},
         log::*,
         object_store::{
-            directory::{Directory, ObjectDescriptor},
-            transaction::Options,
-            HandleOptions, HandleOwner, ObjectStore,
+            directory::Directory, transaction::Options, HandleOptions, HandleOwner,
+            ObjectDescriptor, ObjectStore,
         },
     },
     std::{
@@ -608,10 +607,9 @@ mod tests {
             fsck::{fsck, fsck_volume},
             object_handle::{ObjectHandle, ObjectHandleExt},
             object_store::{
-                directory::ObjectDescriptor,
                 transaction::{Options, TransactionHandler},
                 volume::root_volume,
-                HandleOptions, ObjectStore,
+                HandleOptions, ObjectDescriptor, ObjectStore,
             },
         },
         fxfs_insecure_crypto::InsecureCrypt,

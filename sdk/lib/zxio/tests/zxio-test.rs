@@ -19,6 +19,7 @@ use {
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+        node::Node,
         path::Path,
         pseudo_directory,
         symlink::Symlink,
@@ -76,6 +77,20 @@ async fn test_read_link_error() {
     impl Symlink for ErrorSymlink {
         async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
             Err(zx::Status::IO)
+        }
+    }
+
+    #[async_trait]
+    impl Node for ErrorSymlink {
+        async fn get_attributes(
+            &self,
+            _requested_attributes: fio::NodeAttributesQuery,
+        ) -> Result<fio::NodeAttributes2, zx::Status> {
+            unreachable!();
+        }
+
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            unreachable!();
         }
     }
 

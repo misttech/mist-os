@@ -24,9 +24,9 @@ use {
         object_handle::ObjectProperties,
         object_store::{
             self,
-            directory::{self, ObjectDescriptor, ReplacedChild},
+            directory::{self, ReplacedChild},
             transaction::{LockKey, Options, Transaction},
-            Directory, ObjectStore,
+            Directory, ObjectDescriptor, ObjectStore,
         },
     },
     std::{
@@ -249,6 +249,7 @@ impl FxDirectory {
         mut transaction: Transaction<'_>,
         name: &str,
         source_id: u64,
+        kind: ObjectDescriptor,
     ) -> Result<(), zx::Status> {
         let store = self.store();
         if self.is_deleted() {
@@ -258,7 +259,7 @@ impl FxDirectory {
             return Err(zx::Status::ALREADY_EXISTS);
         }
         self.directory
-            .insert_child(&mut transaction, &name, source_id, ObjectDescriptor::File)
+            .insert_child(&mut transaction, &name, source_id, kind)
             .await
             .map_err(map_to_status)?;
         store.adjust_refs(&mut transaction, source_id, 1).await.map_err(map_to_status)?;
@@ -336,7 +337,7 @@ impl MutableDirectory for FxDirectory {
             None => return Err(zx::Status::NOT_FOUND),
             _ => return Err(zx::Status::NOT_SUPPORTED),
         };
-        self.link_object(transaction, &name, source_id).await
+        self.link_object(transaction, &name, source_id, ObjectDescriptor::File).await
     }
 
     async fn unlink(
@@ -1710,6 +1711,66 @@ mod tests {
                 proxy.describe().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })
             );
+        }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_hard_link_to_symlink() {
+        let fixture = TestFixture::new().await;
+
+        {
+            let root = fixture.root();
+
+            root.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
+                let (proxy, server_end) =
+                    create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
+                root.open(
+                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
+                    fio::ModeType::empty(),
+                    path,
+                    ServerEnd::new(server_end.into_channel()),
+                )
+                .expect("open failed");
+
+                let on_open = proxy
+                    .take_event_stream()
+                    .next()
+                    .await
+                    .expect("missing OnOpen event")
+                    .expect("failed to read event")
+                    .into_on_open_();
+
+                if let Some((0, Some(node_info))) = on_open {
+                    assert_matches!(
+                        *node_info,
+                        fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target, .. })
+                            if target == b"target"
+                    );
+                } else {
+                    panic!("Unexpected on_open {on_open:?}");
+                }
+
+                proxy
+            }
+
+            let proxy = open_symlink(&root, "symlink").await;
+
+            let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            proxy
+                .link_into(zx::Event::from(dst_token.unwrap()), "symlink2")
+                .await
+                .expect("link_into (FIDL) failed")
+                .expect("link_into failed");
+
+            open_symlink(&root, "symlink2").await;
         }
 
         fixture.close().await;

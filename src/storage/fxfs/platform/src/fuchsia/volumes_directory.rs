@@ -30,10 +30,9 @@ use {
         metrics,
         object_store::{
             allocator::Allocator,
-            directory::ObjectDescriptor,
             transaction::{LockKey, Options},
             volume::RootVolume,
-            Directory, ObjectStore,
+            Directory, ObjectDescriptor, ObjectStore,
         },
     },
     fxfs_crypto::Crypt,

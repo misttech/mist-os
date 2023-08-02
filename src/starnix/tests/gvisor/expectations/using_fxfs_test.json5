@@ -18,10 +18,6 @@
                 // fallocate_test
                 "AllocateTest.Fallocate",
 
-                // link_test
-                "LinkTest.LinkDoesNotFollowSymlinks",
-                "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
-
                 // xattr_test
                 "XattrTest.LXattrOnSymlink",
             ],

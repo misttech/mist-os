@@ -24,7 +24,7 @@ use {
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{
             transaction::{LockKey, Options},
-            DataObjectHandle, Timestamp,
+            DataObjectHandle, ObjectDescriptor, Timestamp,
         },
         round::{round_down, round_up},
     },
@@ -328,7 +328,7 @@ impl vfs::node::Node for FxFile {
         if self.open_count.load(Ordering::Relaxed) & PURGED != 0 {
             return Err(zx::Status::NOT_FOUND);
         }
-        dir.link_object(transaction, &name, object_id).await
+        dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
     }
 }
 
