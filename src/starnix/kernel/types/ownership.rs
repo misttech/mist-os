@@ -47,6 +47,118 @@ pub trait Releasable {
     fn release(&self, c: &Self::Context);
 }
 
+/// A wrapper a round a Releasable object that will check, in test and when assertion are enabled,
+/// that the value has been released before being dropped.
+#[must_use = "ReleaseGuard must be released"]
+pub struct ReleaseGuard<T: Releasable> {
+    /// The wrapped value.
+    value: T,
+
+    /// A guard that will ensure a panic on drop if the ref has not been released.
+    drop_guard: DropGuard,
+}
+
+impl<T: Releasable> Releasable for ReleaseGuard<T> {
+    type Context = T::Context;
+
+    fn release(&self, c: &Self::Context) {
+        self.drop_guard.disarm();
+        self.value.release(c);
+    }
+}
+
+#[cfg(test)]
+impl<T: Releasable> ReleaseGuard<T> {
+    pub fn new_released(value: T) -> Self {
+        let result: Self = value.into();
+        result.drop_guard.disarm();
+        result
+    }
+}
+
+#[cfg(test)]
+impl<T: Releasable + Default> ReleaseGuard<T> {
+    pub fn default_released() -> Self {
+        Self::new_released(T::default())
+    }
+}
+
+impl<T: Releasable + std::fmt::Debug> std::fmt::Debug for ReleaseGuard<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<T: Releasable + Default> Default for ReleaseGuard<T> {
+    fn default() -> Self {
+        T::default().into()
+    }
+}
+
+impl<T: Releasable + Clone> Clone for ReleaseGuard<T> {
+    fn clone(&self) -> Self {
+        self.value.clone().into()
+    }
+}
+
+impl<T: Releasable> From<T> for ReleaseGuard<T> {
+    fn from(value: T) -> Self {
+        Self { value, drop_guard: Default::default() }
+    }
+}
+
+impl<T: Releasable> std::ops::Deref for ReleaseGuard<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T: Releasable> std::ops::DerefMut for ReleaseGuard<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<T: Releasable> std::borrow::Borrow<T> for ReleaseGuard<T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<T: Releasable> std::convert::AsRef<T> for ReleaseGuard<T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<T: Releasable + PartialEq> PartialEq for ReleaseGuard<T> {
+    fn eq(&self, other: &ReleaseGuard<T>) -> bool {
+        **self == **other
+    }
+}
+
+impl<T: Releasable + Eq> Eq for ReleaseGuard<T> {}
+
+impl<T: Releasable + PartialOrd> PartialOrd for ReleaseGuard<T> {
+    fn partial_cmp(&self, other: &ReleaseGuard<T>) -> Option<std::cmp::Ordering> {
+        (**self).partial_cmp(&**other)
+    }
+}
+
+impl<T: Releasable + Ord> Ord for ReleaseGuard<T> {
+    fn cmp(&self, other: &ReleaseGuard<T>) -> std::cmp::Ordering {
+        (**self).cmp(&**other)
+    }
+}
+
+impl<T: Releasable + Hash> Hash for ReleaseGuard<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
 /// An owning reference to a shared owned object. Each instance must call `release` before being
 /// dropped.
 /// `OwnedRef` will panic on Drop in debug builds if it has not been released.
@@ -171,9 +283,9 @@ impl<T: Releasable + Hash> Hash for OwnedRef<T> {
 
 /// A weak reference to a shared owned object. The `upgrade` method try to build a `TempRef` from a
 /// `WeakRef` and will fail if there is no `OwnedRef` left.
-pub struct WeakRef<T>(Weak<RefInner<T>>);
+pub struct WeakRef<T: Releasable>(Weak<RefInner<T>>);
 
-impl<T> WeakRef<T> {
+impl<T: Releasable> WeakRef<T> {
     pub fn new() -> Self {
         Self(Weak::new())
     }
@@ -197,13 +309,13 @@ impl<T> WeakRef<T> {
     }
 }
 
-impl<T> Default for WeakRef<T> {
+impl<T: Releasable> Default for WeakRef<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> Clone for WeakRef<T> {
+impl<T: Releasable> Clone for WeakRef<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
@@ -221,15 +333,15 @@ impl<T: Releasable> From<&OwnedRef<T>> for WeakRef<T> {
 /// owning such a refeence.
 // Until negative trait bound are implemented, using `*mut u8` to prevent transferring TempRef
 // across threads.
-pub struct TempRef<'a, T>(Arc<RefInner<T>>, std::marker::PhantomData<(&'a T, *mut u8)>);
+pub struct TempRef<'a, T: Releasable>(Arc<RefInner<T>>, std::marker::PhantomData<(&'a T, *mut u8)>);
 
-impl<'a, T> Drop for TempRef<'a, T> {
+impl<'a, T: Releasable> Drop for TempRef<'a, T> {
     fn drop(&mut self) {
         self.0.dec_temp_ref();
     }
 }
 
-impl<'a, T> TempRef<'a, T> {
+impl<'a, T: Releasable> TempRef<'a, T> {
     /// Build a new TempRef. Ensures `temp_refs_count` is correctly updated.
     fn new(inner: Arc<RefInner<T>>) -> Self {
         inner.inc_temp_ref();
@@ -254,13 +366,13 @@ impl<'a, T: Releasable> From<&'a OwnedRef<T>> for TempRef<'a, T> {
     }
 }
 
-impl<'a, T> From<&TempRef<'a, T>> for WeakRef<T> {
+impl<'a, T: Releasable> From<&TempRef<'a, T>> for WeakRef<T> {
     fn from(temp_ref: &TempRef<'a, T>) -> Self {
         Self(Arc::downgrade(&temp_ref.0))
     }
 }
 
-impl<'a, T> std::ops::Deref for TempRef<'a, T> {
+impl<'a, T: Releasable> std::ops::Deref for TempRef<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -268,39 +380,39 @@ impl<'a, T> std::ops::Deref for TempRef<'a, T> {
     }
 }
 
-impl<'a, T> std::borrow::Borrow<T> for TempRef<'a, T> {
+impl<'a, T: Releasable> std::borrow::Borrow<T> for TempRef<'a, T> {
     fn borrow(&self) -> &T {
         &self.0.deref().value
     }
 }
 
-impl<'a, T> std::convert::AsRef<T> for TempRef<'a, T> {
+impl<'a, T: Releasable> std::convert::AsRef<T> for TempRef<'a, T> {
     fn as_ref(&self) -> &T {
         &self.0.deref().value
     }
 }
 
-impl<'a, T: PartialEq> PartialEq for TempRef<'a, T> {
+impl<'a, T: Releasable + PartialEq> PartialEq for TempRef<'a, T> {
     fn eq(&self, other: &TempRef<'_, T>) -> bool {
         Arc::ptr_eq(&self.0, &other.0) || **self == **other
     }
 }
 
-impl<'a, T: Eq> Eq for TempRef<'a, T> {}
+impl<'a, T: Releasable + Eq> Eq for TempRef<'a, T> {}
 
-impl<'a, T: PartialOrd> PartialOrd for TempRef<'a, T> {
+impl<'a, T: Releasable + PartialOrd> PartialOrd for TempRef<'a, T> {
     fn partial_cmp(&self, other: &TempRef<'_, T>) -> Option<std::cmp::Ordering> {
         (**self).partial_cmp(&**other)
     }
 }
 
-impl<'a, T: Ord> Ord for TempRef<'a, T> {
+impl<'a, T: Releasable + Ord> Ord for TempRef<'a, T> {
     fn cmp(&self, other: &TempRef<'_, T>) -> std::cmp::Ordering {
         (**self).cmp(&**other)
     }
 }
 
-impl<'a, T: Hash> Hash for TempRef<'a, T> {
+impl<'a, T: Releasable + Hash> Hash for TempRef<'a, T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         (**self).hash(state)
     }
@@ -316,9 +428,9 @@ impl<'a, T: Hash> Hash for TempRef<'a, T> {
 ///   increased.
 /// This ensures that `wait_for_no_ref` will always be notified when it is waiting on the
 /// `temp_refs_count` futex and the number of `TempRef` reaches 0.
-struct RefInner<T> {
+struct RefInner<T: Releasable> {
     /// The underlying value.
-    value: T,
+    value: ReleaseGuard<T>,
     /// The number of `OwnedRef` sharing this data.
     owned_refs_count: AtomicUsize,
     /// The number of `TempRef` sharing this data.
@@ -353,9 +465,13 @@ pub fn debug_assert_no_local_temp_ref() {
     }
 }
 
-impl<T> RefInner<T> {
+impl<T: Releasable> RefInner<T> {
     fn new(value: T) -> Arc<Self> {
-        Arc::new(Self { value, owned_refs_count: AtomicUsize::new(1), temp_refs_count: 0.into() })
+        Arc::new(Self {
+            value: value.into(),
+            owned_refs_count: AtomicUsize::new(1),
+            temp_refs_count: 0.into(),
+        })
     }
 
     /// Increase `temp_refs_count`. Must be called each time a new `TempRef` is built.
@@ -429,7 +545,7 @@ impl<T> RefInner<T> {
 }
 
 #[derive(Default, Debug)]
-pub struct DropGuard {
+struct DropGuard {
     #[cfg(any(test, debug_assertions))]
     released: std::sync::atomic::AtomicBool,
 }
@@ -439,7 +555,13 @@ impl DropGuard {
     fn disarm(&self) {
         #[cfg(any(test, debug_assertions))]
         {
-            self.released.store(true, Ordering::Release);
+            if self
+                .released
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+            {
+                panic!("Guard was disarmed twice");
+            }
         }
     }
 }
@@ -473,6 +595,7 @@ impl Drop for DropGuard {
 mod test {
     use super::*;
 
+    #[derive(Default)]
     struct Data;
 
     impl Releasable for Data {
@@ -580,5 +703,24 @@ mod test {
         let value = OwnedRef::new(Data {});
         value.release(&());
         let _ = OwnedRef::clone(&value);
+    }
+
+    #[::fuchsia::test]
+    #[should_panic]
+    fn test_unrelease_release_guard() {
+        let _value = ReleaseGuard::<Data>::default();
+    }
+
+    #[::fuchsia::test]
+    #[should_panic]
+    fn test_double_release_release_guard() {
+        let value = ReleaseGuard::<Data>::default();
+        value.release(&());
+        value.release(&());
+    }
+
+    #[::fuchsia::test]
+    fn test_released_release_guard() {
+        let _value = ReleaseGuard::<Data>::default_released();
     }
 }
