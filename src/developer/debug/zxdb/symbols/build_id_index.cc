@@ -110,13 +110,7 @@ void BuildIDIndex::SetCacheDir(const std::string& cache_dir) {
   cache_dir_ = std::make_unique<CacheDir>(cache_dir);
 }
 
-void BuildIDIndex::AddSymbolIndexFile(const std::string& path) {
-  if (debug::StringEndsWith(path, ".json")) {
-    LoadSymbolIndexFileJSON(path);
-  } else {
-    LoadSymbolIndexFilePlain(path);
-  }
-}
+void BuildIDIndex::AddSymbolIndexFile(const std::string& path) { LoadSymbolIndexFile(path); }
 
 void BuildIDIndex::AddPlainFileOrDir(const std::string& path) {
   if (std::find(sources_.begin(), sources_.end(), path) != sources_.end())
@@ -223,52 +217,7 @@ void BuildIDIndex::LoadIdsTxt(const IdsTxt& ids_txt) {
     LOGS(Warn) << "No mappings found in build ID file: " << ids_txt.path;
 }
 
-void BuildIDIndex::LoadSymbolIndexFilePlain(const std::string& file_name) {
-  std::ifstream file(file_name);
-  if (file.fail()) {
-    LOGS(Warn) << "Cannot read symbol-index file: " << file_name;
-    return;
-  }
-
-  while (!file.eof()) {
-    std::string line;
-    std::string symbol_path;
-    std::string build_dir;
-
-    std::getline(file, line);
-    if (file.fail()) {
-      // If the file ends with \n, we will get failbit, eofbit and line == "".
-      if (file.eof())
-        break;
-      LOGS(Warn) << "Error reading " << file_name;
-      return;
-    }
-
-    if (auto tab_index = line.find('\t'); tab_index != std::string::npos) {
-      symbol_path = line.substr(0, tab_index);
-      build_dir = line.substr(tab_index + 1);
-    } else {
-      symbol_path = line;
-      build_dir.clear();
-    }
-
-    // Both paths must be absolute.
-    if (symbol_path.empty() || symbol_path[0] != '/' ||
-        (!build_dir.empty() && build_dir[0] != '/')) {
-      LOGS(Warn) << "Invalid line in " << file_name << ": " << line.c_str();
-      continue;
-    }
-
-    std::error_code ec;
-    if (std::filesystem::is_directory(symbol_path, ec)) {
-      AddBuildIdDir(symbol_path, build_dir);
-    } else if (std::filesystem::exists(symbol_path, ec)) {
-      AddIdsTxt(symbol_path, build_dir);
-    }
-  }
-}
-
-void BuildIDIndex::LoadSymbolIndexFileJSON(const std::string& file_name) {
+void BuildIDIndex::LoadSymbolIndexFile(const std::string& file_name) {
   std::vector<std::string> files_to_load{file_name};
   std::set<std::string> visited;
 

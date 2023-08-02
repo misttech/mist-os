@@ -151,10 +151,9 @@ class BuildIDIndex {
   // Adds all the mappings from the given ids.txt to the index.
   void LoadIdsTxt(const IdsTxt& ids_txt);
 
-  // Populates build_id_dirs_, ids_txts_ and symbol_servers_ with the content of symbol-index file.
+  // Populates build_id_dirs_, ids_txts_ and symbol_servers_ with the content of symbol-index.json
+  // file.
   void LoadSymbolIndexFile(const std::string& file_name);
-  void LoadSymbolIndexFilePlain(const std::string& file_name);
-  void LoadSymbolIndexFileJSON(const std::string& file_name);
 
   // Adds all the mappings from the given file or directory to the index.
   void IndexSourcePath(const std::string& path);

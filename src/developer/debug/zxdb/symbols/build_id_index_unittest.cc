@@ -67,15 +67,7 @@ TEST(BuildIDIndex, IndexBuildIdDir) {
             index.EntryForBuildID(TestSymbolModule::kCheckedInBuildId).debug_info);
 }
 
-TEST(BuildIDIndex, ReadFromSymbolIndexPlain) {
-  BuildIDIndex index;
-  index.AddSymbolIndexFile(GetTestDataDir() / "symbol-index");
-
-  EXPECT_EQ(1ul, index.build_id_dirs().size());
-  EXPECT_EQ(0ul, index.ids_txts().size());
-}
-
-TEST(BuildIDIndex, ReadFromSymbolIndexJSON) {
+TEST(BuildIDIndex, ReadFromSymbolIndex) {
   BuildIDIndex index;
   index.AddSymbolIndexFile(GetTestDataDir() / "symbol-index.json");
 
