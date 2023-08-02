@@ -4,7 +4,7 @@
 
 use crate::Task;
 
-use futures::{channel::mpsc, future::BoxFuture, StreamExt};
+use futures::{channel::mpsc, future::BoxFuture, Future, StreamExt};
 
 /// Errors that can be returned by this crate.
 #[derive(Debug, thiserror::Error)]
@@ -48,6 +48,18 @@ impl TaskGroup {
         // Therefore this method can't be called after the receiver is closed and should
         // never panic.
         self.sink.try_add(task).unwrap();
+    }
+
+    /// Spawns a new task in this TaskGroup.
+    ///
+    /// To add a future that is not [`Send`] to this TaskGroup, use [`TaskGroup::add`].
+    ///
+    /// # Panics
+    ///
+    /// `spawn` may panic if not called in the context of an executor (e.g.
+    /// within a call to `run` or `run_singlethreaded`).
+    pub fn spawn(&mut self, future: impl Future<Output = ()> + Send + 'static) {
+        self.add(Task::spawn(future));
     }
 
     /// Waits for all Tasks in this TaskGroup to finish.
@@ -100,8 +112,8 @@ mod tests {
         }
     }
 
-    // Waits for a group of `DoneSignalers` to signal completion.
-    // Create as many `DoneSignaler` objects as needed with `WaitGroup::add_one` and
+    // Waits for a group of `impl Drop` to signal completion.
+    // Create as many `impl Drop` objects as needed with `WaitGroup::add_one` and
     // call `wait` to wait for all of them to be dropped.
     struct WaitGroup {
         tx: mpsc::UnboundedSender<()>,
@@ -114,7 +126,7 @@ mod tests {
             Self { tx, rx }
         }
 
-        fn add_one(&self) -> DoneSignaler {
+        fn add_one(&self) -> impl Drop {
             DoneSignaler { done: self.tx.clone() }
         }
 
@@ -175,6 +187,29 @@ mod tests {
             drop(task_group);
             wait_group.wait().await;
             // If we get here, all tasks were cancelled.
+        });
+    }
+
+    #[test]
+    fn test_task_group_spawn() {
+        let task_count = 3;
+        SendExecutor::new(task_count).run(async move {
+            let mut task_group = TaskGroup::new();
+
+            // We can spawn tasks from any Future<()> implementation, including...
+
+            // ... naked futures.
+            task_group.spawn(std::future::ready(()));
+
+            // ... futures returned from async blocks.
+            task_group.spawn(async move {
+                std::future::ready(()).await;
+            });
+
+            // ... and other tasks.
+            task_group.spawn(Task::spawn(std::future::ready(())));
+
+            task_group.join().await;
         });
     }
 }
