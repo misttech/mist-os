@@ -883,8 +883,8 @@ pub(crate) mod testutil {
 
     use derivative::Derivative;
     use net_types::{
-        ip::{AddrSubnet, GenericOverIp, IpAddress, Subnet},
-        MulticastAddr, Witness,
+        ip::{GenericOverIp, IpAddr},
+        MulticastAddr,
     };
 
     use super::*;
@@ -895,16 +895,13 @@ pub(crate) mod testutil {
         },
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
-            device::state::{
-                AssignedAddress as _, DualStackIpDeviceState, IpDeviceState, Ipv4AddrConfig,
-                Ipv4AddressEntry, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6DadState,
-            },
+            device::state::{AssignedAddress as _, DualStackIpDeviceState, IpDeviceState},
             forwarding::{
                 testutil::{DualStackForwardingTable, FakeIpForwardingCtx},
                 ForwardingTable,
             },
             testutil::FakeIpDeviceIdCtx,
-            types::{Destination, Metric, RawMetric},
+            types::Destination,
             HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
             DEFAULT_HOP_LIMITS,
         },
@@ -1128,17 +1125,11 @@ pub(crate) mod testutil {
             let mut device_state = HashMap::default();
             for (device, state, addrs) in devices {
                 for ip in addrs {
-                    let subnet = Subnet::new(ip.get(), <I::Addr as IpAddress>::BYTES * 8).unwrap();
-                    let entry = crate::ip::types::Entry {
-                        subnet,
-                        device: device.clone(),
-                        gateway: None,
-                        metric: Metric::ExplicitMetric(RawMetric(0)),
-                    };
-                    assert_eq!(
-                        crate::ip::forwarding::testutil::add_entry(&mut table, entry.clone()),
-                        Ok(&entry)
-                    );
+                    crate::ip::forwarding::testutil::add_on_link_forwarding_entry(
+                        &mut table,
+                        ip,
+                        device.clone(),
+                    )
                 }
                 assert!(
                     device_state.insert(device.clone(), state).is_none(),
@@ -1275,6 +1266,30 @@ pub(crate) mod testutil {
     }
 
     impl<D: FakeStrongDeviceId> FakeDualStackIpSocketCtx<D> {
+        #[allow(unused)] // TODO(https://fxbug.dev/21198): remove when used
+        pub(crate) fn new<A: Into<SpecifiedAddr<IpAddr>>>(
+            devices: impl IntoIterator<Item = FakeDeviceConfig<D, A>>,
+        ) -> Self {
+            Self::with_devices_state(devices.into_iter().map(
+                |FakeDeviceConfig { device, local_ips, remote_ips }| {
+                    let mut device_state = DualStackIpDeviceState::default();
+                    for ip in local_ips {
+                        match IpAddr::from(ip.into()) {
+                            IpAddr::V4(ip) => crate::ip::device::state::testutil::add_addr_subnet(
+                                device_state.as_mut(),
+                                ip,
+                            ),
+                            IpAddr::V6(ip) => crate::ip::device::state::testutil::add_addr_subnet(
+                                device_state.as_mut(),
+                                ip,
+                            ),
+                        }
+                    }
+                    (device, device_state, remote_ips)
+                },
+            ))
+        }
+
         pub(crate) fn get_device_state(&self, device: &D) -> &DualStackIpDeviceState<FakeInstant> {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
@@ -1286,6 +1301,54 @@ pub(crate) mod testutil {
         ) -> impl Iterator<Item = D> + '_ {
             let Self { table: _, device_state, ip_forwarding_ctx: _ } = self;
             find_devices_with_addr::<I, _, _>(device_state, addr)
+        }
+
+        #[allow(unused)] // TODO(https://fxbug.dev/21198): remove when used
+        pub(crate) fn multicast_memberships<I: IpDeviceStateIpExt>(
+            &self,
+        ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
+            let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
+            multicast_memberships::<I, _, _>(device_state)
+        }
+
+        #[allow(unused)] // TODO(https://fxbug.dev/21198): remove when used
+        pub(crate) fn with_devices_state(
+            devices: impl IntoIterator<
+                Item = (
+                    D,
+                    DualStackIpDeviceState<FakeInstant>,
+                    Vec<impl Into<SpecifiedAddr<IpAddr>>>,
+                ),
+            >,
+        ) -> Self {
+            let mut table = DualStackForwardingTable::default();
+            let mut device_state = HashMap::default();
+            for (device, state, addrs) in devices {
+                for ip in addrs {
+                    match IpAddr::from(ip.into()) {
+                        IpAddr::V4(ip) => {
+                            crate::ip::forwarding::testutil::add_on_link_forwarding_entry(
+                                table.as_mut(),
+                                ip,
+                                device.clone(),
+                            );
+                        }
+                        IpAddr::V6(ip) => {
+                            crate::ip::forwarding::testutil::add_on_link_forwarding_entry(
+                                table.as_mut(),
+                                ip,
+                                device.clone(),
+                            );
+                        }
+                    }
+                }
+                assert!(
+                    device_state.insert(device.clone(), state).is_none(),
+                    "duplicate entries for {}",
+                    device
+                );
+            }
+            Self { table, device_state, ip_forwarding_ctx: FakeIpForwardingCtx::default() }
         }
     }
 
@@ -1435,46 +1498,23 @@ pub(crate) mod testutil {
     }
 
     #[derive(Clone, GenericOverIp)]
-    pub(crate) struct FakeDeviceConfig<D, A: IpAddress> {
+    pub(crate) struct FakeDeviceConfig<D, A> {
         pub(crate) device: D,
-        pub(crate) local_ips: Vec<SpecifiedAddr<A>>,
-        pub(crate) remote_ips: Vec<SpecifiedAddr<A>>,
+        pub(crate) local_ips: Vec<A>,
+        pub(crate) remote_ips: Vec<A>,
     }
 
     impl<I: IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         /// Creates a new `FakeIpSocketCtx<Ipv6>` with the given device
         /// configs.
-        pub(crate) fn new(devices: impl IntoIterator<Item = FakeDeviceConfig<D, I::Addr>>) -> Self {
+        pub(crate) fn new(
+            devices: impl IntoIterator<Item = FakeDeviceConfig<D, SpecifiedAddr<I::Addr>>>,
+        ) -> Self {
             FakeIpSocketCtx::with_devices_state(devices.into_iter().map(
                 |FakeDeviceConfig { device, local_ips, remote_ips }| {
                     let mut device_state = IpDeviceState::default();
                     for ip in local_ips {
-                        // Users of this utility don't care about subnet prefix length,
-                        // so just pick a reasonable one.
-                        I::map_ip(
-                            (&mut device_state, ip),
-                            |(device_state, ip)| {
-                                let _addr_id = device_state
-                                    .addrs
-                                    .write()
-                                    .add(Ipv4AddressEntry::new(
-                                        AddrSubnet::new(ip.get(), 32).unwrap(),
-                                        Ipv4AddrConfig::default(),
-                                    ))
-                                    .expect("add address");
-                            },
-                            |(device_state, ip)| {
-                                let _addr_id = device_state
-                                    .addrs
-                                    .write()
-                                    .add(Ipv6AddressEntry::new(
-                                        AddrSubnet::new(ip.get(), 128).unwrap(),
-                                        Ipv6DadState::Assigned,
-                                        Ipv6AddrConfig::default(),
-                                    ))
-                                    .expect("add address");
-                            },
-                        )
+                        crate::ip::device::state::testutil::add_addr_subnet(&mut device_state, ip);
                     }
                     (device, device_state, remote_ips)
                 },

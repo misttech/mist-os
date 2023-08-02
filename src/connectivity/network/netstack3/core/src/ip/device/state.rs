@@ -961,7 +961,7 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv
     }
 }
 #[cfg(test)]
-mod testutil {
+pub(crate) mod testutil {
     use super::*;
 
     impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<Self> for IpDeviceState<Instant, I> {
@@ -980,6 +980,48 @@ mod testutil {
                 |IpInvariant(dual_stack)| &dual_stack.ipv6.ip_state,
             )
         }
+    }
+
+    impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsMut<IpDeviceState<Instant, I>>
+        for DualStackIpDeviceState<Instant>
+    {
+        fn as_mut(&mut self) -> &mut IpDeviceState<Instant, I> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(dual_stack)| &mut dual_stack.ipv4.ip_state,
+                |IpInvariant(dual_stack)| &mut dual_stack.ipv6.ip_state,
+            )
+        }
+    }
+
+    /// Adds an address and route for the size-1 subnet containing the address.
+    pub(crate) fn add_addr_subnet<A: IpAddress, Instant: crate::Instant>(
+        device_state: &mut IpDeviceState<Instant, A::Version>,
+        ip: SpecifiedAddr<A>,
+    ) where
+        A::Version: IpDeviceStateIpExt,
+    {
+        #[derive(GenericOverIp)]
+        struct Wrap<I: Ip + IpDeviceStateIpExt, Instant: crate::Instant>(
+            I::AssignedAddress<Instant>,
+        );
+        let Wrap(entry) = <A::Version as Ip>::map_ip(
+            ip.get(),
+            |ip| {
+                Wrap(Ipv4AddressEntry::new(
+                    AddrSubnet::new(ip, 32).unwrap(),
+                    Ipv4AddrConfig::default(),
+                ))
+            },
+            |ip| {
+                Wrap(Ipv6AddressEntry::new(
+                    AddrSubnet::new(ip, 128).unwrap(),
+                    Ipv6DadState::Assigned,
+                    Ipv6AddrConfig::default(),
+                ))
+            },
+        );
+        let _addr_id = device_state.addrs.get_mut().add(entry).expect("add address");
     }
 }
 

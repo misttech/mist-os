@@ -366,7 +366,7 @@ pub(crate) mod testutil {
     use alloc::collections::HashSet;
 
     use derivative::Derivative;
-    use net_types::ip::{IpInvariant, Ipv4, Ipv6};
+    use net_types::ip::{IpAddress, IpInvariant, Ipv4, Ipv6};
 
     use super::*;
 
@@ -374,6 +374,18 @@ pub(crate) mod testutil {
         context::testutil::FakeSyncCtx,
         ip::{testutil::FakeIpDeviceIdCtx, StrongId},
     };
+
+    /// Adds an on-link forwarding entry for the specified address and device.
+    pub(crate) fn add_on_link_forwarding_entry<A: IpAddress, D: Clone + Debug + PartialEq>(
+        table: &mut ForwardingTable<A::Version, D>,
+        ip: SpecifiedAddr<A>,
+        device: D,
+    ) {
+        let subnet = Subnet::new(*ip, A::BYTES * 8).unwrap();
+        let entry =
+            Entry { subnet, device, gateway: None, metric: Metric::ExplicitMetric(RawMetric(0)) };
+        assert_eq!(crate::ip::forwarding::testutil::add_entry(table, entry.clone()), Ok(&entry));
+    }
 
     // Provide tests with access to the private `ForwardingTable.add_entry` fn.
     pub(crate) fn add_entry<I: Ip, D: Clone + Debug + PartialEq>(
@@ -440,6 +452,16 @@ pub(crate) mod testutil {
                 IpInvariant(self),
                 |IpInvariant(table)| &table.v4,
                 |IpInvariant(table)| &table.v6,
+            )
+        }
+    }
+
+    impl<D, I: Ip> AsMut<ForwardingTable<I, D>> for DualStackForwardingTable<D> {
+        fn as_mut(&mut self) -> &mut ForwardingTable<I, D> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(table)| &mut table.v4,
+                |IpInvariant(table)| &mut table.v6,
             )
         }
     }
