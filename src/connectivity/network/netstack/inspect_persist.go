@@ -58,7 +58,7 @@ func startPersistClient(ctx context.Context, componentCtx *component.Context, cl
 func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context, clock tcpip.Clock) {
 	_ = syslog.InfoTf(persistenceTagName, "starting persistence polling routine")
 	// Request immediately, then wait for the timer.
-	if err := makePersistenceRequest(persistClientEnd, ctx); err != nil {
+	if err := makePersistenceRequest(persistClientEnd, ctx, 0*time.Second); err != nil {
 		_ = syslog.WarnTf(persistenceTagName, "aborting persistence routine startup: %s", err)
 		return
 	}
@@ -69,7 +69,7 @@ func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface,
 		case <-ctx.Done():
 			_ = syslog.InfoTf(persistenceTagName, "stopping persistence polling routine")
 		default:
-			if err := makePersistenceRequest(persistClientEnd, ctx); err != nil {
+			if err := makePersistenceRequest(persistClientEnd, ctx, 5*time.Second); err != nil {
 				_ = syslog.WarnTf(persistenceTagName, "stopping persistence routine: %s", err)
 				return
 			}
@@ -78,7 +78,7 @@ func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface,
 	})
 }
 
-func makePersistenceRequest(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context) error {
+func makePersistenceRequest(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context, delay time.Duration) error {
 	_ = syslog.DebugTf(persistenceTagName, "requesting persistence for netstack")
 	for _, tag := range tags {
 		result, err := persistClientEnd.Persist(ctx, tag)
@@ -89,6 +89,8 @@ func makePersistenceRequest(persistClientEnd *persist.DataPersistenceWithCtxInte
 		if want := persist.PersistResultQueued; result != want {
 			_ = syslog.WarnTf(persistenceTagName, "unexpected persist result; expected %s got %s", want, result)
 		}
+		// TODO(fxbug.dev/130139): Remove once multi-tag persistence is working
+		time.Sleep(delay)
 	}
 
 	return nil
