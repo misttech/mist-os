@@ -1153,13 +1153,6 @@ pub(crate) mod testutil {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
         }
-
-        pub(crate) fn multicast_memberships(
-            &self,
-        ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
-            let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
-            multicast_memberships(device_state)
-        }
     }
 
     fn find_devices_with_addr<
@@ -1266,7 +1259,6 @@ pub(crate) mod testutil {
     }
 
     impl<D: FakeStrongDeviceId> FakeDualStackIpSocketCtx<D> {
-        #[allow(unused)] // TODO(https://fxbug.dev/21198): remove when used
         pub(crate) fn new<A: Into<SpecifiedAddr<IpAddr>>>(
             devices: impl IntoIterator<Item = FakeDeviceConfig<D, A>>,
         ) -> Self {
@@ -1303,7 +1295,6 @@ pub(crate) mod testutil {
             find_devices_with_addr::<I, _, _>(device_state, addr)
         }
 
-        #[allow(unused)] // TODO(https://fxbug.dev/21198): remove when used
         pub(crate) fn multicast_memberships<I: IpDeviceStateIpExt>(
             &self,
         ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
@@ -1311,7 +1302,6 @@ pub(crate) mod testutil {
             multicast_memberships::<I, _, _>(device_state)
         }
 
-        #[allow(unused)] // TODO(https://fxbug.dev/21198): remove when used
         pub(crate) fn with_devices_state(
             devices: impl IntoIterator<
                 Item = (

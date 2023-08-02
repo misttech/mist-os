@@ -2996,8 +2996,6 @@ pub(crate) mod testutil {
     pub(crate) struct WrongIpVersion;
 
     impl<D> DualStackSendIpPacketMeta<D> {
-        // TODO(https://fxbug.dev/21198): Use this to test dual-stack sockets.
-        #[allow(unused)]
         pub(crate) fn try_as<I: packet_formats::ip::IpExt>(
             &self,
         ) -> Result<&SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, WrongIpVersion> {
