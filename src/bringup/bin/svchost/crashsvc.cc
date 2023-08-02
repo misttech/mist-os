@@ -138,6 +138,27 @@ void HandOffException(async_dispatcher_t* dispatcher, zx::exception exception,
     return;
   }
 
+  // If the process serving fuchsia.logger.LogSink crashes, an exception handler down the line
+  // could get spawned and try to set up its syslog on startup, which is currently done via a
+  // blocking call, so it would hang and then the exception would be held forever.
+  //
+  // This needs to be kept in sync with the name of the process serving fuchsia.logger.LogSink.
+  //
+  // Given that as of August 1, 2023, archivist.cm is a critical process to the root job, the
+  // system will reboot upon the exception release and a crash report won't have time to be filed
+  // anyway so we might as well bail out here earlier without loss of reporting.
+  //
+  // DO NOT REMOVE: Removing this will lead to archivist crashes leaving the device stuck in a bad
+  // state instead of rebooting.
+  if (process_name == "archivist.cm") {
+    LogError("cannot handle exception for the server of fuchsia.logger.LogSink",
+             ZX_ERR_NOT_SUPPORTED);
+
+    // Release the exception to let the kernel terminate the process.
+    exception.reset();
+    return;
+  }
+
   // Send over the exception to the handler.
   // From this point on, crashsvc has no ownership over the exception and it's up to the handler to
   // decide when and how to resume it.
