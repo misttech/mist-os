@@ -20,6 +20,12 @@ pub struct PidFdFileObject {
     pub pid: pid_t,
 }
 
+impl PidFdFileObject {
+    pub fn downcast(file: &FileHandle) -> Result<&PidFdFileObject, Errno> {
+        file.downcast_file::<PidFdFileObject>().ok_or_else(|| errno!(EBADF))
+    }
+}
+
 pub fn new_pidfd(current_task: &CurrentTask, pid: pid_t, flags: OpenFlags) -> FileHandle {
     Anon::new_file(current_task, Box::new(PidFdFileObject { pid }), flags)
 }

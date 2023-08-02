@@ -27,7 +27,7 @@ use crate::{
     loader::*,
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
-    mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
+    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{types::*, SignalInfo},
     syscalls::{decls::Syscall, SyscallResult},
     task::*,
@@ -623,6 +623,80 @@ impl Task {
 
     pub fn set_fs(&self, fs: Arc<FsContext>) {
         self.fs.set(fs).map_err(|_| "Cannot set fs multiple times").unwrap();
+    }
+
+    // See "Ptrace access mode checking" in https://man7.org/linux/man-pages/man2/ptrace.2.html
+    pub fn check_ptrace_access_mode(
+        &self,
+        mode: PtraceAccessMode,
+        target: &Task,
+    ) -> Result<(), Errno> {
+        // (1)  If the calling thread and the target thread are in the same
+        //      thread group, access is always allowed.
+        if self.thread_group.leader == target.thread_group.leader {
+            return Ok(());
+        }
+
+        // (2)  If the access mode specifies PTRACE_MODE_FSCREDS, then, for
+        //      the check in the next step, employ the caller's filesystem
+        //      UID and GID.  (As noted in credentials(7), the filesystem
+        //      UID and GID almost always have the same values as the
+        //      corresponding effective IDs.)
+        //
+        //      Otherwise, the access mode specifies PTRACE_MODE_REALCREDS,
+        //      so use the caller's real UID and GID for the checks in the
+        //      next step.  (Most APIs that check the caller's UID and GID
+        //      use the effective IDs.  For historical reasons, the
+        //      PTRACE_MODE_REALCREDS check uses the real IDs instead.)
+        let creds = self.creds();
+        let (uid, gid) = if mode.contains(PTRACE_MODE_FSCREDS) {
+            let fscred = creds.as_fscred();
+            (fscred.uid, fscred.gid)
+        } else if mode.contains(PTRACE_MODE_REALCREDS) {
+            (creds.uid, creds.gid)
+        } else {
+            unreachable!();
+        };
+
+        // (3)  Deny access if neither of the following is true:
+        //
+        //      -  The real, effective, and saved-set user IDs of the target
+        //         match the caller's user ID, and the real, effective, and
+        //         saved-set group IDs of the target match the caller's
+        //         group ID.
+        //
+        //      -  The caller has the CAP_SYS_PTRACE capability in the user
+        //         namespace of the target.
+        let target_creds = target.creds();
+        if !creds.has_capability(CAP_SYS_PTRACE)
+            || !(target_creds.uid == uid
+                && target_creds.euid == uid
+                && target_creds.saved_uid == uid
+                && target_creds.gid == gid
+                && target_creds.egid == gid
+                && target_creds.saved_gid == gid)
+        {
+            return error!(EPERM);
+        }
+
+        // (4)  Deny access if the target process "dumpable" attribute has a
+        //      value other than 1 (SUID_DUMP_USER; see the discussion of
+        //      PR_SET_DUMPABLE in prctl(2)), and the caller does not have
+        //      the CAP_SYS_PTRACE capability in the user namespace of the
+        //      target process.
+        let dumpable = *target.mm.dumpable.lock();
+        if dumpable != DumpPolicy::User && !creds.has_capability(CAP_SYS_PTRACE) {
+            return error!(EPERM);
+        }
+
+        // TODO: Implement the LSM security_ptrace_access_check() interface.
+        //
+        // (5)  The kernel LSM security_ptrace_access_check() interface is
+        //      invoked to see if ptrace access is permitted.
+
+        // (6)  If access has not been denied by any of the preceding steps,
+        //      then access is allowed.
+        Ok(())
     }
 
     pub fn create_init_child_process(

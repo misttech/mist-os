@@ -180,9 +180,9 @@ pub fn dispatch_syscall(
         #[cfg(target_arch = "x86_64")] open[3],
         openat[4],
         personality[1],
-        // pidfd_getfd[3],  // TODO(fxbug.dev/119476) implement pidfd support.
+        pidfd_getfd[3],
         pidfd_open[2],
-        // pidfd_send_signal[4],
+        // pidfd_send_signal[4],  // TODO(fxbug.dev/119476) implement pidfd support.
         #[cfg(target_arch = "x86_64")] pause[0],
         pipe2[2],
         #[cfg(target_arch = "x86_64")] pipe[1],

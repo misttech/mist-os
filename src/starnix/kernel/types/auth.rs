@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(dead_code)]
+
+use bitflags::bitflags;
 use std::ops;
 
 use crate::types::*;
@@ -214,6 +217,34 @@ pub const CAP_PERFMON: Capabilities = Capabilities { mask: 1u64 << uapi::CAP_PER
 pub const CAP_BPF: Capabilities = Capabilities { mask: 1u64 << uapi::CAP_BPF };
 pub const CAP_CHECKPOINT_RESTORE: Capabilities =
     Capabilities { mask: 1u64 << uapi::CAP_CHECKPOINT_RESTORE };
+
+bitflags! {
+    pub struct PtraceAccessMode: u32 {
+        const READ      = 1 << 0;
+        const ATTACH    = 1 << 1;
+        const FSCREDS   = 1 << 2;
+        const REALCREDS = 1 << 3;
+        const NOAUDIT   = 1 << 4;
+    }
+}
+
+pub const PTRACE_MODE_READ: PtraceAccessMode = PtraceAccessMode::READ;
+pub const PTRACE_MODE_ATTACH: PtraceAccessMode = PtraceAccessMode::ATTACH;
+pub const PTRACE_MODE_FSCREDS: PtraceAccessMode = PtraceAccessMode::FSCREDS;
+pub const PTRACE_MODE_REALCREDS: PtraceAccessMode = PtraceAccessMode::REALCREDS;
+pub const PTRACE_MODE_READ_FSCREDS: PtraceAccessMode = PtraceAccessMode::from_bits_truncate(
+    PtraceAccessMode::READ.bits() | PtraceAccessMode::FSCREDS.bits(),
+);
+pub const PTRACE_MODE_READ_REALCREDS: PtraceAccessMode = PtraceAccessMode::from_bits_truncate(
+    PtraceAccessMode::READ.bits() | PtraceAccessMode::REALCREDS.bits(),
+);
+pub const PTRACE_MODE_ATTACH_FSCREDS: PtraceAccessMode = PtraceAccessMode::from_bits_truncate(
+    PtraceAccessMode::ATTACH.bits() | PtraceAccessMode::FSCREDS.bits(),
+);
+pub const PTRACE_MODE_ATTACH_REALCREDS: PtraceAccessMode = PtraceAccessMode::from_bits_truncate(
+    PtraceAccessMode::ATTACH.bits() | PtraceAccessMode::REALCREDS.bits(),
+);
+pub const PTRACE_MODE_NOAUDIT: PtraceAccessMode = PtraceAccessMode::NOAUDIT;
 
 #[cfg(test)]
 mod tests {

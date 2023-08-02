@@ -1482,8 +1482,28 @@ pub fn sys_pidfd_open(
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
     let file = new_pidfd(current_task, pid, open_flags);
-    let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
-    Ok(fd)
+    current_task.add_file(file, FdFlags::CLOEXEC)
+}
+
+pub fn sys_pidfd_getfd(
+    current_task: &CurrentTask,
+    pidfd: FdNumber,
+    targetfd: FdNumber,
+    flags: u32,
+) -> Result<FdNumber, Errno> {
+    if flags != 0 {
+        return error!(EINVAL);
+    }
+
+    let file = current_task.files.get(pidfd)?;
+    let pidfd_file = PidFdFileObject::downcast(&file)?;
+    let task = current_task.get_task(pidfd_file.pid);
+    let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
+
+    current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &task)?;
+
+    let target_file = task.files.get(targetfd)?;
+    current_task.add_file(target_file, FdFlags::CLOEXEC)
 }
 
 pub fn sys_timerfd_create(

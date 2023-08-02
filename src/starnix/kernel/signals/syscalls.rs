@@ -603,7 +603,7 @@ pub fn sys_waitid(
             if file.flags().contains(OpenFlags::NONBLOCK) {
                 waiting_options.block = false;
             }
-            let pidfd = file.downcast_file::<PidFdFileObject>().ok_or_else(|| errno!(EINVAL))?;
+            let pidfd = PidFdFileObject::downcast(&file)?;
             ProcessSelector::Pid(pidfd.pid)
         }
         _ => return error!(EINVAL),

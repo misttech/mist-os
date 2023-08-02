@@ -17,8 +17,6 @@
             matchers: [
                 // TODO(https://fxbug.dev/119476): Implement pidfd
                 "pidfd_DeathTest.pidfd_send_signal",
-                "fdtrack.pidfd_getfd",
-                "pidfd.pidfd_getfd",
 
                 // These tests expect /proc/version to exist
                 "dirent.scandir_filter",
