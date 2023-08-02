@@ -61,8 +61,6 @@ impl BlobFetchParams {
         self.blob_type
     }
 
-    // TODO(fxbug.dev/118495): use this when implementing fallback
-    #[allow(dead_code)]
     pub fn delivery_blob_fallback(&self) -> bool {
         self.delivery_blob_fallback
     }
@@ -581,7 +579,7 @@ async fn fetch_blob(
     inspect: inspect::NeedsRemoteType,
     http_client: &fuchsia_hyper::HttpsClient,
     stats: Arc<Mutex<Stats>>,
-    cobalt_sender: ProtocolSender<MetricEvent>,
+    mut cobalt_sender: ProtocolSender<MetricEvent>,
     merkle: BlobId,
     context: FetchBlobContext,
     local_mirror_proxy: Option<&LocalMirrorProxy>,
@@ -658,10 +656,19 @@ async fn fetch_blob(
                         ..blob_fetch_params
                     },
                     &stats,
-                    cobalt_sender,
+                    cobalt_sender.clone(),
                     trace_id,
                 )
                 .await;
+
+                cobalt_sender.send(
+                    MetricEvent::builder(metrics::DELIVERY_BLOB_FALLBACK_METRIC_ID)
+                        .with_event_codes(match &res {
+                            Ok(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Success,
+                            Err(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Failure,
+                        })
+                        .as_occurrence(1),
+                );
             }
             guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
             res

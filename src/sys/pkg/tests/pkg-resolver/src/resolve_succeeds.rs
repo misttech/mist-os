@@ -7,7 +7,7 @@
 /// different types of packages when blobfs is in various intermediate states.
 use {
     assert_matches::assert_matches,
-    fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     fuchsia_inspect::assert_data_tree,
     fuchsia_pkg_testing::{
         serve::{responder, Domain},
@@ -1025,6 +1025,13 @@ async fn fetch_delivery_blob_fallback() {
         env.resolve_package("fuchsia-pkg://test/delivery_blob_fallback").await.unwrap();
 
     pkg.verify_contents(&resolved_pkg).await.unwrap();
+
+    env.assert_count_events(
+        metrics::DELIVERY_BLOB_FALLBACK_METRIC_ID,
+        // 3 blobs: meta.far, bin/delivery_blob_fallback, data/delivery_blob_fallback-0
+        vec![metrics::DeliveryBlobFallbackMetricDimensionResult::Success; 3],
+    )
+    .await;
 
     env.stop().await;
 }
