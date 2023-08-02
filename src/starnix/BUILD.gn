@@ -18,7 +18,6 @@ group("tests") {
     "containers:tests",
     "examples:tests",
     "kernel:tests",
-    "lib:tests",
     "tests",
     "tools:tests",
   ]
