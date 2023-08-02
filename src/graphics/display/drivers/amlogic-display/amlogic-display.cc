@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
 
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -64,7 +65,6 @@ constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 2> kSupportedBan
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 
-constexpr uint32_t kCanvasLittleEndian64Bit = 7;
 constexpr uint32_t kBufferAlignment = 64;
 
 bool IsFormatSupported(fuchsia_images2::wire::PixelFormat format) {
@@ -778,8 +778,39 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   canvas_info.height = collection_info.settings.image_format_constraints.min_coded_height;
   canvas_info.stride_bytes = collection_info.settings.image_format_constraints.min_bytes_per_row;
   canvas_info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
-  canvas_info.endianness =
-      fuchsia_hardware_amlogiccanvas::CanvasEndianness(kCanvasLittleEndian64Bit);
+
+  // Canvas images are by default little-endian for each 128-bit (16-byte)
+  // chunk. By default, for 8-bit YUV444 images, the pixels are interpreted as
+  //   Y0  U0  V0  Y1  U1  V1  Y2  U2    V2  Y3  U3  V3  Y4  U4  V4  Y5...
+  //
+  // However, capture memory interface uses big-endian for each 128-bit
+  // (16-byte) chunk (defined in Vpu::CaptureInit), and the high- and low-64
+  // bits (8 bytes) are already swapped. This is effectively big-endian for
+  // each 64-bit chunk. So, the 8-bit YUV444 pixels are stored by the capture
+  // memory interface as
+  //   U2  Y2  V1  U1  Y1  V0  U0  Y0    Y5  V4  U4  Y4  V3  U3  Y3  V2...
+  //
+  // In order to read / write the captured canvas image correctly, the canvas
+  // endianness must match that of capture memory interface.
+  //
+  // To convert 128-bit little-endian to 64-bit big-endian, we need to swap
+  // every 8-bit pairs, 16-bit pairs and 32-bit pairs within every 64-bit chunk:
+  //
+  //   The original bytes written by the capture memory interface:
+  //     U2  Y2  V1  U1  Y1  V0  U0  Y0    Y5  V4  U4  Y4  V3  U3  Y3  V2...
+  //   Swapping every 8-bit pairs we get:
+  //     Y2  U2  U1  V1  V0  Y1  Y0  U0    V4  Y5  Y4  U4  U3  V3  V2  Y3...
+  //   Then we swap every 16-bit pairs:
+  //     U1  V1  Y2  U2  Y0  U0  V0  Y1    Y4  U4  V4  Y5  V2  Y3  U3  V3...
+  //   Then we swap every 32-bit pairs:
+  //     Y0  U0  V0  Y1  U1  V1  Y2  U2    V2  Y3  U3  V3  Y4  U4  V4  Y5...
+  //   Then we got the correct pixel interpretation.
+  constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness kCanvasBigEndian64Bit =
+      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap8Bits |
+      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap16Bits |
+      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap32Bits;
+
+  canvas_info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness(kCanvasBigEndian64Bit);
   canvas_info.flags = fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
                       fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite;
 
