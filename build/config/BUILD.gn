@@ -903,7 +903,6 @@ config("Wno-conversion") {
     "//zircon/third_party/ulib/musl/third_party/complex",
     "//zircon/third_party/ulib/musl/third_party/math",
     "//zircon/third_party/ulib/musl/third_party/tre",
-    "//zircon/third_party/ulib/ngunwind:*",
     "//zircon/tools/lz4:*",
   ]
 }

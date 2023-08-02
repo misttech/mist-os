@@ -464,7 +464,6 @@ sdk_molecule("platform_libs") {
     "//src/lib/process:process_sdk",
     "//third_party/re2:re2_sdk",
     "//zircon/public/sysroot/sdk:sysroot_sdk",
-    "//zircon/third_party/ulib/ngunwind:ngunwind_sdk",
   ]
 }
 

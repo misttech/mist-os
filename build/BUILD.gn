@@ -338,7 +338,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/third_party/ulib/cksum:*",
     "//zircon/third_party/ulib/linenoise:*",
     "//zircon/third_party/ulib/lz4:*",
-    "//zircon/third_party/ulib/ngunwind:*",
     "//zircon/tools/lz4:*",
     "//zircon/tools/zbi:*",
   ]
