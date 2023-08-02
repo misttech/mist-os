@@ -38,8 +38,6 @@
                 "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
                 "fuchsia.process.Launcher",
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
             ],
             from: "parent",
             to: "#realm_builder",
