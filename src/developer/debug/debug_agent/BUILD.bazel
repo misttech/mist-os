@@ -123,13 +123,11 @@ cc_library(
         "@internal_sdk//pkg/syslog_cpp",
         "@internal_sdk//src/developer/debug/ipc_ipc",
         "@internal_sdk//src/developer/debug/shared_shared",
-        "@internal_sdk//src/developer/debug/third_party/libunwindstack_libunwindstack",
         "@internal_sdk//src/lib/containers/cpp_cpp",
         "@internal_sdk//src/lib/diagnostics/accessor2logger_accessor2logger",
         "@internal_sdk//src/lib/elflib_elflib",
         "@internal_sdk//src/lib/process_process",
         "@internal_sdk//src/lib/unwinder_unwinder",
-        "@internal_sdk//zircon/third_party/ulib/ngunwind_ngunwind",
         "@prebuilt_llvm//:llvm_includes",
     ],
 )

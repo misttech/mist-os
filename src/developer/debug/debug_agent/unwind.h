@@ -5,8 +5,6 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_UNWIND_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_UNWIND_H_
 
-#include <stdint.h>
-
 #include <vector>
 
 #include "src/developer/debug/ipc/records.h"
@@ -17,16 +15,6 @@ class GeneralRegisters;
 class ModuleList;
 class ProcessHandle;
 class ThreadHandle;
-
-// We're testing different unwinders, this specifies which one you want to use.
-// The unwinder type is a process-wide state.
-enum class UnwinderType {
-  kNgUnwind,
-  kAndroid,
-  kFuchsia,
-};
-
-void SetUnwinderType(UnwinderType unwinder_type);
 
 zx_status_t UnwindStack(const ProcessHandle& process, const ModuleList& modules,
                         const ThreadHandle& thread, const GeneralRegisters& regs, size_t max_depth,

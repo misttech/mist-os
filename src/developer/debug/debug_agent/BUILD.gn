@@ -105,11 +105,9 @@ static_library("lib") {
 
   deps = [
     "//sdk/lib/component/incoming/cpp",
-    "//src/developer/debug/third_party/libunwindstack",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/elflib",
     "//src/lib/unwinder",
-    "//zircon/third_party/ulib/ngunwind",
   ]
 
   public_deps = [

@@ -158,19 +158,6 @@ void DoUnwindTest() {
 
 }  // namespace
 
-TEST(Unwind, Android) {
-  SetUnwinderType(UnwinderType::kAndroid);
-  DoUnwindTest();
-}
-
-TEST(Unwind, NG) {
-  SetUnwinderType(UnwinderType::kNgUnwind);
-  DoUnwindTest();
-}
-
-TEST(Unwind, Fuchsia) {
-  SetUnwinderType(UnwinderType::kFuchsia);
-  DoUnwindTest();
-}
+TEST(Unwind, Unwind) { DoUnwindTest(); }
 
 }  // namespace debug_agent
