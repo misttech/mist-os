@@ -541,7 +541,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// override this function.
     ///
     /// Return a reader lock on the updated information.
-    fn update_info<'a>(
+    fn refresh_info<'a>(
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -1250,7 +1250,7 @@ impl FsNode {
     }
 
     pub fn stat(&self, current_task: &CurrentTask) -> Result<uapi::stat, Errno> {
-        let info = self.ops().update_info(self, current_task, &self.info)?;
+        let info = self.refresh_info(current_task)?;
 
         let time_to_kernel_timespec_pair = |t| {
             let timespec { tv_sec, tv_nsec } = timespec_from_time(t);
@@ -1306,9 +1306,9 @@ impl FsNode {
     ) -> Result<statx, Errno> {
         // Ignore mask for now and fill in all of the fields.
         let info = if flags.contains(StatxFlags::AT_STATX_DONT_SYNC) {
-            self.info.read()
+            self.info()
         } else {
-            self.ops().update_info(self, current_task, &self.info)?
+            self.refresh_info(current_task)?
         };
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
@@ -1415,9 +1415,19 @@ impl FsNode {
         }))
     }
 
+    /// Returns current `FsNodeInfo`.
     pub fn info(&self) -> RwLockReadGuard<'_, FsNodeInfo> {
         self.info.read()
     }
+
+    /// Refreshes the `FsNodeInfo` if necessary and returns a read lock.
+    pub fn refresh_info(
+        &self,
+        current_task: &CurrentTask,
+    ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno> {
+        self.ops().refresh_info(self, current_task, &self.info)
+    }
+
     pub fn update_info<F, T>(&self, mutator: F) -> T
     where
         F: FnOnce(&mut FsNodeInfo) -> T,

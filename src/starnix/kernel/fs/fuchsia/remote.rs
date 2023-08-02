@@ -468,7 +468,7 @@ impl FsNodeOps for RemoteNode {
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 
-    fn update_info<'a>(
+    fn refresh_info<'a>(
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,

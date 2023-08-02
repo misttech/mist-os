@@ -198,7 +198,7 @@ impl FuseNode {
         node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
     }
 
-    fn update_node_info(info: &mut FsNodeInfo, attributes: uapi::fuse_attr) -> Result<(), Errno> {
+    fn refresh_node_info(info: &mut FsNodeInfo, attributes: uapi::fuse_attr) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
         info.size = attributes.size.try_into().map_err(|_| errno!(EINVAL))?;
@@ -245,7 +245,7 @@ impl FuseNode {
                 state: Default::default(),
             });
             let mut info = FsNodeInfo::default();
-            FuseNode::update_node_info(&mut info, entry.attr)?;
+            FuseNode::refresh_node_info(&mut info, entry.attr)?;
             Ok(FsNode::new_uncached(Box::new(fuse_node), &node.fs(), id, info))
         })?;
         // . and .. do not get their lookup count increased.
@@ -731,7 +731,7 @@ impl FsNodeOps for Arc<FuseNode> {
             } else {
                 return error!(EINVAL);
             };
-            FuseNode::update_node_info(info, attr.attr)?;
+            FuseNode::refresh_node_info(info, attr.attr)?;
             Ok(())
         })
     }
@@ -747,7 +747,7 @@ impl FsNodeOps for Arc<FuseNode> {
         error!(ENOTSUP)
     }
 
-    fn update_info<'a>(
+    fn refresh_info<'a>(
         &self,
         _node: &FsNode,
         current_task: &CurrentTask,
@@ -761,7 +761,7 @@ impl FsNodeOps for Arc<FuseNode> {
             return error!(EINVAL);
         };
         let mut info = info.write();
-        FuseNode::update_node_info(&mut info, attr.attr)?;
+        FuseNode::refresh_node_info(&mut info, attr.attr)?;
         Ok(RwLockWriteGuard::downgrade(info))
     }
 

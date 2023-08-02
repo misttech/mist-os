@@ -125,7 +125,7 @@ impl FsNodeOps for File {
         Ok(Box::new(RemoteFileObject::new(zxio)))
     }
 
-    fn update_info<'a>(
+    fn refresh_info<'a>(
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,
