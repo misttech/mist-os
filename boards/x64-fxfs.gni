@@ -5,9 +5,3 @@
 # TODO(b/291975381): Move Fxfs images config to //products/core_with_fxblob.gni and delete this.
 
 import("x64.gni")
-
-fxfs_blob = true
-delivery_blob_type = 1  # Fxblob only supports delivery blobs.
-
-fvm_partition = ""
-fxfs_partition = "fvm"

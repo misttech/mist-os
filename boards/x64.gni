@@ -64,6 +64,7 @@ vbmeta_a_partition = "vbmeta_a"
 vbmeta_b_partition = "vbmeta_b"
 vbmeta_r_partition = "vbmeta_r"
 fvm_partition = "fvm"
+fxfs_partition = "fvm"
 active_partition = "a"
 fastboot_product = "gigaboot"
 
