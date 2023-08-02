@@ -81,7 +81,6 @@ _METRICS_TRACK_COMMAND_OPS=(
     "shell iperf3"
     "shell iquery"
     "shell join"
-    "shell josh"
     "shell limbo_client"
     "shell link"
     "shell locate"

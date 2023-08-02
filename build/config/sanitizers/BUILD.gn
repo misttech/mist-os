@@ -100,7 +100,6 @@ sanitizer_default_options("lsan_default_options") {
 sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
   visibility = [
     "//src/cobalt/bin/system-metrics/*",
-    "//src/developer/shell/josh/*",
     "//src/devices/usb/drivers/xhci/*",
     "//src/fonts/*",
     "//src/graphics/drivers/msd-vsi-vip/tests/integration/*",

@@ -99,8 +99,6 @@ natural and wire APIs; the wire APIs were called LLCPP).
     precludes const global/static variables whose initializer contains non-NULL
     pointer values, which rules out many libraries including FIDL bindings. This
     will be addressed by [fxbug.dev/121753](https://fxbug.dev/121753).
-  * [josh]: uses [fidl-codec] for encoding/decoding, but sets its own
-    transactional message header.
   * [ldmsg]: used by the C library to load libraries during process startup. It
     cannot use full-fledged FIDL bindings due to
     [sanitizer ABI requirements][sanitizer-abi]. This will be addressed by
@@ -142,7 +140,6 @@ Add coverage to:
 [fidlmerge]: /tools/fidl/fidlmerge
 [gidl]: /tools/fidl/gidl
 [go-example]: /examples/fidl/go/fidl_packages/fidl_test.go
-[josh]: /src/developer/shell/josh/lib/fidl.cc
 [ldmsg]: /zircon/system/ulib/ldmsg/ldmsg.c
 [lexicon]: /docs/reference/fidl/language/lexicon.md
 [llcpp-allocators]: /docs/development/languages/fidl/tutorials/cpp/topics/wire-memory-ownership.md

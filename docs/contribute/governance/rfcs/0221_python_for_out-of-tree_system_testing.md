@@ -556,7 +556,7 @@ N/A
 [PEP 484]: https://peps.python.org/pep-0484/
 [Tast]: https://chromium.googlesource.com/chromiumos/platform/tast/+/HEAD/docs/writing_tests.md
 [fidlgen]: https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlgen_go/codegen/codegen.go;drc=de60385f02bc4b7fc9c1d0735094a7b13567639b
-[Josh]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/shell/josh/
+[Josh]: https://fuchsia.googlesource.com/fuchsia/+/135631995bb6b67ba7af3c55bc4c6d99de6eb409/src/developer/shell/josh/
 [OTA tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/tests/system-tests/upgrade_test/upgrade_test.go;drc=f8debaf13f2a5b31b516e9c857daf7f7c8af7fed
 [In-tree e2e]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/end_to_end/README.md;drc=c0a4ffba21d17e3c68cd3fe83e11bf8eff6b0f92
 [Bazel Go]: https://github.com/bazelbuild/rules_go
