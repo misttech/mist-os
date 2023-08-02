@@ -124,7 +124,13 @@ bool VulkanExtensionTest::InitVulkan() {
                                                       VK_FUCHSIA_BUFFER_COLLECTION_EXTENSION_NAME};
   vk::DeviceCreateInfo device_info;
   device_info.pNext = device_supports_protected_memory_ ? &protected_memory : nullptr;
-  device_info.pQueueCreateInfos = &ctx_->queue_info();
+
+  auto queue_info = ctx_->queue_info();
+  if (device_supports_protected_memory_) {
+    // The Mali ICD requires that a protected queue be created before creating protected memory.
+    queue_info.flags |= vk::DeviceQueueCreateFlagBits::eProtected;
+  }
+  device_info.pQueueCreateInfos = &queue_info;
   device_info.queueCreateInfoCount = 1;
   device_info.enabledExtensionCount = static_cast<uint32_t>(enabled_device_extensions.size());
   device_info.ppEnabledExtensionNames = enabled_device_extensions.data();
