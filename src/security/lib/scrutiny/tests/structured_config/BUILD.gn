@@ -112,6 +112,19 @@ if (is_fuchsia) {
     platform = {
       build_type = "user"
       feature_set_level = "utility"
+      storage = {
+        filesystems = {
+          image_name = "assembly"
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
     }
   }
 

@@ -23,6 +23,7 @@ template("assemble_network_conformance_system") {
     images_config_fvm = "${target_name}.images_config_fvm"
     images_config_fxfs = "${target_name}.images_config_fxfs"
     product_config = "${target_name}.product_assembly_config"
+    product_config_fxfs = "${target_name}.product_assembly_config_fxfs"
     board_config = "${target_name}.board_config"
   }
   files = {
@@ -69,6 +70,32 @@ template("assemble_network_conformance_system") {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
+      storage = {
+        filesystems = {
+          image_name = _image_name
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  product_assembly_configuration(labels.product_config_fxfs) {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "utility"
+      storage = {
+        filesystems = {
+          image_name = _image_name
+          volume = "fxfs"
+        }
+      }
     }
   }
 
@@ -77,14 +104,15 @@ template("assemble_network_conformance_system") {
 
     if (!fxfs_blob) {
       assembly_images_config_label = ":${labels.images_config_fvm}"
+      product_assembly_config_label = ":${labels.product_config}"
       generate_fvm = true
     } else {
       assembly_images_config_label = ":${labels.images_config_fxfs}"
+      product_assembly_config_label = ":${labels.product_config_fxfs}"
       generate_fxfs = true
     }
     ramdisk_in_zbi = true
 
-    product_assembly_config_label = ":${labels.product_config}"
     board_config = files.board_config
     deps = [ ":${labels.board_config}" ]
     allow_eng_platform_bundle_use = true

@@ -8,6 +8,7 @@ use std::collections::{btree_map::Entry, BTreeSet};
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, FileEntry, ICUConfig};
+use assembly_images_config::ProductFilesystemConfig;
 use assembly_util::NamedMap;
 
 /// The platform's base service level.
@@ -98,6 +99,7 @@ pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
     pub board_info: &'a BoardInformation,
+    pub filesystems: &'a ProductFilesystemConfig,
 }
 
 /// A struct for collecting multiple kinds of platform configuration.
@@ -616,6 +618,7 @@ impl ConfigurationContext<'_> {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
+            filesystems: &tests::FILESYSTEMS_FOR_TESTS,
         }
     }
 }
@@ -633,6 +636,8 @@ mod tests {
             filesystems: BoardFilesystemConfig::default(),
             main_support_bundle: None,
         };
+        pub(crate) static ref FILESYSTEMS_FOR_TESTS: ProductFilesystemConfig =
+            ProductFilesystemConfig::default();
     }
 
     #[test]

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_images_config::ProductFilesystemConfig;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for storage support.
@@ -16,4 +17,7 @@ pub struct StorageConfig {
 
     #[serde(default)]
     pub gpt_all: bool,
+
+    #[serde(default)]
+    pub filesystems: Option<ProductFilesystemConfig>,
 }

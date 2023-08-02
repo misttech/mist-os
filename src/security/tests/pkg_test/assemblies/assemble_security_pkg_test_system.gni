@@ -6,6 +6,7 @@ import("//build/assembly/assembled_system.gni")
 import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/package_list.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/update_package.gni")
 import("//build/compiled_action.gni")
 import("//build/components/fuchsia_package.gni")
@@ -122,6 +123,8 @@ template("assemble_security_pkg_test_system") {
     base_packages = "${assembly_name}.base_packages"
     images_config = "${assembly_name}_images_config"
     images_config_fxfs = "${assembly_name}_images_config_fxfs"
+    product_config = "${assembly_name}_product_config"
+    product_config_fxfs = "${assembly_name}_product_config_fxfs"
     board_config = "${assembly_name}_board_config"
     build_info = "${assembly_name}_build_info"
     repository_config = "${assembly_name}_repository_config"
@@ -270,6 +273,55 @@ template("assemble_security_pkg_test_system") {
     }
   }
 
+  product_assembly_configuration(labels.product_config) {
+    platform = {
+      build_type = "eng"
+
+      # We use a bootstrap assembly, because this is a test
+      # Even though we are building a fvm/fxfs, a bootstrap assembly cannot load
+      # blobs. The blobs are necessary for the test to exercise blob resolution.
+      # The test never tries to boot using this assembly, and uses the resolution
+      # code from the "main" assembly.
+      feature_set_level = "bootstrap"
+      storage = {
+        filesystems = {
+          image_name = labels.assembly
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
+    }
+    product = {
+    }
+  }
+
+  product_assembly_configuration(labels.product_config_fxfs) {
+    platform = {
+      build_type = "eng"
+
+      # We use a bootstrap assembly, because this is a test
+      # Even though we are building a fvm/fxfs, a bootstrap assembly cannot load
+      # blobs. The blobs are necessary for the test to exercise blob resolution.
+      # The test never tries to boot using this assembly, and uses the resolution
+      # code from the "main" assembly.
+      feature_set_level = "bootstrap"
+      storage = {
+        filesystems = {
+          image_name = labels.assembly
+          volume = "fxfs"
+        }
+      }
+    }
+    product = {
+    }
+  }
+
   packages_for_assembly = [
                             ":${labels.build_info}",
                             ":${labels.root_ssl_certificates}",
@@ -313,16 +365,12 @@ template("assemble_security_pkg_test_system") {
     use_fxfs_blob = use_fxfs_blob
     if (!use_fxfs_blob) {
       assembly_images_config_label = ":${labels.images_config}"
+      product_assembly_config_label = ":${labels.product_config}"
     } else {
       assembly_images_config_label = ":${labels.images_config_fxfs}"
+      product_assembly_config_label = ":${labels.product_config_fxfs}"
     }
 
-    # We use a bootstrap assembly, because this is a test
-    # Even though we are building a fvm/fxfs, a bootstrap assembly cannot load
-    # blobs. The blobs are necessary for the test to exercise blob resolution.
-    # The test never tries to boot using this assembly, and uses the resolution
-    # code from the "main" assembly.
-    product_assembly_config_label = "//build/assembly:default_product_config"
     board_config = files.board_config
     deps = [ ":${labels.board_config}" ]
     use_bringup_platform_bundles_only = true

@@ -23,6 +23,12 @@ product_assembly_configuration("product_assembly_config") {
   platform = {
     feature_set_level = "bootstrap"
     build_type = "eng"
+    storage = {
+      filesystems = {
+        image_name = "bringup"
+        volume = "none"
+      }
+    }
   }
 
   # The bringup product can't specify anything in base/cache packages, as it

@@ -77,17 +77,19 @@ template("_cuckoo_kernel_zbi_test") {
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
-    product_assembly_config_label =
-        "//build/testing:cuckoo-product-configuration"
     board_config = board_information_for_assembly
     allow_eng_platform_bundle_use = true
 
     if (!fxfs_blob) {
+      product_assembly_config_label =
+          "//build/testing:cuckoo-product-configuration"
       assembly_images_config_label = "//boards/images:default"
       generate_fvm = !bootfs_only
       generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
       generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     } else {
+      product_assembly_config_label =
+          "//build/testing:cuckoo-product-configuration-fxfs"
       assembly_images_config_label = "//boards/images:default-fxfs"
       generate_fxfs = !bootfs_only
     }
