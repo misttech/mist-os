@@ -266,7 +266,12 @@ func InstallThreadProfiles(ctx context.Context, componentCtx *component.Context)
 			}
 
 			if status := zx.Status(status); status != zx.ErrOk {
-				_ = syslog.Errorf("failed to set thread profile %s for koid=%s; rejected with %s", threadProfile, koid, status)
+				switch status {
+				case zx.ErrNotFound:
+					_ = syslog.WarnTf("did not find thread profile %s for koid=%s", threadProfile, koid)
+				default:
+					_ = syslog.Errorf("failed to set thread profile %s for koid=%s; rejected with %s", threadProfile, koid, status)
+				}
 				continue
 			}
 
