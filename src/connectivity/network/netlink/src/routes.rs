@@ -9,6 +9,7 @@ use std::{
     collections::HashSet,
     fmt::Debug,
     hash::{Hash, Hasher},
+    num::{NonZeroU32, NonZeroU64},
 };
 
 use fidl::endpoints::ProtocolMarker;
@@ -29,7 +30,7 @@ use futures::{
 };
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
-    SpecifiedAddress as _,
+    SpecifiedAddr, SpecifiedAddress as _, Witness as _,
 };
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
@@ -75,6 +76,33 @@ pub(crate) struct UnicastRouteArgs<I: Ip> {
 pub(crate) enum NewRouteArgs<I: Ip> {
     /// Direct or gateway routes.
     Unicast(UnicastRouteArgs<I>),
+}
+
+/// Arguments for an RTM_DELROUTE unicast route.
+/// Only the subnet field is required. All other fields are optional.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct UnicastDelRouteArgs<I: Ip> {
+    // The network and prefix of the route.
+    pub(crate) subnet: Subnet<I::Addr>,
+    // The outbound interface to use when forwarding packets.
+    pub(crate) outbound_interface: Option<NonZeroU64>,
+    // The next-hop IP address of the route.
+    pub(crate) next_hop: Option<SpecifiedAddr<I::Addr>>,
+    // The metric used to weigh the importance of the route.
+    pub(crate) priority: Option<NonZeroU32>,
+    // The routing table.
+    // TODO(issuetracker.google.com/289582515): Use this to remove routes from
+    // a RouteSet based on the table value.
+    pub(crate) table: NonZeroU32,
+}
+
+/// Arguments for an RTM_DELROUTE [`Request`].
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+// TODO(https://issuetracker.google.com/283136222): Support RTM_DELROUTE.
+#[allow(unused)]
+pub(crate) enum DelRouteArgs<I: Ip> {
+    /// Direct or gateway routes.
+    Unicast(UnicastDelRouteArgs<I>),
 }
 
 /// [`Request`] arguments associated with routes.
@@ -904,6 +932,64 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
     }
 }
 
+/// A view into the NLA's held by a `NetlinkRouteMessage`.
+struct RouteNlaView<'a> {
+    subnet: Option<&'a Vec<u8>>,
+    metric: &'a u32,
+    interface_id: &'a u32,
+    next_hop: Option<&'a Vec<u8>>,
+}
+
+/// Extract and return a view of the Nlas from the given route.
+///
+/// # Panics
+///
+/// Panics if:
+///   * The route is missing any of the following Nlas: `Oif`, `Priority`,
+///     or `Destination` (only when the destination_prefix_len is non-zero).
+///   * Any Nla besides `Oif`, `Priority`, `Gateway`, `Destination` is provided.
+///   * Any Nla is provided multiple times.
+/// Note that this fn is so opinionated about the provided NLAs because it is
+/// intended to be used on existing routes, which are constructed by the module
+/// meaning the exact set of NLAs is known.
+fn view_existing_route_nlas(route: &RouteMessage) -> RouteNlaView<'_> {
+    let mut subnet = None;
+    let mut metric = None;
+    let mut interface_id = None;
+    let mut next_hop = None;
+    route.nlas.iter().for_each(|nla| match nla {
+        netlink_packet_route::route::Nla::Destination(dst) => {
+            assert_eq!(subnet, None, "existing route has multiple `Destination` NLAs");
+            subnet = Some(dst)
+        }
+        netlink_packet_route::route::Nla::Priority(p) => {
+            assert_eq!(metric, None, "existing route has multiple `Priority` NLAs");
+            metric = Some(p)
+        }
+        netlink_packet_route::route::Nla::Oif(interface) => {
+            assert_eq!(interface_id, None, "existing route has multiple `Oif` NLAs");
+            interface_id = Some(interface)
+        }
+        netlink_packet_route::route::Nla::Gateway(gateway) => {
+            assert_eq!(next_hop, None, "existing route has multiple `Gateway` NLAs");
+            next_hop = Some(gateway)
+        }
+        nla => panic!("existing route has unexpected NLA: {:?}", nla),
+    });
+    if subnet.is_none() {
+        assert_eq!(
+            route.header.destination_prefix_length, 0,
+            "existing route without `Destination` NLA must be a default route"
+        );
+    }
+    RouteNlaView {
+        subnet,
+        metric: metric.expect("existing route must have a `Priority` NLA"),
+        interface_id: interface_id.expect("existing routes must have an `Oif` NLA"),
+        next_hop,
+    }
+}
+
 // Check if the new route conflicts with an existing route.
 //
 // Note that Linux and Fuchsia differ on what constitutes a conflicting route.
@@ -922,35 +1008,69 @@ fn new_route_matches_existing<I: Ip>(
         if subnet.prefix() != existing_route.header.destination_prefix_length {
             return false;
         }
-        // NB: The `existing_route` was constructed by this module, so the
-        // exact set of NLAs it contains is known.
-        let mut destination_matches = None;
-        let mut metric_matches = None;
-        existing_route.nlas.iter().for_each(|nla| match nla {
-            netlink_packet_route::route::Nla::Destination(dst) => {
-                assert_eq!(
-                    destination_matches, None,
-                    "existing route has multiple `Destination` NLAs"
-                );
-                destination_matches = Some(&dst[..] == subnet.network().bytes());
-            }
-            netlink_packet_route::route::Nla::Priority(metric) => {
-                assert_eq!(metric_matches, None, "existing route has multiple `Metric` NLAs");
-                metric_matches = Some(metric == priority);
-            }
-            // Ignore expected NLAs that are irrelevant to the "matches" check.
-            netlink_packet_route::route::Nla::Oif(_)
-            | netlink_packet_route::route::Nla::Gateway(_) => {}
-            nla => panic!("existing route has unexpected NLA: {:?}", nla),
-        });
-        destination_matches.unwrap_or_else(|| {
-            assert_eq!(
-                existing_route.header.destination_prefix_length, 0,
-                "existing route without `Destination` NLA must be a default route"
-            );
-            !subnet.network().is_specified()
-        }) && metric_matches.expect("existing routes must have a Priority NLA")
+        let RouteNlaView {
+            subnet: existing_subnet,
+            metric: existing_metric,
+            interface_id: _,
+            next_hop: _,
+        } = view_existing_route_nlas(existing_route);
+        let subnet_matches = existing_subnet
+            .map_or(!subnet.network().is_specified(), |dst| &dst[..] == subnet.network().bytes());
+        let metric_matches = existing_metric == priority;
+        subnet_matches && metric_matches
     })
+}
+
+/// Select a route for deletion, based on the given deletion arguments.
+///
+/// Note that Linux and Fuchsia differ on how to specify a route for deletion.
+/// Linux is more flexible and allows you specify matchers as arguments, where
+/// Fuchsia requires that you exactly specify the route. Here, Linux's matchers
+/// are provided in `deletion_args`; Many of the matchers are optional, and an
+/// existing route matches the arguments if all provided arguments are equal to
+/// the values held by the route. If multiple routes match the arguments, the
+/// route with the lowest metric is selected.
+// TODO(https://issuetracker.google.com/283136222): Support RTM_DELROUTE.
+#[allow(unused)]
+fn select_route_for_deletion<I: Ip>(
+    deletion_args: DelRouteArgs<I>,
+    existing_routes: &HashSet<NetlinkRouteMessage>,
+) -> Option<&NetlinkRouteMessage> {
+    // Find the set of candidate routes, mapping them to tuples (route, metric).
+    existing_routes
+        .iter()
+        .filter_map(|route| {
+            let NetlinkRouteMessage(existing_route) = route;
+            let UnicastDelRouteArgs { subnet, outbound_interface, next_hop, priority, table } =
+                match deletion_args {
+                    DelRouteArgs::Unicast(args) => args,
+                };
+            if subnet.prefix() != existing_route.header.destination_prefix_length {
+                return None;
+            }
+            let RouteNlaView {
+                subnet: existing_subnet,
+                metric: existing_metric,
+                interface_id: existing_interface,
+                next_hop: existing_next_hop,
+            } = view_existing_route_nlas(existing_route);
+            let subnet_matches = existing_subnet.map_or(!subnet.network().is_specified(), |dst| {
+                &dst[..] == subnet.network().bytes()
+            });
+            let metric_matches = priority.map_or(true, |p| p.get() == *existing_metric);
+            let interface_matches =
+                outbound_interface.map_or(true, |i| i.get() == (*existing_interface).into());
+            let next_hop_matches = next_hop
+                .map_or(true, |n| existing_next_hop.map_or(false, |e| n.get().bytes() == e));
+            if subnet_matches && metric_matches && interface_matches && next_hop_matches {
+                Some((route, *existing_metric))
+            } else {
+                None
+            }
+        })
+        // Select the route with the lowest metric
+        .min_by(|(route1, metric1), (route2, metric2)| metric1.cmp(metric2))
+        .map(|(route, _metric)| route)
 }
 
 #[cfg(test)]
@@ -994,7 +1114,7 @@ mod tests {
     const DEV1: u32 = 1;
     const DEV2: u32 = 2;
 
-    const METRIC1: u32 = 0;
+    const METRIC1: u32 = 1;
     const METRIC2: u32 = 100;
     const METRIC3: u32 = 9999;
     const TEST_SEQUENCE_NUMBER: u32 = 1234;
@@ -2535,5 +2655,230 @@ mod tests {
             )])
         };
         assert_eq!(new_route_matches_existing(&new_route_args, &existing_routes), expect_match);
+    }
+
+    // Calls `select_route_for_deletion` with the given args & existing_routes.
+    //
+    // Asserts that the return route matches the route in `existing_routes` at
+    // `expected_index`.
+    fn test_select_route_for_deletion_helper<I: Ip>(
+        args: UnicastDelRouteArgs<I>,
+        existing_routes: &[Route<I>],
+        // The index into `existing_routes` of the route that should be selected.
+        expected_index: Option<usize>,
+    ) {
+        let existing_routes = existing_routes
+            .iter()
+            .map(|Route { subnet, device, nexthop, metric }| {
+                // Don't populate the Destination NLA if this is the default route.
+                let destination = (subnet.prefix() != 0).then_some(*subnet);
+                create_netlink_route_message::<I>(
+                    subnet.prefix(),
+                    create_nlas::<I>(destination, nexthop.to_owned(), *device, *metric),
+                )
+            })
+            .collect::<Vec<_>>();
+        let expected_route = expected_index.map(|index| {
+            existing_routes
+                .get(index)
+                .expect("index should be within the bounds of `existing_routes`")
+                .clone()
+        });
+
+        assert_eq!(
+            select_route_for_deletion(
+                DelRouteArgs::Unicast(args),
+                &HashSet::from_iter(existing_routes)
+            ),
+            expected_route.as_ref()
+        )
+    }
+
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB2, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        false; "subnet_does_not_match_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB3, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        false; "subnet_prefix_len_does_not_match_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "subnet_matches_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
+            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV2, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        false; "interface_does_not_match_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
+            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "interface_matches_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None,
+            next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        false; "nexthop_absent_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None,
+            next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP2), metric: METRIC1, },
+        false; "nexthop_does_not_match_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None,
+            next_hop: Some(SpecifiedAddr::new(V4_NEXTHOP1).unwrap()), priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        true; "nexthop_matches_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None,
+            next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC2, },
+        false; "metric_does_not_match_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None,
+            next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        true; "metric_matches_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB2, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        false; "subnet_does_not_match_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB3, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        false; "subnet_prefix_len_does_not_match_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "subnet_matches_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
+            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV2, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        false; "interface_does_not_match_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: Some(NonZeroU64::new(DEV1.into()).unwrap()),
+            next_hop: None, priority: None, table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "interface_matches_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None,
+            next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        false; "nexthop_absent_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None,
+            next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP2), metric: METRIC1, },
+        false; "nexthop_does_not_match_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None,
+            next_hop: Some(SpecifiedAddr::new(V6_NEXTHOP1).unwrap()), priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        true; "nexthop_matches_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None,
+            next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC2, },
+        false; "metric_does_not_match_v6")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None,
+            next_hop: None, priority: Some(NonZeroU32::new(METRIC1).unwrap()),
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: None, metric: METRIC1, },
+        true; "metric_matches_v6")]
+    fn test_select_route_for_deletion<I: Ip>(
+        args: UnicastDelRouteArgs<I>,
+        existing_route: Route<I>,
+        expect_match: bool,
+    ) {
+        test_select_route_for_deletion_helper(args, &[existing_route], expect_match.then_some(0))
+    }
+
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv4> {
+            subnet: V4_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        &[
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC2, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv4>{subnet: V4_SUB1, device: DEV1, nexthop: Some(V4_NEXTHOP1), metric: METRIC3, },
+        ],
+        Some(1); "multiple_matches_prefers_lowest_metric_v4")]
+    #[test_case(
+        UnicastDelRouteArgs::<Ipv6> {
+            subnet: V6_SUB1, outbound_interface: None, next_hop: None, priority: None,
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
+        },
+        &[
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC2, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC1, },
+        Route::<Ipv6>{subnet: V6_SUB1, device: DEV1, nexthop: Some(V6_NEXTHOP1), metric: METRIC3, },
+        ],
+        Some(1); "multiple_matches_prefers_lowest_metric_v6")]
+    fn test_select_route_for_deletion_multiple_matches<I: Ip>(
+        args: UnicastDelRouteArgs<I>,
+        existing_routes: &[Route<I>],
+        expected_index: Option<usize>,
+    ) {
+        test_select_route_for_deletion_helper(args, existing_routes, expected_index);
     }
 }
