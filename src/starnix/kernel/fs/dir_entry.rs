@@ -245,6 +245,7 @@ impl DirEntry {
         } else {
             // An entry was created. Update the ctime and mtime of this directory.
             self.node.update_ctime_mtime();
+            entry.notify(InotifyMask::CREATE);
             Ok(entry)
         }
     }
