@@ -43,7 +43,6 @@ func TestReplacements(t *testing.T) {
 			With:    "\"",
 		},
 	}
-	Config.FuchsiaDir = "/"
 	Config.Replacements = r
 	expected := []byte("left quote: \" right quote: \"")
 

@@ -140,6 +140,7 @@
           "src/connectivity/bluetooth/hci/vendor/marvell": true,
           "third_party/android/platform/packages/modules/Bluetooth": true,
           "third_party/android/platform/system": true,
+          "third_party/android/platform/system/core/debuggerd": true,
           "third_party/cobalt/build/secondary/third_party/eigen": true,
           "third_party/cobalt/build/secondary/third_party/golibs": true,
           "third_party/cobalt/third_party": true,

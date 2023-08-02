@@ -75,6 +75,15 @@ func LoadFile(path string, ft FileType, projectName string) (*File, error) {
 		plusVal(NumPotentialLicenseFiles, path)
 	}
 
+	// Check if the file is empty
+	fileInfo, err := os.Stat(absPath)
+	if err != nil {
+		return nil, err
+	}
+	if fileInfo.Size() == 0 {
+		return nil, fmt.Errorf("Empty file")
+	}
+
 	name := filepath.Base(path)
 	f := &File{
 		name:        name,
