@@ -27,7 +27,6 @@ group("pci") {
     "//src/connectivity/ethernet/drivers/third_party/igc",
     "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:fuchsia_driver",
-    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_driver",
     "//src/devices/block/drivers/ahci:ahci",
     "//src/devices/block/drivers/nvme:nvme",
     "//src/devices/block/drivers/pci-sdhci:pci-sdhci",

@@ -56,7 +56,6 @@
 //src/connectivity/telephony/tests/fake-drivers/at-fake-transport:fake_at_driver-driver
 //src/connectivity/telephony/tests/fake-drivers/usb-qmi-function:qmi_function-driver
 //src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:fuchsia_driver-driver
-//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_driver-driver
 //src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:nxpfmac_sdio-driver
 //src/connectivity/wlan/drivers/wlanif:wlanif_driver-driver
 //src/connectivity/wlan/drivers/wlanphy:wlanphy_driver-driver

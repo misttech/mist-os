@@ -23,6 +23,10 @@ verify_product_configuration("verify_minimal_product_configuration") {
 
   bazel_inputs =
       [ "//src/fonts/asset_providers:small-open-fonts-collection-bazel" ]
+
+  if (board_name == "x64") {
+    bazel_inputs += [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel" ]
+  }
 }
 
 group("verifications") {

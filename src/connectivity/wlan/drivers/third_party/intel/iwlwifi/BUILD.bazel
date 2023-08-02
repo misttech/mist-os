@@ -1,0 +1,18 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_prebuilt_package")
+
+package(
+    default_visibility = [
+        "//build/bazel/assembly/product_configuration:__subpackages__",
+        "//products/minimal:__subpackages__",
+    ],
+)
+
+fuchsia_prebuilt_package(
+    name = "iwlwifi",
+    archive = "@legacy_ninja_build_outputs//:iwlwifi.far",
+    drivers = ["meta/iwlwifi.cm"],
+)

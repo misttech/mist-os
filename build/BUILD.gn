@@ -146,6 +146,7 @@ group("non_hermetic_deps") {
     "//src/chromium:web_engine_pkg",
     "//src/chromium:web_engine_shell_pkg",
     "//src/chromium:web_runner_pkg",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
     "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
     "//src/dart:dart_aot_product_runner",
     "//src/dart:dart_aot_runner",
