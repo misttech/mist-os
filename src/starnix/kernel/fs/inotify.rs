@@ -334,7 +334,7 @@ impl InotifyWatchers {
     }
 
     /// Notifies all watchers that have the specified event mask.
-    pub fn notify(&self, event_mask: InotifyMask, name: &FsString) {
+    pub fn notify(&self, mut event_mask: InotifyMask, name: &FsString, mode: FileMode) {
         // Clone inotify references so that we don't hold watchers lock when notifying.
         struct InotifyWatch {
             watch_id: WdNumber,
@@ -359,6 +359,9 @@ impl InotifyWatchers {
             });
         }
 
+        if mode.is_dir() {
+            event_mask |= InotifyMask::ISDIR;
+        }
         for watch in watches {
             let inotify = watch
                 .file
@@ -415,7 +418,7 @@ mod tests {
         }
 
         // Generate 1 event.
-        root.node.watchers.notify(InotifyMask::ACCESS, &"".into());
+        root.node.watchers.notify(InotifyMask::ACCESS, &"".into(), FileMode::IFREG);
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {
@@ -425,7 +428,7 @@ mod tests {
         }
 
         // Generate another event.
-        root.node.watchers.notify(InotifyMask::ATTRIB, &"".into());
+        root.node.watchers.notify(InotifyMask::ATTRIB, &"".into(), FileMode::IFREG);
 
         assert_eq!(inotify.available(), DATA_SIZE * 2);
         {
@@ -528,8 +531,8 @@ mod tests {
         }
 
         // Generate 2 identical events. They should combine into 1.
-        root.node.watchers.notify(InotifyMask::ACCESS, &"".into());
-        root.node.watchers.notify(InotifyMask::ACCESS, &"".into());
+        root.node.watchers.notify(InotifyMask::ACCESS, &"".into(), FileMode::IFREG);
+        root.node.watchers.notify(InotifyMask::ACCESS, &"".into(), FileMode::IFREG);
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {
