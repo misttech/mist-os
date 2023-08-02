@@ -62,6 +62,7 @@ int parse_args(int argc, const char** argv, df_options_t* options, const char***
     *dirs = &argv[1];
     *count = argc - 1;
   } else {
+    printf("(hint: to see filesystems in root, use 'df *' or 'df <path>')\n");
     *dirs = &root;
     *count = 1;
   }
