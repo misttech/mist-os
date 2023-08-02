@@ -142,7 +142,6 @@
 #define VPU_VDIN1_WR_CTRL (0x1320 << 2)
 #define VPU_VDIN1_WR_H_START_END (0x1321 << 2)
 #define VPU_VDIN1_WR_V_START_END (0x1322 << 2)
-#define VPU_VDIN1_ASFIFO_CTRL3 (0x136f << 2)
 #define VPU_VDIN1_MISC_CTRL (0x2782 << 2)
 #define VPU_VIU_VDIN_IF_MUX_CTRL (0x2783 << 2)  // undocumented ¯\_(ツ)_/¯
 
@@ -306,19 +305,6 @@ class VdInWrVStartEndReg : public hwreg::RegisterBase<VdInWrVStartEndReg, uint32
   DEF_FIELD(28, 16, start);
   DEF_FIELD(12, 0, end);
   static auto Get() { return hwreg::RegisterAddr<VdInWrVStartEndReg>(VPU_VDIN1_WR_V_START_END); }
-};
-
-class VdInAFifoCtrl3Reg : public hwreg::RegisterBase<VdInAFifoCtrl3Reg, uint32_t> {
- public:
-  DEF_BIT(7, data_valid_en);
-  DEF_BIT(6, go_field_en);
-  DEF_BIT(5, go_line_en);
-  DEF_BIT(4, vsync_pol_set);
-  DEF_BIT(3, hsync_pol_set);
-  DEF_BIT(2, vsync_sync_reset_en);
-  DEF_BIT(1, fifo_overflow_clr);
-  DEF_BIT(0, soft_reset_en);
-  static auto Get() { return hwreg::RegisterAddr<VdInAFifoCtrl3Reg>(VPU_VDIN1_ASFIFO_CTRL3); }
 };
 
 class VdInMiscCtrlReg : public hwreg::RegisterBase<VdInMiscCtrlReg, uint32_t> {

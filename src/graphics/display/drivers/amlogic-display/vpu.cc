@@ -437,16 +437,16 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
   VdinLFifoCtrlReg::Get().FromValue(0).set_fifo_buf_size(0x780).WriteTo(&(*vpu_mmio_));
 
   // Setup Async Fifo
-  VdInAFifoCtrl3Reg::Get()
+  VideoInputAsyncFifoControl3::Get(kVideoInputModuleId)
       .ReadFrom(&(*vpu_mmio_))
-      .set_data_valid_en(1)
-      .set_go_field_en(1)
-      .set_go_line_en(1)
-      .set_vsync_pol_set(0)
-      .set_hsync_pol_set(0)
-      .set_vsync_sync_reset_en(1)
-      .set_fifo_overflow_clr(0)
-      .set_soft_reset_en(0)
+      .set_channel6_data_enabled(true)
+      .set_channel6_go_field_signal_enabled(true)
+      .set_channel6_go_line_signal_enabled(true)
+      .set_channel6_input_vsync_is_negative(false)
+      .set_channel6_input_hsync_is_negative(false)
+      .set_channel6_async_fifo_software_reset_on_vsync(true)
+      .set_channel6_clear_overflow_bit(false)
+      .set_channel6_async_fifo_software_reset(false)
       .WriteTo(&(*vpu_mmio_));
 
   VdInMatrixCtrlReg::Get()
@@ -639,8 +639,9 @@ void Vpu::CapturePrintRegisters() {
             VdInWrHStartEndReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInWrVStartEndReg = 0x%x\n",
             VdInWrVStartEndReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
-  DISP_INFO("VdInAFifoCtrl3Reg = 0x%x\n",
-            VdInAFifoCtrl3Reg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
+  DISP_INFO(
+      "VdInAFifoCtrl3Reg = 0x%x\n",
+      VideoInputAsyncFifoControl3::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInMiscCtrlReg = 0x%x\n", VdInMiscCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInIfMuxCtrlReg = 0x%x\n",
             VdInIfMuxCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
