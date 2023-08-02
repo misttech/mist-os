@@ -19,5 +19,6 @@
         { service: "fuchsia.hardware.clock.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.pwm.Service" },
+        { protocol: "fuchsia.boot.RootResource" },
     ],
 }

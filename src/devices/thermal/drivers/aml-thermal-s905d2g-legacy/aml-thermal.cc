@@ -158,7 +158,8 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
   // Initialize CPU frequency scaling.
   status = cpufreq_scaling->Create(device, thermal_config, thermal_info);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-thermal: Could not initialize CPU freq. scaling: %d", status);
+    zxlogf(ERROR, "aml-thermal: Could not initialize CPU freq. scaling: %s",
+           zx_status_get_string(status));
     return status;
   }
 
