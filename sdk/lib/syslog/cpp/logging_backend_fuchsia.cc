@@ -270,15 +270,13 @@ void LogState::Connect() {
     } else {
       logger = zx::channel(provided_log_sink_);
     }
-    ::fuchsia::logger::LogSink_SyncProxy logger_client(std::move(logger));
+    ::fuchsia::logger::LogSinkPtr logger_client;
+    logger_client.Bind(std::move(logger), loop_.dispatcher());
     zx::socket local, remote;
     if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
       return;
     }
-    if (logger_client.ConnectStructured(std::move(remote))) {
-      return;
-    }
-
+    logger_client->ConnectStructured(std::move(remote));
     descriptor_ = std::move(local);
   }
 }
