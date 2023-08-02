@@ -7,7 +7,7 @@
         "inspect/offer.shard.cml",
     ],
     program: {
-        environ: [ "NETSTACK3=1" ],
+        environ: [ "NETSTACK3=true" ],
     },
     children: [
         {

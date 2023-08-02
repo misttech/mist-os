@@ -8,7 +8,7 @@
     ],
     program: {
         environ: [
-            "NETSTACK3=1",
+            "NETSTACK3=true",
             "TRACING=true",
         ],
     },
