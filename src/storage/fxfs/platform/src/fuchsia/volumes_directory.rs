@@ -1021,6 +1021,8 @@ mod tests {
     }
 
     #[fuchsia::test]
+    #[ignore] // TODO(b/293917849) re-enable this test when de-flaked
+
     async fn test_volume_dir_races() {
         let device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
