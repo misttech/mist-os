@@ -94,8 +94,5 @@ group("tests") {
   deps = [
     ":unwinder_tests",
     ":unwinder_tests_bin($host_toolchain)",
-
-    # Compile only
-    "benchmark($host_toolchain)",
   ]
 }

@@ -457,7 +457,6 @@ sdk_molecule("platform_libs") {
     "//sdk/lib/syslog/cpp:backend_fuchsia_lib_sdk",
     "//src/developer/debug/ipc:ipc_sdk",
     "//src/developer/debug/shared:shared_sdk",
-    "//src/developer/debug/third_party/libunwindstack:libunwindstack_sdk",
     "//src/lib/containers/cpp:cpp_sdk",
     "//src/lib/diagnostics/accessor2logger:accessor2logger_sdk",
     "//src/lib/elflib:elflib_sdk",

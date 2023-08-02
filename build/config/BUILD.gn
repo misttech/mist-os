@@ -631,11 +631,6 @@ config("Wno-unused-function") {
   ]
 }
 
-config("Wno-range-loop-construct") {
-  cflags = [ "-Wno-range-loop-construct" ]
-  visibility = [ "//src/developer/debug/third_party/libunwindstack" ]
-}
-
 config("Wno-strict-prototypes") {
   cflags = [ "-Wno-strict-prototypes" ]
 }
@@ -720,7 +715,6 @@ config("Wno-conversion") {
     "//src/connectivity/wlan/testing/wlantap-driver:*",
     "//src/developer/debug/debug_agent:*",
     "//src/developer/debug/debug_agent/integration_tests:*",
-    "//src/developer/debug/third_party/libunwindstack:*",
     "//src/developer/debug/zxdb/client:*",
     "//src/developer/debug/zxdb/console:*",
     "//src/developer/debug/zxdb/debug_adapter:*",
