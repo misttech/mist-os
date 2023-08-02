@@ -1033,12 +1033,6 @@ impl FsNode {
         self.check_sticky_bit(current_task, child)?;
         self.ops().unlink(self, current_task, name, child)?;
         self.update_ctime_mtime();
-
-        let child_mode = child.info().mode;
-        if !child_mode.is_dir() {
-            // Linux notifies link count change for non-directories.
-            child.watchers.notify(InotifyMask::ATTRIB, &FsString::default(), child_mode);
-        }
         Ok(())
     }
 

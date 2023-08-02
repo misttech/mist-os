@@ -125,6 +125,7 @@
                 "getsockopt01",
                 "init_module01",
                 "inotify02",
+                "inotify04",
                 "inotify05",
                 "inotify06",
                 "inotify11",

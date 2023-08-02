@@ -128,15 +128,16 @@ impl InotifyFileObject {
         event_mask: InotifyMask,
         cookie: u32,
         name: FsString,
-        remove_watcher_after_notify: bool,
+        oneshot: bool,
     ) {
         let mut state = self.state.lock();
         let new_event = InotifyEvent::new(watch_id, event_mask, cookie, name);
         if Some(&new_event) == state.events.back() {
+            debug_assert!(!oneshot, "oneshot watchers cannot create 2 equivalent events");
             return;
         }
         state.events.push_back(new_event);
-        if remove_watcher_after_notify {
+        if oneshot {
             state.watches.remove(&watch_id);
             state.events.push_back(InotifyEvent::new(
                 watch_id,
@@ -333,46 +334,40 @@ impl InotifyWatchers {
     }
 
     /// Notifies all watchers that have the specified event mask.
-    /// If event_mask is IN_DELETE_SELF, then all watchers are removed.
     pub fn notify(&self, mut event_mask: InotifyMask, name: &FsString, mode: FileMode) {
         // Clone inotify references so that we don't hold watchers lock when notifying.
         struct InotifyWatch {
             watch_id: WdNumber,
             file: Arc<FileObject>,
-            should_remove: bool,
+            oneshot: bool,
         }
         let mut watches: Vec<InotifyWatch> = vec![];
         {
             let mut watchers = self.watchers.lock();
             watchers.retain(|inotify, watcher| {
-                let mut should_remove = event_mask == InotifyMask::DELETE_SELF;
                 if watcher.mask.contains(event_mask) {
-                    should_remove = should_remove || watcher.mask.contains(InotifyMask::ONESHOT);
+                    let oneshot = watcher.mask.contains(InotifyMask::ONESHOT);
                     if let Some(file) = inotify.0.upgrade() {
-                        watches.push(InotifyWatch {
-                            watch_id: watcher.watch_id,
-                            file,
-                            should_remove,
-                        });
+                        watches.push(InotifyWatch { watch_id: watcher.watch_id, file, oneshot });
+                        !oneshot
                     } else {
-                        should_remove = true;
+                        false
                     }
+                } else {
+                    true
                 }
-                !should_remove
             });
         }
 
-        if event_mask != InotifyMask::DELETE_SELF && mode.is_dir() {
-            // Linux does not report IN_ISDIR with IN_DELETE_SELF for directories.
+        if mode.is_dir() {
             event_mask |= InotifyMask::ISDIR;
         }
-
         for watch in watches {
             let inotify = watch
                 .file
-                .downcast_file::<InotifyFileObject>()
+                .downcast_file::<inotify::InotifyFileObject>()
                 .expect("failed to downcast to inotify");
-            inotify.notify(watch.watch_id, event_mask, 0, name.clone(), watch.should_remove);
+            inotify.notify(watch.watch_id, event_mask, 0, name.clone(), watch.oneshot);
         }
     }
 }
@@ -461,40 +456,6 @@ mod tests {
         {
             let state = inotify.state.lock();
             assert_eq!(state.events.len(), 0);
-        }
-    }
-
-    #[::fuchsia::test]
-    async fn notify_deletion_from_watchers() {
-        let (_kernel, current_task) = create_kernel_and_task();
-
-        let file = InotifyFileObject::new_file(&current_task, true);
-        let inotify =
-            file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
-
-        // Use root as the watched directory.
-        let root = current_task.fs().root().entry;
-        assert!(inotify.add_watch(root.clone(), InotifyMask::ALL_EVENTS, &file).is_ok());
-
-        {
-            let watchers = root.node.watchers.watchers.lock();
-            assert_eq!(watchers.len(), 1);
-        }
-
-        root.node.watchers.notify(InotifyMask::DELETE_SELF, &"".into(), FileMode::IFREG);
-
-        {
-            let watchers = root.node.watchers.watchers.lock();
-            assert_eq!(watchers.len(), 0);
-        }
-
-        {
-            let state = inotify.state.lock();
-            assert_eq!(state.watches.len(), 0);
-            assert_eq!(state.events.len(), 2);
-
-            assert_eq!(state.events.get(0).unwrap().mask, InotifyMask::DELETE_SELF);
-            assert_eq!(state.events.get(1).unwrap().mask, InotifyMask::IGNORED);
         }
     }
 
