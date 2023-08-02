@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cap::{dict::Key, AnyCapability, CloneDict, Dict, SomeDict},
     fuchsia_runtime::{HandleInfo, HandleType},
     futures::channel::mpsc::UnboundedSender,
     futures::future::{BoxFuture, FutureExt},
@@ -10,6 +9,7 @@ use {
     namespace::Namespace,
     process_builder::StartupHandle,
     processargs::ProcessArgs,
+    sandbox::{dict::Key, AnyCapability, CloneDict, Dict, SomeDict},
     std::collections::HashMap,
     std::iter::once,
     thiserror::Error,
@@ -26,7 +26,7 @@ pub enum Delivery {
     /// As a result, a namespace entry will be created in the resulting processargs, corresponding
     /// to the parent directory, e.g. "/svc/foo".
     ///
-    /// For example, installing a `cap::open::Open` at "/svc/fuchsia.examples.Echo" will
+    /// For example, installing a `sandbox::Open` at "/svc/fuchsia.examples.Echo" will
     /// cause the framework to spin up a `fuchsia.io/Directory` implementation backing "/svc",
     /// containing a filesystem object named "fuchsia.examples.Echo".
     ///
@@ -181,9 +181,9 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 #[cfg(test)]
 mod test_util {
     use {
-        cap::{open::Open, Handle},
         fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
         fuchsia_zircon::HandleBased,
+        sandbox::{Handle, Open},
         vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, service},
     };
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{Capability, Remote},
+    crate::{Capability, Remote},
     core::fmt,
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,

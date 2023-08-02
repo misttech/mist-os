@@ -5,6 +5,11 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
+visibility = [
+  "//src/sys/component_manager/*",
+  "//src/sys/lib/elf_runner/*",
+]
+
 group("tests") {
   testonly = true
   deps = [ ":serve_processargs_unittests" ]
@@ -22,8 +27,8 @@ rustc_library("serve_processargs") {
     "//src/lib/process_builder",
     "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/sys/bedrock/cap",
-    "//src/sys/bedrock/processargs",
+    "//src/sys/component_manager/lib/processargs",
+    "//src/sys/component_manager/lib/sandbox",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",

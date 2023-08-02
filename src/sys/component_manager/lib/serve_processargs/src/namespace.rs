@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    cap::{open::Open, AnyCapability, Dict, Remote, TryIntoOpenError},
     cm_types::Path,
     fuchsia_zircon::HandleBased,
     futures::stream::FuturesUnordered,
@@ -13,6 +12,7 @@ use {
         FutureExt, StreamExt,
     },
     process_builder::NamespaceEntry,
+    sandbox::{open::Open, AnyCapability, Dict, Remote, TryIntoOpenError},
     std::collections::HashMap,
     std::ffi::CString,
     thiserror::Error,

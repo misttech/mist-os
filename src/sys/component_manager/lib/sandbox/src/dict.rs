@@ -3,14 +3,11 @@
 // found in the LICENSE file.
 use {
     crate::{
-        cap::{
-            AnyCapability, AnyCloneCapability, Capability, Remote, TryIntoOpen, TryIntoOpenError,
-        },
-        open::Open,
+        AnyCapability, AnyCloneCapability, Capability, Open, Remote, TryIntoOpen, TryIntoOpenError,
     },
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
-    fidl_fuchsia_component_bedrock as fbedrock, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
     futures::{
@@ -61,10 +58,10 @@ impl<T: ?Sized + Capability> Dict<Box<T>>
 where
     Box<T>: TryFrom<zx::Handle>,
 {
-    /// Serve the `fuchsia.component.bedrock.Dict` protocol for this `Dict`.
+    /// Serve the `fuchsia.component.Dict` protocol for this `Dict`.
     pub async fn serve_dict(
         &mut self,
-        mut stream: fbedrock::DictRequestStream,
+        mut stream: fsandbox::DictRequestStream,
     ) -> Result<(), Error> {
         // Tasks that serve the zx handles for entries removed from this dict.
         let mut entry_tasks = vec![];
@@ -73,20 +70,20 @@ where
             stream.try_next().await.context("failed to read request from stream")?
         {
             match request {
-                fbedrock::DictRequest::Insert { key, value, responder, .. } => {
+                fsandbox::DictRequest::Insert { key, value, responder, .. } => {
                     let result = match self.entries.entry(key) {
-                        Entry::Occupied(_) => Err(fbedrock::DictError::AlreadyExists),
+                        Entry::Occupied(_) => Err(fsandbox::DictError::AlreadyExists),
                         Entry::Vacant(entry) => match Box::<T>::try_from(value) {
                             Ok(cap) => {
                                 entry.insert(cap);
                                 Ok(())
                             }
-                            Err(_) => Err(fbedrock::DictError::BadHandle),
+                            Err(_) => Err(fsandbox::DictError::BadHandle),
                         },
                     };
                     responder.send(result).context("failed to send response")?;
                 }
-                fbedrock::DictRequest::Remove { key, responder } => {
+                fsandbox::DictRequest::Remove { key, responder } => {
                     let cap = self.entries.remove(&key);
                     let result = match cap {
                         Some(cap) => {
@@ -100,7 +97,7 @@ where
                             // Ignore the result of sending. The receiver is free to break away to
                             // ignore all the not-found errors.
                             let _ = self.not_found.send(key);
-                            Err(fbedrock::DictError::NotFound)
+                            Err(fsandbox::DictError::NotFound)
                         }
                     };
                     responder.send(result).context("failed to send response")?;
@@ -113,7 +110,7 @@ where
 
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let (dict_client_end, dict_stream) =
-            create_request_stream::<fbedrock::DictMarker>().unwrap();
+            create_request_stream::<fsandbox::DictMarker>().unwrap();
 
         let fut = async move {
             let mut dict = *self;
@@ -233,7 +230,7 @@ mod tests {
         anyhow::{anyhow, Error},
         assert_matches::assert_matches,
         fidl::endpoints::{create_endpoints, create_proxy_and_stream, Proxy},
-        fidl_fuchsia_component_bedrock as fbedrock,
+        fidl_fuchsia_component_sandbox as fsandbox,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon::{self as zx, AsHandleRef},
         futures::try_join,
@@ -249,7 +246,7 @@ mod tests {
     async fn serve_insert() -> Result<(), Error> {
         let mut dict = Dict::<AnyCapability>::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         // Create an event and get its koid.
@@ -297,7 +294,7 @@ mod tests {
         dict.entries.insert(CAP_KEY.to_string(), Box::new(Handle::from(event.into_handle())));
         assert_eq!(dict.entries.len(), 1);
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -328,7 +325,7 @@ mod tests {
     async fn insert_already_exists() -> Result<(), Error> {
         let mut dict = Dict::<AnyCapability>::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -348,7 +345,7 @@ mod tests {
                 .insert(CAP_KEY, event.into_handle())
                 .await
                 .context("failed to call Insert")?;
-            assert_matches!(result, Err(fbedrock::DictError::AlreadyExists));
+            assert_matches!(result, Err(fsandbox::DictError::AlreadyExists));
 
             Ok(())
         };
@@ -361,13 +358,13 @@ mod tests {
     async fn remove_not_found() -> Result<(), Error> {
         let mut dict = Dict::<AnyCapability>::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
             // Removing an item from an empty dict should fail.
             let result = dict_proxy.remove(CAP_KEY).await.context("failed to call Remove")?;
-            assert_matches!(result, Err(fbedrock::DictError::NotFound));
+            assert_matches!(result, Err(fsandbox::DictError::NotFound));
 
             Ok(())
         };
@@ -380,7 +377,7 @@ mod tests {
     async fn clone_insert() -> Result<(), Error> {
         let mut dict = Dict::<AnyCloneCapability>::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -403,7 +400,7 @@ mod tests {
     async fn clone_insert_bad_handle() -> Result<(), Error> {
         let mut dict = Dict::<AnyCloneCapability>::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -415,7 +412,7 @@ mod tests {
 
             let result =
                 dict_proxy.insert(CAP_KEY, handle).await.context("failed to call Insert")?;
-            assert_matches!(result, Err(fbedrock::DictError::BadHandle));
+            assert_matches!(result, Err(fsandbox::DictError::BadHandle));
 
             Ok(())
         };

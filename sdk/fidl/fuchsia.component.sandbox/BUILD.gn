@@ -4,9 +4,14 @@
 
 import("//build/fidl/fidl.gni")
 
-visibility = [ "//src/sys/bedrock/*" ]
+visibility = [ "//src/sys/component_manager/*" ]
 
-fidl("fuchsia.component.bedrock") {
-  sources = [ "cap.fidl" ]
+fidl("fuchsia.component.sandbox") {
+  sdk_category = "internal"
+
+  sources = [
+    "overview.fidl",
+    "sandbox.fidl",
+  ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

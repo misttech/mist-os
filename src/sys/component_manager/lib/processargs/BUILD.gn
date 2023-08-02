@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-visibility = [ "//src/sys/bedrock/*" ]
+visibility = [ "//src/sys/component_manager/*" ]
 
 group("tests") {
   testonly = true

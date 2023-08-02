@@ -17,7 +17,6 @@ group("tests") {
   deps = [
     "activity:tests",
     "base-resolver:tests",
-    "bedrock:tests",
     "cache_manager:tests",
     "component_manager:tests",
     "early_boot_instrumentation:tests",

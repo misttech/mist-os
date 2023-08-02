@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{Capability, Remote, TryIntoOpen},
+    crate::capability::{Capability, Remote, TryIntoOpen},
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::future::BoxFuture,
 };
