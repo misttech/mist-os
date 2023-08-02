@@ -24,7 +24,7 @@ class ScriptTest : public E2eTest, public MockConsole::OutputObserver {
   void TestBody() override;
 
   // Implements |MockConsole::OutputObserver|.
-  void OnOuput(const OutputBuffer& output) override;
+  void OnOutput(const OutputBuffer& output) override;
 
   // Scan the directory and register all script tests.
   static void RegisterScriptTests();

@@ -29,7 +29,7 @@ class MockConsole : public Console {
 
   class OutputObserver {
    public:
-    virtual void OnOuput(const OutputBuffer& output) {}
+    virtual void OnOutput(const OutputBuffer& output) {}
   };
 
   explicit MockConsole(Session* session) : Console(session), session_(session) {}

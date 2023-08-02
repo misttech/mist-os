@@ -21,7 +21,7 @@ void MockConsole::Output(const OutputBuffer& output, bool add_newline) {
     debug::MessageLoop::Current()->QuitNow();
   }
   for (auto& observer : output_observers_) {
-    observer.OnOuput(output);
+    observer.OnOutput(output);
   }
 }
 

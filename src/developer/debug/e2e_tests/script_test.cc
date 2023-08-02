@@ -84,7 +84,7 @@ void ScriptTest::TestBody() {
   }
 }
 
-void ScriptTest::OnOuput(const OutputBuffer& output) {
+void ScriptTest::OnOutput(const OutputBuffer& output) {
   output_for_debug_ += output.AsString();
   if (!output_for_debug_.empty() && output_for_debug_.back() != '\n') {
     output_for_debug_ += '\n';
