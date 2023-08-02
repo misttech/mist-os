@@ -700,6 +700,29 @@ class SymlinkRelativeTests(unittest.TestCase):
             self.assertEqual(src.resolve(), dest.resolve())
 
 
+class QualifyToolPathTests(unittest.TestCase):
+
+    def test_absolute(self):
+        path = Path('/foo/bar.exe')
+        self.assertEqual(cl_utils.qualify_tool_path(path), str(path))
+
+    def test_relative_subdir(self):
+        path = Path('foo/bar.exe')
+        self.assertEqual(cl_utils.qualify_tool_path(path), str(path))
+
+    def test_relative_up_and_down(self):
+        path = Path('../../foo/bar.exe')
+        self.assertEqual(cl_utils.qualify_tool_path(path), str(path))
+
+    def test_unqualified(self):
+        path = Path('bar.exe')
+        self.assertEqual(cl_utils.qualify_tool_path(path), './bar.exe')
+
+    def test_unqualified_redundant(self):
+        path = Path('./bar.exe')
+        self.assertEqual(cl_utils.qualify_tool_path(path), './bar.exe')
+
+
 class ExecRelaunchTests(unittest.TestCase):
 
     def go_away(self):

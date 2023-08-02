@@ -2323,11 +2323,11 @@ def auto_relaunch_with_reproxy(
 
     python = cl_utils.relpath(Path(sys.executable), start=Path(os.curdir))
     relaunch_args = ['--', str(python), '-S', str(script)] + argv
+    reproxy_wrap = cl_utils.qualify_tool_path(fuchsia.REPROXY_WRAP)
     if args.verbose:
-        cmd_str = cl_utils.command_quoted_str(
-            [str(fuchsia.REPROXY_WRAP)] + relaunch_args)
+        cmd_str = cl_utils.command_quoted_str([reproxy_wrap] + relaunch_args)
         msg(f'Automatically re-launching: {cmd_str}')
-    cl_utils.exec_relaunch([fuchsia.REPROXY_WRAP] + relaunch_args)
+    cl_utils.exec_relaunch([reproxy_wrap] + relaunch_args)
     assert False, "exec_relaunch() should never return"
 
 

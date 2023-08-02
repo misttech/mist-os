@@ -2907,7 +2907,7 @@ class MainTests(unittest.TestCase):
         mock_relaunch.assert_called_once()
         args, kwargs = mock_relaunch.call_args_list[0]
         relaunch_cmd = args[0]
-        self.assertEqual(relaunch_cmd[0], fuchsia.REPROXY_WRAP)
+        self.assertEqual(relaunch_cmd[0], str(fuchsia.REPROXY_WRAP))
         cmd_slices = cl_utils.split_into_subsequences(relaunch_cmd[1:], '--')
         reproxy_args, self_script, wrapped_command = cmd_slices
         self.assertEqual(reproxy_args, [])

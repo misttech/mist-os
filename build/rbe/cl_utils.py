@@ -439,6 +439,33 @@ def symlink_relative(dest: Path, src: Path):
     src.symlink_to(relpath(dest, start=src.parent))
 
 
+def qualify_tool_path(path: Path) -> str:
+    """Automatically prepend ./ to a tool path if needed.
+
+    The relative path to a tool can sometimes be unqualified
+    if it is in the current working directory, but to execute it
+    it either needs to be in PATH or be relative-path qualified.
+    Prepending './' makes it relative-path qualified.
+
+    Args:
+      path: path to a tool to be used in a subprocess.Popen.
+
+    Returns:
+      Relative-path qualified string because Path('./foo')
+      is represented as Path('foo') (lossy).
+    """
+    if path.is_absolute():
+        # absolute, no need to adjust
+        return str(path)
+
+    if path.parent == Path('.'):
+        # unqualified, needs './' prepended
+        return os.path.join('.', str(path))
+
+    # else already relative-path qualified
+    return str(path)
+
+
 def exec_relaunch(command: Sequence[str]) -> None:
     """Re-launches a command without returning.
 
