@@ -57,7 +57,7 @@ const BARRIER: &str = "<ffx symbolizer>\n";
 
 /// Returns true if the given string is a context marker.
 pub fn is_symbolizer_context_marker(s: &str) -> bool {
-    return s.starts_with("{{{reset}}}")
+    return s.starts_with("{{{reset")
         || s.starts_with("{{{bt")
         || s.starts_with("{{{mmap")
         || s.starts_with("{{{dumpfile")
