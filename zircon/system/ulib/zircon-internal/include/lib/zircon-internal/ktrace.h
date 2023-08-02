@@ -54,6 +54,7 @@ enum {
   KTRACE_GRP_ARCH_BIT,
   KTRACE_GRP_SYSCALL_BIT,
   KTRACE_GRP_VM_BIT,
+  KTRACE_GRP_RESTRICTED_BIT,
 };
 
 // Filter Groups
@@ -68,6 +69,7 @@ enum {
 #define KTRACE_GRP_ARCH           (1u << KTRACE_GRP_ARCH_BIT)
 #define KTRACE_GRP_SYSCALL        (1u << KTRACE_GRP_SYSCALL_BIT)
 #define KTRACE_GRP_VM             (1u << KTRACE_GRP_VM_BIT)
+#define KTRACE_GRP_RESTRICTED     (1u << KTRACE_GRP_RESTRICTED_BIT)
 
 #define KTRACE_GRP_TO_MASK(grp)   ((grp) << 20)
 

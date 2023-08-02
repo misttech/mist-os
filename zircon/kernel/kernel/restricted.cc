@@ -74,6 +74,7 @@ template <typename T>
   vmm_set_active_aspace(up->normal_aspace_ptr());
 
   // bounce into normal mode
+  KTRACE_INSTANT("kernel:restricted", "RestrictedLeave", ("reason", reason));
   RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(), reason);
 
   __UNREACHABLE;
@@ -169,6 +170,7 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   // user mode to ensure the thread's active aspace and "in restricted mode" flags are consistent
   // with the thread being in restricted mode.  No error returns from here on out.  Interrupts must
   // remain disabled.
+  KTRACE_INSTANT("kernel:restricted", "RestrictedEnter");
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   VmAspace* restricted_aspace = up->restricted_aspace();
   // This check can be removed once the restricted mode tests can and do run with a restricted
@@ -187,6 +189,9 @@ void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
   DEBUG_ASSERT(rs->in_restricted());
   zx_restricted_state_t* state = rs->state_ptr();
   DEBUG_ASSERT(state);
+
+  KTRACE_INSTANT("kernel:restricted", "RestrictedLeave",
+                 ("reason", ZX_RESTRICTED_REASON_EXCEPTION));
 
   // Save the exception register state into the restricted state.
   RestrictedState::ArchSaveRestrictedExceptionState(*state);

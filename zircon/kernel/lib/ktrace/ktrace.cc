@@ -53,6 +53,7 @@ const CategoryEntry kCategories[] = {
     {KTRACE_GRP_ARCH_BIT, "kernel:arch"_category},
     {KTRACE_GRP_SYSCALL_BIT, "kernel:syscall"_category},
     {KTRACE_GRP_VM_BIT, "kernel:vm"_category},
+    {KTRACE_GRP_RESTRICTED_BIT, "kernel:restricted"_category},
 };
 
 void SetupCategoryBits() {
