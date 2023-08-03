@@ -281,6 +281,76 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install endpoint into Netstack");
+
+    const VALID_UNTIL: zx::sys::zx_time_t = 123_000_000_000;
+
+    const ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("2001:0db8::1/64");
+    let _addr_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
+        ADDR,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            initial_properties: Some(fidl_fuchsia_net_interfaces_admin::AddressProperties {
+                valid_lifetime_end: Some(VALID_UNTIL),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("failed to add preferred address");
+
+    let interface_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("event stream from state")
+    .fuse();
+    futures::pin_mut!(event_stream);
+    let mut if_state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
+
+    let valid_until = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        event_stream,
+        &mut if_state,
+        |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+             properties:
+                 fidl_fuchsia_net_interfaces_ext::Properties {
+                     addresses,
+                     online: _,
+                     id: _,
+                     name: _,
+                     device_class: _,
+                     has_default_ipv4_route: _,
+                     has_default_ipv6_route: _,
+                 },
+             state: (),
+         }| {
+            addresses.iter().find_map(
+                |fidl_fuchsia_net_interfaces_ext::Address {
+                     addr,
+                     valid_until,
+                     assignment_state: _,
+                 }| { (*addr == ADDR).then_some(*valid_until) },
+            )
+        },
+    )
+    .await
+    .expect("should succeed");
+
+    assert_eq!(valid_until, VALID_UNTIL);
+}
+
+#[netstack_test]
 async fn add_address_errors<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
