@@ -5,6 +5,7 @@
 //! Component sandbox traits and capability types.
 
 mod capability;
+pub mod data;
 pub mod dict;
 pub mod handle;
 pub mod open;
@@ -13,6 +14,7 @@ pub use self::capability::{
     AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote, TryIntoOpen,
     TryIntoOpenError,
 };
+pub use self::data::AsData;
 pub use self::dict::SomeDict;
 pub use self::handle::{CloneHandle, Handle};
 pub use self::open::Open;

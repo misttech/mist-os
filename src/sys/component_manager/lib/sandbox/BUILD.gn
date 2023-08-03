@@ -39,6 +39,7 @@ rustc_library("sandbox") {
 
   sources = [
     "src/capability.rs",
+    "src/data.rs",
     "src/dict.rs",
     "src/handle.rs",
     "src/lib.rs",
