@@ -14,6 +14,12 @@ declare_args() {
 
   # Whether or not tracing is disabled globally.
   starnix_disable_tracing = true
+
+  # Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
+  starnix_use_fuchsia_mutex = false
+
+  # Wheher to use fuchsia_sync::RwLock instead of parking_lot::RwLock.
+  starnix_use_fuchsia_rwlock = false
 }
 
 group("kernel") {
@@ -379,6 +385,12 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_disable_tracing) {
     features += [ "disable_tracing" ]
+  }
+  if (starnix_use_fuchsia_mutex) {
+    features += [ "use_fuchsia_mutex" ]
+  }
+  if (starnix_use_fuchsia_rwlock) {
+    features += [ "use_fuchsia_rwlock" ]
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

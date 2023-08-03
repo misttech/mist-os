@@ -4,6 +4,7 @@
 
 use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon::{self as zx, AsHandleRef};
+use once_cell::sync::Lazy;
 
 use crate::lock::Mutex;
 use crate::logging::log_warn;
@@ -36,7 +37,8 @@ impl UtcClockSource {
     }
 }
 
-static UTC_CLOCK_SOURCE: Mutex<UtcClockSource> = Mutex::new(UtcClockSource::new());
+static UTC_CLOCK_SOURCE: Lazy<Mutex<UtcClockSource>> =
+    Lazy::new(|| Mutex::new(UtcClockSource::new()));
 
 pub fn utc_now() -> zx::Time {
     #[cfg(test)]
@@ -47,7 +49,7 @@ pub fn utc_now() -> zx::Time {
             return test_time;
         }
     }
-    UTC_CLOCK_SOURCE.lock().now()
+    (*UTC_CLOCK_SOURCE).lock().now()
 }
 
 pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
@@ -61,7 +63,7 @@ pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
             return test_time;
         }
     }
-    UTC_CLOCK_SOURCE.lock().estimate_monotonic_deadline(utc)
+    (*UTC_CLOCK_SOURCE).lock().estimate_monotonic_deadline(utc)
 }
 
 pub async fn start_utc_clock() {
@@ -70,7 +72,7 @@ pub async fn start_utc_clock() {
     // If it is, continue silently. Otherwise we'll log that we are waiting.
     match real_utc_clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST) {
         Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => {
-            *UTC_CLOCK_SOURCE.lock() = UtcClockSource::Clock(real_utc_clock);
+            *(*UTC_CLOCK_SOURCE).lock() = UtcClockSource::Clock(real_utc_clock);
             return;
         }
         Ok(_) | Err(zx::Status::TIMED_OUT) => {}
@@ -85,13 +87,13 @@ pub async fn start_utc_clock() {
     // time so the clock will jump forward. It could jump backwards if we started running close to
     // the backstop time and our monotonic clock runs much faster than the external UTC reference.
     let offset = real_utc_clock.get_details().unwrap().backstop - zx::Time::get_monotonic();
-    *UTC_CLOCK_SOURCE.lock() = UtcClockSource::MonotonicWithOffset(offset);
+    *(*UTC_CLOCK_SOURCE).lock() = UtcClockSource::MonotonicWithOffset(offset);
     fuchsia_async::Task::spawn(async move {
         let _ = fuchsia_async::OnSignals::new(&real_utc_clock, zx::Signals::CLOCK_STARTED)
             .await
             .expect("wait should always succeed");
         log_warn!("Real UTC clock has started, replacing synthetic clock.");
-        *UTC_CLOCK_SOURCE.lock() = UtcClockSource::Clock(real_utc_clock);
+        *(*UTC_CLOCK_SOURCE).lock() = UtcClockSource::Clock(real_utc_clock);
     })
     .detach();
 }
