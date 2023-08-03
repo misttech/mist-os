@@ -79,7 +79,7 @@ pub(crate) enum NewRouteArgs<I: Ip> {
 }
 
 /// Arguments for an RTM_DELROUTE unicast route.
-/// Only the subnet field is required. All other fields are optional.
+/// Only the subnet and table field are required. All other fields are optional.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct UnicastDelRouteArgs<I: Ip> {
     // The network and prefix of the route.
@@ -98,8 +98,6 @@ pub(crate) struct UnicastDelRouteArgs<I: Ip> {
 
 /// Arguments for an RTM_DELROUTE [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-// TODO(https://issuetracker.google.com/283136222): Support RTM_DELROUTE.
-#[allow(unused)]
 pub(crate) enum DelRouteArgs<I: Ip> {
     /// Direct or gateway routes.
     Unicast(UnicastDelRouteArgs<I>),
@@ -112,6 +110,8 @@ pub(crate) enum RouteRequestArgs<I: Ip> {
     Get(GetRouteArgs),
     /// RTM_NEWROUTE
     New(NewRouteArgs<I>),
+    /// RTM_DELROUTE
+    Del(DelRouteArgs<I>),
 }
 
 /// The argument(s) for a [`Request`].
@@ -658,6 +658,11 @@ impl<
                         }
                         Err(e) => Err(e),
                     }
+                }
+                RouteRequestArgs::Del(_args) => {
+                    // TODO(issuetracker.google.com/283136222): Respond with the result
+                    // from removing the route, rather than always returning Ok(()).
+                    Ok(())
                 }
             },
         };
