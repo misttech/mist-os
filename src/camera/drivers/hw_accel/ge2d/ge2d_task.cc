@@ -14,7 +14,6 @@
 
 #include <fbl/algorithm.h>
 
-constexpr uint32_t kEndianness = 7;
 constexpr auto kTag = "ge2d";
 
 namespace ge2d {
@@ -81,7 +80,11 @@ zx_status_t Ge2dTask::AllocCanvasId(const image_format_2_t* image_format, zx_han
   info.height = image_format->display_height;
   info.stride_bytes = image_format->bytes_per_row;
   info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
-  // Do 64-bit endianness conversion.
+  // 64-bit big-endian to little-endian conversion.
+  constexpr fuchsia_hardware_amlogiccanvas::CanvasEndianness kEndianness =
+      fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap8BitPairs |
+      fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap16BitPairs |
+      fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap32BitPairs;
   info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness(kEndianness);
   info.flags = alloc_flag;
   zx_status_t status;

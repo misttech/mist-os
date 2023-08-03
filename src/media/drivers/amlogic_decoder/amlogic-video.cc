@@ -360,9 +360,9 @@ std::unique_ptr<CanvasEntry> AmlogicVideo::ConfigureCanvas(
   info.blkmode = blockmode;
 
   // 64-bit big-endian to little-endian conversion.
-  info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap8Bits |
-                    fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap16Bits |
-                    fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap32Bits;
+  info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap8BitPairs |
+                    fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap16BitPairs |
+                    fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap32BitPairs;
 
   zx::unowned_vmo vmo(io_buffer->vmo_handle);
   zx::vmo dup_vmo;

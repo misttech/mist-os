@@ -806,9 +806,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   //     Y0  U0  V0  Y1  U1  V1  Y2  U2    V2  Y3  U3  V3  Y4  U4  V4  Y5...
   //   Then we got the correct pixel interpretation.
   constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness kCanvasBigEndian64Bit =
-      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap8Bits |
-      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap16Bits |
-      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap32Bits;
+      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap8BitPairs |
+      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap16BitPairs |
+      fuchsia_hardware_amlogiccanvas::wire::CanvasEndianness::kSwap32BitPairs;
 
   canvas_info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness(kCanvasBigEndian64Bit);
   canvas_info.flags = fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
