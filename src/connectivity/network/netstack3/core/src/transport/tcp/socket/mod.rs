@@ -1322,15 +1322,15 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     fn do_send(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
     fn handle_timer(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
 
-    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R, Id: Into<SocketId<I>>>(
+    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
         &mut self,
         ctx: &mut C,
-        id: Id,
+        id: SocketId<I>,
         f: F,
     ) -> R;
-    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R, Id: Into<SocketId<I>>>(
+    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
         &mut self,
-        id: Id,
+        id: SocketId<I>,
         f: F,
     ) -> R;
 
@@ -1341,10 +1341,10 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError>;
 
-    fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
-    fn send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id) -> Option<usize>;
-    fn set_receive_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
-    fn receive_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id) -> Option<usize>;
+    fn set_send_buffer_size(&mut self, ctx: &mut C, id: SocketId<I>, size: usize);
+    fn send_buffer_size(&mut self, ctx: &mut C, id: SocketId<I>) -> Option<usize>;
+    fn set_receive_buffer_size(&mut self, ctx: &mut C, id: SocketId<I>, size: usize);
+    fn receive_buffer_size(&mut self, ctx: &mut C, id: SocketId<I>) -> Option<usize>;
 
     fn set_reuseaddr(&mut self, id: SocketId<I>, reuse: bool) -> Result<(), SetReuseAddrError>;
     fn reuseaddr(&mut self, id: SocketId<I>) -> bool;
@@ -2008,14 +2008,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         })
     }
 
-    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R, Id: Into<SocketId<I>>>(
+    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
         &mut self,
         ctx: &mut C,
-        id: Id,
+        id: SocketId<I>,
         f: F,
     ) -> R {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
-            let id = id.into();
             match sockets.socket_state.get_mut(&id).expect("invalid socket ID") {
                 SocketState::Unbound(unbound) => f(&mut unbound.socket_options),
                 SocketState::Bound(BoundSocketState::Listener((
@@ -2046,13 +2045,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         })
     }
 
-    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R, Id: Into<SocketId<I>>>(
+    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
         &mut self,
-        id: Id,
+        id: SocketId<I>,
         f: F,
     ) -> R {
         self.with_tcp_sockets(|sockets| {
-            match sockets.socket_state.get(&id.into()).expect("invalid socket ID") {
+            match sockets.socket_state.get(&id).expect("invalid socket ID") {
                 SocketState::Unbound(unbound) => f(&unbound.socket_options),
                 SocketState::Bound(BoundSocketState::Listener((
                     MaybeListener::Bound(bound),
@@ -2071,29 +2070,20 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         })
     }
 
-    fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, _ctx: &mut C, id: Id, size: usize) {
-        set_buffer_size::<SendBufferSize, I, C, SC>(self, id.into(), size)
+    fn set_send_buffer_size(&mut self, _ctx: &mut C, id: SocketId<I>, size: usize) {
+        set_buffer_size::<SendBufferSize, I, C, SC>(self, id, size)
     }
 
-    fn send_buffer_size<Id: Into<SocketId<I>>>(&mut self, _ctx: &mut C, id: Id) -> Option<usize> {
-        get_buffer_size::<SendBufferSize, I, C, SC>(self, id.into())
+    fn send_buffer_size(&mut self, _ctx: &mut C, id: SocketId<I>) -> Option<usize> {
+        get_buffer_size::<SendBufferSize, I, C, SC>(self, id)
     }
 
-    fn set_receive_buffer_size<Id: Into<SocketId<I>>>(
-        &mut self,
-        _ctx: &mut C,
-        id: Id,
-        size: usize,
-    ) {
-        set_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id.into(), size)
+    fn set_receive_buffer_size(&mut self, _ctx: &mut C, id: SocketId<I>, size: usize) {
+        set_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id, size)
     }
 
-    fn receive_buffer_size<Id: Into<SocketId<I>>>(
-        &mut self,
-        _ctx: &mut C,
-        id: Id,
-    ) -> Option<usize> {
-        get_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id.into())
+    fn receive_buffer_size(&mut self, _ctx: &mut C, id: SocketId<I>) -> Option<usize> {
+        get_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id)
     }
 
     fn set_reuseaddr(&mut self, id: SocketId<I>, reuse: bool) -> Result<(), SetReuseAddrError> {
@@ -2907,13 +2897,12 @@ where
 }
 
 /// Gets the POSIX SO_REUSEADDR socket option on a socket.
-pub fn reuseaddr<I, C>(sync_ctx: &SyncCtx<C>, id: impl Into<SocketId<I>>) -> bool
+pub fn reuseaddr<I, C>(sync_ctx: &SyncCtx<C>, id: SocketId<I>) -> bool
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let id = id.into();
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::reuseaddr(sync_ctx, id),
@@ -3052,8 +3041,8 @@ pub fn get_info<I: Ip, C: crate::NonSyncContext>(
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
-        |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_info(sync_ctx, id),
-        |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv6, _>::get_info(sync_ctx, id),
+        |(IpInvariant(sync_ctx), id)| SocketHandler::get_info(sync_ctx, id),
+        |(IpInvariant(sync_ctx), id)| SocketHandler::get_info(sync_ctx, id),
     )
 }
 
@@ -3063,16 +3052,15 @@ pub fn with_socket_options_mut<
     C: crate::NonSyncContext,
     R,
     F: FnOnce(&mut SocketOptions) -> R,
-    Id: Into<SocketId<I>>,
 >(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: Id,
+    id: SocketId<I>,
     f: F,
 ) -> R {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(r) = I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, f)), id.into()),
+        (IpInvariant((&mut sync_ctx, ctx, f)), id),
         |(IpInvariant((sync_ctx, ctx, f)), id)| {
             IpInvariant(SocketHandler::with_socket_options_mut(sync_ctx, ctx, id, f))
         },
@@ -3084,20 +3072,14 @@ pub fn with_socket_options_mut<
 }
 
 /// Access socket options immutably for a TCP socket.
-pub fn with_socket_options<
-    I: Ip,
-    C: crate::NonSyncContext,
-    R,
-    F: FnOnce(&SocketOptions) -> R,
-    Id: Into<SocketId<I>>,
->(
+pub fn with_socket_options<I: Ip, C: crate::NonSyncContext, R, F: FnOnce(&SocketOptions) -> R>(
     sync_ctx: &SyncCtx<C>,
-    id: Id,
+    id: SocketId<I>,
     f: F,
 ) -> R {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(r) = I::map_ip(
-        (IpInvariant((&mut sync_ctx, f)), id.into()),
+        (IpInvariant((&mut sync_ctx, f)), id),
         |(IpInvariant((sync_ctx, f)), id)| {
             IpInvariant(SocketHandler::with_socket_options(sync_ctx, id, f))
         },
@@ -3109,15 +3091,15 @@ pub fn with_socket_options<
 }
 
 /// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
+pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: Id,
+    id: SocketId<I>,
     size: usize,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, size)), id.into()),
+        (IpInvariant((&mut sync_ctx, ctx, size)), id),
         |(IpInvariant((sync_ctx, ctx, size)), id)| {
             SocketHandler::set_send_buffer_size(sync_ctx, ctx, id, size)
         },
@@ -3128,14 +3110,14 @@ pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I
 }
 
 /// Get the size of the send buffer for this socket and future derived sockets.
-pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
+pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: Id,
+    id: SocketId<I>,
 ) -> Option<usize> {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(size) = I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id.into()),
+        (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             IpInvariant(SocketHandler::send_buffer_size(sync_ctx, ctx, id))
         },
@@ -3147,15 +3129,15 @@ pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
 }
 
 /// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
+pub fn set_receive_buffer_size<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: Id,
+    id: SocketId<I>,
     size: usize,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, size)), id.into()),
+        (IpInvariant((&mut sync_ctx, ctx, size)), id),
         |(IpInvariant((sync_ctx, ctx, size)), id)| {
             SocketHandler::set_receive_buffer_size(sync_ctx, ctx, id, size)
         },
@@ -3167,14 +3149,14 @@ pub fn set_receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketI
 
 /// Get the size of the receive buffer for this socket and future derived
 /// sockets.
-pub fn receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
+pub fn receive_buffer_size<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: Id,
+    id: SocketId<I>,
 ) -> Option<usize> {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(size) = I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id.into()),
+        (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             IpInvariant(SocketHandler::receive_buffer_size(sync_ctx, ctx, id))
         },
@@ -5260,11 +5242,16 @@ mod tests {
                 Some(PORT_1),
             )
             .expect("bind should succeed");
-            SocketHandler::set_send_buffer_size(sync_ctx, non_sync_ctx, bound, local_sizes.send);
+            SocketHandler::set_send_buffer_size(
+                sync_ctx,
+                non_sync_ctx,
+                bound.into(),
+                local_sizes.send,
+            );
             SocketHandler::set_receive_buffer_size(
                 sync_ctx,
                 non_sync_ctx,
-                bound,
+                bound.into(),
                 local_sizes.receive,
             );
             SocketHandler::listen(sync_ctx, bound, NonZeroUsize::new(5).unwrap())
@@ -5273,11 +5260,16 @@ mod tests {
 
         let remote_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
-            SocketHandler::set_send_buffer_size(sync_ctx, non_sync_ctx, unbound, remote_sizes.send);
+            SocketHandler::set_send_buffer_size(
+                sync_ctx,
+                non_sync_ctx,
+                unbound.into(),
+                remote_sizes.send,
+            );
             SocketHandler::set_receive_buffer_size(
                 sync_ctx,
                 non_sync_ctx,
-                unbound,
+                unbound.into(),
                 local_sizes.receive,
             );
             SocketHandler::connect_unbound(

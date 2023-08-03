@@ -886,30 +886,20 @@ where
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        match *id {
-            SocketId::Unbound(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Bound(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Connection(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Listener(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-        }
+        set_send_buffer_size(sync_ctx, non_sync_ctx, *id, new_size);
     }
 
     fn send_buffer_size(self) -> u64 {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match *id {
-            SocketId::Unbound(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Bound(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Connection(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Listener(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
-        }
-        // If the socket doesn't have a send buffer (e.g. because it was shut
-        // down for writing and all the data was sent to the peer), return 0.
-        .unwrap_or(0)
-        .try_into()
-        .ok_checked::<TryFromIntError>()
-        .unwrap_or(u64::MAX)
+        send_buffer_size(sync_ctx, non_sync_ctx, *id)
+            // If the socket doesn't have a send buffer (e.g. because it was shut
+            // down for writing and all the data was sent to the peer), return 0.
+            .unwrap_or(0)
+            .try_into()
+            .ok_checked::<TryFromIntError>()
+            .unwrap_or(u64::MAX)
     }
 
     fn set_receive_buffer_size(self, new_size: u64) {
@@ -918,32 +908,20 @@ where
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        match *id {
-            SocketId::Unbound(id) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Bound(id) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Connection(id) => {
-                set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size)
-            }
-            SocketId::Listener(id) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-        }
+        set_receive_buffer_size(sync_ctx, non_sync_ctx, *id, new_size);
     }
 
     fn receive_buffer_size(self) -> u64 {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match *id {
-            SocketId::Unbound(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Bound(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Connection(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Listener(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
-        }
-        // If the socket doesn't have a receive buffer (e.g. because the remote
-        // end signalled FIN and all data was sent to the client), return 0.
-        .unwrap_or(0)
-        .try_into()
-        .ok_checked::<TryFromIntError>()
-        .unwrap_or(u64::MAX)
+        receive_buffer_size(sync_ctx, non_sync_ctx, *id)
+            // If the socket doesn't have a receive buffer (e.g. because the remote
+            // end signalled FIN and all data was sent to the client), return 0.
+            .unwrap_or(0)
+            .try_into()
+            .ok_checked::<TryFromIntError>()
+            .unwrap_or(u64::MAX)
     }
 
     fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
@@ -957,12 +935,7 @@ where
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-        match *id {
-            SocketId::Unbound(id) => reuseaddr(sync_ctx, id),
-            SocketId::Bound(id) => reuseaddr(sync_ctx, id),
-            SocketId::Listener(id) => reuseaddr(sync_ctx, id),
-            SocketId::Connection(id) => reuseaddr(sync_ctx, id),
-        }
+        reuseaddr(sync_ctx, *id)
     }
 
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
@@ -1639,24 +1612,14 @@ where
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        match *id {
-            SocketId::Unbound(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Bound(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Connection(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Listener(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
-        }
+        with_socket_options_mut(sync_ctx, non_sync_ctx, *id, f)
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx: _ } = &ctx;
-        match *id {
-            SocketId::Unbound(id) => with_socket_options(sync_ctx, id, f),
-            SocketId::Bound(id) => with_socket_options(sync_ctx, id, f),
-            SocketId::Connection(id) => with_socket_options(sync_ctx, id, f),
-            SocketId::Listener(id) => with_socket_options(sync_ctx, id, f),
-        }
+        with_socket_options(sync_ctx, *id, f)
     }
 }
 
