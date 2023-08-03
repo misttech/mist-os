@@ -1828,6 +1828,10 @@ constexpr zxio_ops_t Symlink::kOps = ([]() {
   ops.flags_get = Adaptor::From<&Symlink::FlagsGet>;
   ops.read_link = Adaptor::From<&Symlink::ReadLink>;
   ops.link_into = Adaptor::From<&Symlink::LinkInto>;
+  ops.xattr_list = Adaptor::From<&Symlink::XattrList>;
+  ops.xattr_get = Adaptor::From<&Symlink::XattrGet>;
+  ops.xattr_set = Adaptor::From<&Symlink::XattrSet>;
+  ops.xattr_remove = Adaptor::From<&Symlink::XattrRemove>;
   return ops;
 })();
 

@@ -1116,6 +1116,64 @@ impl FsNodeOps for RemoteSymlink {
             self.zxio.read_link().map_err(|status| from_status_like_fdio!(status))?.to_vec(),
         ))
     }
+
+    fn get_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        _max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        let value = self.zxio.xattr_get(name).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })?;
+        Ok(value.into())
+    }
+
+    fn set_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
+        let mode = match op {
+            XattrOp::Set => XattrSetMode::Set,
+            XattrOp::Create => XattrSetMode::Create,
+            XattrOp::Replace => XattrSetMode::Replace,
+        };
+
+        self.zxio.xattr_set(name, value, mode).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })
+    }
+
+    fn remove_xattr(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        self.zxio.xattr_remove(name).map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            _ => from_status_like_fdio!(status),
+        })
+    }
+
+    fn list_xattrs(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        self.zxio
+            .xattr_list()
+            .map(ValueOrSize::from)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
 }
 
 #[cfg(test)]

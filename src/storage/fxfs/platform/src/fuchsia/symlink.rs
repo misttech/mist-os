@@ -14,7 +14,8 @@ use {
         object_handle::ObjectProperties,
         object_store::{
             transaction::{LockKey, Options},
-            ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
+            HandleOptions, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
+            StoreObjectHandle,
         },
     },
     std::sync::Arc,
@@ -33,12 +34,43 @@ impl FxSymlink {
     pub fn new(volume: Arc<FxVolume>, object_id: u64) -> Self {
         Self { volume, object_id }
     }
+
+    fn store_handle(&self) -> StoreObjectHandle<FxVolume> {
+        StoreObjectHandle::new(
+            self.volume.clone(),
+            self.object_id,
+            None,
+            HandleOptions::default(),
+            false,
+        )
+    }
 }
 
 #[async_trait]
 impl Symlink for FxSymlink {
     async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
         self.volume.store().read_symlink(self.object_id).await.map_err(map_to_status)
+    }
+
+    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, zx::Status> {
+        self.store_handle().list_extended_attributes().await.map_err(map_to_status)
+    }
+    async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, zx::Status> {
+        self.store_handle().get_extended_attribute(name).await.map_err(map_to_status)
+    }
+    async fn set_extended_attribute(
+        &self,
+        name: Vec<u8>,
+        value: Vec<u8>,
+        mode: fio::SetExtendedAttributeMode,
+    ) -> Result<(), zx::Status> {
+        self.store_handle()
+            .set_extended_attribute(name, value, mode.into())
+            .await
+            .map_err(map_to_status)
+    }
+    async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), zx::Status> {
+        self.store_handle().remove_extended_attribute(name).await.map_err(map_to_status)
     }
 }
 
