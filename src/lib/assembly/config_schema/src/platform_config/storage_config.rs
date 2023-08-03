@@ -19,5 +19,5 @@ pub struct StorageConfig {
     pub gpt_all: bool,
 
     #[serde(default)]
-    pub filesystems: Option<ProductFilesystemConfig>,
+    pub filesystems: ProductFilesystemConfig,
 }

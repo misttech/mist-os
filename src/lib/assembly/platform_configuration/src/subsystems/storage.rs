@@ -14,16 +14,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         storage_config: &StorageConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if let Some(filesystems) = &storage_config.filesystems {
-            if context.filesystems != filesystems {
-                bail!(
-                    "The filesystems passed to product assembly via \
-                       the CLI argument --filesystem-config does not \
-                       match the filesystems nested inside the product \
-                       config from --product: {}",
-                    Comparison::new(&context.filesystems, &filesystems)
-                );
-            }
+        if context.filesystems != &storage_config.filesystems {
+            bail!(
+                "The filesystems passed to product assembly via \
+                   the CLI argument --filesystem-config does not \
+                   match the filesystems nested inside the product \
+                   config from --product: {}",
+                Comparison::new(&context.filesystems, &storage_config.filesystems)
+            );
         }
 
         if storage_config.live_usb_enabled {

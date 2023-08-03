@@ -13,6 +13,19 @@ test_assembly_config("structured_config") {
   platform = {
     feature_set_level = "bootstrap"
     build_type = "eng"
+    storage = {
+      filesystems = {
+        image_name = "assemble_test"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
   }
   additional_args = [
     "--config",

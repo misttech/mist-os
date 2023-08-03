@@ -26,6 +26,19 @@ test_assembly_config("compiled_package") {
     example_config = {
       include_example_aib = true
     }
+    storage = {
+      filesystems = {
+        image_name = "assemble_test"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
   }
   core_realm_definition = ":core_realm"
   additional_args = [

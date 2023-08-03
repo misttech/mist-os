@@ -16,5 +16,18 @@ test_assembly_config("product_drivers") {
   platform = {
     feature_set_level = "empty"
     build_type = "eng"
+    storage = {
+      filesystems = {
+        image_name = "assemble_test"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
   }
 }
