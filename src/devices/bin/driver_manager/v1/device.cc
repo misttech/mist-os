@@ -68,7 +68,9 @@ Device::Device(Coordinator* coord, fbl::String name, fbl::String parent_driver_u
       parent_(std::move(parent)),
       protocol_id_(protocol_id),
       publish_task_([this] {
-        [[maybe_unused]] auto result = device_controller_->SignalMadeVisible();
+        if (device_controller_.is_valid()) {
+          [[maybe_unused]] auto result = device_controller_->SignalMadeVisible();
+        }
         // TODO(tesienbe): We probably should do something with the return value
         // from this...
         coordinator->bind_driver_manager().BindDevice(fbl::RefPtr(this));
