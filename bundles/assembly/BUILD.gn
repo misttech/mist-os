@@ -276,9 +276,6 @@ assembly_input_bundle("bootstrap_userdebug") {
     "//src/zircon/bin/ktrace:bootfs",
     "//src/zircon/bin/loadgen:bootfs",
 
-    # drivers
-    "//src/devices/nand/drivers/broker:bootfs",
-
     # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
@@ -286,6 +283,13 @@ assembly_input_bundle("bootstrap_userdebug") {
   # Do not automatically include pistress, but build it to keep it from
   # bit-rotting.
   deps = [ "//src/zircon/bin/pistress:bootfs" ]
+
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/nand/drivers/broker:package"
+      driver_components = [ "meta/nand-broker.cm" ]
+    },
+  ]
 }
 
 # The most-common, most-basic, AIB that is included in all eng systems.
