@@ -2,6 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+declare_args() {
+  # This directory contains the cipd packages for linux-x64, linux-arm64, and
+  # mac-x64. Rather than using the prebuilts provided with the source tree, you
+  # can download these individual packages from cipd and set this to the directory
+  # containing those packages.
+  llvm_prefix = "//prebuilt/third_party/llvm"
+}
+
 # Soft transition when rolling LLVM with API changes. Clients can use LLVM_USING_OLD_PREBUILT macro
 # to detect the LLVM version.
 #
@@ -9,9 +17,9 @@
 # checking, and update the old_prebuilt_instance_ids to the old version you want
 # to detect. Otherwise this condition should be false.
 if (false) {
-  prebuilt_cipd_version = read_file(
-          "//prebuilt/third_party/llvm/${host_platform}/.versions/llvm.cipd_version",
-          "json")
+  prebuilt_cipd_version =
+      read_file("${llvm_prefix}/${host_platform}/.versions/llvm.cipd_version",
+                "json")
   prebuilt_instance_id = prebuilt_cipd_version.instance_id
 
   old_prebuilt_instance_ids = [
@@ -29,12 +37,11 @@ if (false) {
 config("LLVM_config") {
   visibility = [ ":*" ]
 
-  include_dirs = [ "//prebuilt/third_party/llvm/${current_platform}/include" ]
+  include_dirs = [ "${llvm_prefix}/${current_platform}/include" ]
   if (current_os == "linux") {
-    libs = [ "//prebuilt/third_party/llvm/${current_platform}/lib/libLLVM.so" ]
+    libs = [ "${llvm_prefix}/${current_platform}/lib/libLLVM.so" ]
   } else if (current_os == "mac") {
-    libs =
-        [ "//prebuilt/third_party/llvm/${current_platform}/lib/libLLVM.dylib" ]
+    libs = [ "${llvm_prefix}/${current_platform}/lib/libLLVM.dylib" ]
   }
 
   if (using_old_prebuilt) {
@@ -52,9 +59,8 @@ config("LLVMHeader_config") {
   # of LLVM library yet, always use host_platform's include directory for now.
   # It should make no difference as headers are the same across different platforms.
   # Use -isystem instead of -I to suppress -Wconversion warnings in those headers.
-  cflags = [ "-isystem" +
-             rebase_path("//prebuilt/third_party/llvm/${host_platform}/include",
-                         root_build_dir) ]
+  cflags = [ "-isystem" + rebase_path("${llvm_prefix}/${host_platform}/include",
+                                      root_build_dir) ]
 
   if (using_old_prebuilt) {
     defines = [ "LLVM_USING_OLD_PREBUILT" ]
@@ -64,9 +70,7 @@ config("LLVMHeader_config") {
 template("llvm_library") {
   config(target_name + "_config") {
     visibility = [ ":*" ]
-    libs = [
-      "//prebuilt/third_party/llvm/${current_platform}/lib/lib${target_name}.a",
-    ]
+    libs = [ "${llvm_prefix}/${current_platform}/lib/lib${target_name}.a" ]
   }
 
   group(target_name) {
