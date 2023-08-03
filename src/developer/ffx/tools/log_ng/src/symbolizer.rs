@@ -15,7 +15,7 @@ use crate::error::LogError;
 #[derive(Debug)]
 pub struct SymbolizerChannel<T>
 where
-    T: Symbolizer + Debug,
+    T: Symbolizer,
 {
     sender: async_channel::Sender<String>,
     receiver: async_channel::Receiver<String>,
@@ -25,7 +25,7 @@ where
 #[async_trait(?Send)]
 impl<T> Symbolize for SymbolizerChannel<T>
 where
-    T: Symbolizer + Debug,
+    T: Symbolizer,
 {
     async fn symbolize(&self, entry: LogEntry) -> LogEntry {
         self.symbolize_message(entry).await
@@ -44,7 +44,7 @@ enum SymbolizerError {
 
 impl<T> SymbolizerChannel<T>
 where
-    T: Symbolizer + Debug,
+    T: Symbolizer,
 {
     /// Constructs a SymbolizerChannel from the given symbolizer
     /// and starts the symbolizer process, opening a channel for communication.
@@ -59,7 +59,7 @@ where
     /// if it cannot be symbolized.
     async fn symbolize_message(&self, log: LogEntry) -> LogEntry
     where
-        T: Symbolizer + Debug,
+        T: Symbolizer,
     {
         let LogEntry { timestamp, data } = log;
         let data = match data {

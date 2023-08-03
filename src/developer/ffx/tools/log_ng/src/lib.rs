@@ -24,7 +24,7 @@ use log_command::{
     },
     LogCommand, LogSubCommand, TimeFormat, WatchCommand,
 };
-use log_symbolizer::NoOpSymbolizer;
+use log_symbolizer::{LogSymbolizer, Symbolizer};
 use std::io::Write;
 use symbolizer::SymbolizerChannel;
 
@@ -52,7 +52,8 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_main(writer, self.rcs_proxy, self.target_collection, self.cmd).await?;
+        log_main(writer, self.rcs_proxy, self.target_collection, self.cmd, LogSymbolizer::new())
+            .await?;
         Ok(())
     }
 }
@@ -63,6 +64,7 @@ async fn log_main(
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
+    symbolizer: impl Symbolizer,
 ) -> Result<(), LogError> {
     let is_json = writer.is_machine();
     let node_name = rcs_proxy.identify_host().await??.nodename;
@@ -104,7 +106,7 @@ async fn log_main(
             ..Default::default()
         },
     );
-    log_loop(target_collection_proxy, target_query, cmd, formatter).await?;
+    log_loop(target_collection_proxy, target_query, cmd, formatter, symbolizer).await?;
     Ok(())
 }
 
@@ -182,10 +184,12 @@ async fn log_loop<W>(
     target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
+    symbolizer: impl Symbolizer,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
 {
+    let symbolizer_channel = SymbolizerChannel::new(symbolizer).await?;
     let stream_mode = get_stream_mode(cmd.clone())?;
     // TODO(https://fxbug.dev/129624): Add support for reconnect handling to Overnet.
     // This plugin needs special logic to handle reconnects as logging should tolerate
@@ -199,12 +203,8 @@ where
             connection.log_settings_client.set_interest(&cmd.select).await?;
         }
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
-        let maybe_err = dump_logs_from_socket(
-            connection.log_socket,
-            &mut formatter,
-            &SymbolizerChannel::new(NoOpSymbolizer::new()).await?,
-        )
-        .await;
+        let maybe_err =
+            dump_logs_from_socket(connection.log_socket, &mut formatter, &symbolizer_channel).await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
             break;
         }
@@ -255,24 +255,101 @@ mod tests {
         log_formatter::{LogData, TIMESTAMP_FORMAT},
         parse_seconds_string_as_duration, parse_time, DumpCommand,
     };
+    use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
     use selectors::parse_log_interest_selector;
     use std::rc::Rc;
+
+    #[fuchsia::test]
+    async fn symbolizer_replaces_markers_with_symbolized_logs() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            ..LogCommand::default()
+        };
+        let symbolizer = FakeSymbolizerForTest::new("prefix", vec![]);
+        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
+            messages: vec![
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("{{{reset}}}")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("{{{mmap:something}}")
+                .build(),
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("not_real")
+                .build(),
+            ],
+            ..Default::default()
+        }));
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Ensure that main exited successfully.
+        main_result.next().await.unwrap().unwrap();
+
+        assert_eq!(
+            test_buffers.stdout.into_string().split('\n').collect::<Vec<_>>(),
+            vec![
+                "[00000.000000][ffx] INFO: prefix{{{reset}}}\u{1b}[m",
+                "[00000.000000][ffx] INFO: prefix{{{mmap:something}}\u{1b}[m",
+                "[00000.000000][ffx] INFO: not_real\u{1b}[m",
+                ""
+            ]
+        );
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+    }
 
     #[fuchsia::test]
     async fn json_logger_test() {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
         task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
@@ -281,9 +358,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager.spawn_result(
-            tool.main(MachineWriter::<LogEntry>::new_test(Some(Format::Json), &test_buffers)),
-        );
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(Some(Format::Json), &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -313,17 +394,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                since: Some(parse_time("now").unwrap()),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            since: Some(parse_time("now").unwrap()),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let task_manager = TaskManager::new();
         let scheduler = task_manager.get_scheduler();
         task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
@@ -332,20 +410,18 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
 
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
-        assert_matches!(
-            main_result.next().await.unwrap().map_err(|value| {
-                assert_matches!(value, fho::Error::User(value)=>value)
-                    .downcast::<LogError>()
-                    .unwrap()
-            }),
-            Err(LogError::DumpWithSinceNow)
-        );
+        assert_matches!(main_result.next().await.unwrap(), Err(LogError::DumpWithSinceNow));
     }
 
     #[fuchsia::test]
@@ -353,16 +429,13 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -372,8 +445,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -391,17 +469,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                no_color: true,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            no_color: true,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -411,8 +486,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -430,18 +510,15 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                show_metadata: true,
-                no_color: true,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            show_metadata: true,
+            no_color: true,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -451,8 +528,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -470,17 +552,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                clock: TimeFormat::Utc,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            clock: TimeFormat::Utc,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -502,8 +581,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -521,18 +605,15 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                clock: TimeFormat::Utc,
-                severity: Severity::Error,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            clock: TimeFormat::Utc,
+            severity: Severity::Error,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
@@ -576,8 +657,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -596,19 +682,16 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                clock: TimeFormat::Local,
-                since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
-                until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            clock: TimeFormat::Local,
+            since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
+            until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
@@ -670,8 +753,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -689,19 +777,16 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                clock: TimeFormat::Utc,
-                since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
-                until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            clock: TimeFormat::Utc,
+            since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
+            until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
@@ -745,8 +830,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -764,17 +854,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                clock: TimeFormat::Local,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            clock: TimeFormat::Local,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -796,8 +883,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -818,16 +910,13 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -850,8 +939,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -869,16 +963,13 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -901,8 +992,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -920,17 +1016,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                show_full_moniker: true,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            show_full_moniker: true,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -953,8 +1046,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -972,17 +1070,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                hide_tags: true,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            hide_tags: true,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1005,8 +1100,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -1025,17 +1125,14 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let severity = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                select: severity.clone(),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            select: severity.clone(),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new();
         let mut event_stream = task_manager.take_event_stream().unwrap();
         let scheduler = task_manager.get_scheduler();
@@ -1045,8 +1142,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -1065,16 +1167,13 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1099,8 +1198,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
@@ -1119,17 +1223,14 @@ mod tests {
         let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
-        let tool = LogTool {
-            cmd: LogCommand {
-                sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                    session: log_command::SessionSpec::Relative(0),
-                })),
-                hide_file: true,
-                ..LogCommand::default()
-            },
-            rcs_proxy: rcs_proxy,
-            target_collection: target_collection_proxy,
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {
+                session: log_command::SessionSpec::Relative(0),
+            })),
+            hide_file: true,
+            ..LogCommand::default()
         };
+        let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
@@ -1154,8 +1255,13 @@ mod tests {
             scheduler.clone(),
         ));
         let test_buffers = TestBuffers::default();
-        let mut main_result = task_manager
-            .spawn_result(tool.main(MachineWriter::<LogEntry>::new_test(None, &test_buffers)));
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+        ));
         // Run all tasks until exit.
         task_manager.run().await;
         // Ensure that main exited successfully.
