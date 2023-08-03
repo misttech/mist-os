@@ -45,8 +45,12 @@ For an API to be included in the Fuchsia SDK in the `partner`,
 hurdles: there must be a ready and willing customer, and the API must have gone
 through [API calibration][calibration].
 
-To request an API Calibration, send an email to api-council@fuchsia.dev,
-indicating the specific library or libraries you'd like to promote.
+To request an API Calibration, fill out this form:
+[goto.google.com/fuchsia-api-calibration-request](https://goto.google.com/fuchsia-api-calibration-request).
+
+If you don't have access to that form, send an email to
+api-council@fuchsia.dev indicating the specific library or libraries you'd
+like to promote, and the API council will follow up with next steps.
 
 <!-- Reference links -->
 
