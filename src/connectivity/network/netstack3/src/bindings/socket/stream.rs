@@ -39,7 +39,7 @@ use netstack3_core::{
         segment::Payload,
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
-            get_connection_error, get_handshake_status, get_info, listen, receive_buffer_size,
+            get_handshake_status, get_info, get_socket_error, listen, receive_buffer_size,
             remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_device,
             set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown_conn,
             shutdown_listener, with_socket_options, with_socket_options_mut, AcceptError,
@@ -823,16 +823,11 @@ where
 
     fn get_error(self) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        match *id {
-            SocketId::Unbound(_) | SocketId::Bound(_) | SocketId::Listener(_) => Ok(()),
-            SocketId::Connection(conn_id) => {
-                let mut ctx = ctx.clone();
-                let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-                match get_connection_error(sync_ctx, conn_id) {
-                    Some(err) => Err(err.into_errno()),
-                    None => Ok(()),
-                }
-            }
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        match get_socket_error(sync_ctx, *id) {
+            Some(err) => Err(err.into_errno()),
+            None => Ok(()),
         }
     }
 

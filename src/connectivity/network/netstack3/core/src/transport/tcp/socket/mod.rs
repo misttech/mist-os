@@ -909,7 +909,7 @@ struct Connection<I: IpExt, D: Id, II: Instant, R: ReceiveBuffer, S: SendBuffer,
     socket_options: SocketOptions,
     /// In contrast to a hard error, which will cause a connection to be closed,
     /// a soft error will not abort the connection, but it can be read by either
-    /// calling `get_connection_error`, or after the connection times out.
+    /// calling `get_socket_error`, or after the connection times out.
     soft_error: Option<ConnectionError>,
     /// Whether the handshake has finished or aborted.
     handshake_status: HandshakeStatus,
@@ -1361,7 +1361,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         error: IcmpErrorCode,
     );
 
-    fn get_connection_error(&mut self, conn_id: ConnectionId<I>) -> Option<ConnectionError>;
+    fn get_socket_error(&mut self, id: SocketId<I>) -> Option<ConnectionError>;
     fn with_info<V: InfoVisitor>(&mut self, cb: V) -> V::VisitResult;
 }
 
@@ -2202,16 +2202,20 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         })
     }
 
-    fn get_connection_error(&mut self, conn_id: ConnectionId<I>) -> Option<ConnectionError> {
+    fn get_socket_error(&mut self, id: SocketId<I>) -> Option<ConnectionError> {
         self.with_tcp_sockets_mut(|Sockets { socket_state, port_alloc: _, socketmap: _ }| {
-            let (conn, _sharing, _addr) =
-                conn_id.get_from_socket_state_mut(socket_state).expect("invalid connection ID");
-            let hard_error = if let State::Closed(Closed { reason: hard_error }) = conn.state {
-                hard_error.clone()
-            } else {
-                None
-            };
-            hard_error.or_else(|| conn.soft_error.take())
+            match socket_state.get_mut(&id).expect("invalid socket ID") {
+                SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => None,
+                SocketState::Bound(BoundSocketState::Connected((conn, _sharing, _addr))) => {
+                    let hard_error =
+                        if let State::Closed(Closed { reason: hard_error }) = conn.state {
+                            hard_error.clone()
+                        } else {
+                            None
+                        };
+                    hard_error.or_else(|| conn.soft_error.take())
+                }
+            }
         })
     }
 
@@ -3168,19 +3172,15 @@ pub fn receive_buffer_size<I: Ip, C: crate::NonSyncContext>(
 }
 
 /// Gets the last error on the connection.
-pub fn get_connection_error<I: Ip, C: crate::NonSyncContext>(
+pub fn get_socket_error<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
-    conn_id: ConnectionId<I>,
+    id: SocketId<I>,
 ) -> Option<ConnectionError> {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(err) = I::map_ip(
-        (IpInvariant(&mut sync_ctx), conn_id),
-        |(IpInvariant(sync_ctx), conn_id)| {
-            IpInvariant(SocketHandler::get_connection_error(sync_ctx, conn_id))
-        },
-        |(IpInvariant(sync_ctx), conn_id)| {
-            IpInvariant(SocketHandler::get_connection_error(sync_ctx, conn_id))
-        },
+        (IpInvariant(&mut sync_ctx), id),
+        |(IpInvariant(sync_ctx), id)| IpInvariant(SocketHandler::get_socket_error(sync_ctx, id)),
+        |(IpInvariant(sync_ctx), id)| IpInvariant(SocketHandler::get_socket_error(sync_ctx, id)),
     );
     err
 }
@@ -5161,7 +5161,7 @@ mod tests {
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
             for conn in [remote_connection, second_connection] {
                 assert_eq!(
-                    SocketHandler::get_connection_error(sync_ctx, conn),
+                    SocketHandler::get_socket_error(sync_ctx, conn.into()),
                     Some(ConnectionError::ConnectionReset),
                 )
             }
@@ -5798,7 +5798,7 @@ mod tests {
             SocketHandler::get_handshake_status(&mut sync_ctx, connection),
             HandshakeStatus::Aborted,
         );
-        SocketHandler::get_connection_error(&mut sync_ctx, connection).unwrap()
+        SocketHandler::get_socket_error(&mut sync_ctx, connection.into()).unwrap()
     }
 
     #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
@@ -5873,7 +5873,7 @@ mod tests {
             );
             // An error should be posted on the connection.
             let error = assert_matches!(
-                SocketHandler::get_connection_error(sync_ctx, local),
+                SocketHandler::get_socket_error(sync_ctx, local.into()),
                 Some(error) => error
             );
             // But it should stay established.
