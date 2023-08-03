@@ -29,7 +29,8 @@ To run a command directly from the command line:
 PATH=/.dash/tools/debug-dash-launcher
 PWD=/
 ",
-    note = "The environment contains the following directories of the explored instance:
+    note = "When --layout=nested (the default), the environment contains the following
+directories of the explored instance:
 * /ns       The namespace of the instance
 * /exposed  The capabilities exposed by the instance
 * /out      The outgoing directory of the instance, if it is running
@@ -39,13 +40,19 @@ The environment also contains the following directories, irrespective of the exp
 * /.dash    User-added and built-in dash tools
 * /svc      Protocols required by the dash shell
 
-If additional binaries are provided via --tools, they will be loaded into .dash/tools/<pkg>/<binary>
-The path is set so that they can be run by name. The path preference is in the command line order
-of the --tools arguments, ending with the built-in dash tools (/.dash/tools/debug-dash-launcher).
+When --layout=namespace, the contents of the /ns dir above are placed at / with two protocols
+(fuchsia.process.Launcher and fuchsia.process.Resolver) overlayed into /svc. In this mode, the
+exposed, out, and runtime directories will not be accessible.
 
---tools URLs may be package or binary URLs. Note that collisions can occur if different URLs have
-the same package and binary names. An error, `NonUniqueBinaryName`, is returned if a binary name
-collision occurs.
+With --tools, tools in the specified package will be loaded into /.dash/tools/<pkg>/<binary>
+The path is set so that they can be run by name. The path preference is in the command line order
+of the --tools arguments, with any built-in tools taking lowest priority.
+
+--tools URLs may be package or binary URLs. If a package URL is given, tool executables are expected
+to be in a bin/ dir within the package. If a specific tool URL is given, append the tool path
+to the package URL. For example: --tools fuchsia-pkg://fuchsia.com/my_package#bin/my_tool. Note that
+naming collisions can occur if multiple packages share a package or binary name. An error,
+`NonUniqueBinaryName`, is returned if a binary name collision occurs.
 "
 )]
 
