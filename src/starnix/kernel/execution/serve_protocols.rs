@@ -193,17 +193,15 @@ fn forward_to_pty(
     kernel.kthreads.pool.dispatch({
         let read_task = container.kernel.kthreads.new_system_thread()?;
         move || {
-            let _result: Result<(), Error> =
-                fasync::LocalExecutor::new().run_singlethreaded(async {
-                    scopeguard::defer! {
-                        read_task.release(&());
-                    }
+            let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
+                async_release_after!(read_task, &(), || -> Result<(), Error> {
                     let mut buffer = vec![0u8; BUFFER_CAPACITY];
                     loop {
                         let bytes = rx.read(&mut buffer[..]).await?;
                         pty_sink.write(&read_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
                     }
-                });
+                })
+            });
         }
     });
 
@@ -211,18 +209,16 @@ fn forward_to_pty(
     kernel.kthreads.pool.dispatch({
         let write_task = container.kernel.kthreads.new_system_thread()?;
         move || {
-            let _result: Result<(), Error> =
-                fasync::LocalExecutor::new().run_singlethreaded(async {
-                    scopeguard::defer! {
-                        write_task.release(&());
-                    }
+            let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
+                async_release_after!(write_task, &(), || -> Result<(), Error> {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();
                         pty_source.read(&write_task, &mut buffer)?;
                         tx.write_all(buffer.data()).await?;
                     }
-                });
+                })
+            });
         }
     });
 

@@ -582,6 +582,29 @@ macro_rules! release_on_error {
     }};
 }
 
+pub mod internal {
+    pub async fn async_try<E>(block: impl std::future::Future<Output = E>) -> E {
+        block.await
+    }
+}
+
+/// Macro that ensure the releasable is released with the given context after the block terminates,
+/// whether there is an error or not.
+macro_rules! async_release_after {
+    ($releasable_name:ident, $context:expr, $body:block ) => {{
+        let result = crate::types::ownership::internal::async_try(async { $body }).await;
+        $releasable_name.release($context);
+        result
+    }};
+    ($releasable_name:ident, $context:expr, || -> $output_type:ty $body:block ) => {{
+        let result =
+            crate::types::ownership::internal::async_try::<$output_type>(async { $body }).await;
+        $releasable_name.release($context);
+        result
+    }};
+}
+
+pub(crate) use async_release_after;
 pub(crate) use release_on_error;
 
 #[cfg(any(test, debug_assertions))]
