@@ -4,7 +4,7 @@
 
 use {
     num_traits::FromPrimitive,
-    zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Ref},
 };
 
 #[repr(u8)]
@@ -155,13 +155,13 @@ impl<'a> HidDescriptorIter<'a> {
         HidDescriptorIter { offset: std::mem::size_of::<HidDescriptor>(), buffer }
     }
 
-    pub fn get(&self) -> LayoutVerified<&[u8], HidDescriptor> {
-        LayoutVerified::new(&self.buffer[0..(std::mem::size_of::<HidDescriptor>())]).unwrap()
+    pub fn get(&self) -> Ref<&[u8], HidDescriptor> {
+        Ref::new(&self.buffer[0..(std::mem::size_of::<HidDescriptor>())]).unwrap()
     }
 }
 
 impl<'a> Iterator for HidDescriptorIter<'a> {
-    type Item = LayoutVerified<&'a [u8], HidDescriptorEntry>;
+    type Item = Ref<&'a [u8], HidDescriptorEntry>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let len = std::mem::size_of::<HidDescriptorEntry>();
@@ -171,18 +171,18 @@ impl<'a> Iterator for HidDescriptorIter<'a> {
         let slice = &self.buffer[self.offset..self.offset + len];
         self.offset += len;
 
-        LayoutVerified::new(slice)
+        Ref::new(slice)
     }
 }
 
 pub enum Descriptor<'a> {
-    Config(LayoutVerified<&'a [u8], ConfigurationDescriptor>),
-    Interface(LayoutVerified<&'a [u8], InterfaceInfoDescriptor>),
-    InterfaceAssociation(LayoutVerified<&'a [u8], InterfaceAssocDescriptor>),
-    Endpoint(LayoutVerified<&'a [u8], EndpointInfoDescriptor>),
+    Config(Ref<&'a [u8], ConfigurationDescriptor>),
+    Interface(Ref<&'a [u8], InterfaceInfoDescriptor>),
+    InterfaceAssociation(Ref<&'a [u8], InterfaceAssocDescriptor>),
+    Endpoint(Ref<&'a [u8], EndpointInfoDescriptor>),
     Hid(HidDescriptorIter<'a>),
-    SsEpCompanion(LayoutVerified<&'a [u8], SsEpCompDescriptorInfo>),
-    SsIsochEpCompanion(LayoutVerified<&'a [u8], SsIsochEpCompDescriptor>),
+    SsEpCompanion(Ref<&'a [u8], SsEpCompDescriptorInfo>),
+    SsIsochEpCompanion(Ref<&'a [u8], SsIsochEpCompDescriptor>),
     Unknown(&'a [u8]),
 }
 
@@ -204,15 +204,9 @@ impl<'a> Iterator for DescriptorIterator<'a> {
         let slice = &self.buffer[self.offset..self.offset + length];
 
         let desc = match DescriptorType::from_u8(desc_type) {
-            Some(DescriptorType::Config) => {
-                LayoutVerified::new(slice).map(|d| Descriptor::Config(d))
-            }
-            Some(DescriptorType::Interface) => {
-                LayoutVerified::new(slice).map(|d| Descriptor::Interface(d))
-            }
-            Some(DescriptorType::Endpoint) => {
-                LayoutVerified::new(slice).map(|d| Descriptor::Endpoint(d))
-            }
+            Some(DescriptorType::Config) => Ref::new(slice).map(|d| Descriptor::Config(d)),
+            Some(DescriptorType::Interface) => Ref::new(slice).map(|d| Descriptor::Interface(d)),
+            Some(DescriptorType::Endpoint) => Ref::new(slice).map(|d| Descriptor::Endpoint(d)),
             Some(DescriptorType::Hid) => {
                 if length < std::mem::size_of::<HidDescriptor>() {
                     None
@@ -223,13 +217,13 @@ impl<'a> Iterator for DescriptorIterator<'a> {
                 }
             }
             Some(DescriptorType::SsEpCompanion) => {
-                LayoutVerified::new(slice).map(|d| Descriptor::SsEpCompanion(d))
+                Ref::new(slice).map(|d| Descriptor::SsEpCompanion(d))
             }
             Some(DescriptorType::SsIsochEpCompanion) => {
-                LayoutVerified::new(slice).map(|d| Descriptor::SsIsochEpCompanion(d))
+                Ref::new(slice).map(|d| Descriptor::SsIsochEpCompanion(d))
             }
             Some(DescriptorType::InterfaceAssociation) => {
-                LayoutVerified::new(slice).map(|d| Descriptor::InterfaceAssociation(d))
+                Ref::new(slice).map(|d| Descriptor::InterfaceAssociation(d))
             }
             _ => Some(Descriptor::Unknown(slice)),
         };

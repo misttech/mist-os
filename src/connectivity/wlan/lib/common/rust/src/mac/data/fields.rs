@@ -152,10 +152,8 @@ mod tests {
     fn fixed_fields_dst_addr() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            LayoutVerified::<_, FixedDataHdrFields>::new_unaligned_from_prefix(
-                &mut fixed_fields[..],
-            )
-            .expect("invalid data header");
+            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+                .expect("invalid data header");
         let mut fc = FrameControl(0);
         fc.set_to_ds(true);
         fixed_fields.frame_ctrl = fc;
@@ -169,10 +167,8 @@ mod tests {
     fn fixed_fields_src_addr() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            LayoutVerified::<_, FixedDataHdrFields>::new_unaligned_from_prefix(
-                &mut fixed_fields[..],
-            )
-            .expect("invalid data header");
+            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+                .expect("invalid data header");
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false
         fixed_fields.frame_ctrl = fc;
@@ -197,20 +193,18 @@ mod tests {
     #[test]
     fn fixed_fields_ta() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
-        let (fixed_fields, _) = LayoutVerified::<_, FixedDataHdrFields>::new_unaligned_from_prefix(
-            &mut fixed_fields[..],
-        )
-        .expect("invalid data header");
+        let (fixed_fields, _) =
+            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+                .expect("invalid data header");
         assert_eq!(data_transmitter_addr(&fixed_fields), [4; 6]); // Addr2
     }
 
     #[test]
     fn fixed_fields_ra() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
-        let (fixed_fields, _) = LayoutVerified::<_, FixedDataHdrFields>::new_unaligned_from_prefix(
-            &mut fixed_fields[..],
-        )
-        .expect("invalid data header");
+        let (fixed_fields, _) =
+            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+                .expect("invalid data header");
         assert_eq!(data_receiver_addr(&fixed_fields), [3; 6]); // Addr2
     }
 
@@ -218,10 +212,8 @@ mod tests {
     fn fixed_fields_bssid() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            LayoutVerified::<_, FixedDataHdrFields>::new_unaligned_from_prefix(
-                &mut fixed_fields[..],
-            )
-            .expect("invalid data header");
+            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+                .expect("invalid data header");
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false
         fixed_fields.frame_ctrl = fc;

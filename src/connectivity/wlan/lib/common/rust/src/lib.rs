@@ -44,7 +44,7 @@ pub mod wmm;
 use {
     channel::{Cbw, Channel},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
-    zerocopy::{LayoutVerified, Unalign},
+    zerocopy::{Ref, Unalign},
 };
 
 pub use time::TimeUnit;
@@ -74,4 +74,4 @@ impl RadioConfig {
     }
 }
 
-pub type UnalignedView<B, T> = LayoutVerified<B, Unalign<T>>;
+pub type UnalignedView<B, T> = Ref<B, Unalign<T>>;

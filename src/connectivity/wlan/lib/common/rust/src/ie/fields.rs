@@ -9,7 +9,7 @@ use {
     static_assertions::const_assert_eq,
     std::mem::size_of,
     wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
 };
 
 macro_rules! pub_const {
@@ -709,32 +709,32 @@ pub struct MpmPmk(pub [u8; 16]);
 
 // MPM element in a "mesh peering open" frame
 pub struct MpmOpenView<B> {
-    pub header: LayoutVerified<B, MpmHeader>,
-    pub pmk: Option<LayoutVerified<B, MpmPmk>>,
+    pub header: Ref<B, MpmHeader>,
+    pub pmk: Option<Ref<B, MpmPmk>>,
 }
 
 // MPM element in a "mesh peering confirm" frame
 pub struct MpmConfirmView<B> {
-    pub header: LayoutVerified<B, MpmHeader>,
+    pub header: Ref<B, MpmHeader>,
     pub peer_link_id: UnalignedView<B, u16>,
-    pub pmk: Option<LayoutVerified<B, MpmPmk>>,
+    pub pmk: Option<Ref<B, MpmPmk>>,
 }
 
 // MPM element in a "mesh peering close" frame
 pub struct MpmCloseView<B> {
-    pub header: LayoutVerified<B, MpmHeader>,
+    pub header: Ref<B, MpmHeader>,
     pub peer_link_id: Option<UnalignedView<B, u16>>,
     pub reason_code: UnalignedView<B, ReasonCode>,
-    pub pmk: Option<LayoutVerified<B, MpmPmk>>,
+    pub pmk: Option<Ref<B, MpmPmk>>,
 }
 
 // IEEE Std 802.11-2016, 9.4.2.27, Table 9-135
 pub struct ExtCapabilitiesView<B> {
     // Extended capabilities has a variable number of bytes.
     // The spec defines up to bit 72, but we only need the first 3 bytes right now.
-    pub ext_caps_octet_1: Option<LayoutVerified<B, ExtCapabilitiesOctet1>>,
-    pub ext_caps_octet_2: Option<LayoutVerified<B, ExtCapabilitiesOctet2>>,
-    pub ext_caps_octet_3: Option<LayoutVerified<B, ExtCapabilitiesOctet3>>,
+    pub ext_caps_octet_1: Option<Ref<B, ExtCapabilitiesOctet1>>,
+    pub ext_caps_octet_2: Option<Ref<B, ExtCapabilitiesOctet2>>,
+    pub ext_caps_octet_3: Option<Ref<B, ExtCapabilitiesOctet3>>,
     pub remaining: B,
 }
 
@@ -840,10 +840,10 @@ pub struct PreqPerTarget {
 }
 
 pub struct PreqView<B> {
-    pub header: LayoutVerified<B, PreqHeader>,
-    pub originator_external_addr: Option<LayoutVerified<B, MacAddr>>,
-    pub middle: LayoutVerified<B, PreqMiddle>,
-    pub targets: LayoutVerified<B, [PreqPerTarget]>,
+    pub header: Ref<B, PreqHeader>,
+    pub originator_external_addr: Option<Ref<B, MacAddr>>,
+    pub middle: Ref<B, PreqMiddle>,
+    pub targets: Ref<B, [PreqPerTarget]>,
 }
 
 // IEEE Std 802.11-2016, 9.4.2.114, Figure 9-481
@@ -882,9 +882,9 @@ pub struct PrepTail {
 }
 
 pub struct PrepView<B> {
-    pub header: LayoutVerified<B, PrepHeader>,
-    pub target_external_addr: Option<LayoutVerified<B, MacAddr>>,
-    pub tail: LayoutVerified<B, PrepTail>,
+    pub header: Ref<B, PrepHeader>,
+    pub target_external_addr: Option<Ref<B, MacAddr>>,
+    pub tail: Ref<B, PrepTail>,
 }
 
 // Fixed-length fields of the PERR element that precede the variable-length
@@ -919,13 +919,13 @@ pub struct PerrDestinationHeader {
 }
 
 pub struct PerrDestinationView<B> {
-    pub header: LayoutVerified<B, PerrDestinationHeader>,
-    pub ext_addr: Option<LayoutVerified<B, MacAddr>>,
+    pub header: Ref<B, PerrDestinationHeader>,
+    pub ext_addr: Option<Ref<B, MacAddr>>,
     pub reason_code: UnalignedView<B, ReasonCode>,
 }
 
 pub struct PerrView<B> {
-    pub header: LayoutVerified<B, PerrHeader>,
+    pub header: Ref<B, PerrHeader>,
     pub destinations: PerrDestinationListView<B>,
 }
 
@@ -1040,17 +1040,17 @@ pub struct TransmitPower(pub u8);
 
 // IEEE Std 802.11-2016 9.2.4.162: Transmit Power Envelope element
 pub struct TransmitPowerEnvelopeView<B> {
-    pub transmit_power_info: LayoutVerified<B, TransmitPowerInfo>,
-    pub max_transmit_power_20: LayoutVerified<B, TransmitPower>,
-    pub max_transmit_power_40: Option<LayoutVerified<B, TransmitPower>>,
-    pub max_transmit_power_80: Option<LayoutVerified<B, TransmitPower>>,
-    pub max_transmit_power_160: Option<LayoutVerified<B, TransmitPower>>,
+    pub transmit_power_info: Ref<B, TransmitPowerInfo>,
+    pub max_transmit_power_20: Ref<B, TransmitPower>,
+    pub max_transmit_power_40: Option<Ref<B, TransmitPower>>,
+    pub max_transmit_power_80: Option<Ref<B, TransmitPower>>,
+    pub max_transmit_power_160: Option<Ref<B, TransmitPower>>,
 }
 
 // IEEE Std 802.11-2016 9.2.4.163: Channel Switch Wrapper element
 pub struct ChannelSwitchWrapperView<B> {
     pub new_country: Option<CountryView<B>>,
-    pub wide_bandwidth_channel_switch: Option<LayoutVerified<B, WideBandwidthChannelSwitch>>,
+    pub wide_bandwidth_channel_switch: Option<Ref<B, WideBandwidthChannelSwitch>>,
     pub new_transmit_power_envelope: Option<TransmitPowerEnvelopeView<B>>,
 }
 
@@ -1288,7 +1288,7 @@ mod tests {
                 0x15, // asel_capabilities
             ],
         };
-        let ht_cap = LayoutVerified::<&[u8], HtCapabilities>::new(&from.bytes[..]).unwrap();
+        let ht_cap = Ref::<&[u8], HtCapabilities>::new(&from.bytes[..]).unwrap();
         let mcs_set = ht_cap.mcs_set;
         assert_eq!(
             mcs_set.as_bytes(),

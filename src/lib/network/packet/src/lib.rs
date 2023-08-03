@@ -404,7 +404,7 @@ use std::convert::Infallible as Never;
 use std::mem;
 use std::ops::{Bound, Range, RangeBounds};
 
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, LayoutVerified, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, Ref, Unaligned};
 
 /// A buffer that may be fragmented in multiple parts which are discontiguous in
 /// memory.
@@ -1257,7 +1257,7 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     where
         T: FromBytes + Unaligned,
     {
-        Some(LayoutVerified::<_, T>::new_unaligned_from_prefix((&*self).as_ref())?.0.into_ref())
+        Some(Ref::<_, T>::new_unaligned_from_prefix((&*self).as_ref())?.0.into_ref())
     }
 
     /// Takes an object from the front of the buffer's body.
@@ -1268,13 +1268,13 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// if `Self: GrowBuffer`, the prefix is `size_of::<T>()` bytes longer. If
     /// the body is not at least `size_of::<T>()` bytes in length,
     /// `take_obj_front` returns `None`.
-    fn take_obj_front<T>(&mut self) -> Option<LayoutVerified<B, T>>
+    fn take_obj_front<T>(&mut self) -> Option<Ref<B, T>>
     where
         T: Unaligned,
     {
         let bytes = self.take_front(mem::size_of::<T>())?;
         // new_unaligned only returns None if there aren't enough bytes
-        Some(LayoutVerified::new_unaligned(bytes).unwrap())
+        Some(Ref::new_unaligned(bytes).unwrap())
     }
 
     /// Takes a slice of objects from the front of the buffer's body.
@@ -1289,14 +1289,14 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// # Panics
     ///
     /// Panics if `T` is a zero-sized type.
-    fn take_slice_front<T>(&mut self, n: usize) -> Option<LayoutVerified<B, [T]>>
+    fn take_slice_front<T>(&mut self, n: usize) -> Option<Ref<B, [T]>>
     where
         T: Unaligned,
     {
         let bytes = self.take_front(n * mem::size_of::<T>())?;
         // `new_slice_unaligned` will return `None` only if `bytes.len()` is
         // not a multiple of `mem::size_of::<T>()`.
-        Some(LayoutVerified::new_slice_unaligned(bytes).unwrap())
+        Some(Ref::new_slice_unaligned(bytes).unwrap())
     }
 
     /// Peeks at an object at the back of the buffer's body.
@@ -1309,7 +1309,7 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     where
         T: FromBytes + Unaligned,
     {
-        Some(LayoutVerified::<_, T>::new_unaligned_from_suffix((&*self).as_ref())?.1.into_ref())
+        Some(Ref::<_, T>::new_unaligned_from_suffix((&*self).as_ref())?.1.into_ref())
     }
 
     /// Takes an object from the back of the buffer's body.
@@ -1320,13 +1320,13 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// if `Self: GrowBuffer`, the suffix is `size_of::<T>()` bytes longer. If
     /// the body is not at least `size_of::<T>()` bytes in length,
     /// `take_obj_back` returns `None`.
-    fn take_obj_back<T>(&mut self) -> Option<LayoutVerified<B, T>>
+    fn take_obj_back<T>(&mut self) -> Option<Ref<B, T>>
     where
         T: Unaligned,
     {
         let bytes = self.take_back(mem::size_of::<T>())?;
         // new_unaligned only returns None if there aren't enough bytes
-        Some(LayoutVerified::new_unaligned(bytes).unwrap())
+        Some(Ref::new_unaligned(bytes).unwrap())
     }
 
     /// Takes a slice of objects from the back of the buffer's body.
@@ -1341,14 +1341,14 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// # Panics
     ///
     /// Panics if `T` is a zero-sized type.
-    fn take_slice_back<T>(&mut self, n: usize) -> Option<LayoutVerified<B, [T]>>
+    fn take_slice_back<T>(&mut self, n: usize) -> Option<Ref<B, [T]>>
     where
         T: Unaligned,
     {
         let bytes = self.take_back(n * mem::size_of::<T>())?;
         // `new_slice_unaligned` will return `None` only if `bytes.len()` is
         // not a multiple of `mem::size_of::<T>()`.
-        Some(LayoutVerified::new_slice_unaligned(bytes).unwrap())
+        Some(Ref::new_slice_unaligned(bytes).unwrap())
     }
 }
 
@@ -1427,13 +1427,13 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// that it zeroes the bytes before converting them to a `T`. This can be
     /// useful when serializing to ensure that the contents of packets
     /// previously stored in the buffer are not leaked.
-    fn take_obj_front_zero<T>(&mut self) -> Option<LayoutVerified<B, T>>
+    fn take_obj_front_zero<T>(&mut self) -> Option<Ref<B, T>>
     where
         T: Unaligned,
     {
         let bytes = self.take_front(mem::size_of::<T>())?;
         // new_unaligned_zeroed only returns None if there aren't enough bytes
-        Some(LayoutVerified::new_unaligned_zeroed(bytes).unwrap())
+        Some(Ref::new_unaligned_zeroed(bytes).unwrap())
     }
 
     /// Takes an object from the back of the buffer's body and zeroes it.
@@ -1442,13 +1442,13 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// it zeroes the bytes before converting them to a `T`. This can be useful
     /// when serializing to ensure that the contents of packets previously
     /// stored in the buffer are not leaked.
-    fn take_obj_back_zero<T>(&mut self) -> Option<LayoutVerified<B, T>>
+    fn take_obj_back_zero<T>(&mut self) -> Option<Ref<B, T>>
     where
         T: Unaligned,
     {
         let bytes = self.take_back(mem::size_of::<T>())?;
         // new_unaligned_zeroed only returns None if there aren't enough bytes
-        Some(LayoutVerified::new_unaligned_zeroed(bytes).unwrap())
+        Some(Ref::new_unaligned_zeroed(bytes).unwrap())
     }
 
     /// Writes an object to the front of the buffer's body, consuming the bytes.

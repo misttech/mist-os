@@ -25,8 +25,8 @@ use packet::{
 };
 use tracing::debug;
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes,
-    LayoutVerified, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, Ref,
+    Unaligned,
 };
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
@@ -234,7 +234,7 @@ pub struct Ipv4OnlyMeta {
 /// `Ipv4PacketBuilder` - maintains the invariant that the checksum is always
 /// valid.
 pub struct Ipv4Packet<B> {
-    hdr_prefix: LayoutVerified<B, HeaderPrefix>,
+    hdr_prefix: Ref<B, HeaderPrefix>,
     options: Options<B>,
     body: B,
 }
@@ -583,7 +583,7 @@ where
 /// [`Ipv4Packet`] provides a [`FromRaw`] implementation that can be used to
 /// validate an `Ipv4PacketRaw`.
 pub struct Ipv4PacketRaw<B> {
-    hdr_prefix: LayoutVerified<B, HeaderPrefix>,
+    hdr_prefix: Ref<B, HeaderPrefix>,
     options: MaybeParsed<OptionsRaw<B, Ipv4OptionsImpl>, B>,
     body: MaybeParsed<B, B>,
 }
@@ -917,7 +917,7 @@ pub(crate) fn reassemble_fragmented_packet<
 
     // We know the call to `unwrap` will not fail because we just copied the header
     // bytes into `bytes`.
-    let mut header = LayoutVerified::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap().0;
+    let mut header = Ref::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap().0;
 
     // Update the total length field.
     header.total_len.set(u16::try_from(byte_count).unwrap());
@@ -1189,8 +1189,8 @@ mod tests {
     fn hdr_prefix_to_bytes(hdr_prefix: HeaderPrefix) -> [u8; 20] {
         let mut bytes = [0; 20];
         {
-            let mut lv = LayoutVerified::<_, HeaderPrefix>::new_unaligned(&mut bytes[..]).unwrap();
-            *lv = hdr_prefix;
+            let mut r = Ref::<_, HeaderPrefix>::new_unaligned(&mut bytes[..]).unwrap();
+            *r = hdr_prefix;
         }
         bytes
     }

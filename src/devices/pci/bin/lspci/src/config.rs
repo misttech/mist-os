@@ -5,7 +5,7 @@ use {
     crate::util::is_set,
     bitfield::bitfield,
     std::fmt,
-    zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Ref},
 };
 
 // PCI Local Bus Specification v3.0 section 6.1
@@ -39,8 +39,8 @@ pub struct Type00Config {
 }
 
 impl Type00Config {
-    pub fn new(config: &[u8]) -> LayoutVerified<&[u8], Type00Config> {
-        let (config, _) = LayoutVerified::new_from_prefix(config).unwrap();
+    pub fn new(config: &[u8]) -> Ref<&[u8], Type00Config> {
+        let (config, _) = Ref::new_from_prefix(config).unwrap();
         config
     }
 }
@@ -85,8 +85,8 @@ pub struct Type01Config {
 }
 
 impl Type01Config {
-    pub fn new(config: &[u8]) -> LayoutVerified<&[u8], Type01Config> {
-        let (config, _) = LayoutVerified::new_from_prefix(config).unwrap();
+    pub fn new(config: &[u8]) -> Ref<&[u8], Type01Config> {
+        let (config, _) = Ref::new_from_prefix(config).unwrap();
         config
     }
 }

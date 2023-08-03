@@ -28,7 +28,7 @@ use {
         hash::Hash,
         ops::Range,
     },
-    zerocopy::{AsBytes, LayoutVerified},
+    zerocopy::{AsBytes, Ref},
 };
 
 // TODO(fxbug.dev/29885): Represent this as bitfield instead.
@@ -176,7 +176,7 @@ impl BssDescription {
         self.rsne_range.as_ref().map(|range| &self.ies[range.clone()])
     }
 
-    pub fn ht_cap(&self) -> Option<LayoutVerified<&[u8], ie::HtCapabilities>> {
+    pub fn ht_cap(&self) -> Option<Ref<&[u8], ie::HtCapabilities>> {
         self.ht_cap_range.clone().map(|range| {
             // Safe to unwrap because we already verified HT caps is parseable in `from_fidl`
             ie::parse_ht_capabilities(&self.ies[range]).unwrap()
@@ -192,14 +192,14 @@ impl BssDescription {
         })
     }
 
-    pub fn ht_op(&self) -> Option<LayoutVerified<&[u8], ie::HtOperation>> {
+    pub fn ht_op(&self) -> Option<Ref<&[u8], ie::HtOperation>> {
         self.ht_op_range.clone().map(|range| {
             // Safe to unwrap because we already verified HT op is parseable in `from_fidl`
             ie::parse_ht_operation(&self.ies[range]).unwrap()
         })
     }
 
-    pub fn rm_enabled_cap(&self) -> Option<LayoutVerified<&[u8], ie::RmEnabledCapabilities>> {
+    pub fn rm_enabled_cap(&self) -> Option<Ref<&[u8], ie::RmEnabledCapabilities>> {
         self.rm_enabled_cap_range.clone().map(|range| {
             // Safe to unwrap because we already verified RM enabled cap is parseable in `from_fidl`
             ie::parse_rm_enabled_capabilities(&self.ies[range]).unwrap()
@@ -219,7 +219,7 @@ impl BssDescription {
         })
     }
 
-    pub fn vht_cap(&self) -> Option<LayoutVerified<&[u8], ie::VhtCapabilities>> {
+    pub fn vht_cap(&self) -> Option<Ref<&[u8], ie::VhtCapabilities>> {
         self.vht_cap_range.clone().map(|range| {
             // Safe to unwrap because we already verified VHT caps is parseable in `from_fidl`
             ie::parse_vht_capabilities(&self.ies[range]).unwrap()
@@ -235,7 +235,7 @@ impl BssDescription {
         })
     }
 
-    pub fn vht_op(&self) -> Option<LayoutVerified<&[u8], ie::VhtOperation>> {
+    pub fn vht_op(&self) -> Option<Ref<&[u8], ie::VhtOperation>> {
         self.vht_op_range.clone().map(|range| {
             // Safe to unwrap because we already verified VHT op is parseable in `from_fidl`
             ie::parse_vht_operation(&self.ies[range]).unwrap()
@@ -400,7 +400,7 @@ impl BssDescription {
 
     /// Search for WMM Parameter Element and parse it. If no WMM Parameter Element is found,
     /// return an error.
-    pub fn wmm_param(&self) -> Result<LayoutVerified<&[u8], ie::WmmParam>, anyhow::Error> {
+    pub fn wmm_param(&self) -> Result<Ref<&[u8], ie::WmmParam>, anyhow::Error> {
         ie::parse_wmm_param(self.find_wmm_param().ok_or(format_err!("no wmm parameter found"))?)
             .map_err(|e| e.into())
     }

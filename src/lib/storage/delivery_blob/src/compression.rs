@@ -15,7 +15,7 @@ use {
     thiserror::Error,
     zerocopy::{
         byteorder::{LE, U16, U32, U64},
-        AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+        AsBytes, FromBytes, FromZeroes, Ref, Unaligned,
     },
 };
 
@@ -54,7 +54,7 @@ pub fn decode_archive(
     data: &[u8],
     archive_length: usize,
 ) -> Result<Option<(Vec<ChunkInfo>, /*archive_data*/ &[u8])>, ChunkedArchiveError> {
-    match LayoutVerified::<_, ChunkedArchiveHeader>::new_unaligned_from_prefix(data) {
+    match Ref::<_, ChunkedArchiveHeader>::new_unaligned_from_prefix(data) {
         Some((header, data)) => header.decode_seek_table(data, archive_length as u64),
         None => Ok(None), // Not enough data.
     }
@@ -160,7 +160,7 @@ impl ChunkedArchiveHeader {
         // Deserialize seek table.
         let num_entries = self.num_entries.get() as usize;
         let Some((entries, chunk_data)) =
-            LayoutVerified::<_, [SeekTableEntry]>::new_slice_unaligned_from_prefix(data, num_entries
+            Ref::<_, [SeekTableEntry]>::new_slice_unaligned_from_prefix(data, num_entries
         ) else {
             return Ok(None);
         };

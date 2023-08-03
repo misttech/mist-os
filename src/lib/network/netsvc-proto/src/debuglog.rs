@@ -14,8 +14,7 @@ use packet::{
 };
 use std::num::NonZeroU16;
 use zerocopy::{
-    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
-    Unaligned,
+    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 pub const MULTICAST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33337));
@@ -35,7 +34,7 @@ pub struct PacketHead {
 }
 
 pub struct DebugLogPacket<B> {
-    head: LayoutVerified<B, PacketHead>,
+    head: Ref<B, PacketHead>,
     nodename: ValidStr<B>,
     data: ValidStr<B>,
 }

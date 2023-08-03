@@ -10,7 +10,7 @@ use {
         collections::HashSet,
         ops::BitAnd,
     },
-    zerocopy::LayoutVerified,
+    zerocopy::Ref,
 };
 
 // TODO(fxbug.dev/42763): HT and VHT intersections defined here are best effort only.
@@ -251,14 +251,14 @@ pub struct ClientRates<'a>(pub &'a [SupportedRate]);
 impl<'a> From<&'a [u8]> for ApRates<'a> {
     fn from(rates: &'a [u8]) -> Self {
         // This is always safe, as SupportedRate is a newtype of u8.
-        Self(LayoutVerified::new_slice(rates).unwrap().into_slice())
+        Self(Ref::new_slice(rates).unwrap().into_slice())
     }
 }
 
 impl<'a> From<&'a [u8]> for ClientRates<'a> {
     fn from(rates: &'a [u8]) -> Self {
         // This is always safe, as SupportedRate is a newtype of u8.
-        Self(LayoutVerified::new_slice(rates).unwrap().into_slice())
+        Self(Ref::new_slice(rates).unwrap().into_slice())
     }
 }
 

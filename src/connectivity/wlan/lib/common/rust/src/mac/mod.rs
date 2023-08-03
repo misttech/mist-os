@@ -6,7 +6,7 @@ use {
     crate::{buffer_reader::BufferReader, UnalignedView},
     ieee80211::MacAddr,
     num::Unsigned,
-    zerocopy::{ByteSlice, LayoutVerified},
+    zerocopy::{ByteSlice, Ref},
 };
 
 mod ctrl;
@@ -48,9 +48,9 @@ pub fn is_multicast(addr: MacAddr) -> bool {
 // TODO(fxbug.dev/128928): Use this in the `MacFrame::Data` variant.
 pub struct DataFrame<B> {
     // Data Header: fixed fields
-    pub fixed_fields: LayoutVerified<B, FixedDataHdrFields>,
+    pub fixed_fields: Ref<B, FixedDataHdrFields>,
     // Data Header: optional fields
-    pub addr4: Option<LayoutVerified<B, Addr4>>,
+    pub addr4: Option<Ref<B, Addr4>>,
     pub qos_ctrl: Option<UnalignedView<B, QosControl>>,
     pub ht_ctrl: Option<UnalignedView<B, HtControl>>,
     // Body
@@ -111,7 +111,7 @@ where
 // TODO(fxbug.dev/128928): Use this in the `MacFrame::Mgmt` variant.
 pub struct MgmtFrame<B> {
     // Management Header: fixed fields
-    pub mgmt_hdr: LayoutVerified<B, MgmtHdr>,
+    pub mgmt_hdr: Ref<B, MgmtHdr>,
     // Management Header: optional fields
     pub ht_ctrl: Option<UnalignedView<B, HtControl>>,
     // Body
@@ -147,7 +147,7 @@ where
 pub enum MacFrame<B> {
     Mgmt {
         // Management Header: fixed fields
-        mgmt_hdr: LayoutVerified<B, MgmtHdr>,
+        mgmt_hdr: Ref<B, MgmtHdr>,
         // Management Header: optional fields
         ht_ctrl: Option<UnalignedView<B, HtControl>>,
         // Body
@@ -155,9 +155,9 @@ pub enum MacFrame<B> {
     },
     Data {
         // Data Header: fixed fields
-        fixed_fields: LayoutVerified<B, FixedDataHdrFields>,
+        fixed_fields: Ref<B, FixedDataHdrFields>,
         // Data Header: optional fields
-        addr4: Option<LayoutVerified<B, Addr4>>,
+        addr4: Option<Ref<B, Addr4>>,
         qos_ctrl: Option<UnalignedView<B, QosControl>>,
         ht_ctrl: Option<UnalignedView<B, HtControl>>,
         // Body

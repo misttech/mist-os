@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::fmt::{Debug, Display, Error, Formatter};
-use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
 
 /// Error type indicating that the given slice was not the expected size.
 #[derive(Debug, Eq, PartialEq, Hash, thiserror::Error)]
@@ -34,9 +34,7 @@ impl<'a> std::convert::TryInto<&'a EUI64> for &'a [u8] {
     type Error = WrongSize;
 
     fn try_into(self) -> Result<&'a EUI64, Self::Error> {
-        LayoutVerified::<_, EUI64>::new_unaligned(self)
-            .ok_or(WrongSize)
-            .map(LayoutVerified::into_ref)
+        Ref::<_, EUI64>::new_unaligned(self).ok_or(WrongSize).map(Ref::into_ref)
     }
 }
 
@@ -59,8 +57,6 @@ impl<'a> std::convert::TryInto<&'a EUI48> for &'a [u8] {
     type Error = WrongSize;
 
     fn try_into(self) -> Result<&'a EUI48, Self::Error> {
-        LayoutVerified::<_, EUI48>::new_unaligned(self)
-            .ok_or(WrongSize)
-            .map(LayoutVerified::into_ref)
+        Ref::<_, EUI48>::new_unaligned(self).ok_or(WrongSize).map(Ref::into_ref)
     }
 }

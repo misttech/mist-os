@@ -4,7 +4,7 @@
 
 use {
     crate::{big_endian::BigEndianU16, mac::MacAddr},
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
 };
 
 // RFC 704, Appendix B.2
@@ -25,13 +25,13 @@ pub struct EthernetIIHdr {
 }
 
 pub struct EthernetFrame<B: ByteSlice> {
-    pub hdr: LayoutVerified<B, EthernetIIHdr>,
+    pub hdr: Ref<B, EthernetIIHdr>,
     pub body: B,
 }
 
 impl<B: ByteSlice> EthernetFrame<B> {
     pub fn parse(bytes: B) -> Option<Self> {
-        let (hdr, body) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+        let (hdr, body) = Ref::new_unaligned_from_prefix(bytes)?;
         Some(Self { hdr, body })
     }
 }
@@ -48,9 +48,8 @@ mod tests {
             13, 14, // ether_type
             99, 99, // trailing bytes
         ];
-        let (mut hdr, body) =
-            LayoutVerified::<_, EthernetIIHdr>::new_unaligned_from_prefix(&mut bytes[..])
-                .expect("cannot create ethernet header.");
+        let (mut hdr, body) = Ref::<_, EthernetIIHdr>::new_unaligned_from_prefix(&mut bytes[..])
+            .expect("cannot create ethernet header.");
         assert_eq!(hdr.da, [1u8, 2, 3, 4, 5, 6]);
         assert_eq!(hdr.sa, [7u8, 8, 9, 10, 11, 12]);
         assert_eq!(hdr.ether_type.to_native(), 13 << 8 | 14);

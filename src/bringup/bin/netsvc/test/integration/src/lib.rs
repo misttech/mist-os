@@ -20,7 +20,7 @@ use std::borrow::Cow;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU16;
 use test_case::test_case;
-use zerocopy::{byteorder::native_endian::U32, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+use zerocopy::{byteorder::native_endian::U32, FromBytes, FromZeroes, Ref, Unaligned};
 
 const NETSVC_URL: &str = "#meta/netsvc.cm";
 const NETSVC_NAME: &str = "netsvc";
@@ -848,8 +848,8 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
             .expect("unexpected message");
         assert_eq!(data.block(), 1);
         assert_eq!(data.payload().len(), std::mem::size_of::<BoardInfo>());
-        let board_info = LayoutVerified::<_, BoardInfo>::new(data.payload().as_ref())
-            .expect("failed to get board info");
+        let board_info =
+            Ref::<_, BoardInfo>::new(data.payload().as_ref()).expect("failed to get board info");
         let BoardInfo { board_name, board_revision, mac_address, _padding } = &*board_info;
         // mac_address is not filled by netsvc.
         assert_eq!(mac_address, [0u8; 6].as_ref());

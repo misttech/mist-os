@@ -6,14 +6,14 @@ use {
     crate::device::Device,
     crate::util::format_bytes,
     std::fmt,
-    zerocopy::LayoutVerified,
+    zerocopy::Ref,
 };
 
 // A PCI Bridge is a Device with a different (Type 01) configuration layout, but much of the
 // information displayed is similar.
 pub struct Bridge<'a> {
     device: &'a Device<'a>,
-    cfg: LayoutVerified<&'a [u8], Type01Config>,
+    cfg: Ref<&'a [u8], Type01Config>,
 }
 
 impl<'a> Bridge<'a> {

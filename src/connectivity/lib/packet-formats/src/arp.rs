@@ -16,8 +16,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{IpAddress, Ipv4Addr};
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -122,7 +121,7 @@ impl Header {
 /// so `peek_arp_types` succeeding does not guarantee that a subsequent call to
 /// `parse` will also succeed.
 pub fn peek_arp_types<B: ByteSlice>(bytes: B) -> ParseResult<(ArpHardwareType, ArpNetworkType)> {
-    let (header, _) = LayoutVerified::<B, Header>::new_unaligned_from_prefix(bytes)
+    let (header, _) = Ref::<B, Header>::new_unaligned_from_prefix(bytes)
         .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
 
     let hw = ArpHardwareType::try_from(header.htype.get()).ok().ok_or_else(debug_err_fn!(
@@ -184,8 +183,8 @@ unsafe impl<HwAddr: AsBytes + Unaligned, ProtoAddr: AsBytes + Unaligned> AsBytes
 /// from or serialized to, meaning that no copying or extra allocation is
 /// necessary.
 pub struct ArpPacket<B, HwAddr, ProtoAddr> {
-    header: LayoutVerified<B, Header>,
-    body: LayoutVerified<B, Body<HwAddr, ProtoAddr>>,
+    header: Ref<B, Header>,
+    body: Ref<B, Body<HwAddr, ProtoAddr>>,
 }
 
 impl<B: ByteSlice, HwAddr, ProtoAddr> ParsablePacket<B, ()> for ArpPacket<B, HwAddr, ProtoAddr>
@@ -373,8 +372,8 @@ mod tests {
     fn header_to_bytes(header: Header) -> [u8; ARP_HDR_LEN] {
         let mut bytes = [0; ARP_HDR_LEN];
         {
-            let mut lv = LayoutVerified::<_, Header>::new_unaligned(&mut bytes[..]).unwrap();
-            *lv = header;
+            let mut r = Ref::<_, Header>::new_unaligned(&mut bytes[..]).unwrap();
+            *r = header;
         }
         bytes
     }
@@ -486,8 +485,7 @@ mod tests {
         // Assert that parsing a particular header results in an error.
         fn assert_header_err(header: Header, err: ParseError) {
             let mut buf = [0; ARP_ETHERNET_IPV4_PACKET_LEN];
-            *LayoutVerified::<_, Header>::new_unaligned_from_prefix(&mut buf[..]).unwrap().0 =
-                header;
+            *Ref::<_, Header>::new_unaligned_from_prefix(&mut buf[..]).unwrap().0 = header;
             assert_err(&buf[..], err);
         }
 

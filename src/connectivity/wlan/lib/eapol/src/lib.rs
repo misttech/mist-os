@@ -14,7 +14,7 @@ use {
         big_endian::{BigEndianU16, BigEndianU64},
         buffer_reader::BufferReader,
     },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
 };
 
 #[derive(Debug, Error)]
@@ -45,11 +45,11 @@ impl From<BufferTooSmall> for Error {
 
 pub enum Frame<B: ByteSlice> {
     Key(KeyFrameRx<B>),
-    Unsupported(LayoutVerified<B, EapolFields>),
+    Unsupported(Ref<B, EapolFields>),
 }
 
 impl<B: ByteSlice> Frame<B> {
-    pub fn parse_fixed_fields(bytes: B) -> Result<LayoutVerified<B, EapolFields>, Error> {
+    pub fn parse_fixed_fields(bytes: B) -> Result<Ref<B, EapolFields>, Error> {
         let mut reader = BufferReader::new(bytes);
         reader.read().ok_or(Error::FrameTruncated)
     }
@@ -58,8 +58,8 @@ impl<B: ByteSlice> Frame<B> {
 // IEEE Std 802.11-2016, 12.7.2, Figure 12-32
 #[derive(Debug)]
 pub struct KeyFrameRx<B: ByteSlice> {
-    pub eapol_fields: LayoutVerified<B, EapolFields>,
-    pub key_frame_fields: LayoutVerified<B, KeyFrameFields>,
+    pub eapol_fields: Ref<B, EapolFields>,
+    pub key_frame_fields: Ref<B, KeyFrameFields>,
     pub key_mic: B, /* AKM dependent size */
     // 2 octets omitted - key data length is calculated from key_data.len()
     pub key_data: B,

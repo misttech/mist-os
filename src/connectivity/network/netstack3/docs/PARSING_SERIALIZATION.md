@@ -159,4 +159,4 @@ The logic for adding padding is provided by `EncapsulatingSerializer`, described
 in the *Prefix, Suffix, and Padding* section above. `EncapsulatingSerializer`
 ensures that these padding bytes are zeroed.
 
-*See also: the `_zeroed` constructors of the `zerocopy::LayoutVerified` type*
+*See also: the `_zeroed` constructors of the `zerocopy::Ref` type*

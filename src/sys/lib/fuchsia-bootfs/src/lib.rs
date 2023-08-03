@@ -14,7 +14,7 @@ use {
     std::convert::TryFrom,
     std::{ffi::CStr, mem::size_of, str::Utf8Error},
     thiserror::Error,
-    zerocopy::{ByteSlice, LayoutVerified},
+    zerocopy::{ByteSlice, Ref},
 };
 
 const ZBI_BOOTFS_DIRENT_SIZE: usize = size_of::<zbi_bootfs_dirent_t>();
@@ -70,14 +70,13 @@ pub enum BootfsParserError {
 
 #[derive(Debug)]
 struct ZbiBootfsDirent<B: ByteSlice> {
-    header: LayoutVerified<B, zbi_bootfs_dirent_t>,
+    header: Ref<B, zbi_bootfs_dirent_t>,
     name_bytes: B,
 }
 impl<B: ByteSlice> ZbiBootfsDirent<B> {
     pub fn parse(bytes: B) -> Result<ZbiBootfsDirent<B>, BootfsParserError> {
-        let (header, name_bytes) =
-            LayoutVerified::<B, zbi_bootfs_dirent_t>::new_unaligned_from_prefix(bytes)
-                .ok_or(BootfsParserError::FailedToParseDirEntry)?;
+        let (header, name_bytes) = Ref::<B, zbi_bootfs_dirent_t>::new_unaligned_from_prefix(bytes)
+            .ok_or(BootfsParserError::FailedToParseDirEntry)?;
 
         Ok(ZbiBootfsDirent { header, name_bytes })
     }
@@ -120,7 +119,7 @@ impl BootfsParser {
         vmo.read(&mut header_bytes, 0)
             .map_err(|status| BootfsParserError::FailedToReadPayload { status })?;
 
-        let header = LayoutVerified::<_, zbi_bootfs_header_t>::new_unaligned(&header_bytes[..])
+        let header = Ref::<_, zbi_bootfs_header_t>::new_unaligned(&header_bytes[..])
             .ok_or(BootfsParserError::FailedToParseHeader)?;
         if header.magic.get() == ZBI_BOOTFS_MAGIC {
             Ok(Self { vmo, dirsize: header.dirsize.get() })

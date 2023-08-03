@@ -457,7 +457,7 @@ pub mod options {
     };
     use packet::BufferView as _;
     use zerocopy::byteorder::{network_endian::U32, ByteOrder, NetworkEndian};
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
 
     use super::NonZeroNdpLifetime;
     use crate::utils::NonZeroDuration;
@@ -686,9 +686,8 @@ pub mod options {
         }
 
         fn serialize(&self, buffer: &mut [u8]) {
-            let (mut hdr, buffer) =
-                LayoutVerified::<_, RouteInformationHeader>::new_from_prefix(buffer)
-                    .expect("expected buffer to hold enough bytes for serialization");
+            let (mut hdr, buffer) = Ref::<_, RouteInformationHeader>::new_from_prefix(buffer)
+                .expect("expected buffer to hold enough bytes for serialization");
 
             let prefix_bytes_len = self.prefix_bytes_len();
             let RouteInformation { prefix, route_lifetime_seconds, preference } = self;
@@ -890,8 +889,7 @@ pub mod options {
                 NdpOptionType::SourceLinkLayerAddress => NdpOption::SourceLinkLayerAddress(data),
                 NdpOptionType::TargetLinkLayerAddress => NdpOption::TargetLinkLayerAddress(data),
                 NdpOptionType::PrefixInformation => {
-                    let data =
-                        LayoutVerified::<_, PrefixInformation>::new(data).ok_or(OptionParseErr)?;
+                    let data = Ref::<_, PrefixInformation>::new(data).ok_or(OptionParseErr)?;
                     NdpOption::PrefixInformation(data.into_ref())
                 }
                 NdpOptionType::RedirectedHeader => NdpOption::RedirectedHeader {
@@ -913,11 +911,11 @@ pub mod options {
                     // As per RFC 8106 section 5.1, the 32 bit lifetime field immediately
                     // follows the reserved field.
                     let (lifetime, data) =
-                        LayoutVerified::<_, U32>::new_from_prefix(data).ok_or(OptionParseErr)?;
+                        Ref::<_, U32>::new_from_prefix(data).ok_or(OptionParseErr)?;
 
                     // As per RFC 8106 section 5.1, the list of addresses immediately
                     // follows the lifetime field.
-                    let addresses = LayoutVerified::<_, [Ipv6Addr]>::new_slice_unaligned(data)
+                    let addresses = Ref::<_, [Ipv6Addr]>::new_slice_unaligned(data)
                         .ok_or(OptionParseErr)?
                         .into_slice();
 
@@ -1114,7 +1112,7 @@ mod tests {
     use packet::{InnerPacketBuilder, ParseBuffer};
     use test_case::test_case;
     use zerocopy::byteorder::{ByteOrder, NetworkEndian};
-    use zerocopy::LayoutVerified;
+    use zerocopy::Ref;
 
     use super::*;
     use crate::icmp::{IcmpPacket, IcmpPacketBuilder, IcmpParseArgs};
@@ -1589,13 +1587,13 @@ mod tests {
         }
         expected[5] |= u8::from(preference) << 3;
         let (mut router_lifetime, _rest) =
-            LayoutVerified::<_, U16>::new_from_prefix(&mut expected[6..]).unwrap();
+            Ref::<_, U16>::new_from_prefix(&mut expected[6..]).unwrap();
         router_lifetime.set(router_lifetime_seconds);
         let (mut reachable_time, _rest) =
-            LayoutVerified::<_, U32>::new_from_prefix(&mut expected[8..]).unwrap();
+            Ref::<_, U32>::new_from_prefix(&mut expected[8..]).unwrap();
         reachable_time.set(reachable_time_seconds);
         let (mut retransmit_timer, _rest) =
-            LayoutVerified::<_, U32>::new_from_prefix(&mut expected[12..]).unwrap();
+            Ref::<_, U32>::new_from_prefix(&mut expected[12..]).unwrap();
         retransmit_timer.set(retransmit_timer_seconds);
 
         let mut c = internet_checksum::Checksum::new();
@@ -1719,7 +1717,7 @@ mod tests {
         expected[2] = prefix_length;
         expected[3] = u8::from(preference) << 3;
         let (mut lifetime_seconds, _rest) =
-            LayoutVerified::<_, U32>::new_from_prefix(&mut expected[4..]).unwrap();
+            Ref::<_, U32>::new_from_prefix(&mut expected[4..]).unwrap();
         lifetime_seconds.set(route_lifetime_seconds);
         expected[8..].copy_from_slice(prefix.bytes());
 

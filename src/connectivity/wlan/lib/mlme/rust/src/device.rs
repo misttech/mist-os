@@ -187,9 +187,7 @@ impl DeviceOps for Device {
         }
         // Unwrap is safe since the byte slice is always the same size.
         let frame_control =
-            zerocopy::LayoutVerified::<&[u8], FrameControl>::new(&buf.as_slice()[0..=1])
-                .unwrap()
-                .into_ref();
+            zerocopy::Ref::<&[u8], FrameControl>::new(&buf.as_slice()[0..=1]).unwrap().into_ref();
         if frame_control.protected() {
             tx_flags |= banjo_wlan_softmac::WlanTxInfoFlags::PROTECTED.0;
         }

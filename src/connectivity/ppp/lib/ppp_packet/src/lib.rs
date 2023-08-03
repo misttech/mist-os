@@ -23,7 +23,7 @@ use {
     thiserror::Error,
     zerocopy::{
         byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+        AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
     },
 };
 
@@ -55,7 +55,7 @@ impl PppHeader {
 
 /// Wrapper around a parsed on-the-wire PPP header and the rest of the packet.
 pub struct PppPacket<B> {
-    header: LayoutVerified<B, PppHeader>,
+    header: Ref<B, PppHeader>,
     body: B,
 }
 
@@ -128,7 +128,7 @@ impl ControlProtocolHeader {
 
 /// Wrapper around a parsed on-the-wire control protocol header and the rest of the packet.
 pub struct ControlProtocolPacket<B> {
-    header: LayoutVerified<B, ControlProtocolHeader>,
+    header: Ref<B, ControlProtocolHeader>,
     body: B,
 }
 
@@ -333,7 +333,7 @@ impl ProtocolRejectHeader {
 
 /// Wrapper around a parsed on-the-wire protocol reject packet header and the rest of the packet.
 pub struct ProtocolRejectPacket<B> {
-    header: LayoutVerified<B, ProtocolRejectHeader>,
+    header: Ref<B, ProtocolRejectHeader>,
     body: B,
 }
 
@@ -402,7 +402,7 @@ impl EchoDiscardHeader {
 
 /// Wrapper around a parsed on-the-wire echo-discard packet header and the rest of the packet.
 pub struct EchoDiscardPacket<B> {
-    header: LayoutVerified<B, EchoDiscardHeader>,
+    header: Ref<B, EchoDiscardHeader>,
     body: B,
 }
 

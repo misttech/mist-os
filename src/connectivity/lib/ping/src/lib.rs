@@ -402,9 +402,8 @@ where
 }
 
 fn verify_packet<I: Ip>(addr: I::Addr, packet: &[u8]) -> Result<PingData<I>, PingError> {
-    let (reply, body): (zerocopy::LayoutVerified<_, IcmpHeader>, _) =
-        zerocopy::LayoutVerified::new_unaligned_from_prefix(packet)
-            .ok_or_else(|| PingError::Parse)?;
+    let (reply, body): (zerocopy::Ref<_, IcmpHeader>, _) =
+        zerocopy::Ref::new_unaligned_from_prefix(packet).ok_or_else(|| PingError::Parse)?;
 
     // The identifier cannot be verified, since ICMP socket implementations rewrites the field on
     // send and uses its value to demultiplex packets for delivery to sockets on receive.
@@ -501,8 +500,8 @@ mod test {
                 .flatten()
                 .copied()
                 .collect::<Vec<u8>>();
-            let (mut header, _): (zerocopy::LayoutVerified<_, IcmpHeader>, _) =
-                match zerocopy::LayoutVerified::new_unaligned_from_prefix(&mut buf[..]) {
+            let (mut header, _): (zerocopy::Ref<_, IcmpHeader>, _) =
+                match zerocopy::Ref::new_unaligned_from_prefix(&mut buf[..]) {
                     Some(layout_verified) => layout_verified,
                     None => {
                         return Poll::Ready(Err(std::io::Error::new(

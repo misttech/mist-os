@@ -30,8 +30,8 @@ use std::{convert::TryFrom, io::Write as _, num::NonZeroU16, str::FromStr};
 use thiserror::Error;
 use witness::NonEmptyValidStr;
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes,
-    LayoutVerified, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, Ref,
+    Unaligned,
 };
 
 /// The port netsvc uses to send TFTP traffic from.
@@ -370,7 +370,7 @@ where
 /// The body of a data message.
 #[derive(Debug)]
 pub struct DataBody<B: ByteSlice> {
-    block: LayoutVerified<B, U16>,
+    block: Ref<B, U16>,
     payload: B,
 }
 
@@ -396,7 +396,7 @@ where
 /// The body of an Ack message.
 #[derive(Debug)]
 pub struct AckBody<B: ByteSlice> {
-    block: LayoutVerified<B, U16>,
+    block: Ref<B, U16>,
 }
 
 impl<B> AckBody<B>

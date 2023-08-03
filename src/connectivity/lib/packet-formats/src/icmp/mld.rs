@@ -21,8 +21,7 @@ use packet::{
     BufferView,
 };
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
@@ -89,8 +88,8 @@ impl MulticastRecordHeader {
 ///
 /// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
 pub struct MulticastRecord<B> {
-    header: LayoutVerified<B, MulticastRecordHeader>,
-    sources: LayoutVerified<B, [Ipv6Addr]>,
+    header: Ref<B, MulticastRecordHeader>,
+    sources: Ref<B, [Ipv6Addr]>,
 }
 
 impl<B: ByteSlice> MulticastRecord<B> {
@@ -162,7 +161,7 @@ impl Mldv2ReportMessageHeader {
 /// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
 #[derive(Debug)]
 pub struct Mldv2ReportBody<B: ByteSlice> {
-    header: LayoutVerified<B, Mldv2ReportMessageHeader>,
+    header: Ref<B, Mldv2ReportMessageHeader>,
     records: Records<B, Mldv2ReportRecords>,
 }
 
@@ -180,8 +179,8 @@ impl<B: ByteSlice> Mldv2ReportBody<B> {
 
 impl<B: ByteSlice> MessageBody<B> for Mldv2ReportBody<B> {
     fn parse(bytes: B) -> ParseResult<Self> {
-        let (header, bytes) = LayoutVerified::<_, Mldv2ReportMessageHeader>::new_from_prefix(bytes)
-            .ok_or(ParseError::Format)?;
+        let (header, bytes) =
+            Ref::<_, Mldv2ReportMessageHeader>::new_from_prefix(bytes).ok_or(ParseError::Format)?;
         let records = Records::parse_with_context(bytes, header.num_mcast_addr_records().into())?;
         Ok(Mldv2ReportBody { header, records })
     }
@@ -329,7 +328,7 @@ impl Mldv1Message {
 
 /// The on-wire structure for the body of an MLDv1 message.
 #[derive(Debug)]
-pub struct Mldv1Body<B: ByteSlice>(LayoutVerified<B, Mldv1Message>);
+pub struct Mldv1Body<B: ByteSlice>(Ref<B, Mldv1Message>);
 
 impl<B: ByteSlice> Deref for Mldv1Body<B> {
     type Target = Mldv1Message;
@@ -341,7 +340,7 @@ impl<B: ByteSlice> Deref for Mldv1Body<B> {
 
 impl<B: ByteSlice> MessageBody<B> for Mldv1Body<B> {
     fn parse(bytes: B) -> ParseResult<Self> {
-        LayoutVerified::new(bytes).map_or(Err(ParseError::Format), |body| Ok(Mldv1Body(body)))
+        Ref::new(bytes).map_or(Err(ParseError::Format), |body| Ok(Mldv1Body(body)))
     }
 
     fn len(&self) -> usize {

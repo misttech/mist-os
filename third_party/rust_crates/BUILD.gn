@@ -1097,7 +1097,7 @@ group("xts-mode") {
 }
 
 group("zerocopy") {
-  public_deps = [ ":zerocopy-v0_7_0-alpha_4" ]
+  public_deps = [ ":zerocopy-v0_7_0-alpha_5" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -13026,24 +13026,24 @@ rust_library("xts-mode-v0_4_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("zerocopy-v0_7_0-alpha_4") {
+rust_library("zerocopy-v0_7_0-alpha_5") {
   crate_name = "zerocopy"
   crate_root =
-      "//third_party/rust_crates/vendor/zerocopy-0.7.0-alpha.4/src/lib.rs"
-  output_name = "zerocopy-ed393f51636da2c3"
+      "//third_party/rust_crates/vendor/zerocopy-0.7.0-alpha.5/src/lib.rs"
+  output_name = "zerocopy-2977ee0d554be9ca"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":zerocopy-derive-v0_7_0-alpha_4($host_toolchain)" ]
+  deps += [ ":zerocopy-derive-v0_7_0-alpha_5($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=ed393f51636da2c3",
-    "-Cextra-filename=-ed393f51636da2c3",
+    "-Cmetadata=2977ee0d554be9ca",
+    "-Cextra-filename=-2977ee0d554be9ca",
     "--cfg=feature=\"byteorder\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"simd\"",
@@ -13052,10 +13052,10 @@ rust_library("zerocopy-v0_7_0-alpha_4") {
   visibility = [ ":*" ]
 }
 
-rust_proc_macro("zerocopy-derive-v0_7_0-alpha_4") {
+rust_proc_macro("zerocopy-derive-v0_7_0-alpha_5") {
   crate_name = "zerocopy_derive"
-  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.7.0-alpha.4/src/lib.rs"
-  output_name = "zerocopy_derive-7c6eecfa76aeacea"
+  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.7.0-alpha.5/src/lib.rs"
+  output_name = "zerocopy_derive-6330c727c000fadc"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -13068,8 +13068,8 @@ rust_proc_macro("zerocopy-derive-v0_7_0-alpha_4") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=7c6eecfa76aeacea",
-    "-Cextra-filename=-7c6eecfa76aeacea",
+    "-Cmetadata=6330c727c000fadc",
+    "-Cextra-filename=-6330c727c000fadc",
   ]
 
   visibility = [ ":*" ]

@@ -38,7 +38,7 @@ use {
     thiserror::Error,
     zerocopy::{
         byteorder::little_endian::{U16 as LEU16, U32 as LEU32, U64 as LEU64},
-        ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+        ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
     },
 };
 
@@ -384,7 +384,7 @@ assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 #[derive(FromZeroes, FromBytes)]
 #[repr(C)]
 pub struct ExtentTreeNode<B: ByteSlice> {
-    pub header: LayoutVerified<B, ExtentHeader>,
+    pub header: Ref<B, ExtentHeader>,
     pub entries: B,
 }
 
@@ -675,7 +675,7 @@ pub trait ParseToStruct: FromBytes + Unaligned + Sized {
     ///
     /// `Self` is the ext4 struct that represents the given `data`.
     fn to_struct_ref(data: &[u8], error_type: ParsingError) -> Result<&Self, ParsingError> {
-        LayoutVerified::<&[u8], Self>::new(data).map(|res| res.into_ref()).ok_or(error_type)
+        Ref::<&[u8], Self>::new(data).map(|res| res.into_ref()).ok_or(error_type)
     }
 }
 
@@ -688,7 +688,7 @@ impl<B: ByteSlice> ExtentTreeNode<B> {
     /// `data` must be large enough to construct an ExtentHeader. If not, `None`
     /// is returned. `data` is consumed by this operation.
     pub fn parse(data: B) -> Option<Self> {
-        LayoutVerified::<B, ExtentHeader>::new_from_prefix(data)
+        Ref::<B, ExtentHeader>::new_from_prefix(data)
             .map(|(header, entries)| Self { header, entries })
     }
 }

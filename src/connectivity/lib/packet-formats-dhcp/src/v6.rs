@@ -25,7 +25,7 @@ use {
     uuid::Uuid,
     zerocopy::{
         byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+        AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
     },
 };
 
@@ -273,7 +273,7 @@ pub enum ParsedDhcpOption<'a> {
 /// An overlay representation of an IA_NA option.
 #[derive(Debug, PartialEq)]
 pub struct IanaData<B: ByteSlice> {
-    header: LayoutVerified<B, IanaHeader>,
+    header: Ref<B, IanaHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
@@ -359,7 +359,7 @@ impl<'a, B: ByteSlice> IanaData<B> {
     /// Constructs a new `IanaData` from a `ByteSlice`.
     fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = LayoutVerified::new_unaligned_from_prefix(buf)
+        let (header, options) = Ref::new_unaligned_from_prefix(buf)
             .ok_or(ParseError::InvalidOpLen(OptionCode::Iana, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IanaData { header, options })
@@ -408,7 +408,7 @@ struct IanaHeader {
 /// An overlay representation of an IA Address option.
 #[derive(Debug, PartialEq)]
 pub struct IaAddrData<B: ByteSlice> {
-    header: LayoutVerified<B, IaAddrHeader>,
+    header: Ref<B, IaAddrHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
@@ -416,7 +416,7 @@ impl<'a, B: ByteSlice> IaAddrData<B> {
     /// Constructs a new `IaAddrData` from a `ByteSlice`.
     pub fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = LayoutVerified::new_unaligned_from_prefix(buf)
+        let (header, options) = Ref::new_unaligned_from_prefix(buf)
             .ok_or(ParseError::InvalidOpLen(OptionCode::IaAddr, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaAddrData { header, options })
@@ -476,7 +476,7 @@ struct IaPdHeader {
 /// [RFC 8415 section 21.21]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.21
 #[derive(Debug, PartialEq)]
 pub struct IaPdData<B: ByteSlice> {
-    header: LayoutVerified<B, IaPdHeader>,
+    header: Ref<B, IaPdHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
@@ -484,7 +484,7 @@ impl<'a, B: ByteSlice> IaPdData<B> {
     /// Constructs a new `IaPdData` from a `ByteSlice`.
     fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = LayoutVerified::new_unaligned_from_prefix(buf)
+        let (header, options) = Ref::new_unaligned_from_prefix(buf)
             .ok_or(ParseError::InvalidOpLen(OptionCode::IaPd, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaPdData { header, options })
@@ -536,7 +536,7 @@ struct IaPrefixHeader {
 /// [RFC 8415 section 21.22]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.22
 #[derive(Debug, PartialEq)]
 pub struct IaPrefixData<B: ByteSlice> {
-    header: LayoutVerified<B, IaPrefixHeader>,
+    header: Ref<B, IaPrefixHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
@@ -544,7 +544,7 @@ impl<'a, B: ByteSlice> IaPrefixData<B> {
     /// Constructs a new `IaPrefixData` from a `ByteSlice`.
     pub fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = LayoutVerified::new_unaligned_from_prefix(buf)
+        let (header, options) = Ref::new_unaligned_from_prefix(buf)
             .ok_or(ParseError::InvalidOpLen(OptionCode::IaPrefix, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaPrefixData { header, options })

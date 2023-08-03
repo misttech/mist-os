@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     paste::paste,
     std::mem::size_of,
-    zerocopy::{ByteSlice, LayoutVerified},
+    zerocopy::{ByteSlice, Ref},
 };
 
 macro_rules! validate {
@@ -28,8 +28,8 @@ macro_rules! simple_parse_func {
         paste! {
             pub fn [<parse_ $ie_snake_case>]<B: ByteSlice>(
                 raw_body: B,
-            ) -> FrameParseResult<LayoutVerified<B, [<$ie_snake_case:camel>]>> {
-                LayoutVerified::new(raw_body)
+            ) -> FrameParseResult<Ref<B, [<$ie_snake_case:camel>]>> {
+                Ref::new(raw_body)
                     .ok_or(FrameParseError::new(
                         concat!(
                             "Invalid length or alignment for ",
@@ -60,29 +60,29 @@ pub fn parse_ssid<B: ByteSlice>(raw_body: B) -> FrameParseResult<B> {
 
 pub fn parse_supported_rates<B: ByteSlice>(
     raw_body: B,
-) -> FrameParseResult<LayoutVerified<B, [SupportedRate]>> {
+) -> FrameParseResult<Ref<B, [SupportedRate]>> {
     // IEEE Std 802.11-2016, 9.2.4.3 specifies that the Supported Rates IE may contain at most
     // eight rates. However, in practice some devices transmit more (rather than using Extended
     // Supported Rates). As the rates are encoded in a standard IE, this function does not validate
     // the number of rates to improve interoperability.
     validate!(!raw_body.is_empty(), "Empty Supported Rates IE");
     // unwrap() is OK because sizeof(SupportedRate) is 1, and any slice length is a multiple of 1
-    Ok(LayoutVerified::new_slice_unaligned(raw_body).unwrap())
+    Ok(Ref::new_slice_unaligned(raw_body).unwrap())
 }
 
 pub fn parse_extended_supported_rates<B: ByteSlice>(
     raw_body: B,
-) -> FrameParseResult<LayoutVerified<B, [SupportedRate]>> {
+) -> FrameParseResult<Ref<B, [SupportedRate]>> {
     validate!(!raw_body.is_empty(), "Empty Extended Supported Rates IE");
     // The maximum number of extended supported rates (each a single u8) is the same as the
     // maximum number of bytes in an IE. Therefore, there is no need to check the max length
     // of the extended supported rates IE body.
     // unwrap() is OK because sizeof(SupportedRate) is 1, and any slice length is a multiple of 1
-    Ok(LayoutVerified::new_slice_unaligned(raw_body).unwrap())
+    Ok(Ref::new_slice_unaligned(raw_body).unwrap())
 }
 
 pub fn parse_tim<B: ByteSlice>(raw_body: B) -> FrameParseResult<TimView<B>> {
-    let (header, bitmap) = LayoutVerified::<B, TimHeader>::new_unaligned_from_prefix(raw_body)
+    let (header, bitmap) = Ref::<B, TimHeader>::new_unaligned_from_prefix(raw_body)
         .ok_or(FrameParseError::new("Element body is too short to include a TIM header"))?;
     validate!(!bitmap.is_empty(), "Bitmap in TIM is empty");
     validate!(bitmap.len() <= TIM_MAX_BITMAP_LEN, "Bitmap in TIM is too long");

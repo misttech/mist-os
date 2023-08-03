@@ -43,7 +43,7 @@ use packet::{
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
@@ -81,7 +81,7 @@ impl HeaderPrefix {
 /// and so `peek_message_type` succeeding does not guarantee that a subsequent
 /// call to `parse` will also succeed.
 pub fn peek_message_type<MessageType: TryFrom<u8>>(bytes: &[u8]) -> ParseResult<MessageType> {
-    let (hdr_pfx, _) = LayoutVerified::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes)
+    let (hdr_pfx, _) = Ref::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes)
         .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
     MessageType::try_from(hdr_pfx.msg_type).map_err(|_| {
         debug_err!(ParseError::NotSupported, "unrecognized message type: {:x}", hdr_pfx.msg_type,)
@@ -142,7 +142,7 @@ impl IcmpIpExt for Ipv4 {
             return bytes.len();
         }
         let (header_prefix, _) =
-            LayoutVerified::<_, ipv4::HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap();
+            Ref::<_, ipv4::HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap();
         cmp::min(header_prefix.ihl() as usize * 4, bytes.len())
     }
 }
@@ -374,7 +374,7 @@ unsafe impl<M: AsBytes + Unaligned> AsBytes for Header<M> {
 /// validate an [`IcmpPacketRaw`].
 #[derive(Debug)]
 pub struct IcmpPacketRaw<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> {
-    header: LayoutVerified<B, Header<M>>,
+    header: Ref<B, Header<M>>,
     message_body: B,
     _marker: PhantomData<I>,
 }
@@ -392,7 +392,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacketRaw<I, B, M> {
 /// parsed from, meaning that no copying or extra allocation is necessary.
 #[derive(Debug)]
 pub struct IcmpPacket<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> {
-    header: LayoutVerified<B, Header<M>>,
+    header: Ref<B, Header<M>>,
     message_body: M::Body,
     _marker: PhantomData<I>,
 }

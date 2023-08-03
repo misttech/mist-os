@@ -5,7 +5,7 @@
 use {
     std::mem::size_of,
     thiserror::Error,
-    zerocopy::{AsBytes, FromBytes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, FromBytes, Ref, Unaligned},
 };
 
 #[derive(Error, Debug)]
@@ -32,23 +32,23 @@ pub trait Appendable {
         self.append_bytes(&[byte])
     }
 
-    fn append_value_zeroed<T>(&mut self) -> Result<LayoutVerified<&mut [u8], T>, BufferTooSmall>
+    fn append_value_zeroed<T>(&mut self) -> Result<Ref<&mut [u8], T>, BufferTooSmall>
     where
         T: FromBytes + Unaligned,
     {
         let bytes = self.append_bytes_zeroed(size_of::<T>())?;
-        Ok(LayoutVerified::new_unaligned(bytes).unwrap())
+        Ok(Ref::new_unaligned(bytes).unwrap())
     }
 
     fn append_array_zeroed<T>(
         &mut self,
         num_elems: usize,
-    ) -> Result<LayoutVerified<&mut [u8], [T]>, BufferTooSmall>
+    ) -> Result<Ref<&mut [u8], [T]>, BufferTooSmall>
     where
         T: FromBytes + Unaligned,
     {
         let bytes = self.append_bytes_zeroed(size_of::<T>() * num_elems)?;
-        Ok(LayoutVerified::new_slice_unaligned(bytes).unwrap())
+        Ok(Ref::new_slice_unaligned(bytes).unwrap())
     }
 }
 

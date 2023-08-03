@@ -8,7 +8,7 @@ use {
         buffer_reader::BufferReader,
         mac::{round_up, MacAddr},
     },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
 };
 
 // IEEE Std 802.11-2016, 9.3.2.2.2
@@ -22,7 +22,7 @@ pub struct AmsduSubframeHdr {
 }
 
 pub struct AmsduSubframe<B> {
-    pub hdr: LayoutVerified<B, AmsduSubframeHdr>,
+    pub hdr: Ref<B, AmsduSubframeHdr>,
     pub body: B,
 }
 

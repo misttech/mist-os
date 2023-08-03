@@ -11,8 +11,7 @@ use net_types::ip::Ipv4Addr;
 use packet::records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 use super::{
@@ -195,11 +194,11 @@ impl MembershipQueryData {
 #[derive(Copy, Clone, Debug)]
 pub struct IgmpMembershipQueryV3;
 
-impl<B> IgmpNonEmptyBody for LayoutVerified<B, [Ipv4Addr]> {}
+impl<B> IgmpNonEmptyBody for Ref<B, [Ipv4Addr]> {}
 
 impl<B> MessageType<B> for IgmpMembershipQueryV3 {
     type FixedHeader = MembershipQueryData;
-    type VariableBody = LayoutVerified<B, [Ipv4Addr]>;
+    type VariableBody = Ref<B, [Ipv4Addr]>;
     type MaxRespTime = IgmpResponseTimeV3;
     const TYPE: IgmpMessageType = IgmpMessageType::MembershipQuery;
 
@@ -308,8 +307,8 @@ impl GroupRecordHeader {
 ///
 /// [RFC 3376 section 4.2.10]: https://tools.ietf.org/html/rfc3376#section-4.2.10
 pub struct GroupRecord<B> {
-    header: LayoutVerified<B, GroupRecordHeader>,
-    sources: LayoutVerified<B, [Ipv4Addr]>,
+    header: Ref<B, GroupRecordHeader>,
+    sources: Ref<B, [Ipv4Addr]>,
 }
 
 impl<B: ByteSlice> GroupRecord<B> {

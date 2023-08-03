@@ -15,9 +15,7 @@ use futures::{
 };
 use std::{io::ErrorKind, net::SocketAddr, num::Wrapping, pin::Pin, time::Duration};
 use timeout::timeout;
-use zerocopy::{
-    byteorder::big_endian::U16, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
-};
+use zerocopy::{byteorder::big_endian::U16, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
 
 const HOST_PORT: u16 = 5554;
 const REPLY_TIMEOUT: Duration = Duration::from_millis(500);
@@ -39,13 +37,13 @@ struct Header {
 }
 
 struct Packet<B: ByteSlice> {
-    header: LayoutVerified<B, Header>,
+    header: Ref<B, Header>,
     data: B,
 }
 
 impl<B: ByteSlice> Packet<B> {
     fn parse(bytes: B) -> Option<Packet<B>> {
-        let (header, data) = LayoutVerified::new_from_prefix(bytes)?;
+        let (header, data) = Ref::new_from_prefix(bytes)?;
         Some(Self { header, data })
     }
 

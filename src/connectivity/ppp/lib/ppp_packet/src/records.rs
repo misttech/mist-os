@@ -540,7 +540,7 @@ impl<'a> packet::BufferView<&'a [u8]> for LongLivedBuff<'a> {
 mod test {
     use super::*;
     use packet::BufferView;
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
 
     const DUMMY_BYTES: [u8; 16] = [
         0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03,
@@ -557,7 +557,7 @@ mod test {
 
     fn parse_dummy_rec<'a, BV>(
         data: &mut BV,
-    ) -> Result<Option<Option<LayoutVerified<&'a [u8], DummyRecord>>>, ()>
+    ) -> Result<Option<Option<Ref<&'a [u8], DummyRecord>>>, ()>
     where
         BV: BufferView<&'a [u8]>,
     {
@@ -584,7 +584,7 @@ mod test {
     }
 
     impl<'a> RecordsImpl<'a> for ContextlessRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -606,7 +606,7 @@ mod test {
     }
 
     impl<'a> LimitedRecordsImpl<'a> for LimitContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -629,7 +629,7 @@ mod test {
     }
 
     impl<'a> LimitedRecordsImpl<'a> for ExactLimitContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -664,7 +664,7 @@ mod test {
     }
 
     impl<'a> RecordsImpl<'a> for FilterContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             bytes: &mut BV,
@@ -723,7 +723,7 @@ mod test {
     }
 
     impl<'a> RecordsImpl<'a> for StatefulContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -749,7 +749,7 @@ mod test {
     fn parse_dummy_rec_with_context<'a, BV>(
         data: &mut BV,
         context: &mut StatefulContext,
-    ) -> Result<Option<Option<LayoutVerified<&'a [u8], DummyRecord>>>, ()>
+    ) -> Result<Option<Option<Ref<&'a [u8], DummyRecord>>>, ()>
     where
         BV: BufferView<&'a [u8]>,
     {

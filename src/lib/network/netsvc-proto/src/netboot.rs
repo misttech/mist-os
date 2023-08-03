@@ -20,8 +20,7 @@ use std::{
     num::NonZeroU16,
 };
 use zerocopy::{
-    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
-    Unaligned,
+    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 // Re-export witness type.
@@ -216,7 +215,7 @@ struct MessageHead {
 #[derive(Debug)]
 pub struct NetbootPacket<B: ByteSlice> {
     command: OpcodeOrErr,
-    message: LayoutVerified<B, MessageHead>,
+    message: Ref<B, MessageHead>,
     payload: B,
 }
 

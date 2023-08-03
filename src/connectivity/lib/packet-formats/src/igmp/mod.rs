@@ -32,7 +32,7 @@ use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, InnerPacketBuilder,
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
 
 use self::messages::IgmpMessageType;
 use crate::error::ParseError;
@@ -93,7 +93,7 @@ pub trait MessageType<B> {
     // `VariableBody` as `[u8]` to `MessageType` as opposed to just enforcing
     // a trait in `VariableBody` to do so. The decision to go this way is to
     // be able to relax the `ByteSlice` requirement on `B` elsewhere and it
-    // also plays better with existing traits on `LayoutVerified` and
+    // also plays better with existing traits on `Ref` and
     // `Records`.
     fn body_bytes(body: &Self::VariableBody) -> &[u8]
     where
@@ -247,8 +247,8 @@ impl HeaderPrefix {
 /// `MessageType` trait.
 #[derive(Debug)]
 pub struct IgmpMessage<B: ByteSlice, M: MessageType<B>> {
-    prefix: LayoutVerified<B, HeaderPrefix>,
-    header: LayoutVerified<B, M::FixedHeader>,
+    prefix: Ref<B, HeaderPrefix>,
+    header: Ref<B, M::FixedHeader>,
     body: M::VariableBody,
 }
 
@@ -358,7 +358,7 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(
     // a single Ipv4Address
     let long_message =
         bytes.len() > (core::mem::size_of::<HeaderPrefix>() + core::mem::size_of::<Ipv4Addr>());
-    let (header, _) = LayoutVerified::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes)
+    let (header, _) = Ref::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes)
         .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
     let msg_type = MessageType::try_from(header.msg_type).map_err(|_| {
         debug_err!(ParseError::NotSupported, "unrecognized message type: {:x}", header.msg_type,)

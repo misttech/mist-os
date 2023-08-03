@@ -24,7 +24,7 @@
 use {
     crate::{compression::ChunkedArchive, format::SerializedType1Blob},
     thiserror::Error,
-    zerocopy::{AsBytes, LayoutVerified},
+    zerocopy::{AsBytes, Ref},
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -215,7 +215,7 @@ impl Type1Blob {
     /// header and metadata portion of a delivery blob are required to be present in `data`.
     pub fn parse(data: &[u8]) -> Result<Option<(Type1Blob, &[u8])>, DeliveryBlobError> {
         let Some((serialized_header, payload)) =
-            LayoutVerified::<_, SerializedType1Blob>::new_unaligned_from_prefix(data) else {
+            Ref::<_, SerializedType1Blob>::new_unaligned_from_prefix(data) else {
                 return Ok(None);
             };
         serialized_header.decode().map(|metadata| Some((metadata, payload)))

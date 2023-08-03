@@ -22,8 +22,7 @@ use packet::{
     ParseMetadata, SerializeTarget, Serializer,
 };
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -52,7 +51,7 @@ struct Header {
 /// A `UdpPacket` - whether parsed using `parse` or created using `serialize` -
 /// maintains the invariant that the checksum is always valid.
 pub struct UdpPacket<B> {
-    header: LayoutVerified<B, Header>,
+    header: Ref<B, Header>,
     body: B,
 }
 
@@ -225,7 +224,7 @@ struct UdpFlowHeader {
 /// A partially parsed UDP packet header.
 #[derive(Debug)]
 struct PartialHeader<B: ByteSlice> {
-    flow: LayoutVerified<B, UdpFlowHeader>,
+    flow: Ref<B, UdpFlowHeader>,
     rest: B,
 }
 
@@ -243,7 +242,7 @@ struct PartialHeader<B: ByteSlice> {
 /// [`UdpPacket`] provides a [`FromRaw`] implementation that can be used to
 /// validate a `UdpPacketRaw`.
 pub struct UdpPacketRaw<B: ByteSlice> {
-    header: MaybeParsed<LayoutVerified<B, Header>, PartialHeader<B>>,
+    header: MaybeParsed<Ref<B, Header>, PartialHeader<B>>,
     body: MaybeParsed<B, B>,
 }
 

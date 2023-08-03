@@ -14,7 +14,7 @@ use {
     futures::stream::{self, BoxStream, StreamExt},
     std::{collections::VecDeque, str::Utf8Error},
     thiserror::Error,
-    zerocopy::{FromBytes, FromZeroes, LayoutVerified, Unaligned},
+    zerocopy::{FromBytes, FromZeroes, Ref, Unaligned},
 };
 
 mod watcher;
@@ -609,7 +609,7 @@ pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentErr
     let mut entries = vec![];
 
     while !buf.is_empty() {
-        let Some((dirent, rest)) = LayoutVerified::<_, Dirent>::new_unaligned_from_prefix(buf) else {
+        let Some((dirent, rest)) = Ref::<_, Dirent>::new_unaligned_from_prefix(buf) else {
             entries.push(Err(DecodeDirentError::BufferOverrun));
             return entries;
         };

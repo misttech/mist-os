@@ -9,14 +9,14 @@ use {
     crate::Args,
     fidl_fuchsia_hardware_pci::PciDevice as FidlDevice,
     std::fmt,
-    zerocopy::LayoutVerified,
+    zerocopy::Ref,
 };
 
 pub struct Device<'a> {
     pub device: &'a FidlDevice,
     pub class: Option<String>,
     pub name: Option<String>,
-    pub cfg: LayoutVerified<&'a [u8], Type00Config>,
+    pub cfg: Ref<&'a [u8], Type00Config>,
     pub args: &'a Args,
 }
 

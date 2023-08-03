@@ -4,7 +4,7 @@
 
 use {
     super::MgmtSubtype,
-    zerocopy::{ByteSlice, LayoutVerified},
+    zerocopy::{ByteSlice, Ref},
 };
 
 mod fields;
@@ -19,7 +19,7 @@ pub struct ActionFrame<const NO_ACK: bool, B>
 where
     B: ByteSlice,
 {
-    pub action_hdr: LayoutVerified<B, ActionHdr>,
+    pub action_hdr: Ref<B, ActionHdr>,
     pub elements: B,
 }
 
@@ -28,7 +28,7 @@ where
     B: ByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        LayoutVerified::new_unaligned_from_prefix(bytes)
+        Ref::new_unaligned_from_prefix(bytes)
             .map(|(action_hdr, elements)| ActionFrame { action_hdr, elements })
     }
 }
@@ -39,7 +39,7 @@ pub struct AssocReqFrame<B>
 where
     B: ByteSlice,
 {
-    pub assoc_req_hdr: LayoutVerified<B, AssocReqHdr>,
+    pub assoc_req_hdr: Ref<B, AssocReqHdr>,
     pub elements: B,
 }
 
@@ -48,7 +48,7 @@ where
     B: ByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        LayoutVerified::new_unaligned_from_prefix(bytes)
+        Ref::new_unaligned_from_prefix(bytes)
             .map(|(assoc_req_hdr, elements)| AssocReqFrame { assoc_req_hdr, elements })
     }
 }
@@ -59,7 +59,7 @@ pub struct AssocRespFrame<B>
 where
     B: ByteSlice,
 {
-    pub assoc_resp_hdr: LayoutVerified<B, AssocRespHdr>,
+    pub assoc_resp_hdr: Ref<B, AssocRespHdr>,
     pub elements: B,
 }
 
@@ -68,7 +68,7 @@ where
     B: ByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        LayoutVerified::new_unaligned_from_prefix(bytes)
+        Ref::new_unaligned_from_prefix(bytes)
             .map(|(assoc_resp_hdr, elements)| AssocRespFrame { assoc_resp_hdr, elements })
     }
 }
@@ -79,7 +79,7 @@ pub struct AuthFrame<B>
 where
     B: ByteSlice,
 {
-    pub auth_hdr: LayoutVerified<B, AuthHdr>,
+    pub auth_hdr: Ref<B, AuthHdr>,
     pub elements: B,
 }
 
@@ -88,7 +88,7 @@ where
     B: ByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        LayoutVerified::new_unaligned_from_prefix(bytes)
+        Ref::new_unaligned_from_prefix(bytes)
             .map(|(auth_hdr, elements)| AuthFrame { auth_hdr, elements })
     }
 }
@@ -113,15 +113,15 @@ where
 
 #[derive(Debug)]
 pub enum MgmtBody<B: ByteSlice> {
-    Beacon { bcn_hdr: LayoutVerified<B, BeaconHdr>, elements: B },
+    Beacon { bcn_hdr: Ref<B, BeaconHdr>, elements: B },
     ProbeReq { elements: B },
-    ProbeResp { probe_resp_hdr: LayoutVerified<B, ProbeRespHdr>, elements: B },
-    Authentication { auth_hdr: LayoutVerified<B, AuthHdr>, elements: B },
-    AssociationReq { assoc_req_hdr: LayoutVerified<B, AssocReqHdr>, elements: B },
-    AssociationResp { assoc_resp_hdr: LayoutVerified<B, AssocRespHdr>, elements: B },
-    Deauthentication { deauth_hdr: LayoutVerified<B, DeauthHdr>, elements: B },
-    Disassociation { disassoc_hdr: LayoutVerified<B, DisassocHdr>, elements: B },
-    Action { no_ack: bool, action_hdr: LayoutVerified<B, ActionHdr>, elements: B },
+    ProbeResp { probe_resp_hdr: Ref<B, ProbeRespHdr>, elements: B },
+    Authentication { auth_hdr: Ref<B, AuthHdr>, elements: B },
+    AssociationReq { assoc_req_hdr: Ref<B, AssocReqHdr>, elements: B },
+    AssociationResp { assoc_resp_hdr: Ref<B, AssocRespHdr>, elements: B },
+    Deauthentication { deauth_hdr: Ref<B, DeauthHdr>, elements: B },
+    Disassociation { disassoc_hdr: Ref<B, DisassocHdr>, elements: B },
+    Action { no_ack: bool, action_hdr: Ref<B, ActionHdr>, elements: B },
     Unsupported { subtype: MgmtSubtype },
 }
 
@@ -129,40 +129,40 @@ impl<B: ByteSlice> MgmtBody<B> {
     pub fn parse(subtype: MgmtSubtype, bytes: B) -> Option<Self> {
         match subtype {
             MgmtSubtype::BEACON => {
-                let (bcn_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (bcn_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Beacon { bcn_hdr, elements })
             }
             MgmtSubtype::PROBE_REQ => Some(MgmtBody::ProbeReq { elements: bytes }),
             MgmtSubtype::PROBE_RESP => {
-                let (probe_resp_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (probe_resp_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::ProbeResp { probe_resp_hdr, elements })
             }
             MgmtSubtype::AUTH => {
-                let (auth_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (auth_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Authentication { auth_hdr, elements })
             }
             MgmtSubtype::ASSOC_REQ => {
-                let (assoc_req_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (assoc_req_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::AssociationReq { assoc_req_hdr, elements })
             }
             MgmtSubtype::ASSOC_RESP => {
-                let (assoc_resp_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (assoc_resp_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::AssociationResp { assoc_resp_hdr, elements })
             }
             MgmtSubtype::DEAUTH => {
-                let (deauth_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (deauth_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Deauthentication { deauth_hdr, elements })
             }
             MgmtSubtype::DISASSOC => {
-                let (disassoc_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (disassoc_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Disassociation { disassoc_hdr, elements })
             }
             MgmtSubtype::ACTION => {
-                let (action_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (action_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Action { no_ack: false, action_hdr, elements })
             }
             MgmtSubtype::ACTION_NO_ACK => {
-                let (action_hdr, elements) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (action_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Action { no_ack: true, action_hdr, elements })
             }
             subtype => Some(MgmtBody::Unsupported { subtype }),

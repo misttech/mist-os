@@ -3380,12 +3380,11 @@ impl BinderDriver {
                     }
 
                     // Verify alignment and size before reading the data as a [u32].
-                    let (layout, _) =
-                        zerocopy::LayoutVerified::<&mut [u8], [u32]>::new_slice_from_prefix(
-                            &mut parent_buffer_payload[parent_offset..],
-                            num_fds,
-                        )
-                        .ok_or_else(|| errno!(EINVAL))?;
+                    let (layout, _) = zerocopy::Ref::<&mut [u8], [u32]>::new_slice_from_prefix(
+                        &mut parent_buffer_payload[parent_offset..],
+                        num_fds,
+                    )
+                    .ok_or_else(|| errno!(EINVAL))?;
                     let fd_array = layout.into_mut_slice();
 
                     // Dup each file descriptor and re-write the value of the new FD.

@@ -4,7 +4,7 @@
 
 use {
     super::CtrlSubtype,
-    zerocopy::{ByteSlice, LayoutVerified},
+    zerocopy::{ByteSlice, Ref},
 };
 
 mod fields;
@@ -13,7 +13,7 @@ pub use fields::*;
 
 #[derive(Debug)]
 pub enum CtrlBody<B: ByteSlice> {
-    PsPoll { ps_poll: LayoutVerified<B, PsPoll> },
+    PsPoll { ps_poll: Ref<B, PsPoll> },
     Unsupported { subtype: CtrlSubtype },
 }
 
@@ -21,7 +21,7 @@ impl<B: ByteSlice> CtrlBody<B> {
     pub fn parse(subtype: CtrlSubtype, bytes: B) -> Option<Self> {
         match subtype {
             CtrlSubtype::PS_POLL => {
-                let (ps_poll, _) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+                let (ps_poll, _) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(CtrlBody::PsPoll { ps_poll })
             }
             subtype => Some(CtrlBody::Unsupported { subtype }),

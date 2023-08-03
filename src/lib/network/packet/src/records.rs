@@ -900,7 +900,7 @@ impl<'a> BufferView<&'a [u8]> for LongLivedBuff<'a> {
 #[cfg(test)]
 mod tests {
     use test_case::test_case;
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
 
     use super::*;
 
@@ -912,7 +912,7 @@ mod tests {
     fn get_empty_tuple_mut_ref<'a>() -> &'a mut () {
         // This is a hack since `&mut ()` is invalid.
         let bytes: &mut [u8] = &mut [];
-        zerocopy::LayoutVerified::<_, ()>::new_unaligned(bytes).unwrap().into_mut()
+        zerocopy::Ref::<_, ()>::new_unaligned(bytes).unwrap().into_mut()
     }
 
     #[derive(Debug, AsBytes, FromZeroes, FromBytes, Unaligned)]
@@ -943,7 +943,7 @@ mod tests {
 
     fn parse_dummy_rec<'a, BV>(
         data: &mut BV,
-    ) -> RecordParseResult<LayoutVerified<&'a [u8], DummyRecord>, DummyRecordErr>
+    ) -> RecordParseResult<Ref<&'a [u8], DummyRecord>, DummyRecordErr>
     where
         BV: BufferView<&'a [u8]>,
     {
@@ -970,7 +970,7 @@ mod tests {
     }
 
     impl<'a> RecordsImpl<'a> for ContextlessRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -993,7 +993,7 @@ mod tests {
     }
 
     impl<'a> RecordsImpl<'a> for LimitContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -1034,7 +1034,7 @@ mod tests {
     }
 
     impl<'a> RecordsImpl<'a> for FilterContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             bytes: &mut BV,
@@ -1099,7 +1099,7 @@ mod tests {
     }
 
     impl<'a> RecordsImpl<'a> for StatefulContextRecordImpl {
-        type Record = LayoutVerified<&'a [u8], DummyRecord>;
+        type Record = Ref<&'a [u8], DummyRecord>;
 
         fn parse_with_context<BV: BufferView<&'a [u8]>>(
             data: &mut BV,
@@ -1133,7 +1133,7 @@ mod tests {
     fn parse_dummy_rec_with_context<'a, BV>(
         data: &mut BV,
         context: &mut StatefulContext,
-    ) -> RecordParseResult<LayoutVerified<&'a [u8], DummyRecord>, DummyRecordErr>
+    ) -> RecordParseResult<Ref<&'a [u8], DummyRecord>, DummyRecordErr>
     where
         BV: BufferView<&'a [u8]>,
     {

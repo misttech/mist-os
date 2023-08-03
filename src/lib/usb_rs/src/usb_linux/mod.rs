@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Poll, Waker};
 use std::thread;
-use zerocopy::LayoutVerified;
+use zerocopy::Ref;
 
 use crate::{
     DeviceDescriptor, Endpoint, EndpointDescriptor, EndpointDirection, EndpointType, Error,
@@ -68,9 +68,8 @@ impl DeviceHandleInner {
         let mut device = Option::<DeviceDescriptor>::None;
 
         while descriptor_buf.len() >= std::mem::size_of::<usb_descriptor_header>() + OVERRUN {
-            let (header, _) =
-                LayoutVerified::<_, usb_descriptor_header>::new_from_prefix(descriptor_buf)
-                    .ok_or(Error::MalformedDescriptor)?;
+            let (header, _) = Ref::<_, usb_descriptor_header>::new_from_prefix(descriptor_buf)
+                .ok_or(Error::MalformedDescriptor)?;
             let length = header.bLength as usize;
             if length > descriptor_buf.len() {
                 return Err(Error::MalformedDescriptor);
@@ -79,7 +78,7 @@ impl DeviceHandleInner {
             if device.is_none() {
                 if header.bDescriptorType == USB_DT_DEVICE as u8 {
                     let (descriptor, _) =
-                        LayoutVerified::<_, usb_device_descriptor>::new_from_prefix(descriptor_buf)
+                        Ref::<_, usb_device_descriptor>::new_from_prefix(descriptor_buf)
                             .ok_or(Error::MalformedDescriptor)?;
 
                     device = Some(DeviceDescriptor {
@@ -102,13 +101,13 @@ impl DeviceHandleInner {
                 };
 
                 let (descriptor, _) =
-                    LayoutVerified::<_, usb_endpoint_descriptor>::new_from_prefix(descriptor_buf)
+                    Ref::<_, usb_endpoint_descriptor>::new_from_prefix(descriptor_buf)
                         .ok_or(Error::MalformedDescriptor)?;
 
                 iface.add_endpoint(&*descriptor);
             } else if header.bDescriptorType == USB_DT_INTERFACE as u8 {
                 let (descriptor, _) =
-                    LayoutVerified::<_, usb_interface_descriptor>::new_from_prefix(descriptor_buf)
+                    Ref::<_, usb_interface_descriptor>::new_from_prefix(descriptor_buf)
                         .ok_or(Error::MalformedDescriptor)?;
 
                 if let Some(iface) = iface.replace(InterfaceDescriptor::from_ch9(&*descriptor)) {

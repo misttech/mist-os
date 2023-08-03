@@ -14,7 +14,7 @@ use std::net::IpAddr;
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 const IPV4_SIZE: usize = 4;
@@ -479,11 +479,11 @@ impl<B: ByteSlice + Clone> Record<B> {
             }
             Type::A => {
                 let buf = buffer.take_front(IPV4_SIZE).ok_or(ParseError::Malformed)?;
-                RData::A(A::read_from(buf).ok_or(ParseError::Malformed)?)
+                RData::A(A::read_from(&buf).ok_or(ParseError::Malformed)?)
             }
             Type::Aaaa => {
                 let buf = buffer.take_front(IPV6_SIZE).ok_or(ParseError::Malformed)?;
-                RData::Aaaa(Aaaa::read_from(buf).ok_or(ParseError::Malformed)?)
+                RData::Aaaa(Aaaa::read_from(&buf).ok_or(ParseError::Malformed)?)
             }
             _ => RData::Bytes(buffer.take_front(rdata_len.into()).ok_or(ParseError::Malformed)?),
         };
@@ -553,7 +553,7 @@ impl EmbeddedPacketBuilder for RecordBuilder<'_> {
 
 /// A parsed mDNS message in its entirety.
 pub struct Message<B: ByteSlice> {
-    pub header: LayoutVerified<B, Header>,
+    pub header: Ref<B, Header>,
     pub questions: Vec<Question<B>>,
     pub answers: Vec<Record<B>>,
     pub authority: Vec<Record<B>>,

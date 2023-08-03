@@ -12,7 +12,7 @@ use packet::{
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+    AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -62,9 +62,9 @@ const TPID_8021AD: u16 = 0x88a8;
 /// parsed from or serialized to, meaning that no copying or extra allocation is
 /// necessary.
 pub struct EthernetFrame<B> {
-    hdr_prefix: LayoutVerified<B, HeaderPrefix>,
-    tag: Option<LayoutVerified<B, U32>>,
-    ethertype: LayoutVerified<B, U16>,
+    hdr_prefix: Ref<B, HeaderPrefix>,
+    tag: Option<Ref<B, U32>>,
+    ethertype: Ref<B, U16>,
     body: B,
 }
 

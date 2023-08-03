@@ -37,7 +37,7 @@ use {
         timer::{EventId, Timer},
     },
     wlan_statemachine::*,
-    zerocopy::{ByteSlice, LayoutVerified},
+    zerocopy::{ByteSlice, Ref},
 };
 
 /// Reconnect timeout in Beacon periods.
@@ -449,7 +449,7 @@ impl Associating {
 /// If either IE is of an incorrect length, it will be ignored.
 fn extract_ht_vht_op<B: ByteSlice>(
     elements: B,
-) -> (Option<LayoutVerified<B, ie::HtOperation>>, Option<LayoutVerified<B, ie::VhtOperation>>) {
+) -> (Option<Ref<B, ie::HtOperation>>, Option<Ref<B, ie::VhtOperation>>) {
     let mut ht_op = None;
     let mut vht_op = None;
     for (id, body) in ie::Reader::new(elements) {

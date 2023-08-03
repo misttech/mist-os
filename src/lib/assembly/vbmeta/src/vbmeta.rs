@@ -141,7 +141,7 @@ mod tests {
     use crate::descriptor::Salt;
     use crate::test;
     use std::convert::TryFrom;
-    use zerocopy::LayoutVerified;
+    use zerocopy::Ref;
 
     #[test]
     fn simple_vbmeta() {
@@ -293,9 +293,8 @@ mod tests {
         if vbmeta_bytes[..expected_header_bytes.len()] != expected_header_bytes {
             // the bytes didn't line up as expected, so compare the two header structs
             // directly, first, as it can have prettier results.
-            let expected_header = LayoutVerified::<_, Header>::new(&expected_header_bytes as &[u8])
-                .unwrap()
-                .into_ref();
+            let expected_header =
+                Ref::<_, Header>::new(&expected_header_bytes as &[u8]).unwrap().into_ref();
             assert_eq!(
                 vbmeta.header(),
                 expected_header,

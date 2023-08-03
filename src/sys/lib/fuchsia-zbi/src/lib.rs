@@ -13,7 +13,7 @@ use {
     },
     thiserror::Error,
     tracing::info,
-    zerocopy::LayoutVerified,
+    zerocopy::Ref,
 };
 
 pub use fuchsia_zbi_abi::{
@@ -141,8 +141,8 @@ impl ZbiParser {
     fn get_header<'a>(
         &self,
         bytes: &'a [u8],
-    ) -> Result<(ZbiType, LayoutVerified<&'a [u8], zbi_header_t>), ZbiParserError> {
-        let header = LayoutVerified::<&[u8], zbi_header_t>::new_unaligned(&bytes[..])
+    ) -> Result<(ZbiType, Ref<&'a [u8], zbi_header_t>), ZbiParserError> {
+        let header = Ref::<&[u8], zbi_header_t>::new_unaligned(&bytes[..])
             .ok_or(ZbiParserError::FailedToParseHeader)?;
 
         if header.magic.get() != ZBI_ITEM_MAGIC {

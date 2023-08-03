@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::error::Error, anyhow::format_err, wlan_common::mac, zerocopy::LayoutVerified};
+use {crate::error::Error, anyhow::format_err, wlan_common::mac, zerocopy::Ref};
 
 pub fn set_more_data(buf: &mut [u8]) -> Result<(), Error> {
-    let (frame_ctrl, _) = LayoutVerified::<&mut [u8], mac::FrameControl>::new_from_prefix(buf)
+    let (frame_ctrl, _) = Ref::<&mut [u8], mac::FrameControl>::new_from_prefix(buf)
         .ok_or(format_err!("could not parse frame control header"))?;
     let frame_ctrl = frame_ctrl.into_mut();
     frame_ctrl.set_more_data(true);

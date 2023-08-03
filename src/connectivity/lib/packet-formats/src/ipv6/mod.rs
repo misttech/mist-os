@@ -25,8 +25,8 @@ use packet::{
 };
 use tracing::debug;
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes,
-    LayoutVerified, Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeroes, Ref,
+    Unaligned,
 };
 
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
@@ -279,7 +279,7 @@ pub trait Ipv6Header {
 /// parsed from or serialized to, meaning that no copying or extra allocation is
 /// necessary.
 pub struct Ipv6Packet<B> {
-    fixed_hdr: LayoutVerified<B, FixedHeader>,
+    fixed_hdr: Ref<B, FixedHeader>,
     extension_hdrs: Records<B, Ipv6ExtensionHeaderImpl>,
     body: B,
     proto: Ipv6Proto,
@@ -806,7 +806,7 @@ pub struct ExtHdrParseError;
 /// validate an `Ipv6PacketRaw`.
 pub struct Ipv6PacketRaw<B> {
     /// A raw packet always contains at least a fully parsed `FixedHeader`.
-    fixed_hdr: LayoutVerified<B, FixedHeader>,
+    fixed_hdr: Ref<B, FixedHeader>,
     /// When `extension_hdrs` is [`MaybeParsed::Complete`], it contains the
     /// `RecordsRaw` that can be validated for full extension headers parsing.
     /// Otherwise, it just contains the extension header bytes that were
@@ -1202,7 +1202,7 @@ pub(crate) fn reassemble_fragmented_packet<
 
     // We know the call to `unwrap` will not fail because we just copied the header
     // bytes into `bytes`.
-    let mut header = LayoutVerified::<_, FixedHeader>::new_unaligned_from_prefix(bytes).unwrap().0;
+    let mut header = Ref::<_, FixedHeader>::new_unaligned_from_prefix(bytes).unwrap().0;
 
     // Update the payload length field.
     header.payload_len.set(u16::try_from(payload_length).unwrap());
@@ -1278,8 +1278,8 @@ mod tests {
     fn fixed_hdr_to_bytes(fixed_hdr: FixedHeader) -> [u8; IPV6_FIXED_HDR_LEN] {
         let mut bytes = [0; IPV6_FIXED_HDR_LEN];
         {
-            let mut lv = LayoutVerified::<_, FixedHeader>::new_unaligned(&mut bytes[..]).unwrap();
-            *lv = fixed_hdr;
+            let mut r = Ref::<_, FixedHeader>::new_unaligned(&mut bytes[..]).unwrap();
+            *r = fixed_hdr;
         }
         bytes
     }

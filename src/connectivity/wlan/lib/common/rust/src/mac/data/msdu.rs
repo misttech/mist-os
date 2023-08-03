@@ -8,7 +8,7 @@ use {
         buffer_reader::BufferReader,
         mac::{data::*, DataFrame, MacAddr, MacFrame},
     },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned},
+    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned},
 };
 
 // RFC 1042
@@ -29,14 +29,14 @@ pub struct LlcHdr {
 }
 
 pub struct LlcFrame<B> {
-    pub hdr: LayoutVerified<B, LlcHdr>,
+    pub hdr: Ref<B, LlcHdr>,
     pub body: B,
 }
 
 /// An LLC frame is only valid if it contains enough bytes for header AND at least 1 byte for body
 impl<B: ByteSlice> LlcFrame<B> {
     pub fn parse(bytes: B) -> Option<Self> {
-        let (hdr, body) = LayoutVerified::new_unaligned_from_prefix(bytes)?;
+        let (hdr, body) = Ref::new_unaligned_from_prefix(bytes)?;
         if body.is_empty() {
             None
         } else {

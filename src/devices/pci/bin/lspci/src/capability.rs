@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_hardware_pci::Capability as FidlCapability,
     std::convert::From,
     std::fmt,
-    zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified},
+    zerocopy::{AsBytes, FromBytes, FromZeroes, Ref},
 };
 
 // Capability types are documented in PCI Local Bus Specification v3.0 Appendix H
@@ -130,7 +130,7 @@ impl<'a> Capability<'a> {
         )?;
 
         if control.can_be_64bit() {
-            let (msi, _) = LayoutVerified::<_, Msi64Capability>::new_from_prefix(
+            let (msi, _) = Ref::<_, Msi64Capability>::new_from_prefix(
                 &self.config[self.offset..self.config.len()],
             )
             .unwrap();
@@ -142,7 +142,7 @@ impl<'a> Capability<'a> {
                 { msi.data }
             )
         } else {
-            let (msi, _) = LayoutVerified::<_, Msi32Capability>::new_from_prefix(
+            let (msi, _) = Ref::<_, Msi32Capability>::new_from_prefix(
                 &self.config[self.offset..self.config.len()],
             )
             .unwrap();
@@ -151,10 +151,9 @@ impl<'a> Capability<'a> {
     }
 
     fn msi_x(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (msix, _) = LayoutVerified::<_, MsixCapability>::new_from_prefix(
-            &self.config[self.offset..self.config.len()],
-        )
-        .unwrap();
+        let (msix, _) =
+            Ref::<_, MsixCapability>::new_from_prefix(&self.config[self.offset..self.config.len()])
+                .unwrap();
         let control = MsixControl(msix.control);
         let table = MsixBarField(msix.table);
         let pba = MsixBarField(msix.pba);
@@ -172,7 +171,7 @@ impl<'a> Capability<'a> {
     }
 
     fn pci_express(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (pcie, _) = LayoutVerified::<_, PciExpressCapability>::new_from_prefix(
+        let (pcie, _) = Ref::<_, PciExpressCapability>::new_from_prefix(
             &self.config[self.offset..self.config.len()],
         )
         .unwrap();

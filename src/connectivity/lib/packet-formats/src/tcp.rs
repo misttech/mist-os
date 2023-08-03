@@ -27,7 +27,7 @@ use packet::{
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, FromZeroes, LayoutVerified, Unaligned,
+    AsBytes, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -210,7 +210,7 @@ mod data_offset_reserved_flags {
 /// `TcpSegmentBuilder` - maintains the invariant that the checksum is always
 /// valid.
 pub struct TcpSegment<B> {
-    hdr_prefix: LayoutVerified<B, HeaderPrefix>,
+    hdr_prefix: Ref<B, HeaderPrefix>,
     // Invariant: At most MAX_OPTIONS_LEN bytes long. This guarantees that we
     // can store these in an `ArrayVec<u8, MAX_OPTIONS_LEN>` in `builder`.
     options: Options<B>,
@@ -459,7 +459,7 @@ pub struct TcpFlowHeader {
 
 #[derive(Debug)]
 struct PartialHeaderPrefix<B: ByteSlice> {
-    flow: LayoutVerified<B, TcpFlowHeader>,
+    flow: Ref<B, TcpFlowHeader>,
     rest: B,
 }
 
@@ -509,7 +509,7 @@ impl TcpFlowAndSeqNum {
 /// [`TcpSegment`] provides a [`FromRaw`] implementation that can be used to
 /// validate a `TcpSegmentRaw`.
 pub struct TcpSegmentRaw<B: ByteSlice> {
-    hdr_prefix: MaybeParsed<LayoutVerified<B, HeaderPrefix>, PartialHeaderPrefix<B>>,
+    hdr_prefix: MaybeParsed<Ref<B, HeaderPrefix>, PartialHeaderPrefix<B>>,
     // Invariant: At most MAX_OPTIONS_LEN bytes long. This guarantees that we
     // can store these in an `ArrayVec<u8, MAX_OPTIONS_LEN>` in `builder`.
     options: MaybeParsed<OptionsRaw<B, TcpOptionsImpl>, B>,
@@ -871,7 +871,7 @@ pub mod options {
     };
     use packet::BufferViewMut as _;
     use zerocopy::byteorder::{network_endian::U32, ByteOrder, NetworkEndian};
-    use zerocopy::{AsBytes, FromBytes, FromZeroes, LayoutVerified, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeroes, Ref, Unaligned};
 
     use super::*;
 
@@ -986,7 +986,7 @@ pub mod options {
                     }
                 }
                 self::OPTION_KIND_SACK => Ok(Some(TcpOption::Sack(
-                    LayoutVerified::new_slice(data).ok_or(OptionParseErr)?.into_slice(),
+                    Ref::new_slice(data).ok_or(OptionParseErr)?.into_slice(),
                 ))),
                 self::OPTION_KIND_TIMESTAMP => {
                     if data.len() != 8 {
@@ -1208,8 +1208,8 @@ mod tests {
     fn hdr_prefix_to_bytes(hdr_prefix: HeaderPrefix) -> [u8; HDR_PREFIX_LEN] {
         let mut bytes = [0; HDR_PREFIX_LEN];
         {
-            let mut lv = LayoutVerified::<_, HeaderPrefix>::new_unaligned(&mut bytes[..]).unwrap();
-            *lv = hdr_prefix;
+            let mut r = Ref::<_, HeaderPrefix>::new_unaligned(&mut bytes[..]).unwrap();
+            *r = hdr_prefix;
         }
         bytes
     }
@@ -1355,8 +1355,7 @@ mod tests {
             .unwrap_b();
 
         // Set all three reserved bits and update the checksum.
-        let mut hdr_prefix =
-            LayoutVerified::<_, HeaderPrefix>::new_unaligned(buffer.as_mut()).unwrap();
+        let mut hdr_prefix = Ref::<_, HeaderPrefix>::new_unaligned(buffer.as_mut()).unwrap();
         let old_checksum = hdr_prefix.checksum;
         let old_data_offset_reserved_flags = hdr_prefix.data_offset_reserved_flags;
         hdr_prefix.data_offset_reserved_flags.as_bytes_mut()[0] |= 0b00000111;
