@@ -41,11 +41,10 @@ use netstack3_core::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_connection_error, get_handshake_status, get_info, listen, receive_buffer_size,
             remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_device,
-            set_receive_buffer_size, set_reuseaddr_bound, set_reuseaddr_listener,
-            set_reuseaddr_unbound, set_send_buffer_size, shutdown_conn, shutdown_listener,
-            with_socket_options, with_socket_options_mut, AcceptError, BoundInfo, ConnectError,
-            ConnectionId, ConnectionInfo, HandshakeStatus, ListenError, ListenerNotifier,
-            NoConnection, SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
+            set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown_conn,
+            shutdown_listener, with_socket_options, with_socket_options_mut, AcceptError,
+            BoundInfo, ConnectError, ConnectionId, ConnectionInfo, HandshakeStatus, ListenError,
+            ListenerNotifier, NoConnection, SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -574,8 +573,10 @@ impl IntoErrno for ListenError {
 
 impl IntoErrno for SetReuseAddrError {
     fn into_errno(self) -> fposix::Errno {
-        let SetReuseAddrError = self;
-        fposix::Errno::Eaddrinuse
+        match self {
+            SetReuseAddrError::AddrInUse => fposix::Errno::Eaddrinuse,
+            SetReuseAddrError::NotSupported => fposix::Errno::Eopnotsupp,
+        }
     }
 }
 
@@ -949,16 +950,7 @@ where
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-        match *id {
-            SocketId::Unbound(id) => Ok(set_reuseaddr_unbound(sync_ctx, id, value)),
-            SocketId::Bound(id) => {
-                set_reuseaddr_bound(sync_ctx, id, value).map_err(IntoErrno::into_errno)
-            }
-            SocketId::Listener(id) => {
-                set_reuseaddr_listener(sync_ctx, id, value).map_err(IntoErrno::into_errno)
-            }
-            SocketId::Connection(_) => Err(fposix::Errno::Enoprotoopt),
-        }
+        set_reuseaddr(sync_ctx, *id, value).map_err(IntoErrno::into_errno)
     }
 
     fn reuse_address(self) -> bool {

@@ -1346,14 +1346,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     fn set_receive_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
     fn receive_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id) -> Option<usize>;
 
-    fn set_reuseaddr_unbound(&mut self, id: UnboundId<I>, reuse: bool);
-    fn set_reuseaddr_bound(&mut self, id: BoundId<I>, reuse: bool)
-        -> Result<(), SetReuseAddrError>;
-    fn set_reuseaddr_listener(
-        &mut self,
-        id: ListenerId<I>,
-        reuse: bool,
-    ) -> Result<(), SetReuseAddrError>;
+    fn set_reuseaddr(&mut self, id: SocketId<I>, reuse: bool) -> Result<(), SetReuseAddrError>;
     fn reuseaddr(&mut self, id: SocketId<I>) -> bool;
 
     /// Receives an ICMP error from the IP layer.
@@ -2103,40 +2096,43 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         get_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id.into())
     }
 
-    fn set_reuseaddr_unbound(&mut self, id: UnboundId<I>, reuse: bool) {
+    fn set_reuseaddr(&mut self, id: SocketId<I>, reuse: bool) -> Result<(), SetReuseAddrError> {
+        let new_sharing = match reuse {
+            true => SharingState::ReuseAddress,
+            false => SharingState::Exclusive,
+        };
         self.with_tcp_sockets_mut(|sockets| {
-            let Sockets { socket_state, port_alloc: _, socketmap: _ } = sockets;
-            let Unbound {
-                sharing,
-                bound_device: _,
-                buffer_sizes: _,
-                socket_options: _,
-                socket_extra: _,
-            } = assert_matches!(
-                socket_state.get_mut(&id.into()).expect("invalid socket ID"),
-                SocketState::Unbound(unbound) => unbound
-            );
-            *sharing = match reuse {
-                true => SharingState::ReuseAddress,
-                false => SharingState::Exclusive,
-            };
+            match sockets.socket_state.get_mut(&id).expect("invalid socket ID") {
+                SocketState::Unbound(unbound) => {
+                    unbound.sharing = new_sharing;
+                    Ok(())
+                }
+                SocketState::Bound(BoundSocketState::Listener((_listener, old_sharing, addr))) => {
+                    let ListenerSharingState { listening, sharing } = *old_sharing;
+                    let entry = sockets
+                        .socketmap
+                        .listeners_mut()
+                        .entry(&MaybeListenerId(id.get_id(), IpVersionMarker::default()), addr)
+                        .expect("invalid socket ID");
+                    if new_sharing == sharing {
+                        return Ok(());
+                    }
+                    let new_sharing = ListenerSharingState { listening, sharing: new_sharing };
+                    match entry.try_update_sharing(old_sharing, new_sharing.clone()) {
+                        Ok(()) => {
+                            *old_sharing = new_sharing;
+                            Ok(())
+                        }
+                        Err(UpdateSharingError) => Err(SetReuseAddrError::AddrInUse),
+                    }
+                }
+                SocketState::Bound(BoundSocketState::Connected(_)) => {
+                    // TODO(https://fxbug.dev/97823): Support setting the option
+                    // for connection sockets.
+                    Err(SetReuseAddrError::NotSupported)
+                }
+            }
         })
-    }
-
-    fn set_reuseaddr_bound(
-        &mut self,
-        id: BoundId<I>,
-        reuse: bool,
-    ) -> Result<(), SetReuseAddrError> {
-        set_reuseaddr_maybe_listener(false, self, id.into(), reuse)
-    }
-
-    fn set_reuseaddr_listener(
-        &mut self,
-        id: ListenerId<I>,
-        reuse: bool,
-    ) -> Result<(), SetReuseAddrError> {
-        set_reuseaddr_maybe_listener(true, self, id.into(), reuse)
     }
 
     fn reuseaddr(&mut self, id: SocketId<I>) -> bool {
@@ -2296,37 +2292,6 @@ fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
                 SharingState::Exclusive => false,
                 SharingState::ReuseAddress => true,
             },
-        }
-    })
-}
-
-fn set_reuseaddr_maybe_listener<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
-    listener: bool,
-    sync_ctx: &mut SC,
-    id: MaybeListenerId<I>,
-    reuse: bool,
-) -> Result<(), SetReuseAddrError> {
-    sync_ctx.with_tcp_sockets_mut(|sockets| {
-        let Sockets { socket_state, port_alloc: _, socketmap } = sockets;
-        let bound_state = id.get_from_socket_state_mut(socket_state).expect("invalid listener ID");
-        let (_, old_sharing @ ListenerSharingState { listening, sharing }, addr) = &bound_state;
-        let entry = socketmap.listeners_mut().entry(&id, addr).expect("invalid socket ID");
-        assert_eq!(listener, *listening);
-        let new_sharing = match reuse {
-            true => SharingState::ReuseAddress,
-            false => SharingState::Exclusive,
-        };
-        if new_sharing == *sharing {
-            return Ok(());
-        }
-        let new_sharing = ListenerSharingState { listening: false, sharing: new_sharing };
-        match entry.try_update_sharing(old_sharing, new_sharing.clone()) {
-            Ok(()) => {
-                let (_, sharing, _) = bound_state;
-                *sharing = new_sharing;
-                Ok(())
-            }
-            Err(UpdateSharingError) => Err(SetReuseAddrError),
         }
     })
 }
@@ -2622,7 +2587,12 @@ pub struct NoConnection;
 
 /// Error returned when attempting to set the ReuseAddress option.
 #[derive(Debug, GenericOverIp)]
-pub struct SetReuseAddrError;
+pub enum SetReuseAddrError {
+    /// Cannot share the address because it is already used.
+    AddrInUse,
+    /// Cannot set ReuseAddr on a connected socket.
+    NotSupported,
+}
 
 /// Accepts an established socket from the queue of a listener socket.
 pub fn accept<I: Ip, C>(
@@ -2918,28 +2888,10 @@ where
     )
 }
 
-/// Sets the POSIX SO_REUSEADDR socket option on an unbound socket.
-pub fn set_reuseaddr_unbound<I, C>(sync_ctx: &SyncCtx<C>, id: UnboundId<I>, reuse: bool)
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, reuse)), id),
-        |(IpInvariant((sync_ctx, reuse)), id)| {
-            SocketHandler::set_reuseaddr_unbound(sync_ctx, id, reuse)
-        },
-        |(IpInvariant((sync_ctx, reuse)), id)| {
-            SocketHandler::set_reuseaddr_unbound(sync_ctx, id, reuse)
-        },
-    )
-}
-
-/// Sets the POSIX SO_REUSEADDR socket option on a bound socket.
-pub fn set_reuseaddr_bound<I, C>(
+/// Sets the POSIX SO_REUSEADDR socket option on a socket.
+pub fn set_reuseaddr<I, C>(
     sync_ctx: &SyncCtx<C>,
-    id: BoundId<I>,
+    id: SocketId<I>,
     reuse: bool,
 ) -> Result<(), SetReuseAddrError>
 where
@@ -2949,34 +2901,8 @@ where
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, reuse)), id),
-        |(IpInvariant((sync_ctx, reuse)), id)| {
-            SocketHandler::set_reuseaddr_bound(sync_ctx, id, reuse)
-        },
-        |(IpInvariant((sync_ctx, reuse)), id)| {
-            SocketHandler::set_reuseaddr_bound(sync_ctx, id, reuse)
-        },
-    )
-}
-
-/// Sets the POSIX SO_REUSEADDR socket option on a listening socket.
-pub fn set_reuseaddr_listener<I, C>(
-    sync_ctx: &SyncCtx<C>,
-    id: ListenerId<I>,
-    reuse: bool,
-) -> Result<(), SetReuseAddrError>
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, reuse)), id),
-        |(IpInvariant((sync_ctx, reuse)), id)| {
-            SocketHandler::set_reuseaddr_listener(sync_ctx, id, reuse)
-        },
-        |(IpInvariant((sync_ctx, reuse)), id)| {
-            SocketHandler::set_reuseaddr_listener(sync_ctx, id, reuse)
-        },
+        |(IpInvariant((sync_ctx, reuse)), id)| SocketHandler::set_reuseaddr(sync_ctx, id, reuse),
+        |(IpInvariant((sync_ctx, reuse)), id)| SocketHandler::set_reuseaddr(sync_ctx, id, reuse),
     )
 }
 
@@ -4081,7 +4007,7 @@ mod tests {
                 ProvidedBuffers::Buffers(client_ends.clone()),
             );
             if client_reuse_addr {
-                SocketHandler::set_reuseaddr_unbound(sync_ctx, conn, true);
+                SocketHandler::set_reuseaddr(sync_ctx, conn.into(), true).expect("can set");
             }
             if let Some(port) = client_port {
                 let conn = SocketHandler::bind(
@@ -5477,14 +5403,14 @@ mod tests {
         let first_bound = {
             let unbound =
                 SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), true).expect("can set");
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
                 .expect("bind succeeds")
         };
         let _second_bound = {
             let unbound =
                 SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), true).expect("can set");
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
                 .expect("bind succeeds")
         };
@@ -5515,14 +5441,16 @@ mod tests {
 
         let unbound =
             SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-        SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, set_reuseaddr[0]);
+        SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), set_reuseaddr[0])
+            .expect("can set");
         let _first_bound =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                 .expect("bind succeeds");
 
         let unbound =
             SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-        SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, set_reuseaddr[1]);
+        SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), set_reuseaddr[1])
+            .expect("can set");
         let second_bind_result =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1));
 
@@ -5568,8 +5496,8 @@ mod tests {
         .unwrap();
         // Setting and un-setting ReuseAddr should be fine since these sockets
         // don't conflict.
-        SocketHandler::set_reuseaddr_bound(&mut sync_ctx, first, true).expect("can set");
-        SocketHandler::set_reuseaddr_bound(&mut sync_ctx, first, false).expect("can un-set");
+        SocketHandler::set_reuseaddr(&mut sync_ctx, first.into(), true).expect("can set");
+        SocketHandler::set_reuseaddr(&mut sync_ctx, first.into(), false).expect("can un-set");
     }
 
     #[ip_test]
@@ -5582,7 +5510,7 @@ mod tests {
             ));
         let unbound =
             SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-        SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
+        SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), true).expect("can set");
         let first = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5594,7 +5522,7 @@ mod tests {
 
         let unbound =
             SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-        SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
+        SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), true).expect("can set");
         let second =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                 .unwrap();
@@ -5602,12 +5530,12 @@ mod tests {
         // Both sockets can be bound because they have ReuseAddr set. Since
         // removing it would introduce inconsistent state, that's not allowed.
         assert_matches!(
-            SocketHandler::set_reuseaddr_bound(&mut sync_ctx, first, false),
-            Err(SetReuseAddrError)
+            SocketHandler::set_reuseaddr(&mut sync_ctx, first.into(), false),
+            Err(SetReuseAddrError::AddrInUse)
         );
         assert_matches!(
-            SocketHandler::set_reuseaddr_bound(&mut sync_ctx, second, false),
-            Err(SetReuseAddrError)
+            SocketHandler::set_reuseaddr(&mut sync_ctx, second.into(), false),
+            Err(SetReuseAddrError::AddrInUse)
         );
     }
 
@@ -5618,7 +5546,7 @@ mod tests {
 
         let server = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(sync_ctx, unbound.into(), true).expect("can set");
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -5668,7 +5596,7 @@ mod tests {
             );
 
             // Binding should succeed after setting ReuseAddr.
-            SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(sync_ctx, unbound.into(), true).expect("can set");
             assert_matches!(
                 SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, None, Some(PORT_1)),
                 Ok(_)
@@ -5715,7 +5643,7 @@ mod tests {
         );
 
         // Setting SO_REUSEADDR for the second socket isn't enough.
-        SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, second, true);
+        SocketHandler::set_reuseaddr(&mut sync_ctx, second.into(), true).expect("can set");
         assert_matches!(
             SocketHandler::bind(
                 &mut sync_ctx,
@@ -5728,7 +5656,7 @@ mod tests {
         );
 
         // Setting SO_REUSEADDR for the first socket lets the second bind.
-        SocketHandler::set_reuseaddr_bound(&mut sync_ctx, first_bound, true).expect("only socket");
+        SocketHandler::set_reuseaddr(&mut sync_ctx, first_bound.into(), true).expect("only socket");
         let _second_bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5751,7 +5679,7 @@ mod tests {
         let bound = {
             let unbound =
                 SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), true).expect("can set");
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                 .expect("bind succeeds")
         };
@@ -5759,7 +5687,7 @@ mod tests {
         let listener = {
             let unbound =
                 SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(&mut sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(&mut sync_ctx, unbound.into(), true).expect("can set");
             let bound =
                 SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1))
                     .expect("bind succeeds");
@@ -5770,8 +5698,8 @@ mod tests {
         // We can't clear SO_REUSEADDR on the listener because it's sharing with
         // the bound socket.
         assert_matches!(
-            SocketHandler::set_reuseaddr_listener(&mut sync_ctx, listener, false),
-            Err(SetReuseAddrError)
+            SocketHandler::set_reuseaddr(&mut sync_ctx, listener.into(), false),
+            Err(SetReuseAddrError::AddrInUse)
         );
 
         // We can, however, connect to the listener with the bound socket. Then
@@ -5783,7 +5711,7 @@ mod tests {
             SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
         )
         .expect("can connect");
-        SocketHandler::set_reuseaddr_listener(&mut sync_ctx, listener, false).expect("can unset")
+        SocketHandler::set_reuseaddr(&mut sync_ctx, listener.into(), false).expect("can unset")
     }
 
     fn deliver_icmp_error<
@@ -6043,7 +5971,7 @@ mod tests {
         // Locally, we create a connection with a full accept queue.
         let listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(sync_ctx, unbound.into(), true).expect("can set");
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
@@ -6188,7 +6116,7 @@ mod tests {
         // connection, this should fail.
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
-            SocketHandler::set_reuseaddr_unbound(sync_ctx, unbound, true);
+            SocketHandler::set_reuseaddr(sync_ctx, unbound.into(), true).expect("can set");
             let bound = SocketHandler::bind(
                 sync_ctx,
                 non_sync_ctx,
