@@ -40,10 +40,9 @@ use netstack3_core::{
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_connection_error, get_handshake_status, get_info, listen, receive_buffer_size,
-            remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_bound_device,
-            set_connection_device, set_listener_device, set_receive_buffer_size,
-            set_reuseaddr_bound, set_reuseaddr_listener, set_reuseaddr_unbound,
-            set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
+            remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_device,
+            set_receive_buffer_size, set_reuseaddr_bound, set_reuseaddr_listener,
+            set_reuseaddr_unbound, set_send_buffer_size, shutdown_conn, shutdown_listener,
             with_socket_options, with_socket_options_mut, AcceptError, BoundInfo, ConnectError,
             ConnectionId, ConnectionInfo, HandshakeStatus, ListenError, ListenerNotifier,
             NoConnection, SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
@@ -877,16 +876,7 @@ where
             .map(|name| non_sync_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
             .transpose()?;
 
-        match *id {
-            SocketId::Unbound(id) => {
-                set_unbound_device(sync_ctx, non_sync_ctx, id, device);
-                Ok(())
-            }
-            SocketId::Bound(id) => set_bound_device(sync_ctx, non_sync_ctx, id, device),
-            SocketId::Listener(id) => set_listener_device(sync_ctx, non_sync_ctx, id, device),
-            SocketId::Connection(id) => set_connection_device(sync_ctx, non_sync_ctx, id, device),
-        }
-        .map_err(IntoErrno::into_errno)
+        set_device(sync_ctx, non_sync_ctx, *id, device).map_err(IntoErrno::into_errno)
     }
 
     fn set_send_buffer_size(self, new_size: u64) {

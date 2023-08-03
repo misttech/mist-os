@@ -1322,19 +1322,6 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     fn do_send(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
     fn handle_timer(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
 
-    fn set_unbound_device(&mut self, ctx: &mut C, id: UnboundId<I>, device: Option<Self::DeviceId>);
-    fn set_bound_device(
-        &mut self,
-        ctx: &mut C,
-        id: impl Into<MaybeListenerId<I>>,
-        device: Option<Self::DeviceId>,
-    ) -> Result<(), SetDeviceError>;
-    fn set_connection_device(
-        &mut self,
-        ctx: &mut C,
-        id: ConnectionId<I>,
-        device: Option<Self::DeviceId>,
-    ) -> Result<(), SetDeviceError>;
     fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R, Id: Into<SocketId<I>>>(
         &mut self,
         ctx: &mut C,
@@ -1346,6 +1333,13 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         id: Id,
         f: F,
     ) -> R;
+
+    fn set_device(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+        device: Option<Self::DeviceId>,
+    ) -> Result<(), SetDeviceError>;
 
     fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
     fn send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id) -> Option<usize>;
@@ -1879,131 +1873,105 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         )
     }
 
-    fn set_unbound_device(
-        &mut self,
-        _ctx: &mut C,
-        id: UnboundId<I>,
-        device: Option<Self::DeviceId>,
-    ) {
-        self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
-            debug!("set device on {id:?} to {device:?}");
-            let Sockets { socket_state, port_alloc: _, socketmap: _ } = sockets;
-            let Unbound {
-                bound_device,
-                buffer_sizes: _,
-                socket_options: _,
-                sharing: _,
-                socket_extra: _,
-            } = assert_matches!(
-                socket_state.get_mut(&id.into()).expect("invalid unbound socket ID"),
-                SocketState::Unbound(unbound) => unbound
-            );
-            *bound_device = device.map(|d| sync_ctx.downgrade_device_id(&d));
-        })
-    }
-
-    fn set_bound_device(
-        &mut self,
-        _ctx: &mut C,
-        id: impl Into<MaybeListenerId<I>>,
-        new_device: Option<Self::DeviceId>,
-    ) -> Result<(), SetDeviceError> {
-        let id = id.into();
-        self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
-            debug!("set device on {id:?} to {new_device:?}");
-            let Sockets { socket_state, socketmap, port_alloc: _ } = sockets;
-            let bound_state =
-                id.get_from_socket_state_mut(socket_state).expect("missing bound state");
-            let (_state, _sharing, addr) = bound_state;
-            let entry = socketmap.listeners_mut().entry(&id, addr).expect("invalid ID");
-            let ListenerAddr { device: old_device, ip: ip_addr } = addr;
-            let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
-
-            if !crate::socket::can_device_change(
-                ip.as_ref(), /* local_ip */
-                None,        /* remote_ip */
-                old_device.as_ref(),
-                new_device.as_ref(),
-            ) {
-                return Err(SetDeviceError::ZoneChange);
-            }
-
-            let ip = *ip_addr;
-            match entry.try_update_addr(ListenerAddr {
-                device: new_device.map(|d| sync_ctx.downgrade_device_id(&d)),
-                ip,
-            }) {
-                Ok(entry) => {
-                    *addr = entry.get_addr().clone();
-                    Ok(())
-                }
-                Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
-            }
-        })
-    }
-
-    fn set_connection_device(
+    fn set_device(
         &mut self,
         ctx: &mut C,
-        id: ConnectionId<I>,
+        id: SocketId<I>,
         new_device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError> {
-        self.with_ip_transport_ctx_and_tcp_sockets_mut(
-            |ip_transport_ctx, Sockets { socket_state, socketmap, port_alloc: _ }| {
-                debug!("set device on {id:?} to {new_device:?}");
-                let bound_state =
-                    id.get_from_socket_state_mut(socket_state).expect("invalid conn state");
-                let (connection, _sharing, addr) = bound_state;
-                let entry = socketmap.conns_mut().entry(&id.into(), addr).expect("invalid conn ID");
-                let ConnAddr {
-                    device: old_device,
-                    ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
-                } = addr;
+        self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
+            debug!("set device on {id:?} to {new_device:?}");
+            match sockets.socket_state.get_mut(&id).expect("invalid socket ID") {
+                SocketState::Unbound(unbound) => {
+                    unbound.bound_device = new_device.map(|d| ip_transport_ctx.downgrade_device_id(&d));
+                    Ok(())
+                },
+                SocketState::Bound(BoundSocketState::Connected((conn, _sharing, addr))) => {
+                    let ConnAddr {
+                        device: old_device,
+                        ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
+                    } = addr;
 
-                if !crate::socket::can_device_change(
-                    Some(local_ip),
-                    Some(remote_ip),
-                    old_device.as_ref(),
-                    new_device.as_ref(),
-                ) {
-                    return Err(SetDeviceError::ZoneChange);
-                }
-
-                let new_socket = ip_transport_ctx
-                    .new_ip_socket(
-                        ctx,
-                        new_device.as_ref().map(EitherDeviceId::Strong),
-                        Some(*local_ip),
-                        *remote_ip,
-                        IpProto::Tcp.into(),
-                        Default::default(),
-                    )
-                    .map_err(|_: (IpSockCreationError, DefaultSendOptions)| {
-                        SetDeviceError::Unroutable
-                    })?;
-
-                match entry.try_update_addr(ConnAddr {
-                    device: new_socket.device().cloned(),
-                    ..addr.clone()
-                }) {
-                    Ok(entry) => {
-                        *addr = entry.get_addr().clone();
-                        let Connection {
-                            ip_sock,
-                            acceptor: _,
-                            state: _,
-                            defunct: _,
-                            socket_options: _,
-                            soft_error: _,
-                            handshake_status: _,
-                        } = connection;
-                        *ip_sock = new_socket;
-                        Ok(())
+                    if !crate::socket::can_device_change(
+                        Some(local_ip),
+                        Some(remote_ip),
+                        old_device.as_ref(),
+                        new_device.as_ref(),
+                    ) {
+                        return Err(SetDeviceError::ZoneChange);
                     }
-                    Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
+
+                    let new_socket = ip_transport_ctx
+                        .new_ip_socket(
+                            ctx,
+                            new_device.as_ref().map(EitherDeviceId::Strong),
+                            Some(*local_ip),
+                            *remote_ip,
+                            IpProto::Tcp.into(),
+                            Default::default(),
+                        )
+                        .map_err(|_: (IpSockCreationError, DefaultSendOptions)| {
+                            SetDeviceError::Unroutable
+                        })?;
+
+                    let id = assert_matches!(
+                        id, SocketId::Connection(ConnectionId(x, marker)) => MaybeClosedConnectionId(x, marker)
+                    );
+                    let entry = sockets.socketmap
+                        .conns_mut()
+                        .entry(&id, addr)
+                        .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
+                    match entry.try_update_addr(ConnAddr {
+                        device: new_socket.device().cloned(),
+                        ..addr.clone()
+                    }) {
+                        Ok(entry) => {
+                            *addr = entry.get_addr().clone();
+                            let Connection {
+                                ip_sock,
+                                acceptor: _,
+                                state: _,
+                                defunct: _,
+                                socket_options: _,
+                                soft_error: _,
+                                handshake_status: _,
+                            } = conn;
+                            *ip_sock = new_socket;
+                            Ok(())
+                        }
+                        Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
+                    }
+
+                },
+                SocketState::Bound(BoundSocketState::Listener((_listener, _sharing, addr))) => {
+                    let id = MaybeListenerId(id.get_id(), IpVersionMarker::default());
+                    let entry = sockets.socketmap.listeners_mut().entry(&id, addr).expect("invalid ID");
+                    let ListenerAddr { device: old_device, ip: ip_addr } = addr;
+                    let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
+
+                    if !crate::socket::can_device_change(
+                        ip.as_ref(), /* local_ip */
+                        None,        /* remote_ip */
+                        old_device.as_ref(),
+                        new_device.as_ref(),
+                    ) {
+                        return Err(SetDeviceError::ZoneChange);
+                    }
+
+                    let ip = *ip_addr;
+                    match entry.try_update_addr(ListenerAddr {
+                        device: new_device.map(|d| ip_transport_ctx.downgrade_device_id(&d)),
+                        ip,
+                    }) {
+                        Ok(entry) => {
+                            *addr = entry.get_addr().clone();
+                            Ok(())
+                        }
+                        Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
+                    }
                 }
-            },
-        )
+            }
+        })
     }
 
     fn get_info(&mut self, id: SocketId<I>) -> SocketInfo<I::Addr, SC::WeakDeviceId> {
@@ -2550,31 +2518,6 @@ where
     )
 }
 
-/// Sets the device to which a socket should be bound.
-///
-/// Sets the device on which the socket (once bound or connected) should send
-/// and receive packets, or `None` to clear the bound device.
-pub fn set_unbound_device<I, C>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: UnboundId<I>,
-    device: Option<DeviceId<C>>,
-) where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, device)), id),
-        |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_unbound_device(sync_ctx, ctx, id, device)
-        },
-        |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_unbound_device(sync_ctx, ctx, id, device)
-        },
-    )
-}
-
 /// Error returned when failing to set the bound device for a socket.
 #[derive(Debug, GenericOverIp)]
 pub enum SetDeviceError {
@@ -2586,67 +2529,13 @@ pub enum SetDeviceError {
     ZoneChange,
 }
 
-/// Sets the device on which a listening socket will receive new connections.
+/// Sets the device on a socket.
 ///
-/// Sets the device on which the given socket will listen for new incoming
-/// connections. Passing `None` clears the bound device.
-pub fn set_listener_device<I, C>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-    device: Option<DeviceId<C>>,
-) -> Result<(), SetDeviceError>
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, device)), id),
-        |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_bound_device(sync_ctx, ctx, id, device)
-        },
-        |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_bound_device(sync_ctx, ctx, id, device)
-        },
-    )
-}
-
-/// Sets the device on which a bound socket will eventually receive traffic.
-///
-/// Sets the device on which the given socket will either (if turned into a
-/// listening socket) accept connections or (if connected to a remote address)
-/// or send and receive packets. Passing `None` clears the bound device.
-pub fn set_bound_device<I, C>(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: BoundId<I>,
-    device: Option<DeviceId<C>>,
-) -> Result<(), SetDeviceError>
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, device)), id),
-        |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_bound_device(sync_ctx, ctx, id, device)
-        },
-        |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_bound_device(sync_ctx, ctx, id, device)
-        },
-    )
-}
-
-/// Sets the device on which a connected socket sends and receives traffic.
-///
-/// Sets the device on which the connected socket sends and receives packets.
 /// Passing `None` clears the bound device.
-pub fn set_connection_device<I, C>(
+pub fn set_device<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: ConnectionId<I>,
+    id: SocketId<I>,
     device: Option<DeviceId<C>>,
 ) -> Result<(), SetDeviceError>
 where
@@ -2657,10 +2546,10 @@ where
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
         |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_connection_device(sync_ctx, ctx, id, device)
+            SocketHandler::set_device(sync_ctx, ctx, id, device)
         },
         |(IpInvariant((sync_ctx, ctx, device)), id)| {
-            SocketHandler::set_connection_device(sync_ctx, ctx, id, device)
+            SocketHandler::set_device(sync_ctx, ctx, id, device)
         },
     )
 }
@@ -4598,12 +4487,7 @@ mod tests {
             // Double-check that the bound device can't be changed after being set
             // implicitly.
             assert_matches!(
-                SocketHandler::set_connection_device(
-                    sync_ctx,
-                    non_sync_ctx,
-                    client_connection,
-                    None
-                ),
+                SocketHandler::set_device(sync_ctx, non_sync_ctx, client_connection.into(), None),
                 Err(SetDeviceError::ZoneChange)
             );
         });
@@ -4679,12 +4563,7 @@ mod tests {
             // Double-check that the bound device can't be changed after being set
             // implicitly.
             assert_matches!(
-                SocketHandler::set_connection_device(
-                    sync_ctx,
-                    non_sync_ctx,
-                    server_connection,
-                    None
-                ),
+                SocketHandler::set_device(sync_ctx, non_sync_ctx, server_connection.into(), None),
                 Err(SetDeviceError::ZoneChange)
             );
         });
@@ -4788,11 +4667,14 @@ mod tests {
 
         let bound_a =
             SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-        SocketHandler::set_unbound_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            bound_a,
-            Some(MultipleDevicesId::A),
+        assert_matches!(
+            SocketHandler::set_device(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                bound_a.into(),
+                Some(MultipleDevicesId::A),
+            ),
+            Ok(())
         );
         let bound_a =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, bound_a, None, Some(LOCAL_PORT))
@@ -4814,11 +4696,14 @@ mod tests {
 
         // Once `s` is bound to a different device, though, it no longer
         // conflicts.
-        SocketHandler::set_unbound_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            s,
-            Some(MultipleDevicesId::B),
+        assert_matches!(
+            SocketHandler::set_device(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                s.into(),
+                Some(MultipleDevicesId::B),
+            ),
+            Ok(())
         );
         let _: BoundId<_> =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, s, None, Some(LOCAL_PORT))
@@ -4855,7 +4740,7 @@ mod tests {
         .expect("bind should succeed");
 
         assert_matches!(
-            SocketHandler::set_bound_device(&mut sync_ctx, &mut non_sync_ctx, bound, set_device),
+            SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, bound.into(), set_device),
             Err(SetDeviceError::ZoneChange)
         );
     }
@@ -4890,12 +4775,7 @@ mod tests {
         .expect("connect should succeed");
 
         assert_matches!(
-            SocketHandler::set_connection_device(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                bound,
-                set_device
-            ),
+            SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, bound.into(), set_device),
             Err(SetDeviceError::ZoneChange)
         );
     }
