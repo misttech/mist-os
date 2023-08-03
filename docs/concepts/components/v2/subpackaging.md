@@ -29,15 +29,12 @@ components will then be loaded from a declared subpackage of the parent
 component's package. This encapsulates [ABI][glossary.abi] dependencies at
 package boundaries.
 
-Components can also use a subpackage to declare a dependency on a data-only
-package. While components cannot resolve a package directly, a package can
-expose data to components selectively, by including a component manifest that
-defines and exposes directory capabilities to other components. Each directory
-capability maps to a specific package subdirectory. (With a data-only package,
-the manifest does not include a `program` declaration.) By treating exposed data
-as standard [directory capabilities], the components use [capability routing] to
-ensure the right information is only made available to the components that need
-it.
+Components can also use a subpackage to declare a dependency on a
+non-executable component (one without a `program` declaration) and gain access
+to the `/pkg` data therein using [directory capabilities]. By exposing package
+data as standard [directory capabilities], the components use
+[capability routing] to restrict access to specific package subdirectories,
+thereby upholding the Principle of Least Privilege.
 
 ### Package dependendencies mirror Component dependencies
 
