@@ -4,8 +4,5 @@
 
 group("boards") {
   testonly = true
-  public_deps = [
-    "images",
-    "partitions",
-  ]
+  public_deps = [ "partitions" ]
 }

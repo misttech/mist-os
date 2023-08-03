@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/package_list.gni")
 import("//build/assembly/product_assembly_configuration.gni")
@@ -121,8 +120,6 @@ template("assemble_security_pkg_test_system") {
     assembly_image_assembler = "${assembly_name}.image_assembler"
     assembly_partitions_config = "${assembly_name}_partitions_config"
     base_packages = "${assembly_name}.base_packages"
-    images_config = "${assembly_name}_images_config"
-    images_config_fxfs = "${assembly_name}_images_config_fxfs"
     product_config = "${assembly_name}_product_config"
     product_config_fxfs = "${assembly_name}_product_config_fxfs"
     board_config = "${assembly_name}_board_config"
@@ -245,34 +242,6 @@ template("assemble_security_pkg_test_system") {
     minimum_utc_stamp = files.build_info_minimum_utc_stamp
   }
 
-  generated_images_config(labels.images_config) {
-    zbi = {
-      name = labels.assembly
-    }
-    fvm = {
-      slice_size = 1048576
-      blobfs = {
-        layout = "compact"
-      }
-    }
-
-    if (defined(invoker.fvm_truncate_to_length)) {
-      fvm.truncate_to_length = invoker.fvm_truncate_to_length
-    }
-  }
-
-  generated_images_config(labels.images_config_fxfs) {
-    zbi = {
-      name = labels.assembly
-    }
-    fxfs = {
-    }
-
-    if (defined(invoker.assembly_fxfs_image_size_bytes)) {
-      fxfs.size_bytes = invoker.assembly_fxfs_image_size_bytes
-    }
-  }
-
   product_assembly_configuration(labels.product_config) {
     platform = {
       build_type = "eng"
@@ -364,10 +333,8 @@ template("assemble_security_pkg_test_system") {
     generate_fxfs = use_fxfs_blob
     use_fxfs_blob = use_fxfs_blob
     if (!use_fxfs_blob) {
-      assembly_images_config_label = ":${labels.images_config}"
       product_assembly_config_label = ":${labels.product_config}"
     } else {
-      assembly_images_config_label = ":${labels.images_config_fxfs}"
       product_assembly_config_label = ":${labels.product_config_fxfs}"
     }
 

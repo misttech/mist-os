@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/components/fuchsia_package.gni")
@@ -38,30 +37,6 @@ if (is_fuchsia) {
           sparse_output = {
           }
         }
-      }
-    }
-  }
-
-  generated_images_config("images_config") {
-    zbi = {
-      name = _assemble_system_target_name
-    }
-    fvm = {
-      slice_size = 1048576
-      blobfs = {
-        layout = "compact"
-      }
-    }
-  }
-
-  generated_images_config("images_config_recovery") {
-    zbi = {
-      name = _assemble_system_recovery_target_name
-    }
-    fvm = {
-      slice_size = 1048576
-      blobfs = {
-        layout = "compact"
       }
     }
   }
@@ -114,7 +89,6 @@ if (is_fuchsia) {
   assembled_system(_assemble_system_target_name) {
     testonly = true
     generate_fvm = true
-    assembly_images_config_label = ":images_config"
     product_assembly_config_label = ":product_config"
     board_config = _board_config
     deps = [ ":board_config" ]
@@ -132,7 +106,6 @@ if (is_fuchsia) {
   assembled_system(_assemble_system_recovery_target_name) {
     testonly = true
     generate_fvm = true
-    assembly_images_config_label = ":images_config_recovery"
     product_assembly_config_label = ":product_config_recovery"
     board_config = _board_config
     deps = [ ":board_config" ]

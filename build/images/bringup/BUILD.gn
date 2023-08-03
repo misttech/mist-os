@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
@@ -34,12 +33,6 @@ product_assembly_configuration("product_assembly_config") {
   # The bringup product can't specify anything in base/cache packages, as it
   # doesn't have an fvm with blobfs.
   product = {
-  }
-}
-
-generated_images_config("images_config") {
-  zbi = {
-    name = "bringup"
   }
 }
 
@@ -94,6 +87,5 @@ bringup_base = {
 
 assembled_system("bringup") {
   forward_variables_from(bringup_base, "*")
-  assembly_images_config_label = ":images_config"
   image_metadata_overrides = legacy_bringup_image_metadata_overrides
 }

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/config.gni")
@@ -58,12 +57,6 @@ if (is_fuchsia) {
     }
   }
 
-  generated_images_config("images_config") {
-    zbi = {
-      name = "assembly"
-    }
-  }
-
   product_assembly_configuration("assembly_config") {
     platform = {
       feature_set_level = "empty"
@@ -87,7 +80,6 @@ if (is_fuchsia) {
       "def",
     ]
 
-    assembly_images_config_label = ":images_config"
     product_assembly_config_label = ":assembly_config"
     board_config = files.board_config
     deps = [ ":board_config" ]

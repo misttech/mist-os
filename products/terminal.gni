@@ -89,7 +89,6 @@ legacy_cache_package_labels += [
 
 # Use the product assembly config target to specify the product configuration.
 fuchsia_product_assembly_config_label = "//products/terminal"
-fuchsia_filesystem_config = "//boards/images:default"
 
 fuchsia_structured_config_policy =
     "//products/terminal/terminal_user_structured_config_policy.json5"

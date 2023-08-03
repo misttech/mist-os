@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/update_package.gni")
@@ -43,7 +42,6 @@ if (is_fuchsia) {
   }
 
   files = {
-    images_config = "$target_out_dir/fuchsia.images_config.json"
     board_config = "$target_out_dir/fuchsia.board_config.json"
     partitions_config = "$target_out_dir/partitions_config.json"
 
@@ -59,18 +57,6 @@ if (is_fuchsia) {
     qemu_kernel = qemu_boot_shim.path
 
     product_bundle = target_out_dir + "/product_bundle"
-  }
-
-  generated_images_config("images_config") {
-    zbi = {
-      name = "assembly"
-    }
-    fvm = {
-      slice_size = 8388608
-      blobfs = {
-        layout = "compact"
-      }
-    }
   }
 
   generated_file("board_config") {
@@ -113,7 +99,6 @@ if (is_fuchsia) {
     generate_fvm_fastboot = false
     generate_vbmeta = false
 
-    assembly_images_config_label = ":images_config"
     product_assembly_config_label = ":product_assembly_config"
     board_config = files.board_config
     deps = [ ":board_config" ]

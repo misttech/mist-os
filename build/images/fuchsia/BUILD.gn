@@ -63,7 +63,6 @@ if (is_fuchsia) {
 
     # Outputs of assembly.
     outdir = target_out_dir + "/fuchsia"
-    images_config = "${outdir}.images_config.json"
     zbi = "${outdir}/fuchsia.zbi"
     zbi_signed = "${outdir}/fuchsia.zbi.signed"
     vbmeta = "${outdir}/fuchsia.vbmeta"
@@ -86,7 +85,6 @@ if (is_fuchsia) {
     recovery_name = get_label_info(recovery_label, "name")
     recovery_outdir =
         get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
-    recovery_images_config = "${recovery_outdir}.images_config.json"
     recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
     recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
     recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
@@ -247,17 +245,13 @@ if (is_fuchsia) {
     }
   }
 
-  _images_config = "//boards/images:default"
   _partitions_config = "//boards/partitions:default"
   if (has_board) {
     assert(partitions_config_label != false,
            "Need to define partitions_config_label")
     assert(board_information_for_assembly != false,
            "Need to define board_information_for_assembly for cuckoo tests")
-    assert(fuchsia_filesystem_config != false,
-           "Need to define fuchsia_filesystem_config")
     _partitions_config = partitions_config_label
-    _images_config = fuchsia_filesystem_config
   }
   _partitions_config_file =
       get_label_info(_partitions_config, "target_out_dir") + "/" +
@@ -271,7 +265,6 @@ if (is_fuchsia) {
     create_legacy_aib_package = create_legacy_aib_archive
     create_legacy_aib_archive = create_legacy_aib_archive
 
-    assembly_images_config_label = _images_config
     image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
     must_exist_deps = must_exist
   }
@@ -452,7 +445,6 @@ if (is_fuchsia) {
     forward_variables_from(fuchsia_base, "*")
     ramdisk_in_zbi = true
 
-    assembly_images_config_label = _images_config
     board_config = board_information_for_assembly
     image_metadata_overrides = {
       zbi = {

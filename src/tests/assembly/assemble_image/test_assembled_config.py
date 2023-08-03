@@ -24,11 +24,6 @@ def main():
         required=True,
         help="Path to product assembly configuration input.")
     parser.add_argument(
-        "--filesystem-config",
-        type=pathlib.Path,
-        required=True,
-        help="Path to filesystem config input.")
-    parser.add_argument(
         "--board-information",
         type=pathlib.Path,
         required=True,
@@ -74,7 +69,6 @@ def main():
     output = run_product_assembly(
         ffx_bin=args.ffx_bin,
         product=args.product_assembly_config,
-        filesystem_config=args.filesystem_config,
         board_info=args.board_information,
         input_bundles=args.input_bundles_dir,
         legacy_bundle=args.legacy_bundle,

@@ -3,6 +3,5 @@
 # found in the LICENSE file.
 
 import("//products/core.gni")
-fuchsia_filesystem_config = "//boards/images:default-fxfs"
 fuchsia_product_assembly_config_label = "//products/core:core_with_fxfs"
 fxfs_blob = true

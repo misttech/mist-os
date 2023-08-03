@@ -3,27 +3,15 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::bail;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
-use pretty_assertions::Comparison;
 
 pub(crate) struct StorageSubsystemConfig;
 impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
     fn define_configuration(
-        context: &ConfigurationContext<'_>,
+        _context: &ConfigurationContext<'_>,
         storage_config: &StorageConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if context.filesystems != &storage_config.filesystems {
-            bail!(
-                "The filesystems passed to product assembly via \
-                   the CLI argument --filesystem-config does not \
-                   match the filesystems nested inside the product \
-                   config from --product: {}",
-                Comparison::new(&context.filesystems, &storage_config.filesystems)
-            );
-        }
-
         if storage_config.live_usb_enabled {
             builder.platform_bundle("live_usb");
         } else {

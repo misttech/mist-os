@@ -50,12 +50,10 @@ if (is_fuchsia) {
     ramdisk_in_zbi = true
 
     if (!fxfs_blob) {
-      assembly_images_config_label = "//boards/images:default"
       generate_fvm = !bootfs_only
       generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
       generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     } else {
-      assembly_images_config_label = "//boards/images:default-fxfs"
       generate_fxfs = !bootfs_only
     }
     board_config = board_information_for_assembly
@@ -374,12 +372,10 @@ if (is_fuchsia) {
     generate_vbmeta = use_vbmeta
 
     if (!fxfs_blob) {
-      assembly_images_config_label = "//boards/images:default"
       generate_fvm = !bootfs_only
       generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
       generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     } else {
-      assembly_images_config_label = "//boards/images:default-fxfs"
       generate_fxfs = !bootfs_only
     }
 

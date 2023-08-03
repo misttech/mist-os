@@ -5,7 +5,7 @@
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{Context, Result};
 use assembly_config_schema::{AssemblyConfig, BoardInformation};
-use assembly_images_config::{ImagesConfig, ProductFilesystemConfig};
+use assembly_images_config::ImagesConfig;
 use assembly_tool::SdkToolProvider;
 use assembly_util as util;
 use camino::Utf8PathBuf;
@@ -24,7 +24,6 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         legacy_bundle,
         additional_packages_path,
         package_validation,
-        filesystem_config,
     } = args;
 
     info!("Loading configuration files.");
@@ -37,17 +36,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let board_info = util::read_config::<BoardInformation>(&board_info_path)
         .context("Loading board information")?;
 
-    let filesystem_config: ProductFilesystemConfig =
-        util::read_config(filesystem_config).context("Loading filesystem configuration")?;
-
     let mut builder = ImageAssemblyConfigBuilder::default();
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
-    let configuration = assembly_platform_configuration::define_configuration(
-        &config,
-        &board_info,
-        &filesystem_config,
-    )?;
+    let configuration =
+        assembly_platform_configuration::define_configuration(&config, &board_info)?;
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
@@ -120,8 +113,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Do the actual building of everything for the Image Assembly config.
     let mut image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
-    let images = ImagesConfig::from_product_and_board(&filesystem_config, &board_info.filesystems)
-        .context("Constructing images config")?;
+    let images = ImagesConfig::from_product_and_board(
+        &config.platform.storage.filesystems,
+        &board_info.filesystems,
+    )
+    .context("Constructing images config")?;
     image_assembly.images_config = images;
 
     // Validate the built product assembly.

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_images_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
@@ -19,12 +18,6 @@ assert(current_toolchain == default_toolchain,
 if (has_board) {
   assert(board_information_for_assembly != false,
          "Need to define board_information_for_assembly")
-}
-
-generated_images_config("images_config") {
-  zbi = {
-    name = "zedboot"
-  }
 }
 
 product_assembly_configuration("product_config") {
@@ -53,7 +46,6 @@ assembled_system("zedboot_assembly") {
   fshost_config = board_zedboot_fshost_config
   use_bringup_platform_bundles_only = true
 
-  assembly_images_config_label = ":images_config"
   product_assembly_config_label = ":product_config"
   board_config = board_information_for_assembly
 
