@@ -453,6 +453,11 @@ void arm64_feature_init() {
     if (pfr0.advsimd() != arch::ArmIdAa64Pfr0El1::Fp::kNone) {
       arm64_isa_features |= ZX_ARM64_FEATURE_ISA_ASIMD;
     }
+    if (pfr0.sve() != arch::ArmIdAa64Pfr0El1::Sve::kNone) {
+      // TODO(fxbug.dev/131698): We do not currently report
+      // ZX_ARM64_FEATURE_ISA_SVE even if the processor supports the feature
+      // because Zircon does not have all the supporting code yet.
+    }
 
     auto mmfr0 = arch::ArmIdAa64Mmfr0El1::Read();
 
@@ -536,7 +541,7 @@ static void print_isa_features() {
       {ZX_ARM64_FEATURE_ISA_SM4, "sm4"},         {ZX_ARM64_FEATURE_ISA_DP, "dp"},
       {ZX_ARM64_FEATURE_ISA_DPB, "dpb"},         {ZX_ARM64_FEATURE_ISA_FHM, "fhm"},
       {ZX_ARM64_FEATURE_ISA_TS, "ts"},           {ZX_ARM64_FEATURE_ISA_RNDR, "rndr"},
-      {ZX_ARM64_FEATURE_ISA_I8MM, "i8mm"},
+      {ZX_ARM64_FEATURE_ISA_I8MM, "i8mm"},       {ZX_ARM64_FEATURE_ISA_SVE, "sve"},
   };
 
   printf("ARM ISA Features: ");
