@@ -39,6 +39,7 @@ where
 {
     /// Try initialize NAT64 at boot time.
     #[tracing::instrument(skip_all)]
+    #[allow(unused)]
     pub fn init_nat64(&self) {
         let driver_state = self.driver_state.lock();
 
