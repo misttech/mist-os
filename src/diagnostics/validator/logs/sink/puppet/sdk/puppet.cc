@@ -61,8 +61,8 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   void BeginRecordPrintf(fuchsia_syslog::LogBuffer* buffer, FuchsiaLogSeverity severity,
                          cpp17::optional<cpp17::string_view> file_name, unsigned int line,
                          cpp17::optional<cpp17::string_view> msg) {
-    buffer->BeginRecord(severity, file_name, line, msg, std::nullopt /* condition */, true,
-                        socket_.borrow(), 0, GetKoid(zx_process_self()), GetKoid(zx_thread_self()));
+    buffer->BeginRecord(severity, file_name, line, msg, true, socket_.borrow(), 0,
+                        GetKoid(zx_process_self()), GetKoid(zx_thread_self()));
   }
 
   static FuchsiaLogSeverity IntoLogSeverity(fuchsia::diagnostics::Severity severity) {

@@ -46,9 +46,8 @@ class LogBuffer final {
                    const zx::unowned_socket& socket, uint32_t dropped_count, zx_koid_t pid,
                    zx_koid_t tid) {
     syslog_begin_record(&data_, severity, StringViewToCStr(file_name), StringViewLength(file_name),
-                        line, StringViewToCStr(message), StringViewLength(message),
-                        /* condition=*/nullptr, /*condition_length=*/0, false, socket->get(),
-                        dropped_count, pid, tid);
+                        line, StringViewToCStr(message), StringViewLength(message), false,
+                        socket->get(), dropped_count, pid, tid);
   }
 
   // Initializes a LogBuffer
@@ -61,7 +60,6 @@ class LogBuffer final {
   // then the caller maintains ownership of the message buffer and MUST NOT
   // mutate of free the string until FlushRecord is called or the buffer is reset/discarded
   // with another call to BeginRecord.
-  // condition -- Does nothing. Exists solely for compatibility with legacy code.
   // is_printf -- Whether or not this is a printf message. If true,
   // the message should be interpreted as a C-style printf before being displayed to the
   // user.
@@ -71,19 +69,6 @@ class LogBuffer final {
   // tid -- The thread ID that generated the message.
   //
   // DEPRECATED: Removing. See fxbug.dev/131587
-  void BeginRecord(FuchsiaLogSeverity severity, cpp17::optional<cpp17::string_view> file_name,
-                   unsigned int line, cpp17::optional<cpp17::string_view> message,
-                   cpp17::optional<cpp17::string_view> condition, bool is_printf,
-                   const zx::unowned_socket& socket, uint32_t dropped_count, zx_koid_t pid,
-                   zx_koid_t tid) {
-    syslog_begin_record(&data_, severity, StringViewToCStr(file_name), StringViewLength(file_name),
-                        line, StringViewToCStr(message), StringViewLength(message),
-                        StringViewToCStr(condition), StringViewLength(condition), is_printf,
-                        socket->get(), dropped_count, pid, tid);
-  }
-
-  // Transitional BeginRecord method, which doesn't include condition.
-  // The other one will be deleted once everyone switches to this one.
   void BeginRecord(FuchsiaLogSeverity severity, cpp17::optional<cpp17::string_view> file_name,
                    unsigned int line, cpp17::optional<cpp17::string_view> message, bool is_printf,
                    const zx::unowned_socket& socket, uint32_t dropped_count, zx_koid_t pid,

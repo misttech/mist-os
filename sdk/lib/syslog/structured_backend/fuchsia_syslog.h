@@ -82,9 +82,8 @@ typedef struct fuchsia_log_buffer {
 // THIS IS DEPRECATED! Please use syslog_begin_record_transitional instead.
 void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity severity,
                          const char* file_name, size_t file_name_length, unsigned int line,
-                         const char* message, size_t message_length, const char* condition,
-                         size_t condition_length, bool is_printf, zx_handle_t socket,
-                         uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
+                         const char* message, size_t message_length, bool is_printf,
+                         zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
 // Initializes a LogBuffer
 // buffer -- The buffer to initialize
@@ -98,8 +97,6 @@ void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity
 // then the caller maintains ownership of the message buffer and MUST NOT
 // mutate of free the string until FlushRecord is called or the buffer is reset/discarded
 // with another call to BeginRecord.
-
-// condition -- Does nothing. Exists solely for compatibility with legacy code.
 
 // is_printf -- Whether or not this is a printf message. If true,
 // the message should be interpreted as a C-style printf before being displayed to the

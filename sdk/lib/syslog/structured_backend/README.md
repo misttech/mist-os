@@ -16,7 +16,7 @@ a socket. Use the other side of the socket to do any of the following:
 
 ```cpp
 fuchsia_syslog::LogBuffer buffer;
-buffer.BeginRecord(severity, file_name, line, msg, condition, false /* is_printf */, logsink_socket, number_of_dropped_messages, pid, tid);
+buffer.BeginRecord(severity, file_name, line, msg, false /* is_printf */, logsink_socket, number_of_dropped_messages, pid, tid);
 number_of_dropped_message+=buffer.FlushRecord() ? 0 : 1;
 ```
 
@@ -24,7 +24,7 @@ number_of_dropped_message+=buffer.FlushRecord() ? 0 : 1;
 
 ```cpp
 fuchsia_syslog::LogBuffer buffer;
-buffer.BeginRecord(severity, file_name, line, "Constant C format string %i %s", condition, true /* is_printf */, logsink_socket, number_of_dropped_messages, pid, tid);
+buffer.BeginRecord(severity, file_name, line, "Constant C format string %i %s", true /* is_printf */, logsink_socket, number_of_dropped_messages, pid, tid);
 // NOTE: In printf encoding you MUST NOT
 // name your keys.
 buffer.WriteKeyValue(FUCHSIA_SYSLOG_PRINTF_KEY, 5);
@@ -53,7 +53,7 @@ The C API is similar to the C++ API. This is the same printf example but in C
 
 ```c
 log_buffer_t buffer;
-syslog_begin_record(&buffer, severity, file_name, line, "Constant C format string %i %s", condition, true /* is_printf */, logsink_socket, number_of_dropped_messages, pid, tid);
+syslog_begin_record(&buffer, severity, file_name, line, "Constant C format string %i %s", true /* is_printf */, logsink_socket, number_of_dropped_messages, pid, tid);
 // NOTE: In printf encoding you MUST NOT
 // name your keys.
 syslog_write_key_value_int64(&buffer, FUCHSIA_SYSLOG_PRINTF_KEY, 0, 5);

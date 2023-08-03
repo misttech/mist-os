@@ -233,8 +233,8 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     if (file) {
       file = syslog::internal::StripFile(file, severity);
     }
-    buf_ptr->BeginRecord(severity, ViewFromC(file), line, ViewFromC(fmt_string), cpp17::nullopt,
-                         false, this->socket_.borrow(), 0, pid_, GetCurrentThreadKoid());
+    buf_ptr->BeginRecord(severity, ViewFromC(file), line, ViewFromC(fmt_string), false,
+                         this->socket_.borrow(), 0, pid_, GetCurrentThreadKoid());
     if (tag) {
       buf_ptr->WriteKeyValue("tag", tag);
     }

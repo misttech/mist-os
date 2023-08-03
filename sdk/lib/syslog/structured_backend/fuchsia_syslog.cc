@@ -481,8 +481,7 @@ cpp17::string_view StripDots(cpp17::string_view path) {
 
 void BeginRecordInternal(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity severity,
                          cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                         cpp17::optional<cpp17::string_view> msg,
-                         cpp17::optional<cpp17::string_view> condition, bool is_printf,
+                         cpp17::optional<cpp17::string_view> msg, bool is_printf,
                          zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid,
                          zx_koid_t tid) {
   cpp17::optional<int8_t> raw_severity;
@@ -540,11 +539,10 @@ void BeginRecordInternal(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity
 
 void BeginRecord(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity severity,
                  cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                 cpp17::optional<cpp17::string_view> message,
-                 cpp17::optional<cpp17::string_view> condition, bool is_printf,
+                 cpp17::optional<cpp17::string_view> message, bool is_printf,
                  zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
-  BeginRecordInternal(buffer, severity, file_name, line, message, condition, is_printf,
-                      std::move(socket), dropped_count, pid, tid);
+  BeginRecordInternal(buffer, severity, file_name, line, message, is_printf, std::move(socket),
+                      dropped_count, pid, tid);
 }
 
 void WriteKeyValue(fuchsia_syslog_log_buffer_t* buffer, cpp17::string_view key,
@@ -642,19 +640,17 @@ void syslog_begin_record_transitional(fuchsia_syslog_log_buffer_t* buffer,
                                       zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid,
                                       zx_koid_t tid) {
   fuchsia_syslog::BeginRecord(buffer, severity, CStringToStringView(file_name, file_name_length),
-                              line, CStringToStringView(message, message_length), cpp17::nullopt,
-                              is_printf, zx::unowned_socket(socket), dropped_count, pid, tid);
+                              line, CStringToStringView(message, message_length), is_printf,
+                              zx::unowned_socket(socket), dropped_count, pid, tid);
 }
 
 __BEGIN_CDECLS
 void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity severity,
                          const char* file_name, size_t file_name_length, unsigned int line,
-                         const char* message, size_t message_length, const char* condition,
-                         size_t condition_length, bool is_printf, zx_handle_t socket,
-                         uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
+                         const char* message, size_t message_length, bool is_printf,
+                         zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
   fuchsia_syslog::BeginRecord(buffer, severity, CStringToStringView(file_name, file_name_length),
-                              line, CStringToStringView(message, message_length),
-                              CStringToStringView(condition, condition_length), is_printf,
+                              line, CStringToStringView(message, message_length), is_printf,
                               zx::unowned_socket(socket), dropped_count, pid, tid);
 }
 

@@ -45,8 +45,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   auto pid = provider.ConsumeIntegral<zx_koid_t>();
   auto tid = provider.ConsumeIntegral<zx_koid_t>();
   auto condition = provider.ConsumeRandomLengthString();
-  buffer.BeginRecord(severity, file.data(), line, msg.data(), condition.data(), false,
-                     output.borrow(), 0, pid, tid);
+  buffer.BeginRecord(severity, file.data(), line, msg.data(), false, output.borrow(), 0, pid, tid);
   while (provider.remaining_bytes()) {
     auto op = provider.ConsumeEnum<OP>();
     auto key = provider.ConsumeRandomLengthString();

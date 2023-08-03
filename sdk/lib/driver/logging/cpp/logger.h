@@ -63,8 +63,7 @@ class Logger {
   // this directly.
   void BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
                    cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                   cpp17::optional<cpp17::string_view> message,
-                   cpp17::optional<cpp17::string_view> condition, bool is_printf, uint32_t dropped);
+                   cpp17::optional<cpp17::string_view> message, bool is_printf, uint32_t dropped);
 
   // Sends a log record to the backend. You probably don't want to call this directly.
   // This call also increments dropped_logs_, which is why we don't call FlushRecord
