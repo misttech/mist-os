@@ -17,7 +17,7 @@
                 "fuchsia.accessibility.scene.Provider",
                 "fuchsia.accessibility.semantics.SemanticsManager",
 
-                // Allows clients to control the GFX clip space transform directly.
+                // Allows clients to set the magnification transform directly.
                 "test.accessibility.Magnifier",
             ],
         },
