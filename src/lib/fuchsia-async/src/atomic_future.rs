@@ -13,11 +13,12 @@ use std::task::{Context, Poll};
 pub struct AtomicFuture {
     // ACTIVE, INACTIVE, NOTIFIED, or DONE
     state: AtomicUsize,
-    // `future` is safe to access only after a successful
-    // compare-and-swap from INACTIVE to ACTIVE, and before
-    // a transition from ACTIVE or NOTIFIED to INACTIVE or DONE.
-    // INVARIANT: this value must be `Some(...)` so long as
-    // `state` != `DONE`.
+    // `future` is safe to access after a successful compare-and-swap from INACTIVE to ACTIVE, and
+    // before a transition from ACTIVE or NOTIFIED to INACTIVE or DONE.  There is a transition from
+    // INACTIVE to DONE in the function `try_drop` below after which `future` will be dropped (which
+    // is safe).  INVARIANT: this value must be `Some(...)` so long as `state` != `DONE`, but this
+    // value can also be `Some(...)` just after the aforementioned transition from INACTIVE to DONE
+    // in `try_drop` below.
     future: UnsafeCell<Option<FutureObj<'static, ()>>>,
 }
 
@@ -219,5 +220,19 @@ impl AtomicFuture {
     pub unsafe fn drop_future_unchecked(&self) {
         (*self.future.get()).take();
         self.state.store(DONE, Relaxed);
+    }
+
+    /// Drops the future if it is not currently being polled. Returns success if the future was
+    /// dropped or was already dropped.
+    pub fn try_drop(&self) -> Result<(), ()> {
+        match self.state.compare_exchange(INACTIVE, DONE, Relaxed, Relaxed) {
+            Ok(_) => {
+                // SAFETY: Nothing touches future once we're in the DONE state.
+                unsafe { (*self.future.get()).take() };
+                Ok(())
+            }
+            Err(DONE) => Ok(()),
+            Err(_) => Err(()),
+        }
     }
 }

@@ -376,7 +376,17 @@ impl Inner {
     /// https://github.com/tokio-rs/tokio/blob/b42f21ec3e212ace25331d0c13889a45769e6006/tokio/src/io/driver/mod.rs#L297
     pub fn on_parent_drop(&self) {
         // Drop all tasks
-        self.active_tasks.lock().clear();
+        let active_tasks = std::mem::take(&mut *self.active_tasks.lock());
+
+        // Any use of fasync::unblock can involve a waker. Wakers hold weak references to tasks, but
+        // as part of waking, there's an upgrade to a strong reference, so for a small amount of
+        // time `fasync::unblock` can hold a strong reference to a task which in turn holds the
+        // future for the task which in turn could hold references to receivers, which, if we did
+        // nothing about it, would trip the assertion below. For that reason, we forcibly drop the
+        // task futures here.
+        for (_, task) in active_tasks {
+            task.future.try_drop().expect("Failed to drop task");
+        }
 
         // Drop all of the uncompleted tasks
         while let Some(_) = self.ready_tasks.pop() {}
