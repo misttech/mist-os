@@ -263,19 +263,5 @@ TEST(MountTest, InvalidOptions) {
   ASSERT_EQ(options.SetValue(options.GetNameView(kOptNoHeap), 1), ZX_ERR_INVALID_ARGS);
 }
 
-TEST(MountTest, MountException) {
-  std::unique_ptr<Bcache> bc;
-  uint64_t block_count = 20ull * 1024ull * 1024ull / kDefaultSectorSize;
-  auto device =
-      std::make_unique<block_client::FakeBlockDevice>(block_client::FakeBlockDevice::Config{
-          .block_count = block_count, .block_size = kDefaultSectorSize, .supports_trim = true});
-  bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
-  ASSERT_TRUE(bc_or.is_ok());
-
-  MountOptions mount_options;
-  ASSERT_EQ(Mount(mount_options, std::move(*bc_or), {}).status_value(), ZX_ERR_INVALID_ARGS);
-}
-
 }  // namespace
 }  // namespace f2fs

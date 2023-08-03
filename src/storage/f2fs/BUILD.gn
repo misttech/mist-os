@@ -38,8 +38,6 @@ static_library("f2fs") {
     "reader.cc",
     "reader.h",
     "recovery.cc",
-    "runner.cc",
-    "runner.h",
     "segment.cc",
     "segment.h",
     "storage_buffer.cc",

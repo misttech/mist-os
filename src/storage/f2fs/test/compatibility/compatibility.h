@@ -28,6 +28,7 @@
 
 namespace f2fs {
 
+using Runner = ComponentRunner;
 constexpr size_t kTestBlockSize = 4096;
 constexpr size_t kTestBlockCount = 25600;
 constexpr size_t kTestBlockDeviceSize = kTestBlockSize * kTestBlockCount;

@@ -12,6 +12,7 @@
 namespace f2fs {
 
 using block_client::FakeBlockDevice;
+using Runner = ComponentRunner;
 
 F2fsFakeDevTestFixture::F2fsFakeDevTestFixture(const TestOptions &options)
     : block_count_(options.block_count),

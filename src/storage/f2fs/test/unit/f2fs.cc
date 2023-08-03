@@ -12,6 +12,7 @@
 
 namespace f2fs {
 namespace {
+using Runner = ComponentRunner;
 
 TEST(SuperblockTest, SanityCheckRawSuper) {
   std::unique_ptr<Bcache> bc;
@@ -143,31 +144,6 @@ TEST(SuperblockTest, Reset) {
   ASSERT_TRUE(fs->IsValid());
   fs->Reset();
   ASSERT_FALSE(fs->IsValid());
-}
-
-TEST(RunnerTest, CreateException) {
-  uint64_t block_count = 20ull * 1024ull * 1024ull / kDefaultSectorSize;
-  auto device =
-      std::make_unique<block_client::FakeBlockDevice>(block_client::FakeBlockDevice::Config{
-          .block_count = block_count, .block_size = kDefaultSectorSize, .supports_trim = true});
-  auto bc_or = CreateBcache(std::move(device));
-  ASSERT_TRUE(bc_or.is_ok());
-
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-
-  ASSERT_EQ(Runner::Create(loop.dispatcher(), std::move(*bc_or), MountOptions{}).status_value(),
-            ZX_ERR_INVALID_ARGS);
-}
-
-TEST(RunnerTest, GetRootVnodeException) {
-  std::unique_ptr<Bcache> bc;
-  FileTester::MkfsOnFakeDev(&bc, 819200, kDefaultSectorSize);
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto vfs_or = Runner::Create(loop.dispatcher(), std::move(bc), MountOptions{});
-  ASSERT_TRUE(vfs_or.is_ok());
-  vfs_or->Shutdown([](zx_status_t status) {});
-  loop.RunUntilIdle();
-  ASSERT_TRUE(vfs_or->ServeRoot({}).is_error());
 }
 
 TEST(F2fsTest, TakeBc) {

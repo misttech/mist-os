@@ -12,6 +12,16 @@
 
 namespace f2fs {
 
+zx::result<std::unique_ptr<ComponentRunner>> ComponentRunner::CreateRunner(
+    FuchsiaDispatcher dispatcher) {
+  std::unique_ptr<ComponentRunner> runner(new ComponentRunner(dispatcher));
+  // Create Pager and PagerPool
+  if (auto status = runner->Init(); status.is_error()) {
+    return status.take_error();
+  }
+  return zx::ok(std::move(runner));
+}
+
 ComponentRunner::ComponentRunner(async_dispatcher_t* dispatcher)
     : fs::PagedVfs(dispatcher), dispatcher_(dispatcher) {
   outgoing_ = fbl::MakeRefCounted<fs::PseudoDir>();

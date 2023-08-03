@@ -15,6 +15,7 @@ namespace f2fs {
 namespace {
 
 using SegmentManagerTest = F2fsFakeDevTestFixture;
+using Runner = ComponentRunner;
 
 TEST_F(SegmentManagerTest, BlkChaining) {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();

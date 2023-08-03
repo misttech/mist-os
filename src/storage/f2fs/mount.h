@@ -62,11 +62,6 @@ class MountOptions {
   MountOpt opt_[kOptMaxNum];
 };
 
-// Start the filesystem on the block device backed by |bcache|, and serve it on |root|. Blocks
-// until the filesystem terminates.
-zx::result<> Mount(const MountOptions &options, std::unique_ptr<f2fs::Bcache> bcache,
-                   fidl::ServerEnd<fuchsia_io::Directory> root);
-
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
                             fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle);
 

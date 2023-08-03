@@ -67,7 +67,6 @@
 #include "src/storage/f2fs/storage_buffer.h"
 #include "src/storage/f2fs/writeback.h"
 #include "src/storage/f2fs/reader.h"
-#include "src/storage/f2fs/runner.h"
 #include "src/storage/f2fs/vnode.h"
 #include "src/storage/f2fs/vnode_cache.h"
 #include "src/storage/f2fs/dir.h"
@@ -273,9 +272,7 @@ class F2fs final {
                       bool flush = true) {
     writer_->ScheduleWriteBlocks(completion, std::move(pages), flush);
   }
-  void ScheduleWriter(fpromise::promise<> task) {
-    writer_->ScheduleTask(std::move(task));
-  }
+  void ScheduleWriter(fpromise::promise<> task) { writer_->ScheduleTask(std::move(task)); }
 
   void ScheduleWriteback(size_t num_pages = kDefaultBlocksPerSegment);
   zx::result<> WaitForWriteback() {

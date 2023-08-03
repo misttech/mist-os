@@ -9,7 +9,7 @@
 
 namespace f2fs {
 
-class ComponentRunner final : public fs::PagedVfs {
+class ComponentRunner final : public PlatformVfs {
  public:
   explicit ComponentRunner(async_dispatcher_t* dispatcher);
 
@@ -17,6 +17,9 @@ class ComponentRunner final : public fs::PagedVfs {
   ComponentRunner& operator=(const ComponentRunner&) = delete;
 
   ~ComponentRunner();
+
+  // for unit tests
+  static zx::result<std::unique_ptr<ComponentRunner>> CreateRunner(FuchsiaDispatcher dispatcher);
 
   zx::result<> ServeRoot(fidl::ServerEnd<fuchsia_io::Directory> root,
                          fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle);

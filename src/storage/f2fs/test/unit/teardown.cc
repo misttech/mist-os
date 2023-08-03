@@ -15,6 +15,7 @@
 
 namespace f2fs {
 namespace {
+using Runner = ComponentRunner;
 
 class AsyncTearDownVnode : public Dir {
  public:

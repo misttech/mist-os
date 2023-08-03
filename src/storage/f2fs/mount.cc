@@ -29,33 +29,6 @@ const MountOpt default_option[] = {
     {"active_logs", 6, true},  // It should be the last one.
 };
 
-zx::result<> Mount(const MountOptions& options, std::unique_ptr<f2fs::Bcache> bc,
-                   fidl::ServerEnd<fuchsia_io::Directory> root) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
-
-  auto on_unmount = [&loop]() {
-    loop.Quit();
-    FX_LOGS(INFO) << "unmounted successfully";
-  };
-
-  auto runner_or = Runner::Create(loop.dispatcher(), std::move(bc), options);
-  if (runner_or.is_error()) {
-    return runner_or.take_error();
-  }
-
-  if (auto status = (*runner_or)->ServeRoot(std::move(root)); status.is_error()) {
-    return status.take_error();
-  }
-
-  runner_or->SetUnmountCallback(std::move(on_unmount));
-
-  FX_LOGS(INFO) << "mounted successfully";
-
-  ZX_ASSERT(loop.Run() == ZX_ERR_CANCELED);
-  return zx::ok();
-}
-
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
                             fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
