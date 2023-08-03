@@ -28,6 +28,7 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext, Id},
     error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
+        device::state::IpDeviceStateIpExt,
         socket::{
             BufferIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
             IpSockSendError, IpSocketHandler as _, SendOptions,
@@ -284,10 +285,10 @@ impl<A: IpAddress, D: crate::device::Id> ConnAddr<A, D, NonZeroU16, NonZeroU16> 
     }
 }
 
-fn leave_all_joined_groups<I: Ip, C, SC: MulticastMembershipHandler<I, C>>(
+fn leave_all_joined_groups<A: IpAddress, C, SC: MulticastMembershipHandler<A::Version, C>>(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    memberships: MulticastMemberships<I::Addr, SC::WeakDeviceId>,
+    memberships: MulticastMemberships<A, SC::WeakDeviceId>,
 ) {
     for (addr, device) in memberships {
         let Some(device) = sync_ctx.upgrade_weak_device_id(&device) else { continue; };
@@ -322,13 +323,12 @@ pub(crate) trait DatagramStateContext<I: IpExt, C, S: DatagramSocketSpec>:
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
-    type SocketsStateCtx<'a>: DatagramBoundStateContext<
-        I,
-        C,
-        S,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+    type SocketsStateCtx<'a>: DatagramBoundStateContext<I, C, S>
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        // Allow access to the demultiplexing map for the other IP version. This
+        // is needed for dual-stack socket support, where an IPv6 socket ID can
+        // be present in the IPv4 map.
+        + DatagramBoundStateContext<I::OtherVersion, C, S>;
 
     /// Calls the function with an immutable reference to the datagram sockets.
     fn with_sockets_state<
@@ -400,8 +400,12 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
-    type IpSocketsCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + MulticastMembershipHandler<I, C>;
+    type IpSocketsCtx<'a>: TransportIpContext<I, C>
+        + MulticastMembershipHandler<I, C>
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        // Allow sending packets for the other IP version. This is needed to
+        // allow sending IPv4 packets from dual-stack IPv6 sockets.
+        + TransportIpContext<I::OtherVersion, C>;
 
     /// The additional allocator passed to the callback provided to
     /// `with_sockets_mut`.
@@ -682,6 +686,12 @@ pub(crate) trait DualStackIpExt: Ip {
     // DatagramSocketSpec into its own trait and use that as the bound here.
     type DualStackReceivingId<S: DatagramSocketSpec>: Clone + Debug + Eq;
 
+    /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
+    type OtherVersion: Ip
+        + IpDeviceStateIpExt
+        + DualStackIpExt<OtherVersion = Self>
+        + crate::ip::IpExt;
+
     /// Convert a socket ID into a `Self::DualStackReceivingId`.
     ///
     /// For coherency reasons this can't be a `From` bound on
@@ -711,6 +721,8 @@ impl DualStackIpExt for Ipv4 {
     /// Incoming IPv4 packets may be received by either IPv4 or IPv6 sockets.
     type DualStackReceivingId<S: DatagramSocketSpec> = EitherIpSocket<S>;
 
+    type OtherVersion = Ipv6;
+
     fn dual_stack_receiver<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
     ) -> Self::DualStackReceivingId<S> {
@@ -721,6 +733,8 @@ impl DualStackIpExt for Ipv4 {
 impl DualStackIpExt for Ipv6 {
     /// Incoming IPv6 packets may only be received by IPv6 sockets.
     type DualStackReceivingId<S: DatagramSocketSpec> = S::SocketId<Self>;
+
+    type OtherVersion = Ipv4;
 
     fn dual_stack_receiver<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
@@ -1738,15 +1752,18 @@ pub enum SetMulticastMembershipError {
 /// Selects the interface for the given remote address, optionally with a
 /// constraint on the source address.
 fn pick_interface_for_addr<
-    I: IpExt,
+    A: IpAddress,
     S: DatagramSocketSpec,
-    C: DatagramStateNonSyncContext<I, S>,
-    SC: TransportIpContext<I, C>,
+    C: DatagramStateNonSyncContext<A::Version, S>,
+    SC: TransportIpContext<A::Version, C>,
 >(
     sync_ctx: &mut SC,
-    _remote_addr: MulticastAddr<I::Addr>,
-    source_addr: Option<SpecifiedAddr<I::Addr>>,
-) -> Result<SC::DeviceId, SetMulticastMembershipError> {
+    _remote_addr: MulticastAddr<A>,
+    source_addr: Option<SpecifiedAddr<A>>,
+) -> Result<SC::DeviceId, SetMulticastMembershipError>
+where
+    A::Version: IpExt,
+{
     if let Some(source_addr) = source_addr {
         let mut devices = sync_ctx.get_devices_with_assigned_addr(source_addr);
         if let Some(d) = devices.next() {
@@ -1849,10 +1866,20 @@ pub(crate) fn set_multicast_membership<
             .ok_or(SetMulticastMembershipError::NoMembershipChange)?
         {
             MulticastMembershipChange::Join => {
-                sync_ctx.join_multicast_group(ctx, &strong_interface, multicast_group)
+                MulticastMembershipHandler::<I, _>::join_multicast_group(
+                    sync_ctx,
+                    ctx,
+                    &strong_interface,
+                    multicast_group,
+                )
             }
             MulticastMembershipChange::Leave => {
-                sync_ctx.leave_multicast_group(ctx, &strong_interface, multicast_group)
+                MulticastMembershipHandler::<I, _>::leave_multicast_group(
+                    sync_ctx,
+                    ctx,
+                    &strong_interface,
+                    multicast_group,
+                )
             }
         }
 
@@ -1955,7 +1982,10 @@ pub(crate) fn get_ip_hop_limits<
         let (options, device) = get_options_device(state, id);
         let IpOptions { hop_limits, multicast_memberships: _ } = options;
         let device = device.as_ref().and_then(|d| sync_ctx.upgrade_weak_device_id(d));
-        hop_limits.get_limits_with_defaults(&sync_ctx.get_default_hop_limits(device.as_ref()))
+        hop_limits.get_limits_with_defaults(&TransportIpContext::<I, _>::get_default_hop_limits(
+            sync_ctx,
+            device.as_ref(),
+        ))
     })
 }
 
@@ -2330,7 +2360,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
+    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
         DatagramBoundStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
     {
@@ -2384,7 +2414,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static>
+    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
         LocalIdentifierAllocator<
             I,
             FakeWeakDeviceId<D>,

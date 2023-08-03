@@ -2897,7 +2897,6 @@ pub(crate) mod testutil {
     use crate::{
         context::{testutil::FakeInstant, RngContext},
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-        ip::device::state::IpDeviceStateIpExt,
         testutil::{FakeNonSyncCtx, FakeSyncCtx},
     };
 
@@ -3104,7 +3103,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: Ip + IpDeviceStateIpExt,
+            I: Ip,
             C: RngContext + InstantContext<Instant = FakeInstant>,
             D: FakeStrongDeviceId + 'static,
             State: MulticastMembershipHandler<I, C, DeviceId = D>,

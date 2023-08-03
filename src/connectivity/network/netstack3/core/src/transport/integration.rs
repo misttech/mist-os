@@ -235,7 +235,9 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv6>>>
 impl<
         I: udp::IpExt,
         B: BufferMut,
-        C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext,
+        C: udp::BufferNonSyncContext<I, B>
+            + udp::BufferNonSyncContext<I::OtherVersion, B>
+            + crate::NonSyncContext,
         L,
     > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
@@ -248,7 +250,9 @@ where
 impl<
         I: udp::IpExt,
         B: BufferMut,
-        C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext,
+        C: udp::BufferNonSyncContext<I, B>
+            + udp::BufferNonSyncContext<I::OtherVersion, B>
+            + crate::NonSyncContext,
         L,
     > udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where

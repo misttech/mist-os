@@ -851,13 +851,24 @@ pub trait NonSyncContext<I: IcmpIpExt> {
 }
 
 /// The non-synchronized context for UDP.
-pub trait StateNonSyncContext<I: IcmpIpExt>:
-    InstantContext + RngContext + NonSyncContext<I> + CounterContext + TracingContext
+pub(crate) trait StateNonSyncContext<I: IpExt>:
+    InstantContext
+    + RngContext
+    + CounterContext
+    + TracingContext
+    + NonSyncContext<I>
+    // The non-sync context needs to allow delivering cross-IP-version traffic.
+    + NonSyncContext<I::OtherVersion>
 {
 }
 impl<
-        I: IcmpIpExt,
-        C: InstantContext + RngContext + NonSyncContext<I> + CounterContext + TracingContext,
+        I: IpExt,
+        C: InstantContext
+            + RngContext
+            + CounterContext
+            + TracingContext
+            + NonSyncContext<I>
+            + NonSyncContext<I::OtherVersion>,
     > StateNonSyncContext<I> for C
 {
 }
@@ -868,8 +879,12 @@ pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
-    type IpSocketsCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + MulticastMembershipHandler<I, C>;
+    type IpSocketsCtx<'a>: TransportIpContext<I, C>
+        + MulticastMembershipHandler<I, C>
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        // Allow sending IP packets for the other IP version as well. This is
+        // needed to send IPv4 packets out of dual-stack IPv6 sockets.
+        + TransportIpContext<I::OtherVersion, C>;
 
     /// Calls the function with an immutable reference to UDP sockets.
     fn with_bound_sockets<
@@ -897,12 +912,12 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback.
-    type SocketStateCtx<'a>: BoundStateContext<
-        I,
-        C,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+    type SocketStateCtx<'a>: BoundStateContext<I, C>
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        // Allow accessing the bound state for the other IP version as well.
+        // This lets us put IPv6 socket IDs into the IPv4 socket map, which is
+        // needed for dual-stack IPv6 sockets to receive IPv4 packets.
+        + BoundStateContext<I::OtherVersion, C>;
 
     /// Calls the function with an immutable reference to a socket's state.
     fn with_sockets_state<
@@ -946,7 +961,7 @@ pub trait BufferNonSyncContext<I: IcmpIpExt, B: BufferMut>: NonSyncContext<I> {
 }
 
 /// The non-synchronized context for UDP with a buffer.
-pub trait BufferStateNonSyncContext<I: IcmpIpExt, B: BufferMut>:
+pub(crate) trait BufferStateNonSyncContext<I: IpExt, B: BufferMut>:
     StateNonSyncContext<I> + BufferNonSyncContext<I, B>
 {
 }
@@ -1017,30 +1032,35 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
         if let (Some(src_ip), Some(src_port), Some(dst_port)) =
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
-            sync_ctx.with_sockets(|sync_ctx, sockets_state, bound_sockets| {
-                let receiver = lookup(
-                    sockets_state,
-                    bound_sockets,
-                    (*dst_ip, Some(dst_port)),
-                    (src_ip, src_port),
-                    sync_ctx.downgrade_device_id(device),
-                )
-                .next();
+            sync_ctx.with_sockets_state(|sync_ctx, sockets_state| {
+                BoundStateContext::<I, _>::with_bound_sockets(
+                    sync_ctx,
+                    |sync_ctx, BoundSockets { bound_sockets, lazy_port_alloc: _ }| {
+                        let receiver = lookup(
+                            sockets_state,
+                            bound_sockets,
+                            (*dst_ip, Some(dst_port)),
+                            (src_ip, src_port),
+                            sync_ctx.downgrade_device_id(device),
+                        )
+                        .next();
 
-                if let Some(id) = receiver {
-                    let id = match id {
-                        LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
-                    };
-                    let id = assert_is_ip_socket::<I>(id);
-                    ctx.receive_icmp_error(*id, err);
-                } else {
-                    trace!(
-                        "UdpIpTransportContext::receive_icmp_error: Got ICMP error
-                        message for nonexistent UDP socket; either the socket
-                        responsible has since been removed, or the error message
-                        was sent in error or corrupted"
-                    );
-                }
+                        if let Some(id) = receiver {
+                            let id = match id {
+                                LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
+                            };
+                            let id = assert_is_ip_socket::<I>(id);
+                            ctx.receive_icmp_error(*id, err);
+                        } else {
+                            trace!(
+                                "UdpIpTransportContext::receive_icmp_error: Got ICMP error
+                                message for nonexistent UDP socket; either the socket
+                                responsible has since been removed, or the error message
+                                was sent in error or corrupted"
+                            );
+                        }
+                    },
+                )
             });
         } else {
             trace!("UdpIpTransportContext::receive_icmp_error: Got ICMP error message for IP packet with an invalid source or destination IP or port");
@@ -2206,7 +2226,7 @@ mod tests {
     /// A packet received on a socket.
     #[derive(Debug, Derivative, PartialEq)]
     #[derivative(Default(bound = ""))]
-    struct SocketReceived<I: TestIpExt> {
+    struct SocketReceived<I: IcmpIpExt> {
         packets: Vec<ReceivedPacket<I>>,
         errors: Vec<I::ErrorCode>,
     }
@@ -2328,9 +2348,9 @@ mod tests {
             map
         }
 
-        fn received_mut<I: TestIpExt>(&mut self) -> &mut HashMap<SocketId<I>, SocketReceived<I>> {
+        fn received_mut<I: IcmpIpExt>(&mut self) -> &mut HashMap<SocketId<I>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + TestIpExt>(&'a mut HashMap<SocketId<I>, SocketReceived<I>>);
+            struct Wrap<'a, I: Ip + IcmpIpExt>(&'a mut HashMap<SocketId<I>, SocketReceived<I>>);
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&mut state.received_v4),
@@ -2359,14 +2379,14 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt> NonSyncContext<I> for FakeUdpNonSyncCtx {
+    impl<I: IcmpIpExt> NonSyncContext<I> for FakeUdpNonSyncCtx {
         fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode) {
             self.state_mut().received_mut().entry(id).or_default().errors.push(err)
         }
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId + 'static> StateContext<I, FakeUdpNonSyncCtx>
-        for FakeUdpSyncCtx<I, D>
+    impl<I: IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
+        StateContext<I, FakeUdpNonSyncCtx> for FakeUdpSyncCtx<I, D>
     {
         type SocketStateCtx<'a> = WrappedFakeSyncCtx<
             FakeBoundSockets<D::Weak>,
@@ -2401,7 +2421,8 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId + 'static> BoundStateContext<I, FakeUdpNonSyncCtx>
+    impl<I: IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
+        BoundStateContext<I, FakeUdpNonSyncCtx>
         for WrappedFakeSyncCtx<
             FakeBoundSockets<FakeWeakDeviceId<D>>,
             FakeDualStackIpSocketCtx<D>,
