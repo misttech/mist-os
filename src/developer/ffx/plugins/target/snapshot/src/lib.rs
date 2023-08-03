@@ -196,7 +196,7 @@ pub async fn snapshot_impl<W: Write>(
         // Build parameters
         let params = GetSnapshotParameters {
             collection_timeout_per_data: Some(
-                i64::try_from(Duration::from_secs(5 * 60).as_nanos()).map_err(|e| anyhow!(e))?,
+                i64::try_from(Duration::from_secs(60).as_nanos()).map_err(|e| anyhow!(e))?,
             ),
             response_channel: Some(file_server_end.into_channel()),
             ..Default::default()
