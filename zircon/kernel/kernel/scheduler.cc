@@ -1105,10 +1105,6 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     performance_scale_reciprocal_ = 1 / performance_scale_;
   }
 
-  // Always call to handle races between reschedule IPIs and changes to the run
-  // queue.
-  mp_prepare_current_cpu_idle_state(next_thread->IsIdle());
-
   if (next_thread->IsIdle()) {
     mp_set_cpu_idle(current_cpu);
   } else {

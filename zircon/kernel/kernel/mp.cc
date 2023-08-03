@@ -53,8 +53,6 @@ static void mp_sync_task(void* context);
 
 void mp_init() {}
 
-void mp_prepare_current_cpu_idle_state(bool idle) { arch_prepare_current_cpu_idle_state(idle); }
-
 void mp_reschedule(cpu_mask_t mask, uint flags) {
   DEBUG_ASSERT(arch_ints_disabled());
 

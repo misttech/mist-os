@@ -68,6 +68,10 @@ MwaitMonitorArray gMwaitMonitorArray;
 // used in a non-smp environment.
 MwaitMonitor gFakeMonitor;
 
+// For use with gMonitorArray.
+constexpr uint8_t kTargetStateNotIdle = 0;
+constexpr uint8_t kTargetStateIdle = 1;
+
 // Also set up a fake table of idle states.
 x86_idle_states_t fake_supported_idle_states = {
     .states = {X86_CSTATE_C1(0)},
@@ -316,8 +320,6 @@ int x86_apic_id_to_cpu_num(uint32_t apic_id) {
 }
 
 void arch_mp_reschedule(cpu_mask_t mask) {
-  thread_lock.AssertHeld();
-
   cpu_mask_t needs_ipi = 0;
   if (use_monitor) {
     while (mask) {
@@ -331,8 +333,9 @@ void arch_mp_reschedule(cpu_mask_t mask) {
       // cpu wakes up, the idle thread sees the cleared flag and preempts itself. Both of
       // these operations are under the scheduler lock, so there are no races where the
       // wrong signal can be sent.
-      const uint8_t old_val = percpu->monitor->Exchange(0);
-      if (!old_val) {
+      const uint8_t old_target_state = percpu->monitor->Exchange(kTargetStateNotIdle);
+      if (old_target_state != kTargetStateIdle) {
+        // CPU was not idle.  We'll need to send it an IPI.
         needs_ipi |= cpu_mask;
       }
       mask &= ~cpu_mask;
@@ -363,14 +366,6 @@ void arch_mp_reschedule(cpu_mask_t mask) {
   }
 }
 
-void arch_prepare_current_cpu_idle_state(bool idle) {
-  thread_lock.AssertHeld();
-
-  if (use_monitor) {
-    x86_get_percpu()->monitor->Write(idle ? 1 : 0);
-  }
-}
-
 __NO_RETURN int arch_idle_thread_routine(void*) {
   struct x86_percpu* percpu = x86_get_percpu();
   const cpu_mask_t local_reschedule_mask = cpu_num_to_mask(arch_curr_cpu_num());
@@ -378,9 +373,18 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
 
   if (use_monitor) {
     for (;;) {
-      AutoPreemptDisabler preempt_disabled;
       bool rsb_maybe_empty = false;
-      while (percpu->monitor->Read() && !preemption_state.preempts_pending()) {
+
+      // It's critical that the monitor only indidates this CPU is idle when
+      // this thread cannot be preempted.  If we are preempted while "showing
+      // idle", the signaling CPU may see we're idle, elide the IPI and result
+      // in a lost reschedule event.  Prior to re-enabling preemption
+      // (i.e. prior to destroying this RAII object), we must set the moniotor
+      // to "not idle".
+      AutoPreemptDisabler preempt_disabled;
+      percpu->monitor->Write(kTargetStateIdle);
+
+      while (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
         X86IdleState* next_state = percpu->idle_states->PickIdleState();
         rsb_maybe_empty |= x86_intel_idle_state_may_empty_rsb(next_state);
         ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
@@ -402,11 +406,10 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
         //
         arch_disable_ints();
         percpu->monitor->PrepareForWait();
-        if (percpu->monitor->Read() && !preemption_state.preempts_pending()) {
+        if (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
           auto start = current_time();
           x86_enable_ints_and_mwait(next_state->MwaitHint());
           auto duration = zx_time_sub_time(current_time(), start);
-
           percpu->idle_states->RecordDuration(duration);
           next_state->RecordDuration(duration);
           next_state->CountEntry();
@@ -414,6 +417,7 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
           arch_enable_ints();
         }
       }
+
       // Spectre V2: If we enter a deep sleep state, fill the RSB before RET-ing from this function.
       // (CVE-2017-5715, see Intel "Deep Dive: Retpoline: A Branch Target Injection Mitigation").
       if (x86_cpu_vulnerable_to_rsb_underflow() & rsb_maybe_empty) {
@@ -428,8 +432,13 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
       // because of an interrupt causing a thread to be assigned to this core.
       //
       // So, simply unconditionally force there to be a local preempt pending
-      // and let the APD destructor take care of things for us.
+      // and let the APD destructor take care of things for us.  We are about to
+      // re-enable preemption, it is critical that we update our state to
+      // Not-Idle to avoid the possibility of a lost reschedule event.  See the
+      // related comment earlier in this function where the
+      // |AutoPreemptDisabler| is constructed.
       preemption_state.preempts_pending_add(local_reschedule_mask);
+      percpu->monitor->Write(kTargetStateNotIdle);
     }
   } else {
     for (;;) {

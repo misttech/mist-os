@@ -31,7 +31,6 @@ typedef enum { MP_IPI_GENERIC, MP_IPI_RESCHEDULE, MP_IPI_INTERRUPT, MP_IPI_HALT 
 typedef enum { MP_IPI_TARGET_MASK, MP_IPI_TARGET_ALL, MP_IPI_TARGET_ALL_BUT_LOCAL } mp_ipi_target_t;
 
 void mp_init();
-void mp_prepare_current_cpu_idle_state(bool idle);
 
 // Trigger reschedules on other CPUs. Used mostly by inner threading
 // and scheduler logic.

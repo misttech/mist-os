@@ -76,10 +76,6 @@ static cpu_num_t arch_curr_cpu_num_slow() {
   return arm64_mpidr_to_cpu_num(mpidr);
 }
 
-void arch_prepare_current_cpu_idle_state(bool idle) {
-  // no-op
-}
-
 void arch_mp_reschedule(cpu_mask_t mask) {
   arch_mp_send_ipi(MP_IPI_TARGET_MASK, mask, MP_IPI_RESCHEDULE);
 }
