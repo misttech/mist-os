@@ -207,10 +207,10 @@ if __name__ == '__main__':
         description=
         'Copies files converted by fidlc via a flag-enabled mode back into the source tree.'
     )
-    parser.add_argument('--dry-run', dest='dryrun', action='store_true')
-    parser.add_argument('--no-dry-run', dest='dryrun', action='store_false')
+    parser.add_argument('--dry-run', dest='dryrun',
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.set_defaults(dryrun=True)
-    parser.add_argument('--rebuild', dest='rebuild', action='store_true')
-    parser.add_argument('--no-rebuild', dest='rebuild', action='store_false')
+    parser.add_argument('--rebuild', dest='rebuild',
+                        action=argparse.BooleanOptionalAction, default=False)
     parser.set_defaults(rebuild=True)
     main(parser.parse_args())

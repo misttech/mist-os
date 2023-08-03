@@ -60,14 +60,8 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--execute",
         default=True,
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         help="Execute the command and scan its outputs.",
-    )
-    parser.add_argument(
-        "--no-execute",
-        dest="execute",
-        action="store_false",
-        help="Run only pre-flight checks, and do not execute.",
     )
     # Positional args are the outputs of the command to scan.
     parser.add_argument(

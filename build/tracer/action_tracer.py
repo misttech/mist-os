@@ -684,12 +684,9 @@ def main_arg_parser() -> argparse.ArgumentParser:
         "--trace-output", required=True, help="Where to store the trace")
     parser.add_argument(
         "--keep-raw-trace",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="Whether to keep trace output after the checks are successful")
-    parser.add_argument(
-        "--no-keep-raw-trace", action="store_false", dest="keep_raw_trace")
-
     parser.add_argument(
         "--target-type",
         choices=["action", "action_foreach"],
@@ -714,33 +711,21 @@ def main_arg_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=[],
         help="Extra file-path prefix that should be ignored.")
-
-    # Want --foo (default:True) and --no-foo (False).
-    # This is ugly, trying to emulate argparse.BooleanOptionalAction,
-    # which isn't available until Python 3.9.
     parser.add_argument(
         "--check-access-permissions",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
         help="Check permissions on file reads and writes")
-    parser.add_argument(
-        "--no-check-access-permissions",
-        action="store_false",
-        dest="check_access_permissions")
 
     # This affects the set of files that are allowed to be written.
     # TODO(fangism): remove this flag entirely, disallowing writes to inputs
     parser.add_argument(
         "--writeable-depfile-inputs",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help=
         "Allow writes to inputs found in depfiles.  Only effective with --check-access-permissions."
     )
-    parser.add_argument(
-        "--no-writeable-depfile-inputs",
-        action="store_false",
-        dest="writeable_depfile_inputs")
 
     # TODO(fangism): This check is blocked on *.py being in the ignored set.
     parser.add_argument(
