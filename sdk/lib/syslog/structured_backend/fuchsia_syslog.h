@@ -46,21 +46,6 @@ static_assert(FUCHSIA_LOG_FATAL < FUCHSIA_LOG_NONE, "");
 // Additional storage for internal log state.
 #define FUCHSIA_SYSLOG_STATE_SIZE (15)
 
-// Printf key to use in printf arguments.
-// This only has special meaning when the following conditions
-// are met:
-// * No other KVP has been encoded other than a printf KVP
-// * BeginRecord was called with is_printf set to true
-// * A valid format string was passed to message
-// If an invalid format string is passed as the message
-// parameter, the log message will be considered invalid.
-// This may result in an error message being output
-// to the log destination, the failure to print the message
-// entirely, or the log message being interpreted as a
-// regular KVP message and rendered as such by the log
-// consumer.
-#define FUCHSIA_SYSLOG_PRINTF_KEY ""
-
 // Opaque structure representing the backend encode state.
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
@@ -82,8 +67,8 @@ typedef struct fuchsia_log_buffer {
 // THIS IS DEPRECATED! Please use syslog_begin_record_transitional instead.
 void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity severity,
                          const char* file_name, size_t file_name_length, unsigned int line,
-                         const char* message, size_t message_length, bool is_printf,
-                         zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
+                         const char* message, size_t message_length, zx_handle_t socket,
+                         uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
 // Initializes a LogBuffer
 // buffer -- The buffer to initialize
@@ -98,10 +83,6 @@ void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity
 // mutate of free the string until FlushRecord is called or the buffer is reset/discarded
 // with another call to BeginRecord.
 
-// is_printf -- Whether or not this is a printf message. If true,
-// the message should be interpreted as a C-style printf before being displayed to the
-// user.
-
 // socket -- The socket to write the message to.
 
 // dropped_count -- Number of dropped messages
@@ -112,7 +93,7 @@ void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity
 void syslog_begin_record_transitional(fuchsia_syslog_log_buffer_t* buffer,
                                       FuchsiaLogSeverity severity, const char* file_name,
                                       size_t file_name_length, unsigned int line,
-                                      const char* message, size_t message_length, bool is_printf,
+                                      const char* message, size_t message_length,
                                       zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid,
                                       zx_koid_t tid);
 

@@ -297,7 +297,7 @@ static cpp17::optional<cpp17::string_view> CStringToStringView(const char* str) 
 
 void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
                          const char* file_name, unsigned int line, const char* msg,
-                         const char* condition, bool is_printf, zx_handle_t socket) {
+                         const char* condition, zx_handle_t socket) {
   // Ensure we have log state
   GlobalStateLock log_state;
   // Optional so no allocation overhead
@@ -333,30 +333,21 @@ void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severit
     state->maybe_fatal_string = msg;
   }
   state->buffer.BeginRecord(severity, CStringToStringView(file_name), line,
-                            CStringToStringView(msg), is_printf, zx::unowned_socket(socket), 0, pid,
-                            tid);
+                            CStringToStringView(msg), zx::unowned_socket(socket), 0, pid, tid);
   for (size_t i = 0; i < log_state->tag_count(); i++) {
     state->buffer.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
   }
 }
 
-void BeginRecordPrintf(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                       const char* file_name, unsigned int line, const char* msg) {
-  BeginRecordInternal(buffer, severity, file_name, line, msg, nullptr, true /* is_printf */,
-                      ZX_HANDLE_INVALID);
-}
-
 void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file_name,
                  unsigned int line, const char* msg, const char* condition) {
-  BeginRecordInternal(buffer, severity, file_name, line, msg, condition, false /* is_printf */,
-                      ZX_HANDLE_INVALID);
+  BeginRecordInternal(buffer, severity, file_name, line, msg, condition, ZX_HANDLE_INVALID);
 }
 
 void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
                            const char* file_name, unsigned int line, const char* msg,
                            const char* condition, zx_handle_t socket) {
-  BeginRecordInternal(buffer, severity, file_name, line, msg, condition, false /* is_printf */,
-                      socket);
+  BeginRecordInternal(buffer, severity, file_name, line, msg, condition, socket);
 }
 
 void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value) {

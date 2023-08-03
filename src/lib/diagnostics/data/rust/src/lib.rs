@@ -595,10 +595,6 @@ pub struct LogsDataBuilder {
     args: BuilderArgs,
     /// List of KVPs from the user
     keys: Vec<Property<LogsField>>,
-    /// Printf format string
-    format: Option<String>,
-    /// Arguments for printf string
-    printf_args: Vec<String>,
 }
 
 /// Arguments used to create a new [`LogsDataBuilder`].
@@ -626,8 +622,6 @@ impl LogsDataBuilder {
             tags: vec![],
             tid: None,
             keys: vec![],
-            format: None,
-            printf_args: vec![],
         }
     }
 
@@ -710,20 +704,6 @@ impl LogsDataBuilder {
             let val = DiagnosticsHierarchy::new("keys", self.keys, vec![]);
             payload_fields.push(val);
         }
-        if let Some(format) = self.format {
-            let val = DiagnosticsHierarchy::new(
-                "printf".to_string(),
-                vec![
-                    LogsProperty::String(LogsField::Other("format".to_string()), format),
-                    LogsProperty::StringList(
-                        LogsField::Other("args".to_string()),
-                        self.printf_args,
-                    ),
-                ],
-                vec![],
-            );
-            payload_fields.push(val);
-        }
         let mut payload = LogsHierarchy::new("root", vec![], payload_fields);
         payload.sort();
         let mut ret = LogsData::for_logs(
@@ -753,14 +733,6 @@ impl LogsDataBuilder {
     #[must_use = "You must call build on your builder to consume its result"]
     pub fn set_message(mut self, msg: impl Into<String>) -> Self {
         self.msg = Some(msg.into());
-        self
-    }
-
-    /// Sets the printf format and arguments.
-    #[must_use = "You must call build on your builder to consume its result"]
-    pub fn set_format_printf(mut self, format: impl Into<String>, args: Vec<String>) -> Self {
-        self.format = Some(format.into());
-        self.printf_args = args;
         self
     }
 
@@ -844,33 +816,6 @@ impl Data<Logs> {
                 _ => None,
             })
         })
-    }
-
-    /// If the log has a printf format, returns an exclusive reference to format string.
-    pub fn payload_printf_format(&mut self) -> Option<&str> {
-        self.payload_printf().as_ref().and_then(|p| {
-            p.properties.iter().find_map(|property| match property {
-                LogsProperty::String(LogsField::Format, format) => Some(format.as_str()),
-                _ => None,
-            })
-        })
-    }
-
-    /// If the log has printf args, returns an exclusive reference to args.
-    pub fn payload_printf_args(&mut self) -> Option<&[String]> {
-        self.payload_printf().as_ref().and_then(|p| {
-            p.properties.iter().find_map(|property| match property {
-                LogsProperty::StringList(LogsField::Args, format) => Some(format.as_slice()),
-                _ => None,
-            })
-        })
-    }
-
-    /// If the log has printf payload, returns an exclusive reference to it.
-    pub fn payload_printf(&self) -> Option<&DiagnosticsHierarchy<LogsField>> {
-        self.payload
-            .as_ref()
-            .and_then(|p| p.children.iter().find(|property| property.name.as_str() == "printf"))
     }
 
     /// If the log has message, returns an exclusive reference to it.
@@ -1357,8 +1302,6 @@ pub enum LogsField {
     MsgStructured,
     FilePath,
     LineNumber,
-    Args,
-    Format,
     Other(String),
 }
 
@@ -1374,8 +1317,6 @@ impl fmt::Display for LogsField {
             LogsField::MsgStructured => write!(f, "value"),
             LogsField::FilePath => write!(f, "file_path"),
             LogsField::LineNumber => write!(f, "line_number"),
-            LogsField::Args => write!(f, "args"),
-            LogsField::Format => write!(f, "format"),
             LogsField::Other(name) => write!(f, "{}", name),
         }
     }
@@ -1395,10 +1336,6 @@ pub const TAG_LABEL: &str = "tag";
 pub const MESSAGE_LABEL_STRUCTURED: &str = "value";
 /// The label for the message in the log payload.
 pub const MESSAGE_LABEL: &str = "message";
-/// The label for the format of a printf log in the log payload.
-pub const FORMAT_LABEL: &str = "format";
-/// The label for the args of a printf log in the log payload.
-pub const ARGS_LABEL: &str = "args";
 /// The label for the verbosity of a log.
 pub const VERBOSITY_LABEL: &str = "verbosity";
 /// The label for the file associated with a log line.
@@ -1433,8 +1370,6 @@ impl AsRef<str> for LogsField {
             Self::FilePath => FILE_PATH_LABEL,
             Self::LineNumber => LINE_NUMBER_LABEL,
             Self::MsgStructured => MESSAGE_LABEL_STRUCTURED,
-            Self::Args => ARGS_LABEL,
-            Self::Format => FORMAT_LABEL,
             Self::Other(str) => str.as_str(),
         }
     }
@@ -1456,8 +1391,6 @@ where
             FILE_PATH_LABEL => Self::FilePath,
             LINE_NUMBER_LABEL => Self::LineNumber,
             MESSAGE_LABEL_STRUCTURED => Self::MsgStructured,
-            FORMAT_LABEL => Self::Format,
-            ARGS_LABEL => Self::Args,
             _ => Self::Other(s.to_string()),
         }
     }
@@ -1673,60 +1606,6 @@ mod tests {
                   },
                   "message":{
                       "value":"app"
-                  }
-              }
-          },
-          "metadata": {
-            "errors": [],
-            "component_url": "url",
-              "errors": [{"dropped_logs":{"count":2}}],
-              "file": "test file.cc",
-              "line": 420,
-              "pid": 1001,
-              "severity": "INFO",
-              "tags": ["You're", "IT!"],
-              "tid": 200,
-
-            "timestamp": 0,
-          }
-        });
-        let result_json =
-            serde_json::to_value(&builder.build()).expect("serialization should succeed.");
-        pretty_assertions::assert_eq!(result_json, expected_json, "golden diff failed.");
-    }
-
-    #[fuchsia::test]
-    fn printf_test() {
-        let builder = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
-            moniker: String::from("moniker"),
-            severity: Severity::Info,
-            timestamp_nanos: 0.into(),
-        })
-        .set_format_printf("app", vec!["some".to_string(), "arg".to_string()])
-        .set_file("test file.cc")
-        .set_line(420)
-        .set_pid(1001)
-        .set_tid(200)
-        .set_dropped(2)
-        .add_tag("You're")
-        .add_tag("IT!")
-        .add_key(LogsProperty::String(LogsField::Other("key".to_string()), "value".to_string()));
-        let expected_json = json!({
-          "moniker": "moniker",
-          "version": 1,
-          "data_source": "Logs",
-          "payload": {
-              "root":
-              {
-                  "keys":{
-                      "key":"value"
-                  },
-                  "printf":{
-                    "args":["some", "arg"],
-                    "format":"app"
-                  },
-                  "message":{
                   }
               }
           },
@@ -2096,26 +1975,6 @@ mod tests {
         .build();
 
         assert_eq!("[00012.345678][123][456][moniker] INFO: some message", format!("{}", data))
-    }
-
-    #[fuchsia::test]
-    fn display_for_logs_with_args_no_printf() {
-        let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
-            severity: Severity::Info,
-        })
-        .set_pid(123)
-        .set_tid(456)
-        .set_message("some message".to_string())
-        .add_key(LogsProperty::String(LogsField::Other("args".to_string()), "value".to_string()))
-        .build();
-
-        assert_eq!(
-            "[00012.345678][123][456][moniker] INFO: some message args=value",
-            format!("{}", data)
-        )
     }
 
     #[fuchsia::test]

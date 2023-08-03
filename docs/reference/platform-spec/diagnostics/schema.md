@@ -176,9 +176,6 @@ The logs payload is an object with the following fields:
 - Message: Contains a log message. This is an object with one field:
   - Value: String representing the log message.
 - Keys: Contains an object with the keys and associated values for structured log messages.
-- Printf: Contains printf format data. This is an object with two fields:
-  - Format: The format passed to printf.
-  - Args: A list of arguments passed to printf.
 
 For a regular text log (or a structured log without keys), this would look as follows in JSON:
 
@@ -206,20 +203,6 @@ For a structured log with keys, this would look as follows in JSON:
             "foo": 3,
             "bar": "baz",
             ...
-        }
-    }
-}
-```
-
-For a printf log, this would look as follows in JSON:
-
-```json
-{
-    ...
-    "payload": {
-        "printf": {
-            "format": "my log %s",
-            "args": ["foo"]
         }
     }
 }

@@ -46,8 +46,8 @@ class LogBuffer final {
                    const zx::unowned_socket& socket, uint32_t dropped_count, zx_koid_t pid,
                    zx_koid_t tid) {
     syslog_begin_record(&data_, severity, StringViewToCStr(file_name), StringViewLength(file_name),
-                        line, StringViewToCStr(message), StringViewLength(message), false,
-                        socket->get(), dropped_count, pid, tid);
+                        line, StringViewToCStr(message), StringViewLength(message), socket->get(),
+                        dropped_count, pid, tid);
   }
 
   // Initializes a LogBuffer
@@ -75,8 +75,8 @@ class LogBuffer final {
                    zx_koid_t tid) {
     syslog_begin_record_transitional(&data_, severity, StringViewToCStr(file_name),
                                      StringViewLength(file_name), line, StringViewToCStr(message),
-                                     StringViewLength(message), is_printf, socket->get(),
-                                     dropped_count, pid, tid);
+                                     StringViewLength(message), socket->get(), dropped_count, pid,
+                                     tid);
   }
 
   // Writes a key/value pair to the buffer.

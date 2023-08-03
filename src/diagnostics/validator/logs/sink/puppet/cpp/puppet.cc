@@ -13,11 +13,6 @@
 #include "lib/syslog/cpp/log_settings.h"
 #include "lib/syslog/cpp/logging_backend.h"
 
-namespace syslog_backend {
-void BeginRecordPrintf(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                       const char* file_name, unsigned int line, const char* msg);
-}
-
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   zx_status_t status =
@@ -55,18 +50,6 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
-    EmitLog(spec, nullptr);
-    callback();
-  }
-
-  void EmitPrintfLog(fuchsia::validate::logs::PrintfRecordSpec printf_spec,
-                     EmitPrintfLogCallback callback) override {
-    EmitLog(printf_spec.record, &printf_spec);
-    callback();
-  }
-
-  static void EmitLog(fuchsia::validate::logs::RecordSpec& spec,
-                      fuchsia::validate::logs::PrintfRecordSpec* printf_spec) {
     syslog_backend::LogBuffer buffer;
     fuchsia_logging::LogSeverity severity;
     switch (spec.record.severity) {
@@ -89,33 +72,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
         severity = fuchsia_logging::LOG_WARNING;
         break;
     }
-    if (printf_spec) {
-      syslog_backend::BeginRecordPrintf(&buffer, severity, spec.file.data(), spec.line,
-                                        printf_spec->msg.data());
-      for (auto& arg : printf_spec->printf_arguments) {
-        switch (arg.Which()) {
-          case fuchsia::validate::logs::PrintfValue::kFloatValue:
-            syslog_backend::WriteKeyValue(&buffer, "", arg.float_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kIntegerValue:
-            syslog_backend::WriteKeyValue(&buffer, "", arg.integer_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kUnsignedIntegerValue:
-            syslog_backend::WriteKeyValue(&buffer, "", arg.unsigned_integer_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kStringValue:
-            syslog_backend::WriteKeyValue(&buffer, "", arg.string_value().data());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kBooleanValue:
-            syslog_backend::WriteKeyValue(&buffer, "", arg.boolean_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::Invalid:
-            break;
-        }
-      }
-    } else {
-      syslog_backend::BeginRecord(&buffer, severity, spec.file.data(), spec.line, nullptr, nullptr);
-    }
+    syslog_backend::BeginRecord(&buffer, severity, spec.file.data(), spec.line, nullptr, nullptr);
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
         case fuchsia::diagnostics::stream::Value::kUnknown:
@@ -139,6 +96,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
       }
     }
     syslog_backend::FlushRecord(&buffer);
+    callback();
   }
 
  private:

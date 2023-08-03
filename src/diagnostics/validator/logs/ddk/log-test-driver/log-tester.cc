@@ -46,11 +46,6 @@ void LogTester::DdkInit(ddk::InitTxn txn) {
   return txn.Reply(ZX_OK);
 }
 
-void LogTester::EmitPrintfLog(EmitPrintfLogRequestView request,
-                              EmitPrintfLogCompleter::Sync& completer) {
-  completer.Reply();
-}
-
 void LogTester::StopInterestListener(StopInterestListenerCompleter::Sync& completer) {
   completer.Reply();
 }

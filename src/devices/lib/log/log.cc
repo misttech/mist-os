@@ -89,8 +89,7 @@ void Logger::VLogWrite(FuchsiaLogSeverity severity, const char* tag, const char*
 void Logger::BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
                          cpp17::optional<cpp17::string_view> file_name, unsigned int line,
                          cpp17::optional<cpp17::string_view> msg) const {
-  buffer.BeginRecord(severity, file_name, line, msg, false, socket_.borrow(), 0, pid_,
-                     GetCurrentThread());
+  buffer.BeginRecord(severity, file_name, line, msg, socket_.borrow(), 0, pid_, GetCurrentThread());
 }
 
 void Logger::FlushRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity) const {

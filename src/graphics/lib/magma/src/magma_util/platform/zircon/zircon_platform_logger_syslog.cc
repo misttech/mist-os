@@ -98,7 +98,7 @@ void PlatformLogger::LogVa(LogLevel level, const char* file, int line, const cha
   uint64_t tid = PlatformThreadId().id();
   uint64_t pid = PlatformProcessHelper::GetCurrentProcessId();
   log_buffer.BeginRecord(get_severity(level), file, line, fmt_string,
-                         /*is_printf*/ false, zx::unowned_socket(log_socket), 0, pid, tid);
+                         zx::unowned_socket(log_socket), 0, pid, tid);
   log_buffer.WriteKeyValue("tag", "magma");
   log_buffer.FlushRecord();
 }

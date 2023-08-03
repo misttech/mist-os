@@ -54,14 +54,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   void BeginRecord(fuchsia_syslog::LogBuffer* buffer, FuchsiaLogSeverity severity,
                    cpp17::optional<cpp17::string_view> file_name, unsigned int line,
                    cpp17::optional<cpp17::string_view> msg) {
-    buffer->BeginRecord(severity, file_name, line, msg, false, socket_.borrow(), 0,
-                        GetKoid(zx_process_self()), GetKoid(zx_thread_self()));
-  }
-
-  void BeginRecordPrintf(fuchsia_syslog::LogBuffer* buffer, FuchsiaLogSeverity severity,
-                         cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                         cpp17::optional<cpp17::string_view> msg) {
-    buffer->BeginRecord(severity, file_name, line, msg, true, socket_.borrow(), 0,
+    buffer->BeginRecord(severity, file_name, line, msg, socket_.borrow(), 0,
                         GetKoid(zx_process_self()), GetKoid(zx_thread_self()));
   }
 
@@ -131,18 +124,6 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
-    EmitLog(spec, nullptr);
-    callback();
-  }
-
-  void EmitPrintfLog(fuchsia::validate::logs::PrintfRecordSpec printf_spec,
-                     EmitPrintfLogCallback callback) override {
-    EmitLog(printf_spec.record, &printf_spec);
-    callback();
-  }
-
-  void EmitLog(fuchsia::validate::logs::RecordSpec& spec,
-               fuchsia::validate::logs::PrintfRecordSpec* printf_spec) {
     fuchsia_syslog::LogBuffer buffer;
     FuchsiaLogSeverity severity;
     switch (spec.record.severity) {
@@ -165,32 +146,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
         severity = FUCHSIA_LOG_WARNING;
         break;
     }
-    if (printf_spec) {
-      BeginRecordPrintf(&buffer, severity, spec.file.data(), spec.line, printf_spec->msg.data());
-      for (auto& arg : printf_spec->printf_arguments) {
-        switch (arg.Which()) {
-          case fuchsia::validate::logs::PrintfValue::kFloatValue:
-            buffer.WriteKeyValue("", arg.float_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kIntegerValue:
-            buffer.WriteKeyValue("", arg.integer_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kUnsignedIntegerValue:
-            buffer.WriteKeyValue("", arg.unsigned_integer_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kStringValue:
-            buffer.WriteKeyValue("", arg.string_value().data());
-            break;
-          case fuchsia::validate::logs::PrintfValue::kBooleanValue:
-            buffer.WriteKeyValue("", arg.boolean_value());
-            break;
-          case fuchsia::validate::logs::PrintfValue::Invalid:
-            break;
-        }
-      }
-    } else {
-      BeginRecord(&buffer, severity, spec.file.data(), spec.line, std::nullopt /* message */);
-    }
+    BeginRecord(&buffer, severity, spec.file.data(), spec.line, std::nullopt /* message */);
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
         case fuchsia::diagnostics::stream::Value::kUnknown:
@@ -216,6 +172,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
     if (severity >= min_log_level_) {
       buffer.FlushRecord();
     }
+    callback();
   }
 
  private:

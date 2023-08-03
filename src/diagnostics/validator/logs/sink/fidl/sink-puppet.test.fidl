@@ -16,24 +16,10 @@ type PuppetInfo = struct {
     tid zx.Koid;
 };
 
-type PrintfValue = strict union {
-    1: unsigned_integer_value uint64;
-    2: string_value string;
-    3: float_value float64;
-    4: integer_value int64;
-    5: boolean_value bool;
-};
-
 type RecordSpec = struct {
     file string:MAX_ARG_NAME_LENGTH;
     line uint32;
     record fuchsia.diagnostics.stream.Record;
-};
-
-type PrintfRecordSpec = struct {
-    record RecordSpec;
-    printf_arguments vector<PrintfValue>:MAX;
-    msg string:MAX_ARG_NAME_LENGTH;
 };
 
 @discoverable
@@ -46,11 +32,6 @@ closed protocol LogSinkPuppet {
     /// Logs a record.
     strict EmitLog(struct {
         spec RecordSpec;
-    }) -> ();
-
-    /// Logs a printf record.
-    strict EmitPrintfLog(struct {
-        spec PrintfRecordSpec;
     }) -> ();
 
     /// Disables the interest listener

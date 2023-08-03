@@ -123,8 +123,7 @@ struct LogValue {
               const char* condition) const {
     EncoderState state;
     uint32_t dropped = logger.GetAndResetDropped();
-    logger.BeginRecord(state.buffer, severity, FromCString(file), line, FromCString(msg), false,
-                       dropped);
+    logger.BeginRecord(state.buffer, severity, FromCString(file), line, FromCString(msg), dropped);
     // https://bugs.llvm.org/show_bug.cgi?id=41093 -- Clang loses constexpr
     // even though this should be constexpr here.
     state.Encode<0, sizeof...(KeyValuePairs)>(kvps);
