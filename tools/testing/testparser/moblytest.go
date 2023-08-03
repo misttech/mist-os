@@ -28,11 +28,14 @@ const (
 var moblyTestPreamblePattern = regexp.MustCompile(moblyTestPreamblePatternStr)
 
 type moblyTestCase struct {
-	BeginTimeMillis int    `yaml:"Begin Time,omitempty"`
-	EndTimeMillis   int    `yaml:"End Time,omitempty"`
-	Result          string `yaml:"Result,omitempty"`
-	TestClass       string `yaml:"Test Class,omitempty"`
-	TestName        string `yaml:"Test Name,omitempty"`
+	BeginTimeMillis int `yaml:"Begin Time,omitempty"`
+	// Description of the cause for test case termination.
+	// This is set to empty string for passed test cases.
+	Details       string `yaml:"Details,omitempty"`
+	EndTimeMillis int    `yaml:"End Time,omitempty"`
+	Result        string `yaml:"Result,omitempty"`
+	TestClass     string `yaml:"Test Class,omitempty"`
+	TestName      string `yaml:"Test Name,omitempty"`
 	// Type describes the Mobly YAML document entry type which is in the set of
 	// (Record, TestNameList, Summary, ControllerInfo, UserData)
 	Type string `yaml:"Type,omitempty"`
@@ -86,6 +89,7 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 
 		res = append(res, runtests.TestCaseResult{
 			DisplayName: fmt.Sprintf("%s.%s", tc.TestClass, tc.TestName),
+			FailReason:  tc.Details,
 			SuiteName:   tc.TestClass,
 			CaseName:    tc.TestName,
 			Status:      status,

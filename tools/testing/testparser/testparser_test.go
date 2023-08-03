@@ -1352,7 +1352,9 @@ Type: Record
 UID: null
 ---
 Begin Time: 1668122321143
-Details: null
+Details: 'Some multi-line error:
+    line-1,
+    line-2'
 End Time: 1668122321149
 Extra Errors: {}
 Extras: null
@@ -1379,6 +1381,7 @@ Type: Summary
 	want := []runtests.TestCaseResult{
 		{
 			DisplayName: "GreetingsTest.test_goodbye",
+			FailReason:  "",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_goodbye",
 			Status:      runtests.TestSuccess,
@@ -1387,6 +1390,7 @@ Type: Summary
 		},
 		{
 			DisplayName: "GreetingsTest.test_hello",
+			FailReason:  "",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_hello",
 			Status:      runtests.TestFailure,
@@ -1395,6 +1399,7 @@ Type: Summary
 		},
 		{
 			DisplayName: "GreetingsTest.test_skipped",
+			FailReason:  "",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_skipped",
 			Status:      runtests.TestSkipped,
@@ -1403,6 +1408,7 @@ Type: Summary
 		},
 		{
 			DisplayName: "GreetingsTest.test_error",
+			FailReason:  "Some multi-line error: line-1, line-2",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_error",
 			Status:      runtests.TestCrashed,
