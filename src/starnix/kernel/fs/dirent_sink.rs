@@ -94,9 +94,6 @@ pub trait DirentSink {
     /// The current offset to return.
     fn offset(&self) -> off_t;
 
-    /// The number of bytes which have been written into the sink.
-    fn actual(&self) -> usize;
-
     /// Optional information about the max number of bytes to send to the user.
     fn user_capacity(&self) -> Option<usize> {
         None
@@ -127,6 +124,24 @@ impl<'a> BaseDirentSink<'a> {
     fn offset(&self) -> off_t {
         *self.offset
     }
+
+    // Converts result value received from `add()` to `getdents()` result.
+    //
+    // `add()` may return `ENOSPC` if there was not enough space in the buffer for the new entry.
+    // This error should be returned to the caller only if we didn't have space for the first
+    // directory entry.
+    //
+    // We use `ENOSPC` rather than `EINVAL` to signal this condition because `EINVAL` is a very
+    // generic error. We only want to perform this transformation in exactly the case where there
+    // was not sufficient space in the DirentSink.
+    fn map_result_with_actual(&self, result: Result<(), Errno>) -> Result<usize, Errno> {
+        match result {
+            Ok(()) => Ok(self.actual),
+            Err(errno) if errno == ENOSPC && self.actual > 0 => Ok(self.actual),
+            Err(errno) if errno == ENOSPC => error!(EINVAL),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 pub struct DirentSink64<'a> {
@@ -143,6 +158,10 @@ impl<'a> DirentSink64<'a> {
         Self {
             base: BaseDirentSink { current_task, offset, user_buffer, user_capacity, actual: 0 },
         }
+    }
+
+    pub fn map_result_with_actual(&self, result: Result<(), Errno>) -> Result<usize, Errno> {
+        self.base.map_result_with_actual(result)
     }
 }
 
@@ -176,10 +195,6 @@ impl DirentSink for DirentSink64<'_> {
         self.base.offset()
     }
 
-    fn actual(&self) -> usize {
-        self.base.actual
-    }
-
     fn user_capacity(&self) -> Option<usize> {
         Some(self.base.user_capacity)
     }
@@ -200,6 +215,11 @@ impl<'a> DirentSink32<'a> {
         Self {
             base: BaseDirentSink { current_task, offset, user_buffer, user_capacity, actual: 0 },
         }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub fn map_result_with_actual(&self, result: Result<(), Errno>) -> Result<usize, Errno> {
+        self.base.map_result_with_actual(result)
     }
 }
 
@@ -231,10 +251,6 @@ impl DirentSink for DirentSink32<'_> {
 
     fn offset(&self) -> off_t {
         self.base.offset()
-    }
-
-    fn actual(&self) -> usize {
-        self.base.actual
     }
 
     fn user_capacity(&self) -> Option<usize> {

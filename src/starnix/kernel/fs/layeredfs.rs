@@ -133,9 +133,6 @@ impl FileOps for LayeredFsRootNodeOps {
             fn offset(&self) -> off_t {
                 *self.offset
             }
-            fn actual(&self) -> usize {
-                self.sink.actual()
-            }
         }
 
         let mut root_file_offset = self.root_file.offset.lock();
@@ -170,9 +167,6 @@ mod test {
             }
             fn offset(&self) -> off_t {
                 self.offset
-            }
-            fn actual(&self) -> usize {
-                self.offset as usize
             }
         }
         let mut sink = DirentNameCapturer { names: vec![], offset: 0 };

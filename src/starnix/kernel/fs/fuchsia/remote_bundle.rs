@@ -437,10 +437,6 @@ mod test {
             fn offset(&self) -> off_t {
                 self.offset
             }
-
-            fn actual(&self) -> usize {
-                0
-            }
         }
 
         let mut sink = Sink { offset: 0, entries: HashMap::new() };

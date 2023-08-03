@@ -156,9 +156,6 @@ impl StarnixNodeConnection {
             fn offset(&self) -> off_t {
                 *self.offset
             }
-            fn actual(&self) -> usize {
-                0
-            }
         }
         let offset = match pos {
             directory::traversal_position::TraversalPosition::Start => 0,

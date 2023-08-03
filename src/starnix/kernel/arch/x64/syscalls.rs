@@ -13,7 +13,7 @@ use crate::{
             sys_newfstatat, sys_openat, sys_pipe2, sys_readlinkat, sys_renameat2, sys_symlinkat,
             sys_unlinkat,
         },
-        DirentSink, DirentSink32, FdNumber,
+        DirentSink32, FdNumber,
     },
     mm::MemoryAccessorExt,
     signals::syscalls::sys_signalfd4,
@@ -176,8 +176,8 @@ pub fn sys_getdents(
     let file = current_task.files.get(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink32::new(current_task, &mut offset, user_buffer, user_capacity);
-    file.readdir(current_task, &mut sink)?;
-    Ok(sink.actual())
+    let result = file.readdir(current_task, &mut sink);
+    sink.map_result_with_actual(result)
 }
 
 pub fn sys_getpgrp(current_task: &CurrentTask) -> Result<pid_t, Errno> {

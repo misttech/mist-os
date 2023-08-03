@@ -573,8 +573,8 @@ pub fn sys_getdents64(
     let file = current_task.files.get(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink64::new(current_task, &mut offset, user_buffer, user_capacity);
-    file.readdir(current_task, &mut sink)?;
-    Ok(sink.actual())
+    let result = file.readdir(current_task, &mut sink);
+    sink.map_result_with_actual(result)
 }
 
 pub fn sys_chroot(current_task: &CurrentTask, user_path: UserCString) -> Result<(), Errno> {
