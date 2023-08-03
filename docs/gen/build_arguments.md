@@ -2719,7 +2719,7 @@ From //build/config/compiler.gni:66
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:57
+From //build/product.gni:51
 
 ### emu_window_size_width
 
@@ -2727,7 +2727,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:56
+From //build/product.gni:50
 
 ### enable_api_diff
 
@@ -3343,17 +3343,6 @@ TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to bui
 **Current value (from the default):** `true`
 
 From //build/product.gni:38
-
-### fuchsia_filesystem_config
-
-The filesystem config to pass to product assembly.
-This should point to a generated_images_config() target.
-TODO(b/292181325): Delete this once the filesystems configs are moved into
-the product assembly config.
-
-**Current value (from the default):** `false`
-
-From //build/product.gni:47
 
 ### fuchsia_product_assembly_config_label
 
@@ -4450,6 +4439,17 @@ From //BUILD.gn:85
 **Current value (from the default):** `[]`
 
 From //BUILD.gn:65
+
+### llvm_prefix
+
+This directory contains the cipd packages for linux-x64, linux-arm64, and
+mac-x64. Rather than using the prebuilts provided with the source tree, you
+can download these individual packages from cipd and set this to the directory
+containing those packages.
+
+**Current value (from the default):** `"//prebuilt/third_party/llvm"`
+
+From //src/lib/llvm/BUILD.gn:10
 
 ### local_bench
 
@@ -7805,6 +7805,22 @@ Whether or not tracing is disabled globally.
 
 From //src/starnix/kernel/BUILD.gn:16
 
+### starnix_use_fuchsia_mutex
+
+Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:19
+
+### starnix_use_fuchsia_rwlock
+
+Wheher to use fuchsia_sync::RwLock instead of parking_lot::RwLock.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:22
+
 ### target_cpu
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
@@ -8585,7 +8601,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:53
+From //build/product.gni:47
 
 ### vm_tracing_level
 
