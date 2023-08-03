@@ -3351,19 +3351,7 @@ This should point to a generated_images_config() target.
 TODO(b/292181325): Delete this once the filesystems configs are moved into
 the product assembly config.
 
-**Current value for `target_cpu = "arm64"`:** `"//boards/images:default"`
-
-From //products/bringup.gni:27
-
-**Overridden from the default:** `false`
-
-From //build/product.gni:47
-
-**Current value for `target_cpu = "x64"`:** `"//boards/images:default"`
-
-From //products/bringup.gni:27
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/product.gni:47
 
@@ -5917,7 +5905,7 @@ https://pip.pypa.io/en/stable/cli/pip/#general-options
 
 **Current value (from the default):** `["--disable-pip-version-check"]`
 
-From //third_party/pigweed/src/pw_build/python_gn_args.gni:50
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:51
 
 ### pw_build_PYTHON_PIP_DOWNLOAD_ALL_PLATFORMS
 
@@ -5942,16 +5930,17 @@ From //third_party/pigweed/src/pw_build/python_gn_args.gni:41
 
 List of paths to folders containing Python wheels (*.whl) or source tar
 files (*.tar.gz). Pip will check each of these directories when looking for
-potential install candidates.
+potential install candidates. Each path will be passed to all 'pip install'
+commands as '--find-links PATH'.
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_build/python_gn_args.gni:46
+From //third_party/pigweed/src/pw_build/python_gn_args.gni:47
 
 ### pw_build_PYTHON_PIP_INSTALL_OFFLINE
 
 Adds --no-index forcing pip to not reach out to the internet (pypi.org) to
-download packages. Using this opiton requires setting
+download packages. Using this option requires setting
 pw_build_PYTHON_PIP_INSTALL_FIND_LINKS as well.
 
 **Current value (from the default):** `false`
