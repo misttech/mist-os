@@ -56,13 +56,14 @@ pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, RawTracingMutex, T>;
 #[cfg(any(test, debug_assertions))]
 pub type MappedMutexGuard<'a, T> = lock_api::MappedMutexGuard<'a, RawTracingMutex, T>;
 
-// TODO(fxbug.dev/88603): Switch RWLocks to fuchsia_sync as well once fuchsia_sync offers RWLocks.
 #[cfg(any(test, debug_assertions))]
-pub type RwLock<T> = tracing_mutex::parkinglot::TracingRwLock<T>;
+type RawTracingRwLock = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncRwLock>;
 #[cfg(any(test, debug_assertions))]
-pub type RwLockReadGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockReadGuard<'a, T>;
+pub type RwLock<T> = lock_api::RwLock<RawTracingRwLock, T>;
 #[cfg(any(test, debug_assertions))]
-pub type RwLockWriteGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockWriteGuard<'a, T>;
+pub type RwLockReadGuard<'a, T> = lock_api::RwLockReadGuard<'a, RawTracingRwLock, T>;
+#[cfg(any(test, debug_assertions))]
+pub type RwLockWriteGuard<'a, T> = lock_api::RwLockWriteGuard<'a, RawTracingRwLock, T>;
 
 /// Lock `m1` and `m2` in a consistent order (using the memory address of m1 and m2 and returns the
 /// associated guard. This ensure that `ordered_lock(m1, m2)` and `ordered_lock(m2, m1)` will not
