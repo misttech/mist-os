@@ -54,6 +54,7 @@ source_set("macros") {
   sources = [
     "dlog.h",
     "macros.h",
+    "utils.h",
   ]
 }
 

@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
+#include "magma_util/utils.h"
 #include "platform_bus_mapper.h"
 
 class TestPlatformBusMapperCases {

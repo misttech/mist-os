@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "magma_util/short_macros.h"
+#include "magma_util/utils.h"
 #include "platform_buffer.h"
 
 // Some tests don't support ASAN

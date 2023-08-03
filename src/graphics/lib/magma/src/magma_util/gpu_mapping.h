@@ -13,6 +13,7 @@
 #include <magma_util/macros.h>
 
 #include "accessor.h"
+#include "magma_util/utils.h"
 
 namespace magma {
 

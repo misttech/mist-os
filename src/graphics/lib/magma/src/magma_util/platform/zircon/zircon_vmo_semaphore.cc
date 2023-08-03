@@ -7,6 +7,7 @@
 #include <lib/zx/time.h>
 
 #include "magma_util/short_macros.h"
+#include "magma_util/utils.h"
 #include "platform_object.h"
 #include "zircon_platform_port.h"
 

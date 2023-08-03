@@ -8,6 +8,7 @@
 
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
+#include "magma_util/utils.h"
 #include "zircon/syscalls/port.h"
 
 namespace magma {

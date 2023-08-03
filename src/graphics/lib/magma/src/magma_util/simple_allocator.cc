@@ -12,6 +12,7 @@
 
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
+#include "magma_util/utils.h"
 
 namespace magma {
 

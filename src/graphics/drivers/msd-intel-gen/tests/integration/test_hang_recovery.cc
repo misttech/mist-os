@@ -18,6 +18,7 @@
 #include "magma_intel_gen_defs.h"
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
+#include "magma_util/utils.h"
 
 namespace {
 

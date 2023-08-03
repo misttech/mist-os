@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "magma_util/dlog.h"
+#include "magma_util/utils.h"
 #include "platform_connection_client.h"
 #include "zircon_platform_handle.h"
 #include "zircon_platform_status.h"

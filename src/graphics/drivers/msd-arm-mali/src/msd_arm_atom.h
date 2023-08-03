@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "magma_util/utils.h"
 #include "platform_semaphore.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"

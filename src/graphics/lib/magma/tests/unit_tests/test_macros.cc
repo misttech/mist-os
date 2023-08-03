@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "magma_util/short_macros.h"
+#include "magma_util/utils.h"
 
 TEST(MagmaUtil, GetPow2) {
   uint64_t pow2;

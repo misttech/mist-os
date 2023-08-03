@@ -4,6 +4,8 @@
 
 #include "mali_utils.h"
 
+#include "magma_util/utils.h"
+
 namespace mali_utils {
 
 bool AtomHelper::InitJobBuffer(magma_buffer_t buffer, JobBufferType type, uint64_t size,

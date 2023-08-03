@@ -16,6 +16,7 @@
 #include <magma_util/status.h>
 
 #include "accessor.h"
+#include "magma_util/utils.h"
 
 namespace magma {
 

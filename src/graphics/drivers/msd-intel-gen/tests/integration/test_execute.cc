@@ -12,6 +12,7 @@
 #include "helper/inflight_list.h"
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
+#include "magma_util/utils.h"
 
 namespace {
 

@@ -10,6 +10,7 @@
 #include <magma_util/instruction_writer.h>
 #include <magma_util/short_macros.h>
 
+#include "magma_util/utils.h"
 #include "types.h"
 
 // from intel-gfx-prm-osrc-bdw-vol02a-commandreference-instructions_2.pdf pp.870
