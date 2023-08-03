@@ -235,6 +235,7 @@ gvisor_tests_run_as_root = [
 ]
 
 gvisor_tests_custom_manifest = [
+  "cgroup_test",
   "exec_test",
   "futex_test",
   "setgid_test",
