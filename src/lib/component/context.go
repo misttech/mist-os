@@ -9,13 +9,11 @@ package component
 import (
 	"context"
 	"fmt"
-	"sync"
 	"syscall/zx"
 	"syscall/zx/fdio"
 	"syscall/zx/fidl"
 
 	"fidl/fuchsia/io"
-	"fidl/fuchsia/sys"
 )
 
 // #include "zircon/process.h"
@@ -84,15 +82,8 @@ func (od OutDirectory) AddService(name string, addFn func(context.Context, zx.Ch
 }
 
 type Context struct {
-	connector   Connector
-	environment struct {
-		sync.Once
-		*sys.EnvironmentWithCtxInterface
-	}
-	launcher struct {
-		sync.Once
-		*sys.LauncherWithCtxInterface
-	}
+	connector Connector
+
 	// OutgoingService is the directory served on the startup directory request.
 	//
 	// OutgoingService is cleared when BindStartupHandle is called to prevent further mutation which
@@ -163,30 +154,6 @@ func (c *Context) BindStartupHandle(ctx fidl.Context) {
 
 func (c *Context) Connector() *Connector {
 	return &c.connector
-}
-
-func (c *Context) Environment() *sys.EnvironmentWithCtxInterface {
-	c.environment.Do(func() {
-		r, p, err := sys.NewEnvironmentWithCtxInterfaceRequest()
-		if err != nil {
-			panic(err)
-		}
-		c.environment.EnvironmentWithCtxInterface = p
-		c.ConnectToEnvService(r)
-	})
-	return c.environment.EnvironmentWithCtxInterface
-}
-
-func (c *Context) Launcher() *sys.LauncherWithCtxInterface {
-	c.launcher.Do(func() {
-		r, p, err := sys.NewLauncherWithCtxInterfaceRequest()
-		if err != nil {
-			panic(err)
-		}
-		c.launcher.LauncherWithCtxInterface = p
-		c.ConnectToEnvService(r)
-	})
-	return c.launcher.LauncherWithCtxInterface
 }
 
 func (c *Context) ConnectToEnvService(r fidl.ServiceRequest) {
