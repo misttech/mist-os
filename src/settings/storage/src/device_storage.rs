@@ -6,7 +6,7 @@ use crate::stash_logger::StashInspectLogger;
 use crate::UpdateState;
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_stash::{StoreAccessorProxy, Value};
-use fuchsia_async::{Task, Timer, WakeupTime};
+use fuchsia_async::{Duration, Task, Time, Timer};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::OptionFuture;
 use futures::lock::{Mutex, MutexGuard};
@@ -17,14 +17,13 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 const SETTINGS_PREFIX: &str = "settings";
 
 /// Minimum amount of time between Flush calls to Stash, in milliseconds. The Flush call triggers
 /// file I/O which is slow. If we call flush too often, we can overwhelm Stash, which eventually
 /// causes the kernel to crash our service due to filling up the channel.
-const MIN_FLUSH_INTERVAL_MS: u64 = 500;
+const MIN_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Stores device level settings in persistent storage.
 /// User level settings should not use this.
@@ -213,57 +212,27 @@ impl DeviceStorage {
                     let inspect_handle = Arc::clone(&inspect_handle);
                     // Each key has an independent flush queue.
                     Task::spawn(async move {
-                        const MIN_FLUSH_DURATION: Duration =
-                            Duration::from_millis(MIN_FLUSH_INTERVAL_MS);
-                        let mut has_pending_flush = false;
-
-                        // The time of the last flush. Initialized to MIN_FLUSH_INTERVAL_MS before the
-                        // current time so that the first flush always goes through, no matter the
-                        // timing.
-                        let mut last_flush: Instant =
-                            Instant::now().checked_sub(MIN_FLUSH_DURATION).unwrap();
-
-                        // Timer for flush cooldown. OptionFuture allows us to wait on the future even
-                        // if it's None.
-                        let mut next_flush_timer: OptionFuture<Timer> = None.into();
-                        let mut next_flush_timer_fuse = next_flush_timer.fuse();
-
-                        let flush_fuse = flush_receiver.fuse();
-
-                        futures::pin_mut!(flush_fuse);
+                        let mut next_allowed_flush = Time::now();
+                        let mut next_flush_timer = OptionFuture::from(None).fuse();
+                        let flush_requested = flush_receiver.fuse();
+                        futures::pin_mut!(flush_requested);
                         loop {
                             futures::select! {
-                                _ = flush_fuse.select_next_some() => {
-                                    // Received a request to do a flush.
-                                    let now = Instant::now();
-                                    let next_flush_time = if now - last_flush > MIN_FLUSH_DURATION {
-                                        // Last flush happened more than MIN_FLUSH_INTERVAL_MS ago,
-                                        // flush immediately in next iteration of loop.
-                                        now
-                                    } else {
-                                        // Last flush was less than MIN_FLUSH_INTERVAL_MS ago, schedule
-                                        // it accordingly. It's okay if the time is in the past, Timer
-                                        // will still trigger on the next loop iteration.
-                                        last_flush + MIN_FLUSH_DURATION
-                                    };
-                                    has_pending_flush = true;
-                                    next_flush_timer = Some(Timer::new(next_flush_time.into_time()))
-                                        .into();
-                                    next_flush_timer_fuse = next_flush_timer.fuse();
-                                }
-
-                                _ = next_flush_timer_fuse => {
-                                    // Timer triggered, check for pending flushes.
-                                    if has_pending_flush {
+                                () = flush_requested.select_next_some() => {
+                                    next_flush_timer = OptionFuture::from(Some(Timer::new(
+                                        next_allowed_flush
+                                    )))
+                                    .fuse();
+                                },
+                                o = next_flush_timer => {
+                                    if let Some(()) = o {
                                         DeviceStorage::stash_flush(
                                             &stash_proxy,
                                             Arc::clone(&inspect_handle),
                                             key.to_string()).await;
-                                        last_flush = Instant::now();
-                                        has_pending_flush = false;
+                                        next_allowed_flush = Time::now() + MIN_FLUSH_INTERVAL;
                                     }
                                 }
-
                                 complete => break,
                             }
                         }
@@ -472,11 +441,10 @@ mod tests {
         FlushError, StoreAccessorMarker, StoreAccessorRequest, StoreAccessorRequestStream,
     };
     use fuchsia_async as fasync;
-    use fuchsia_async::{TestExecutor, Time};
+    use fuchsia_async::TestExecutor;
     use fuchsia_inspect::assert_data_tree;
     use futures::prelude::*;
     use serde::{Deserialize, Serialize};
-    use std::convert::TryInto;
     use std::marker::Unpin;
     use std::task::Poll;
 
@@ -500,6 +468,7 @@ mod tests {
     }
 
     /// Advances `future` until `executor` finishes. Panics if the end result was a stall.
+    #[track_caller]
     fn advance_executor<F>(executor: &mut TestExecutor, future: &mut F)
     where
         F: Future + Unpin,
@@ -847,7 +816,8 @@ mod tests {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(Time::from_nanos(0));
+        let start_time = Time::from_nanos(0);
+        executor.set_fake_time(start_time);
 
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
@@ -928,17 +898,13 @@ mod tests {
         assert_matches!(executor.run_until_stalled(&mut flush_future), Poll::Pending);
 
         // Advance time to 1ms before the flush triggers.
-        executor.set_fake_time(Time::from_nanos(
-            ((MIN_FLUSH_INTERVAL_MS - 1) * 10_u64.pow(6)).try_into().unwrap(),
-        ));
+        executor.set_fake_time(start_time + (MIN_FLUSH_INTERVAL - Duration::from_millis(1)));
 
         // TextExecutor is still waiting on the time to finish.
         assert_matches!(executor.run_until_stalled(&mut flush_future), Poll::Pending);
 
         // Advance time so that the flush will trigger.
-        executor.set_fake_time(Time::from_nanos(
-            (MIN_FLUSH_INTERVAL_MS * 10_u64.pow(6)).try_into().unwrap(),
-        ));
+        executor.set_fake_time(start_time + MIN_FLUSH_INTERVAL);
 
         // Stash receives a flush request after one timer cycle and the future terminates.
         advance_executor(&mut executor, &mut flush_future);
