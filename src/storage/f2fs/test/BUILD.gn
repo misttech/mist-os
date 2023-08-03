@@ -86,6 +86,20 @@ fuchsia_unittest_component("f2fs-gc-unittest") {
   deps = [ ":f2fs_gc_unit" ]
 }
 
+test("f2fs_large_volume_unit") {
+  sources = [
+    "unit/large_volume.cc",
+    "unit/unit_lib.cc",
+  ]
+  public = [ "unit/unit_lib.h" ]
+  deps = test_deps
+}
+
+fuchsia_unittest_component("f2fs-large-volume-unittest") {
+  manifest = "f2fs_large_volume_unittest.cml"
+  deps = [ ":f2fs_large_volume_unit" ]
+}
+
 test("f2fs_slow_unit") {
   sources = [
     "unit/multithreading.cc",
@@ -148,6 +162,7 @@ fs_test_suite("f2fs") {
   extra_components = [
     ":f2fs-unittest",
     ":f2fs-gc-unittest",
+    ":f2fs-large-volume-unittest",
     ":f2fs-slow-unittest",
     ":f2fs-component-runner-test",
   ]
