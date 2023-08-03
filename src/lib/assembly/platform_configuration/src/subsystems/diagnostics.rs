@@ -14,6 +14,7 @@ const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[
     "/core/network/netcfg",
     "/core/network/netstack",
     "/core/sshd-host",
+    "/core/system-update/system-update-committer",
     "/core/wlancfg",
     "/core/wlandevicemonitor",
 ];
