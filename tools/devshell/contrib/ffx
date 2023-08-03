@@ -19,7 +19,9 @@ FFX_WRAPPER_INVOKE=${FFX_WRAPPER_INVOKE:-fx ffx}
 export FFX_WRAPPER_INVOKE
 
 if is-remote-workflow-device; then
-  fx-command-run host-tool ffx target add $(get-device-pair)
+  # Devices may hang on connect if they're running very out-of-date versions of
+  # Overnet. This prevents OTAs which would otherwise fix this problem.
+  fx-command-run host-tool ffx target add --nowait $(get-device-pair)
 fi
 
 # NOTE: this could be improved if it knew enough about ffx args to
