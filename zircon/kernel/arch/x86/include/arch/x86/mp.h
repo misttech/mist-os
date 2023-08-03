@@ -43,10 +43,14 @@
 #include <kernel/cpu.h>
 #include <ktl/atomic.h>
 #include <ktl/declval.h>
+#include <ktl/type_traits.h>
 
 struct Thread;
 struct percpu;
+class MwaitMonitor;
 
+// This struct is accessed very early during boot so it's important that it can live in the BSS and
+// be initialized without calling global constructors.
 struct x86_percpu {
   /* a direct pointer to ourselves */
   struct x86_percpu *direct;
@@ -68,8 +72,8 @@ struct x86_percpu {
   /* Whether blocking is disallowed.  See arch_blocking_disallowed(). */
   uint32_t blocking_disallowed;
 
-  /* Memory for IPI-free rescheduling of idle CPUs with monitor/mwait. */
-  volatile uint8_t *monitor;
+  /* Used for IPI-free rescheduling of idle CPUs with monitor/mwait. */
+  MwaitMonitor *monitor;
 
   /* Interlock to avoid HLT on idle CPUs without monitor/mwait. */
   /* halt_interlock is never used on CPUs that have enabled monitor/mwait for idle. */

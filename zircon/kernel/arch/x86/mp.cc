@@ -32,6 +32,7 @@
 #include <arch/x86/idle_states.h>
 #include <arch/x86/interrupts.h>
 #include <arch/x86/mmu.h>
+#include <arch/x86/mwait_monitor.h>
 #include <dev/hw_rng.h>
 #include <dev/interrupt.h>
 #include <hwreg/x86msr.h>
@@ -39,6 +40,8 @@
 #include <kernel/cpu.h>
 #include <kernel/event.h>
 #include <kernel/timer.h>
+#include <ktl/algorithm.h>
+#include <ktl/align.h>
 
 // Enable/disable ktraces local to this file.
 #define LOCAL_KTRACE_ENABLE 0
@@ -56,10 +59,14 @@ static uint8_t unsafe_kstack[PAGE_SIZE] __ALIGNED(16);
 #define unsafe_kstack_end nullptr
 #endif
 
+// Holds an array of MwaitMonitor objects used to signal that a CPU is
+// about-to-enter or should-wake-from the idle thread.
+MwaitMonitorArray gMwaitMonitorArray;
+
 // Fake monitor to use until smp is initialized. The size of
 // the memory range doesn't matter, since it won't actually get
 // used in a non-smp environment.
-volatile uint8_t fake_monitor;
+MwaitMonitor gFakeMonitor;
 
 // Also set up a fake table of idle states.
 x86_idle_states_t fake_supported_idle_states = {
@@ -79,7 +86,7 @@ struct x86_percpu bp_percpu = {
     .saved_user_sp = {},
 
     .blocking_disallowed = {},
-    .monitor = &fake_monitor,
+    .monitor = &gFakeMonitor,
     .halt_interlock = {},
     .idle_states = &fake_idle_states,
 
@@ -114,22 +121,22 @@ zx_status_t x86_allocate_ap_structures(uint32_t* apic_ids, uint8_t cpu_count) {
     }
     memset(ap_percpus, 0, len);
 
+    // TODO(maniscalco): There's a data race here that we should fix.  We could
+    // be racing with the idle thread on this CPU.  Consider reworking the
+    // monitor initialization sequence or perhaps upgrading this to an atomic.
+    // Same goes for the assignment to |bp_percpu.monitor| below.
     use_monitor = arch::BootCpuid<arch::CpuidFeatureFlagsC>().monitor() &&
                   arch::BootCpuidSupports<arch::CpuidMonitorMwaitB>() &&
                   !x86_get_microarch_config()->idle_prefer_hlt;
     if (use_monitor) {
-      auto monitor_size = static_cast<uint16_t>(
-          arch::BootCpuid<arch::CpuidMonitorMwaitB>().largest_monitor_line_size());
-      if (monitor_size < MAX_CACHE_LINE) {
-        monitor_size = MAX_CACHE_LINE;
+      printf("initializing mwait/monitor for idle threads\n");
+      zx_status_t status = gMwaitMonitorArray.Init(cpu_count);
+      if (status != ZX_OK) {
+        return status;
       }
-      uint8_t* monitors = (uint8_t*)memalign(monitor_size, monitor_size * cpu_count);
-      if (monitors == nullptr) {
-        return ZX_ERR_NO_MEMORY;
-      }
-      bp_percpu.monitor = monitors;
-      for (uint i = 1; i < cpu_count; ++i) {
-        ap_percpus[i - 1].monitor = monitors + (i * monitor_size);
+      bp_percpu.monitor = &gMwaitMonitorArray.GetForCpu(BOOT_CPU_ID);
+      for (cpu_num_t i = 1; i < cpu_count; ++i) {
+        ap_percpus[i - 1].monitor = &gMwaitMonitorArray.GetForCpu(i);
       }
 
       uint16_t idle_states_size = sizeof(X86IdleStates);
@@ -318,14 +325,13 @@ void arch_mp_reschedule(cpu_mask_t mask) {
       cpu_mask_t cpu_mask = cpu_num_to_mask(cpu_id);
       struct x86_percpu* percpu = cpu_id ? &ap_percpus[cpu_id - 1] : &bp_percpu;
 
-      // When a cpu see that it is about to start the idle thread, it sets its own
+      // When a cpu sees that it is about to start the idle thread, it sets its own
       // monitor flag. When a cpu is rescheduling another cpu, if it sees the monitor flag
       // set, it can clear the flag to wake up the other cpu w/o an IPI. When the other
       // cpu wakes up, the idle thread sees the cleared flag and preempts itself. Both of
       // these operations are under the scheduler lock, so there are no races where the
       // wrong signal can be sent.
-      uint8_t old_val = *percpu->monitor;
-      *percpu->monitor = 0;
+      const uint8_t old_val = percpu->monitor->Exchange(0);
       if (!old_val) {
         needs_ipi |= cpu_mask;
       }
@@ -361,7 +367,7 @@ void arch_prepare_current_cpu_idle_state(bool idle) {
   thread_lock.AssertHeld();
 
   if (use_monitor) {
-    *x86_get_percpu()->monitor = idle;
+    x86_get_percpu()->monitor->Write(idle ? 1 : 0);
   }
 }
 
@@ -374,7 +380,7 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
     for (;;) {
       AutoPreemptDisabler preempt_disabled;
       bool rsb_maybe_empty = false;
-      while (*percpu->monitor && !preemption_state.preempts_pending()) {
+      while (percpu->monitor->Read() && !preemption_state.preempts_pending()) {
         X86IdleState* next_state = percpu->idle_states->PickIdleState();
         rsb_maybe_empty |= x86_intel_idle_state_may_empty_rsb(next_state);
         ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
@@ -395,8 +401,8 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
         // we enter the mwait before any interrupts can actually fire.
         //
         arch_disable_ints();
-        x86_monitor(percpu->monitor);
-        if (*percpu->monitor && !preemption_state.preempts_pending()) {
+        percpu->monitor->PrepareForWait();
+        if (percpu->monitor->Read() && !preemption_state.preempts_pending()) {
           auto start = current_time();
           x86_enable_ints_and_mwait(next_state->MwaitHint());
           auto duration = zx_time_sub_time(current_time(), start);
