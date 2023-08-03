@@ -112,7 +112,47 @@ closed protocol RemoteController {
     /// component to start servicing the binder protocol.
     strict Start(resource table {
         1: dev_binder client_end:DevBinder;
+        2: lutex_controller client_end:LutexController;
     });
+};
+
+/// Protocol that allows a Fuchsia component to interact with the Linux futexes
+/// of a process running inside starnix.
+closed protocol LutexController {
+    /// FUTEX_WAIT_BITSET command
+    strict WaitBitSet(resource table {
+        /// The vmo containing the shared address of the futex.
+        /// Mandatory
+        1: vmo zx.Handle:VMO;
+        /// The offset in the vmo where the shared address of the futex is.
+        /// Mandatory
+        2: offset uint64;
+        /// The expected value of the futex.
+        /// Mandatory
+        3: value uint32;
+        /// The bit mask.
+        /// Optional. If not present, as mask with all bits present will be used.
+        4: mask uint32;
+        /// The deadline for the wait operation.
+        /// Optional. If not present, the operation can block indefinitely.
+        5: deadline zx.Time;
+    }) -> () error fuchsia.posix.Errno;
+
+    /// FUTEX_WAKE_BITSET command
+    strict WakeBitSet(resource table {
+        /// The vmo containing the shared address of the futex.
+        /// Mandatory
+        1: vmo zx.Handle:VMO;
+        /// The offset in the vmo where the shared address of the futex is.
+        /// Mandatory
+        2: offset uint64;
+        /// Maximum number of waiter to wake.
+        /// Mandatory
+        3: count uint32;
+        /// The bit mask.
+        /// Optional. If not present, as mask with all bits present will be used.
+        4: mask uint32;
+    }) -> () error fuchsia.posix.Errno;
 };
 
 /// An opened connection to a binder driver.
