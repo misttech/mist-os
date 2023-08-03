@@ -767,6 +767,27 @@ impl Task {
         })
     }
 
+    /// Create a kernel task in the same ThreadGroup as the given `system_task`.
+    ///
+    /// There is no underlying Zircon thread to host the task.
+    pub fn create_kernel_thread(
+        system_task: &CurrentTask,
+        initial_name: CString,
+    ) -> Result<CurrentTask, Errno> {
+        Task::create_task(
+            system_task.kernel(),
+            initial_name,
+            Some(Arc::clone(system_task.fs())),
+            |_pid, _process_group| {
+                Ok(TaskInfo {
+                    thread: None,
+                    thread_group: Arc::clone(&system_task.thread_group),
+                    memory_manager: Arc::clone(&system_task.mm),
+                })
+            },
+        )
+    }
+
     fn create_task<F>(
         kernel: &Arc<Kernel>,
         initial_name: CString,

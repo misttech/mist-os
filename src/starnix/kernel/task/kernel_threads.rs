@@ -76,6 +76,10 @@ impl KernelThreads {
         self.system_task.get().unwrap().into()
     }
 
+    pub fn new_system_thread(&self) -> Result<CurrentTask, Errno> {
+        Task::create_kernel_thread(self.system_task(), CString::new("[kthread]").unwrap())
+    }
+
     pub fn dispatch<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
