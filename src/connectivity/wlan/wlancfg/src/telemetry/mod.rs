@@ -1473,18 +1473,6 @@ pub async fn create_metrics_logger(
 const HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.02;
 const VERY_HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.05;
 
-const DEVICE_LOW_UPTIME_THRESHOLD: f64 = 0.95;
-/// Threshold for high number of disconnects per day connected.
-/// Example: if threshold is 12 and a device has 1 disconnect after being connected for less
-///          than 2 hours, then it has high DPDC ratio.
-const DEVICE_HIGH_DPDC_THRESHOLD: f64 = 12.0;
-/// Note: Threshold is for "percentage of time" the device has high packet drop rate.
-///       That is, if threshold is 0.10, then the device passes that threshold if more
-///       than 10% of the time it has high packet drop rate.
-const DEVICE_FREQUENT_HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.10;
-const DEVICE_FREQUENT_VERY_HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.10;
-/// TODO(fxbug.dev/83621): Adjust this threshold when we consider unicast frames only
-const DEVICE_FREQUENT_NO_RX_THRESHOLD: f64 = 0.01;
 const DEVICE_LOW_CONNECTION_SUCCESS_RATE_THRESHOLD: f64 = 0.1;
 
 async fn diff_and_log_counters(
@@ -1795,32 +1783,6 @@ impl StatsLogger {
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(uptime_ratio)),
             });
-
-            if uptime_ratio < DEVICE_LOW_UPTIME_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_LOW_UPTIME_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
-
-            let uptime_ratio_dim = {
-                use metrics::ConnectivityWlanMetricDimensionUptimeRatio::*;
-                match uptime_ratio {
-                    x if x < 0.75 => LessThan75Percent,
-                    x if x < 0.90 => _75ToLessThan90Percent,
-                    x if x < 0.95 => _90ToLessThan95Percent,
-                    x if x < 0.98 => _95ToLessThan98Percent,
-                    x if x < 0.99 => _98ToLessThan99Percent,
-                    x if x < 0.995 => _99ToLessThan99_5Percent,
-                    _ => _99_5To100Percent,
-                }
-            };
-            metric_events.push(MetricEvent {
-                metric_id: metrics::DEVICE_CONNECTED_UPTIME_RATIO_BREAKDOWN_METRIC_ID,
-                event_codes: vec![uptime_ratio_dim as u32],
-                payload: MetricEventPayload::Count(1),
-            });
         }
 
         let connected_dur_in_day = c.connected_duration.into_seconds() as f64 / (24 * 3600) as f64;
@@ -1830,31 +1792,6 @@ impl StatsLogger {
                 metric_id: metrics::DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(dpdc_ratio)),
-            });
-
-            if dpdc_ratio > DEVICE_HIGH_DPDC_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_HIGH_DISCONNECT_RATE_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
-
-            let dpdc_ratio_dim = {
-                use metrics::DeviceDisconnectPerDayConnectedBreakdownMetricDimensionDpdcRatio::*;
-                match dpdc_ratio {
-                    x if x == 0.0 => _0,
-                    x if x <= 1.5 => UpTo1_5,
-                    x if x <= 3.0 => UpTo3,
-                    x if x <= 5.0 => UpTo5,
-                    x if x <= 10.0 => UpTo10,
-                    _ => MoreThan10,
-                }
-            };
-            metric_events.push(MetricEvent {
-                metric_id: metrics::DEVICE_DISCONNECT_PER_DAY_CONNECTED_BREAKDOWN_METRIC_ID,
-                event_codes: vec![dpdc_ratio_dim as u32],
-                payload: MetricEventPayload::Count(1),
             });
         }
 
@@ -1888,14 +1825,6 @@ impl StatsLogger {
                     high_rx_drop_time_ratio,
                 )),
             });
-
-            if high_rx_drop_time_ratio > DEVICE_FREQUENT_HIGH_PACKET_DROP_RATE_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_FREQUENT_HIGH_RX_PACKET_DROP_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
         }
 
         let high_tx_drop_time_ratio = c.tx_high_packet_drop_duration.into_seconds() as f64
@@ -1908,14 +1837,6 @@ impl StatsLogger {
                     high_tx_drop_time_ratio,
                 )),
             });
-
-            if high_tx_drop_time_ratio > DEVICE_FREQUENT_HIGH_PACKET_DROP_RATE_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_FREQUENT_HIGH_TX_PACKET_DROP_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
         }
 
         let very_high_rx_drop_time_ratio = c.rx_very_high_packet_drop_duration.into_seconds()
@@ -1929,14 +1850,6 @@ impl StatsLogger {
                     very_high_rx_drop_time_ratio,
                 )),
             });
-
-            if very_high_rx_drop_time_ratio > DEVICE_FREQUENT_VERY_HIGH_PACKET_DROP_RATE_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_FREQUENT_VERY_HIGH_RX_PACKET_DROP_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
         }
 
         let very_high_tx_drop_time_ratio = c.tx_very_high_packet_drop_duration.into_seconds()
@@ -1950,14 +1863,6 @@ impl StatsLogger {
                     very_high_tx_drop_time_ratio,
                 )),
             });
-
-            if very_high_tx_drop_time_ratio > DEVICE_FREQUENT_VERY_HIGH_PACKET_DROP_RATE_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_FREQUENT_VERY_HIGH_TX_PACKET_DROP_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
         }
 
         let no_rx_time_ratio =
@@ -1970,14 +1875,6 @@ impl StatsLogger {
                     no_rx_time_ratio,
                 )),
             });
-
-            if no_rx_time_ratio > DEVICE_FREQUENT_NO_RX_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_FREQUENT_NO_RX_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
         }
 
         let connection_success_rate = c.connection_success_rate();
@@ -1989,14 +1886,6 @@ impl StatsLogger {
                     connection_success_rate,
                 )),
             });
-
-            if connection_success_rate < DEVICE_LOW_CONNECTION_SUCCESS_RATE_THRESHOLD {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::DEVICE_WITH_LOW_CONNECTION_SUCCESS_RATE_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::Count(1),
-                });
-            }
         }
 
         log_cobalt_1dot1_batch!(
@@ -2016,24 +1905,6 @@ impl StatsLogger {
                 metric_id: metrics::DISCONNECT_PER_DAY_CONNECTED_7D_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(dpdc_ratio)),
-            });
-
-            let dpdc_ratio_dim = {
-                use metrics::DeviceDisconnectPerDayConnectedBreakdown7dMetricDimensionDpdcRatio::*;
-                match dpdc_ratio {
-                    x if x == 0.0 => _0,
-                    x if x <= 0.2 => UpTo0_2,
-                    x if x <= 0.35 => UpTo0_35,
-                    x if x <= 0.5 => UpTo0_5,
-                    x if x <= 1.0 => UpTo1,
-                    x if x <= 5.0 => UpTo5,
-                    _ => MoreThan5,
-                }
-            };
-            metric_events.push(MetricEvent {
-                metric_id: metrics::DEVICE_DISCONNECT_PER_DAY_CONNECTED_BREAKDOWN_7D_METRIC_ID,
-                event_codes: vec![dpdc_ratio_dim as u32],
-                payload: MetricEventPayload::Count(1),
             });
 
             log_cobalt_1dot1_batch!(
@@ -4877,20 +4748,6 @@ mod tests {
         assert_eq!(uptime_ratios.len(), 1);
         // 12 hours of uptime, 6 hours of adjusted downtime => 66.66% uptime
         assert_eq!(uptime_ratios[0].payload, MetricEventPayload::IntegerValue(6666));
-
-        let device_low_uptime =
-            test_helper.get_logged_metrics(metrics::DEVICE_WITH_LOW_UPTIME_METRIC_ID);
-        assert_eq!(device_low_uptime.len(), 1);
-        assert_eq!(device_low_uptime[0].payload, MetricEventPayload::Count(1));
-
-        let uptime_ratio_breakdowns = test_helper
-            .get_logged_metrics(metrics::DEVICE_CONNECTED_UPTIME_RATIO_BREAKDOWN_METRIC_ID);
-        assert_eq!(uptime_ratio_breakdowns.len(), 1);
-        assert_eq!(
-            uptime_ratio_breakdowns[0].event_codes,
-            &[metrics::ConnectivityWlanMetricDimensionUptimeRatio::LessThan75Percent as u32]
-        );
-        assert_eq!(uptime_ratio_breakdowns[0].payload, MetricEventPayload::Count(1));
     }
 
     /// Send a random connect event and 4 hours later send a disconnect with the specified
@@ -4960,31 +4817,6 @@ mod tests {
         assert_eq!(dpdc_ratios_7d.len(), 1);
         assert_eq!(dpdc_ratios_7d[0].payload, MetricEventPayload::IntegerValue(60_000));
 
-        let device_high_disconnect =
-            test_helper.get_logged_metrics(metrics::DEVICE_WITH_HIGH_DISCONNECT_RATE_METRIC_ID);
-        assert_eq!(device_high_disconnect.len(), 0);
-
-        let dpdc_ratio_breakdowns = test_helper
-            .get_logged_metrics(metrics::DEVICE_DISCONNECT_PER_DAY_CONNECTED_BREAKDOWN_METRIC_ID);
-        assert_eq!(dpdc_ratio_breakdowns.len(), 1);
-        assert_eq!(
-            dpdc_ratio_breakdowns[0].event_codes,
-            &[metrics::DeviceDisconnectPerDayConnectedBreakdownMetricDimensionDpdcRatio::UpTo10
-                as u32]
-        );
-        assert_eq!(dpdc_ratio_breakdowns[0].payload, MetricEventPayload::Count(1));
-
-        let dpdc_ratio_7d_breakdowns = test_helper.get_logged_metrics(
-            metrics::DEVICE_DISCONNECT_PER_DAY_CONNECTED_BREAKDOWN_7D_METRIC_ID,
-        );
-        assert_eq!(dpdc_ratio_7d_breakdowns.len(), 1);
-        assert_eq!(
-            dpdc_ratio_7d_breakdowns[0].event_codes,
-            &[metrics::DeviceDisconnectPerDayConnectedBreakdown7dMetricDimensionDpdcRatio::MoreThan5
-                as u32]
-        );
-        assert_eq!(dpdc_ratio_7d_breakdowns[0].payload, MetricEventPayload::Count(1));
-
         // Clear record of logged Cobalt events
         test_helper.cobalt_events.clear();
 
@@ -5016,27 +4848,6 @@ mod tests {
             test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
-
-        let dpdc_ratio_breakdowns = test_helper
-            .get_logged_metrics(metrics::DEVICE_DISCONNECT_PER_DAY_CONNECTED_BREAKDOWN_METRIC_ID);
-        assert_eq!(dpdc_ratio_breakdowns.len(), 1);
-        assert_eq!(
-            dpdc_ratio_breakdowns[0].event_codes,
-            &[metrics::DeviceDisconnectPerDayConnectedBreakdownMetricDimensionDpdcRatio::_0 as u32]
-        );
-        assert_eq!(dpdc_ratio_breakdowns[0].payload, MetricEventPayload::Count(1));
-
-        // In the last 7 days, 3 disconnects and 1.25 days connected => 2.4 dpdc ratio
-        let dpdc_ratio_7d_breakdowns = test_helper.get_logged_metrics(
-            metrics::DEVICE_DISCONNECT_PER_DAY_CONNECTED_BREAKDOWN_7D_METRIC_ID,
-        );
-        assert_eq!(dpdc_ratio_7d_breakdowns.len(), 1);
-        assert_eq!(
-            dpdc_ratio_7d_breakdowns[0].event_codes,
-            &[metrics::DeviceDisconnectPerDayConnectedBreakdown7dMetricDimensionDpdcRatio::UpTo5
-                as u32]
-        );
-        assert_eq!(dpdc_ratio_7d_breakdowns[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
@@ -5092,11 +4903,6 @@ mod tests {
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(23.hours(), test_fut.as_mut());
-
-        let device_high_disconnect =
-            test_helper.get_logged_metrics(metrics::DEVICE_WITH_HIGH_DISCONNECT_RATE_METRIC_ID);
-        assert_eq!(device_high_disconnect.len(), 1);
-        assert_eq!(device_high_disconnect[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
@@ -5135,21 +4941,11 @@ mod tests {
         assert_eq!(high_rx_drop_time_ratios.len(), 1);
         assert_eq!(high_rx_drop_time_ratios[0].payload, MetricEventPayload::IntegerValue(1666));
 
-        let device_frequent_high_rx_drop = test_helper
-            .get_logged_metrics(metrics::DEVICE_WITH_FREQUENT_HIGH_RX_PACKET_DROP_METRIC_ID);
-        assert_eq!(device_frequent_high_rx_drop.len(), 1);
-        assert_eq!(device_frequent_high_rx_drop[0].payload, MetricEventPayload::Count(1));
-
         let high_tx_drop_time_ratios =
             test_helper.get_logged_metrics(metrics::TIME_RATIO_WITH_HIGH_TX_PACKET_DROP_METRIC_ID);
         // 3 hours of high RX drop rate, 24 hours connected => 12.48% duration
         assert_eq!(high_tx_drop_time_ratios.len(), 1);
         assert_eq!(high_tx_drop_time_ratios[0].payload, MetricEventPayload::IntegerValue(1250));
-
-        let device_frequent_high_tx_drop = test_helper
-            .get_logged_metrics(metrics::DEVICE_WITH_FREQUENT_HIGH_TX_PACKET_DROP_METRIC_ID);
-        assert_eq!(device_frequent_high_tx_drop.len(), 1);
-        assert_eq!(device_frequent_high_tx_drop[0].payload, MetricEventPayload::Count(1));
 
         let very_high_rx_drop_time_ratios = test_helper
             .get_logged_metrics(metrics::TIME_RATIO_WITH_VERY_HIGH_RX_PACKET_DROP_METRIC_ID);
@@ -5159,11 +4955,6 @@ mod tests {
             MetricEventPayload::IntegerValue(1666)
         );
 
-        let device_frequent_very_high_rx_drop = test_helper
-            .get_logged_metrics(metrics::DEVICE_WITH_FREQUENT_VERY_HIGH_RX_PACKET_DROP_METRIC_ID);
-        assert_eq!(device_frequent_very_high_rx_drop.len(), 1);
-        assert_eq!(device_frequent_very_high_rx_drop[0].payload, MetricEventPayload::Count(1));
-
         let very_high_tx_drop_time_ratios = test_helper
             .get_logged_metrics(metrics::TIME_RATIO_WITH_VERY_HIGH_TX_PACKET_DROP_METRIC_ID);
         assert_eq!(very_high_tx_drop_time_ratios.len(), 1);
@@ -5172,21 +4963,11 @@ mod tests {
             MetricEventPayload::IntegerValue(1250)
         );
 
-        let device_frequent_very_high_tx_drop = test_helper
-            .get_logged_metrics(metrics::DEVICE_WITH_FREQUENT_VERY_HIGH_TX_PACKET_DROP_METRIC_ID);
-        assert_eq!(device_frequent_very_high_tx_drop.len(), 1);
-        assert_eq!(device_frequent_very_high_tx_drop[0].payload, MetricEventPayload::Count(1));
-
         // 1 hour of no RX, 24 hours connected => 4.16% duration
         let no_rx_time_ratios =
             test_helper.get_logged_metrics(metrics::TIME_RATIO_WITH_NO_RX_METRIC_ID);
         assert_eq!(no_rx_time_ratios.len(), 1);
         assert_eq!(no_rx_time_ratios[0].payload, MetricEventPayload::IntegerValue(416));
-
-        let device_frequent_no_rx =
-            test_helper.get_logged_metrics(metrics::DEVICE_WITH_FREQUENT_NO_RX_METRIC_ID);
-        assert_eq!(device_frequent_no_rx.len(), 1);
-        assert_eq!(device_frequent_no_rx[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
@@ -5253,11 +5034,6 @@ mod tests {
         assert_eq!(connection_success_rate.len(), 1);
         // 1 successful, 11 total attempts => 9.09% success rate
         assert_eq!(connection_success_rate[0].payload, MetricEventPayload::IntegerValue(909));
-
-        let device_low_success = test_helper
-            .get_logged_metrics(metrics::DEVICE_WITH_LOW_CONNECTION_SUCCESS_RATE_METRIC_ID);
-        assert_eq!(device_low_success.len(), 1);
-        assert_eq!(device_low_success[0].payload, MetricEventPayload::Count(1));
     }
 
     #[fuchsia::test]
