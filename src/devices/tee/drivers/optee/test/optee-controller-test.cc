@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.rpmb/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -157,20 +156,6 @@ class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
   zx::vmo fake_vmo_;
 };
 
-class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
- public:
-  FakeSysmem() {}
-
-  const sysmem_protocol_ops_t* proto_ops() const { return &sysmem_protocol_ops_; }
-
-  zx_status_t SysmemConnect(zx::channel allocator2_request) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SysmemUnregisterSecureMem() { return ZX_ERR_NOT_SUPPORTED; }
-};
-
 class FakeRpmbService {
  public:
   FakeRpmbService() : outgoing_(loop_.dispatcher()) {}
@@ -247,7 +232,6 @@ class FakeDdkOptee : public zxtest::Test {
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
     parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto_ops(), &pdev_, "pdev");
-    parent_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_.proto_ops(), &sysmem_, "sysmem");
     parent_->AddFidlService(fuchsia_hardware_rpmb::Service::Name, rpmb_service_.Connect(), "rpmb");
 
     ASSERT_OK(OpteeController::Create(nullptr, parent_.get()));
@@ -274,7 +258,6 @@ class FakeDdkOptee : public zxtest::Test {
 
  protected:
   FakePDev pdev_;
-  FakeSysmem sysmem_;
   FakeRpmbService rpmb_service_;
 
   fdf_testing::DriverRuntime runtime_;

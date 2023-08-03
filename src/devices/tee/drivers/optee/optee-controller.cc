@@ -470,12 +470,6 @@ zx_status_t OpteeController::Bind() {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  sysmem_ = ddk::SysmemProtocolClient(parent(), "sysmem");
-  if (!sysmem_.is_valid()) {
-    LOG(ERROR, "unable to get sysmem protocol");
-    return ZX_ERR_NO_RESOURCES;
-  }
-
   status = InitThreadPools();
   if (status != ZX_OK) {
     return status;

@@ -14,17 +14,5 @@
                 }
             }
         ]
-    },
-    {
-        "node": "sysmem",
-        "tests": [
-            {
-                "name": "Match",
-                "expected": "match",
-                "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sysmem.BIND_PROTOCOL.DEVICE"
-                }
-            }
-        ]
     }
 ]

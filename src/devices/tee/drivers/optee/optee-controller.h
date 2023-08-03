@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.rpmb/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fidl/fuchsia.tee.manager/cpp/wire.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -187,7 +186,6 @@ class OpteeController : public OpteeControllerBase,
   std::list<async::Loop> custom_loops_;
   std::map<Uuid, std::list<async::Loop>::iterator> uuid_config_;
 
-  ddk::SysmemProtocolClient sysmem_;
   zx::resource secure_monitor_;
   uint32_t secure_world_capabilities_ = 0;
   GetOsRevisionResult os_revision_;
