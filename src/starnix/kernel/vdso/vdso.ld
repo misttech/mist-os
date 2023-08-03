@@ -1,4 +1,7 @@
 SECTIONS {
+  /* Points the variable vvar (accessible to the vDSO)
+     to be one page (4096) above the vDSO */
+  vvar = . - 0x1000;
   . = SIZEOF_HEADERS;
   .rodata : {
     *(.rodata*)
@@ -17,10 +20,6 @@ SECTIONS {
   }
 
 }
-/* Entry point should not normally be used directly in vDSO, so here it is used to store
-   the offset at which vDSO constants are located, for easy reference. */
-start = DEFINED(DATA_CONSTANTS) ? DATA_CONSTANTS : 0 ;
-ENTRY(start)
 
 PHDRS {
   /* The LOAD section must include at least FILEHDR so that it covers the start of the file.

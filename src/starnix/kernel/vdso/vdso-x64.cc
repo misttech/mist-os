@@ -12,9 +12,9 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "vdso-constants.h"
+#include "vvar-data.h"
 
-extern __LOCAL struct vdso_constants DATA_CONSTANTS;
+extern "C" vvar_data vvar;
 
 extern "C" int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3) {
   int ret;
@@ -30,12 +30,10 @@ extern "C" EXPORT int __vdso_clock_gettime(int clock_id, struct timespec* tp) {
   const int64_t NSEC_PER_SEC = 1'000'000'000;
   if ((clock_id == CLOCK_MONOTONIC) || (clock_id == CLOCK_MONOTONIC_RAW) ||
       (clock_id == CLOCK_MONOTONIC_COARSE) || (clock_id == CLOCK_BOOTTIME)) {
-    struct vvar_data* vvar =
-        (struct vvar_data*)((uint64_t)&DATA_CONSTANTS - DATA_CONSTANTS.vvar_offset);
     uint64_t raw_ticks = __rdtsc();
-    uint64_t ticks = raw_ticks + vvar->raw_ticks_to_ticks_offset;
+    uint64_t ticks = raw_ticks + vvar.raw_ticks_to_ticks_offset;
     // TODO(mariagl): This could potentially overflow; Find a way to avoid this.
-    uint64_t monot_nsec = ticks * vvar->ticks_to_mono_numerator / vvar->ticks_to_mono_denominator;
+    uint64_t monot_nsec = ticks * vvar.ticks_to_mono_numerator / vvar.ticks_to_mono_denominator;
     tp->tv_sec = monot_nsec / NSEC_PER_SEC;
     tp->tv_nsec = monot_nsec % NSEC_PER_SEC;
   } else {

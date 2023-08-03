@@ -7,7 +7,7 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use std::sync::Arc;
 
 use crate::{
-    arch::vdso::{get_sigreturn_offset, set_vdso_constants, set_vvar_data, HAS_VDSO},
+    arch::vdso::{get_sigreturn_offset, set_vvar_data, HAS_VDSO},
     mm::PAGE_SIZE,
     types::{errno, from_status_like_fdio, Errno},
 };
@@ -96,11 +96,5 @@ pub fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 
-    let vdso_size = vdso_vmo.get_size().map_err(|status| from_status_like_fdio!(status))?;
-    let vdso_clone = vdso_vmo
-        .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
-        .map_err(|status| from_status_like_fdio!(status))?;
-    set_vdso_constants(&vdso_clone)?;
-
-    Ok(Some(Arc::new(vdso_clone)))
+    Ok(Some(Arc::new(vdso_vmo)))
 }

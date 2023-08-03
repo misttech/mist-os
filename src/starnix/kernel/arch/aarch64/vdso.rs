@@ -11,10 +11,6 @@ use crate::types::{errno, from_status_like_fdio, Errno};
 
 pub const HAS_VDSO: bool = true;
 
-pub fn set_vdso_constants(_vdso_vmo: &zx::Vmo) -> Result<(), Errno> {
-    Ok(())
-}
-
 pub fn set_vvar_data(_vvar_vmo: &Arc<zx::Vmo>) -> Result<(), Errno> {
     Ok(())
 }

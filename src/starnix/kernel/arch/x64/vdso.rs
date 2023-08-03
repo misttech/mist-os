@@ -4,14 +4,10 @@
 
 use core::arch::x86_64::_rdtsc;
 use fuchsia_zircon as zx;
-use process_builder::elf_parse;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
-use crate::{
-    mm::PAGE_SIZE,
-    types::{errno, from_status_like_fdio, uapi, Errno},
-};
+use crate::types::{errno, from_status_like_fdio, uapi, Errno};
 
 pub const HAS_VDSO: bool = true;
 
@@ -38,17 +34,6 @@ pub fn calculate_ticks_offset() -> i64 {
         }
     }
     ticks_offset
-}
-
-pub fn set_vdso_constants(vdso_vmo: &zx::Vmo) -> Result<(), Errno> {
-    let headers = elf_parse::Elf64Headers::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
-    let constants_offset = headers.file_header().entry as u64;
-    let vdso_consts: uapi::vdso_constants =
-        uapi::vdso_constants { vvar_offset: constants_offset + *PAGE_SIZE as u64 };
-    vdso_vmo
-        .write(vdso_consts.as_bytes(), constants_offset as u64)
-        .map_err(|status| from_status_like_fdio!(status))?;
-    Ok(())
 }
 
 pub fn set_vvar_data(vvar_vmo: &Arc<zx::Vmo>) -> Result<(), Errno> {

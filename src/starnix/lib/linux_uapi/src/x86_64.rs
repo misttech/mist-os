@@ -4660,8 +4660,6 @@ pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"posix_acl_default\0") };
 pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_default\0") };
-pub const VDSO_CONSTANTS_ALIGN: u32 = 8;
-pub const VDSO_CONSTANTS_SIZE: u32 = 8;
 pub const ARCH_SET_GS: u32 = 4097;
 pub const ARCH_SET_FS: u32 = 4098;
 pub const ARCH_GET_FS: u32 = 4099;
@@ -12060,11 +12058,6 @@ pub struct sockaddr_vm {
     pub svm_cid: crate::types::c_uint,
     pub svm_flags: __u8,
     pub svm_zero: [crate::types::c_uchar; 3usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
-pub struct vdso_constants {
-    pub vvar_offset: u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]

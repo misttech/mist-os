@@ -76,8 +76,8 @@
 #include <linux/wait.h>
 #include <linux/xattr.h>
 
-// Constants shared between Starnix and a vDSO implementation.
-#include <vdso-constants.h>
+// Data shared between Starnix and a vDSO implementation.
+#include <vvar-data.h>
 
 #ifdef __x86_64__
 #include <asm/prctl.h>
