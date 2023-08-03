@@ -273,3 +273,26 @@ TEST(Socket, ConcurrentCreate) {
   EXPECT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
   child.join();
 }
+
+class SndRcvBufSockOpt : public testing::TestWithParam<int> {};
+
+// This test asserts that the value of SO_RCVBUF and SO_SNDBUF are doubled on
+// set, and this doubled value is returned on get, as described in the Linux
+// socket(7) man page.
+TEST_P(SndRcvBufSockOpt, DoubledOnGet) {
+  fbl::unique_fd fd;
+  EXPECT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
+
+  int buf_size;
+  socklen_t optlen = sizeof(buf_size);
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, GetParam(), &buf_size, &optlen), 0) << strerror(errno);
+
+  ASSERT_EQ(setsockopt(fd.get(), SOL_SOCKET, GetParam(), &buf_size, optlen), 0) << strerror(errno);
+
+  int new_buf_size;
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, GetParam(), &new_buf_size, &optlen), 0)
+      << strerror(errno);
+  ASSERT_EQ(new_buf_size, 2 * buf_size);
+}
+
+INSTANTIATE_TEST_SUITE_P(SndRcvBufSockOpt, SndRcvBufSockOpt, testing::Values(SO_SNDBUF, SO_RCVBUF));
