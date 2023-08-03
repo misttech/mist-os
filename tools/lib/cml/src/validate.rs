@@ -277,7 +277,7 @@ impl<'a> ValidationContext<'a> {
             self.features.has(&Feature::EnableAllowNonHermeticPackagesFeature);
 
         if restrict_test_type {
-            let allowed_values = ["cts", "chromium"];
+            let allowed_values = ["chromium"];
             let test_type = test_facet_map.map(|m| m.get(TEST_TYPE_FACET_KEY)).flatten();
             if let Some(test_type) = test_type {
                 match test_type {
