@@ -165,24 +165,6 @@ class ProtocolModifierFix final : public ParsedFix {
       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) final;
 };
 
-class EmptyStructResponseFix final : public CompiledFix {
- public:
-  EmptyStructResponseFix(std::unique_ptr<SourceManager> library,
-                         std::vector<std::unique_ptr<fidl::SourceManager>> dependencies,
-                         const VersionSelection* version_selection,
-                         const ExperimentalFlags experimental_flags)
-      : CompiledFix(Fixable::Get(Fixable::Kind::kEmptyStructResponse), std::move(library),
-                    std::move(dependencies), version_selection, experimental_flags) {}
-  ~EmptyStructResponseFix() = default;
-
- protected:
-  std::unique_ptr<CompiledTransformer> GetCompiledTransformer(
-      const std::vector<const SourceFile*>& source_files,
-      const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
-      const fidl::VersionSelection* version_selection,
-      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) final;
-};
-
 }  // namespace fidl::fix
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FIXES_H_

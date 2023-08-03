@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -279,7 +278,7 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCa
 inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(::std::string s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& other) noexcept {
+inline ExampleUseOfErrorSyntaxCallWhichMayFailRequest& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -296,7 +295,7 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxC
 inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(int64_t value) noexcept
     : storage_({.value = std::move(value)}) {}
 inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept : ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse(other.CloneStorage_()) {}
-inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse& other) noexcept {
+inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse::operator=(const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

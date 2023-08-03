@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -91,7 +90,7 @@ inline Foo::Foo(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Foo::Foo(::test_dependent::MyEnum field) noexcept
     : storage_({.field = std::move(field)}) {}
 inline Foo::Foo(const ::test_structdefaultvalueenumlibraryreference::Foo& other) noexcept : ::test_structdefaultvalueenumlibraryreference::Foo(other.CloneStorage_()) {}
-inline Foo& ::test_structdefaultvalueenumlibraryreference::Foo::operator=(const ::test_structdefaultvalueenumlibraryreference::Foo& other) noexcept {
+inline Foo& ::test_structdefaultvalueenumlibraryreference::Foo::operator=(const ::test_structdefaultvalueenumlibraryreference::Foo & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

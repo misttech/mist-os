@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -278,7 +277,7 @@ inline ExampleFooRequest::ExampleFooRequest(Storage_ storage) noexcept : storage
 inline ExampleFooRequest::ExampleFooRequest(::std::string s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ExampleFooRequest::ExampleFooRequest(const ::test_error::ExampleFooRequest& other) noexcept : ::test_error::ExampleFooRequest(other.CloneStorage_()) {}
-inline ExampleFooRequest& ::test_error::ExampleFooRequest::operator=(const ::test_error::ExampleFooRequest& other) noexcept {
+inline ExampleFooRequest& ::test_error::ExampleFooRequest::operator=(const ::test_error::ExampleFooRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -295,7 +294,7 @@ inline ExampleFooResponse::ExampleFooResponse(Storage_ storage) noexcept : stora
 inline ExampleFooResponse::ExampleFooResponse(int64_t y) noexcept
     : storage_({.y = std::move(y)}) {}
 inline ExampleFooResponse::ExampleFooResponse(const ::test_error::ExampleFooResponse& other) noexcept : ::test_error::ExampleFooResponse(other.CloneStorage_()) {}
-inline ExampleFooResponse& ::test_error::ExampleFooResponse::operator=(const ::test_error::ExampleFooResponse& other) noexcept {
+inline ExampleFooResponse& ::test_error::ExampleFooResponse::operator=(const ::test_error::ExampleFooResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

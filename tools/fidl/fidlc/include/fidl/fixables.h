@@ -25,7 +25,6 @@ class Fixable {
   enum struct Kind {
     kNoop,
     kProtocolModifier,
-    kEmptyStructResponse,
   };
 
   // Is this a fix that only requires successful parsing of the files-to-be-fixed, or does the fix

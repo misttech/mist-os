@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -107,7 +106,7 @@ inline ExampleUseOfVectors::ExampleUseOfVectors(::std::vector<uint8_t> vector_of
     : storage_({.vector_of_uint8 = std::move(vector_of_uint8),
                 .vector_of_vector_of_bool = std::move(vector_of_vector_of_bool)}) {}
 inline ExampleUseOfVectors::ExampleUseOfVectors(const ::test_vectors::ExampleUseOfVectors& other) noexcept : ::test_vectors::ExampleUseOfVectors(other.CloneStorage_()) {}
-inline ExampleUseOfVectors& ::test_vectors::ExampleUseOfVectors::operator=(const ::test_vectors::ExampleUseOfVectors& other) noexcept {
+inline ExampleUseOfVectors& ::test_vectors::ExampleUseOfVectors::operator=(const ::test_vectors::ExampleUseOfVectors & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

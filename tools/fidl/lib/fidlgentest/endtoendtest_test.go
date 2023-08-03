@@ -51,7 +51,7 @@ func TestErrorSyntaxOfImportedComposedProtocol(t *testing.T) {
 	root := EndToEndTest{T: t}.WithDependency(`library parent;
 
 	protocol Parent {
-		Method() -> (struct{}) error uint32;
+		Method() -> () error uint32;
 	};
 
 `).Single(`library child;
@@ -90,7 +90,7 @@ func TestMultipleFiles(t *testing.T) {
 	root := EndToEndTest{T: t}.WithDependency(`library dependency;
 
 	protocol Foo {
-		Method() -> (struct{}) error uint32;
+		Method() -> () error uint32;
 	};
 
 `).Multiple([]string{

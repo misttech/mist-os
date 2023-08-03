@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -765,7 +764,7 @@ inline StructWithNullableString::StructWithNullableString(Storage_ storage) noex
 inline StructWithNullableString::StructWithNullableString(::std::optional<::std::string> val) noexcept
     : storage_({.val = std::move(val)}) {}
 inline StructWithNullableString::StructWithNullableString(const ::test_nullable::StructWithNullableString& other) noexcept : ::test_nullable::StructWithNullableString(other.CloneStorage_()) {}
-inline StructWithNullableString& ::test_nullable::StructWithNullableString::operator=(const ::test_nullable::StructWithNullableString& other) noexcept {
+inline StructWithNullableString& ::test_nullable::StructWithNullableString::operator=(const ::test_nullable::StructWithNullableString & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -782,7 +781,7 @@ inline StructWithNullableVector::StructWithNullableVector(Storage_ storage) noex
 inline StructWithNullableVector::StructWithNullableVector(::std::optional<::std::vector<int32_t>> val) noexcept
     : storage_({.val = std::move(val)}) {}
 inline StructWithNullableVector::StructWithNullableVector(const ::test_nullable::StructWithNullableVector& other) noexcept : ::test_nullable::StructWithNullableVector(other.CloneStorage_()) {}
-inline StructWithNullableVector& ::test_nullable::StructWithNullableVector::operator=(const ::test_nullable::StructWithNullableVector& other) noexcept {
+inline StructWithNullableVector& ::test_nullable::StructWithNullableVector::operator=(const ::test_nullable::StructWithNullableVector & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -816,7 +815,7 @@ inline SimpleProtocolAddRequest::SimpleProtocolAddRequest(int32_t a, int32_t b) 
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline SimpleProtocolAddRequest::SimpleProtocolAddRequest(const ::test_nullable::SimpleProtocolAddRequest& other) noexcept : ::test_nullable::SimpleProtocolAddRequest(other.CloneStorage_()) {}
-inline SimpleProtocolAddRequest& ::test_nullable::SimpleProtocolAddRequest::operator=(const ::test_nullable::SimpleProtocolAddRequest& other) noexcept {
+inline SimpleProtocolAddRequest& ::test_nullable::SimpleProtocolAddRequest::operator=(const ::test_nullable::SimpleProtocolAddRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -838,7 +837,7 @@ inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(Storage_ storage) no
 inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(int32_t sum) noexcept
     : storage_({.sum = std::move(sum)}) {}
 inline SimpleProtocolAddResponse::SimpleProtocolAddResponse(const ::test_nullable::SimpleProtocolAddResponse& other) noexcept : ::test_nullable::SimpleProtocolAddResponse(other.CloneStorage_()) {}
-inline SimpleProtocolAddResponse& ::test_nullable::SimpleProtocolAddResponse::operator=(const ::test_nullable::SimpleProtocolAddResponse& other) noexcept {
+inline SimpleProtocolAddResponse& ::test_nullable::SimpleProtocolAddResponse::operator=(const ::test_nullable::SimpleProtocolAddResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -887,7 +886,7 @@ inline Int32Wrapper::Int32Wrapper(Storage_ storage) noexcept : storage_(std::mov
 inline Int32Wrapper::Int32Wrapper(int32_t val) noexcept
     : storage_({.val = std::move(val)}) {}
 inline Int32Wrapper::Int32Wrapper(const ::test_nullable::Int32Wrapper& other) noexcept : ::test_nullable::Int32Wrapper(other.CloneStorage_()) {}
-inline Int32Wrapper& ::test_nullable::Int32Wrapper::operator=(const ::test_nullable::Int32Wrapper& other) noexcept {
+inline Int32Wrapper& ::test_nullable::Int32Wrapper::operator=(const ::test_nullable::Int32Wrapper & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -904,7 +903,7 @@ inline StructWithNullableStruct::StructWithNullableStruct(Storage_ storage) noex
 inline StructWithNullableStruct::StructWithNullableStruct(::fidl::Box<::test_nullable::Int32Wrapper> val) noexcept
     : storage_({.val = std::move(val)}) {}
 inline StructWithNullableStruct::StructWithNullableStruct(const ::test_nullable::StructWithNullableStruct& other) noexcept : ::test_nullable::StructWithNullableStruct(other.CloneStorage_()) {}
-inline StructWithNullableStruct& ::test_nullable::StructWithNullableStruct::operator=(const ::test_nullable::StructWithNullableStruct& other) noexcept {
+inline StructWithNullableStruct& ::test_nullable::StructWithNullableStruct::operator=(const ::test_nullable::StructWithNullableStruct & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -921,7 +920,7 @@ inline StructWithNullableUnion::StructWithNullableUnion(Storage_ storage) noexce
 inline StructWithNullableUnion::StructWithNullableUnion(::fidl::Box<::test_nullable::SimpleUnion> val) noexcept
     : storage_({.val = std::move(val)}) {}
 inline StructWithNullableUnion::StructWithNullableUnion(const ::test_nullable::StructWithNullableUnion& other) noexcept : ::test_nullable::StructWithNullableUnion(other.CloneStorage_()) {}
-inline StructWithNullableUnion& ::test_nullable::StructWithNullableUnion::operator=(const ::test_nullable::StructWithNullableUnion& other) noexcept {
+inline StructWithNullableUnion& ::test_nullable::StructWithNullableUnion::operator=(const ::test_nullable::StructWithNullableUnion & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

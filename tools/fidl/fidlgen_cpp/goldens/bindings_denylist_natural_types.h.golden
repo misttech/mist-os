@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -1490,7 +1489,7 @@ inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(St
 inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyDartRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& other) noexcept {
+inline DenyEachBindingOnlyDenyDartRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1507,7 +1506,7 @@ inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(
 inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyDartResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse& other) noexcept {
+inline DenyEachBindingOnlyDenyDartResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1524,7 +1523,7 @@ inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(Storag
 inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyGoRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& other) noexcept {
+inline DenyEachBindingOnlyDenyGoRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1541,7 +1540,7 @@ inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(Stor
 inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyGoResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& other) noexcept {
+inline DenyEachBindingOnlyDenyGoResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1558,7 +1557,7 @@ inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzer
 inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyLibfuzzerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept {
+inline DenyEachBindingOnlyDenyLibfuzzerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1575,7 +1574,7 @@ inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzze
 inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyLibfuzzerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept {
+inline DenyEachBindingOnlyDenyLibfuzzerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1592,7 +1591,7 @@ inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(St
 inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyRustRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& other) noexcept {
+inline DenyEachBindingOnlyDenyRustRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1609,7 +1608,7 @@ inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(
 inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyRustResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& other) noexcept {
+inline DenyEachBindingOnlyDenyRustResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1626,7 +1625,7 @@ inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkaller
 inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenySyzkallerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept {
+inline DenyEachBindingOnlyDenySyzkallerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1643,7 +1642,7 @@ inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkalle
 inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(int32_t b) noexcept
     : storage_({.b = std::move(b)}) {}
 inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenySyzkallerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept {
+inline DenyEachBindingOnlyDenySyzkallerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1660,7 +1659,7 @@ inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(
 inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& other) noexcept : ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
-inline MemberOnlyAppearsInImportingLibrary& ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& other) noexcept {
+inline MemberOnlyAppearsInImportingLibrary& ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1677,7 +1676,7 @@ inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(Storage_ sto
 inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library) noexcept
     : storage_({.member_only_appears_in_importing_library = std::move(member_only_appears_in_importing_library)}) {}
 inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& other) noexcept : ::test_bindingsdenylist::OnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
-inline OnlyAppearsInImportingLibrary& ::test_bindingsdenylist::OnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& other) noexcept {
+inline OnlyAppearsInImportingLibrary& ::test_bindingsdenylist::OnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

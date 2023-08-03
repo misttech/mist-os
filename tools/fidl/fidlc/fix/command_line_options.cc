@@ -161,7 +161,6 @@ cmdline::Status ProcessCommandLine(fidl::fix::CommandLineOptions& options,
     version_selection.Insert(platform.value(), version.value());
   }
 
-  //  std::unique_ptr<fidl::fix::Fix> fix;
   switch (fixable.value().kind) {
     case fidl::Fixable::Kind::kNoop: {
       fix = std::make_unique<fidl::fix::NoopParsedFix>(std::move(library), experimental_flags);
@@ -170,11 +169,6 @@ cmdline::Status ProcessCommandLine(fidl::fix::CommandLineOptions& options,
     case fidl::Fixable::Kind::kProtocolModifier: {
       fix =
           std::make_unique<fidl::fix::ProtocolModifierFix>(std::move(library), experimental_flags);
-      break;
-    }
-    case fidl::Fixable::Kind::kEmptyStructResponse: {
-      fix = std::make_unique<fidl::fix::EmptyStructResponseFix>(
-          std::move(library), std::move(dependencies), &version_selection, experimental_flags);
       break;
     }
   }

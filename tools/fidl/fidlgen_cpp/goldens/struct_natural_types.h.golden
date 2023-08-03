@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -187,7 +186,7 @@ inline Simple::Simple(uint8_t f1, bool f2) noexcept
     : storage_({.f1 = std::move(f1),
                 .f2 = std::move(f2)}) {}
 inline Simple::Simple(const ::test_struct::Simple& other) noexcept : ::test_struct::Simple(other.CloneStorage_()) {}
-inline Simple& ::test_struct::Simple::operator=(const ::test_struct::Simple& other) noexcept {
+inline Simple& ::test_struct::Simple::operator=(const ::test_struct::Simple & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -210,7 +209,7 @@ inline BasicStruct::BasicStruct(uint32_t x, ::std::string y) noexcept
     : storage_({.x = std::move(x),
                 .y = std::move(y)}) {}
 inline BasicStruct::BasicStruct(const ::test_struct::BasicStruct& other) noexcept : ::test_struct::BasicStruct(other.CloneStorage_()) {}
-inline BasicStruct& ::test_struct::BasicStruct::operator=(const ::test_struct::BasicStruct& other) noexcept {
+inline BasicStruct& ::test_struct::BasicStruct::operator=(const ::test_struct::BasicStruct & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

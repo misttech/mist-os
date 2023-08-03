@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -528,7 +527,7 @@ inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictRespon
 inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(::test_requestflexibleenvelope::StrictFoo s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest(other.CloneStorage_()) {}
-inline ProtocolRequestStrictResponseFlexibleRequest& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept {
+inline ProtocolRequestStrictResponseFlexibleRequest& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -545,7 +544,7 @@ inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictRespo
 inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(::test_requestflexibleenvelope::FlexibleFoo f) noexcept
     : storage_({.f = std::move(f)}) {}
 inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse(other.CloneStorage_()) {}
-inline ProtocolRequestStrictResponseFlexibleResponse& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept {
+inline ProtocolRequestStrictResponseFlexibleResponse& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -562,7 +561,7 @@ inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResp
 inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(::test_requestflexibleenvelope::FlexibleFoo s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest(other.CloneStorage_()) {}
-inline ProtocolRequestFlexibleResponseStrictRequest& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept {
+inline ProtocolRequestFlexibleResponseStrictRequest& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -579,7 +578,7 @@ inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleRes
 inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(::test_requestflexibleenvelope::StrictFoo f) noexcept
     : storage_({.f = std::move(f)}) {}
 inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse(other.CloneStorage_()) {}
-inline ProtocolRequestFlexibleResponseStrictResponse& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept {
+inline ProtocolRequestFlexibleResponseStrictResponse& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

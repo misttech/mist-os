@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -827,7 +826,7 @@ inline OverrideTest::OverrideTest(::test_anonymous::Op op, ::fidl::Box<::test_an
                 .left = std::move(left),
                 .right = std::move(right)}) {}
 inline OverrideTest::OverrideTest(const ::test_anonymous::OverrideTest& other) noexcept : ::test_anonymous::OverrideTest(other.CloneStorage_()) {}
-inline OverrideTest& ::test_anonymous::OverrideTest::operator=(const ::test_anonymous::OverrideTest& other) noexcept {
+inline OverrideTest& ::test_anonymous::OverrideTest::operator=(const ::test_anonymous::OverrideTest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -852,7 +851,7 @@ inline OverrideTest& OverrideTest::right(::fidl::Box<::test_anonymous::Expressio
 
 inline FunctionApplication::FunctionApplication(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline FunctionApplication::FunctionApplication(const ::test_anonymous::FunctionApplication& other) noexcept : FunctionApplication(other.CloneStorage_()) {}
-inline FunctionApplication& ::test_anonymous::FunctionApplication::operator=(const FunctionApplication& other) noexcept {
+inline FunctionApplication& ::test_anonymous::FunctionApplication::operator=(const FunctionApplication & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -875,7 +874,7 @@ inline TableData::TableData(Storage_ storage) noexcept : storage_(std::move(stor
 inline TableData::TableData(uint8_t data) noexcept
     : storage_({.data = std::move(data)}) {}
 inline TableData::TableData(const ::test_anonymous::TableData& other) noexcept : ::test_anonymous::TableData(other.CloneStorage_()) {}
-inline TableData& ::test_anonymous::TableData::operator=(const ::test_anonymous::TableData& other) noexcept {
+inline TableData& ::test_anonymous::TableData::operator=(const ::test_anonymous::TableData & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -890,7 +889,7 @@ inline TableData& TableData::data(uint8_t value) {
 
 inline TableMember::TableMember(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableMember::TableMember(const ::test_anonymous::TableMember& other) noexcept : TableMember(other.CloneStorage_()) {}
-inline TableMember& ::test_anonymous::TableMember::operator=(const TableMember& other) noexcept {
+inline TableMember& ::test_anonymous::TableMember::operator=(const TableMember & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -906,7 +905,7 @@ inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(::test_anony
     : storage_({.union_member = std::move(union_member),
                 .table_member = std::move(table_member)}) {}
 inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(const ::test_anonymous::SomeProtocolSomeMethodRequest& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodRequest(other.CloneStorage_()) {}
-inline SomeProtocolSomeMethodRequest& ::test_anonymous::SomeProtocolSomeMethodRequest::operator=(const ::test_anonymous::SomeProtocolSomeMethodRequest& other) noexcept {
+inline SomeProtocolSomeMethodRequest& ::test_anonymous::SomeProtocolSomeMethodRequest::operator=(const ::test_anonymous::SomeProtocolSomeMethodRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -928,7 +927,7 @@ inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(Storage_ s
 inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(::test_anonymous::BitsMember bits_member) noexcept
     : storage_({.bits_member = std::move(bits_member)}) {}
 inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(const ::test_anonymous::SomeProtocolSomeMethodResponse& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodResponse(other.CloneStorage_()) {}
-inline SomeProtocolSomeMethodResponse& ::test_anonymous::SomeProtocolSomeMethodResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodResponse& other) noexcept {
+inline SomeProtocolSomeMethodResponse& ::test_anonymous::SomeProtocolSomeMethodResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

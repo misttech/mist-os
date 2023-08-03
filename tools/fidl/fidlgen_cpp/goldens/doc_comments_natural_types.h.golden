@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -390,7 +389,7 @@ inline Struct::Struct(Storage_ storage) noexcept : storage_(std::move(storage)) 
 inline Struct::Struct(int32_t field) noexcept
     : storage_({.field = std::move(field)}) {}
 inline Struct::Struct(const ::test_doccomments::Struct& other) noexcept : ::test_doccomments::Struct(other.CloneStorage_()) {}
-inline Struct& ::test_doccomments::Struct::operator=(const ::test_doccomments::Struct& other) noexcept {
+inline Struct& ::test_doccomments::Struct::operator=(const ::test_doccomments::Struct & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -405,7 +404,7 @@ inline Struct& Struct::field(int32_t value) {
 
 inline Table::Table(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Table::Table(const ::test_doccomments::Table& other) noexcept : Table(other.CloneStorage_()) {}
-inline Table& ::test_doccomments::Table::operator=(const Table& other) noexcept {
+inline Table& ::test_doccomments::Table::operator=(const Table & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

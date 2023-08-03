@@ -1031,19 +1031,6 @@ protocol MyProtocol {
   ASSERT_COMPILED(library);
 }
 
-// TODO(fxbug.dev/112767): This is temporarily still allowed. Remove once the
-// soft transition of `--experimental simple_empty_response_syntax` is done.
-TEST(ProtocolTests, GoodMethodEmptyStructResponseWithError) {
-  TestLibrary library(R"FIDL(
-library example;
-
-protocol MyProtocol {
-    MyMethod() -> (struct {}) error uint32;
-};
-)FIDL");
-  ASSERT_COMPILED(library);
-}
-
 TEST(ProtocolTests, BadMethodEmptyStructResponseWithError) {
   TestLibrary library(R"FIDL(
 library example;
@@ -1052,9 +1039,7 @@ protocol MyProtocol {
     MyMethod() -> (struct {}) error uint32;
 };
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructsWhenResultUnion);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
 }
 
 TEST(ProtocolTests, GoodMethodNamedTypeRequest) {

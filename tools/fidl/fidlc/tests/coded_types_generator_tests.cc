@@ -337,7 +337,7 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesGeneratedWrappers) {
   TestLibrary library(R"FIDL(library example;
 
 protocol ErrorSyntaxProtocol {
-    ErrorSyntaxMethod() -> (struct{}) error uint32;
+    ErrorSyntaxMethod() -> () error uint32;
 };
 )FIDL");
   ASSERT_COMPILED(library);

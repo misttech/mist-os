@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -305,7 +304,7 @@ inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(Storage_ stora
 inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(::test_exampleusing::Empty arg) noexcept
     : storage_({.arg = std::move(arg)}) {}
 inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(const ::test_placementofattributes::ExampleProtocolMethodRequest& other) noexcept : ::test_placementofattributes::ExampleProtocolMethodRequest(other.CloneStorage_()) {}
-inline ExampleProtocolMethodRequest& ::test_placementofattributes::ExampleProtocolMethodRequest::operator=(const ::test_placementofattributes::ExampleProtocolMethodRequest& other) noexcept {
+inline ExampleProtocolMethodRequest& ::test_placementofattributes::ExampleProtocolMethodRequest::operator=(const ::test_placementofattributes::ExampleProtocolMethodRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -322,7 +321,7 @@ inline ExampleStruct::ExampleStruct(Storage_ storage) noexcept : storage_(std::m
 inline ExampleStruct::ExampleStruct(uint32_t member) noexcept
     : storage_({.member = std::move(member)}) {}
 inline ExampleStruct::ExampleStruct(const ::test_placementofattributes::ExampleStruct& other) noexcept : ::test_placementofattributes::ExampleStruct(other.CloneStorage_()) {}
-inline ExampleStruct& ::test_placementofattributes::ExampleStruct::operator=(const ::test_placementofattributes::ExampleStruct& other) noexcept {
+inline ExampleStruct& ::test_placementofattributes::ExampleStruct::operator=(const ::test_placementofattributes::ExampleStruct & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -337,7 +336,7 @@ inline ExampleStruct& ExampleStruct::member(uint32_t value) {
 
 inline ExampleTable::ExampleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExampleTable::ExampleTable(const ::test_placementofattributes::ExampleTable& other) noexcept : ExampleTable(other.CloneStorage_()) {}
-inline ExampleTable& ::test_placementofattributes::ExampleTable::operator=(const ExampleTable& other) noexcept {
+inline ExampleTable& ::test_placementofattributes::ExampleTable::operator=(const ExampleTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

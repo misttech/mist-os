@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -90,7 +89,7 @@ inline ByteAndBytes::ByteAndBytes(Storage_ storage) noexcept : storage_(std::mov
 inline ByteAndBytes::ByteAndBytes(uint8_t single_byte) noexcept
     : storage_({.single_byte = std::move(single_byte)}) {}
 inline ByteAndBytes::ByteAndBytes(const ::test_byteandbytes::ByteAndBytes& other) noexcept : ::test_byteandbytes::ByteAndBytes(other.CloneStorage_()) {}
-inline ByteAndBytes& ::test_byteandbytes::ByteAndBytes::operator=(const ::test_byteandbytes::ByteAndBytes& other) noexcept {
+inline ByteAndBytes& ::test_byteandbytes::ByteAndBytes::operator=(const ::test_byteandbytes::ByteAndBytes & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

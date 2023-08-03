@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -1438,7 +1437,7 @@ class MainProtocolOnAnonWithErrorResult {
 
 inline LocalTablePayload::LocalTablePayload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline LocalTablePayload::LocalTablePayload(const ::test_protocollayouts::LocalTablePayload& other) noexcept : LocalTablePayload(other.CloneStorage_()) {}
-inline LocalTablePayload& ::test_protocollayouts::LocalTablePayload::operator=(const LocalTablePayload& other) noexcept {
+inline LocalTablePayload& ::test_protocollayouts::LocalTablePayload::operator=(const LocalTablePayload & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1451,7 +1450,7 @@ inline LocalTablePayload& LocalTablePayload::a(std::optional<uint16_t> value) {
 
 inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(const ::test_protocollayouts::MainProtocolOneWayAnonRequest& other) noexcept : MainProtocolOneWayAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolOneWayAnonRequest& ::test_protocollayouts::MainProtocolOneWayAnonRequest::operator=(const MainProtocolOneWayAnonRequest& other) noexcept {
+inline MainProtocolOneWayAnonRequest& ::test_protocollayouts::MainProtocolOneWayAnonRequest::operator=(const MainProtocolOneWayAnonRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1464,7 +1463,7 @@ inline MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::a(std::opti
 
 inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(const ::test_protocollayouts::MainProtocolTwoWayAnonResponse& other) noexcept : MainProtocolTwoWayAnonResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonResponse& ::test_protocollayouts::MainProtocolTwoWayAnonResponse::operator=(const MainProtocolTwoWayAnonResponse& other) noexcept {
+inline MainProtocolTwoWayAnonResponse& ::test_protocollayouts::MainProtocolTwoWayAnonResponse::operator=(const MainProtocolTwoWayAnonResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1477,7 +1476,7 @@ inline MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::a(std::op
 
 inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept : MainProtocolTwoWayAnonWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest::operator=(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept {
+inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest::operator=(const MainProtocolTwoWayAnonWithErrorRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1490,7 +1489,7 @@ inline MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRe
 
 inline MainProtocolOnAnonWithErrorResponse::MainProtocolOnAnonWithErrorResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolOnAnonWithErrorResponse::MainProtocolOnAnonWithErrorResponse(const ::test_protocollayouts::MainProtocolOnAnonWithErrorResponse& other) noexcept : MainProtocolOnAnonWithErrorResponse(other.CloneStorage_()) {}
-inline MainProtocolOnAnonWithErrorResponse& ::test_protocollayouts::MainProtocolOnAnonWithErrorResponse::operator=(const MainProtocolOnAnonWithErrorResponse& other) noexcept {
+inline MainProtocolOnAnonWithErrorResponse& ::test_protocollayouts::MainProtocolOnAnonWithErrorResponse::operator=(const MainProtocolOnAnonWithErrorResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

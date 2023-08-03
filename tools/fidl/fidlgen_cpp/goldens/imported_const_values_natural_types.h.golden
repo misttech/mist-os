@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -95,7 +94,7 @@ inline MyStruct::MyStruct(Storage_ storage) noexcept : storage_(std::move(storag
 inline MyStruct::MyStruct(uint8_t __reserved) noexcept
     : storage_({.__reserved = std::move(__reserved)}) {}
 inline MyStruct::MyStruct(const ::test_importedconstvalues::MyStruct& other) noexcept : ::test_importedconstvalues::MyStruct(other.CloneStorage_()) {}
-inline MyStruct& ::test_importedconstvalues::MyStruct::operator=(const ::test_importedconstvalues::MyStruct& other) noexcept {
+inline MyStruct& ::test_importedconstvalues::MyStruct::operator=(const ::test_importedconstvalues::MyStruct & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

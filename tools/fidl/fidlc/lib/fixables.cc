@@ -32,14 +32,6 @@ std::unordered_map<const Fixable::Kind, const Fixable> Fixable::kActiveFixables 
       "protocol_modifier",
       Fixable::Scope::kParsed,
       {ExperimentalFlags(ExperimentalFlags::Flag::kUnknownInteractions)}}},
-
-    // empty_struct_response
-    {Fixable::Kind::kEmptyStructResponse,
-     {Fixable::Kind::kEmptyStructResponse,
-      "empty_struct_response",
-      Fixable::Scope::kCompiled,
-      {ExperimentalFlags({ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax,
-                          ExperimentalFlags::Flag::kUnknownInteractions})}}},
 };
 
 const Fixable Fixable::Get(Fixable::Kind kind) { return kActiveFixables.at(kind); }

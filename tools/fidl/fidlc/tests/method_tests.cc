@@ -1061,9 +1061,7 @@ open protocol Test {
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
 }
 
-// TODO(fxbug.dev/112767): This is temporarily still allowed. Remove once the
-// soft transition of `--experimental simple_empty_response_syntax` is done.
-TEST(MethodTests, GoodEmptyStructPayloadFlexibleNoError) {
+TEST(MethodTests, BadEmptyStructPayloadFlexibleNoError) {
   TestLibrary library(R"FIDL(library example;
 
 open protocol Test {
@@ -1072,12 +1070,10 @@ open protocol Test {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_COMPILED(library);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
 }
 
-// TODO(fxbug.dev/112767): This is temporarily still allowed. Remove once the
-// soft transition of `--experimental simple_empty_response_syntax` is done.
-TEST(MethodTests, GoodEmptyStructPayloadStrictError) {
+TEST(MethodTests, BadEmptyStructPayloadStrictError) {
   TestLibrary library(R"FIDL(library example;
 
 open protocol Test {
@@ -1086,12 +1082,10 @@ open protocol Test {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_COMPILED(library);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
 }
 
-// TODO(fxbug.dev/112767): This is temporarily still allowed. Remove once the
-// soft transition of `--experimental simple_empty_response_syntax` is done.
-TEST(MethodTests, GoodEmptyStructPayloadFlexibleError) {
+TEST(MethodTests, BadEmptyStructPayloadFlexibleError) {
   TestLibrary library(R"FIDL(library example;
 
 open protocol Test {
@@ -1100,7 +1094,7 @@ open protocol Test {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_COMPILED(library);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
 }
 
 TEST(MethodTests, GoodAbsentPayloadFlexibleNoError) {
@@ -1137,37 +1131,6 @@ open protocol Test {
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
-}
-
-TEST(MethodTests, BadEmptyStructPayloadStrictError) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0194-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructsWhenResultUnion);
-}
-
-TEST(MethodTests, BadEmptyStructPayloadFlexibleError) {
-  TestLibrary library(R"FIDL(library example;
-
-open protocol Test {
-  flexible Method() -> (struct {}) error int32;
-};
-)FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructsWhenResultUnion);
-}
-
-TEST(MethodTests, BadEmptyStructPayloadFlexibleNoError) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0194-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructsWhenResultUnion);
 }
 
 TEST(MethodTests, GoodFlexibleNoErrorResponseUnion) {

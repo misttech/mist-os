@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -1023,7 +1022,7 @@ class SixtyFourOrdinalTable {
 
 inline EmptyTable::EmptyTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline EmptyTable::EmptyTable(const ::test_table::EmptyTable& other) noexcept : EmptyTable(other.CloneStorage_()) {}
-inline EmptyTable& ::test_table::EmptyTable::operator=(const EmptyTable& other) noexcept {
+inline EmptyTable& ::test_table::EmptyTable::operator=(const EmptyTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1032,7 +1031,7 @@ inline EmptyTable::EmptyTable(::fidl::internal::DefaultConstructPossiblyInvalidO
 
 inline SimpleTable::SimpleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline SimpleTable::SimpleTable(const ::test_table::SimpleTable& other) noexcept : SimpleTable(other.CloneStorage_()) {}
-inline SimpleTable& ::test_table::SimpleTable::operator=(const SimpleTable& other) noexcept {
+inline SimpleTable& ::test_table::SimpleTable::operator=(const SimpleTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1049,7 +1048,7 @@ inline SimpleTable& SimpleTable::y(std::optional<int64_t> value) {
 
 inline OlderSimpleTable::OlderSimpleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline OlderSimpleTable::OlderSimpleTable(const ::test_table::OlderSimpleTable& other) noexcept : OlderSimpleTable(other.CloneStorage_()) {}
-inline OlderSimpleTable& ::test_table::OlderSimpleTable::operator=(const OlderSimpleTable& other) noexcept {
+inline OlderSimpleTable& ::test_table::OlderSimpleTable::operator=(const OlderSimpleTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1062,7 +1061,7 @@ inline OlderSimpleTable& OlderSimpleTable::x(std::optional<int64_t> value) {
 
 inline NewerSimpleTable::NewerSimpleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline NewerSimpleTable::NewerSimpleTable(const ::test_table::NewerSimpleTable& other) noexcept : NewerSimpleTable(other.CloneStorage_()) {}
-inline NewerSimpleTable& ::test_table::NewerSimpleTable::operator=(const NewerSimpleTable& other) noexcept {
+inline NewerSimpleTable& ::test_table::NewerSimpleTable::operator=(const NewerSimpleTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1083,7 +1082,7 @@ inline NewerSimpleTable& NewerSimpleTable::z(std::optional<int64_t> value) {
 
 inline ReverseOrdinalTable::ReverseOrdinalTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ReverseOrdinalTable::ReverseOrdinalTable(const ::test_table::ReverseOrdinalTable& other) noexcept : ReverseOrdinalTable(other.CloneStorage_()) {}
-inline ReverseOrdinalTable& ::test_table::ReverseOrdinalTable::operator=(const ReverseOrdinalTable& other) noexcept {
+inline ReverseOrdinalTable& ::test_table::ReverseOrdinalTable::operator=(const ReverseOrdinalTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1104,7 +1103,7 @@ inline ReverseOrdinalTable& ReverseOrdinalTable::x(std::optional<int64_t> value)
 
 inline TableWithAttributes::TableWithAttributes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableWithAttributes::TableWithAttributes(const ::test_table::TableWithAttributes& other) noexcept : TableWithAttributes(other.CloneStorage_()) {}
-inline TableWithAttributes& ::test_table::TableWithAttributes::operator=(const TableWithAttributes& other) noexcept {
+inline TableWithAttributes& ::test_table::TableWithAttributes::operator=(const TableWithAttributes & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1117,7 +1116,7 @@ inline TableWithAttributes& TableWithAttributes::x(std::optional<int64_t> value)
 
 inline ExtensionTable::ExtensionTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExtensionTable::ExtensionTable(const ::test_table::ExtensionTable& other) noexcept : ExtensionTable(other.CloneStorage_()) {}
-inline ExtensionTable& ::test_table::ExtensionTable::operator=(const ExtensionTable& other) noexcept {
+inline ExtensionTable& ::test_table::ExtensionTable::operator=(const ExtensionTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1126,7 +1125,7 @@ inline ExtensionTable::ExtensionTable(::fidl::internal::DefaultConstructPossibly
 
 inline SixtyFourOrdinalTable::SixtyFourOrdinalTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline SixtyFourOrdinalTable::SixtyFourOrdinalTable(const ::test_table::SixtyFourOrdinalTable& other) noexcept : SixtyFourOrdinalTable(other.CloneStorage_()) {}
-inline SixtyFourOrdinalTable& ::test_table::SixtyFourOrdinalTable::operator=(const SixtyFourOrdinalTable& other) noexcept {
+inline SixtyFourOrdinalTable& ::test_table::SixtyFourOrdinalTable::operator=(const SixtyFourOrdinalTable & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

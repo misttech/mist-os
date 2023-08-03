@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -490,7 +489,7 @@ inline Int8Int32::Int8Int32(int8_t a, int32_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Int8Int32::Int8Int32(const ::test_encapsulatedstructs::Int8Int32& other) noexcept : ::test_encapsulatedstructs::Int8Int32(other.CloneStorage_()) {}
-inline Int8Int32& ::test_encapsulatedstructs::Int8Int32::operator=(const ::test_encapsulatedstructs::Int8Int32& other) noexcept {
+inline Int8Int32& ::test_encapsulatedstructs::Int8Int32::operator=(const ::test_encapsulatedstructs::Int8Int32 & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -513,7 +512,7 @@ inline Int16Int8::Int16Int8(int16_t a, int8_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Int16Int8::Int16Int8(const ::test_encapsulatedstructs::Int16Int8& other) noexcept : ::test_encapsulatedstructs::Int16Int8(other.CloneStorage_()) {}
-inline Int16Int8& ::test_encapsulatedstructs::Int16Int8::operator=(const ::test_encapsulatedstructs::Int16Int8& other) noexcept {
+inline Int16Int8& ::test_encapsulatedstructs::Int16Int8::operator=(const ::test_encapsulatedstructs::Int16Int8 & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -535,7 +534,7 @@ inline ArrayInt16Int8::ArrayInt16Int8(Storage_ storage) noexcept : storage_(std:
 inline ArrayInt16Int8::ArrayInt16Int8(::std::array<::test_encapsulatedstructs::Int16Int8, 3> arr) noexcept
     : storage_({.arr = std::move(arr)}) {}
 inline ArrayInt16Int8::ArrayInt16Int8(const ::test_encapsulatedstructs::ArrayInt16Int8& other) noexcept : ::test_encapsulatedstructs::ArrayInt16Int8(other.CloneStorage_()) {}
-inline ArrayInt16Int8& ::test_encapsulatedstructs::ArrayInt16Int8::operator=(const ::test_encapsulatedstructs::ArrayInt16Int8& other) noexcept {
+inline ArrayInt16Int8& ::test_encapsulatedstructs::ArrayInt16Int8::operator=(const ::test_encapsulatedstructs::ArrayInt16Int8 & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -554,7 +553,7 @@ inline StructPaddingTestStruct::StructPaddingTestStruct(::test_encapsulatedstruc
                 .inner = std::move(inner),
                 .array = std::move(array)}) {}
 inline StructPaddingTestStruct::StructPaddingTestStruct(const ::test_encapsulatedstructs::StructPaddingTestStruct& other) noexcept : ::test_encapsulatedstructs::StructPaddingTestStruct(other.CloneStorage_()) {}
-inline StructPaddingTestStruct& ::test_encapsulatedstructs::StructPaddingTestStruct::operator=(const ::test_encapsulatedstructs::StructPaddingTestStruct& other) noexcept {
+inline StructPaddingTestStruct& ::test_encapsulatedstructs::StructPaddingTestStruct::operator=(const ::test_encapsulatedstructs::StructPaddingTestStruct & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

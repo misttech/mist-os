@@ -406,10 +406,7 @@ constexpr ErrorDef<192, std::string_view> ErrProtocolMustDefineOpenness(
     "from closed to open, and explicit modifiers are mandatory during the migration.)",
     {.fixable = Fixable::Kind::kProtocolModifier});
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
-constexpr ErrorDef<194, std::string_view> ErrEmptyPayloadStructsWhenResultUnion(
-    "method '{}' cannot have an empty struct as a payload, prefer omitting the payload"
-    "altogether",
-    {.fixable = Fixable::Kind::kEmptyStructResponse});
+constexpr RetiredDef<194> ErrEmptyPayloadStructsWhenResultUnion;
 constexpr RetiredDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag;
 constexpr RetiredDef<196> ErrExperimentalOverflowingIncorrectUsage;
 constexpr ErrorDef<197> ErrOverlayMustBeStrict("overlays must be strict", {.documented = false});

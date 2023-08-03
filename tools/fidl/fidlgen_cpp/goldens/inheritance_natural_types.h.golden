@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -153,7 +152,7 @@ inline SuperFooRequest::SuperFooRequest(Storage_ storage) noexcept : storage_(st
 inline SuperFooRequest::SuperFooRequest(::std::string s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline SuperFooRequest::SuperFooRequest(const ::test_inheritance::SuperFooRequest& other) noexcept : ::test_inheritance::SuperFooRequest(other.CloneStorage_()) {}
-inline SuperFooRequest& ::test_inheritance::SuperFooRequest::operator=(const ::test_inheritance::SuperFooRequest& other) noexcept {
+inline SuperFooRequest& ::test_inheritance::SuperFooRequest::operator=(const ::test_inheritance::SuperFooRequest & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -170,7 +169,7 @@ inline SuperFooResponse::SuperFooResponse(Storage_ storage) noexcept : storage_(
 inline SuperFooResponse::SuperFooResponse(int64_t y) noexcept
     : storage_({.y = std::move(y)}) {}
 inline SuperFooResponse::SuperFooResponse(const ::test_inheritance::SuperFooResponse& other) noexcept : ::test_inheritance::SuperFooResponse(other.CloneStorage_()) {}
-inline SuperFooResponse& ::test_inheritance::SuperFooResponse::operator=(const ::test_inheritance::SuperFooResponse& other) noexcept {
+inline SuperFooResponse& ::test_inheritance::SuperFooResponse::operator=(const ::test_inheritance::SuperFooResponse & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

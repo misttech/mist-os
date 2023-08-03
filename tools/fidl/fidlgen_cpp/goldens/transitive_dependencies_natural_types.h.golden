@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -91,7 +90,7 @@ inline Baz::Baz(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Baz::Baz(::test_middle::Bar g) noexcept
     : storage_({.g = std::move(g)}) {}
 inline Baz::Baz(const ::test_transitivedependencies::Baz& other) noexcept : ::test_transitivedependencies::Baz(other.CloneStorage_()) {}
-inline Baz& ::test_transitivedependencies::Baz::operator=(const ::test_transitivedependencies::Baz& other) noexcept {
+inline Baz& ::test_transitivedependencies::Baz::operator=(const ::test_transitivedependencies::Baz & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }

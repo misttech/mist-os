@@ -2,7 +2,6 @@
 
 // fidl_experiment = no_optional_structs
 // fidl_experiment = output_index_json
-// fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_mandate
 
@@ -449,7 +448,7 @@ inline StructSmallArray::StructSmallArray(Storage_ storage) noexcept : storage_(
 inline StructSmallArray::StructSmallArray(::std::array<uint32_t, 2> a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline StructSmallArray::StructSmallArray(const ::test_arrays::StructSmallArray& other) noexcept : ::test_arrays::StructSmallArray(other.CloneStorage_()) {}
-inline StructSmallArray& ::test_arrays::StructSmallArray::operator=(const ::test_arrays::StructSmallArray& other) noexcept {
+inline StructSmallArray& ::test_arrays::StructSmallArray::operator=(const ::test_arrays::StructSmallArray & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -466,7 +465,7 @@ inline StructLargeArray::StructLargeArray(Storage_ storage) noexcept : storage_(
 inline StructLargeArray::StructLargeArray(::std::array<uint32_t, 100> a) noexcept
     : storage_({.a = std::move(a)}) {}
 inline StructLargeArray::StructLargeArray(const ::test_arrays::StructLargeArray& other) noexcept : ::test_arrays::StructLargeArray(other.CloneStorage_()) {}
-inline StructLargeArray& ::test_arrays::StructLargeArray::operator=(const ::test_arrays::StructLargeArray& other) noexcept {
+inline StructLargeArray& ::test_arrays::StructLargeArray::operator=(const ::test_arrays::StructLargeArray & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -481,7 +480,7 @@ inline StructLargeArray& StructLargeArray::a(::std::array<uint32_t, 100> value) 
 
 inline TableSmallArray::TableSmallArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableSmallArray::TableSmallArray(const ::test_arrays::TableSmallArray& other) noexcept : TableSmallArray(other.CloneStorage_()) {}
-inline TableSmallArray& ::test_arrays::TableSmallArray::operator=(const TableSmallArray& other) noexcept {
+inline TableSmallArray& ::test_arrays::TableSmallArray::operator=(const TableSmallArray & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -494,7 +493,7 @@ inline TableSmallArray& TableSmallArray::a(std::optional<::std::array<uint32_t, 
 
 inline TableLargeArray::TableLargeArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableLargeArray::TableLargeArray(const ::test_arrays::TableLargeArray& other) noexcept : TableLargeArray(other.CloneStorage_()) {}
-inline TableLargeArray& ::test_arrays::TableLargeArray::operator=(const TableLargeArray& other) noexcept {
+inline TableLargeArray& ::test_arrays::TableLargeArray::operator=(const TableLargeArray & other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
