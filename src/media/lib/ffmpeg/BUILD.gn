@@ -70,28 +70,11 @@ if (use_prebuilt_ffmpeg) {
   forward_variables_from(
       read_file("$prebuilt_dir/prebuilt_variants.json", "json"),
       [ "prebuilt_variants" ])
-  use_variant = prebuilt_variants + [ toolchain_variant.name ] -
-                [ toolchain_variant.name ] != prebuilt_variants
-
-  # TODO(fxbug.dev/131605): https://reviews.llvm.org/rGaa972f607c55cdbab3b9182aacb3ed6a5d9e73e1
-  # contains a change to the -fsanitize=function ABI for detecting function type mismatches. The
-  # last ubsan-instrumented versions of ffmpeg though were made with the much older integration
-  # toolchain, so function type mismatches in ubsan-instrumented code with the toolchain we're
-  # going to roll to will not match the ABI from ffmpeg made with the old toolchain. This means
-  # we'll also need to roll a version of ffmpeg made with a newer toolchain. The issue here is
-  # ffmpeg is unique and requires checking out all of fuchsia to build, and the infrastructure
-  # for building ffmpeg with a custom toolchain doesn't exist at the moment and would take some
-  # effort to hookup into infra. So for now, what we can do is temporarily not use
-  # ubsan-instrumented ffmpegs to facilitate the roll, but once we get the new toolchain in, we
-  # should come back and rebuild ffmpeg with the new integration toolchain and continue to use
-  # ubsan prebuilts.
-  has_ubsan = toolchain_variant.tags + [ "ubsan" ] - [ "ubsan" ] !=
-              toolchain_variant.tags
-  use_variant = !has_ubsan && use_variant
 
   # If there is a variant prebuilt, use it from the variant-named subdirectory.
   # Otherwise use the vanilla build in the main directory.
-  if (use_variant) {
+  if (prebuilt_variants + [ toolchain_variant.name ] -
+      [ toolchain_variant.name ] != prebuilt_variants) {
     ffmpeg_lib_dir = "$prebuilt_lib_dir/${toolchain_variant.name}/"
   } else {
     ffmpeg_lib_dir = prebuilt_lib_dir
