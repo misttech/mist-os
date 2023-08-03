@@ -155,10 +155,10 @@ impl FirstProtocolEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<FirstProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name: <FirstProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
         }
@@ -231,7 +231,7 @@ impl futures::Stream for FirstProtocolRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x5828c91b57492931 => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
@@ -244,7 +244,7 @@ impl futures::Stream for FirstProtocolRequestStream {
                     Ok(FirstProtocolRequest::MethodOnFirst { control_handle })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name:
                         <FirstProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
@@ -435,10 +435,10 @@ impl SecondProtocolEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<SecondProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name:
                     <SecondProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
@@ -512,7 +512,7 @@ impl futures::Stream for SecondProtocolRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x70b439758de25c44 => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
@@ -525,7 +525,7 @@ impl futures::Stream for SecondProtocolRequestStream {
                     Ok(SecondProtocolRequest::MethodOnSecond { control_handle })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name:
                         <SecondProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),

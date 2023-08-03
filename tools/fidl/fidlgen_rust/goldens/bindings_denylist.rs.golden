@@ -233,10 +233,10 @@ impl AllowedEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<AllowedEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name: <AllowedMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
         }
@@ -309,9 +309,9 @@ impl futures::Stream for AllowedRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name: <AllowedMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
@@ -720,10 +720,10 @@ impl DenyEachBindingEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<DenyEachBindingEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name:
                     <DenyEachBindingMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
@@ -797,7 +797,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x290bad96051b1b92 => {
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyCppRequest);
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyCppRequest>(
@@ -812,8 +812,8 @@ impl futures::Stream for DenyEachBindingRequestStream {
 
                         responder: DenyEachBindingOnlyDenyCppResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -831,8 +831,8 @@ impl futures::Stream for DenyEachBindingRequestStream {
 
                         responder: DenyEachBindingOnlyDenyDartResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -850,8 +850,8 @@ impl futures::Stream for DenyEachBindingRequestStream {
 
                         responder: DenyEachBindingOnlyDenyGoResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -869,8 +869,8 @@ impl futures::Stream for DenyEachBindingRequestStream {
 
                         responder: DenyEachBindingOnlyDenyLibfuzzerResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -888,13 +888,13 @@ impl futures::Stream for DenyEachBindingRequestStream {
 
                         responder: DenyEachBindingOnlyDenySyzkallerResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name:
                         <DenyEachBindingMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
@@ -1492,10 +1492,10 @@ impl ImportsSameNameContextEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ImportsSameNameContextEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name:
                     <ImportsSameNameContextMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
@@ -1569,7 +1569,7 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x698380acfd29e8f => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
@@ -1591,7 +1591,7 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name: <ImportsSameNameContextMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))

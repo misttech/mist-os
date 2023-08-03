@@ -305,8 +305,8 @@ impl {{ $protocol.Event }} {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<{{ $protocol.Event }}, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             {{- range $method := $protocol.Methods }}
             {{- if not $method.HasRequest }}
             {{ .Ordinal | printf "%#x" }} => {
@@ -323,12 +323,12 @@ impl {{ $protocol.Event }} {
             {{- if $protocol.OneWayUnknownInteractions }}
             _ if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
                 Ok({{ $protocol.Event }}::_UnknownEvent {
-                    ordinal: tx_header.ordinal(),
+                    ordinal: tx_header.ordinal,
                 })
             }
             {{- end }}
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name: <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             })
         }
@@ -401,7 +401,7 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 {{- range $method := $protocol.Methods }}
                 {{- if $method.HasRequest }}
                 {{ .Ordinal | printf "%#x" }} => {
@@ -415,8 +415,8 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                         {{- if $method.HasResponse }}
                         responder: {{ $method.Responder }} {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                         {{- else }}
                         control_handle,
@@ -426,9 +426,9 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                 {{- end }}
                 {{- end }}
                 {{- if $protocol.OneWayUnknownInteractions }}
-                _ if header.tx_id() == 0 && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
+                _ if header.tx_id == 0 && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
                     Ok({{ $protocol.Request }}::_UnknownMethod {
-                        ordinal: header.ordinal(),
+                        ordinal: header.ordinal,
                         control_handle: {{ $protocol.ControlHandle }} { inner: this.inner.clone() },
                         {{- if $protocol.TwoWayUnknownInteractions }}
                         unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
@@ -439,13 +439,13 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                 _ if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
                     this.inner.send_framework_err(
                         fidl::encoding::FrameworkErr::UnknownMethod,
-                        header.tx_id(),
-                        header.ordinal(),
+                        header.tx_id,
+                        header.ordinal,
                         header.dynamic_flags(),
                         (bytes, handles),
                     )?;
                     Ok({{ $protocol.Request }}::_UnknownMethod {
-                        ordinal: header.ordinal(),
+                        ordinal: header.ordinal,
                         control_handle: {{ $protocol.ControlHandle }} { inner: this.inner.clone() },
                         unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
                     })
@@ -453,7 +453,7 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                 {{- end }}
                 {{- end }}
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name: <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))

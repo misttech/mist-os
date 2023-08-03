@@ -6,7 +6,7 @@
 
 use {
     crate::node::{CloseError, OpenError},
-    fidl::encoding::{persist, unpersist, Persistable},
+    fidl::{persist, unpersist, Persistable},
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
     thiserror::Error,
 };

@@ -32,7 +32,7 @@ pub fn decode_transaction_body<T: TypeMarker, const EXPECTED_ORDINAL: u64>(
 ) -> Result<T::Owned, Error> {
     let (bytes, handles) = buf.split_mut();
     let (header, body_bytes) = decode_transaction_header(bytes)?;
-    if header.ordinal() != EXPECTED_ORDINAL {
+    if header.ordinal != EXPECTED_ORDINAL {
         return Err(Error::InvalidResponseOrdinal);
     }
     let mut output = Decode::<T>::new_empty();
@@ -658,14 +658,14 @@ impl ClientInner {
             // Epitaph handling is done, so the lock is no longer required.
             drop(epitaph_lock);
 
-            if header.tx_id() == 0 {
+            if header.tx_id == 0 {
                 // received an event
                 let mut lock = self.event_channel.lock();
                 lock.queue.push_back(buf);
                 lock.listener.wake();
             } else {
                 // received a message response
-                let recvd_interest_id = InterestId::from_txid(Txid(header.tx_id()));
+                let recvd_interest_id = InterestId::from_txid(Txid(header.tx_id));
 
                 // Look for a message interest with the given ID.
                 // If one is found, store the message so that it can be picked up later.
@@ -819,7 +819,7 @@ pub mod sync {
 
             let (bytes, mut handle_infos) = buf.split();
             let (header, body_bytes) = decode_transaction_header(&bytes)?;
-            if header.ordinal() != ordinal {
+            if header.ordinal != ordinal {
                 return Err(Error::InvalidResponseOrdinal);
             }
             let mut output = Decode::<Response>::new_empty();
@@ -846,7 +846,7 @@ pub mod sync {
                         // an event not a two-way method reply.
                         let (header, _) = decode_transaction_header(buf.bytes())
                             .map_err(|_| Error::InvalidHeader)?;
-                        if header.tx_id() != 0 {
+                        if header.tx_id != 0 {
                             return Err(Error::UnexpectedSyncResponse);
                         }
                         return Ok(buf);
@@ -959,9 +959,9 @@ mod tests {
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
             let (header, _body_bytes) = decode_transaction_header(buf).expect("server decode");
-            assert_eq!(header.ordinal(), SEND_ORDINAL);
+            assert_eq!(header.ordinal, SEND_ORDINAL);
             send_transaction(
-                TransactionHeader::new(header.tx_id(), header.ordinal(), DynamicFlags::empty()),
+                TransactionHeader::new(header.tx_id, header.ordinal, DynamicFlags::empty()),
                 &server_end,
             );
         });
@@ -990,8 +990,8 @@ mod tests {
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
             let (header, _body_bytes) = decode_transaction_header(buf).expect("server decode");
-            assert_ne!(header.tx_id(), 0);
-            assert_eq!(header.ordinal(), SEND_ORDINAL);
+            assert_ne!(header.tx_id, 0);
+            assert_eq!(header.ordinal, SEND_ORDINAL);
             // First, send an event.
             send_transaction(
                 TransactionHeader::new(0, EVENT_ORDINAL, DynamicFlags::empty()),
@@ -1000,7 +1000,7 @@ mod tests {
             // Then send the reply. The kernel should pick the correct message to deliver based
             // on the tx_id.
             send_transaction(
-                TransactionHeader::new(header.tx_id(), header.ordinal(), DynamicFlags::empty()),
+                TransactionHeader::new(header.tx_id, header.ordinal, DynamicFlags::empty()),
                 &server_end,
             );
         });
@@ -1018,7 +1018,7 @@ mod tests {
             client.wait_for_event(zx::Time::after(5.seconds())).context("waiting for event")?;
         let (bytes, _handles) = event_buf.split();
         let (header, _body) = decode_transaction_header(&bytes).expect("event decode");
-        assert_eq!(header.ordinal(), EVENT_ORDINAL);
+        assert_eq!(header.ordinal, EVENT_ORDINAL);
 
         Ok(())
     }

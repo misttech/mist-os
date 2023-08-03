@@ -791,8 +791,8 @@ impl MainProtocolEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<MainProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             0x19fbe2b2f6f9273a => {
                 let mut out =
                     fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
@@ -864,7 +864,7 @@ impl MainProtocolEvent {
                 Ok((MainProtocolEvent::OnAnonWithError { result: out.map(|x| (x.a, x.b)) }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name: <MainProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
         }
@@ -937,7 +937,7 @@ impl futures::Stream for MainProtocolRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x241e4384443ccb10 => {
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
@@ -959,8 +959,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayComposedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -976,8 +976,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayComposedWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1007,8 +1007,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayLocalResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1027,8 +1027,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayLocalWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1053,8 +1053,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayImportResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1070,8 +1070,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayImportWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1101,8 +1101,8 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayAnonResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1121,13 +1121,13 @@ impl futures::Stream for MainProtocolRequestStream {
 
                         responder: MainProtocolTwoWayAnonWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name:
                         <MainProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),

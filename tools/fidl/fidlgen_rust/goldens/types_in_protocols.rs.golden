@@ -4327,8 +4327,8 @@ impl ProtocolEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<ProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             0x51c5b06295c10c40 => {
                 let mut out = fidl::new_empty!(Basic);
                 fidl::encoding::Decoder::decode_into::<Basic>(
@@ -4521,7 +4521,7 @@ impl ProtocolEvent {
                 }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name: <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
         }
@@ -4594,7 +4594,7 @@ impl futures::Stream for ProtocolRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x7c311f0d9e662df9 => {
                     let mut req = fidl::new_empty!(Basic);
                     fidl::encoding::Decoder::decode_into::<Basic>(
@@ -4646,8 +4646,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4663,8 +4663,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorBasic {
                         responder: ProtocolErrorBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4709,8 +4709,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4726,8 +4726,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorCompound {
                         responder: ProtocolErrorCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4782,8 +4782,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayArrayBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4799,8 +4799,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorArrayBasic {
                         responder: ProtocolErrorArrayBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4845,8 +4845,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayArrayCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4862,8 +4862,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorArrayCompound {
                         responder: ProtocolErrorArrayCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4918,8 +4918,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayVectorBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4935,8 +4935,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorVectorBasic {
                         responder: ProtocolErrorVectorBasicResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4981,8 +4981,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayVectorCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4998,8 +4998,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorVectorCompound {
                         responder: ProtocolErrorVectorCompoundResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5038,8 +5038,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayVectorOptionalResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5055,8 +5055,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorVectorOptional {
                         responder: ProtocolErrorVectorOptionalResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5095,8 +5095,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayArrayVectorNestedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5112,8 +5112,8 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorArrayVectorNested {
                         responder: ProtocolErrorArrayVectorNestedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5198,8 +5198,8 @@ impl futures::Stream for ProtocolRequestStream {
 
                         responder: ProtocolTwoWayResourceResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5215,13 +5215,13 @@ impl futures::Stream for ProtocolRequestStream {
                     Ok(ProtocolRequest::ErrorResource {
                         responder: ProtocolErrorResourceResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id(),
-                            ordinal: header.ordinal(),
+                            tx_id: header.tx_id,
+                            ordinal: header.ordinal,
                         },
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name: <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))

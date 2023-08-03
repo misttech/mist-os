@@ -97,7 +97,7 @@ fn benchmark_{{ .Name }}_decode(b: &mut Bencher) {
             let mut handles = Vec::<HandleDisposition<'static>>::new();
             let original_value = &{{ if .IsResource}}mut {{ end }}{{ .Value }};
             Encoder::encode_with_context::<{{ .ValueType }}>(_V2_CONTEXT, &mut bytes, &mut handles, original_value).unwrap();
-            let handle_infos = fidl::encoding::convert_handle_dispositions_to_infos(handles).unwrap();
+            let handle_infos = fidl::convert_handle_dispositions_to_infos(handles).unwrap();
             {{- /* Wrap handle in an Option to allow low-overhead measurement of drop time */}}
             (bytes, handle_infos, ManuallyDrop::new(fidl::new_empty!({{ .ValueType }})))
         },

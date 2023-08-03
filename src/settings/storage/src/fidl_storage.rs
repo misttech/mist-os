@@ -4,8 +4,8 @@
 
 use crate::UpdateState;
 use anyhow::{bail, format_err, Context, Error};
-use fidl::encoding::{persist, unpersist, Persistable};
 use fidl::Status;
+use fidl::{persist, unpersist, Persistable};
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{Task, Time, Timer};
 use fuchsia_fs::file::ReadError;

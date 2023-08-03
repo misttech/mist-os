@@ -1223,10 +1223,10 @@ impl TestProtocolEvent {
     fn decode(mut buf: fidl::MessageBufEtc) -> Result<TestProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
-        debug_assert_eq!(tx_header.tx_id(), 0);
-        match tx_header.ordinal() {
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
             _ => Err(fidl::Error::UnknownOrdinal {
-                ordinal: tx_header.ordinal(),
+                ordinal: tx_header.ordinal,
                 protocol_name: <TestProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
             }),
         }
@@ -1299,7 +1299,7 @@ impl futures::Stream for TestProtocolRequestStream {
             // A message has been received from the channel
             let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal() {
+            std::task::Poll::Ready(Some(match header.ordinal {
                 0x5bfca9479251b9c3 => {
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
@@ -1313,8 +1313,8 @@ impl futures::Stream for TestProtocolRequestStream {
                         responder:
                             TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
+                                tx_id: header.tx_id,
+                                ordinal: header.ordinal,
                             },
                     })
                 }
@@ -1331,13 +1331,13 @@ impl futures::Stream for TestProtocolRequestStream {
                         responder:
                             TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
-                                tx_id: header.tx_id(),
-                                ordinal: header.ordinal(),
+                                tx_id: header.tx_id,
+                                ordinal: header.ordinal,
                             },
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal(),
+                    ordinal: header.ordinal,
                     protocol_name:
                         <TestProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),

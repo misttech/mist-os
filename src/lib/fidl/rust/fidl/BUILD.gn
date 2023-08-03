@@ -32,6 +32,7 @@ fidl_rust_sources = [
   "src/error.rs",
   "src/handle.rs",
   "src/lib.rs",
+  "src/persistence.rs",
   "src/prelude.rs",
   "src/server.rs",
 ]

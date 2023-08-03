@@ -72,7 +72,6 @@ pub mod fuchsia_handles {
 /// Non-Fuchsia implementation of handles
 #[cfg(not(target_os = "fuchsia"))]
 pub mod non_fuchsia_handles {
-
     pub use fuchsia_async::emulated_handle::{
         AsHandleRef, EmulatedHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo,
         HandleOp, HandleRef, MessageBufEtc, ObjectType, Peered, Rights, Signals, SocketOpts,
@@ -122,4 +121,36 @@ pub mod non_fuchsia_handles {
     }
 
     invoke_for_handle_types!(host_handle);
+}
+
+/// Converts a vector of `HandleDisposition` (handles bundled with their
+/// intended object type and rights) to a vector of `HandleInfo` (handles
+/// bundled with their actual type and rights, guaranteed by the kernel).
+///
+/// This makes a `zx_handle_replace` syscall for each handle unless the rights
+/// are `Rights::SAME_RIGHTS`.
+///
+/// # Panics
+///
+/// Panics if any of the handle dispositions uses `HandleOp::Duplicate`. This is
+/// never the case for handle dispositions return by `standalone_encode`.
+pub fn convert_handle_dispositions_to_infos(
+    handle_dispositions: Vec<HandleDisposition<'_>>,
+) -> crate::Result<Vec<HandleInfo>> {
+    handle_dispositions
+        .into_iter()
+        .map(|hd| {
+            Ok(HandleInfo {
+                handle: match hd.handle_op {
+                    HandleOp::Move(h) if hd.rights == Rights::SAME_RIGHTS => h,
+                    HandleOp::Move(h) => {
+                        h.replace(hd.rights).map_err(crate::Error::HandleReplace)?
+                    }
+                    HandleOp::Duplicate(_) => panic!("unexpected HandleOp::Duplicate"),
+                },
+                object_type: hd.object_type,
+                rights: hd.rights,
+            })
+        })
+        .collect()
 }

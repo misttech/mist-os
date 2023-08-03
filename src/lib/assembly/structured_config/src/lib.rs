@@ -10,7 +10,7 @@ use assembly_config_schema::FileEntry;
 use assembly_validate_util::PkgNamespace;
 use camino::{Utf8Path, Utf8PathBuf};
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
-use fidl::encoding::{unpersist, Persistable};
+use fidl::{unpersist, Persistable};
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::{collections::BTreeMap, fmt::Debug};
 

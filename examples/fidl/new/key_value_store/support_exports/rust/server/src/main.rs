@@ -15,7 +15,7 @@ use {
 
 // [START diff_1]
 use {
-    fidl::{encoding::persist, Vmo},
+    fidl::{persist, Vmo},
     fidl_examples_keyvaluestore_supportexports::{
         ExportError, Exportable, Item, StoreRequest, StoreRequestStream, WriteError,
     },

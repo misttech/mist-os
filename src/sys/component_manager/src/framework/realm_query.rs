@@ -427,7 +427,7 @@ async fn resolve_declaration(
         .map_err(|_| fsys::GetDeclarationError::InstanceNotResolved)?;
 
     trace!("encoding manifest as persistent FIDL bytes");
-    let bytes = fidl::encoding::persist(&resolved.decl.native_into_fidl()).map_err(|error| {
+    let bytes = fidl::persist(&resolved.decl.native_into_fidl()).map_err(|error| {
         warn!(parent=%parent_moniker, %error, "RealmQuery failed to encode manifest");
         fsys::GetDeclarationError::EncodeFailed
     })?;

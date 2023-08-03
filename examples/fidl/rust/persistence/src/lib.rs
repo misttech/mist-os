@@ -45,8 +45,7 @@ fn standalone_encode_decode_resource() -> Result<(), fidl::Error> {
     // [END standalone_encode_resource]
 
     // [START standalone_decode_resource]
-    let mut handle_infos =
-        fidl::encoding::convert_handle_dispositions_to_infos(handle_dispositions)?;
+    let mut handle_infos = fidl::convert_handle_dispositions_to_infos(handle_dispositions)?;
     let decoded_value: fex::EventStruct =
         fidl::standalone_decode_resource(&bytes, &mut handle_infos, &wire_metadata)?;
     assert!(decoded_value.event.is_some());

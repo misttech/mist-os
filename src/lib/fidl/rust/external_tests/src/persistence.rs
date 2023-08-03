@@ -4,7 +4,7 @@
 
 //! This file tests FIDL's persistent encoding/decoding API.
 
-use fidl::encoding::{persist, standalone_decode_value, standalone_encode_value, unpersist};
+use fidl::{persist, standalone_decode_value, standalone_encode_value, unpersist};
 use fidl_test_external::{Coordinate, FlexibleValueThing, ValueRecord};
 
 // TODO(fxbug.dev/99738): Remove this.
@@ -61,11 +61,8 @@ fn standalone_encode_decode_value() {
 #[cfg(target_os = "fuchsia")]
 mod zx {
     use fidl::{
-        encoding::{
-            convert_handle_dispositions_to_infos, standalone_decode_resource,
-            standalone_encode_resource,
-        },
-        AsHandleRef,
+        convert_handle_dispositions_to_infos, standalone_decode_resource,
+        standalone_encode_resource, AsHandleRef,
     };
     use fidl_test_external::StructWithHandles;
     use fuchsia_zircon as zx;
