@@ -250,8 +250,6 @@ def fuchsia_product_image(
         platform_aibs,
         board_config,
         create_system_mode = None,
-        # buildifier: disable=unused-variable
-        image = None,
         **kwargs):
     fuchsia_product_assembly(
         name = name + "_product_assembly",

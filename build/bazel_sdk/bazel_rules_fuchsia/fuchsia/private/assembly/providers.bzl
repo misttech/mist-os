@@ -37,13 +37,6 @@ FuchsiaBoardConfigInfo = provider(
     },
 )
 
-FuchsiaProductImagesConfigInfo = provider(
-    doc = "The product arguments of the images config.",
-    fields = {
-        "config": "JSON configuration file",
-    },
-)
-
 FuchsiaAssemblyConfigInfo = provider(
     doc = "Private provider that includes a single JSON configuration file.",
     fields = {
@@ -77,101 +70,6 @@ fuchsia_product_assembly_bundle repository.
     fields = {
         "dir": "Path to the bundle directory",
         "files": "All files contained in the bundle",
-    },
-)
-
-FuchsiaZbiInfo = provider(
-    doc = """An Image info for Zbi.""",
-    fields = {
-        "zbi_name": "Name of zbi image appeared in image configuration",
-        "compression": "Zbi compression format",
-        "postprocessing_script": "Post-procesing script",
-        "postprocessing_args": "Args needed by post-processing script",
-    },
-)
-
-FuchsiaVbmetaInfo = provider(
-    doc = """An Image info for Vbmeta.""",
-    fields = {
-        "vbmeta_name": "Name of vbmeta image appeared in image configuration",
-        "key": "The key for signing VBMeta",
-        "key_metadata": "Key metadata to add to the VBMeta",
-        "extra_descriptors": "Optional descriptors to add to the VBMeta image",
-    },
-)
-
-FuchsiaVbmetaExtraDescriptorInfo = provider(
-    doc = """An extra descriptor for a VBMeta image""",
-    fields = {
-        "name": "Name of this descriptor",
-        "size": "Size of the partitions in bytes",
-        "flags": "Custom VBMeta flags to add",
-        "min_avb_version": "Minimum AVB version to add",
-    },
-)
-
-FuchsiaFsBlobFsInfo = provider(
-    doc = """A BlobFs filesystem.""",
-    fields = {
-        "blobfs_name": "Name of filesystem",
-        "blobfs_info": "Json of Blob FS information",
-    },
-)
-
-FuchsiaFsEmptyDataInfo = provider(
-    doc = """An Empty MinFs filesystem.""",
-    fields = {
-        "empty_data_name": "Name of filesystem",
-    },
-)
-
-FuchsiaFsEmptyAccountInfo = provider(
-    doc = """An Empty Account filesystem.""",
-    fields = {
-        "empty_account_name": "Name of filesystem",
-    },
-)
-
-FuchsiaFsReservedInfo = provider(
-    doc = """A Reserved filesystem.""",
-    fields = {
-        "reserved_name": "Name of filesystem",
-        "reserved_info": "Json of Reserved FS information",
-    },
-)
-
-FuchsiaFVMStandardInfo = provider(
-    doc = "A fvm with no modification.",
-    fields = {
-        "fvm_standard_name": "Name of fvm file",
-        "filesystems": "Filesystems to use",
-        "fvm_info": "Json of FVM information",
-    },
-)
-
-FuchsiaFVMSparseInfo = provider(
-    doc = "A fvm that is compressed sparse.",
-    fields = {
-        "fvm_sparse_name": "Name of fvm file",
-        "filesystems": "Filesystems to use",
-        "fvm_info": "Json of FVM information",
-    },
-)
-
-FuchsiaFVMNandInfo = provider(
-    doc = "A FVM prepared for a Nand partition.",
-    fields = {
-        "fvm_nand_name": "Name of fvm file",
-        "filesystems": "Filesystems to use",
-        "fvm_info": "Json of FVM information",
-    },
-)
-
-FuchsiaFxfsInfo = provider(
-    doc = "An Fxfs image.",
-    fields = {
-        "fxfs_name": "Name of Fxfs image file",
-        "fxfs_info": "Json of Fxfs information",
     },
 )
 

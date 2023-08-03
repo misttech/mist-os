@@ -218,9 +218,6 @@ template("assembled_system") {
          "Need to define product_assembly_config_label")
   assert(defined(invoker.board_config), "Need to define board_config")
 
-  # TODO(b/292181325): Delete once all clients stop providing.
-  not_needed(invoker, [ "assembly_images_config_label" ])
-
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
     _generate_fvm = invoker.generate_fvm

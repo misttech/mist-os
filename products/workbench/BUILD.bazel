@@ -9,20 +9,13 @@ load(
     "SLOT",
     "fuchsia_bootloader_partition",
     "fuchsia_elf_sizes",
-    "fuchsia_filesystem_blobfs",
-    "fuchsia_filesystem_empty_data",
-    "fuchsia_fvm_sparse",
-    "fuchsia_fvm_standard",
-    "fuchsia_images_configuration",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
     "fuchsia_prebuilt_package",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
     "fuchsia_product_image",
-    "fuchsia_vbmeta",
     "fuchsia_virtual_device",
-    "fuchsia_zbi",
 )
 load("//products/workbench:platform_config.bzl", "workbench_platform_config")
 
@@ -135,7 +128,6 @@ fuchsia_product_image(
     name = "assembly_eng.x64_recovery",
     board_config = "//boards:x64",
     create_system_mode = "bootfs",
-    image = ":recovery_images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
     product_config = "//build/bazel/assembly/product_configurations:zedboot",
@@ -144,7 +136,6 @@ fuchsia_product_image(
 fuchsia_product_image(
     name = "assembly_eng.x64",
     board_config = "//boards:x64",
-    image = ":images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
@@ -154,7 +145,6 @@ fuchsia_product_image(
     name = "assembly_eng.qemu-x64_recovery",
     board_config = "//boards:qemu-x64",
     create_system_mode = "bootfs",
-    image = ":recovery_images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
     product_config = "//build/bazel/assembly/product_configurations:zedboot",
@@ -163,7 +153,6 @@ fuchsia_product_image(
 fuchsia_product_image(
     name = "assembly_eng.qemu-x64",
     board_config = "//boards:qemu-x64",
-    image = ":images_config",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
@@ -172,7 +161,6 @@ fuchsia_product_image(
 fuchsia_product_image(
     name = "assembly_eng.vim3",
     board_config = "//boards:vim3",
-    image = "//build/bazel/assembly/images_configurations:fuchsia_vim3",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
@@ -182,7 +170,6 @@ fuchsia_product_image(
     name = "assembly_eng.vim3_recovery",
     board_config = "//boards:vim3",
     create_system_mode = "bootfs",
-    image = "//build/bazel/assembly/images_configurations:zedboot_vim3",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
     product_config = "//build/bazel/assembly/product_configurations:zedboot",
@@ -217,88 +204,6 @@ fuchsia_product_configuration(
             "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm",
         },
     },
-)
-
-fuchsia_images_configuration(
-    name = "images_config",
-    fvm_slice_size = "8388608",
-    images = [
-        ":fuchsia_zbi",
-        ":fuchsia_vbmeta",
-        ":standard_fvm",
-        ":sparse_fvm",
-        ":fastboot_fvm",
-    ],
-)
-
-fuchsia_images_configuration(
-    name = "recovery_images_config",
-    fvm_slice_size = "8388608",
-    images = [
-        ":zedboot_zbi",
-        ":zedboot_vbmeta",
-    ],
-)
-
-fuchsia_vbmeta(
-    name = "fuchsia_vbmeta",
-    key = "//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
-    key_metadata = "//:third_party/android/platform/external/avb/test/data/atx_metadata.bin",
-)
-
-fuchsia_vbmeta(
-    name = "zedboot_vbmeta",
-    key = "//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
-    key_metadata = "//:third_party/android/platform/external/avb/test/data/atx_metadata.bin",
-    vbmeta_name = "zedboot",
-)
-
-fuchsia_zbi(
-    name = "zedboot_zbi",
-    zbi_name = "zedboot",
-)
-
-fuchsia_zbi(
-    name = "fuchsia_zbi",
-)
-
-fuchsia_fvm_standard(
-    name = "standard_fvm",
-    filesystems = [
-        ":empty_data",
-        ":blobfs",
-    ],
-    fvm_standard_name = "fvm",
-)
-
-fuchsia_fvm_standard(
-    name = "fastboot_fvm",
-    filesystems = [
-        ":empty_data",
-        ":blobfs",
-    ],
-    fvm_standard_name = "fvm.fastboot",
-    resize_image_file_to_fit = True,
-    truncate_to_length = "17179869184",
-)
-
-# Currently required by bazel_assembled_system
-fuchsia_fvm_sparse(
-    name = "sparse_fvm",
-    filesystems = [
-        ":empty_data",
-        ":blobfs",
-    ],
-    fvm_sparse_name = "fvm.sparse",
-)
-
-fuchsia_filesystem_blobfs(
-    name = "blobfs",
-    maximum_contents_size = "5216665600",
-)
-
-fuchsia_filesystem_empty_data(
-    name = "empty_data",
 )
 
 fuchsia_prebuilt_package(
