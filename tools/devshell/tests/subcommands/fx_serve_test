@@ -442,6 +442,7 @@ EOF
     "--watch" \
     "--package-list" "all_package_manifests.list" \
     "--trusted-root" "${REPODIR}/repository/9.root.json" \
+    "--ignore-missing-packages" \
     "--time-versioning"
 
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stdout "Ready to push packages!"

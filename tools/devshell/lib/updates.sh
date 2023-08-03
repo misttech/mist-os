@@ -19,7 +19,7 @@ function package-server-mode {
     if [[ $mode =~ \"(.*)\" ]]; then
       mode="${BASH_REMATCH[1]}"
     else
-      fx-error "could not parse ffx server mode: ${mode}"
+      fx-error "could not parse ffx server mode: '${mode}'"
       return 1
     fi
   fi
@@ -200,7 +200,7 @@ function check-for-package-server {
     if [[ ${ffx_addr} =~ .*:([0-9]+) ]]; then
       local ffx_port="${BASH_REMATCH[1]}"
     else
-      fx-error "could not parse ip and port from ffx server address: $actual_addr"
+      fx-error "could not parse ip and port from ffx server address: '$ffx_addr'"
       return 1
     fi
 
@@ -387,9 +387,8 @@ function ffx-register-repository {
 }
 
 function ffx-repository-server-state {
-  # FIXME(http://fxbug.dev/120327): Remove the `ffx_repository=true` once this command is stable.
   local state=$(
-    fx-command-run ffx --config ffx_repository=true --machine json repository server status |
+    fx-command-run ffx --machine json repository server status |
       fx-command-run jq -r '.state'
   )
   err=$?
@@ -410,10 +409,11 @@ function ffx-repository-server-state {
   return 0
 }
 
+# If the server is running, this returns the address the server is running on.
+# Otherwise it returns an empty string.
 function ffx-repository-server-running-address {
-  # FIXME(http://fxbug.dev/120327): Remove the `ffx_repository=true` once this command is stable.
   local address=$(
-    fx-command-run ffx --config ffx_repository=true --machine json repository server status |
+    fx-command-run ffx --machine json repository server status |
       fx-command-run jq -r 'select(.state == "running") | .address'
   )
   err=$?
@@ -427,6 +427,8 @@ function ffx-repository-server-running-address {
   return 0
 }
 
+# If the server is running, this returns the port the server is running on.
+# Otherwise it returns an empty string.
 function ffx-repository-server-running-port {
   local addr=$(ffx-repository-server-running-address)
   err=$?
@@ -435,10 +437,15 @@ function ffx-repository-server-running-port {
     return "${err}"
   fi
 
+  # Don't return anything if the server is not running.
+  if [[ -z "${addr}" ]]; then
+    return 0
+  fi
+
   if [[ ${addr} =~ .*:([0-9]+) ]]; then
     echo "${BASH_REMATCH[1]}"
   else
-    fx-error "could not parse port from ffx repository server address: $addr"
+    fx-error "could not parse port from ffx repository server address: '$addr'"
     return 1
   fi
 
@@ -480,7 +487,7 @@ function ffx-configured-repository-server-address {
     if [[ $addr =~ \"(.*)\" ]]; then
       echo "${BASH_REMATCH[1]}"
     else
-      fx-error "could not parse ffx server address: ${addr}"
+      fx-error "could not parse ffx server address: '${addr}'"
       return 1
     fi
   fi
@@ -499,7 +506,7 @@ function ffx-configured-repository-server-port {
   if [[ ${addr} =~ .*:([0-9]+) ]]; then
     echo "${BASH_REMATCH[1]}"
   else
-    fx-error "could not parse port from ffx server address: $addr"
+    fx-error "could not parse port from ffx server address: '$addr'"
     return 1
   fi
 
@@ -539,7 +546,7 @@ function join-repository-ip-port {
     local configured_ip="${BASH_REMATCH[1]}"
     local configured_port="${BASH_REMATCH[2]}"
   else
-    fx-error "could not parse ip and port from the configured ffx repository server address: $configured_addr"
+    fx-error "could not parse ip and port from the configured ffx repository server address: '$configured_addr'"
     return 1
   fi
 
