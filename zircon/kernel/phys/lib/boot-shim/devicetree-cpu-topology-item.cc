@@ -11,11 +11,14 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <optional>
+
+#include "lib/devicetree/devicetree.h"
 
 namespace boot_shim {
 
-devicetree::ScanState RiscvDevictreeCpuTopologyItem::OnNode(
-    const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
+devicetree::ScanState DevictreeCpuTopologyItem::OnNode(const devicetree::NodePath& path,
+                                                       const devicetree::PropertyDecoder& decoder) {
   if (path == "/") {
     return devicetree::ScanState::kActive;
   }
@@ -56,7 +59,7 @@ devicetree::ScanState RiscvDevictreeCpuTopologyItem::OnNode(
                       : IncreaseEntryNodeCountFirstScan(path, decoder);
 }
 
-devicetree::ScanState RiscvDevictreeCpuTopologyItem::OnSubtree(const devicetree::NodePath& path) {
+devicetree::ScanState DevictreeCpuTopologyItem::OnSubtree(const devicetree::NodePath& path) {
   // Allocated and filled up, means we are done going through the tree.
   if (cpu_entries_ && cpu_entry_index_ == cpu_entry_count_) {
     if (!has_cpu_map_) {
@@ -97,7 +100,7 @@ devicetree::ScanState RiscvDevictreeCpuTopologyItem::OnSubtree(const devicetree:
   return devicetree::ScanState::kActive;
 }
 
-devicetree::ScanState RiscvDevictreeCpuTopologyItem::IncreaseEntryNodeCountFirstScan(
+devicetree::ScanState DevictreeCpuTopologyItem::IncreaseEntryNodeCountFirstScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(!map_entries_);
   std::string_view name = path.back();
@@ -129,7 +132,7 @@ devicetree::ScanState RiscvDevictreeCpuTopologyItem::IncreaseEntryNodeCountFirst
   return devicetree::ScanState::kDoneWithSubtree;
 }
 
-devicetree::ScanState RiscvDevictreeCpuTopologyItem::AddEntryNodeSecondScan(
+devicetree::ScanState DevictreeCpuTopologyItem::AddEntryNodeSecondScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(map_entries_);
   auto name = path.back().name();
@@ -190,14 +193,14 @@ devicetree::ScanState RiscvDevictreeCpuTopologyItem::AddEntryNodeSecondScan(
   return devicetree::ScanState::kDoneWithSubtree;
 }
 
-devicetree::ScanState RiscvDevictreeCpuTopologyItem::IncreaseCpuNodeCountFirstScan(
+devicetree::ScanState DevictreeCpuTopologyItem::IncreaseCpuNodeCountFirstScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(!cpu_entries_);
   cpu_entry_count_++;
   return devicetree::ScanState::kActive;
 }
 
-devicetree::ScanState RiscvDevictreeCpuTopologyItem::AddCpuNodeSecondScan(
+devicetree::ScanState DevictreeCpuTopologyItem::AddCpuNodeSecondScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(cpu_entries_ && (cpu_entry_index_ < cpu_entry_count_));
 
@@ -219,22 +222,16 @@ devicetree::ScanState RiscvDevictreeCpuTopologyItem::AddCpuNodeSecondScan(
     return devicetree::ScanState::kDone;
   }
 
-  auto hart_id = (*reg_val)[0].address();
-  if (!hart_id) {
-    OnError("Failed to decode CPU hart id.");
-    return devicetree::ScanState::kDone;
-  }
   // Properties are not copy or move assignable, so we must initialize in place.
   new (&cpu_entries_[cpu_entry_index_]) CpuEntry{
       .phandle = phandle_val,
       .properties = decoder.properties(),
-      .hart_id = *hart_id,
   };
   cpu_entry_index_++;
   return devicetree::ScanState::kActive;
 }
 
-fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::UpdateEntryCpuLinks() const {
+fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::UpdateEntryCpuLinks() const {
   ZX_ASSERT(cpu_entries_ && map_entries_);
 
   // Not every devicetree defines a CPU map. When this happens, the entry nodes have been
@@ -308,8 +305,7 @@ fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::UpdateEntry
   return fit::ok();
 }
 
-fit::result<ItemBase::DataZbi::Error>
-RiscvDevictreeCpuTopologyItem::CalculateClusterPerformanceClass(
+fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateClusterPerformanceClass(
     cpp20::span<zbi_topology_node_t> nodes) const {
   if (cluster_count_ <= 1) {
     return fit::ok();
@@ -399,10 +395,10 @@ RiscvDevictreeCpuTopologyItem::CalculateClusterPerformanceClass(
   return fit::ok();
 }
 
-fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::AppendItems(
+fit::result<DevictreeCpuTopologyItem::DataZbi::Error> DevictreeCpuTopologyItem::AppendItems(
     DataZbi& zbi) const {
-  ZX_ASSERT(boot_hart_id_);
   ZX_ASSERT(cpu_entries_ && cpu_entry_count_);
+  ZX_DEBUG_ASSERT(arch_info_setter_);
   // Resolve reference to CPU nodes from the cpu map.
   cpp20::span cpus(cpu_entries_, cpu_entry_count_);
 
@@ -451,29 +447,33 @@ fit::result<ItemBase::DataZbi::Error> RiscvDevictreeCpuTopologyItem::AppendItems
 
       case TopologyEntryType::kCore:
       case TopologyEntryType::kThread:
-        node.entity.discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR;
-        if (entry.cpu_index && cpus[*entry.cpu_index].hart_id) {
-          const auto& cpu = cpus[*entry.cpu_index];
-          node.entity.processor.flags = 0;
-          node.entity.processor.architecture_info.discriminant =
-              ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64;
-          node.entity.processor.architecture_info.riscv64.hart_id = *cpu.hart_id;
+        node.entity = {
+            .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+            .processor =
+                {
+                    .flags = 0,
+                    .logical_ids = {},
+                    .logical_id_count = 0,
+                },
+        };
 
-          if (logical_cpu_id == 0) {
+        if (entry.cpu_index) {
+          // Assume the first cpu is the booting cpu. It is |arch_info_setter_|'s
+          // responsibility to update the processors flags accordingly.
+          node.entity.processor.logical_ids[0] = logical_cpu_id++;
+          node.entity.processor.logical_id_count = 1;
+
+          if (node.entity.processor.logical_ids[0] == 0) {
             cpu_zero_node_index = current_node;
-          }
-          if (cpu.hart_id == *boot_hart_id_) {
             node.entity.processor.flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
+          }
+
+          arch_info_setter_(node.entity.processor, cpus[*entry.cpu_index]);
+          if (node.entity.processor.flags & ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY) {
             boot_cpu_node_index = current_node;
           }
-        } else {
-          node.entity.processor.flags = 0;
         }
-        node.entity.processor.logical_ids[0] = logical_cpu_id++;
-        node.entity.processor.logical_ids[1] = 0;
-        node.entity.processor.logical_ids[2] = 0;
-        node.entity.processor.logical_ids[3] = 0;
-        node.entity.processor.logical_id_count = 1;
+
         break;
     };
     current_node++;

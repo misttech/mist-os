@@ -426,8 +426,8 @@ class RiscvDevicetreePlicItem
 // See:
 // https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/cpu-capacity.txt
 // https://www.kernel.org/doc/Documentation/devicetree/bindings/cpu/cpu-topology.txt
-class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCpuTopologyItem, 2>,
-                                      ItemBase {
+class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyItem, 2>,
+                                 public ItemBase {
  public:
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
@@ -435,26 +435,29 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
   devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
 
   size_t size_bytes() const { return ItemSize(node_element_count() * sizeof(zbi_topology_node_t)); }
+
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
 
-  template <typename Shim>
-  void Init(const Shim& shim) {
-    DevicetreeItemBase<RiscvDevictreeCpuTopologyItem, 2>::Init(shim);
-    allocator_ = &shim.allocator();
-  }
+ protected:
+  // Used for decoding CPU-related properties.
+  struct CpuEntry {
+    std::optional<uint32_t> phandle;
+    devicetree::Properties properties;
+  };
 
-  void set_boot_hart_id(uint64_t hart_id) { boot_hart_id_ = hart_id; }
+  // Callback used for setting up/updating processor information, that is dependent in
+  // architecture specific information.
+  using SetArchCpuInfo =
+      fit::inline_function<void(zbi_topology_processor_t&, const CpuEntry& entry)>;
+
+  template <typename Shim>
+  void Init(const Shim& shim, SetArchCpuInfo arch_info_setter) {
+    DevicetreeItemBase<DevictreeCpuTopologyItem, 2>::Init(shim);
+    allocator_ = &shim.allocator();
+    arch_info_setter_ = std::move(arch_info_setter);
+  }
 
  private:
-  static constexpr bool IsCpuMapNode(std::string_view node_name, std::string_view prefix) {
-    if (!cpp20::starts_with(node_name, prefix)) {
-      return false;
-    }
-    // Must match prefix[0-9].
-    return node_name.substr(prefix.length()).find_first_not_of("01234567890") ==
-           std::string_view::npos;
-  }
-
   // Devicetree 'cpu-map' entities.
   enum class TopologyEntryType {
     kSocket,
@@ -472,13 +475,6 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
     std::optional<uint32_t> cpu_index;
   };
 
-  // Used for decoding CPU-related properties.
-  struct CpuEntry {
-    std::optional<uint32_t> phandle;
-    devicetree::Properties properties;
-    std::optional<uint32_t> hart_id;
-  };
-
   // May only be called after |Init| and a full match sequence has been performed.
   constexpr size_t node_element_count() const { return map_entry_count_; }
 
@@ -490,6 +486,15 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
                                                       const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState AddCpuNodeSecondScan(const devicetree::NodePath& path,
                                              const devicetree::PropertyDecoder& decoder);
+
+  static constexpr bool IsCpuMapNode(std::string_view node_name, std::string_view prefix) {
+    if (!cpp20::starts_with(node_name, prefix)) {
+      return false;
+    }
+    // Must match prefix[0-9].
+    return node_name.substr(prefix.length()).find_first_not_of("01234567890") ==
+           std::string_view::npos;
+  }
 
   // After both |entries_| and |cpus_| have been filled this routine will fill up
   // the reference from an entry to a 'cpu' node.
@@ -506,7 +511,7 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
     if (!alloc) {
       // Log allocation failure. The effect is that the matcher will keep looking and will fail to
       // make progress. But the error will be logged.
-      auto* self = const_cast<RiscvDevictreeCpuTopologyItem*>(this);
+      auto* self = const_cast<DevictreeCpuTopologyItem*>(this);
       self->OnError("Allocation Failed.");
       self->Log("at %s:%u\n", location.file_name(), static_cast<unsigned int>(location.line()));
     }
@@ -529,10 +534,37 @@ class RiscvDevictreeCpuTopologyItem : public DevicetreeItemBase<RiscvDevictreeCp
   uint32_t cpu_entry_index_ = 0;
   uint32_t cluster_count_ = 0;
 
-  std::optional<uint64_t> boot_hart_id_;
-
   // Allocation is environment specific, so we delegate that to a lambda.
   mutable const DevicetreeBootShimAllocator* allocator_ = nullptr;
+
+  SetArchCpuInfo arch_info_setter_;
+};
+
+class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
+ public:
+  template <typename Shim>
+  void Init(Shim& shim) {
+    DevictreeCpuTopologyItem::Init(
+        shim, [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
+          node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64;
+          devicetree::PropertyDecoder decoder(cpu_entry.properties);
+          auto reg = decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsUint32>("reg");
+          if (!reg) {
+            return;
+          }
+          node.architecture_info.riscv64.hart_id = *reg;
+          if (*reg == boot_hart_id_) {
+            node.flags |= ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
+          } else {
+            node.flags &= ~ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
+          }
+        });
+  }
+
+  void set_boot_hart_id(uint64_t hart_id) { boot_hart_id_ = hart_id; }
+
+ private:
+  std::optional<uint64_t> boot_hart_id_;
 };
 
 }  // namespace boot_shim
