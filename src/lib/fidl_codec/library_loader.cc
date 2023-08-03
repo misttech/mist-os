@@ -701,10 +701,6 @@ void LibraryLoader::ParseBuiltinSemantic() {
     semantic::SemanticParser parser(this, semantic::builtin_semantic_fuchsia_io, &parser_errors);
     parser.ParseSemantic();
   }
-  {
-    semantic::SemanticParser parser(this, semantic::builtin_semantic_fuchsia_sys, &parser_errors);
-    parser.ParseSemantic();
-  }
 }
 
 }  // namespace fidl_codec

@@ -219,7 +219,7 @@ TEST_F(BuiltinSemanticTest, Open) {
 
   // This message (we only define the fields used by the semantic):
   StructValue request(method->request()->AsStructType()->struct_definition());
-  request.AddField("path", std::make_unique<StringValue>("fuchsia.sys.Launcher"));
+  request.AddField("path", std::make_unique<StringValue>("fuchsia.io.Directory"));
   request.AddField("object", std::make_unique<HandleValue>(channel0_));
 
   ExecuteWrite(method->semantic(), &request, nullptr);
@@ -229,57 +229,7 @@ TEST_F(BuiltinSemanticTest, Open) {
       handle_semantic_.GetInferredHandleInfo(kPid, kChannel1);
   ASSERT_NE(inferred_handle_info, nullptr);
   ASSERT_EQ(inferred_handle_info->type(), "dir");
-  ASSERT_EQ(inferred_handle_info->path(), "/svc/fuchsia.sys.Launcher");
-}
-
-// Check Launcher::CreateComponent.
-TEST_F(BuiltinSemanticTest, CreateComponent) {
-  // Checks that Launcher::CreateComponent exists in fuchsia.sys.
-  Library* library = library_loader_.GetLibraryFromName("fuchsia.sys");
-  ASSERT_NE(library, nullptr);
-  library->DecodeTypes();
-  Protocol* protocol = nullptr;
-  library->GetProtocolByName("fuchsia.sys/Launcher", &protocol);
-  ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("CreateComponent");
-  ASSERT_NE(method, nullptr);
-  // Checks that the builtin semantic is defined for CreateComponent.
-  ASSERT_NE(method->semantic(), nullptr);
-
-  // Check that by writing on this handle:
-  SetHandleSemantic("dir", "/svc/fuchsia.sys.Launcher");
-
-  // This message (we only define the fields used by the semantic):
-  StructValue request(method->request()->AsStructType()->struct_definition());
-  auto launch_info = std::make_unique<StructValue>(method->request()
-                                                       ->AsStructType()
-                                                       ->struct_definition()
-                                                       .SearchMember("launch_info")
-                                                       ->type()
-                                                       ->AsStructType()
-                                                       ->struct_definition());
-  launch_info->AddField("url",
-                        std::make_unique<StringValue>(
-                            "fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx"));
-  launch_info->AddField("directory_request", std::make_unique<HandleValue>(channel0_));
-  request.AddField("launch_info", std::move(launch_info));
-  request.AddField("controller", std::make_unique<HandleValue>(channel2_));
-
-  ExecuteWrite(method->semantic(), &request, nullptr);
-
-  // We have these handle semantics for kChannel1 and kChannel3.
-  const InferredHandleInfo* inferred_handle_info_1 =
-      handle_semantic_.GetInferredHandleInfo(kPid, kChannel1);
-  ASSERT_NE(inferred_handle_info_1, nullptr);
-  ASSERT_EQ(inferred_handle_info_1->type(), "server");
-  ASSERT_EQ(inferred_handle_info_1->path(),
-            "fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx");
-  const InferredHandleInfo* inferred_handle_info_2 =
-      handle_semantic_.GetInferredHandleInfo(kPid, kChannel3);
-  ASSERT_NE(inferred_handle_info_2, nullptr);
-  ASSERT_EQ(inferred_handle_info_2->type(), "server-control");
-  ASSERT_EQ(inferred_handle_info_2->path(),
-            "fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx");
+  ASSERT_EQ(inferred_handle_info->path(), "/svc/fuchsia.io.Directory");
 }
 
 // Check short display of Directory::Open.
@@ -298,13 +248,13 @@ TEST_F(BuiltinSemanticTest, OpenShortDisplay) {
 
   // This message (we only define the fields used by the display):
   StructValue request(method->request()->AsStructType()->struct_definition());
-  request.AddField("path", std::make_unique<StringValue>("fuchsia.sys.Launcher"));
+  request.AddField("path", std::make_unique<StringValue>("fuchsia.io.Directory"));
   request.AddField("object", std::make_unique<HandleValue>(channel0_));
 
   std::stringstream os;
   ShortDisplay(os, method->short_display(), &request, nullptr);
   ASSERT_EQ(os.str(),
-            "(\"fuchsia.sys.Launcher\")\n"
+            "(\"fuchsia.io.Directory\")\n"
             "-> 00002000\n");
 }
 

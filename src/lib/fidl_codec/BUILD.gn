@@ -174,8 +174,9 @@ generated_file("stripped_sdk_fidl_json") {
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.process:fuchsia.process_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.sys.test:fuchsia.sys.test_sdk($fidl_toolchain)",
+
+    # TODO(fxbug.dev/131693): Uncomment when fidlcat supports the `internal` type
+    # "//sdk/fidl/fuchsia.session:fuchsia.session_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.url:fuchsia.url_sdk($fidl_toolchain)",
   ]

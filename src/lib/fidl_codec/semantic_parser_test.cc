@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/fidl_codec/library_loader.h"
+#include "src/lib/fidl_codec/library_loader_test_data.h"
 #include "src/lib/fidl_codec/list_test_data.h"
 #include "src/lib/fidl_codec/semantic_parser_test.h"
 #include "src/lib/fidl_codec/wire_types.h"
@@ -26,9 +27,14 @@ namespace semantic {
 
 SemanticParserTest::SemanticParserTest() {
   fidl_codec_test::SdkExamples sdk_examples;
+  fidl_codec_test::FidlcodecExamples other_examples;
 
   // Loads all the files in sdk/core.fidl_json.txt.
   for (const auto& element : sdk_examples.map()) {
+    library_loader_.AddContent(element.second, &err_);
+  }
+  // Load all the fidl_codec files.
+  for (const auto& element : other_examples.map()) {
     library_loader_.AddContent(element.second, &err_);
   }
 }
@@ -54,7 +60,7 @@ TEST_F(SemanticParserTest, GlobalExample) {
       "    request.object = handle / request.path;\n"
       "  }\n"
       "}\n"
-      "library fuchsia.sys {\n"
+      "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control', request.launch_info.url);\n"
       "  }\n"
@@ -542,7 +548,7 @@ TEST_F(SemanticParserTest, SemicolonExpected) {
 
 TEST_F(SemanticParserTest, HandleDescriptionTypo) {
   std::string text =
-      "library fuchsia.sys {\n"
+      "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescriptions('server-control', request.launch_info.url);\n"
       "  }\n"
@@ -562,7 +568,7 @@ TEST_F(SemanticParserTest, HandleDescriptionTypo) {
 
 TEST_F(SemanticParserTest, UnterminatedString) {
   std::string text =
-      "library fuchsia.sys {\n"
+      "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control, request.launch_info.url);\n"
       "  }\n"
@@ -582,7 +588,7 @@ TEST_F(SemanticParserTest, UnterminatedString) {
 
 TEST_F(SemanticParserTest, LeftParenthesisExpected) {
   std::string text =
-      "library fuchsia.sys {\n"
+      "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription 'server-control', request.launch_info.url);\n"
       "  }\n"
@@ -602,7 +608,7 @@ TEST_F(SemanticParserTest, LeftParenthesisExpected) {
 
 TEST_F(SemanticParserTest, CommaExpected) {
   std::string text =
-      "library fuchsia.sys {\n"
+      "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control' request.launch_info.url);\n"
       "  }\n"
@@ -621,7 +627,7 @@ TEST_F(SemanticParserTest, CommaExpected) {
 
 TEST_F(SemanticParserTest, RightParenthesisExpected) {
   std::string text =
-      "library fuchsia.sys {\n"
+      "library test.fidlcodec.sys {\n"
       "  Launcher::CreateComponent {\n"
       "   request.controller = HandleDescription('server-control', request.launch_info.url;\n"
       "  }\n"

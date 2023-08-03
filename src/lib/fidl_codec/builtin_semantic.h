@@ -11,7 +11,6 @@ namespace fidl_codec {
 namespace semantic {
 
 extern std::string builtin_semantic_fuchsia_io;
-extern std::string builtin_semantic_fuchsia_sys;
 
 }  // namespace semantic
 }  // namespace fidl_codec
