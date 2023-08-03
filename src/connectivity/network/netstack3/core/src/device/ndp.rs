@@ -254,7 +254,7 @@ mod tests {
         ) -> Result<EthernetDeviceId<FakeNonSyncCtx>, DeviceId<crate::testutil::FakeNonSyncCtx>>
         {
             match id {
-                DeviceId::Ethernet(id) => Ok(id.clone()),
+                DeviceId::Ethernet(id) => Ok(id),
                 DeviceId::Loopback(_) => Err(id),
             }
         }
@@ -899,7 +899,7 @@ mod tests {
             [
                 local_timer_id.clone(),
                 remote_timer_id.clone(),
-                local_timer_id.clone(),
+                local_timer_id,
                 remote_timer_id.clone()
             ]
         );
@@ -990,7 +990,7 @@ mod tests {
         assert_eq!(non_sync_ctx.frames_sent().len(), 3);
 
         // Run 1s
-        let remote_timer_id = dad_timer_id(eth_dev_id.clone(), remote_ip());
+        let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
         assert_eq!(
             non_sync_ctx.trigger_timers_for(
                 Duration::from_secs(1),
@@ -1047,7 +1047,7 @@ mod tests {
         // Test receiving NDP RS when not a router (should not receive)
 
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(config.clone()).build();
+            FakeEventDispatcherBuilder::from_config(config).build();
         let sync_ctx = &sync_ctx;
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
@@ -1429,7 +1429,7 @@ mod tests {
         let time = non_sync_ctx.now();
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone())
+            rs_timer_id(eth_device_id)
         );
         assert_eq!(non_sync_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
         let (src_mac, _, src_ip, _, _, message, code) =
@@ -3186,7 +3186,7 @@ mod tests {
         // for regeneration doesn't result in a new address being created.
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer),
-            Some(regen_timer_id.clone())
+            Some(regen_timer_id)
         );
         assert_eq!(
             get_matching_slaac_address_entries(&mut sync_ctx, &device, |entry| entry

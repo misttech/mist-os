@@ -1464,7 +1464,7 @@ mod tests {
             &mut non_sync_ctx,
             TestConfig { ip_enabled: true, gmp_enabled: true },
         );
-        non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id, range.clone())]);
+        non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id, range)]);
         check_sent_report(&mut non_sync_ctx);
     }
 }

@@ -6,6 +6,8 @@
 //!
 //! This module provides Fuchsia bindings for the [`netstack3_core`] crate.
 
+#![deny(clippy::redundant_clone)]
+
 #[cfg(test)]
 mod integration_tests;
 

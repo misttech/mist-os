@@ -3896,7 +3896,7 @@ mod tests {
 
         // Ip packet from some node destined to a remote on this network,
         // arriving locally.
-        let mut ipv6_packet_buf = Buf::new(body.clone(), ..)
+        let mut ipv6_packet_buf = Buf::new(body, ..)
             .encapsulate(Ipv6PacketBuilder::new(
                 extra_ip,
                 fake_config.remote_ip,
@@ -4471,7 +4471,7 @@ mod tests {
             ),
         }
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
+        device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
     }
 
@@ -4624,7 +4624,7 @@ mod tests {
             &mut non_sync_ctx,
             &device,
             FrameDestination::Individual { local: true },
-            buf.clone(),
+            buf,
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "receive_ipv6_packet: non-unicast source"), 1);
     }

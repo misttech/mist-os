@@ -874,13 +874,7 @@ where
         let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device = device
-            .map(|name| {
-                non_sync_ctx
-                    .devices
-                    .get_device_by_name(name)
-                    .map(|d| d.clone())
-                    .ok_or(fposix::Errno::Enodev)
-            })
+            .map(|name| non_sync_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
             .transpose()?;
 
         match *id {

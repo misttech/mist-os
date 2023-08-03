@@ -69,7 +69,7 @@ fn resolve(destination: fnet::IpAddress, ns: Netstack) -> Option<fnet_routes::Re
 
 /// The inner implementation of [`resolve`] that's generic over `Ip`.
 fn resolve_inner<A: IpAddress>(destination: A, ns: Netstack) -> Option<fnet_routes::Resolved> {
-    let mut ctx = ns.ctx.clone();
+    let mut ctx = ns.ctx;
     let Ctx { sync_ctx, ref mut non_sync_ctx } = &mut ctx;
     let ResolvedRoute { device, src_addr, next_hop } =
         match netstack3_core::ip::resolve_route::<A::Version, _>(sync_ctx, destination) {

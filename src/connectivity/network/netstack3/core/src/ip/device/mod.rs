@@ -2382,7 +2382,7 @@ mod tests {
                     state: IpAddressState::Unavailable,
                 }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                    device: weak_device_id.clone(),
+                    device: weak_device_id,
                     ip_enabled: false,
                 }),
             ]
@@ -2687,7 +2687,7 @@ mod tests {
                     state: IpAddressState::Tentative,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: weak_device_id.clone(),
+                    device: weak_device_id,
                     ip_enabled: true,
                 })
             ]
@@ -2788,7 +2788,7 @@ mod tests {
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
-                device: weak_device_id.clone(),
+                device: weak_device_id,
                 addr: assigned_addr.addr(),
                 reason: RemovedReason::DadFailed,
             }),]

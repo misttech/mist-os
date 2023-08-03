@@ -1982,7 +1982,7 @@ mod tests {
             cfg;
 
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(cfg.clone()).build();
+            FakeEventDispatcherBuilder::from_config(cfg).build();
         let sync_ctx = &sync_ctx;
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(

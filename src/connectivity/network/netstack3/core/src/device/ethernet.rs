@@ -1906,7 +1906,7 @@ mod tests {
         check_other_is_forwarding_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Should not route packets anymore
-        receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(non_sync_ctx.frames_sent().len(), 2);
     }
 
@@ -1959,7 +1959,7 @@ mod tests {
         // Accept packet destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
+        crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
@@ -1992,7 +1992,7 @@ mod tests {
         // Accept packet not destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
+        crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 3);
         assert_eq!(
             get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name),

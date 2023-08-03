@@ -76,7 +76,7 @@ where
     /// IDs.
     pub fn add_device(&self, id: BindingId, core_id: C) {
         let Self { id_map, last_id: _ } = self;
-        assert_matches!(id_map.write().insert(id, core_id.clone()), None);
+        assert_matches!(id_map.write().insert(id, core_id), None);
     }
 
     /// Removes a device from the internal list.

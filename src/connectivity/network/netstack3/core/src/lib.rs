@@ -8,7 +8,7 @@
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
-#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion)]
+#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 // Turn off checks for dead code, but only when building for benchmarking.
 // benchmarking. This allows the benchmarks to be written as part of the crate,
 // with access to test utilities, without a bunch of build errors due to unused

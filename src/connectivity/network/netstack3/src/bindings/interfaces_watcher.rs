@@ -1314,7 +1314,7 @@ mod tests {
 
         // Add address, no event should be generated.
         assert_eq!(
-            Worker::consume_event(&mut state, event.clone()),
+            Worker::consume_event(&mut state, event),
             Ok(Some((
                 finterfaces::Event::Changed(finterfaces::Properties {
                     id: Some(id.get()),
@@ -1343,7 +1343,7 @@ mod tests {
             InterfaceEvent::Changed { id, event: InterfaceUpdate::AddressRemoved(*ip_addr) };
         // Remove address, no event should be generated.
         assert_eq!(
-            Worker::consume_event(&mut state, event.clone()),
+            Worker::consume_event(&mut state, event),
             Ok(Some((
                 finterfaces::Event::Changed(finterfaces::Properties {
                     id: Some(id.get()),

@@ -942,9 +942,9 @@ mod tests {
         assert_eq!(
             get_non_link_local_routes(sync_ctx),
             HashSet::from([
-                gateway_route_entry.clone(),
+                gateway_route_entry,
                 on_link_route_entry.clone(),
-                more_specific_route_entry.clone()
+                more_specific_route_entry
             ]),
         );
 

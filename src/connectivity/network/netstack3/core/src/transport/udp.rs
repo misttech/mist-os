@@ -1108,7 +1108,7 @@ impl<
                 bound_sockets,
                 (src_ip, src_port),
                 (dst_ip, packet.dst_port()),
-                device_weak.clone(),
+                device_weak,
             )
             .peekable();
 
@@ -5552,7 +5552,7 @@ where {
                     FakeDeviceConfig {
                         device: MultipleDevicesId::B,
                         local_ips: vec![SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap()],
-                        remote_ips: remote_ips.clone(),
+                        remote_ips: remote_ips,
                     },
                 ]),
             ));
@@ -5661,7 +5661,7 @@ where {
                     FakeDeviceConfig {
                         device: MultipleDevicesId::B,
                         local_ips: vec![SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap()],
-                        remote_ips: remote_ips.clone(),
+                        remote_ips: remote_ips,
                     },
                 ]),
             ));

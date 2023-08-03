@@ -162,8 +162,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
             futures.push(request_stream.into_future());
         };
 
-        let Self { ctx, data } = self;
-        let mut ctx = ctx.clone();
+        let Self { mut ctx, data } = self;
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         data.close(sync_ctx, non_sync_ctx);
 
