@@ -280,7 +280,7 @@
       description: 'Application-level name resolution.'
 
 - name: 'Security'
-  api_primary: 'jsankey@google.com'
+  api_primary: ''
   api_secondary: ''
   description: |
     The set of APIs used to directly interact with security features (for

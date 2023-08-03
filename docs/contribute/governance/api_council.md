@@ -177,7 +177,7 @@ When considering adding an area, the council considers:
 1. **Coverage.** Is this area already covered by one of the other areas, or is
    there a gap?
 2. **Scope.** Is this area sufficiently large to warrant a dedicated appointee?
-3. **Consistent need.**. Has the need to have this as an area arisen before?
+3. **Consistent need.** Has the need to have this as an area arisen before?
 
 ## Decision process
 
