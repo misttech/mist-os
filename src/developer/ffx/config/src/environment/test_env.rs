@@ -6,6 +6,7 @@ use crate::{ConfigMap, Environment, EnvironmentContext};
 use anyhow::{Context, Result};
 use std::{collections::HashMap, sync::Arc};
 use tempfile::{NamedTempFile, TempDir};
+use tracing::level_filters::LevelFilter;
 
 use super::ExecutableKind;
 
@@ -18,6 +19,8 @@ pub struct TestEnv {
     pub context: EnvironmentContext,
     pub isolate_root: TempDir,
     pub user_file: NamedTempFile,
+    pub log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync>,
+    _log_guard: tracing::subscriber::DefaultGuard,
     _guard: async_lock::MutexGuardArc<()>,
 }
 
@@ -36,7 +39,26 @@ impl TestEnv {
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
         );
-        let test_env = TestEnv { env_file, context, user_file, isolate_root, _guard };
+        let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> = Arc::new(
+            crate::logging::configure_subscribers(
+                &context,
+                Some(crate::logging::StdioOptions { test_writer: true }),
+                false,
+                LevelFilter::DEBUG,
+            )
+            .await,
+        );
+        let _log_guard = tracing::subscriber::set_default(Arc::clone(&log_subscriber));
+
+        let test_env = TestEnv {
+            env_file,
+            context,
+            user_file,
+            isolate_root,
+            log_subscriber,
+            _log_guard,
+            _guard,
+        };
 
         let mut env = Environment::new_empty(test_env.context.clone());
         env.set_user(Some(&user_file_path));

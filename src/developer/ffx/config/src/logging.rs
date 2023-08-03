@@ -18,6 +18,7 @@ use std::{
 use tracing::Metadata;
 use tracing_subscriber::{
     filter::{self, LevelFilter},
+    fmt::{writer::BoxMakeWriter, TestWriter},
     prelude::*,
     Layer,
 };
@@ -306,7 +307,9 @@ pub async fn init(ctx: &EnvironmentContext, log_to_stdio: bool, log_to_file: boo
 
     let level = filter_level(ctx).await;
 
-    configure_subscribers(ctx, log_to_stdio, init_file, level).await;
+    configure_subscribers(ctx, log_to_stdio.then_some(StdioOptions::default()), init_file, level)
+        .await
+        .init();
 
     Ok(())
 }
@@ -350,20 +353,30 @@ async fn include_spans(ctx: &EnvironmentContext) -> bool {
     ctx.query(LOG_INCLUDE_SPANS).get().await.unwrap_or(false)
 }
 
-async fn configure_subscribers(
+#[derive(Default)]
+pub(crate) struct StdioOptions {
+    pub(crate) test_writer: bool,
+}
+
+pub(crate) async fn configure_subscribers(
     ctx: &EnvironmentContext,
-    stdio: bool,
+    stdio: Option<StdioOptions>,
     use_file: bool,
     level: LevelFilter,
-) {
+) -> impl tracing::Subscriber + Send + Sync {
     let filter_targets =
         filter::Targets::new().with_targets(target_levels(ctx).await).with_default(level);
 
     let include_spans = include_spans(ctx).await;
-    let stdio_layer = if stdio {
+    let stdio_layer = if let Some(stdio) = stdio {
         let event_format = LogFormat::new(*LOGGING_ID, include_spans);
         let format = tracing_subscriber::fmt::layer()
             .event_format(event_format)
+            .with_writer(if stdio.test_writer {
+                BoxMakeWriter::new(TestWriter::default())
+            } else {
+                BoxMakeWriter::new(std::io::stdout)
+            })
             .with_filter(DisableableFilter)
             .with_filter(filter_targets.clone());
         Some(format)
@@ -384,5 +397,5 @@ async fn configure_subscribers(
         None
     };
 
-    tracing_subscriber::registry().with(stdio_layer).with(file_layer).init();
+    tracing_subscriber::registry().with(stdio_layer).with(file_layer)
 }
