@@ -330,11 +330,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/block/bin/blktest:bootfs",
     "//src/graphics/display/bin/display-test:bootfs",
     "//src/zircon/tests/evil:bootfs",
-
-    # drivers
-    "//src/devices/misc/drivers/test:bootfs",
-    "//src/devices/tests/sysdev:bootfs",
-    "//src/devices/usb/drivers/usb-peripheral-test:bootfs",
   ]
 
   # Do not automatically include these tools, but build them to keep them from
