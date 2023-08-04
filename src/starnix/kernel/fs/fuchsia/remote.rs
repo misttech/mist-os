@@ -992,25 +992,6 @@ impl FileOps for RemoteFileObject {
         Ok(Arc::new(vmo))
     }
 
-    fn wait_async(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        Some(zxio_wait_async(&self.zxio, waiter, events, handler))
-    }
-
-    fn query_events(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        Ok(zxio_query_events(&self.zxio))
-    }
-
     fn to_handle(
         &self,
         _file: &FileHandle,

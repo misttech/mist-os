@@ -12,41 +12,8 @@
         {
             type: "expect_failure",
             matchers: [
-                // exec_test
-                "ExecTest.SymlinkLimitRefreshedForInterpreter",
-
                 // fallocate_test
                 "AllocateTest.Fallocate",
-            ],
-        },
-        {
-            type: "skip",
-            matchers: [
-                // epoll_test - this test causes a starnix kernel panic because it uses an invalid
-                // watch handle and unwraps the result.
-                "EpollTest.RegularFiles",
-
-                // msync_test
-                // Test 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23 fails
-                // sometimes. Skip all tests for now.
-                "All/MsyncFullParamTest.InvalidateUnlockedSucceeds/*",
-                "All/MsyncFullParamTest.NormallySucceeds/*",
-                "All/MsyncFullParamTest.UnalignedAddressFails/*",
-                "All/MsyncFullParamTest.UnalignedLengthSucceeds/*",
-
-                // pty_test - flaky
-                // Specifically, the following tests were identified as flaky when running on Fxfs.
-                // Until we can find out why thse tests are flaky, skip all tests that are part of
-                // JobControlTest
-                //  * "JobControlTest.ReleaseTTY",
-                //  * "JobControlTest.SetForegroundProcessGroupDifferentSession",
-                //  * "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
-                //  * "JobControlTest.SetForegroundProcessGroupSIGTTOUBlocked"
-                "JobControlTest.*",
-
-                // select_test - this test causes a starnix kernel panic because it uses an invalid
-                // watch handle and unwraps the result.
-                "SelectTest.SetrlimitCallNOFILE",
             ],
         },
     ],
