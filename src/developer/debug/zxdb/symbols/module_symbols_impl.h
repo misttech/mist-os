@@ -109,7 +109,8 @@ class ModuleSymbolsImpl final : public ModuleSymbols {
                                                   const Function* optional_func) const;
   std::optional<Location> ElfLocationForAddress(const SymbolContext& symbol_context,
                                                 uint64_t absolute_address,
-                                                const ResolveOptions& options) const;
+                                                const ResolveOptions& options, FileLine file_line,
+                                                int column) const;
 
   // Converts the given global or static variable to a Location. This doesn't work for local
   // variables which are dynamic and based on the current CPU state and stack.

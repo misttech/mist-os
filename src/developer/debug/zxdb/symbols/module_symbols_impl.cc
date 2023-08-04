@@ -25,11 +25,13 @@
 #include "src/developer/debug/zxdb/symbols/dwarf_expr_eval.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_symbol_factory.h"
 #include "src/developer/debug/zxdb/symbols/elf_symbol.h"
+#include "src/developer/debug/zxdb/symbols/file_line.h"
 #include "src/developer/debug/zxdb/symbols/find_line.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/line_details.h"
 #include "src/developer/debug/zxdb/symbols/line_table_impl.h"
+#include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/developer/debug/zxdb/symbols/resolve_options.h"
 #include "src/developer/debug/zxdb/symbols/symbol_context.h"
 #include "src/developer/debug/zxdb/symbols/symbol_data_provider.h"
@@ -452,10 +454,20 @@ Location ModuleSymbolsImpl::LocationForAddress(const SymbolContext& symbol_conte
                                                uint64_t absolute_address,
                                                const ResolveOptions& options,
                                                const Function* optional_func) const {
-  if (auto dwarf_loc =
-          DwarfLocationForAddress(symbol_context, absolute_address, options, optional_func))
+  auto dwarf_loc =
+      DwarfLocationForAddress(symbol_context, absolute_address, options, optional_func);
+  if (dwarf_loc && dwarf_loc->symbol())
     return std::move(*dwarf_loc);
-  if (auto elf_locs = ElfLocationForAddress(symbol_context, absolute_address, options))
+
+  // Fall back to use ELF symbol but keep the file/line info.
+  FileLine file_line;
+  int column = 0;
+  if (dwarf_loc) {
+    file_line = dwarf_loc->file_line();
+    column = dwarf_loc->column();
+  }
+  if (auto elf_locs =
+          ElfLocationForAddress(symbol_context, absolute_address, options, file_line, column))
     return std::move(*elf_locs);
 
   // Not symbolizable, return an "address" with no symbol information. Mark it symbolized to record
@@ -576,8 +588,8 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
 }
 
 std::optional<Location> ModuleSymbolsImpl::ElfLocationForAddress(
-    const SymbolContext& symbol_context, uint64_t absolute_address,
-    const ResolveOptions& options) const {
+    const SymbolContext& symbol_context, uint64_t absolute_address, const ResolveOptions& options,
+    FileLine file_line, int column) const {
   if (elf_addresses_.empty())
     return std::nullopt;
 
@@ -594,7 +606,7 @@ std::optional<Location> ModuleSymbolsImpl::ElfLocationForAddress(
   if (relative_addr - record->relative_address > kMaxElfOffsetForMatch)
     return std::nullopt;  // Too far away.
   return Location(
-      absolute_address, FileLine(), 0, symbol_context,
+      absolute_address, std::move(file_line), column, symbol_context,
       fxl::MakeRefCounted<ElfSymbol>(const_cast<ModuleSymbolsImpl*>(this)->GetWeakPtr(), *record));
 }
 
