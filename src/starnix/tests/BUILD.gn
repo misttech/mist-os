@@ -102,3 +102,11 @@ fuchsia_test_package("starnix_magma_tests") {
     ]
   }
 }
+
+# Used in hermetic Starnix tests to subpackage a netstack component.
+# TODO(vickiecheng): Update starnix_test_common.shard.cml to launch netstack as a subpackaged
+# child once every test includes this package.
+fuchsia_package("netstack_package") {
+  package_name = "netstack"
+  deps = [ "//src/connectivity/network/netstack:component" ]
+}

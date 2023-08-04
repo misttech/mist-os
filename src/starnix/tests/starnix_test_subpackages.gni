@@ -1,0 +1,10 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# The subpackages a Starnix test including `starnix_test_common.shard.cml` needs to boot a
+# container.
+starnix_test_subpackages = [
+  "//src/starnix/kernel:starnix_kernel_package",
+  "//src/starnix/tests:netstack_package",
+]

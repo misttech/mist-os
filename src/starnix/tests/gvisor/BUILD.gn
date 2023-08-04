@@ -6,6 +6,7 @@ import("//build/dist/zip_resource.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 
 group("tests") {
@@ -510,7 +511,7 @@ template("gvisor_with_expectations_test_package") {
   fuchsia_test_with_expectations_package(target_name) {
     deps = [ ":container_resources" ]
 
-    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+    subpackages = starnix_test_subpackages
 
     forward_variables_from(invoker, [ "test_components" ])
 
@@ -561,7 +562,7 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
     test_components += [ ":${benchmark_name}" ]
   }
 
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  subpackages = starnix_test_subpackages
 
   # Set environments to none so infra doesn't run these benchmarks.
   # These benchmarks are run as a part of:

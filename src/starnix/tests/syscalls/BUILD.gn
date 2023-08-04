@@ -8,6 +8,7 @@ import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 group("tests") {
   testonly = true
@@ -240,7 +241,7 @@ fuchsia_test_package("starnix_syscall_tests") {
     ":crash_test",
   ]
 
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  subpackages = starnix_test_subpackages
 
   deps = [
     ":container_resources",

@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/python/python_host_test.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
-import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 group("tests") {
   testonly = true
@@ -67,7 +67,7 @@ fuchsia_test_package("android") {
   ]
 
   if (target_cpu == "x64") {
-    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+    subpackages = starnix_test_subpackages
   }
 
   deps = [
