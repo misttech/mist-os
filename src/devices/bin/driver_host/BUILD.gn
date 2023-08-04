@@ -76,6 +76,7 @@ source_set("common") {
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/fidl:devfs_fidl",
+    "//src/lib/driver_symbols:driver_symbols",
   ]
 
   public_deps = [

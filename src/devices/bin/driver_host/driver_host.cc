@@ -58,6 +58,7 @@
 #include "src/devices/bin/driver_host/scheduler_profile.h"
 #include "src/devices/bin/driver_host/tracing.h"
 #include "src/devices/lib/log/log.h"
+#include "src/lib/driver_symbols/symbols.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -487,6 +488,18 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
   *out_driver = *std::move(driver);
 
   const char* c_libname = new_driver->libname().c_str();
+
+  auto result = driver_symbols::FindRestrictedSymbols(vmo);
+  if (result.is_error()) {
+    LOGF(WARNING, "Driver '%s' failed to validate as ELF: %s", c_libname, result.status_value());
+  } else if (result->size() > 0) {
+    LOGF(ERROR, "Driver '%s' referenced %lu restricted libc symbols: ", c_libname, result->size());
+    for (auto& str : *result) {
+      LOGF(ERROR, str.c_str());
+    }
+    new_driver->set_status(ZX_ERR_NOT_SUPPORTED);
+    return new_driver->status();
+  }
 
   void* dl = dlopen_vmo(vmo.get(), RTLD_NOW);
   if (dl == nullptr) {
