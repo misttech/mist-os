@@ -8534,7 +8534,7 @@ vboot signing key directory. Must contain `kernel.keyblock` and
 
 **Current value (from the default):** `"//third_party/vboot_reference/tests/devkeys"`
 
-From //build/images/vboot/vboot.gni:15
+From //build/images/vboot/vboot.gni:16
 
 ### vboot_verbose
 
@@ -8542,7 +8542,7 @@ If true, vboot() image builds print out the exact "futility" command line.
 
 **Current value (from the default):** `false`
 
-From //build/images/vboot/vboot.gni:11
+From //build/images/vboot/vboot.gni:12
 
 ### verbose_image_assembly
 
