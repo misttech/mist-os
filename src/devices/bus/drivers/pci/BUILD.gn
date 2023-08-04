@@ -26,6 +26,7 @@ source_set("user_pci") {
     "bus_inspect.cc",
     "capabilities/msix.cc",
     "capabilities/power_management.cc",
+    "composite.cc",
     "config.cc",
     "device.cc",
     "device_caps.cc",
@@ -43,6 +44,11 @@ source_set("user_pci") {
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+    "//src/devices/bind/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//src/devices/bind/fuchsia.pci:fuchsia.pci_cpp",
+    "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/pci/lib/device-protocol-pci",
@@ -110,7 +116,10 @@ if (platform_enable_user_pci) {
       "//build/config:all_source",
       "//build/config/fuchsia:enable_zircon_asserts",
     ]
-    sources = [ "kpci.cc" ]
+    sources = [
+      "composite.cc",
+      "kpci.cc",
+    ]
     deps = [
       ":pci_bind",
       "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
@@ -120,7 +129,11 @@ if (platform_enable_user_pci) {
       "//sdk/lib/component/outgoing/cpp",
       "//sdk/lib/driver/runtime:driver_runtime_cpp",
       "//sdk/lib/fidl",
+      "//src/devices/bind/fuchsia:fuchsia_cpp",
       "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+      "//src/devices/bind/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+      "//src/devices/bind/fuchsia.pci:fuchsia.pci_cpp",
+      "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
       "//src/devices/lib/driver",
       "//src/devices/lib/driver:driver_runtime",
       "//src/devices/lib/pci",

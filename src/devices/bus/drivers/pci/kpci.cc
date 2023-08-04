@@ -31,6 +31,7 @@
 #include <ddktl/device.h>
 
 #include "lib/fidl/cpp/wire/connect_service.h"
+#include "src/devices/bus/drivers/pci/composite.h"
 #include "zircon/system/ulib/async-loop/include/lib/async-loop/loop.h"
 
 namespace fpci = ::fuchsia_hardware_pci;
@@ -145,22 +146,6 @@ zx_status_t pci_get_bti(kpci_device* device, uint32_t index, zx::bti* out_bti) {
   return st;
 }
 
-static const zx_bind_inst_t sysmem_fragment_match[] = {
-    BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_SYSMEM),
-};
-
-static const device_fragment_part_t sysmem_fragment[] = {
-    {std::size(sysmem_fragment_match), sysmem_fragment_match},
-};
-
-static const zx_bind_inst_t sysmem_fidl_fragment_match[] = {
-    BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
-};
-
-static const device_fragment_part_t sysmem_fidl_fragment[] = {
-    {std::size(sysmem_fidl_fragment_match), sysmem_fidl_fragment_match},
-};
-
 template <typename T>
 zx_status_t ReadConfig(zx_handle_t device, uint16_t offset, T* out_value) {
   uint32_t value;
@@ -271,63 +256,30 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
   }
   auto kpci_unowned = kpci.release();
 
-  // DFv2 does not support dynamic binding yet, so we have to specify the bind
-  // rules in C++ rather than in a bind file.
-  const zx_bind_inst_t pci_fidl_fragment_match[] = {
-      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_PCI),
-      BI_ABORT_IF(NE, BIND_PCI_VID, device.info.vendor_id),
-      BI_ABORT_IF(NE, BIND_PCI_DID, device.info.device_id),
-      BI_ABORT_IF(NE, BIND_PCI_CLASS, device.info.base_class),
-      BI_ABORT_IF(NE, BIND_PCI_SUBCLASS, device.info.sub_class),
-      BI_ABORT_IF(NE, BIND_PCI_INTERFACE, device.info.program_interface),
-      BI_ABORT_IF(NE, BIND_PCI_REVISION, device.info.revision_id),
-      BI_ABORT_IF(EQ, BIND_COMPOSITE, 1),
-      BI_MATCH_IF(EQ, BIND_PCI_TOPO, pci_bind_topo),
-  };
-
-  const device_fragment_part_t pci_fidl_fragment[] = {
-      {std::size(pci_fidl_fragment_match), pci_fidl_fragment_match},
-  };
-
-  const zx_bind_inst_t acpi_fragment_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_ACPI),
-      BI_ABORT_IF(NE, BIND_ACPI_BUS_TYPE, bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_PCI),
-      BI_MATCH_IF(EQ, BIND_PCI_TOPO, pci_bind_topo),
-  };
-
-  const device_fragment_part_t acpi_fragment[] = {
-      {std::size(acpi_fragment_match), acpi_fragment_match},
-  };
-
-  const device_fragment_t fragments[] = {
-      {"sysmem", std::size(sysmem_fragment), sysmem_fragment},
-      {"sysmem-fidl", std::size(sysmem_fidl_fragment), sysmem_fidl_fragment},
-      {"pci", std::size(pci_fidl_fragment), pci_fidl_fragment},
-      {"acpi", std::size(acpi_fragment), acpi_fragment},
-  };
-  zx_device_prop_t composite_props[] = {
-      {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_PCI},
-      {BIND_PCI_VID, 0, device.info.vendor_id},
-      {BIND_PCI_DID, 0, device.info.device_id},
-      {BIND_PCI_CLASS, 0, device.info.base_class},
-      {BIND_PCI_SUBCLASS, 0, device.info.sub_class},
-      {BIND_PCI_INTERFACE, 0, device.info.program_interface},
-      {BIND_PCI_REVISION, 0, device.info.revision_id},
-      {BIND_PCI_TOPO, 0, pci_bind_topo},
-  };
-
-  composite_device_desc_t composite_desc = {
-      .props = composite_props,
-      .props_count = std::size(composite_props),
-      .fragments = fragments,
-      .fragments_count = uses_acpi ? std::size(fragments) : std::size(fragments) - 1,
-      .primary_fragment = "pci",
-      .spawn_colocated = false,
+  auto pci_info = CompositeInfo{
+      .vendor_id = device.info.vendor_id,
+      .device_id = device.info.device_id,
+      .class_id = device.info.base_class,
+      .subclass = device.info.sub_class,
+      .program_interface = device.info.program_interface,
+      .revision_id = device.info.revision_id,
+      .bus_id = device.info.bus_id,
+      .dev_id = device.info.dev_id,
+      .func_id = device.info.func_id,
+      .has_acpi = uses_acpi,
   };
 
   char composite_name[ZX_DEVICE_NAME_MAX];
   snprintf(composite_name, sizeof(composite_name), "pci-%s-fidl", device.name);
-  status = kpci_unowned->DdkAddComposite(composite_name, &composite_desc);
+  status = AddLegacyComposite(kpci_unowned->parent(), composite_name, pci_info);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  char spec_name[8];
+  snprintf(spec_name, sizeof(spec_name), "%02x_%02x_%01x", device.info.bus_id, device.info.dev_id,
+           device.info.func_id);
+  status = kpci_unowned->DdkAddCompositeNodeSpec(spec_name, CreateCompositeNodeSpec(pci_info));
   return status;
 }
 

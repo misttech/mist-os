@@ -10,8 +10,7 @@
 #include <lib/fit/defer.h>
 #include <zircon/errors.h>
 
-#include <bind/fuchsia/acpi/cpp/bind.h>
-
+#include "src/devices/bus/drivers/pci/composite.h"
 #include "src/devices/bus/drivers/pci/device.h"
 
 #define RETURN_STATUS(level, status, format, ...)                                   \
@@ -96,69 +95,31 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
 
   auto fidl_dev_unowned = fidl_dev.release();
 
-  const zx_bind_inst_t pci_fragment_match[] = {
-      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_PCI),
-      BI_ABORT_IF(NE, BIND_PCI_VID, device->vendor_id()),
-      BI_ABORT_IF(NE, BIND_PCI_DID, device->device_id()),
-      BI_ABORT_IF(NE, BIND_PCI_CLASS, device->class_id()),
-      BI_ABORT_IF(NE, BIND_PCI_SUBCLASS, device->subclass()),
-      BI_ABORT_IF(NE, BIND_PCI_INTERFACE, device->prog_if()),
-      BI_ABORT_IF(NE, BIND_PCI_REVISION, device->rev_id()),
-      BI_ABORT_IF(EQ, BIND_COMPOSITE, 1),
-      BI_MATCH_IF(EQ, BIND_PCI_TOPO, pci_bind_topo),
+  auto pci_info = CompositeInfo{
+      .vendor_id = device->vendor_id(),
+      .device_id = device->device_id(),
+      .class_id = device->class_id(),
+      .subclass = device->subclass(),
+      .program_interface = device->prog_if(),
+      .revision_id = device->rev_id(),
+      .bus_id = device->bus_id(),
+      .dev_id = device->dev_id(),
+      .func_id = device->func_id(),
+      .has_acpi = device->has_acpi(),
   };
 
-  const device_fragment_part_t pci_fragment[] = {
-      {std::size(pci_fragment_match), pci_fragment_match},
-  };
-
-  const zx_bind_inst_t sysmem_match[] = {
-      BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_SYSMEM),
-  };
-
-  const device_fragment_part_t sysmem_fragment[] = {
-      {std::size(sysmem_match), sysmem_match},
-  };
-
-  const zx_bind_inst_t sysmem_fidl_match[] = {
-      BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
-  };
-
-  const device_fragment_part_t sysmem_fidl_fragment[] = {
-      {std::size(sysmem_fidl_match), sysmem_fidl_match},
-  };
-
-  const zx_bind_inst_t acpi_fragment_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_ACPI),
-      BI_ABORT_IF(NE, BIND_ACPI_BUS_TYPE, bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_PCI),
-      BI_MATCH_IF(EQ, BIND_PCI_TOPO, pci_bind_topo),
-  };
-
-  const device_fragment_part_t acpi_fragment[] = {
-      {std::size(acpi_fragment_match), acpi_fragment_match},
-  };
-
-  // These are laid out so that ACPI can be optionally included via the number
-  // of fragments specified.
-  const device_fragment_t fragments[] = {
-      {"pci", std::size(pci_fragment), pci_fragment},
-      {"sysmem", std::size(sysmem_fragment), sysmem_fragment},
-      {"sysmem-fidl", std::size(sysmem_fidl_fragment), sysmem_fidl_fragment},
-      {"acpi", std::size(acpi_fragment), acpi_fragment},
-  };
-
-  composite_device_desc_t composite_desc = {
-      .props = pci_device_props,
-      .props_count = std::size(pci_device_props),
-      .fragments = fragments,
-      .fragments_count = (device->has_acpi()) ? std::size(fragments) : std::size(fragments) - 1,
-      .primary_fragment = "pci",
-      .spawn_colocated = false,
-  };
-
-  status = fidl_dev_unowned->DdkAddComposite(device->config()->addr(), &composite_desc);
+  status = AddLegacyComposite(fidl_dev_unowned->parent(), device->config()->addr(), pci_info);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "[%s] Failed to create pci fidl composite: %s", device->config()->addr(),
+    zxlogf(ERROR, "[%s] Failed to create pci composite: %s", device->config()->addr(),
+           zx_status_get_string(status));
+  }
+
+  char spec_name[8];
+  snprintf(spec_name, sizeof(spec_name), "%02x_%02x_%01x", device->bus_id(), device->dev_id(),
+           device->func_id());
+  status = fidl_dev_unowned->DdkAddCompositeNodeSpec(spec_name, CreateCompositeNodeSpec(pci_info));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "[%s] Failed to add pci composite spec: %s", device->config()->addr(),
            zx_status_get_string(status));
     return zx::error(status);
   }

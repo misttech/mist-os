@@ -444,6 +444,7 @@ class FidlDevice : public FidlDeviceType, public fidl::WireServer<fuchsia_hardwa
       : FidlDeviceType(parent),
         device_(device),
         outgoing_dir_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
+
   pci::Device* device_;
   fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> bindings_;
   component::OutgoingDirectory outgoing_dir_;
