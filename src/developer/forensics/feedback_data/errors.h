@@ -33,6 +33,8 @@ inline std::string ToReason(const Error error) {
       return "file read failure";
     case Error::kFileWriteFailure:
       return "file write failure";
+    case Error::kNotAvailableInProduct:
+      return "not available in product";
     case Error::kCustom:
       return "became irrelevant after 24 hrs of uptime";
     case Error::kDefault:

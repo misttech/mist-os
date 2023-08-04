@@ -177,5 +177,33 @@ TEST_F(IntlProviderTest, Reconnects) {
                            }));
 }
 
+TEST_F(IntlProviderTest, DoesNotReconnectIfUnavailable) {
+  stubs::IntlProvider server(/*default_locale=*/std::nullopt, "timezone-one");
+  InjectServiceProvider(&server);
+
+  IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
+  Annotations annotations;
+
+  provider.GetOnUpdate([&annotations](Annotations result) { annotations = std::move(result); });
+  EXPECT_THAT(annotations, IsEmpty());
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(server.IsBound());
+
+  server.CloseConnection(ZX_ERR_UNAVAILABLE);
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(server.IsBound());
+
+  // Run past monotonic backoff.
+  RunLoopFor(zx::sec(2));
+  EXPECT_FALSE(server.IsBound());
+
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, Error::kNotAvailableInProduct),
+                               Pair(kSystemTimezonePrimaryKey, Error::kNotAvailableInProduct),
+                           }));
+}
+
 }  // namespace
 }  // namespace forensics::feedback

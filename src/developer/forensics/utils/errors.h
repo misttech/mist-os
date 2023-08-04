@@ -28,6 +28,7 @@ enum class Error {
   kBadValue,
   kFileReadFailure,
   kFileWriteFailure,
+  kNotAvailableInProduct,
   // Custom errors code that can be interpreted in different ways by different components.
   kCustom,
 };
@@ -96,6 +97,8 @@ inline std::string ToString(Error error) {
       return "Error::kFileReadFailure";
     case Error::kFileWriteFailure:
       return "Error::kFileWriteFailure";
+    case Error::kNotAvailableInProduct:
+      return "Error::kNotAvailableInProduct";
     case Error::kCustom:
       return "Error::kCustom";
   }

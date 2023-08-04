@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "src/developer/forensics/feedback/annotations/constants.h"
+#include "src/developer/forensics/utils/errors.h"
 #include "src/lib/backoff/backoff.h"
 
 namespace forensics::feedback {
@@ -23,6 +24,18 @@ IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
       ::fit::bind_member<&IntlProvider::GetInternationalization>(this);
 
   property_provider_ptr_.set_error_handler([this](const zx_status_t status) {
+    if (status == ZX_ERR_UNAVAILABLE) {
+      FX_PLOGS(WARNING, status) << "fuchsia.intl.PropertyProvider unavailable, will not retry";
+
+      Annotations annotations;
+      for (const std::string& key : GetKeys()) {
+        annotations.insert({key, Error::kNotAvailableInProduct});
+      }
+
+      on_update_(annotations);
+      return;
+    }
+
     FX_PLOGS(WARNING, status) << "Lost connection to fuchsia.intl.PropertyProvider";
 
     auto self = ptr_factory_.GetWeakPtr();
