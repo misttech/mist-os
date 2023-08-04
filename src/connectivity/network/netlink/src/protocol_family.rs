@@ -67,15 +67,15 @@ pub mod route {
     };
     use net_types::{
         ip::{
-            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4,
-            Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
+            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpInvariant, IpVersion, Ipv4, Ipv6,
+            Subnet,
         },
         SpecifiedAddr, SpecifiedAddress,
     };
 
     use crate::{
         interfaces,
-        netlink_packet::{self, errno::Errno},
+        netlink_packet::{self, errno::Errno, ip_addr_from_bytes},
         routes,
         rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler, RuleTable},
     };
@@ -564,12 +564,14 @@ pub mod route {
             Errno::ENOTSUP
         })?;
 
-        Ok(routes::RouteRequestArgs::New(routes::NewRouteArgs::Unicast(routes::UnicastRouteArgs {
-            subnet,
-            target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
-            priority,
-            table: table.into(),
-        })))
+        Ok(routes::RouteRequestArgs::New(routes::NewRouteArgs::Unicast(
+            routes::UnicastNewRouteArgs {
+                subnet,
+                target: fnet_routes_ext::RouteTarget { outbound_interface, next_hop },
+                priority,
+                table: table.into(),
+            },
+        )))
     }
 
     // Translates `RouteMessage` to `RouteRequestArgs::Del`.
@@ -592,38 +594,6 @@ pub mod route {
         Ok(routes::RouteRequestArgs::Del(routes::DelRouteArgs::Unicast(
             routes::UnicastDelRouteArgs { subnet, outbound_interface, next_hop, priority, table },
         )))
-    }
-
-    fn ip_addr_from_bytes<I: Ip>(addr_bytes: &[u8]) -> Result<I::Addr, Errno> {
-        I::map_ip(
-            IpInvariant(addr_bytes),
-            |IpInvariant(addr_bytes)| {
-                const BYTES: usize = Ipv4Addr::BYTES as usize;
-                // To conform to Linux expectations, we allow more than the needed bytes
-                // to be present and cut off the remainder.
-                if addr_bytes.len() < BYTES {
-                    return Err(Errno::EINVAL);
-                }
-
-                let mut bytes = [0; BYTES as usize];
-                bytes.copy_from_slice(&addr_bytes[..BYTES]);
-                let addr: Ipv4Addr = bytes.into();
-                Ok(addr)
-            },
-            |IpInvariant(addr_bytes)| {
-                const BYTES: usize = Ipv6Addr::BYTES as usize;
-                // To conform to Linux expectations, we allow more than the needed bytes
-                // to be present and cut off the remainder.
-                if addr_bytes.len() < BYTES {
-                    return Err(Errno::EINVAL);
-                }
-
-                let mut bytes = [0; BYTES];
-                bytes.copy_from_slice(&addr_bytes[..BYTES]);
-                let addr: Ipv6Addr = bytes.into();
-                Ok(addr)
-            },
-        )
     }
 
     #[async_trait]
@@ -1037,7 +1007,7 @@ pub mod route {
                                 },
                                 Err(e) => {
                                     return client.send_unicast(
-                                    netlink_packet::new_error(Err(e), req_header)
+                                        netlink_packet::new_error(Err(e), req_header)
                                     );
                                 }
                             }
@@ -1054,7 +1024,7 @@ pub mod route {
                                 },
                                 Err(e) => {
                                     return client.send_unicast(
-                                    netlink_packet::new_error(Err(e), req_header)
+                                        netlink_packet::new_error(Err(e), req_header)
                                     );
                                 }
                             }
@@ -3447,7 +3417,7 @@ mod test {
                                 interface_id.expect("new requests must have interface id");
 
                             routes::RouteRequestArgs::New::<I>(routes::NewRouteArgs::Unicast(
-                                routes::UnicastRouteArgs {
+                                routes::UnicastNewRouteArgs {
                                     subnet: dst,
                                     target: fnet_routes_ext::RouteTarget {
                                         outbound_interface: interface_id.get(),

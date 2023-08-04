@@ -45,7 +45,7 @@ use crate::{
     logging::{log_debug, log_error, log_warn},
     messaging::Sender,
     multicast_groups::ModernGroup,
-    netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
+    netlink_packet::{errno::Errno, ip_addr_from_bytes, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
 };
 
@@ -57,7 +57,7 @@ pub(crate) enum GetRouteArgs {
 
 /// Arguments for an RTM_NEWROUTE unicast route.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct UnicastRouteArgs<I: Ip> {
+pub(crate) struct UnicastNewRouteArgs<I: Ip> {
     // The network and prefix of the route.
     pub subnet: Subnet<I::Addr>,
     // The forwarding action. Unicast routes are gateway/direct routes and must
@@ -75,7 +75,7 @@ pub(crate) struct UnicastRouteArgs<I: Ip> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum NewRouteArgs<I: Ip> {
     /// Direct or gateway routes.
-    Unicast(UnicastRouteArgs<I>),
+    Unicast(UnicastNewRouteArgs<I>),
 }
 
 /// Arguments for an RTM_DELROUTE unicast route.
@@ -125,8 +125,13 @@ pub(crate) enum RequestArgs<I: Ip> {
 pub(crate) enum RequestError {
     /// The route already exists in the route set.
     AlreadyExists,
+    /// Netstack failed to delete the route due to the route not being
+    /// installed by Netlink.
+    DeletionNotAllowed,
     /// Invalid destination subnet or next-hop.
     InvalidRequest,
+    /// No routes in the route set matched the route query.
+    NotFound,
     /// Interface present in request that was not recognized by Netstack.
     UnrecognizedInterface,
     /// Unspecified error.
@@ -139,7 +144,8 @@ impl RequestError {
         match self {
             RequestError::AlreadyExists => Errno::EEXIST,
             RequestError::InvalidRequest => Errno::EINVAL,
-            RequestError::Unknown => Errno::ENOTSUP,
+            RequestError::NotFound => Errno::ESRCH,
+            RequestError::DeletionNotAllowed | RequestError::Unknown => Errno::ENOTSUP,
             RequestError::UnrecognizedInterface => Errno::ENODEV,
         }
     }
@@ -147,7 +153,7 @@ impl RequestError {
 
 fn map_route_set_error<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
     e: RouteSetError,
-    route: I::Route,
+    route: &I::Route,
     interface_id: u64,
 ) -> RequestError {
     match e {
@@ -293,12 +299,12 @@ pub(crate) enum RoutesNetstackError<I: Ip> {
 }
 
 /// A subset of `RouteRequestArgs`, containing only `Request` types that can be pending.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PendingRouteRequestArgs<I: Ip> {
     /// RTM_NEWROUTE
     New(NewRouteArgs<I>),
-    // TODO(issuetracker.google.com/283136222): Add a `Del` type when RTM_DELROUTE
-    // requests are supported.
+    /// RTM_DELROUTE
+    Del(NetlinkRouteMessage),
 }
 
 #[derive(Derivative)]
@@ -464,15 +470,15 @@ impl<
             if let Some(pending_route_request_some) = pending_route_request.take() {
                 let PendingRouteRequest { request_args, client: _, completer: _ } =
                     &pending_route_request_some;
-                let contains_route = match request_args {
+
+                let done = match request_args {
                     PendingRouteRequestArgs::New(route) => {
                         new_route_matches_existing(&route, &route_messages)
                     }
+                    // For `Del` messages, we expect the exact `NetlinkRouteMessage` to match,
+                    // which was received as part of the `select_route_for_deletion` flow.
+                    PendingRouteRequestArgs::Del(route_msg) => !route_messages.contains(route_msg),
                 };
-
-                // TODO(issuetracker.google.com/283136222): Change `done` based on whether
-                // the args are for NEW OR DEL, after `RTM_DELROUTE` requests are supported.
-                let done = contains_route;
 
                 if done {
                     log_debug!("completed pending request; req = {pending_route_request_some:?}");
@@ -573,46 +579,118 @@ impl<
             route.try_into().expect("route should be converted")
         };
 
-        // Attempt to add a route without authenticating for the interface
-        // first, in case the interface has already been authenticated.
-        // With this approach, it is not necessary to maintain state of which
-        // interfaces are authenticated.
-        match fnet_routes_ext::admin::add_route::<I>(&route_set_proxy, &route)
-            .await
-            .expect("sent add route request")
-        {
-            Ok(true) => return Ok(new_route_args),
-            // TODO(issuetracker.google.com/289518732): Get the key (dest, metric)
-            // and check if a route with the metric currently exists in the observed
-            // set. If it exists, return `AlreadyExists` early without a call to
-            // `add_route`.
-            // When `add_route` has an `Ok(false)` response, this indicates that the
-            // route already exists, which should manifest as a hard error in Linux.
-            Ok(false) => return Err(RequestError::AlreadyExists),
+        Self::dispatch_route_proxy_fn(
+            &route,
+            interface_id,
+            &interfaces_proxy,
+            &route_set_proxy,
+            fnet_routes_ext::admin::add_route::<I>,
+        )
+        .await
+        .map(|did_add| {
+            if did_add {
+                Ok(new_route_args)
+            } else {
+                // When `add_route` has an `Ok(false)` response, this indicates that the
+                // route already exists, which should manifest as a hard error in Linux.
+                Err(RequestError::AlreadyExists)
+            }
+        })?
+    }
+
+    /// Handles a delete route request.
+    ///
+    /// Returns the `NetlinkRouteMessage` if the route was successfully
+    /// removed so that the caller can make sure their local state (from the
+    /// routes watcher) has sent a removal event for the removed route.
+    async fn handle_del_route_request(
+        interfaces_proxy: &fnet_root::InterfacesProxy,
+        route_set_proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
+        del_route_args: DelRouteArgs<I>,
+        existing_routes: &HashSet<NetlinkRouteMessage>,
+    ) -> Result<NetlinkRouteMessage, RequestError> {
+        let route_to_delete = select_route_for_deletion(del_route_args, existing_routes)
+            .ok_or(RequestError::NotFound)?;
+
+        let NetlinkRouteMessage(route) = route_to_delete;
+        let interface_id = route
+            .nlas
+            .iter()
+            .filter_map(|nla| match nla {
+                netlink_packet_route::route::Nla::Oif(interface) => Some(*interface as u64),
+                _nla => None,
+            })
+            .next()
+            .expect("there should be exactly one Oif NLA present");
+
+        let route: I::Route = {
+            let route: fnet_routes_ext::Route<I> = route_to_delete.to_owned().into();
+            route.try_into().expect("route should be converted")
+        };
+
+        Self::dispatch_route_proxy_fn(
+            &route,
+            interface_id,
+            &interfaces_proxy,
+            &route_set_proxy,
+            fnet_routes_ext::admin::remove_route::<I>,
+        )
+        .await
+        .map(|did_remove| {
+            if did_remove {
+                Ok(route_to_delete.to_owned())
+            } else {
+                log_error!(
+                    "Route was not removed as a result of this call. Likely Linux wanted \
+                    to remove a route from the global route set which is not supported  \
+                    by this API, route: {:?}",
+                    route_to_delete
+                );
+                Err(RequestError::DeletionNotAllowed)
+            }
+        })?
+    }
+
+    // Dispatch a function to the RouteSetProxy.
+    //
+    // Attempt to dispatch the function without authenticating first. If the call is
+    // unsuccessful due to an Unauthenticated error, try again after authenticating
+    // for the interface.
+    // Returns: whether the RouteSetProxy function made a change in the Netstack
+    // (an add or delete), or `RequestError` if unsuccessful.
+    async fn dispatch_route_proxy_fn<'a, Fut>(
+        route: &'a I::Route,
+        interface_id: u64,
+        interfaces_proxy: &'a fnet_root::InterfacesProxy,
+        route_set_proxy: &'a <I::RouteSetMarker as ProtocolMarker>::Proxy,
+        dispatch_fn: impl Fn(&'a <I::RouteSetMarker as ProtocolMarker>::Proxy, &'a I::Route) -> Fut,
+    ) -> Result<bool, RequestError>
+    where
+        Fut: futures::Future<Output = Result<Result<bool, RouteSetError>, fidl::Error>>,
+    {
+        match dispatch_fn(route_set_proxy, &route).await.expect("sent route proxy request") {
+            Ok(made_change) => return Ok(made_change),
             Err(RouteSetError::Unauthenticated) => {}
             Err(e) => {
-                log_warn!("error adding route to interface ({interface_id}): {e:?}");
+                log_warn!("error altering route on interface ({interface_id}): {e:?}");
                 return Err(map_route_set_error::<I>(e, route, interface_id));
             }
         };
 
-        // Authenticate for the interface if we failed to add
-        // a route and received the `Unauthenticated` error.
-        Self::authenticate_for_interface(&interfaces_proxy, &route_set_proxy, interface_id).await?;
+        // Authenticate for the interface if we received the `Unauthenticated`
+        // error from the function that was dispatched.
+        Self::authenticate_for_interface(interfaces_proxy, route_set_proxy, interface_id).await?;
 
-        match fnet_routes_ext::admin::add_route::<I>(&route_set_proxy, &route)
-            .await
-            .expect("sent add route request")
-        {
-            Ok(true) => return Ok(new_route_args),
-            Ok(false) => return Err(RequestError::AlreadyExists),
-            // Only try to add a route once more after authenticating. All errors
-            // are treated as hard errors after the second add route attempt.
-            Err(e) => {
-                log_warn!("error adding route to interface ({interface_id}): {e:?}");
-                return Err(map_route_set_error::<I>(e, route, interface_id));
-            }
-        };
+        // Dispatch the function once more after authenticating. All errors are
+        // treated as hard errors after the second dispatch attempt. Further
+        // attempts are not expected to yield differing results.
+        dispatch_fn(route_set_proxy, &route).await.expect("sent route proxy request").map_err(|e| {
+            log_warn!(
+                "error altering route after authenticating for \
+                    interface ({interface_id}): {e:?}"
+            );
+            map_route_set_error::<I>(e, route, interface_id)
+        })
     }
 
     /// Handles a [`Request`].
@@ -659,10 +737,27 @@ impl<
                         Err(e) => Err(e),
                     }
                 }
-                RouteRequestArgs::Del(_args) => {
-                    // TODO(issuetracker.google.com/283136222): Respond with the result
-                    // from removing the route, rather than always returning Ok(()).
-                    Ok(())
+                RouteRequestArgs::Del(args) => {
+                    match Self::handle_del_route_request(
+                        interfaces_proxy,
+                        route_set_proxy,
+                        args,
+                        route_messages,
+                    )
+                    .await
+                    {
+                        Ok(del_route) => {
+                            // Route deletions must be confirmed via a message from the Routes
+                            // watcher with the same Route struct - using the route
+                            // matched for deletion.
+                            return Some(PendingRouteRequest {
+                                request_args: PendingRouteRequestArgs::Del(del_route),
+                                client,
+                                completer,
+                            });
+                        }
+                        Err(e) => Err(e),
+                    }
                 }
             },
         };
@@ -741,6 +836,8 @@ pub(crate) struct NetlinkRouteMessage(RouteMessage);
 
 // Constructs a new set of `NetlinkRouteMessage` from an
 // `InstalledRoute` HashSet.
+// TODO(https://issuetracker.google.com/294273363): Store a HashSet of Route<I>
+// instead of NetlinkRouteMessage.
 fn new_set_with_existing_routes<I: Ip>(
     routes: HashSet<fnet_routes_ext::InstalledRoute<I>>,
 ) -> HashSet<NetlinkRouteMessage> {
@@ -922,7 +1019,7 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
     fn from(new_route_args: NewRouteArgs<I>) -> Self {
         match new_route_args {
             NewRouteArgs::Unicast(args) => {
-                let UnicastRouteArgs { subnet, target, priority, table: _ } = args;
+                let UnicastNewRouteArgs { subnet, target, priority, table: _ } = args;
                 fnet_routes_ext::Route {
                     destination: subnet,
                     action: fnet_routes_ext::RouteAction::Forward(target),
@@ -933,6 +1030,46 @@ impl<I: Ip> From<NewRouteArgs<I>> for fnet_routes_ext::Route<I> {
                     },
                 }
             }
+        }
+    }
+}
+
+// Implement conversions from [`NetlinkRouteMessage`] to
+// [`fnet_routes_ext::Route<I>`]. This is infallible, as all
+// [`NetlinkRouteMessage`]s in this module are created
+// with the expected NLAs and proper formatting.
+impl<I: Ip> From<NetlinkRouteMessage> for fnet_routes_ext::Route<I> {
+    fn from(netlink_route_message: NetlinkRouteMessage) -> Self {
+        let NetlinkRouteMessage(route_message) = netlink_route_message;
+        let RouteNlaView { subnet: subnet_bytes, metric, interface_id, next_hop: next_hop_bytes } =
+            view_existing_route_nlas(&route_message);
+
+        let subnet_bytes = match subnet_bytes {
+            Some(bytes) => ip_addr_from_bytes::<I>(bytes).expect("should be valid addr"),
+            None => I::UNSPECIFIED_ADDRESS,
+        };
+
+        let subnet = Subnet::new(subnet_bytes, route_message.header.destination_prefix_length)
+            .expect("should be valid subnet");
+
+        let next_hop = match next_hop_bytes {
+            Some(bytes) => ip_addr_from_bytes::<I>(bytes)
+                .map(|addr| SpecifiedAddr::new(addr))
+                .expect("should be valid addr if present"),
+            None => None,
+        };
+
+        fnet_routes_ext::Route {
+            destination: subnet,
+            action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                outbound_interface: *interface_id as u64,
+                next_hop,
+            }),
+            properties: fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                    metric: fnet_routes::SpecifiedMetric::ExplicitMetric(*metric),
+                },
+            },
         }
     }
 }
@@ -1007,7 +1144,7 @@ fn new_route_matches_existing<I: Ip>(
     existing_routes: &HashSet<NetlinkRouteMessage>,
 ) -> bool {
     existing_routes.iter().any(|NetlinkRouteMessage(existing_route)| {
-        let UnicastRouteArgs { subnet, target: _, priority, table: _ } = match route {
+        let UnicastNewRouteArgs { subnet, target: _, priority, table: _ } = match route {
             NewRouteArgs::Unicast(args) => args,
         };
         if subnet.prefix() != existing_route.header.destination_prefix_length {
@@ -1035,8 +1172,6 @@ fn new_route_matches_existing<I: Ip>(
 /// existing route matches the arguments if all provided arguments are equal to
 /// the values held by the route. If multiple routes match the arguments, the
 /// route with the lowest metric is selected.
-// TODO(https://issuetracker.google.com/283136222): Support RTM_DELROUTE.
-#[allow(unused)]
 fn select_route_for_deletion<I: Ip>(
     deletion_args: DelRouteArgs<I>,
     existing_routes: &HashSet<NetlinkRouteMessage>,
@@ -1046,7 +1181,7 @@ fn select_route_for_deletion<I: Ip>(
         .iter()
         .filter_map(|route| {
             let NetlinkRouteMessage(existing_route) = route;
-            let UnicastDelRouteArgs { subnet, outbound_interface, next_hop, priority, table } =
+            let UnicastDelRouteArgs { subnet, outbound_interface, next_hop, priority, table: _ } =
                 match deletion_args {
                     DelRouteArgs::Unicast(args) => args,
                 };
@@ -1074,7 +1209,7 @@ fn select_route_for_deletion<I: Ip>(
             }
         })
         // Select the route with the lowest metric
-        .min_by(|(route1, metric1), (route2, metric2)| metric1.cmp(metric2))
+        .min_by(|(_route1, metric1), (_route2, metric2)| metric1.cmp(metric2))
         .map(|(route, _metric)| route)
 }
 
@@ -1691,13 +1826,13 @@ mod tests {
         ]
     }
 
-    fn create_unicast_route_args<A: IpAddress>(
+    fn create_unicast_new_route_args<A: IpAddress>(
         subnet: Subnet<A>,
         next_hop: A,
         interface_id: u64,
         priority: u32,
-    ) -> UnicastRouteArgs<A::Version> {
-        UnicastRouteArgs {
+    ) -> UnicastNewRouteArgs<A::Version> {
+        UnicastNewRouteArgs {
             subnet,
             target: fnet_routes_ext::RouteTarget {
                 outbound_interface: interface_id,
@@ -1705,6 +1840,21 @@ mod tests {
             },
             priority,
             table: Default::default(),
+        }
+    }
+
+    fn create_unicast_del_route_args<A: IpAddress>(
+        subnet: Subnet<A>,
+        next_hop: Option<A>,
+        interface_id: Option<u64>,
+        priority: Option<u32>,
+    ) -> UnicastDelRouteArgs<A::Version> {
+        UnicastDelRouteArgs {
+            subnet,
+            outbound_interface: interface_id.map(NonZeroU64::new).flatten(),
+            next_hop: next_hop.map(SpecifiedAddr::new).flatten(),
+            priority: priority.map(NonZeroU32::new).flatten(),
+            table: NonZeroU32::new(RT_TABLE_MAIN.into()).unwrap(),
         }
     }
 
@@ -1896,11 +2046,32 @@ mod tests {
     #[derive(Debug)]
     enum RouteSetResult {
         AddResult(Result<bool, fnet_routes_admin::RouteSetError>),
-        #[allow(unused)]
-        // TODO(issuetracker.google.com/283136222): Handle `RTM_DELROUTE`
-        // requests from clients.
         DelResult(Result<bool, fnet_routes_admin::RouteSetError>),
         AuthenticationResult(Result<(), fnet_routes_admin::AuthenticateForInterfaceError>),
+    }
+
+    fn route_event_from_route<
+        I: Ip + fnet_routes_ext::FidlRouteIpExt,
+        F: FnOnce(fnet_routes_ext::InstalledRoute<I>) -> fnet_routes_ext::Event<I>,
+    >(
+        route: I::Route,
+        event_fn: F,
+    ) -> I::WatchEvent {
+        let route: fnet_routes_ext::Route<I> = route.try_into().unwrap();
+
+        let metric = match route.properties.specified_properties.metric {
+            fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
+            fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty) => {
+                panic!("metric should be explicit")
+            }
+        };
+
+        event_fn(fnet_routes_ext::InstalledRoute {
+            route,
+            effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+        })
+        .try_into()
+        .unwrap()
     }
 
     // Handle RouteSet API requests then feed the returned
@@ -1945,44 +2116,18 @@ mod tests {
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `AddRoute`");
-                            let metric = match route
-                                .properties
-                                .specified_properties
-                                .as_ref()
-                                .expect("specified properties should be some")
-                                .metric
-                                .expect("metric_should_be_some")
-                            {
-                                fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
-                                fnet_routes::SpecifiedMetric::InheritedFromInterface(
-                                    fnet_routes::Empty,
-                                ) => {
-                                    panic!("metric should be explicit")
-                                }
-                            };
+
                             RouteSetOutputs {
                                 event: match route_set_result {
-                                    Ok(true) => Some(
-                                        fnet_routes_ext::Event::Added(
-                                            fnet_routes_ext::InstalledRoute {
-                                                route: route.try_into().unwrap(),
-                                                effective_properties:
-                                                    fnet_routes_ext::EffectiveRouteProperties {
-                                                        metric,
-                                                    },
-                                            },
-                                        )
-                                        .try_into()
-                                        .unwrap(),
-                                    ),
+                                    Ok(true) => Some(route_event_from_route::<Ipv4, _>(
+                                        route,
+                                        fnet_routes_ext::Event::<Ipv4>::Added,
+                                    )),
                                     _ => None,
                                 },
                             }
                         }
-                        fnet_routes_admin::RouteSetV4Request::RemoveRoute {
-                            route: _,
-                            responder,
-                        } => {
+                        fnet_routes_admin::RouteSetV4Request::RemoveRoute { route, responder } => {
                             let route_set_result = assert_matches!(
                                 route_set_result,
                                 RouteSetResult::DelResult(res) => res
@@ -1991,7 +2136,16 @@ mod tests {
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `RemoveRoute`");
-                            RouteSetOutputs { event: None }
+
+                            RouteSetOutputs {
+                                event: match route_set_result {
+                                    Ok(true) => Some(route_event_from_route::<Ipv4, _>(
+                                        route,
+                                        fnet_routes_ext::Event::<Ipv4>::Removed,
+                                    )),
+                                    _ => None,
+                                },
+                            }
                         }
                         fnet_routes_admin::RouteSetV4Request::AuthenticateForInterface {
                             credential: _,
@@ -2020,44 +2174,18 @@ mod tests {
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `AddRoute`");
-                            let metric = match route
-                                .properties
-                                .specified_properties
-                                .as_ref()
-                                .expect("specified properties should be some")
-                                .metric
-                                .expect("metric_should_be_some")
-                            {
-                                fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
-                                fnet_routes::SpecifiedMetric::InheritedFromInterface(
-                                    fnet_routes::Empty,
-                                ) => {
-                                    panic!("metric should be explicit")
-                                }
-                            };
+
                             RouteSetOutputs {
                                 event: match route_set_result {
-                                    Ok(true) => Some(
-                                        fnet_routes_ext::Event::Added(
-                                            fnet_routes_ext::InstalledRoute {
-                                                route: route.try_into().unwrap(),
-                                                effective_properties:
-                                                    fnet_routes_ext::EffectiveRouteProperties {
-                                                        metric,
-                                                    },
-                                            },
-                                        )
-                                        .try_into()
-                                        .unwrap(),
-                                    ),
+                                    Ok(true) => Some(route_event_from_route::<Ipv6, _>(
+                                        route,
+                                        fnet_routes_ext::Event::<Ipv6>::Added,
+                                    )),
                                     _ => None,
                                 },
                             }
                         }
-                        fnet_routes_admin::RouteSetV6Request::RemoveRoute {
-                            route: _,
-                            responder,
-                        } => {
+                        fnet_routes_admin::RouteSetV6Request::RemoveRoute { route, responder } => {
                             let route_set_result = assert_matches!(
                                 route_set_result,
                                 RouteSetResult::DelResult(res) => res
@@ -2066,7 +2194,16 @@ mod tests {
                             responder
                                 .send(route_set_result)
                                 .expect("failed to respond to `RemoveRoute`");
-                            RouteSetOutputs { event: None }
+
+                            RouteSetOutputs {
+                                event: match route_set_result {
+                                    Ok(true) => Some(route_event_from_route::<Ipv6, _>(
+                                        route,
+                                        fnet_routes_ext::Event::<Ipv6>::Removed,
+                                    )),
+                                    _ => None,
+                                },
+                            }
                         }
                         fnet_routes_admin::RouteSetV6Request::AuthenticateForInterface {
                             credential: _,
@@ -2195,7 +2332,7 @@ mod tests {
                     let sequence_number = message.message.header.sequence_number;
                     assert_matches!(
                         &message.message.payload,
-                        NetlinkPayload::InnerMessage(RtnlMessage::NewRoute(m)) => {
+                        NetlinkPayload::InnerMessage(RtnlMessage::NewRoute(m)) | NetlinkPayload::InnerMessage(RtnlMessage::DelRoute(m)) => {
                             // We expect there to be exactly one Priority NLA present
                             // for the given inputs.
                             m.nlas.clone().into_iter().filter_map(|nla|
@@ -2217,24 +2354,32 @@ mod tests {
         )
     }
 
+    enum RouteRequestKind {
+        New,
+        Del,
+    }
+
     // Tests RTM_NEWROUTE with all interesting responses to add a route.
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Ok(true))
         ],
         Ok(()),
         V4_SUB1,
-        METRIC3;
-        "v4_success")]
+        Some(METRIC3);
+        "v4_new_success")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Ok(true))
         ],
         Ok(()),
         V6_SUB1,
-        METRIC3;
-        "v6_success")]
+        Some(METRIC3);
+        "v6_new_success")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated)),
             RouteSetResult::AuthenticationResult(Err(
@@ -2243,9 +2388,10 @@ mod tests {
         ],
         Err(RequestError::UnrecognizedInterface),
         V4_SUB1,
-        METRIC3;
-        "v4_failed_auth")]
+        Some(METRIC3);
+        "v4_new_failed_auth")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated)),
             RouteSetResult::AuthenticationResult(Err(
@@ -2254,74 +2400,217 @@ mod tests {
         ],
         Err(RequestError::UnrecognizedInterface),
         V6_SUB1,
-        METRIC3;
-        "v6_failed_auth")]
+        Some(METRIC3);
+        "v6_new_failed_auth")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Ok(false))
         ],
         Err(RequestError::AlreadyExists),
         V4_SUB1,
-        METRIC3;
-        "v4_failed_netstack_reports_exists")]
+        Some(METRIC3);
+        "v4_new_failed_netstack_reports_exists")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Ok(false))
         ],
         Err(RequestError::AlreadyExists),
         V6_SUB1,
-        METRIC3;
-        "v6_failed_netstack_reports_exists")]
+        Some(METRIC3);
+        "v6_new_failed_netstack_reports_exists")]
     #[test_case(
+        RouteRequestKind::New,
         vec![],
         Err(RequestError::AlreadyExists),
         V4_SUB1,
-        METRIC1;
-        "v4_failed_netlink_reports_exists")]
+        Some(METRIC1);
+        "v4_new_failed_netlink_reports_exists")]
     #[test_case(
+        RouteRequestKind::New,
         vec![],
         Err(RequestError::AlreadyExists),
         V6_SUB1,
-        METRIC1;
-        "v6_failed_netlink_reports_exists")]
+        Some(METRIC1);
+        "v6_new_failed_netlink_reports_exists")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidDestinationSubnet))
         ],
         Err(RequestError::InvalidRequest),
         V4_SUB1,
-        METRIC3;
-        "v4_invalid_dest")]
+        Some(METRIC3);
+        "v4_new_invalid_dest")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidDestinationSubnet))
         ],
         Err(RequestError::InvalidRequest),
         V6_SUB1,
-        METRIC3;
-        "v6_invalid_dest")]
+        Some(METRIC3);
+        "v6_new_invalid_dest")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidNextHop))
         ],
         Err(RequestError::InvalidRequest),
         V4_SUB1,
-        METRIC3;
-        "v4_invalid_hop")]
+        Some(METRIC3);
+        "v4_new_invalid_hop")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::InvalidNextHop))
         ],
         Err(RequestError::InvalidRequest),
         V6_SUB1,
-        METRIC3;
-        "v6_invalid_hop")]
+        Some(METRIC3);
+        "v6_new_invalid_hop")]
+    // Tests RTM_DELROUTE with all interesting responses to remove a route.
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Ok(true))
+        ],
+        Ok(()),
+        V4_SUB1,
+        None;
+        "v4_del_success_only_subnet")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Ok(true))
+        ],
+        Ok(()),
+        V4_SUB1,
+        Some(METRIC1);
+        "v4_del_success_only_subnet_metric")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Ok(true))
+        ],
+        Ok(()),
+        V6_SUB1,
+        None;
+        "v6_del_success_only_subnet")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Ok(true))
+        ],
+        Ok(()),
+        V6_SUB1,
+        Some(METRIC1);
+        "v6_del_success_only_subnet_metric")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated)),
+            RouteSetResult::AuthenticationResult(Err(
+                fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
+            )),
+        ],
+        Err(RequestError::UnrecognizedInterface),
+        V4_SUB1,
+        None;
+        "v4_del_failed_auth")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated)),
+            RouteSetResult::AuthenticationResult(Err(
+                fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
+            )),
+        ],
+        Err(RequestError::UnrecognizedInterface),
+        V6_SUB1,
+        None;
+        "v6_del_failed_auth")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Ok(false))
+        ],
+        Err(RequestError::DeletionNotAllowed),
+        V4_SUB1,
+        None;
+        "v4_del_failed_attempt_to_delete_route_from_global_set")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Ok(false))
+        ],
+        Err(RequestError::DeletionNotAllowed),
+        V6_SUB1,
+        None;
+        "v6_del_failed_attempt_to_delete_route_from_global_set")]
+    // This deliberately only includes one case where a route is
+    // not selected for deletion, `test_select_route_for_deletion`
+    // covers these cases.
+    // No route with `METRIC3` exists, so this extra selector causes the
+    // `NotFound` result.
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![],
+        Err(RequestError::NotFound),
+        V4_SUB1,
+        Some(METRIC3);
+        "v4_del_no_matching_route")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![],
+        Err(RequestError::NotFound),
+        V6_SUB1,
+        Some(METRIC3);
+        "v6_del_no_matching_route")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::InvalidDestinationSubnet))
+        ],
+        Err(RequestError::InvalidRequest),
+        V4_SUB1,
+        None;
+        "v4_del_invalid_dest")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::InvalidDestinationSubnet))
+        ],
+        Err(RequestError::InvalidRequest),
+        V6_SUB1,
+        None;
+        "v6_del_invalid_dest")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::InvalidNextHop))
+        ],
+        Err(RequestError::InvalidRequest),
+        V4_SUB1,
+        None;
+        "v4_del_invalid_hop")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::InvalidNextHop))
+        ],
+        Err(RequestError::InvalidRequest),
+        V6_SUB1,
+        None;
+        "v6_del_invalid_hop")]
     #[fuchsia::test]
-    async fn test_new_route<A: IpAddress>(
+    async fn test_new_del_route<A: IpAddress>(
+        kind: RouteRequestKind,
         route_set_results: Vec<RouteSetResult>,
         waiter_result: Result<(), RequestError>,
         subnet: Subnet<A>,
-        metric: u32,
+        metric: Option<u32>,
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
@@ -2332,23 +2621,62 @@ mod tests {
 
         let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
 
-        // When the waiter result is Ok(()), then we know that the add
+        // There are two pre-set routes in `test_route_requests`.
+        // * subnet, next_hop1, DEV1, METRIC1
+        // * subnet, next_hop2, DEV2, METRIC2
+        let route_req_args = match kind {
+            RouteRequestKind::New => {
+                // Add a route that is not already present.
+                RouteRequestArgs::New(NewRouteArgs::Unicast(create_unicast_new_route_args(
+                    subnet,
+                    next_hop,
+                    DEV1.into(),
+                    metric.expect("add cases should be Some"),
+                )))
+            }
+            RouteRequestKind::Del => {
+                // Remove an existing route.
+                RouteRequestArgs::Del(DelRouteArgs::Unicast(create_unicast_del_route_args(
+                    subnet, None, None, metric,
+                )))
+            }
+        };
+
+        // When the waiter result is Ok(()), then we know that the add or delete
         // was successful and we got a message.
         let messages = match waiter_result {
-            Ok(()) => Vec::from([SentMessage::multicast(
-                create_netlink_route_message::<A::Version>(
+            Ok(()) => {
+                let route_message = create_netlink_route_message::<A::Version>(
                     subnet.prefix(),
-                    create_nlas::<A::Version>(Some(subnet), Some(next_hop), DEV1, metric),
-                )
-                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
-                route_group,
-            )]),
+                    create_nlas::<A::Version>(
+                        Some(subnet),
+                        Some(next_hop),
+                        DEV1,
+                        match kind {
+                            RouteRequestKind::New => metric.expect("add cases should be some"),
+                            // When a route is found for deletion, we expect that route to have
+                            // a metric value of `METRIC1`. Even though there are two different
+                            // routes with `subnet`, deletion prefers to select the route with
+                            // the lowest metric.
+                            RouteRequestKind::Del => METRIC1,
+                        },
+                    ),
+                );
+
+                let netlink_message = match kind {
+                    RouteRequestKind::New => {
+                        route_message.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)
+                    }
+                    RouteRequestKind::Del => route_message.into_rtnl_del_route(),
+                };
+
+                Vec::from([SentMessage::multicast(netlink_message, route_group)])
+            }
             Err(_) => Vec::new(),
         };
 
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop, DEV1.into(), metric);
         test_route_requests_helper(
-            [RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(unicast_route_args)))],
+            [RequestArgs::Route(route_req_args)],
             messages,
             route_set_results,
             vec![waiter_result],
@@ -2357,9 +2685,10 @@ mod tests {
         .await;
     }
 
-    // Tests RTM_NEWROUTE when two unauthentication events are received - once prior to
-    // making an attempt to authenticate and once after attempting to authenticate.
+    // Tests RTM_NEWROUTE and RTM_DELROUTE when two unauthentication events are received - once
+    // prior to making an attempt to authenticate and once after attempting to authenticate.
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated)),
             RouteSetResult::AuthenticationResult(Ok(())),
@@ -2367,8 +2696,9 @@ mod tests {
         ],
         Err(RequestError::InvalidRequest),
         V4_SUB1;
-        "v4_unauthenticated")]
+        "v4_new_unauthenticated")]
     #[test_case(
+        RouteRequestKind::New,
         vec![
             RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated)),
             RouteSetResult::AuthenticationResult(Ok(())),
@@ -2376,20 +2706,57 @@ mod tests {
         ],
         Err(RequestError::InvalidRequest),
         V6_SUB1;
-        "v6_unauthenticated")]
+        "v6_new_unauthenticated")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated)),
+            RouteSetResult::AuthenticationResult(Ok(())),
+            RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated)),
+        ],
+        Err(RequestError::InvalidRequest),
+        V4_SUB1;
+        "v4_del_unauthenticated")]
+    #[test_case(
+        RouteRequestKind::Del,
+        vec![
+            RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated)),
+            RouteSetResult::AuthenticationResult(Ok(())),
+            RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated)),
+        ],
+        Err(RequestError::InvalidRequest),
+        V6_SUB1;
+        "v6_del_unauthenticated")]
     #[should_panic(expected = "received unauthentication error from route set for route")]
     #[fuchsia::test]
-    async fn test_new_route_failed<A: IpAddress>(
+    async fn test_new_del_route_failed<A: IpAddress>(
+        kind: RouteRequestKind,
         route_set_results: Vec<RouteSetResult>,
         waiter_result: Result<(), RequestError>,
         subnet: Subnet<A>,
     ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop, DEV1.into(), METRIC3);
+        let route_req_args = match kind {
+            RouteRequestKind::New => {
+                let next_hop: A = A::Version::map_ip((), |()| V4_NEXTHOP1, |()| V6_NEXTHOP1);
+                // Add a route that is not already present.
+                RouteRequestArgs::New(NewRouteArgs::Unicast(create_unicast_new_route_args(
+                    subnet,
+                    next_hop,
+                    DEV1.into(),
+                    METRIC3,
+                )))
+            }
+            RouteRequestKind::Del => {
+                // Remove an existing route.
+                RouteRequestArgs::Del(DelRouteArgs::Unicast(create_unicast_del_route_args(
+                    subnet, None, None, None,
+                )))
+            }
+        };
         test_route_requests_helper(
-            [RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(unicast_route_args)))],
+            [RequestArgs::Route(route_req_args)],
             Vec::new(),
             route_set_results,
             vec![waiter_result],
@@ -2401,8 +2768,8 @@ mod tests {
     /// A test to exercise a `RTM_NEWROUTE` followed by a `RTM_GETROUTE`
     /// route request, ensuring that the new route is included in the
     /// dump request.
-    #[test_case(V4_SUB1, ModernGroup(RTNLGRP_IPV4_ROUTE))]
-    #[test_case(V6_SUB1, ModernGroup(RTNLGRP_IPV6_ROUTE))]
+    #[test_case(V4_SUB1, ModernGroup(RTNLGRP_IPV4_ROUTE); "v4_new_dump")]
+    #[test_case(V6_SUB1, ModernGroup(RTNLGRP_IPV6_ROUTE); "v6_new_dump")]
     #[fuchsia::test]
     async fn test_new_then_get_dump_request<A: IpAddress>(subnet: Subnet<A>, group: ModernGroup)
     where
@@ -2419,7 +2786,8 @@ mod tests {
         // * subnet, next_hop2, DEV2, METRIC2
         // To add a new route that does not get rejected by the handler due to it
         // already existing, we use a route that has METRIC3.
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
+        let unicast_route_args =
+            create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
 
         // We expect to see one multicast message, representing the route that was added.
         // Then, three unicast messages, representing the two routes that existed already in the
@@ -2471,15 +2839,16 @@ mod tests {
         .await;
     }
 
-    /// Tests RTM_NEWROUTE when the interface is removed,
-    /// indicated by the closure of the admin Control's server-end.
-    /// The specific cause of the interface removal is unimportant
-    /// for this test.
-    #[test_case(V4_SUB1)]
-    #[test_case(V6_SUB1)]
+    /// A test to exercise a `RTM_NEWROUTE` followed by a `RTM_DELROUTE` for the same route, then a
+    /// `RTM_GETROUTE` request, ensuring that the route added created a multicast message, but does
+    /// not appear in the dump.
+    #[test_case(V4_SUB1, ModernGroup(RTNLGRP_IPV4_ROUTE); "v4_new_del_dump")]
+    #[test_case(V6_SUB1, ModernGroup(RTNLGRP_IPV6_ROUTE); "v6_new_del_dump")]
     #[fuchsia::test]
-    async fn test_new_route_interface_removed<A: IpAddress>(subnet: Subnet<A>)
-    where
+    async fn test_new_then_del_then_get_dump_request<A: IpAddress>(
+        subnet: Subnet<A>,
+        group: ModernGroup,
+    ) where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
         let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
@@ -2492,17 +2861,111 @@ mod tests {
         // * subnet, next_hop1, DEV1, METRIC1
         // * subnet, next_hop2, DEV2, METRIC2
         // To add a new route that does not get rejected by the handler due to it
-        // already existing, we use a route that has METRIC3
-        let unicast_route_args = create_unicast_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
+        // already existing, we use a route that has METRIC3.
+        let new_route_args = create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3);
 
-        // No routes will be added successfully, so there are no expected messages.
+        // The subnet and metric are enough to uniquely identify the above route.
+        let del_route_args = create_unicast_del_route_args(subnet, None, None, Some(METRIC3));
+
+        // We expect to see two multicast messages, one representing the route that was added,
+        // and the other representing the same route being removed. Then, two unicast messages,
+        // representing the two routes that existed already in the route set.
+        let messages = vec![
+            SentMessage::multicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                )
+                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                group,
+            ),
+            SentMessage::multicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC3),
+                )
+                .into_rtnl_del_route(),
+                group,
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop1), DEV1, METRIC1),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+            SentMessage::unicast(
+                create_netlink_route_message::<A::Version>(
+                    subnet.prefix(),
+                    create_nlas::<A::Version>(Some(subnet), Some(next_hop2), DEV2, METRIC2),
+                )
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+            ),
+        ];
+
+        test_route_requests_helper(
+            [
+                RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(new_route_args))),
+                RequestArgs::Route(RouteRequestArgs::Del(DelRouteArgs::Unicast(del_route_args))),
+                RequestArgs::Route(RouteRequestArgs::Get(GetRouteArgs::Dump)),
+            ],
+            messages,
+            vec![RouteSetResult::AddResult(Ok(true)), RouteSetResult::DelResult(Ok(true))],
+            vec![Ok(()), Ok(()), Ok(())],
+            subnet,
+        )
+        .await;
+    }
+
+    /// Tests RTM_NEWROUTE and RTM_DELROUTE when the interface is removed,
+    /// indicated by the closure of the admin Control's server-end.
+    /// The specific cause of the interface removal is unimportant
+    /// for this test.
+    #[test_case(RouteRequestKind::New, V4_SUB1; "v4_new_if_removed")]
+    #[test_case(RouteRequestKind::New, V6_SUB1; "v6_new_if_removed")]
+    #[test_case(RouteRequestKind::Del, V4_SUB1; "v4_del_if_removed")]
+    #[test_case(RouteRequestKind::Del, V6_SUB1; "v6_del_if_removed")]
+    #[fuchsia::test]
+    async fn test_new_del_route_interface_removed<A: IpAddress>(
+        kind: RouteRequestKind,
+        subnet: Subnet<A>,
+    ) where
+        A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    {
+        let (next_hop1, next_hop2): (A, A) = A::Version::map_ip(
+            (),
+            |()| (V4_NEXTHOP1, V4_NEXTHOP2),
+            |()| (V6_NEXTHOP1, V6_NEXTHOP2),
+        );
+
+        // There are two pre-set routes in `test_route_requests`.
+        // * subnet, next_hop1, DEV1, METRIC1
+        // * subnet, next_hop2, DEV2, METRIC2
+        let (route_req_args, route_set_result) = match kind {
+            RouteRequestKind::New => {
+                // Add a route that is not already present.
+                let args = RouteRequestArgs::New(NewRouteArgs::Unicast(
+                    create_unicast_new_route_args(subnet, next_hop1, DEV1.into(), METRIC3),
+                ));
+                let res = RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated));
+                (args, res)
+            }
+            RouteRequestKind::Del => {
+                // Remove an existing route.
+                let args = RouteRequestArgs::Del(DelRouteArgs::Unicast(
+                    create_unicast_del_route_args(subnet, None, None, None),
+                ));
+                let res = RouteSetResult::DelResult(Err(RouteSetError::Unauthenticated));
+                (args, res)
+            }
+        };
+
+        // No routes will be added or removed successfully, so there are no expected messages.
         let expected_messages = Vec::new();
 
         pretty_assertions::assert_eq!(
             test_requests(
-                [RequestArgs::Route(RouteRequestArgs::New(NewRouteArgs::Unicast(
-                    unicast_route_args
-                )))],
+                [RequestArgs::Route(route_req_args)],
                 |interfaces_request_stream| async move {
                     interfaces_request_stream
                         .for_each(|req| {
@@ -2522,7 +2985,7 @@ mod tests {
                         })
                         .await
                 },
-                std::iter::once(RouteSetResult::AddResult(Err(RouteSetError::Unauthenticated))),
+                std::iter::once(route_set_result),
                 subnet,
                 next_hop1,
                 next_hop2,
@@ -2631,7 +3094,7 @@ mod tests {
     ) {
         let new_route_args = {
             let Route { subnet, device, nexthop, metric } = new;
-            NewRouteArgs::Unicast(UnicastRouteArgs {
+            NewRouteArgs::Unicast(UnicastNewRouteArgs {
                 subnet,
                 target: fnet_routes_ext::RouteTarget::<I> {
                     outbound_interface: device.into(),

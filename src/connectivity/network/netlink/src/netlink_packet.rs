@@ -6,11 +6,14 @@
 
 use std::num::NonZeroI32;
 
+use net_types::ip::{Ip, IpAddress, IpInvariant, Ipv4Addr, Ipv6Addr};
 use netlink_packet_core::{
     buffer::NETLINK_HEADER_LEN, constants::NLM_F_MULTIPART, DoneMessage, ErrorMessage,
     NetlinkHeader, NetlinkMessage, NetlinkPayload, NetlinkSerializable,
 };
 use netlink_packet_utils::Emitable as _;
+
+use crate::netlink_packet::errno::Errno;
 
 pub(crate) const UNSPECIFIED_SEQUENCE_NUMBER: u32 = 0;
 
@@ -29,6 +32,39 @@ pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> Net
     // Sets the header `length` and `message_type` based on the payload.
     message.finalize();
     message
+}
+
+/// Produces an `I::Addr` from an array of bytes.
+pub(crate) fn ip_addr_from_bytes<I: Ip>(addr_bytes: &[u8]) -> Result<I::Addr, Errno> {
+    I::map_ip(
+        IpInvariant(addr_bytes),
+        |IpInvariant(addr_bytes)| {
+            const BYTES: usize = Ipv4Addr::BYTES as usize;
+            // To conform to Linux expectations, we allow more than the needed bytes
+            // to be present and cut off the remainder.
+            if addr_bytes.len() < BYTES {
+                return Err(Errno::EINVAL);
+            }
+
+            let mut bytes = [0; BYTES as usize];
+            bytes.copy_from_slice(&addr_bytes[..BYTES]);
+            let addr: Ipv4Addr = bytes.into();
+            Ok(addr)
+        },
+        |IpInvariant(addr_bytes)| {
+            const BYTES: usize = Ipv6Addr::BYTES as usize;
+            // To conform to Linux expectations, we allow more than the needed bytes
+            // to be present and cut off the remainder.
+            if addr_bytes.len() < BYTES {
+                return Err(Errno::EINVAL);
+            }
+
+            let mut bytes = [0; BYTES];
+            bytes.copy_from_slice(&addr_bytes[..BYTES]);
+            let addr: Ipv6Addr = bytes.into();
+            Ok(addr)
+        },
+    )
 }
 
 pub(crate) mod errno {
@@ -54,6 +90,7 @@ pub(crate) mod errno {
         pub(crate) const ENODEV: Errno = const_unwrap_option(Errno::new(-libc::ENODEV));
         pub(crate) const ENOENT: Errno = const_unwrap_option(Errno::new(-libc::ENOENT));
         pub(crate) const ENOTSUP: Errno = const_unwrap_option(Errno::new(-libc::ENOTSUP));
+        pub(crate) const ESRCH: Errno = const_unwrap_option(Errno::new(-libc::ESRCH));
 
         /// Construct a new [`Errno`] from the given negative integer.
         ///

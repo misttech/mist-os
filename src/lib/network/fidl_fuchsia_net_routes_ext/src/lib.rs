@@ -607,7 +607,9 @@ pub trait FidlRouteIpExt: Ip {
         + PartialEq
         + Unpin;
     /// The "route" FIDL type to use for this IP version.
-    type Route: TryFrom<Route<Self>, Error = NetTypeConversionError> + std::fmt::Debug;
+    type Route: TryFrom<Route<Self>, Error = NetTypeConversionError>
+        + TryInto<Route<Self>, Error = FidlConversionError>
+        + std::fmt::Debug;
 }
 
 impl FidlRouteIpExt for Ipv4 {
