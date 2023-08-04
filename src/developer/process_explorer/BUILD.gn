@@ -26,6 +26,7 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//third_party/rapidjson",
+    "//zircon/system/ulib/inspector",
     "//zircon/system/ulib/task-utils",
   ]
 

@@ -9,6 +9,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
+#include <inspector/inspector.h>
 #include <task-utils/walker.h>
 
 #include "src/developer/process_explorer/utils.h"
@@ -129,9 +130,73 @@ void Explorer::GetVmaps(GetVmapsRequest& request, GetVmapsCompleter::Sync& compl
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
+class StackTraceWalker final : public TaskEnumerator {
+ public:
+  StackTraceWalker() = default;
+  ~StackTraceWalker() = default;
+
+  zx::result<std::string> GetStackTrace(std::variant<zx_koid_t, std::string> sought_task) {
+    sought_task_ = std::move(sought_task);
+    if (auto status = WalkRootJobTree(); status != ZX_ERR_STOP) {
+      if (status == ZX_OK) {
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
+      return zx::error(status);
+    }
+    return zx::ok(std::move(stack_trace_));
+  }
+
+  zx_status_t OnProcess(int depth, zx_handle_t process_handle, zx_koid_t koid,
+                        zx_koid_t parent_koid) override {
+    zx::unowned_process process(process_handle);
+    if (zx_koid_t* sought_task_koid = std::get_if<zx_koid_t>(&sought_task_); sought_task_koid) {
+      if (*sought_task_koid != koid) {
+        return ZX_OK;
+      }
+    } else {
+      auto& sought_process_name = std::get<std::string>(sought_task_);
+      char name[ZX_MAX_NAME_LEN];
+
+      if (auto status = process->get_property(ZX_PROP_NAME, &name, std::size(name));
+          status != ZX_OK) {
+        FX_LOGS(ERROR) << "Unable to get process name: " << zx_status_get_string(status);
+        return status;
+      }
+      if (sought_process_name != name) {
+        return ZX_OK;
+      }
+    }
+    char* stack_trace_buffer;
+    size_t stack_trace_buffer_size;
+    FILE* file = open_memstream(&stack_trace_buffer, &stack_trace_buffer_size);
+    inspector_print_debug_info_for_all_threads(file, process->get());
+    fclose(file);
+    stack_trace_ = std::string(stack_trace_buffer, stack_trace_buffer_size);
+    free(stack_trace_buffer);
+    return ZX_ERR_STOP;
+  }
+
+ protected:
+  bool has_on_process() const override { return true; }
+
+ private:
+  std::variant<zx_koid_t, std::string> sought_task_;
+  std::string stack_trace_;
+};
+
 void Explorer::GetStackTrace(GetStackTraceRequest& request,
                              GetStackTraceCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  StackTraceWalker walker;
+  std::variant<zx_koid_t, std::string> task;
+  if (request.koid().has_value()) {
+    task = request.koid().value();
+  } else if (request.process_name().has_value()) {
+    task = request.process_name().value();
+  } else {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+  completer.Reply(walker.GetStackTrace(task));
 }
 
 class KillWalker final : public TaskEnumerator {
@@ -140,7 +205,7 @@ class KillWalker final : public TaskEnumerator {
   ~KillWalker() = default;
 
   zx::result<zx_koid_t> KillTask(std::variant<zx_koid_t, std::string> task) {
-    task_to_kill_ = task;
+    task_to_kill_ = std::move(task);
     if (auto status = WalkRootJobTree(); status != ZX_ERR_STOP) {
       if (status == ZX_OK) {
         return zx::error(ZX_ERR_NOT_FOUND);

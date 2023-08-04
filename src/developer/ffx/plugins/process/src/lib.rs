@@ -9,12 +9,13 @@ mod processes_data;
 mod write_human_readable_output;
 
 use anyhow::Result;
-use ffx_process_args::{Args, ProcessCommand, TaskToKill};
+use ffx_process_args::{Args, ProcessCommand, Task};
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::BuildInfo;
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_process_explorer::{
-    ProcessExplorerKillTaskRequest, ProcessExplorerProxy, QueryProxy,
+    ProcessExplorerGetStackTraceRequest, ProcessExplorerKillTaskRequest, ProcessExplorerProxy,
+    QueryProxy,
 };
 use fuchsia_map::json;
 use fuchsia_zircon_status::Status;
@@ -74,6 +75,7 @@ pub async fn handle_cmd(
         Args::Filter(arg) => filter_subcommand(writer, output, arg.process_koids),
         Args::GenerateFuchsiaMap(_) => generate_fuchsia_map_subcommand(writer, build_info, output),
         Args::Kill(arg) => kill_subcommand(writer, explorer_proxy, arg.task_to_kill).await,
+        Args::StackTrace(arg) => stack_trace_subcommand(writer, explorer_proxy, arg.task).await,
     }
 }
 
@@ -178,11 +180,11 @@ fn generate_fuchsia_map_subcommand(
 async fn kill_subcommand(
     mut w: Writer,
     explorer_proxy: ProcessExplorerProxy,
-    task: TaskToKill,
+    task: Task,
 ) -> Result<()> {
     let arg = match task {
-        TaskToKill::Koid(koid) => ProcessExplorerKillTaskRequest::Koid(koid),
-        TaskToKill::ProcessName(name) => ProcessExplorerKillTaskRequest::ProcessName(name),
+        Task::Koid(koid) => ProcessExplorerKillTaskRequest::Koid(koid),
+        Task::ProcessName(name) => ProcessExplorerKillTaskRequest::ProcessName(name),
     };
     match explorer_proxy.kill_task(&arg).await?.map_err(Status::from_raw) {
         Ok(koid) => {
@@ -195,6 +197,31 @@ async fn kill_subcommand(
         }
         Err(e) => {
             writeln!(w, "Failed to kill process with error {:?}", e)?;
+            Err(e.into())
+        }
+    }
+}
+
+async fn stack_trace_subcommand(
+    mut w: Writer,
+    explorer_proxy: ProcessExplorerProxy,
+    task: Task,
+) -> Result<()> {
+    let arg = match task {
+        Task::Koid(koid) => ProcessExplorerGetStackTraceRequest::Koid(koid),
+        Task::ProcessName(name) => ProcessExplorerGetStackTraceRequest::ProcessName(name),
+    };
+    match explorer_proxy.get_stack_trace(&arg).await?.map_err(Status::from_raw) {
+        Ok(stack_trace) => {
+            writeln!(w, "{}", stack_trace)?;
+            Ok(())
+        }
+        Err(Status::NOT_FOUND) => {
+            writeln!(w, "Failed to find process")?;
+            Ok(())
+        }
+        Err(e) => {
+            writeln!(w, "Failed to get stack trace for process with error {:?}", e)?;
             Err(e.into())
         }
     }
