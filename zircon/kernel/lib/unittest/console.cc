@@ -97,15 +97,28 @@ bool run_unittest(const unittest_testcase_registration_t* testcase) {
   zx_time_t testcase_start = current_time();
 
   for (unsigned long j = 0; j < g_repeat; j++) {
-    bool good = true;
     for (size_t i = 0; i < testcase->test_cnt; ++i) {
       const unittest_registration_t* test = &testcase->tests[i];
 
       unittest_printf("  %-*s : ", static_cast<int>(max_namelen), test->name ? test->name : "");
 
-      zx_time_t test_start = current_time();
-      good &= test->fn ? test->fn() : false;
-      zx_duration_t test_runtime = current_time() - test_start;
+      const cpu_mask_t online_mask_before = mp_get_online_mask();
+      const cpu_mask_t active_mask_before = mp_get_active_mask();
+
+      const zx_time_t test_start = current_time();
+      bool good = (test->fn ? test->fn() : false);
+      const zx_duration_t test_runtime = current_time() - test_start;
+
+      // Make sure that this test didn't change the online or active state of any CPUs.
+      const cpu_mask_t online_mask_after = mp_get_online_mask();
+      const cpu_mask_t active_mask_after = mp_get_active_mask();
+      if ((online_mask_before != online_mask_after) || (active_mask_before != active_mask_after)) {
+        KERNEL_OOPS(
+            "Online/active CPUs changed during test!\n"
+            "(online after=0x%08x before=0x%08x, active after=0x%08x before=0x%08x)\n",
+            online_mask_after, online_mask_before, active_mask_after, active_mask_before);
+        good = false;
+      }
 
       unittest_printf("%s (%" PRIi64 " nSec) ", good ? "PASSED" : "FAILED", test_runtime);
       if (g_repeat > 1) {
@@ -162,9 +175,6 @@ bool run_testcase_in_thread(const unittest_testcase_registration_t* testcase) {
   }
   aspace->AttachToThread(t);
 
-  const cpu_mask_t online_mask_before = mp_get_online_mask();
-  const cpu_mask_t active_mask_before = mp_get_active_mask();
-
   t->Resume();
   int success = 0;
   zx_status_t status = t->Join(&success, ZX_TIME_INFINITE);
@@ -172,14 +182,6 @@ bool run_testcase_in_thread(const unittest_testcase_registration_t* testcase) {
     unittest_printf("failed to join unittest thread: %d\n", status);
     return false;
   }
-
-  // Make sure that |testcase| didn't change the online or active state of any CPUs.
-  const cpu_mask_t online_mask_after = mp_get_online_mask();
-  const cpu_mask_t active_mask_after = mp_get_active_mask();
-  ASSERT_MSG(online_mask_after == online_mask_before, "name=%s after=0x%08x before=0x%08x\n",
-             testcase->name, online_mask_after, online_mask_before);
-  ASSERT_MSG(active_mask_after == active_mask_before, "name=%s after=0x%08x before=0x%08x\n",
-             testcase->name, active_mask_after, active_mask_before);
 
   return success;
 }
