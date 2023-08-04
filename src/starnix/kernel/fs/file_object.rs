@@ -318,6 +318,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     ) -> Result<Option<zx::Handle>, Errno> {
         serve_file(current_task, file).map(|c| Some(c.into_handle()))
     }
+
+    /// Returns the associated pid_t.
+    ///
+    /// Used by pidfd and `/proc/<pid>`. Unlikely to be used by other files.
+    fn as_pid(&self, _file: &FileHandle) -> Result<pid_t, Errno> {
+        error!(EBADF)
+    }
 }
 
 pub fn default_eof_offset(file: &FileObject, current_task: &CurrentTask) -> Result<off_t, Errno> {
@@ -1261,6 +1268,10 @@ impl FileObject {
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.ops().to_handle(self, current_task)
+    }
+
+    pub fn as_pid(self: &Arc<Self>) -> Result<pid_t, Errno> {
+        self.ops().as_pid(self)
     }
 
     pub fn update_file_flags(&self, value: OpenFlags, mask: OpenFlags) {

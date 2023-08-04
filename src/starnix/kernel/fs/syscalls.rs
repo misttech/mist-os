@@ -1496,8 +1496,7 @@ pub fn sys_pidfd_getfd(
     }
 
     let file = current_task.files.get(pidfd)?;
-    let pidfd_file = PidFdFileObject::downcast(&file)?;
-    let task = current_task.get_task(pidfd_file.pid);
+    let task = current_task.get_task(file.as_pid()?);
     let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
     current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &task)?;

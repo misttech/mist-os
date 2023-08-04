@@ -8,7 +8,7 @@ use crate::{
     types::*,
 };
 
-pub struct PidFdFileObject {
+struct PidFdFileObject {
     // In principle, we need some way to designate a Task that is durable for
     // the lifetime of the `PidFdFileObject`. In practice, we never actually
     // reuse pids and have no mechanism for tracking which pids have been freed.
@@ -17,13 +17,7 @@ pub struct PidFdFileObject {
     // reusing pids, we'll need to reconsider this design.
     //
     // See `PidTable::allocate_pid` for a related comment.
-    pub pid: pid_t,
-}
-
-impl PidFdFileObject {
-    pub fn downcast(file: &FileHandle) -> Result<&PidFdFileObject, Errno> {
-        file.downcast_file::<PidFdFileObject>().ok_or_else(|| errno!(EBADF))
-    }
+    pid: pid_t,
 }
 
 pub fn new_pidfd(current_task: &CurrentTask, pid: pid_t, flags: OpenFlags) -> FileHandle {
@@ -33,4 +27,8 @@ pub fn new_pidfd(current_task: &CurrentTask, pid: pid_t, flags: OpenFlags) -> Fi
 impl FileOps for PidFdFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_dataless!();
+
+    fn as_pid(&self, _file: &FileHandle) -> Result<pid_t, Errno> {
+        Ok(self.pid)
+    }
 }

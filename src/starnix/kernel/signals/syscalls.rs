@@ -8,7 +8,7 @@ use std::{convert::TryFrom, sync::Arc};
 
 use super::signalfd::*;
 use crate::{
-    fs::{pidfd::PidFdFileObject, *},
+    fs::*,
     logging::not_implemented,
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{restore_from_signal_handler, *},
@@ -400,6 +400,28 @@ pub fn sys_rt_sigreturn(current_task: &mut CurrentTask) -> Result<SyscallResult,
     Ok(current_task.registers.return_register().into())
 }
 
+fn read_siginfo(
+    current_task: &CurrentTask,
+    signal: Signal,
+    siginfo_ref: UserAddress,
+) -> Result<SignalInfo, Errno> {
+    // Rust will let us do this cast in a const assignment but not in a const generic constraint.
+    const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
+
+    let siginfo_mem = current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(siginfo_ref)?;
+    let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
+
+    if header.signo != 0 && header.signo != signal.number() {
+        return error!(EINVAL);
+    }
+
+    let mut bytes = [0u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE];
+    bytes.copy_from_slice(&siginfo_mem[SI_HEADER_SIZE..SI_MAX_SIZE as usize]);
+    let details = SignalDetail::Raw { data: bytes };
+
+    Ok(SignalInfo { signal, errno: header.errno, code: header.code, detail: details, force: false })
+}
+
 pub fn sys_rt_tgsigqueueinfo(
     current_task: &CurrentTask,
     tgid: pid_t,
@@ -407,36 +429,55 @@ pub fn sys_rt_tgsigqueueinfo(
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
-    // Rust will let us do this cast in a const assignment but not in a const generic constraint.
-    const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
-
-    let siginfo_mem = current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(siginfo_ref)?;
-
-    let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
-
     let signal = Signal::try_from(unchecked_signal)?;
+    let signal_info = read_siginfo(current_task, signal, siginfo_ref)?;
 
     let this_pid = current_task.get_pid();
-    if this_pid == tgid && (header.code >= 0 || header.code == SI_TKILL) {
+    if this_pid == tgid && (signal_info.code >= 0 || signal_info.code == SI_TKILL) {
         return error!(EINVAL);
     }
-
-    let mut bytes = [0u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE];
-    bytes.copy_from_slice(&siginfo_mem[SI_HEADER_SIZE..SI_MAX_SIZE as usize]);
-    let details = SignalDetail::Raw { data: bytes };
-    let signal_info = SignalInfo {
-        signal,
-        errno: header.errno,
-        code: header.code,
-        detail: details,
-        force: false,
-    };
 
     let weak_target = current_task.get_task(tid);
     let target = Task::from_weak(&weak_target)?;
     if target.get_pid() != tgid {
         return error!(EINVAL);
     }
+    if !current_task.can_signal(&target, &unchecked_signal) {
+        return error!(EPERM);
+    }
+
+    send_unchecked_signal_info(&target, &unchecked_signal, signal_info)?;
+    Ok(())
+}
+
+pub fn sys_pidfd_send_signal(
+    current_task: &CurrentTask,
+    pidfd: FdNumber,
+    unchecked_signal: UncheckedSignal,
+    siginfo_ref: UserAddress,
+    flags: u32,
+) -> Result<(), Errno> {
+    if flags != 0 {
+        return error!(EINVAL);
+    }
+
+    let file = current_task.files.get(pidfd)?;
+    let target = current_task.get_task(file.as_pid()?);
+    let target = target.upgrade().ok_or_else(|| errno!(ESRCH))?;
+
+    let signal = Signal::try_from(unchecked_signal)?;
+    let signal_info = if siginfo_ref.is_null() {
+        SignalInfo {
+            signal,
+            errno: 0,
+            code: SI_USER as i32,
+            detail: Default::default(),
+            force: false,
+        }
+    } else {
+        read_siginfo(current_task, signal, siginfo_ref)?
+    };
+
     if !current_task.can_signal(&target, &unchecked_signal) {
         return error!(EPERM);
     }
@@ -603,8 +644,7 @@ pub fn sys_waitid(
             if file.flags().contains(OpenFlags::NONBLOCK) {
                 waiting_options.block = false;
             }
-            let pidfd = PidFdFileObject::downcast(&file)?;
-            ProcessSelector::Pid(pidfd.pid)
+            ProcessSelector::Pid(file.as_pid()?)
         }
         _ => return error!(EINVAL),
     };
@@ -1709,7 +1749,11 @@ mod tests {
         const VALUE_DATA_OFFSET: usize = SI_HEADER_SIZE + 8;
 
         let mut data = vec![0u8; SI_MAX_SIZE as usize];
-        let header = SignalInfoHeader { code: SI_QUEUE, ..SignalInfoHeader::default() };
+        let header = SignalInfoHeader {
+            signo: SIGIO.number(),
+            code: SI_QUEUE,
+            ..SignalInfoHeader::default()
+        };
         header.write_to(&mut data[..SI_HEADER_SIZE]);
         data[PID_DATA_OFFSET..PID_DATA_OFFSET + 4].copy_from_slice(&current_pid.to_ne_bytes());
         data[UID_DATA_OFFSET..UID_DATA_OFFSET + 4].copy_from_slice(&current_uid.to_ne_bytes());

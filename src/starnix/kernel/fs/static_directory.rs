@@ -109,6 +109,12 @@ impl<'a> StaticDirectoryBuilder<'a> {
         );
         self.fs.set_root_node(node);
     }
+
+    /// Builds [`FsNodeOps`] and [`FsFileOps`] for this directory.
+    pub fn build_ops(self) -> (Box<dyn FsNodeOps>, Box<dyn FileOps>) {
+        let directory = Arc::new(StaticDirectory { entries: self.entries });
+        (Box::new(directory.clone()), Box::new(directory))
+    }
 }
 
 pub struct StaticDirectory {

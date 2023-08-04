@@ -19,22 +19,93 @@ use crate::{
     types::*,
 };
 
+/// TaskDirectory delegates most of its operations to StaticDirectory, but we need to override
+/// FileOps::as_pid so that these directories can be used in places that expect a pidfd.
+struct TaskDirectory {
+    pid: pid_t,
+    node_ops: Box<dyn FsNodeOps>,
+    file_ops: Box<dyn FileOps>,
+}
+
+impl TaskDirectory {
+    fn new(
+        fs: &FileSystemHandle,
+        task: &TempRef<'_, Task>,
+        dir: StaticDirectoryBuilder<'_>,
+    ) -> FsNodeHandle {
+        let (node_ops, file_ops) = dir.build_ops();
+        fs.create_node(
+            Arc::new(TaskDirectory { pid: task.id, node_ops, file_ops }),
+            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), task.as_fscred()),
+        )
+    }
+}
+
+impl FsNodeOps for Arc<TaskDirectory> {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(Box::new(self.clone()))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<Arc<FsNode>, Errno> {
+        self.node_ops.lookup(node, current_task, name)
+    }
+}
+
+impl FileOps for Arc<TaskDirectory> {
+    fileops_impl_directory!();
+
+    fn seek(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        current_offset: off_t,
+        target: SeekTarget,
+    ) -> Result<off_t, Errno> {
+        self.file_ops.seek(file, current_task, current_offset, target)
+    }
+
+    fn readdir(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        sink: &mut dyn DirentSink,
+    ) -> Result<(), Errno> {
+        self.file_ops.readdir(file, current_task, sink)
+    }
+
+    fn as_pid(&self, _file: &FileHandle) -> Result<pid_t, Errno> {
+        Ok(self.pid)
+    }
+}
+
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
-pub fn pid_directory(fs: &FileSystemHandle, task: &TempRef<'_, Task>) -> Arc<FsNode> {
+pub fn pid_directory(fs: &FileSystemHandle, task: &TempRef<'_, Task>) -> FsNodeHandle {
     let mut dir =
         static_directory_builder_with_common_task_entries(fs, task, StatsScope::ThreadGroup);
-    dir.entry_creds(task.as_fscred());
     dir.entry(
         b"task",
         TaskListDirectory { thread_group: task.thread_group.clone() },
         mode!(IFDIR, 0o777),
     );
-    dir.build()
+    TaskDirectory::new(fs, task, dir)
 }
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/task/<tid>` directory for `task`.
-fn tid_directory(fs: &FileSystemHandle, task: &TempRef<'_, Task>) -> Arc<FsNode> {
-    static_directory_builder_with_common_task_entries(fs, task, StatsScope::Task).build()
+fn tid_directory(fs: &FileSystemHandle, task: &TempRef<'_, Task>) -> FsNodeHandle {
+    let dir = static_directory_builder_with_common_task_entries(fs, task, StatsScope::Task);
+    TaskDirectory::new(fs, task, dir)
 }
 
 /// Creates a [`StaticDirectoryBuilder`] and pre-populates it with files that are present in both
