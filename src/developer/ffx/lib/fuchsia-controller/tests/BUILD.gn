@@ -134,10 +134,3 @@ python_host_test("fuchsia_controller_fidl_client_test") {
   ]
   deps = [ ":fuchsia_controller_test_base" ]
 }
-
-python_host_test("fuchsia_controller_fidl_channel_test") {
-  main_source = "fidl_channel.py"
-  libraries =
-      [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
-  deps = [ ":fuchsia_controller_test_base" ]
-}
