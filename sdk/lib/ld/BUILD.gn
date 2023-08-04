@@ -174,7 +174,6 @@ shared_library("ld-startup") {
 
   sources = [ "startup-load.h" ]
   deps = [
-    ":abi",
     ":allocator",
     ":bootstrap",
     ":diagnostics",
@@ -289,21 +288,11 @@ user_basic_redirect("ld-startup.basic") {
   public_deps = [ ":ld-startup" ]
 }
 
-verify_ld_abi("ld-startup.basic") {
-}
-
-user_basic_redirect("verify-abi") {
-  public_deps = [
-    ":ld-startup.basic.verify-abi",
-    ":ld-stub.verify-abi",
-  ]
-}
-
 group("tests") {
   testonly = true
 
   deps = [
-    ":verify-abi",
+    ":ld-stub.verify-abi",
     "test:tests",
   ]
 }
