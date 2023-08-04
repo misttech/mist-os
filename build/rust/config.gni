@@ -9,11 +9,6 @@ import("//build/fidl/toolchain.gni")
 
 default_rustc_prefix = "//prebuilt/third_party/rust/${host_platform}"
 
-_rustc_version = read_file(
-        "//prebuilt/third_party/rust/${host_platform}/.versions/rust.cipd_version",
-        "json")
-default_rustc_version_string = _rustc_version.instance_id
-
 _version_file_dir =
     get_label_info("//build/rust:rust_toolchain_version", "target_out_dir")
 rustc_version_file = "$_version_file_dir/rustc_version_file"
@@ -22,7 +17,18 @@ declare_args() {
   # Sets a custom base directory for `rustc` and `cargo`.
   # This can be used to test custom Rust toolchains.
   rustc_prefix = default_rustc_prefix
+}
 
+if (rustc_prefix == default_rustc_prefix) {
+  _rustc_version = read_file(
+          "//prebuilt/third_party/rust/${host_platform}/.versions/rust.cipd_version",
+          "json")
+  default_rustc_version_string = _rustc_version.instance_id
+} else {
+  default_rustc_version_string = ""
+}
+
+declare_args() {
   # This is a string identifying the particular toolchain version in use.  Its
   # only purpose is to be unique enough that it changes when switching to a new
   # toolchain, so that recompilations with the new compiler can be triggered.
