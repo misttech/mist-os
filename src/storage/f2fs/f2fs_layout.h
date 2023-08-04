@@ -67,7 +67,7 @@ struct GlobalParameters {
   int heap = 0;
   int32_t fd = 0;
   char *device_name = nullptr;
-  std::string extension_list;
+  std::vector<std::string> extension_list;
 };
 
 struct Superblock {

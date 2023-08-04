@@ -146,9 +146,9 @@ TEST(FsyncRecoveryTest, FsyncInode) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -186,7 +186,7 @@ TEST(FsyncRecoveryTest, FsyncInode) {
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
   // 4. Remount without roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 1), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -213,9 +213,9 @@ TEST(FsyncRecoveryTest, FsyncDnode) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -253,7 +253,7 @@ TEST(FsyncRecoveryTest, FsyncDnode) {
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
   // 4. Remount without roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 1), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -280,9 +280,9 @@ TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -321,7 +321,7 @@ TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
   // 4. Remount without roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 1), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -348,7 +348,7 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -446,7 +446,7 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   // 6. Enable kMountDisableRollForward option
   // Remount without roll-forward recovery
   FileTester::Unmount(std::move(fs), &bc);
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 1), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
   FileTester::CreateRoot(fs.get(), &root);
@@ -478,9 +478,9 @@ TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -551,9 +551,9 @@ TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -663,9 +663,9 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Enable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -779,9 +779,9 @@ TEST(FsyncRecoveryTest, RecoveryWithoutFsync) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -831,7 +831,7 @@ TEST(FsyncRecoveryTest, RenameFileWithStrictFsync) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
@@ -945,7 +945,7 @@ TEST(FsyncRecoveryTest, RenameFileToOtherDirWithStrictFsync) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
@@ -1074,7 +1074,7 @@ TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
@@ -1182,7 +1182,7 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable roll-forward recovery
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableRollForward), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 

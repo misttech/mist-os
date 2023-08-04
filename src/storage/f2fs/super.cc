@@ -177,64 +177,31 @@ void F2fs::SyncFs(bool bShutdown) {
 #endif
 
 void F2fs::ParseOptions() {
-  for (uint32_t i = 0; i < kOptMaxNum; ++i) {
-    uint32_t value;
-    if (mount_options_.GetValue(i, &value) == ZX_OK) {
-      switch (i) {
-        case kOptActiveLogs:
-          superblock_info_->SetActiveLogs(safemath::checked_cast<int>(value));
-          break;
-        case kOptDiscard:
-          if (value)
-            superblock_info_->SetOpt(kMountDiscard);
-          break;
-        case kOptBgGcOff:
-          if (value)
-            superblock_info_->SetOpt(kMountBgGcOff);
-          break;
-        case kOptNoHeap:
-          if (value)
-            superblock_info_->SetOpt(kMountNoheap);
-          break;
-        case kOptDisableExtIdentify:
-          if (value)
-            superblock_info_->SetOpt(kMountDisableExtIdentify);
-          break;
-        case kOptNoUserXAttr:
-          if (value)
-            superblock_info_->SetOpt(kMountNoXAttr);
-          break;
-        case kOptNoAcl:
-          if (value)
-            superblock_info_->SetOpt(kMountNoAcl);
-          break;
-        case kOptDisableRollForward:
-          if (value)
-            superblock_info_->SetOpt(kMountDisableRollForward);
-          break;
-        case kOptInlineXattr:
-          if (value)
-            superblock_info_->SetOpt(kMountInlineXattr);
-          break;
-        case kOptInlineData:
-          if (value)
-            superblock_info_->SetOpt(kMountInlineData);
-          break;
-        case kOptInlineDentry:
-          if (value)
-            superblock_info_->SetOpt(kMountInlineDentry);
-          break;
-        case kOptForceLfs:
-          if (value)
-            superblock_info_->SetOpt(kMountForceLfs);
-          break;
-        case kOptReadOnly:
-          break;
-        default:
-          FX_LOGS(WARNING) << mount_options_.GetNameView(i) << " is not supported.";
-          break;
-      };
-    }
+  for (const auto &i : MountOptions::Iter()) {
+    auto value_or = mount_options_.GetValue(i);
+    ZX_DEBUG_ASSERT(value_or.is_ok());
+    switch (i) {
+      case MountOption::kActiveLogs:
+        superblock_info_->SetActiveLogs(*value_or);
+        break;
+      case MountOption::kDiscard:
+      case MountOption::kBgGcOff:
+      case MountOption::kNoHeap:
+      case MountOption::kDisableExtIdentify:
+      case MountOption::kNoUserXAttr:
+      case MountOption::kNoAcl:
+      case MountOption::kDisableRollForward:
+      case MountOption::kInlineXattr:
+      case MountOption::kInlineData:
+      case MountOption::kInlineDentry:
+      case MountOption::kForceLfs:
+      case MountOption::kReadOnly:
+        if (*value_or)
+          superblock_info_->SetOpt(i);
+        break;
+      default:
+        break;
+    };
   }
 }
 
@@ -400,7 +367,7 @@ zx_status_t F2fs::FillSuper() {
     return err;
   }
 
-  if (!superblock_info_->TestOpt(kMountDisableRollForward)) {
+  if (!superblock_info_->TestOpt(MountOption::kDisableRollForward)) {
     RecoverFsyncData();
   }
 

@@ -17,7 +17,7 @@ struct TestOptions {
   uint64_t block_count = 819200;
   uint64_t block_size = kDefaultSectorSize;
   MkfsOptions mkfs_options{};
-  std::vector<std::pair<uint32_t, uint32_t>> mount_options;
+  std::vector<std::pair<MountOption, size_t>> mount_options;
   bool run_fsck = true;
 };
 

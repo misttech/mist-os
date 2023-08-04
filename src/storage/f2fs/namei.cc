@@ -43,11 +43,11 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   vnode->SetGeneration(superblock_info.GetNextGeneration());
   superblock_info.IncNextGeneration();
 
-  if (superblock_info.TestOpt(kMountInlineData) && !vnode->IsDir()) {
+  if (superblock_info.TestOpt(MountOption::kInlineData) && !vnode->IsDir()) {
     vnode->SetFlag(InodeInfoFlag::kInlineData);
   }
 
-  if (superblock_info.TestOpt(kMountInlineDentry) && vnode->IsDir()) {
+  if (superblock_info.TestOpt(MountOption::kInlineDentry) && vnode->IsDir()) {
     vnode->SetFlag(InodeInfoFlag::kInlineDentry);
     vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
   }
@@ -101,7 +101,7 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
   vnode = vnode_refptr.get();
   vnode->SetName(name);
 
-  if (!superblock_info.TestOpt(kMountDisableExtIdentify))
+  if (!superblock_info.TestOpt(MountOption::kDisableExtIdentify))
     SetColdFile(*vnode);
 
   {

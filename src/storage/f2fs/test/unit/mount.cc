@@ -20,50 +20,33 @@ constexpr uint32_t kMountDisableExtTest = 1;
 constexpr uint32_t kMountActiveLogsTest = 2;
 
 void MountTestVerifyOptions(F2fs *fs, MountOptions &options) {
-  uint32_t value;
   SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
-  for (uint32_t i = 0; i < kOptMaxNum; ++i) {
-    ASSERT_EQ(options.GetValue(i, &value), ZX_OK);
-    switch (i) {
-      case kOptActiveLogs:
-        ASSERT_EQ(static_cast<uint32_t>(superblock_info.GetActiveLogs()), value);
+  for (const auto &option : MountOptions::Iter()) {
+    auto value_or = options.GetValue(option);
+    ASSERT_TRUE(value_or.is_ok());
+    switch (option) {
+      case MountOption::kActiveLogs:
+        ASSERT_EQ(static_cast<uint32_t>(superblock_info.GetActiveLogs()), *value_or);
         break;
-      case kOptDiscard:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountDiscard) == 0));
+      case MountOption::kDiscard:
+      case MountOption::kBgGcOff:
+      case MountOption::kNoHeap:
+      case MountOption::kDisableExtIdentify:
+      case MountOption::kNoUserXAttr:
+      case MountOption::kNoAcl:
+      case MountOption::kDisableRollForward:
+      case MountOption::kInlineXattr:
+      case MountOption::kInlineData:
+      case MountOption::kInlineDentry:
+      case MountOption::kForceLfs:
+        ASSERT_EQ(*value_or != 0, superblock_info.TestOpt(option));
         break;
-      case kOptBgGcOff:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountBgGcOff) == 0));
-        break;
-      case kOptNoHeap:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountNoheap) == 0));
-        break;
-      case kOptDisableExtIdentify:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountDisableExtIdentify) == 0));
-        break;
-      case kOptNoUserXAttr:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountNoXAttr) == 0));
-        break;
-      case kOptNoAcl:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountNoAcl) == 0));
-        break;
-      case kOptDisableRollForward:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountDisableRollForward) == 0));
-        break;
-      case kOptInlineXattr:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountInlineXattr) == 0));
-        break;
-      case kOptInlineData:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountInlineData) == 0));
-        break;
-      case kOptInlineDentry:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountInlineDentry) == 0));
-        break;
-      case kOptForceLfs:
-        ASSERT_EQ((value == 0), (superblock_info.TestOpt(kMountForceLfs) == 0));
+      default:
         break;
     };
   }
-  ASSERT_EQ(options.GetValue(kOptMaxNum, &value), ZX_ERR_INVALID_ARGS);
+  auto value_or = options.GetValue(MountOption::kMaxNum);
+  ASSERT_EQ(value_or.error_value(), ZX_ERR_INVALID_ARGS);
 }
 
 void MountTestDisableExt(F2fs *fs, uint32_t expectation) {
@@ -140,8 +123,9 @@ void MountTestActiveLogs(F2fs *fs, MountOptions options) {
   Dir *root_dir = static_cast<Dir *>(root.get());
   const char *filenames[] = {"dir", "warm.exe", "cold.mp4"};
   std::vector<CursegType> results(3, CursegType::kNoCheckType);
-  uint32_t num_logs = 0;
-  ASSERT_EQ(options.GetValue(kOptActiveLogs, &num_logs), ZX_OK);
+  auto num_logs_or = options.GetValue(MountOption::kActiveLogs);
+  ASSERT_TRUE(num_logs_or.is_ok());
+  size_t num_logs = *num_logs_or;
 
   constexpr int dir_file = 0;
   constexpr int warm_file = 1;
@@ -220,21 +204,21 @@ TEST(MountTest, Verify) {
 TEST(MountTest, DisableExtOptions) {
   constexpr uint32_t ShouldNotBeCold = 0;
   MountOptions options{};
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableExtIdentify), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableExtIdentify, 1), ZX_OK);
   MountTestMain(options, kMountDisableExtTest, ShouldNotBeCold);
 }
 
 TEST(MountTest, EnableExtOptions) {
   constexpr uint32_t ShouldBeCold = 1;
   MountOptions options{};
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDisableExtIdentify), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableExtIdentify, 0), ZX_OK);
   MountTestMain(options, kMountDisableExtTest, ShouldBeCold);
 }
 
 TEST(MountTest, ActiveLogsOptions) {
   for (uint32_t i = 2; i <= 6; i += 2) {
     MountOptions options{};
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptActiveLogs), i), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kActiveLogs, i), ZX_OK);
     MountTestMain(options, kMountActiveLogsTest, 0);
   }
 }
@@ -247,20 +231,19 @@ TEST(MountTest, EnableDiscardOptions) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   MountOptions options{};
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDiscard), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDiscard, 1), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
-  ASSERT_TRUE(fs->GetSuperblockInfo().TestOpt(kMountDiscard));
+  ASSERT_TRUE(fs->GetSuperblockInfo().TestOpt(MountOption::kDiscard));
 
   FileTester::Unmount(std::move(fs), &bc);
 }
 
 TEST(MountTest, InvalidOptions) {
   MountOptions options{};
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptActiveLogs), kMaxActiveLogs),
-            ZX_ERR_INVALID_ARGS);
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptBgGcOff), 1), ZX_ERR_INVALID_ARGS);
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptNoHeap), 1), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(options.SetValue(MountOption::kActiveLogs, kMaxActiveLogs), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(options.SetValue(MountOption::kBgGcOff, 1), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(options.SetValue(MountOption::kNoHeap, 1), ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace

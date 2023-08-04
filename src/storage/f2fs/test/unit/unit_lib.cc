@@ -22,7 +22,7 @@ F2fsFakeDevTestFixture::F2fsFakeDevTestFixture(const TestOptions &options)
 {
   mkfs_options_ = options.mkfs_options;
   for (auto opt : options.mount_options) {
-    mount_options_.SetValue(mount_options_.GetNameView(opt.first), opt.second);
+    mount_options_.SetValue(opt.first, opt.second);
   }
 }
 
@@ -79,10 +79,9 @@ void FileTester::MountWithOptions(async_dispatcher_t *dispatcher, const MountOpt
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(dispatcher);
   ASSERT_TRUE(vfs_or.is_ok());
-  uint32_t readonly;
-  options.GetValue(f2fs::kOptReadOnly, &readonly);
-  if (readonly) {
-    vfs_or->SetReadonly(readonly != 0);
+  auto readonly_or = options.GetValue(MountOption::kReadOnly);
+  if (*readonly_or) {
+    vfs_or->SetReadonly(true);
   }
   auto fs_or = F2fs::Create(nullptr, std::move(*bc), options, (*vfs_or).get());
   ASSERT_TRUE(fs_or.is_ok());
@@ -197,29 +196,29 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
 }
 
 void FileTester::CheckInlineDir(VnodeF2fs *vn) {
-  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kInlineDentry), 0);
+  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kInlineDentry), false);
   ASSERT_EQ(vn->GetSize(), vn->MaxInlineData());
 }
 
 void FileTester::CheckNonInlineDir(VnodeF2fs *vn) {
-  ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kInlineDentry), 0);
+  ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kInlineDentry), false);
   ASSERT_GT(vn->GetSize(), vn->MaxInlineData());
 }
 
 void FileTester::CheckInlineFile(VnodeF2fs *vn) {
-  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kInlineData), 0);
+  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kInlineData), false);
 }
 
 void FileTester::CheckNonInlineFile(VnodeF2fs *vn) {
-  ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kInlineData), 0);
+  ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kInlineData), false);
 }
 
 void FileTester::CheckDataExistFlagSet(VnodeF2fs *vn) {
-  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kDataExist), 0);
+  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kDataExist), false);
 }
 
 void FileTester::CheckDataExistFlagUnset(VnodeF2fs *vn) {
-  ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kDataExist), 0);
+  ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kDataExist), false);
 }
 
 void FileTester::CheckChildrenFromReaddir(Dir *dir, std::unordered_set<std::string> childs) {

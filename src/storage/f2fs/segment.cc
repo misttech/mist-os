@@ -151,7 +151,7 @@ block_t SegmentManager::ReservedSections() {
   return GetReservedSegmentsCount() / superblock_info_->GetSegsPerSec();
 }
 bool SegmentManager::NeedSSR() {
-  return (!superblock_info_->TestOpt(kMountForceLfs) &&
+  return (!superblock_info_->TestOpt(MountOption::kForceLfs) &&
           FreeSections() < static_cast<uint32_t>(OverprovisionSections()));
 }
 
@@ -178,7 +178,7 @@ constexpr uint32_t kMinIpuUtil = 100;
 bool SegmentManager::NeedInplaceUpdate(VnodeF2fs *vnode) {
   if (vnode->IsDir())
     return false;
-  if (superblock_info_->TestOpt(kMountForceLfs)) {
+  if (superblock_info_->TestOpt(MountOption::kForceLfs)) {
     return false;
   }
   return NeedSSR() && Utilization() > kMinIpuUtil;
@@ -398,7 +398,7 @@ void SegmentManager::ClearPrefreeSegments() {
   uint32_t offset = 0;
   uint32_t total_segs = TotalSegs();
   bool need_align =
-      superblock_info_->TestOpt(kMountForceLfs) && superblock_info_->GetSegsPerSec() > 1;
+      superblock_info_->TestOpt(MountOption::kForceLfs) && superblock_info_->GetSegsPerSec() > 1;
 
   std::lock_guard seglist_lock(dirty_info_->seglist_lock);
   while (true) {
@@ -428,7 +428,7 @@ void SegmentManager::ClearPrefreeSegments() {
       }
     }
 
-    if (!superblock_info_->TestOpt(kMountDiscard)) {
+    if (!superblock_info_->TestOpt(MountOption::kDiscard)) {
       continue;
     }
 
@@ -706,7 +706,7 @@ void SegmentManager::NewCurseg(CursegType type, bool new_sec) {
   if (type == CursegType::kCursegWarmData || type == CursegType::kCursegColdData)
     dir = static_cast<int>(AllocDirection::kAllocRight);
 
-  if (superblock_info.TestOpt(kMountNoheap))
+  if (superblock_info.TestOpt(MountOption::kNoHeap))
     dir = static_cast<int>(AllocDirection::kAllocRight);
 
   GetNewSegment(&segno, new_sec, dir);

@@ -24,7 +24,7 @@ struct MkfsOptions {
   uint32_t overprovision_ratio = 0;
   uint32_t segs_per_sec = 1;
   uint32_t secs_per_zone = 1;
-  std::string extension_list;
+  std::vector<std::string> extension_list;
 };
 
 class MkfsWorker {
@@ -41,8 +41,6 @@ class MkfsWorker {
   zx::result<std::unique_ptr<Bcache>> DoMkfs();
 
   std::unique_ptr<Bcache> Destroy() { return std::move(bc_); }
-
-  void PrintCurrentOption() const;
 
  private:
   friend class MkfsTester;
@@ -78,8 +76,7 @@ class MkfsWorker {
   zx_status_t TrimDevice();
 };
 
-void PrintUsage();
-zx_status_t ParseOptions(int argc, char** argv, MkfsOptions& options);
+zx_status_t ParseOptions(const MkfsOptions& options);
 
 zx::result<std::unique_ptr<Bcache>> Mkfs(const MkfsOptions& options, std::unique_ptr<Bcache> bc);
 

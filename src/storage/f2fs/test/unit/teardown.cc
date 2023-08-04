@@ -60,7 +60,7 @@ TEST(Teardown, ShutdownOnNoConnections) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
   MountOptions options{};
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptDiscard), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kDiscard, 1), ZX_OK);
   auto vfs_or = Runner::CreateRunner(loop.dispatcher());
   ASSERT_TRUE(vfs_or.is_ok());
   auto fs_or = F2fs::Create(nullptr, std::move(bc), options, (*vfs_or).get());

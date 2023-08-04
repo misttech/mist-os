@@ -844,7 +844,7 @@ bool VnodeF2fs::NeedToCheckpoint() {
   if (NeedToSyncDir()) {
     return true;
   }
-  if (fs()->GetSuperblockInfo().TestOpt(kMountDisableRollForward)) {
+  if (fs()->GetSuperblockInfo().TestOpt(MountOption::kDisableRollForward)) {
     return true;
   }
   if (fs()->GetSuperblockInfo().FindVnodeFromVnodeSet(InoType::kModifiedDirIno, GetParentNid())) {

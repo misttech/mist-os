@@ -16,7 +16,7 @@ namespace {
 class VnodeCacheTest : public SingleFileTest {
  public:
   VnodeCacheTest()
-      : SingleFileTest(S_IFDIR, TestOptions{.mount_options = {{kOptInlineDentry, 0}}}) {}
+      : SingleFileTest(S_IFDIR, TestOptions{.mount_options = {{MountOption::kInlineDentry, 0}}}) {}
 
   uint32_t GetCachedVnodeCount() {
     uint32_t cached_vnode_count = 0;

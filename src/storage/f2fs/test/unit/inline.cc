@@ -20,7 +20,7 @@ TEST(InlineDirTest, InlineDirCreation) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline dir option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -47,7 +47,7 @@ TEST(InlineDirTest, InlineDirCreation) {
   FileTester::Unmount(std::move(fs), &bc);
 
   // Disable inline dir option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 0), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
   FileTester::CreateRoot(fs.get(), &root);
@@ -85,7 +85,7 @@ TEST(InlineDirTest, InlineDirConvert) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline dir option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -121,7 +121,7 @@ TEST(InlineDirTest, InlineDirConvert) {
   FileTester::Unmount(std::move(fs), &bc);
 
   // Disable inline dir option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 0), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
   FileTester::CreateRoot(fs.get(), &root);
@@ -154,7 +154,7 @@ TEST(InlineDirTest, InlineDentryOps) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline dir option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -293,7 +293,7 @@ TEST(InlineDirTest, InlineDirPino) {
   MountOptions options{};
 
   // Enable inline dir option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -377,7 +377,7 @@ TEST(InlineDataTest, InlineRegFileCreation) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -404,7 +404,7 @@ TEST(InlineDataTest, InlineRegFileCreation) {
   FileTester::Unmount(std::move(fs), &bc);
 
   // Disable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
   FileTester::CreateRoot(fs.get(), &root);
@@ -444,7 +444,7 @@ TEST(InlineDataTest, InlineRegFileIO) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -525,7 +525,7 @@ TEST(InlineDataTest, InlineRegFileConvert) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -615,7 +615,7 @@ TEST(InlineDataTest, InlineRegFileTruncate) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -726,7 +726,7 @@ TEST(InlineDataTest, DataExistFlag) {
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
   // Enable inline data option
-  ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 

@@ -15,7 +15,8 @@ namespace {
 
 class DirectoryTest : public F2fsFakeDevTestFixture {
  public:
-  DirectoryTest() : F2fsFakeDevTestFixture(TestOptions{.mount_options = {{kOptInlineDentry, 0}}}) {}
+  DirectoryTest()
+      : F2fsFakeDevTestFixture(TestOptions{.mount_options = {{MountOption::kInlineDentry, 0}}}) {}
 };
 
 TEST_F(DirectoryTest, DentryReuse) {

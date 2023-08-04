@@ -129,7 +129,7 @@ TEST_F(SegmentManagerTest, GetNewSegmentHeap) {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
 
   // Check GetNewSegment() on AllocDirection::kAllocLeft
-  superblock_info.ClearOpt(kMountNoheap);
+  superblock_info.ClearOpt(MountOption::kNoHeap);
   uint32_t nwritten = kDefaultBlocksPerSegment * 3;
 
   for (uint32_t i = 0; i < nwritten; ++i) {
@@ -272,7 +272,7 @@ TEST_F(SegmentManagerTest, AllocateNewSegments) {
   fs_->GetSegmentManager().AllocateNewSegments();
   ASSERT_EQ(temp_free_segment - 3, fs_->GetSegmentManager().FreeSegments());
 
-  superblock_info.ClearOpt(kMountDisableRollForward);
+  superblock_info.ClearOpt(MountOption::kDisableRollForward);
   temp_free_segment = fs_->GetSegmentManager().FreeSegments();
   for (int i = static_cast<int>(CursegType::kCursegHotNode);
        i <= static_cast<int>(CursegType::kCursegColdNode); ++i) {
@@ -365,7 +365,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) {
 
   // Clear kMountNoheap opt, Allocate a new segment for hot nodes
   SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
-  superblock_info.ClearOpt(kMountNoheap);
+  superblock_info.ClearOpt(MountOption::kNoHeap);
   fs->GetSegmentManager().NewCurseg(CursegType::kCursegHotNode, false);
 
   const uint32_t alloc_size = kDefaultBlocksPerSegment * mkfs_options.segs_per_sec;
@@ -417,7 +417,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) {
 
   // Set kMountNoheap opt, Allocate a new segment for hot nodes
   SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
-  superblock_info.SetOpt(kMountNoheap);
+  superblock_info.SetOpt(MountOption::kNoHeap);
   fs->GetSegmentManager().NewCurseg(CursegType::kCursegHotNode, false);
 
   uint32_t nwritten =
@@ -491,14 +491,14 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
 
   std::unique_ptr<F2fs> fs;
   MountOptions mount_options;
-  mount_options.SetValue("mode", static_cast<uint32_t>(ModeType::kModeLfs));
+  mount_options.SetValue(MountOption::kForceLfs, static_cast<size_t>(ModeType::kModeLfs));
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), mount_options, &bc, &fs);
   fbl::RefPtr<VnodeF2fs> root;
   FileTester::CreateRoot(fs.get(), &root);
   auto root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-  ASSERT_EQ(fs->GetSuperblockInfo().TestOpt(kMountForceLfs), true);
+  ASSERT_EQ(fs->GetSuperblockInfo().TestOpt(MountOption::kForceLfs), true);
   ASSERT_EQ(fs->GetSegmentManager().NeedSSR(), false);
 
   // Make SSR, IPU condition
@@ -525,14 +525,14 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
   ASSERT_EQ(fs->GetSegmentManager().NeedInplaceUpdate(file.get()), false);
 
   // Make SSR, IPU enable
-  fs->GetSuperblockInfo().ClearOpt(kMountForceLfs);
+  fs->GetSuperblockInfo().ClearOpt(MountOption::kForceLfs);
   ASSERT_EQ(fs->GetSegmentManager().NeedSSR(), true);
 
   EXPECT_EQ(file->Close(), ZX_OK);
   file = nullptr;
 
   // Test ClearPrefreeSegments()
-  fs->GetSuperblockInfo().SetOpt(kMountForceLfs);
+  fs->GetSuperblockInfo().SetOpt(MountOption::kForceLfs);
   FileTester::DeleteChild(root_dir.get(), "alpha", false);
   fs->WriteCheckpoint(false, false);
 

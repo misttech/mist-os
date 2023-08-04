@@ -40,8 +40,9 @@ constexpr uint32_t kRootInodeNid = 3;
 class CheckpointTest : public F2fsFakeDevTestFixture {
  public:
   CheckpointTest()
-      : F2fsFakeDevTestFixture(TestOptions{.block_count = kBlockCount,
-                                           .mount_options = {{kOptDisableRollForward, 1}}}) {}
+      : F2fsFakeDevTestFixture(TestOptions{
+            .block_count = kBlockCount, .mount_options = {{MountOption::kDisableRollForward, 1}}}) {
+  }
 
  protected:
   void DoFirstCheckpoint(CheckpointCallback &callback) {

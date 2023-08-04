@@ -6,6 +6,7 @@
 #define SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
 
 #include "src/storage/f2fs/f2fs_lib.h"
+#include "src/storage/f2fs/mount.h"
 #include "src/storage/f2fs/node_page.h"
 
 namespace f2fs {
@@ -334,9 +335,9 @@ class SuperblockInfo {
     total_valid_inode_count_ = total_valid_inode_count;
   }
 
-  int GetActiveLogs() const { return active_logs_; }
+  size_t GetActiveLogs() const { return active_logs_; }
 
-  void SetActiveLogs(int active_logs) { active_logs_ = active_logs; }
+  void SetActiveLogs(size_t active_logs) { active_logs_ = active_logs; }
 
   block_t GetUserBlockCount() const { return user_block_count_; }
 
@@ -364,9 +365,9 @@ class SuperblockInfo {
 
   void IncNextGeneration() { ++s_next_generation_; }
 
-  void ClearOpt(uint64_t option) { mount_opt_ &= ~option; }
-  void SetOpt(uint64_t option) { mount_opt_ |= option; }
-  bool TestOpt(uint64_t option) const { return ((mount_opt_ & option) != 0); }
+  void ClearOpt(MountOption option) { mount_opt_ &= ~MountOptions::ToBit(option); }
+  void SetOpt(MountOption option) { mount_opt_ |= MountOptions::ToBit(option); }
+  bool TestOpt(MountOption option) const { return (mount_opt_ & MountOptions::ToBit(option)) != 0; }
 
   void IncSegmentCount(int type) { ++segment_count_[type]; }
   uint64_t GetSegmentCount(int type) const { return segment_count_[type]; }
@@ -473,7 +474,7 @@ class SuperblockInfo {
   nid_t total_node_count_ = 0;         // total node block count
   nid_t total_valid_node_count_ = 0;   // valid node block count
   nid_t total_valid_inode_count_ = 0;  // valid inode count
-  int active_logs_ = 0;                // # of active logs
+  size_t active_logs_ = 0;             // # of active logs
 
   block_t user_block_count_ = 0;         // # of user blocks
   block_t total_valid_block_count_ = 0;  // # of valid blocks

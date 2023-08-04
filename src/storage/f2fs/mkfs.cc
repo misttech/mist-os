@@ -4,7 +4,6 @@
 
 #include "src/storage/f2fs/mkfs.h"
 
-#include <getopt.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <iostream>
@@ -15,16 +14,6 @@
 #include "src/storage/f2fs/segment.h"
 
 namespace f2fs {
-
-void MkfsWorker::PrintCurrentOption() const {
-  std::cerr << "f2fs mkfs label = " << mkfs_options_.label << std::endl;
-  std::cerr << "f2fs mkfs heap-based allocation = " << mkfs_options_.heap_based_allocation
-            << std::endl;
-  std::cerr << "f2fs mkfs overprovision ratio = " << mkfs_options_.overprovision_ratio << std::endl;
-  std::cerr << "f2fs mkfs segments per sector = " << mkfs_options_.segs_per_sec << std::endl;
-  std::cerr << "f2fs mkfs sectors per zone = " << mkfs_options_.secs_per_zone << std::endl;
-  std::cerr << "f2fs mkfs extension list = " << mkfs_options_.extension_list << std::endl;
-}
 
 zx::result<std::unique_ptr<Bcache>> MkfsWorker::DoMkfs() {
   InitGlobalParameters();
@@ -80,12 +69,12 @@ zx_status_t MkfsWorker::GetDeviceInfo() {
   params_.start_sector = kSuperblockStart;
 
   if (info.block_size < kDefaultSectorSize || info.block_size > kBlockSize) {
-    std::cerr << "Error: Block size " << info.block_size << " is not supported" << std::endl;
+    FX_LOGS(ERROR) << info.block_size << " of block size is not supported";
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (info.flags & fuchsia_hardware_block::wire::Flag::kReadonly) {
-    std::cerr << "Error: Failed to format f2fs: read only block device" << std::endl;
+    FX_LOGS(ERROR) << "cannot format read-only block device";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -96,28 +85,21 @@ void MkfsWorker::ConfigureExtensionList() {
   super_block_.extension_count = 0;
   memset(super_block_.extension_list, 0, sizeof(super_block_.extension_list));
 
-  int name_len;
   int i = 0;
-
   for (const char *ext : kMediaExtList) {
-    name_len = static_cast<int>(strlen(ext));
-    memcpy(super_block_.extension_list[i++], ext, name_len);
+    memcpy(super_block_.extension_list[i++], ext, strlen(ext));
   }
   super_block_.extension_count = i;
 
-  if (!params_.extension_list.length())
+  if (params_.extension_list.empty())
     return;
 
   // add user ext list
-  char *ue = strtok(const_cast<char *>(params_.extension_list.c_str()), ",");
-  while (ue != nullptr) {
-    name_len = static_cast<int>(strlen(ue));
-    memcpy(super_block_.extension_list[i++], ue, name_len);
-    ue = strtok(nullptr, ",");
+  for (const auto &ext : params_.extension_list) {
+    memcpy(super_block_.extension_list[i++], ext.data(), ext.size());
     if (i >= kMaxExtension)
       break;
   }
-
   super_block_.extension_count = i;
 }
 
@@ -171,7 +153,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
   super_block_.log_sectorsize = CpuToLe(log_sectorsize);
 
   if (log_sectorsize < kMinLogSectorSize || log_sectorsize > kMaxLogSectorSize) {
-    FX_LOGS(ERROR) << "Error: Failed to get the sector size: " << params_.sector_size << "!";
+    FX_LOGS(ERROR) << params_.sector_size << " of sector size is not supported";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -179,7 +161,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
 
   if (log_sectors_per_block < 0 ||
       log_sectors_per_block > (kMaxLogSectorSize - kMinLogSectorSize)) {
-    FX_LOGS(ERROR) << "Error: Failed to get sectors per block: " << params_.sectors_per_blk << "!";
+    FX_LOGS(ERROR) << "failed to get sectors per block: " << params_.sectors_per_blk;
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -188,7 +170,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
 
   if (log_blks_per_seg !=
       static_cast<uint32_t>(log2(static_cast<double>(kDefaultBlocksPerSegment)))) {
-    FX_LOGS(ERROR) << "Error: Failed to get block per segment: " << params_.blks_per_seg << "!";
+    FX_LOGS(ERROR) << "failed to get blocks per segment: " << params_.blks_per_seg;
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -210,7 +192,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
       params_.start_sector * params_.sector_size;
 
   if (params_.start_sector % params_.sectors_per_blk) {
-    FX_LOGS(WARNING) << "WARN: Align start sector number in a unit of pages";
+    FX_LOGS(WARNING) << "start sector number is not aligned with the page size";
     FX_LOGS(WARNING) << "\ti.e., start sector: " << params_.start_sector
                      << ", ofs: " << params_.start_sector % params_.sectors_per_blk
                      << " (sectors per page: " << params_.sectors_per_blk << ")";
@@ -332,7 +314,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
 
   auto op = GetCalculatedOp(params_.overprovision);
   if (op.is_error()) {
-    FX_LOGS(WARNING) << "Error: Device size is not sufficient for F2FS volume";
+    FX_LOGS(WARNING) << "device size is not sufficient for F2FS volume";
     return ZX_ERR_NO_SPACE;
   }
   params_.overprovision = op.value();
@@ -349,8 +331,9 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
 
   if ((safemath::CheckSub(LeToCpu(super_block_.segment_count_main), 2).ValueOrDie()) <
       params_.reserved_segments) {
-    FX_LOGS(ERROR) << "Error: Device size is not sufficient for F2FS volume, more segment needed ="
-                   << params_.reserved_segments - (LeToCpu(super_block_.segment_count_main) - 2);
+    FX_LOGS(ERROR) << "device size is not sufficient for F2FS volume which needs "
+                   << params_.reserved_segments - (LeToCpu(super_block_.segment_count_main) - 2)
+                   << " more segments";
     return ZX_ERR_NO_SPACE;
   }
 
@@ -373,7 +356,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
        params_.secs_per_zone)
           .ValueOrDie();
   if (total_zones <= kNrCursegType) {
-    FX_LOGS(ERROR) << "Error: " << total_zones << " zones: Need more zones by shrinking zone size";
+    FX_LOGS(ERROR) << "requires more zones than " << total_zones;
     return ZX_ERR_NO_SPACE;
   }
 
@@ -428,7 +411,7 @@ zx_status_t MkfsWorker::InitSitArea() {
   for (block_t index = 0; index < segment_count_sit_blocks; ++index) {
     if (zx_status_t ret = WriteToDisk(sit_block.get(), sit_segment_block_num + index);
         ret != ZX_OK) {
-      FX_LOGS(ERROR) << "Error: While zeroing out the sit area on disk!!!";
+      FX_LOGS(ERROR) << "failed to zero out the sit area on disk " << zx_status_get_string(ret);
       return ret;
     }
   }
@@ -446,7 +429,7 @@ zx_status_t MkfsWorker::InitNatArea() {
   for (block_t index = 0; index < segment_count_nat_blocks; ++index) {
     if (zx_status_t ret = WriteToDisk(nat_block.get(), nat_segment_block_num + index);
         ret != ZX_OK) {
-      FX_LOGS(ERROR) << "Error: While zeroing out the nat area on disk!!!";
+      FX_LOGS(ERROR) << "failed to zero out the nat area on disk " << zx_status_get_string(ret);
       return ret;
     }
   }
@@ -522,7 +505,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
   block_t cp_segment_block_num = LeToCpu(super_block_.segment0_blkaddr);
 
   if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the ckp to disk!!!";
+    FX_LOGS(ERROR) << "failed to write out ckeckpoint pack to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -530,7 +513,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
     ++cp_segment_block_num;
     FsBlock<> zero_block;
     if (zx_status_t ret = WriteToDisk(zero_block.get(), cp_segment_block_num); ret != ZX_OK) {
-      FX_LOGS(ERROR) << "Error: While zeroing out the sit bitmap area on disk!!!";
+      FX_LOGS(ERROR) << "failed to zero out the sit bitmap on disk " << zx_status_get_string(ret);
       return ret;
     }
   }
@@ -544,7 +527,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the summary_block to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -554,7 +537,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the summary_block to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -589,7 +572,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the summary_block to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -602,7 +585,8 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
+    FX_LOGS(ERROR) << "failed to while write the summary_block to disk"
+                   << zx_status_get_string(ret);
     return ret;
   }
 
@@ -612,7 +596,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the summary_block to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -622,14 +606,14 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the summary_block to disk " << zx_status_get_string(ret);
     return ret;
   }
 
   // 8. cp page2
   ++cp_segment_block_num;
   if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the checkpoint to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the checkpoint to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -643,7 +627,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   cp_segment_block_num = (LeToCpu(super_block_.segment0_blkaddr) + params_.blks_per_seg);
   if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the checkpoint to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the checkpoint to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -651,7 +635,8 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
     ++cp_segment_block_num;
     FsBlock<> zero_buffer;
     if (zx_status_t ret = WriteToDisk(zero_buffer.get(), cp_segment_block_num); ret != ZX_OK) {
-      FX_LOGS(ERROR) << "Error: While zeroing out the sit bitmap area on disk!!!";
+      FX_LOGS(ERROR) << "failed to zero out the sit bitmap area on disk "
+                     << zx_status_get_string(ret);
       return ret;
     }
   }
@@ -659,7 +644,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
   cp_segment_block_num +=
       checkpoint->cp_pack_total_block_count - 1 - LeToCpu(super_block_.cp_payload);
   if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
-    FX_LOGS(ERROR) << "Error: While writing the checkpoint to disk!!!";
+    FX_LOGS(ERROR) << "failed to write the checkpoint to disk " << zx_status_get_string(ret);
     return ret;
   }
 
@@ -672,7 +657,8 @@ zx_status_t MkfsWorker::WriteSuperblock() {
 
   for (block_t index = 0; index < 2; ++index) {
     if (zx_status_t ret = WriteToDisk(super_block.get(), index); ret != ZX_OK) {
-      FX_LOGS(ERROR) << "Error: While while writing supe_blk on disk!!! index : " << index;
+      FX_LOGS(ERROR) << "failed to write super block at " << index << " "
+                     << zx_status_get_string(ret);
       return ret;
     }
   }
@@ -786,21 +772,20 @@ zx_status_t MkfsWorker::PurgeNodeChain() {
 }
 
 zx_status_t MkfsWorker::CreateRootDir() {
-  std::string err_msg = "Error creating root directory: ";
   if (zx_status_t err = WriteRootInode(); err != ZX_OK) {
-    FX_LOGS(ERROR) << err_msg << "Failed to write root inode " << err;
+    FX_LOGS(ERROR) << "failed to write root inode " << zx_status_get_string(err);
     return err;
   }
   if (zx_status_t err = PurgeNodeChain(); err != ZX_OK) {
-    FX_LOGS(ERROR) << err_msg << "Failed to purge node chain " << err;
+    FX_LOGS(ERROR) << "failed to purge node chain " << zx_status_get_string(err);
     return err;
   }
   if (zx_status_t err = UpdateNatRoot(); err != ZX_OK) {
-    FX_LOGS(ERROR) << err_msg << "Failed to update NAT for root " << err;
+    FX_LOGS(ERROR) << "failed to update NAT for root " << zx_status_get_string(err);
     return err;
   }
   if (zx_status_t err = AddDefaultDentryRoot(); err != ZX_OK) {
-    FX_LOGS(ERROR) << err_msg << "Failed to add default dentries for root " << err;
+    FX_LOGS(ERROR) << "failed to add default dentries for root " << zx_status_get_string(err);
     return err;
   }
   return ZX_OK;
@@ -815,7 +800,7 @@ zx_status_t MkfsWorker::FormatDevice() {
 
   if (zx_status_t err = TrimDevice(); err != ZX_OK) {
     if (err == ZX_ERR_NOT_SUPPORTED) {
-      FX_LOGS(INFO) << "This device doesn't support TRIM";
+      FX_LOGS(INFO) << "this device doesn't support TRIM";
     } else {
       return err;
     }
@@ -845,78 +830,19 @@ zx_status_t MkfsWorker::FormatDevice() {
   return bc_->Flush();
 }
 
-void PrintUsage() {
-  std::cerr << "Usage: mkfs -p \"[OPTIONS]\" devicepath f2fs" << std::endl;
-  std::cerr << "[OPTIONS]" << std::endl;
-  std::cerr << "  -l label" << std::endl;
-  std::cerr << "  -a heap-based allocation [default: 1]" << std::endl;
-  std::cerr << "  -o overprovision ratio [default: 5]" << std::endl;
-  std::cerr << "  -s # of segments per section [default: 1]" << std::endl;
-  std::cerr << "  -z # of sections per zone [default: 1]" << std::endl;
-  std::cerr << "  -e [extension list] e.g. \"mp3,gif,mov\"" << std::endl;
-  std::cerr << "e.g. mkfs -p \"-l hello -a 1 -o 5 -s 1 -z 1 -e mp3,gif\" devicepath f2fs"
-            << std::endl;
-}
-
-zx_status_t ParseOptions(int argc, char **argv, MkfsOptions &options) {
-  struct option opts[] = {
-      {"label", required_argument, nullptr, 'l'},
-      {"heap", required_argument, nullptr, 'a'},
-      {"op", required_argument, nullptr, 'o'},
-      {"seg_per_sec", required_argument, nullptr, 's'},
-      {"sec_per_zone", required_argument, nullptr, 'z'},
-      {"ext_list", required_argument, nullptr, 'e'},
-      {nullptr, 0, nullptr, 0},
-  };
-
-  int opt_index = -1;
-  int c = -1;
-
-  optreset = 1;
-  optind = 1;
-
-  while ((c = getopt_long(argc, argv, "l:a:o:s:z:e:", opts, &opt_index)) >= 0) {
-    switch (c) {
-      case 'l':
-        options.label = optarg;
-        if (options.label.length() >= kVolumeLabelLength) {
-          std::cerr << "ERROR: label length should be less than 16." << std::endl;
-          return ZX_ERR_INVALID_ARGS;
-        }
-        break;
-      case 'a':
-        options.heap_based_allocation = (static_cast<uint32_t>(strtoul(optarg, nullptr, 0)) != 0);
-        break;
-      case 'o':
-        options.overprovision_ratio = static_cast<uint32_t>(strtoul(optarg, nullptr, 0));
-        if (options.overprovision_ratio == 0) {
-          std::cerr << "ERROR: overprovision ratio should be larger than 0." << std::endl;
-          return ZX_ERR_INVALID_ARGS;
-        }
-        break;
-      case 's':
-        options.segs_per_sec = static_cast<uint32_t>(strtoul(optarg, nullptr, 0));
-        if (options.segs_per_sec == 0) {
-          std::cerr << "ERROR: # of segments per section should be larger than 0." << std::endl;
-          return ZX_ERR_INVALID_ARGS;
-        }
-        break;
-      case 'z':
-        options.secs_per_zone = static_cast<uint32_t>(strtoul(optarg, nullptr, 0));
-        if (options.secs_per_zone == 0) {
-          std::cerr << "ERROR: # of sections per zone should be larger than 0." << std::endl;
-          return ZX_ERR_INVALID_ARGS;
-        }
-        break;
-      case 'e':
-        options.extension_list = optarg;
-        break;
-      default:
-        PrintUsage();
-        return ZX_ERR_INVALID_ARGS;
-    };
-  };
-
+zx_status_t ParseOptions(const MkfsOptions &options) {
+  if (options.label.length() >= kVolumeLabelLength) {
+    FX_LOGS(ERROR) << "label length should be less than " << kVolumeLabelLength;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (options.segs_per_sec == 0) {
+    FX_LOGS(ERROR) << "# of segments per section should be larger than 0";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (options.secs_per_zone == 0) {
+    FX_LOGS(ERROR) << "# of sections per zone should be larger than 0";
+    return ZX_ERR_INVALID_ARGS;
+  }
   return ZX_OK;
 }
 

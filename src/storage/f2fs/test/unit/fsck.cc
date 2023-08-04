@@ -332,7 +332,7 @@ TEST(FsckTest, OrphanNodes) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options;
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -386,7 +386,7 @@ TEST(FsckTest, InvalidNatEntry) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options;
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -470,7 +470,7 @@ TEST(FsckTest, InvalidSsaEntry) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options;
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 0), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -851,7 +851,7 @@ TEST(FsckTest, WrongDataExistFlag) {
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options{};
     // Enable inline data option
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;

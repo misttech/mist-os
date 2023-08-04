@@ -12,23 +12,6 @@
 
 namespace f2fs {
 
-// Set .configurable to true when the feature is supported.
-const MountOpt default_option[] = {
-    {"background_gc_off", 1, false},
-    {"disable_roll_forward", 0, true},
-    {"discard", 1, true},
-    {"no_heap", 1, false},
-    {"nouser_xattr", 1, false},
-    {"noacl", 1, false},
-    {"disable_ext_identify", 0, true},
-    {"inline_xattr", 0, false},
-    {"inline_data", 0, true},
-    {"inline_dentry", 1, true},
-    {"mode", static_cast<uint32_t>(ModeType::kModeAdaptive), true},
-    {"readonly", 0, true},
-    {"active_logs", 6, true},  // It should be the last one.
-};
-
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
                             fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -49,64 +32,26 @@ zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
   return zx::ok();
 }
 
-MountOptions::MountOptions() {
-  for (uint32_t i = 0; i < kOptMaxNum; ++i) {
-    opt_[i] = default_option[i];
-  }
+zx::result<size_t> MountOptions::GetValue(const MountOption option) const {
+  if (option >= MountOption::kMaxNum)
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  return zx::ok(opt_[static_cast<size_t>(option)]);
 }
 
-zx_status_t MountOptions::GetValue(const uint32_t opt_id, uint32_t* out) const {
-  if (opt_id >= kOptMaxNum)
+zx_status_t MountOptions::SetValue(const MountOption option, const size_t value) {
+  if (option == MountOption::kActiveLogs && value != 2 && value != 4 && value != 6) {
+    FX_LOGS(WARNING) << " active_logs can be set only to 2, 4, or 6.";
     return ZX_ERR_INVALID_ARGS;
-  *out = opt_[opt_id].value;
+  };
+  if ((option == MountOption::kBgGcOff || option == MountOption::kNoHeap) && value) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  opt_[static_cast<size_t>(option)] = value;
   return ZX_OK;
 }
 
-uint32_t MountOptions::GetOptionID(std::string_view opt) const {
-  for (uint32_t i = 0; i < kOptMaxNum; ++i) {
-    if (opt_[i].name.compare(opt) == 0) {
-      return i;
-    }
-  }
-  return kOptMaxNum;
-}
-
-zx_status_t MountOptions::SetValue(std::string_view opt, const uint32_t value) {
-  zx_status_t ret = ZX_ERR_INVALID_ARGS;
-  uint32_t id = GetOptionID(opt);
-  if (id < kOptMaxNum && !opt_[id].configurable) {
-    FX_LOGS(WARNING) << opt << " is not configurable.";
-  } else {
-    switch (id) {
-      case kOptActiveLogs:
-        if (value != 2 && value != 4 && value != 6) {
-          FX_LOGS(WARNING) << opt << " can be set only to 2, 4, or 6.";
-        } else {
-          opt_[id].value = value;
-          ret = ZX_OK;
-        }
-        break;
-      case kOptDiscard:
-      case kOptBgGcOff:
-      case kOptNoHeap:
-      case kOptDisableExtIdentify:
-      case kOptNoUserXAttr:
-      case kOptNoAcl:
-      case kOptDisableRollForward:
-      case kOptInlineXattr:
-      case kOptInlineData:
-      case kOptInlineDentry:
-      case kOptForceLfs:
-      case kOptReadOnly:
-        opt_[id].value = value;
-        ret = ZX_OK;
-        break;
-      default:
-        FX_LOGS(WARNING) << opt << " is not supported.";
-        break;
-    };
-  }
-  return ret;
+uint64_t MountOptions::ToBit(const MountOption option) {
+  return 1ULL << static_cast<size_t>(option);
 }
 
 }  // namespace f2fs

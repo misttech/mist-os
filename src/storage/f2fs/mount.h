@@ -12,54 +12,57 @@
 
 namespace f2fs {
 
-constexpr uint32_t kOptMaxNum = 13;
-constexpr uint32_t kOptBgGcOff = 0;
-constexpr uint32_t kOptDisableRollForward = 1;
-constexpr uint32_t kOptDiscard = 2;
-constexpr uint32_t kOptNoHeap = 3;
-constexpr uint32_t kOptNoUserXAttr = 4;
-constexpr uint32_t kOptNoAcl = 5;
-constexpr uint32_t kOptDisableExtIdentify = 6;
-constexpr uint32_t kOptInlineXattr = 7;
-constexpr uint32_t kOptInlineData = 8;
-constexpr uint32_t kOptInlineDentry = 9;
-constexpr uint32_t kOptForceLfs = 10;
-constexpr uint32_t kOptReadOnly = 11;
-constexpr uint32_t kOptActiveLogs = (kOptMaxNum - 1);
-
-constexpr uint64_t kMountBgGcOff = (1 << kOptBgGcOff);
-constexpr uint64_t kMountDisableRollForward = (1 << kOptDisableRollForward);
-constexpr uint64_t kMountDiscard = (1 << kOptDiscard);
-constexpr uint64_t kMountNoheap = (1 << kOptNoHeap);
-constexpr uint64_t kMountNoXAttr = (1 << kOptNoUserXAttr);
-constexpr uint64_t kMountNoAcl = (1 << kOptNoAcl);
-constexpr uint64_t kMountDisableExtIdentify = (1 << kOptDisableExtIdentify);
-constexpr uint64_t kMountInlineXattr = (1 << kOptInlineXattr);
-constexpr uint64_t kMountInlineData = (1 << kOptInlineData);
-constexpr uint64_t kMountInlineDentry = (1 << kOptInlineDentry);
-constexpr uint64_t kMountForceLfs = (1 << kOptForceLfs);
-
-struct MountOpt {
-  std::string name;
-  uint32_t value;
-  bool configurable;
+enum class MountOption {
+  kBgGcOff = 0,
+  kDisableRollForward,
+  kDiscard,
+  kNoHeap,
+  kNoUserXAttr,
+  kNoAcl,
+  kDisableExtIdentify,
+  kInlineXattr,
+  kInlineData,
+  kInlineDentry,
+  kForceLfs,
+  kReadOnly,
+  kActiveLogs,  // It should be (kOptMaxNum - 1).
+  kMaxNum,
 };
+
+constexpr size_t kMaxOptionCount = static_cast<size_t>(MountOption::kMaxNum);
 
 class MountOptions {
  public:
-  MountOptions();
+  MountOptions() = default;
   MountOptions(const MountOptions &) = default;
 
-  zx_status_t GetValue(uint32_t opt_id, uint32_t *out) const;
-  uint32_t GetOptionID(std::string_view opt) const;
-  zx_status_t SetValue(std::string_view opt, uint32_t value);
-  std::string_view GetNameView(const uint32_t opt_id) {
-    ZX_ASSERT(opt_id < kOptMaxNum);
-    return opt_[opt_id].name;
+  zx::result<size_t> GetValue(const MountOption option) const;
+  zx_status_t SetValue(const MountOption option, const size_t value);
+  static uint64_t ToBit(const MountOption option);
+  static std::vector<MountOption> Iter() {
+    std::vector<MountOption> iter;
+    for (size_t i = 0; i < kMaxOptionCount; ++i) {
+      iter.push_back(static_cast<MountOption>(i));
+    }
+    return iter;
   }
 
  private:
-  MountOpt opt_[kOptMaxNum];
+  // default values
+  // "background_gc_off", 1
+  // "disable_roll_forward", 0
+  // "discard", 1
+  // "no_heap", 1
+  // "nouser_xattr", 1
+  // "noacl", 1
+  // "disable_ext_identify", 0
+  // "inline_xattr", 0
+  // "inline_data", 0
+  // "inline_dentry", 1
+  // "mode", ModeType::kModeAdaptive (0)
+  // "readonly", 0
+  // "active_logs", 6
+  std::array<size_t, kMaxOptionCount> opt_ = {1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 6};
 };
 
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,

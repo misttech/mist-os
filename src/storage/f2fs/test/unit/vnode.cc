@@ -288,13 +288,13 @@ TEST_F(VnodeTest, SyncFile) {
 
   // 1. Check need_cp
   uint64_t pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  fs_->GetSuperblockInfo().ClearOpt(kMountDisableRollForward);
+  fs_->GetSuperblockInfo().ClearOpt(MountOption::kDisableRollForward);
   file_vnode->SetDirty();
   ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
             ZX_OK);
   uint64_t curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
-  fs_->GetSuperblockInfo().SetOpt(kMountDisableRollForward);
+  fs_->GetSuperblockInfo().SetOpt(MountOption::kDisableRollForward);
 
   // 2. Check vnode is clean
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
