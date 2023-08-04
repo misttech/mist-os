@@ -7,7 +7,6 @@ library fuchsia.device.manager;
 
 using fuchsia.driver.framework as fdf;
 using fuchsia.io;
-using fuchsia.driver.host;
 using fuchsia.device;
 using zx;
 
@@ -278,12 +277,6 @@ closed protocol DriverHostController {
         local_device_id LocalDeviceId;
     }) -> (struct {
         status zx.Status;
-    });
-
-    /// Start a DFv2 driver within a driver host.
-    strict Start(resource struct {
-        start_args fdf.DriverStartArgs;
-        driver server_end:fuchsia.driver.host.Driver;
     });
 
     // TODO(fxbug.dev/68309): Currently unimplemented.

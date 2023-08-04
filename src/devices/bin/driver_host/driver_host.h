@@ -59,7 +59,6 @@ class DriverHostControllerConnection
   void CreateDevice(CreateDeviceRequestView request,
                     CreateDeviceCompleter::Sync& completer) override;
   void Restart(RestartCompleter::Sync& completer) override;
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
 
   StatusOrConn CreateFidlProxyDevice(CreateDeviceRequestView& request);
   StatusOrConn CreateProxyDevice(CreateDeviceRequestView& request);

@@ -64,7 +64,6 @@ source_set("common") {
     "proxy_iostate.cc",
     "scheduler_profile.cc",
     "tracing.cc",
-    "v2.cc",
     "zx_device.cc",
     "zx_driver.cc",
   ]

@@ -14,7 +14,6 @@ fidl("fuchsia.device.manager") {
   public_deps = [
     "//sdk/fidl/fuchsia.device",
     "//sdk/fidl/fuchsia.driver.framework",
-    "//sdk/fidl/fuchsia.driver.host",
     "//sdk/fidl/fuchsia.io",
     "//zircon/vdso/zx",
   ]

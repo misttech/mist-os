@@ -16,7 +16,6 @@
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
 
-namespace fdh = fuchsia_driver_host;
 namespace frunner = fuchsia_component_runner;
 
 DriverHost::DriverHost(Coordinator* coordinator,
