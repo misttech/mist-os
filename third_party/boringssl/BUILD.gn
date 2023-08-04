@@ -31,6 +31,8 @@ group("boringssl-static") {
 
 if (current_cpu == "arm64" && (is_fuchsia || is_linux)) {
   crypto_sources += crypto_sources_linux_aarch64
+} else if (current_cpu == "arm64" && is_mac) {
+  crypto_sources += crypto_sources_apple_aarch64
 } else if (current_cpu == "x64" && (is_fuchsia || is_linux)) {
   crypto_sources += crypto_sources_linux_x86_64
 } else if (current_cpu == "x64" && is_mac) {
