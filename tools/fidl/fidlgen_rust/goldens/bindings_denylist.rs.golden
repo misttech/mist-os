@@ -813,7 +813,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         responder: DenyEachBindingOnlyDenyCppResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -832,7 +831,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         responder: DenyEachBindingOnlyDenyDartResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -851,7 +849,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         responder: DenyEachBindingOnlyDenyGoResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -870,7 +867,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         responder: DenyEachBindingOnlyDenyLibfuzzerResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -889,7 +885,6 @@ impl futures::Stream for DenyEachBindingRequestStream {
                         responder: DenyEachBindingOnlyDenySyzkallerResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1004,7 +999,6 @@ impl DenyEachBindingControlHandle {}
 pub struct DenyEachBindingOnlyDenyCppResponder {
     control_handle: std::mem::ManuallyDrop<DenyEachBindingControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`DenyEachBindingControlHandle::shutdown`])
@@ -1059,7 +1053,7 @@ impl DenyEachBindingOnlyDenyCppResponder {
             .send::<fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>>(
                 result.map(|b| (b,)),
                 self.tx_id,
-                self.ordinal,
+                0x290bad96051b1b92,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -1070,7 +1064,6 @@ impl DenyEachBindingOnlyDenyCppResponder {
 pub struct DenyEachBindingOnlyDenyDartResponder {
     control_handle: std::mem::ManuallyDrop<DenyEachBindingControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`DenyEachBindingControlHandle::shutdown`])
@@ -1126,7 +1119,7 @@ impl DenyEachBindingOnlyDenyDartResponder {
         >>(
             result.map(|b| (b,)),
             self.tx_id,
-            self.ordinal,
+            0x75384066a26d87d7,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1137,7 +1130,6 @@ impl DenyEachBindingOnlyDenyDartResponder {
 pub struct DenyEachBindingOnlyDenyGoResponder {
     control_handle: std::mem::ManuallyDrop<DenyEachBindingControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`DenyEachBindingControlHandle::shutdown`])
@@ -1192,7 +1184,7 @@ impl DenyEachBindingOnlyDenyGoResponder {
             .send::<fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>>(
                 result.map(|b| (b,)),
                 self.tx_id,
-                self.ordinal,
+                0x657655b981478d99,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -1203,7 +1195,6 @@ impl DenyEachBindingOnlyDenyGoResponder {
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponder {
     control_handle: std::mem::ManuallyDrop<DenyEachBindingControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`DenyEachBindingControlHandle::shutdown`])
@@ -1259,7 +1250,7 @@ impl DenyEachBindingOnlyDenyLibfuzzerResponder {
         >>(
             result.map(|b| (b,)),
             self.tx_id,
-            self.ordinal,
+            0x1e4f89c329617b1e,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1270,7 +1261,6 @@ impl DenyEachBindingOnlyDenyLibfuzzerResponder {
 pub struct DenyEachBindingOnlyDenySyzkallerResponder {
     control_handle: std::mem::ManuallyDrop<DenyEachBindingControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`DenyEachBindingControlHandle::shutdown`])
@@ -1326,7 +1316,7 @@ impl DenyEachBindingOnlyDenySyzkallerResponder {
         >>(
             result.map(|b| (b,)),
             self.tx_id,
-            self.ordinal,
+            0x202ee614a749e98a,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

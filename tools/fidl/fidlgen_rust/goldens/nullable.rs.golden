@@ -360,7 +360,6 @@ impl futures::Stream for SimpleProtocolRequestStream {
                         responder: SimpleProtocolAddResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -427,7 +426,6 @@ impl SimpleProtocolControlHandle {}
 pub struct SimpleProtocolAddResponder {
     control_handle: std::mem::ManuallyDrop<SimpleProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`SimpleProtocolControlHandle::shutdown`])
@@ -480,7 +478,7 @@ impl SimpleProtocolAddResponder {
         self.control_handle.inner.send::<SimpleProtocolAddResponse>(
             (sum,),
             self.tx_id,
-            self.ordinal,
+            0x7ee19cf19ae30276,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

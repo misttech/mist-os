@@ -940,7 +940,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                         responder: ComposedProtocolTwoWayAnonComposedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -957,7 +956,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                         responder: ComposedProtocolTwoWayAnonComposedWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -991,7 +989,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                         responder: ComposedProtocolTwoWayNamedComposedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1010,7 +1007,6 @@ impl futures::Stream for ComposedProtocolRequestStream {
                         responder: ComposedProtocolTwoWayNamedComposedWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1217,7 +1213,6 @@ impl ComposedProtocolControlHandle {
 pub struct ComposedProtocolTwoWayAnonComposedResponder {
     control_handle: std::mem::ManuallyDrop<ComposedProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ComposedProtocolControlHandle::shutdown`])
@@ -1279,7 +1274,7 @@ impl ComposedProtocolTwoWayAnonComposedResponder {
         self.control_handle.inner.send::<ComposedProtocolTwoWayAnonComposedResponse>(
             payload,
             self.tx_id,
-            self.ordinal,
+            0x7083713dee9435f4,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1290,7 +1285,6 @@ impl ComposedProtocolTwoWayAnonComposedResponder {
 pub struct ComposedProtocolTwoWayAnonComposedWithErrorResponder {
     control_handle: std::mem::ManuallyDrop<ComposedProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ComposedProtocolControlHandle::shutdown`])
@@ -1355,7 +1349,7 @@ impl ComposedProtocolTwoWayAnonComposedWithErrorResponder {
         >>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x4fd32c5e2ffa6828,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1366,7 +1360,6 @@ impl ComposedProtocolTwoWayAnonComposedWithErrorResponder {
 pub struct ComposedProtocolTwoWayNamedComposedResponder {
     control_handle: std::mem::ManuallyDrop<ComposedProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ComposedProtocolControlHandle::shutdown`])
@@ -1419,7 +1412,7 @@ impl ComposedProtocolTwoWayNamedComposedResponder {
         self.control_handle.inner.send::<TablePayload>(
             payload,
             self.tx_id,
-            self.ordinal,
+            0x45b4d3d31b374054,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1430,7 +1423,6 @@ impl ComposedProtocolTwoWayNamedComposedResponder {
 pub struct ComposedProtocolTwoWayNamedComposedWithErrorResponder {
     control_handle: std::mem::ManuallyDrop<ComposedProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ComposedProtocolControlHandle::shutdown`])
@@ -1486,7 +1478,7 @@ impl ComposedProtocolTwoWayNamedComposedWithErrorResponder {
         self.control_handle.inner.send::<fidl::encoding::ResultType<UnionPayload, u32>>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x450531e2d20c52ef,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -2379,7 +2371,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayAnonComposedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2395,7 +2386,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayAnonComposedWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2424,7 +2414,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayNamedComposedResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2442,7 +2431,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayNamedComposedWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2471,7 +2459,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayLocalResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2489,7 +2476,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayLocalWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2518,7 +2504,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayAnonResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2536,7 +2521,6 @@ impl futures::Stream for MainProtocolRequestStream {
                         responder: MainProtocolTwoWayAnonWithErrorResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2874,7 +2858,6 @@ impl MainProtocolControlHandle {
 pub struct MainProtocolTwoWayAnonComposedResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -2936,7 +2919,7 @@ impl MainProtocolTwoWayAnonComposedResponder {
         self.control_handle.inner.send::<ComposedProtocolTwoWayAnonComposedResponse>(
             payload,
             self.tx_id,
-            self.ordinal,
+            0x7083713dee9435f4,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -2947,7 +2930,6 @@ impl MainProtocolTwoWayAnonComposedResponder {
 pub struct MainProtocolTwoWayAnonComposedWithErrorResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3012,7 +2994,7 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
         >>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x4fd32c5e2ffa6828,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3023,7 +3005,6 @@ impl MainProtocolTwoWayAnonComposedWithErrorResponder {
 pub struct MainProtocolTwoWayNamedComposedResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3076,7 +3057,7 @@ impl MainProtocolTwoWayNamedComposedResponder {
         self.control_handle.inner.send::<TablePayload>(
             payload,
             self.tx_id,
-            self.ordinal,
+            0x45b4d3d31b374054,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3087,7 +3068,6 @@ impl MainProtocolTwoWayNamedComposedResponder {
 pub struct MainProtocolTwoWayNamedComposedWithErrorResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3143,7 +3123,7 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
         self.control_handle.inner.send::<fidl::encoding::ResultType<UnionPayload, u32>>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x450531e2d20c52ef,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3154,7 +3134,6 @@ impl MainProtocolTwoWayNamedComposedWithErrorResponder {
 pub struct MainProtocolTwoWayLocalResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3207,7 +3186,7 @@ impl MainProtocolTwoWayLocalResponder {
         self.control_handle.inner.send::<TablePayload>(
             payload,
             self.tx_id,
-            self.ordinal,
+            0x26998b4c1e8a9a57,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3218,7 +3197,6 @@ impl MainProtocolTwoWayLocalResponder {
 pub struct MainProtocolTwoWayLocalWithErrorResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3274,7 +3252,7 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
         self.control_handle.inner.send::<fidl::encoding::ResultType<UnionPayload, u32>>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x4a7bf9ce881afde7,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3285,7 +3263,6 @@ impl MainProtocolTwoWayLocalWithErrorResponder {
 pub struct MainProtocolTwoWayAnonResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3341,7 +3318,7 @@ impl MainProtocolTwoWayAnonResponder {
         self.control_handle.inner.send::<MainProtocolTwoWayAnonResponse>(
             payload,
             self.tx_id,
-            self.ordinal,
+            0x3fd7ad8e52b07e2e,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3352,7 +3329,6 @@ impl MainProtocolTwoWayAnonResponder {
 pub struct MainProtocolTwoWayAnonWithErrorResponder {
     control_handle: std::mem::ManuallyDrop<MainProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MainProtocolControlHandle::shutdown`])
@@ -3417,7 +3393,7 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
         >>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x1d33061a424eb245,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

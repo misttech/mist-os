@@ -353,7 +353,6 @@ impl futures::Stream for EmptyProtocolRequestStream {
                         responder: EmptyProtocolSendAndReceiveResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -440,7 +439,6 @@ impl EmptyProtocolControlHandle {
 pub struct EmptyProtocolSendAndReceiveResponder {
     control_handle: std::mem::ManuallyDrop<EmptyProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`EmptyProtocolControlHandle::shutdown`])
@@ -493,7 +491,7 @@ impl EmptyProtocolSendAndReceiveResponder {
         self.control_handle.inner.send::<EmptyProtocolSendAndReceiveResponse>(
             (e,),
             self.tx_id,
-            self.ordinal,
+            0x76a931254962cea,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

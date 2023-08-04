@@ -441,7 +441,6 @@ impl futures::Stream for ProtocolRequestStream {
                         responder: ProtocolRequestStrictResponseFlexibleResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -457,7 +456,6 @@ impl futures::Stream for ProtocolRequestStream {
                         responder: ProtocolRequestFlexibleResponseStrictResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -548,7 +546,6 @@ impl ProtocolControlHandle {}
 pub struct ProtocolRequestStrictResponseFlexibleResponder {
     control_handle: std::mem::ManuallyDrop<ProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ProtocolControlHandle::shutdown`])
@@ -601,7 +598,7 @@ impl ProtocolRequestStrictResponseFlexibleResponder {
         self.control_handle.inner.send::<ProtocolRequestStrictResponseFlexibleResponse>(
             (f,),
             self.tx_id,
-            self.ordinal,
+            0x9b8c7d3d118df13,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -612,7 +609,6 @@ impl ProtocolRequestStrictResponseFlexibleResponder {
 pub struct ProtocolRequestFlexibleResponseStrictResponder {
     control_handle: std::mem::ManuallyDrop<ProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ProtocolControlHandle::shutdown`])
@@ -665,7 +661,7 @@ impl ProtocolRequestFlexibleResponseStrictResponder {
         self.control_handle.inner.send::<ProtocolRequestFlexibleResponseStrictResponse>(
             (f,),
             self.tx_id,
-            self.ordinal,
+            0x480c77690533acb7,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

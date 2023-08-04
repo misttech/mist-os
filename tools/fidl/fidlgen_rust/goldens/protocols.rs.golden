@@ -996,7 +996,6 @@ impl futures::Stream for ChannelProtocolRequestStream {
                         responder: ChannelProtocolMethodBResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1015,7 +1014,6 @@ impl futures::Stream for ChannelProtocolRequestStream {
                         responder: ChannelProtocolTakeHandleResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1034,7 +1032,6 @@ impl futures::Stream for ChannelProtocolRequestStream {
                         responder: ChannelProtocolMutateSocketResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -1145,7 +1142,6 @@ impl ChannelProtocolControlHandle {
 pub struct ChannelProtocolMethodBResponder {
     control_handle: std::mem::ManuallyDrop<ChannelProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ChannelProtocolControlHandle::shutdown`])
@@ -1198,7 +1194,7 @@ impl ChannelProtocolMethodBResponder {
         self.control_handle.inner.send::<ChannelProtocolMethodBResponse>(
             (result,),
             self.tx_id,
-            self.ordinal,
+            0x7b8dd3d6c741c9c6,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1209,7 +1205,6 @@ impl ChannelProtocolMethodBResponder {
 pub struct ChannelProtocolTakeHandleResponder {
     control_handle: std::mem::ManuallyDrop<ChannelProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ChannelProtocolControlHandle::shutdown`])
@@ -1262,7 +1257,7 @@ impl ChannelProtocolTakeHandleResponder {
         self.control_handle.inner.send::<fidl::encoding::EmptyPayload>(
             (),
             self.tx_id,
-            self.ordinal,
+            0x836fa31201a0a65,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1273,7 +1268,6 @@ impl ChannelProtocolTakeHandleResponder {
 pub struct ChannelProtocolMutateSocketResponder {
     control_handle: std::mem::ManuallyDrop<ChannelProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ChannelProtocolControlHandle::shutdown`])
@@ -1326,7 +1320,7 @@ impl ChannelProtocolMutateSocketResponder {
         self.control_handle.inner.send::<ChannelProtocolMutateSocketResponse>(
             (b,),
             self.tx_id,
-            self.ordinal,
+            0x66dbcccc06f7f14f,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -1927,7 +1921,6 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
                         responder: HandleRightsProtocolResponseMethodResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2018,7 +2011,6 @@ impl HandleRightsProtocolControlHandle {
 pub struct HandleRightsProtocolResponseMethodResponder {
     control_handle: std::mem::ManuallyDrop<HandleRightsProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`HandleRightsProtocolControlHandle::shutdown`])
@@ -2071,7 +2063,7 @@ impl HandleRightsProtocolResponseMethodResponder {
         self.control_handle.inner.send::<HandleRightsProtocolResponseMethodResponse>(
             (h,),
             self.tx_id,
-            self.ordinal,
+            0x52a8f194ac143547,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -2752,7 +2744,6 @@ impl futures::Stream for MethodWithUnionRequestStream {
                         responder: MethodWithUnionUnionMethodResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -2819,7 +2810,6 @@ impl MethodWithUnionControlHandle {}
 pub struct MethodWithUnionUnionMethodResponder {
     control_handle: std::mem::ManuallyDrop<MethodWithUnionControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`MethodWithUnionControlHandle::shutdown`])
@@ -2872,7 +2862,7 @@ impl MethodWithUnionUnionMethodResponder {
         self.control_handle.inner.send::<MethodWithUnionUnionMethodResponse>(
             (u,),
             self.tx_id,
-            self.ordinal,
+            0x393e7f5b2b821218,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3165,7 +3155,6 @@ impl futures::Stream for TransitionalRequestStream {
                         responder: TransitionalRequestResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -3263,7 +3252,6 @@ impl TransitionalControlHandle {
 pub struct TransitionalRequestResponder {
     control_handle: std::mem::ManuallyDrop<TransitionalControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`TransitionalControlHandle::shutdown`])
@@ -3316,7 +3304,7 @@ impl TransitionalRequestResponder {
         self.control_handle.inner.send::<TransitionalRequestResponse>(
             (y,),
             self.tx_id,
-            self.ordinal,
+            0x512cc1ba467fef08,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -3799,7 +3787,6 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                         responder: WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -3813,7 +3800,6 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                         responder: WithAndWithoutRequestResponseNoRequestWithResponseResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -3839,7 +3825,6 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                         responder: WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -3854,7 +3839,6 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                         responder: WithAndWithoutRequestResponseWithRequestWithResponseResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4038,7 +4022,6 @@ impl WithAndWithoutRequestResponseControlHandle {
 pub struct WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
     control_handle: std::mem::ManuallyDrop<WithAndWithoutRequestResponseControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithAndWithoutRequestResponseControlHandle::shutdown`])
@@ -4091,7 +4074,7 @@ impl WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
         self.control_handle.inner.send::<fidl::encoding::EmptyPayload>(
             (),
             self.tx_id,
-            self.ordinal,
+            0x16a329d17f458668,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -4102,7 +4085,6 @@ impl WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
 pub struct WithAndWithoutRequestResponseNoRequestWithResponseResponder {
     control_handle: std::mem::ManuallyDrop<WithAndWithoutRequestResponseControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithAndWithoutRequestResponseControlHandle::shutdown`])
@@ -4157,7 +4139,7 @@ impl WithAndWithoutRequestResponseNoRequestWithResponseResponder {
             .send::<WithAndWithoutRequestResponseNoRequestWithResponseResponse>(
                 (ret,),
                 self.tx_id,
-                self.ordinal,
+                0x7d6b2fcf0e2a65bd,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -4168,7 +4150,6 @@ impl WithAndWithoutRequestResponseNoRequestWithResponseResponder {
 pub struct WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
     control_handle: std::mem::ManuallyDrop<WithAndWithoutRequestResponseControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithAndWithoutRequestResponseControlHandle::shutdown`])
@@ -4221,7 +4202,7 @@ impl WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
         self.control_handle.inner.send::<fidl::encoding::EmptyPayload>(
             (),
             self.tx_id,
-            self.ordinal,
+            0x27ee4d2bd405df5f,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -4232,7 +4213,6 @@ impl WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
 pub struct WithAndWithoutRequestResponseWithRequestWithResponseResponder {
     control_handle: std::mem::ManuallyDrop<WithAndWithoutRequestResponseControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithAndWithoutRequestResponseControlHandle::shutdown`])
@@ -4287,7 +4267,7 @@ impl WithAndWithoutRequestResponseWithRequestWithResponseResponder {
             .send::<WithAndWithoutRequestResponseWithRequestWithResponseResponse>(
                 (ret,),
                 self.tx_id,
-                self.ordinal,
+                0x590e91945d58f5b1,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -4692,7 +4672,6 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                         responder: WithErrorSyntaxResponseAsStructResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4709,7 +4688,6 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                         responder: WithErrorSyntaxErrorAsPrimitiveResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4726,7 +4704,6 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                         responder: WithErrorSyntaxErrorAsEnumResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4743,7 +4720,6 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                         responder: WithErrorSyntaxHandleInResultResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -4843,7 +4819,6 @@ impl WithErrorSyntaxControlHandle {}
 pub struct WithErrorSyntaxResponseAsStructResponder {
     control_handle: std::mem::ManuallyDrop<WithErrorSyntaxControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithErrorSyntaxControlHandle::shutdown`])
@@ -4902,7 +4877,7 @@ impl WithErrorSyntaxResponseAsStructResponder {
         >>(
             result,
             self.tx_id,
-            self.ordinal,
+            0x3b902a6d8d24693,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -4913,7 +4888,6 @@ impl WithErrorSyntaxResponseAsStructResponder {
 pub struct WithErrorSyntaxErrorAsPrimitiveResponder {
     control_handle: std::mem::ManuallyDrop<WithErrorSyntaxControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithErrorSyntaxControlHandle::shutdown`])
@@ -4968,7 +4942,7 @@ impl WithErrorSyntaxErrorAsPrimitiveResponder {
             .send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>>(
                 result,
                 self.tx_id,
-                self.ordinal,
+                0x602fd6bd920135e7,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -4979,7 +4953,6 @@ impl WithErrorSyntaxErrorAsPrimitiveResponder {
 pub struct WithErrorSyntaxErrorAsEnumResponder {
     control_handle: std::mem::ManuallyDrop<WithErrorSyntaxControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithErrorSyntaxControlHandle::shutdown`])
@@ -5037,7 +5010,7 @@ impl WithErrorSyntaxErrorAsEnumResponder {
             .send::<fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>>(
                 result,
                 self.tx_id,
-                self.ordinal,
+                0x4c371e1673212f43,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -5048,7 +5021,6 @@ impl WithErrorSyntaxErrorAsEnumResponder {
 pub struct WithErrorSyntaxHandleInResultResponder {
     control_handle: std::mem::ManuallyDrop<WithErrorSyntaxControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithErrorSyntaxControlHandle::shutdown`])
@@ -5107,7 +5079,7 @@ impl WithErrorSyntaxHandleInResultResponder {
         >>(
             result.map(|h| (h,)),
             self.tx_id,
-            self.ordinal,
+            0x13092c5b835b0cbf,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -5490,7 +5462,6 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                         responder: WithProtocolEndsClientEndsResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5510,7 +5481,6 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                         responder: WithProtocolEndsServerEndsResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5527,7 +5497,6 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                         responder: WithProtocolEndsStructContainingEndsResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -5637,7 +5606,6 @@ impl WithProtocolEndsControlHandle {}
 pub struct WithProtocolEndsClientEndsResponder {
     control_handle: std::mem::ManuallyDrop<WithProtocolEndsControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithProtocolEndsControlHandle::shutdown`])
@@ -5699,7 +5667,7 @@ impl WithProtocolEndsClientEndsResponder {
         self.control_handle.inner.send::<WithProtocolEndsClientEndsResponse>(
             (out,),
             self.tx_id,
-            self.ordinal,
+            0x51780563edb15042,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -5710,7 +5678,6 @@ impl WithProtocolEndsClientEndsResponder {
 pub struct WithProtocolEndsServerEndsResponder {
     control_handle: std::mem::ManuallyDrop<WithProtocolEndsControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithProtocolEndsControlHandle::shutdown`])
@@ -5772,7 +5739,7 @@ impl WithProtocolEndsServerEndsResponder {
         self.control_handle.inner.send::<WithProtocolEndsServerEndsResponse>(
             (out,),
             self.tx_id,
-            self.ordinal,
+            0x70a02c2ba2228a33,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -5783,7 +5750,6 @@ impl WithProtocolEndsServerEndsResponder {
 pub struct WithProtocolEndsStructContainingEndsResponder {
     control_handle: std::mem::ManuallyDrop<WithProtocolEndsControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`WithProtocolEndsControlHandle::shutdown`])
@@ -5836,7 +5802,7 @@ impl WithProtocolEndsStructContainingEndsResponder {
         self.control_handle.inner.send::<WithProtocolEndsStructContainingEndsResponse>(
             (&mut out,),
             self.tx_id,
-            self.ordinal,
+            0x3893f0baad26f5d5,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

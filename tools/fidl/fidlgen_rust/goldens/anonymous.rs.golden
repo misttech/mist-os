@@ -644,7 +644,6 @@ impl futures::Stream for SomeProtocolRequestStream {
                         responder: SomeProtocolSomeMethodResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -717,7 +716,6 @@ impl SomeProtocolControlHandle {}
 pub struct SomeProtocolSomeMethodResponder {
     control_handle: std::mem::ManuallyDrop<SomeProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`SomeProtocolControlHandle::shutdown`])
@@ -782,7 +780,7 @@ impl SomeProtocolSomeMethodResponder {
         >>(
             result.map(|bits_member| (bits_member,)),
             self.tx_id,
-            self.ordinal,
+            0x22ea52ec7a5146d8,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

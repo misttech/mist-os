@@ -262,7 +262,6 @@ impl futures::Stream for TopRequestStream {
                         responder: TopGetFooResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -328,7 +327,6 @@ impl TopControlHandle {}
 pub struct TopGetFooResponder {
     control_handle: std::mem::ManuallyDrop<TopControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`TopControlHandle::shutdown`])
@@ -384,7 +382,7 @@ impl TopGetFooResponder {
         self.control_handle.inner.send::<fidl_test_middle::MiddleGetFooResponse>(
             (foo,),
             self.tx_id,
-            self.ordinal,
+            0x401a9ffa95a4c333,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

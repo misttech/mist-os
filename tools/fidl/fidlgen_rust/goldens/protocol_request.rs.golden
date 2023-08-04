@@ -640,7 +640,6 @@ impl futures::Stream for ParentRequestStream {
                         responder: ParentGetChildResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -657,7 +656,6 @@ impl futures::Stream for ParentRequestStream {
                         responder: ParentGetChildRequestResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -792,7 +790,6 @@ impl ParentControlHandle {}
 pub struct ParentGetChildResponder {
     control_handle: std::mem::ManuallyDrop<ParentControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ParentControlHandle::shutdown`])
@@ -848,7 +845,7 @@ impl ParentGetChildResponder {
         self.control_handle.inner.send::<ParentGetChildResponse>(
             (c,),
             self.tx_id,
-            self.ordinal,
+            0xc3cd963aafc873b,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -859,7 +856,6 @@ impl ParentGetChildResponder {
 pub struct ParentGetChildRequestResponder {
     control_handle: std::mem::ManuallyDrop<ParentControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ParentControlHandle::shutdown`])
@@ -915,7 +911,7 @@ impl ParentGetChildRequestResponder {
         self.control_handle.inner.send::<ParentGetChildRequestResponse>(
             (r,),
             self.tx_id,
-            self.ordinal,
+            0xf38d08d64f71c79,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

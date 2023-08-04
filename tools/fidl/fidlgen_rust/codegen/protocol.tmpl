@@ -416,7 +416,6 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                         responder: {{ $method.Responder }} {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                         {{- else }}
                         control_handle,
@@ -614,7 +613,6 @@ impl {{ $protocol.ControlHandle }} {
 pub struct {{ $method.Responder }} {
     control_handle: std::mem::ManuallyDrop<{{ $protocol.ControlHandle }}>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`{{ $protocol.ControlHandle }}::shutdown`])
@@ -688,7 +686,7 @@ impl {{ $method.Responder }} {
         self.control_handle.inner.send::<{{ $method.Response.FidlType }}>(
             {{ $method.Response.EncodeExpr }},
             self.tx_id,
-            self.ordinal,
+            {{ $method.Ordinal | printf "%#x" }},
             {{ $method.DynamicFlags }}
         )
     }

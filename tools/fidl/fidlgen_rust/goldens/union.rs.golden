@@ -1314,7 +1314,6 @@ impl futures::Stream for TestProtocolRequestStream {
                             TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
                                 tx_id: header.tx_id,
-                                ordinal: header.ordinal,
                             },
                     })
                 }
@@ -1332,7 +1331,6 @@ impl futures::Stream for TestProtocolRequestStream {
                             TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
                                 tx_id: header.tx_id,
-                                ordinal: header.ordinal,
                             },
                     })
                 }
@@ -1425,7 +1423,6 @@ impl TestProtocolControlHandle {}
 pub struct TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
     control_handle: std::mem::ManuallyDrop<TestProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`TestProtocolControlHandle::shutdown`])
@@ -1482,7 +1479,7 @@ impl TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
             .send::<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>(
                 (xu,),
                 self.tx_id,
-                self.ordinal,
+                0x5bfca9479251b9c3,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }
@@ -1493,7 +1490,6 @@ impl TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponder {
 pub struct TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
     control_handle: std::mem::ManuallyDrop<TestProtocolControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`TestProtocolControlHandle::shutdown`])
@@ -1550,7 +1546,7 @@ impl TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
             .send::<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>(
                 (xu,),
                 self.tx_id,
-                self.ordinal,
+                0x694fede3b8829ce2,
                 fidl::encoding::DynamicFlags::empty(),
             )
     }

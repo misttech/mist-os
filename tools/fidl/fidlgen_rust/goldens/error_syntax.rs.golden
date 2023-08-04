@@ -358,7 +358,6 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
                         responder: ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -373,7 +372,6 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
                         responder: ExampleUseOfErrorSyntaxCallWhichMayFailResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -462,7 +460,6 @@ impl ExampleUseOfErrorSyntaxControlHandle {}
 pub struct ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponder {
     control_handle: std::mem::ManuallyDrop<ExampleUseOfErrorSyntaxControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ExampleUseOfErrorSyntaxControlHandle::shutdown`])
@@ -518,7 +515,7 @@ impl ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponder {
         >>(
             result.map(|value| (value,)),
             self.tx_id,
-            self.ordinal,
+            0x3179cf8f46814221,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
@@ -529,7 +526,6 @@ impl ExampleUseOfErrorSyntaxComposedCallWhichMayFailResponder {
 pub struct ExampleUseOfErrorSyntaxCallWhichMayFailResponder {
     control_handle: std::mem::ManuallyDrop<ExampleUseOfErrorSyntaxControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ExampleUseOfErrorSyntaxControlHandle::shutdown`])
@@ -585,7 +581,7 @@ impl ExampleUseOfErrorSyntaxCallWhichMayFailResponder {
         >>(
             result.map(|value| (value,)),
             self.tx_id,
-            self.ordinal,
+            0x3424ff83ce3004a2,
             fidl::encoding::DynamicFlags::empty(),
         )
     }

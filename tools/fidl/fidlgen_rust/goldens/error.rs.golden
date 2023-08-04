@@ -283,7 +283,6 @@ impl futures::Stream for ExampleRequestStream {
                         responder: ExampleFooResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id,
-                            ordinal: header.ordinal,
                         },
                     })
                 }
@@ -349,7 +348,6 @@ impl ExampleControlHandle {}
 pub struct ExampleFooResponder {
     control_handle: std::mem::ManuallyDrop<ExampleControlHandle>,
     tx_id: u32,
-    ordinal: u64,
 }
 
 /// Set the the channel to be shutdown (see [`ExampleControlHandle::shutdown`])
@@ -402,7 +400,7 @@ impl ExampleFooResponder {
         self.control_handle.inner.send::<fidl::encoding::ResultType<ExampleFooResponse, u32>>(
             result.map(|y| (y,)),
             self.tx_id,
-            self.ordinal,
+            0xf5f1179dc411e44,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
