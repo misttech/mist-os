@@ -568,11 +568,11 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
 
   // Since this function is used by multiple drivers with different bind rules,
   // the fragment name here must be the same as both the simple-display
-  // composite fragment defined in this directory and the PCI sysmem-fidl
+  // composite fragment defined in this directory and the PCI sysmem
   // fragment defined elsewhere.
   zx::result client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          dev, "sysmem-fidl");
+          dev, "sysmem");
   if (client.is_error()) {
     zxlogf(ERROR, "%s: could not get SYSMEM protocol: %s", name, client.status_string());
     return client.status_value();
@@ -615,7 +615,7 @@ zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uin
   // above.
   zx::result sysmem_client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          dev, "sysmem-fidl");
+          dev, "sysmem");
   if (sysmem_client.is_error()) {
     zxlogf(ERROR, "%s: could not get SYSMEM protocol: %s", name, sysmem_client.status_string());
     return sysmem_client.status_value();

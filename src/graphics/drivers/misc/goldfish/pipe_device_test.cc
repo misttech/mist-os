@@ -231,7 +231,7 @@ class PipeDeviceTest : public zxtest::Test {
     });
 
     fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
-                               "sysmem-fidl");
+                               "sysmem");
 
     auto dut = std::make_unique<PipeDevice>(fake_root_.get(), std::move(acpi_client.value()),
                                             test_loop_.dispatcher());

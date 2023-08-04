@@ -113,7 +113,7 @@ class InstanceDeviceTest : public zxtest::Test {
     ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
 
     fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
-                               "sysmem-fidl");
+                               "sysmem");
 
     dut_.emplace(pipe_device_.get(), loop_.dispatcher());
 

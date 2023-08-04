@@ -867,7 +867,7 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   zx::result sysmem_client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          parent, "sysmem-fidl");
+          parent, "sysmem");
   if (sysmem_client.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client.status_string());
     return sysmem_client.status_value();

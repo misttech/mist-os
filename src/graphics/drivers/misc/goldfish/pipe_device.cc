@@ -366,7 +366,7 @@ int PipeDevice::IrqHandler() {
 
 zx_status_t PipeDevice::ConnectToSysmem() {
   zx::result client =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem-fidl");
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
   if (client.is_error()) {
     return client.status_value();
   }

@@ -32,19 +32,11 @@ zx_status_t AddLegacyComposite(zx_device_t* pci_dev_parent, const char* composit
   // clang-format on
 
   const zx_bind_inst_t kSysmemMatch[] = {
-      BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_SYSMEM),
+      BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
   };
 
   const device_fragment_part_t kSysmemFragment[] = {
       {std::size(kSysmemMatch), kSysmemMatch},
-  };
-
-  const zx_bind_inst_t kSysmemFidlMatch[] = {
-      BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
-  };
-
-  const device_fragment_part_t kSysmemFidlFragment[] = {
-      {std::size(kSysmemFidlMatch), kSysmemFidlMatch},
   };
 
   const zx_bind_inst_t kPciFragmentMatch[] = {
@@ -78,7 +70,6 @@ zx_status_t AddLegacyComposite(zx_device_t* pci_dev_parent, const char* composit
   const device_fragment_t kFragments[] = {
       {"pci", std::size(kPciFragment), kPciFragment},
       {"sysmem", std::size(kSysmemFragment), kSysmemFragment},
-      {"sysmem-fidl", std::size(kSysmemFidlFragment), kSysmemFidlFragment},
       {"acpi", std::size(kAcpiFragment), kAcpiFragment},
   };
 
@@ -102,15 +93,6 @@ ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {
   };
 
   const device_bind_prop_t kSysmemProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
-  };
-
-  const ddk::BindRule kSysmemFidlRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
-  };
-
-  const device_bind_prop_t kSysmemFidlProperties[] = {
       ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
   };
@@ -153,7 +135,6 @@ ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {
   };
 
   auto composite_node_spec = ddk::CompositeNodeSpec(kSysmemRules, kSysmemProperties)
-                                 .AddParentSpec(kSysmemFidlRules, kSysmemFidlProperties)
                                  .AddParentSpec(kPciRules, kPciProperties);
   if (info.has_acpi) {
     composite_node_spec.AddParentSpec(kAcpiRules, kAcpiProperties);

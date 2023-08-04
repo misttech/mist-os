@@ -17,10 +17,6 @@ primary node "pci" {
 }
 
 node "sysmem" {
-    fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
-}
-
-node "sysmem-fidl" {
     fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 

@@ -115,7 +115,7 @@ class BindingTest : public testing::Test {
       ASSERT_EQ(ZX_OK, infra->outgoing_sysmem.Serve(std::move(server)).status_value());
     });
     root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
-                          std::move(outgoing_endpoints->client), "sysmem-fidl");
+                          std::move(outgoing_endpoints->client), "sysmem");
   }
 
   void InitCanvas() {

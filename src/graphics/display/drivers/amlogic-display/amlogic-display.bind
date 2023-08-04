@@ -44,7 +44,7 @@ optional node "gpio-hdmi-hotplug-detect" {
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
 }
 
-node "sysmem-fidl" {
+node "sysmem" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 

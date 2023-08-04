@@ -749,7 +749,7 @@ zx_status_t GpuDevice::Init() {
   zxlogf(TRACE, "Init()");
 
   zx::result client =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem-fidl");
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
   if (client.is_error()) {
     zxlogf(ERROR, "Could not get Display SYSMEM protocol: %s", client.status_string());
     return client.status_value();

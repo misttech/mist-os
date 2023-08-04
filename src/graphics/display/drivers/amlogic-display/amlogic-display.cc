@@ -1154,7 +1154,7 @@ zx_status_t AmlogicDisplay::Bind() {
 
   zx::result sysmem_client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          parent_, "sysmem-fidl");
+          parent_, "sysmem");
   if (sysmem_client.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client.status_string());
     return sysmem_client.status_value();

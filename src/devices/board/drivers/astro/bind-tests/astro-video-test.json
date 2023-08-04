@@ -16,7 +16,7 @@
         ]
     },
     {
-        "node": "sysmem-fidl",
+        "node": "sysmem",
         "tests": [
             {
                 "name": "Match",

@@ -271,7 +271,7 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
     ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
 
     parent_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
-                            "sysmem-fidl");
+                            "sysmem");
 
     service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
         fuchsia_hardware_pci::Service::InstanceHandler(
