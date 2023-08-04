@@ -281,19 +281,6 @@ pub struct LogCommand {
     /// May be repeated.
     #[argh(option, from_str_fn(log_interest_selector))]
     pub select: Vec<LogInterestSelector>,
-
-    /// if provided, overrides the default log spam list path that's optionally
-    /// specified in FFX config under the "log_cmd.spam_filepath" key.
-    #[argh(option)]
-    pub spam_list_path: Option<String>,
-
-    /// if set, disable log spam filtering
-    #[argh(switch)]
-    pub disable_spam_filter: bool,
-
-    /// if set and spam filter is enabled, spams will be displayed and highlighted
-    #[argh(switch)]
-    pub enable_spam_highlight: bool,
     /// filters by pid
     #[argh(option)]
     pub pid: Option<u64>,
@@ -325,9 +312,6 @@ impl Default for LogCommand {
             sub_command: None,
             select: vec![],
             show_full_moniker: false,
-            spam_list_path: None,
-            disable_spam_filter: false,
-            enable_spam_highlight: false,
             pid: None,
             tid: None,
         }
