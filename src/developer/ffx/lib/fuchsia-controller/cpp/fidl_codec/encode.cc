@@ -9,8 +9,8 @@
 
 #include "mod.h"
 #include "object_converter.h"
-#include "py_wrapper.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 #include "src/lib/fidl_codec/encoder.h"
 #include "src/lib/fidl_codec/wire_types.h"
 

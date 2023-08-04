@@ -9,8 +9,8 @@
 #include <iostream>
 #include <string>
 
-#include "py_wrapper.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 #include "src/lib/fidl_codec/printer.h"
 #include "src/lib/fidl_codec/visitor.h"
 

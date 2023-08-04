@@ -9,10 +9,10 @@
 #include <iostream>
 
 #include "mod.h"
-#include "py_wrapper.h"
 #include "pyerrors.h"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 namespace ir {
 
