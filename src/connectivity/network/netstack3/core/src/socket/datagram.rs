@@ -51,6 +51,12 @@ pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 /// Storage of state for all datagram sockets.
 pub(crate) type SocketsState<I, D, S> = IdMap<SocketState<I, D, S>>;
 
+impl<I: IpExt, NewIp: IpExt, D: device::WeakId, S: DatagramSocketSpec> GenericOverIp<NewIp>
+    for SocketsState<I, D, S>
+{
+    type Type = SocketsState<NewIp, D, S>;
+}
+
 pub(crate) trait IpExt: crate::ip::IpExt + DualStackIpExt {}
 impl<I: crate::ip::IpExt + DualStackIpExt> IpExt for I {}
 
@@ -348,6 +354,12 @@ pub(crate) trait DatagramStateContext<I: IpExt, C, S: DatagramSocketSpec>:
         cb: F,
     ) -> O;
 
+    /// Calls the function with access to a [`DatagramBoundStateContext`].
+    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
+
     // TODO(https://fxbug.dev/21198): remove default impls.
     fn with_sockets<
         O,
@@ -453,8 +465,10 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
     ) -> O;
 
     /// Calls the function with only the inner context.
-    fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(&mut self, cb: F)
-        -> O;
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
 }
 
 pub(crate) trait DatagramStateNonSyncContext<I: Ip, S>: RngContext {}
@@ -626,7 +640,7 @@ where
         &mut self,
         cb: F,
     ) -> O {
-        Self::without_bound_sockets(self, cb)
+        Self::with_transport_context(self, cb)
     }
 }
 
@@ -2358,6 +2372,14 @@ mod test {
             let Self { outer, inner } = self;
             cb(inner, outer)
         }
+
+        fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let Self { outer: _, inner } = self;
+            cb(inner)
+        }
     }
 
     impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
@@ -2405,7 +2427,7 @@ mod test {
             cb(inner, outer.as_mut(), &mut ())
         }
 
-        fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
+        fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
             &mut self,
             cb: F,
         ) -> O {

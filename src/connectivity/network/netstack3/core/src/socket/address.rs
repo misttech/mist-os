@@ -8,7 +8,7 @@ use core::num::NonZeroU16;
 
 use derivative::Derivative;
 use net_types::{
-    ip::{Ip, IpAddress},
+    ip::{GenericOverIp, Ip, IpAddress},
     SpecifiedAddr,
 };
 
@@ -38,7 +38,7 @@ pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
 }
 
 /// The address of a connected socket.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 pub(crate) struct ConnAddr<A: IpAddress, D, LI, RI> {
     pub(crate) ip: ConnIpAddr<A, LI, RI>,
     pub(crate) device: Option<D>,

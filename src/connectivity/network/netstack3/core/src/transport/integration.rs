@@ -116,6 +116,13 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4
         cb(&mut locked, &mut socket_state)
     }
 
+    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.cast_locked())
+    }
+
     fn should_send_port_unreachable(&mut self) -> bool {
         self.cast_with(|s| &s.state.transport.udpv4.send_port_unreachable).copied()
     }
@@ -150,7 +157,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
         cb(&mut locked, &mut bound_sockets)
     }
 
-    fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -190,6 +197,13 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6
         cb(&mut locked, &mut socket_state)
     }
 
+    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.cast_locked())
+    }
+
     fn should_send_port_unreachable(&mut self) -> bool {
         self.cast_with(|s| &s.state.transport.udpv6.send_port_unreachable).copied()
     }
@@ -224,7 +238,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv6>>>
         cb(&mut locked, &mut bound_sockets)
     }
 
-    fn without_bound_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
