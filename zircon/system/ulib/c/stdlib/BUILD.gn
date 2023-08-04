@@ -22,4 +22,25 @@ llvm_libc_source_set("stdlib") {
     "strtoull",
     "qsort",
   ]
+
+  deps = [ ":abort" ]
+}
+
+llvm_libc_source_set("abort") {
+  functions = [ "abort" ]
+  os_functions = functions
+  if (is_fuchsia) {
+    local_deps = [
+      "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/zircon-internal",
+    ]
+  }
+}
+
+# This provides an archive library of the universally safe stdlib functions.
+# When built outside the "user.libc" environment, these always define only
+# hidden-visibility symbols and should be safe in any build environment.
+static_library("hermetic") {
+  complete_static_lib = true
+  deps = [ ":stdlib" ]
 }

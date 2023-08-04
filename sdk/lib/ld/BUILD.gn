@@ -131,8 +131,8 @@ static_library("standalone") {
   sources = [ "standalone-assert.cc" ]
   deps = [
     "//zircon/system/public",
+    "//zircon/system/ulib/c/stdlib:hermetic",
     "//zircon/system/ulib/c/string:hermetic",
-    "//zircon/third_party/ulib/musl/src/exit:abort",
   ]
 
   public_configs = [ ":standalone.config" ]
