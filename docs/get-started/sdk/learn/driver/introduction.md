@@ -40,7 +40,7 @@ Note: For more details on the driver framework, see the
 
 *   A configured [Fuchsia SDK environment][driver-get-started]
 *   [Emulator product bundle][driver-product-bundle]
-    for `workstation_eng.qemu-x64`
+    for `core.x64`
 
 ## Before you begin
 

@@ -9,10 +9,7 @@ ffx emu stop --all
 Start a new instance of the Fuchsia emulator with Driver Framework v2 enabled:
 
 ```posix-terminal
-ffx emu start workstation_eng.qemu-x64 --headless \
-  --kernel-args "driver_manager.use_driver_framework_v2=true" \
-  --kernel-args "driver_manager.root-driver=fuchsia-boot:///#meta/platform-bus.cm" \
-  --kernel-args "devmgr.enable-ephemeral=true"
+ffx emu start core.x64 --headless
 ```
 
 Note: Driver Framework v2 is not enabled by default. The `--kernel-args` options
