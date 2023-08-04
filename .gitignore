@@ -151,6 +151,8 @@ tables_generator_tests_*.txt
 /third_party/github.com/google/cppdap/src
 !/third_party/pyjson5
 /third_party/pyjson5/src
+!/third_party/chre
+/third_party/chre/src
 
 /tmp/
 /vendor/
