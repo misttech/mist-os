@@ -70,6 +70,7 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
 
   DEF_BIT(4, video_input_enabled);
 
+  // Values for the `input_source_selection` field.
   enum class InputSource : uint32_t {
     kNoInput = 0,
     kMpegFromDram = 1,
@@ -78,9 +79,23 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
     kReservedForTvDecoder = 4,
     kReservedForHdmiRx = 5,
     kDigitalVideoInput = 6,
-    kVideoInputUnitInternalLoopback = 7,
+
+    // Source selected by `WritebackMuxControl`.
+    //
+    // This source is documented as "Internal loopback from VIU" on A311D,
+    // S905D2, and T931. Experiments on VIM3 (A311D), Astro (S905D2) and
+    // Sherlock (T931) confirmed that the behavior actually matches S905D3.
+    kWritebackMux0 = 7,
+
     kReservedForMipiCsi2 = 8,
-    kReservedForIsp = 9,
+
+    // Source selected by `WritebackMuxControl`.
+    //
+    // This source is documented as "Reserved (ISP)" on A311D, S905D2, and T931.
+    // Experiments on VIM3 (A311D), Astro (S905D2) and Sherlock (T931) confirmed
+    // that the behavior actually matches S905D3.
+    kWritebackMux1 = 9,
+
     kSecondBt656 = 10,
   };
 
@@ -97,9 +112,9 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
       case InputSource::kReservedForTvDecoder:
       case InputSource::kReservedForHdmiRx:
       case InputSource::kDigitalVideoInput:
-      case InputSource::kVideoInputUnitInternalLoopback:
+      case InputSource::kWritebackMux0:
       case InputSource::kReservedForMipiCsi2:
-      case InputSource::kReservedForIsp:
+      case InputSource::kWritebackMux1:
       case InputSource::kSecondBt656:
         return set_input_source_selection(input_source);
       default:
@@ -119,9 +134,9 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
       case InputSource::kReservedForTvDecoder:
       case InputSource::kReservedForHdmiRx:
       case InputSource::kDigitalVideoInput:
-      case InputSource::kVideoInputUnitInternalLoopback:
+      case InputSource::kWritebackMux0:
       case InputSource::kReservedForMipiCsi2:
-      case InputSource::kReservedForIsp:
+      case InputSource::kWritebackMux1:
       case InputSource::kSecondBt656:
         return input_source;
       default:

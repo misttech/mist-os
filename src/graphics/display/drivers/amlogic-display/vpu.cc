@@ -431,8 +431,7 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
   VideoInputCommandControl::Get(kVideoInputModuleId)
       .ReadFrom(&(*vpu_mmio_))
       .set_hold_lines(0)
-      .set_input_source_selection(
-          VideoInputCommandControl::InputSource::kVideoInputUnitInternalLoopback)
+      .set_input_source_selection(VideoInputCommandControl::InputSource::kWritebackMux0)
       .WriteTo(&(*vpu_mmio_));
   VdinLFifoCtrlReg::Get().FromValue(0).set_fifo_buf_size(0x780).WriteTo(&(*vpu_mmio_));
 
