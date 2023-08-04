@@ -189,7 +189,16 @@ before commands are run for any package.
     run = DryRun if args.dry_run else subprocess.check_call
 
     run(cmd)
-    run([os.path.join(FUCHSIA_DIR, "integration", "update-lockfiles.sh")])
+
+    update_lockfiles = os.path.join(FUCHSIA_DIR, "integration", "update-lockfiles.sh")
+    if os.path.isfile(update_lockfiles):
+        run([update_lockfiles])
+    else:
+        sys.stderr.write("Warning: update-lockfiles.sh not found, falling back to jiri\n")
+        run([JIRI, "resolve", "-local-manifest=true"])
+
+    sys.stderr.write("\nRun this command to download the updated package:\n")
+    sys.stderr.write("$ jiri fetch-packages -local-manifest\n")
 
     return 0
 
