@@ -10,7 +10,12 @@ import("//build/test.gni")
 driver_bind_rules("virtio_input_bind") {
   rules = "virtio_input.bind"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
+  deps = [
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.hardware.sysmem",
+    "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 fuchsia_driver("virtio_input-driver") {

@@ -20,8 +20,8 @@ TEST_F(DeviceEnumerationTest, AemuX64Test) {
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 
   static const char* kAemuDevicePaths[] = {
-      "sys/platform/pt/PCI0/bus/00:01.0/00:01.0/virtio-input",
-      "sys/platform/pt/PCI0/bus/00:02.0/00:02.0/virtio-input",
+      "sys/platform/pt/PCI0/bus/00:01.0/00_01_0/virtio-input",
+      "sys/platform/pt/PCI0/bus/00:02.0/00_02_0/virtio-input",
       "sys/platform/pt/PCI0/bus/00:0b.0/00:0b.0/goldfish-address-space",
 
       // Verify goldfish pipe root device created.
