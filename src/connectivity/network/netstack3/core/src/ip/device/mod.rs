@@ -85,7 +85,7 @@ impl<DeviceId> From<IgmpTimerId<DeviceId>> for Ipv4DeviceTimerId<DeviceId> {
 impl_timer_context!(
     DeviceId,
     Ipv4DeviceTimerId<DeviceId>,
-    IgmpTimerId<DeviceId>,
+    IgmpTimerId::<DeviceId>,
     Ipv4DeviceTimerId(id),
     id
 );
@@ -170,35 +170,35 @@ impl<DeviceId> From<SlaacTimerId<DeviceId>> for Ipv6DeviceTimerId<DeviceId> {
 impl_timer_context!(
     DeviceId,
     Ipv6DeviceTimerId<DeviceId>,
-    MldDelayedReportTimerId<DeviceId>,
+    MldDelayedReportTimerId::<DeviceId>,
     Ipv6DeviceTimerId::Mld(id),
     id
 );
 impl_timer_context!(
     DeviceId,
     Ipv6DeviceTimerId<DeviceId>,
-    DadTimerId<DeviceId>,
+    DadTimerId::<DeviceId>,
     Ipv6DeviceTimerId::Dad(id),
     id
 );
 impl_timer_context!(
     DeviceId,
     Ipv6DeviceTimerId<DeviceId>,
-    RsTimerId<DeviceId>,
+    RsTimerId::<DeviceId>,
     Ipv6DeviceTimerId::Rs(id),
     id
 );
 impl_timer_context!(
     DeviceId,
     Ipv6DeviceTimerId<DeviceId>,
-    Ipv6DiscoveredRouteTimerId<DeviceId>,
+    Ipv6DiscoveredRouteTimerId::<DeviceId>,
     Ipv6DeviceTimerId::RouteDiscovery(id),
     id
 );
 impl_timer_context!(
     DeviceId,
     Ipv6DeviceTimerId<DeviceId>,
-    SlaacTimerId<DeviceId>,
+    SlaacTimerId::<DeviceId>,
     Ipv6DeviceTimerId::Slaac(id),
     id
 );

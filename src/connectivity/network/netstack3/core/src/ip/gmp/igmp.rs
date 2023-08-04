@@ -329,7 +329,7 @@ impl<DeviceId> From<GmpDelayedReportTimerId<Ipv4Addr, DeviceId>> for IgmpTimerId
 impl_timer_context!(
     DeviceId,
     IgmpTimerId<DeviceId>,
-    GmpDelayedReportTimerId<Ipv4Addr, DeviceId>,
+    GmpDelayedReportTimerId::<Ipv4Addr, DeviceId>,
     IgmpTimerId::Gmp(id),
     id
 );

@@ -740,14 +740,14 @@ pub(super) fn handle_timer<
 impl_timer_context!(
     DeviceId,
     EthernetTimerId<DeviceId>,
-    ArpTimerId<EthernetLinkDevice, DeviceId>,
+    ArpTimerId::<EthernetLinkDevice, DeviceId>,
     EthernetTimerId::Arp(id),
     id
 );
 impl_timer_context!(
     DeviceId,
     EthernetTimerId<DeviceId>,
-    NudTimerId<Ipv6, EthernetLinkDevice, DeviceId>,
+    NudTimerId::<Ipv6, EthernetLinkDevice, DeviceId>,
     EthernetTimerId::Nudv6(id),
     id
 );
