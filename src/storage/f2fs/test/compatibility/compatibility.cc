@@ -413,7 +413,7 @@ void FuchsiaOperator::Rename(std::string_view oldpath, std::string_view newpath)
 uint32_t FuchsiaOperator::MaxInlineDentrySlots() {
   Mkfs();
   MountOptions options;
-  options.SetValue(options.GetNameView(kOptInlineDentry), 1);
+  options.SetValue(MountOption::kInlineDentry, 1);
   Mount(options);
 
   auto umount = fit::defer([&] { Umount(); });
@@ -431,7 +431,7 @@ uint32_t FuchsiaOperator::MaxInlineDentrySlots() {
 uint32_t FuchsiaOperator::MaxInlineDataLength() {
   Mkfs();
   MountOptions options;
-  options.SetValue(options.GetNameView(kOptInlineData), 1);
+  options.SetValue(MountOption::kInlineData, 1);
   Mount(options);
 
   auto umount = fit::defer([&] { Umount(); });

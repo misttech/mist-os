@@ -122,7 +122,7 @@ TEST_F(InlineCompatibilityTest, InlineDentryFuchsiaToLinux) {
   {
     GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
     MountOptions options;
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 1), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 1), ZX_OK);
     GetEnclosedGuest().GetFuchsiaOperator().Mount(options);
 
     auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });
@@ -251,7 +251,7 @@ TEST_F(InlineCompatibilityTest, InlineDataFuchsiaToLinux) {
   {
     GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
     MountOptions options;
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
     GetEnclosedGuest().GetFuchsiaOperator().Mount(options);
 
     auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });
@@ -391,7 +391,7 @@ TEST_F(InlineCompatibilityTest, DataExistFlagFuchsiaToLinux) {
   {
     GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
     MountOptions options;
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineData), 1), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
     GetEnclosedGuest().GetFuchsiaOperator().Mount(options);
 
     auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });

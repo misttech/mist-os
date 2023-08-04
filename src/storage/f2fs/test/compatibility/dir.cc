@@ -281,7 +281,7 @@ TEST_F(DirCompatibilityTest, DirRenameTestFuchsiaToLinux) {
       {"/d_a0", "/d_a0_"}, {"/d_a1", "/d_c/d_a1_"}, {"/d_a/d_b/d_ab0", "/d_c/d_ab0_"}};
   {
     MountOptions options{};
-    ASSERT_EQ(options.SetValue(options.GetNameView(kOptInlineDentry), 0), ZX_OK);
+    ASSERT_EQ(options.SetValue(MountOption::kInlineDentry, 0), ZX_OK);
 
     GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
     GetEnclosedGuest().GetFuchsiaOperator().Mount(options);
