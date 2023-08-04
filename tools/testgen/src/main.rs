@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod cmd_integration_test;
+mod common;
 mod flags;
+
+mod cmd_integration_test;
 
 use anyhow::{bail, Error, Result};
 
@@ -11,7 +13,7 @@ use anyhow::{bail, Error, Result};
 async fn main() -> Result<(), Error> {
     let flags: flags::Flags = argh::from_env();
 
-    // _ignore is an `impl Drop` that sets the log level back to it's default
+    // _ignore is an `impl Drop` that sets the log level back to its default
     // value when dropped. We hold onto it to prevent that from happening until
     // the program exits, and setup logging here rather than in each subcommand.
     let _ignore = flags.setup_logging();
