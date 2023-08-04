@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1895
+From //build/config/BUILDCONFIG.gn:1898
 
 ### allowed_test_device_types
 
@@ -1182,7 +1182,7 @@ Makes clippy targets fail to build when any "deny" lints are found
 
 **Current value (from the default):** `true`
 
-From //build/rust/config.gni:61
+From //build/rust/config.gni:67
 
 ### clippy_force_warn_all
 
@@ -1192,7 +1192,7 @@ should only be used to collect stats about clippy lints in our source tree.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:58
+From //build/rust/config.gni:64
 
 ### clippy_warn_all
 
@@ -1201,7 +1201,7 @@ Note: setting lint levels in source takes precedence over this.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:53
+From //build/rust/config.gni:59
 
 ### cobalt_environment
 
@@ -3175,7 +3175,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1630
+From //build/config/BUILDCONFIG.gn:1633
 
 ### extra_vbmeta_descriptors
 
@@ -3552,7 +3552,7 @@ used for host tools.  If this is "", then a standard prebuilt is used.
 
 **Current value (from the default):** `""`
 
-From //build/toolchain/zircon/gcc.gni:15
+From //build/toolchain/zircon/gcc.gni:10
 
 ### generate_legacy_ninja_build_outputs_licenses_spdx
 
@@ -3959,7 +3959,7 @@ causes clippy targets to get included in the build by default.
 
 **Current value (from the default):** `true`
 
-From //build/rust/config.gni:65
+From //build/rust/config.gni:71
 
 ### include_internal_fonts
 
@@ -4390,7 +4390,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1435
+From //build/config/BUILDCONFIG.gn:1438
 
 ### legacy_base_driver_package_labels
 
@@ -7232,7 +7232,7 @@ ignore warnings.
 
 **Current value (from the default):** `"deny"`
 
-From //build/rust/config.gni:49
+From //build/rust/config.gni:55
 
 ### rust_incremental
 
@@ -7249,7 +7249,7 @@ Sets the default LTO type for rustc bulids.
 
 **Current value (from the default):** `""`
 
-From //build/rust/config.gni:41
+From //build/rust/config.gni:47
 
 ### rust_rbe_check
 
@@ -7343,7 +7343,7 @@ Sets the fuchsia toolchain target triple suffix (after arch)
 
 **Current value (from the default):** `"fuchsia"`
 
-From //build/rust/config.gni:44
+From //build/rust/config.gni:50
 
 ### rust_v0_symbol_mangling
 
@@ -7369,7 +7369,7 @@ This can be used to test custom Rust toolchains.
 
 **Current value (from the default):** `"//prebuilt/third_party/rust/linux-x64"`
 
-From //build/rust/config.gni:24
+From //build/rust/config.gni:19
 
 ### rustc_version_description
 
@@ -7380,7 +7380,7 @@ e.g., clang_version_description = read_file("$_rustc_lib_dir/VERSION")
 
 **Current value (from the default):** `""`
 
-From //build/rust/config.gni:38
+From //build/rust/config.gni:44
 
 ### rustc_version_string
 
@@ -7393,7 +7393,7 @@ prebuilt is used.
 
 **Current value (from the default):** `"dblnU3tEhEv7oy3yIm63PMqD3dsqu8htntNrnj3hkd0C"`
 
-From //build/rust/config.gni:32
+From //build/rust/config.gni:38
 
 ### scenic_display_frame_number
 
@@ -7595,7 +7595,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1885
+From //build/config/BUILDCONFIG.gn:1888
 
 ### select_variant_canonical
 
@@ -7605,7 +7605,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1890
+From //build/config/BUILDCONFIG.gn:1893
 
 ### select_variant_shortcuts
 
@@ -7663,7 +7663,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1676
+From //build/config/BUILDCONFIG.gn:1679
 
 ### size_checker_input
 
@@ -8117,7 +8117,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1660
+From //build/config/BUILDCONFIG.gn:1663
 
 ### universe_package_labels
 
