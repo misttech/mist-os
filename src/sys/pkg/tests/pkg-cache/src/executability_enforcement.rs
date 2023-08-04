@@ -88,7 +88,8 @@ async fn base_package_executable() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn allowlisted_dynamic_index_active_package_executable() {
+async fn allowlisted_dynamic_index_active_package_not_executable() {
+    // TODO(b/294583092) The allowlist is being deleted, it is currently not loaded.
     let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
     let system_image = SystemImageBuilder::new()
         .cache_packages(&[&pkg])
@@ -98,7 +99,7 @@ async fn allowlisted_dynamic_index_active_package_executable() {
         pkg,
         system_image,
         IsRetained::False,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::OpenFlags::RIGHT_READABLE,
     )
     .await;
 }

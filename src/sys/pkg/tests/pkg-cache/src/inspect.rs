@@ -64,13 +64,11 @@ async fn non_static_allow_list() {
     env.block_until_started().await;
 
     let hierarchy = env.inspect_hierarchy().await;
+    // TODO(b/294583092) The allowlist is being deleted, it is currently not loaded.
     assert_data_tree!(
         hierarchy,
         "root": contains {
-            "non_static_allow_list": {
-                "a-package-name": "",
-                "another-name": "",
-            },
+            "non_static_allow_list": {},
         }
     );
     env.stop().await;

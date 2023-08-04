@@ -129,9 +129,8 @@ async fn main_inner() -> Result<(), Error> {
             .context("Accessing contents of system_image package")?;
         inspector.root().record_string("system_image", system_image.hash().to_string());
 
-        let (base_packages_res, cache_packages_res, non_static_allow_list) = join!(
-            BasePackages::new(&blobfs, &system_image),
-            async {
+        let (base_packages_res, cache_packages_res) =
+            join!(BasePackages::new(&blobfs, &system_image), async {
                 let cache_packages =
                     system_image.cache_packages().await.context("reading cache_packages")?;
                 index::load_cache_packages(&mut package_index, &cache_packages, &blobfs).await;
@@ -141,9 +140,7 @@ async fn main_inner() -> Result<(), Error> {
                     cache_packages.record_lazy_inspect("cache-packages"),
                 );
                 Ok(cache_packages)
-            },
-            system_image.non_static_allow_list(),
-        );
+            });
         let base_packages = base_packages_res.context("loading base packages")?;
         let cache_packages = cache_packages_res.map_or_else(
             |e: anyhow::Error| {
@@ -154,6 +151,8 @@ async fn main_inner() -> Result<(), Error> {
         );
 
         let executability_restrictions = system_image.load_executability_restrictions();
+        // TODO(b/294583092) Delete non static allowlist code after lack of clients is verified.
+        let non_static_allow_list = system_image::NonStaticAllowList::empty();
 
         (
             Some(system_image),
