@@ -6,13 +6,18 @@ use {
     crate::{metrics::Metrics, puppet::DiffType},
     anyhow::{bail, format_err, Error},
     base64,
-    diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property as iProperty},
+    diagnostics_hierarchy::{
+        ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram,
+        Property as iProperty,
+    },
     difference,
     fidl_diagnostics_validate::{self as validate, Value},
     inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition},
     num_derive::{FromPrimitive, ToPrimitive},
+    num_traits::Zero,
     std::{
         self,
+        clone::Clone,
         collections::{HashMap, HashSet},
         convert::{From, TryInto},
     },
@@ -94,7 +99,8 @@ enum Payload {
     // JSON.
     GenericNumber(String),
     GenericArray(Vec<String>),
-    GenericHistogram(Vec<String>),
+    GenericLinearHistogram(Vec<String>),
+    GenericExponentialHistogram(Vec<String>),
 }
 
 fn to_string<T: std::fmt::Display>(v: T) -> String {
@@ -105,14 +111,47 @@ fn stringify_list<T: std::fmt::Display>(values: Vec<T>) -> Vec<String> {
     values.into_iter().map(|x| to_string(x)).collect()
 }
 
+fn stringify_linear_histogram<T: Clone + std::fmt::Display + Zero>(
+    histogram: LinearHistogram<T>,
+) -> Vec<String> {
+    let mut values = vec![T::zero(); histogram.size + 2];
+    values[0] = histogram.floor;
+    values[1] = histogram.step;
+    if let Some(indexes) = histogram.indexes {
+        for (index, count) in indexes.iter().zip(histogram.counts) {
+            values[index + 2] = count.clone();
+        }
+    } else {
+        for (index, count) in histogram.counts.iter().enumerate() {
+            values[index + 2] = count.clone();
+        }
+    }
+    stringify_list(values)
+}
+
+fn stringify_exponential_histogram<T: Clone + std::fmt::Display + Zero>(
+    histogram: ExponentialHistogram<T>,
+) -> Vec<String> {
+    let mut values = vec![T::zero(); histogram.size + 3];
+    values[0] = histogram.floor;
+    values[1] = histogram.initial_step;
+    values[2] = histogram.step_multiplier;
+    if let Some(indexes) = histogram.indexes {
+        for (index, count) in indexes.iter().zip(histogram.counts) {
+            values[index + 3] = count.clone();
+        }
+    } else {
+        for (index, count) in histogram.counts.iter().enumerate() {
+            values[index + 3] = count.clone();
+        }
+    }
+    stringify_list(values)
+}
+
 fn handle_array(values: Vec<String>, format: ArrayFormat) -> Payload {
     match format {
-        ArrayFormat::LinearHistogram => {
-            Payload::GenericHistogram(values.into_iter().skip(2).collect())
-        }
-        ArrayFormat::ExponentialHistogram => {
-            Payload::GenericHistogram(values.into_iter().skip(3).collect())
-        }
+        ArrayFormat::LinearHistogram => Payload::GenericLinearHistogram(values),
+        ArrayFormat::ExponentialHistogram => Payload::GenericExponentialHistogram(values),
         _ => Payload::GenericArray(values),
     }
 }
@@ -141,13 +180,16 @@ impl ToGeneric for Payload {
     }
 }
 
-impl<T: std::fmt::Display> ToGeneric for ArrayContent<T> {
+impl<T: std::fmt::Display + Clone + Zero> ToGeneric for ArrayContent<T> {
     fn to_generic(self) -> Payload {
         match self {
             ArrayContent::Values(values) => Payload::GenericArray(stringify_list(values)),
-            ArrayContent::Buckets(buckets) => Payload::GenericHistogram(stringify_list(
-                buckets.into_iter().map(|bucket| bucket.count).collect(),
-            )),
+            ArrayContent::LinearHistogram(histogram) => {
+                Payload::GenericLinearHistogram(stringify_linear_histogram(histogram))
+            }
+            ArrayContent::ExponentialHistogram(histogram) => {
+                Payload::GenericExponentialHistogram(stringify_exponential_histogram(histogram))
+            }
         }
     }
 }
@@ -1272,14 +1314,14 @@ mod tests {
 > > bytes: String("b64:AQI=")
 > > grandchild ->
 > > > double_a: GenericArray(["0.5", "1"])
-> > > double_eh: GenericHistogram(["1", "2", "3"])
-> > > double_lh: GenericHistogram(["1", "2", "3"])
+> > > double_eh: GenericExponentialHistogram(["0.5", "0.5", "2", "1", "2", "3"])
+> > > double_lh: GenericLinearHistogram(["0.5", "0.5", "1", "2", "3"])
 > > > int_a: GenericArray(["-1", "-2"])
-> > > int_eh: GenericHistogram(["1", "2", "3"])
-> > > int_lh: GenericHistogram(["1", "2", "3"])
+> > > int_eh: GenericExponentialHistogram(["-1", "1", "2", "1", "2", "3"])
+> > > int_lh: GenericLinearHistogram(["-1", "1", "1", "2", "3"])
 > > > uint_a: GenericArray(["1", "2"])
-> > > uint_eh: GenericHistogram(["1", "2", "3"])
-> > > uint_lh: GenericHistogram(["1", "2", "3"])"#;
+> > > uint_eh: GenericExponentialHistogram(["1", "1", "2", "1", "2", "3"])
+> > > uint_lh: GenericLinearHistogram(["1", "1", "1", "2", "3"])"#;
 
     #[fuchsia::test]
     fn test_parse_hierarchy() -> Result<(), Error> {

@@ -8,9 +8,9 @@
 
 use {
     crate::{
-        ArrayContent, ArrayFormat, Bucket, DiagnosticsHierarchy, ExponentialHistogramParams,
-        LinearHistogramParams, Property, EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS,
-        LINEAR_HISTOGRAM_EXTRA_SLOTS,
+        ArrayContent, ArrayFormat, DiagnosticsHierarchy, ExponentialHistogram,
+        ExponentialHistogramParams, LinearHistogram, LinearHistogramParams, Property,
+        EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS, LINEAR_HISTOGRAM_EXTRA_SLOTS,
     },
     anyhow::{bail, format_err, Error},
     difference::{Changeset, Difference},
@@ -453,7 +453,7 @@ macro_rules! impl_property_assertion {
 macro_rules! impl_array_properties_assertion {
     ($prop_variant:ident, $($ty:ty),+) => {
         $(
-            /// Asserts primitive arrays
+            /// Asserts plain numeric arrays
             impl<K> PropertyAssertion<K> for Vec<$ty> {
                 fn run(&self, actual: &Property<K>) -> Result<(), Error> {
                     if let Property::$prop_variant(_key, value, ..) = actual {
@@ -461,8 +461,9 @@ macro_rules! impl_array_properties_assertion {
                             ArrayContent::Values(values) => eq_or_bail!(self, values),
                             _ => {
                                 return Err(format_err!(
-                                    "expected a {} array, got a histogram",
-                                    stringify!($prop_variant)
+                                    "expected a plain {} array, got a {}",
+                                    stringify!($prop_variant),
+                                    actual.discriminant_name()
                                 ));
                             }
                         }
@@ -474,16 +475,41 @@ macro_rules! impl_array_properties_assertion {
                 }
             }
 
-            /// Asserts an array of buckets
-            impl<K> PropertyAssertion<K> for Vec<Bucket<$ty>> {
+            impl<K> PropertyAssertion<K> for LinearHistogram<$ty> {
                 fn run(&self, actual: &Property<K>) -> Result<(), Error> {
                     if let Property::$prop_variant(_key, value, ..) = actual {
                         match &value {
-                            ArrayContent::Buckets(buckets) => eq_or_bail!(self, buckets),
+                            ArrayContent::LinearHistogram(histogram) => {
+                                eq_or_bail!(self, histogram)
+                            }
                             _ => {
                                 return Err(format_err!(
-                                    "expected a {} array, got a histogram",
-                                    stringify!($prop_variant)
+                                    "expected a linear {} histogram, got a {}",
+                                    stringify!($prop_variant),
+                                    actual.discriminant_name()
+                                ));
+                            }
+                        }
+                    } else {
+                        return Err(format_err!("expected {}, found {}",
+                            stringify!($prop_variant), actual.discriminant_name()));
+                    }
+                    Ok(())
+                }
+            }
+
+            impl<K> PropertyAssertion<K> for ExponentialHistogram<$ty> {
+                fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+                    if let Property::$prop_variant(_key, value, ..) = actual {
+                        match &value {
+                            ArrayContent::ExponentialHistogram(histogram) => {
+                                eq_or_bail!(self, histogram)
+                            }
+                            _ => {
+                                return Err(format_err!(
+                                    "expected an exponential {} histogram, got a {}",
+                                    stringify!($prop_variant),
+                                    actual.discriminant_name()
                                 ));
                             }
                         }
@@ -662,7 +688,7 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::Bucket};
+    use super::*;
 
     #[fuchsia::test]
     fn test_assert_json_diff() {
@@ -899,6 +925,9 @@ mod tests {
 
     #[fuchsia::test]
     fn test_histograms() {
+        let mut condensed_int_histogram =
+            ArrayContent::new(vec![6, 7, 0, 9, 0], ArrayFormat::LinearHistogram).unwrap();
+        condensed_int_histogram.condense_histogram();
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -910,6 +939,7 @@ mod tests {
                     "@linear-ints".to_string(),
                     ArrayContent::new(vec![6, 7, 8, 9, 10], ArrayFormat::LinearHistogram).unwrap(),
                 ),
+                Property::IntArray("@linear-sparse-ints".to_string(), condensed_int_histogram),
                 Property::DoubleArray(
                     "@linear-doubles".to_string(),
                     ArrayContent::new(vec![1.0, 2.0, 4.0, 5.0, 6.0], ArrayFormat::LinearHistogram)
@@ -936,45 +966,62 @@ mod tests {
             ],
             vec![],
         );
-        let mut linear_assertion = HistogramAssertion::linear(LinearHistogramParams {
+        let mut linear_uint_assertion = HistogramAssertion::linear(LinearHistogramParams {
             floor: 1u64,
             step_size: 2,
             buckets: 1,
         });
-        linear_assertion.insert_values(vec![0, 0, 0, 2, 2, 2, 2, 4, 4, 4, 4, 4]);
-        let mut exponential_assertion =
+        linear_uint_assertion.insert_values(vec![0, 0, 0, 2, 2, 2, 2, 4, 4, 4, 4, 4]);
+        let mut exponential_double_assertion =
             HistogramAssertion::exponential(ExponentialHistogramParams {
                 floor: 1.0,
                 initial_step: 2.0,
                 step_multiplier: 3.0,
                 buckets: 1,
             });
-        exponential_assertion.insert_values(vec![
+        exponential_double_assertion.insert_values(vec![
             -3.1, -2.2, -1.3, 0.0, 1.1, 1.2, 2.5, 2.8, 2.0, 3.1, 4.2, 5.3, 6.4, 7.5, 8.6,
         ]);
         assert_data_tree!(diagnostics_hierarchy, key: {
-            "@linear-uints": linear_assertion,
-            "@linear-ints": vec![
-                Bucket { floor: i64::MIN, ceiling: 6, count: 8 },
-                Bucket { floor: 6, ceiling: 13, count: 9 },
-                Bucket { floor: 13, ceiling: i64::MAX, count: 10 }
-            ],
-            "@linear-doubles": vec![
-                Bucket { floor: f64::MIN, ceiling: 1.0, count: 4.0 },
-                Bucket { floor: 1.0, ceiling: 3.0, count: 5.0 },
-                Bucket { floor: 3.0, ceiling: f64::MAX, count: 6.0 }
-            ],
-            "@exp-uints": vec![
-                Bucket { floor: 0, ceiling: 2, count: 8 },
-                Bucket { floor: 2, ceiling: 6, count: 10 },
-                Bucket { floor: 6, ceiling: u64::MAX, count: 12 }
-            ],
-            "@exp-ints": vec![
-                Bucket { floor: i64::MIN, ceiling: 1, count: 7 },
-                Bucket { floor: 1, ceiling: 4, count: 9 },
-                Bucket { floor: 4, ceiling: i64::MAX, count: 11 }
-            ],
-            "@exp-doubles": exponential_assertion,
+            "@linear-uints": linear_uint_assertion,
+            "@linear-ints": LinearHistogram {
+                floor: 6i64,
+                step: 7,
+                counts: vec![8, 9, 10],
+                indexes: None,
+                size: 3
+            },
+            "@linear-sparse-ints": LinearHistogram {
+                floor: 6i64,
+                step: 7,
+                counts: vec![9],
+                indexes: Some(vec![1]),
+                size: 3
+            },
+            "@linear-doubles": LinearHistogram {
+                floor: 1.0,
+                step: 2.0,
+                counts: vec![4.0, 5.0, 6.0],
+                indexes: None,
+                size: 3
+            },
+            "@exp-uints": ExponentialHistogram {
+                floor: 2u64,
+                initial_step: 4,
+                step_multiplier: 6,
+                counts: vec![8, 10, 12],
+                indexes: None,
+                size: 3
+            },
+            "@exp-ints": ExponentialHistogram {
+                floor: 1i64,
+                initial_step: 3,
+                step_multiplier: 5,
+                counts: vec![7,9,11],
+                indexes: None,
+                size: 3
+            },
+            "@exp-doubles": exponential_double_assertion,
         });
     }
 

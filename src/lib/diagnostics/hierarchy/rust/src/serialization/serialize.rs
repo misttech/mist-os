@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{ArrayContent, Bucket, DiagnosticsHierarchy, Property},
+    crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
     base64,
     serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer},
 };
@@ -21,7 +21,7 @@ where
 }
 
 pub struct SerializableHierarchyFields<'a, Key> {
-    pub(in crate) hierarchy: &'a DiagnosticsHierarchy<Key>,
+    pub(crate) hierarchy: &'a DiagnosticsHierarchy<Key>,
 }
 
 impl<'a, Key> Serialize for SerializableHierarchyFields<'a, Key>
@@ -73,16 +73,83 @@ where
     }
 }
 
+// A condensed histogram has a vec of counts and a vec of corresponding indexes.
+// For serialization, histograms should be condensed if fewer than 50% of the
+// counts are nonzero. We don't worry about decondensing histograms with more
+// than 50% nonzero counts - they'd still be correct, but we shouldn't get them.
+pub(crate) fn maybe_condense_histogram<T>(
+    counts: &[T],
+    indexes: &Option<Vec<usize>>,
+) -> Option<(Vec<T>, Vec<usize>)>
+where
+    T: PartialEq + num_traits::Zero + Copy,
+{
+    if matches!(indexes, Some(_)) {
+        return None;
+    }
+    let mut condensed_counts = vec![];
+    let mut indexes = vec![];
+    let cutoff_len = counts.len() / 2;
+    for (index, count) in counts.iter().enumerate() {
+        if *count != T::zero() {
+            indexes.push(index);
+            condensed_counts.push(*count);
+            if condensed_counts.len() > cutoff_len {
+                return None;
+            }
+        }
+    }
+    Some((condensed_counts, indexes))
+}
+
 macro_rules! impl_serialize_for_array_value {
     ($($type:ty,)*) => {
         $(
             impl Serialize for ArrayContent<$type> {
                 fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                     match self {
-                        ArrayContent::Buckets(buckets) => {
-                            let mut s = serializer.serialize_map(Some(1))?;
-                            s.serialize_entry("buckets", &buckets)?;
-                            s.end()
+                        ArrayContent::LinearHistogram(LinearHistogram {
+                            floor,
+                            step,
+                            counts,
+                            indexes,
+                            size,
+                        }) => {
+                            let condensation = maybe_condense_histogram(counts, indexes);
+                            let (counts, indexes) = match condensation {
+                                None => (counts.to_vec(), indexes.as_ref().map(|v| v.to_vec())),
+                                Some((cc, ci)) => (cc, Some(ci)),
+                            };
+                            LinearHistogram {
+                                floor: *floor,
+                                step: *step,
+                                counts,
+                                indexes,
+                                size: *size,
+                            }.serialize(serializer)
+                        }
+                        ArrayContent::ExponentialHistogram(ExponentialHistogram {
+                            floor,
+                            initial_step,
+                            step_multiplier,
+                            counts,
+                            indexes,
+                            size,
+                        }) => {
+                            let condensation = maybe_condense_histogram(counts, indexes);
+                            let (counts, indexes) = match condensation {
+                                None => (counts.to_vec(), indexes.as_ref().map(|v| v.to_vec())),
+                                Some((cc, ci)) => (cc, Some(ci)),
+                            };
+                            ExponentialHistogram {
+                                floor: *floor,
+                                size: *size,
+                                initial_step: *initial_step,
+                                step_multiplier: *step_multiplier,
+                                counts,
+                                indexes,
+                            }
+                            .serialize(serializer)
                         }
                         ArrayContent::Values(values) => {
                             let mut s = serializer.serialize_seq(Some(values.len()))?;
@@ -98,41 +165,7 @@ macro_rules! impl_serialize_for_array_value {
     }
 }
 
-macro_rules! impl_serialize_for_array_bucket {
-    ($($type:ty,)*) => {
-        $(
-            impl Serialize for Bucket<$type> {
-                fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                    let mut s = serializer.serialize_map(Some(3))?;
-                    s.serialize_entry("count", &self.count)?;
-                    s.serialize_entry("floor", &self.floor)?;
-                    s.serialize_entry("ceiling", &self.ceiling)?;
-                    s.end()
-                }
-            }
-        )*
-    }
-}
-
-impl<'a> Serialize for Bucket<f64> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut s = serializer.serialize_map(Some(3))?;
-        let parts = [("count", self.count), ("floor", self.floor), ("ceiling", self.ceiling)];
-        for (entry_key, value) in parts.iter() {
-            if *value == std::f64::MAX || *value == std::f64::INFINITY || *value == std::f64::MAX {
-                s.serialize_entry(entry_key, &std::f64::MAX)?;
-            } else if *value == std::f64::MIN || *value == std::f64::NEG_INFINITY {
-                s.serialize_entry(entry_key, &std::f64::MIN)?;
-            } else {
-                s.serialize_entry(entry_key, value)?;
-            }
-        }
-        s.end()
-    }
-}
-
 impl_serialize_for_array_value![i64, u64, f64,];
-impl_serialize_for_array_bucket![i64, u64,];
 
 #[cfg(test)]
 mod tests {
@@ -147,7 +180,9 @@ mod tests {
         hierarchy.sort();
         let expected = expected_json();
         let result = serde_json::to_string_pretty(&hierarchy).expect("failed to serialize");
-        assert_eq!(result, expected);
+        let parsed_json_expected: serde_json::Value = serde_json::from_str(&expected).unwrap();
+        let parsed_json_result: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed_json_result, parsed_json_expected);
     }
 
     #[fuchsia::test]
@@ -212,6 +247,11 @@ mod tests {
                             ArrayContent::new(vec![0, 2, 4, 1, 3], ArrayFormat::LinearHistogram)
                                 .unwrap(),
                         ),
+                        Property::IntArray(
+                            "condensed_histogram".to_string(),
+                            ArrayContent::new(vec![0, 2, 0, 1, 0], ArrayFormat::LinearHistogram)
+                                .unwrap(),
+                        ),
                     ],
                     vec![],
                 ),
@@ -238,43 +278,33 @@ mod tests {
       "bytes": "b64:BfGr",
       "double": 2.5,
       "histogram": {
-        "buckets": [
-          {
-            "count": 1.0,
-            "floor": -1.7976931348623157e308,
-            "ceiling": 0.0
-          },
-          {
-            "count": 3.0,
-            "floor": 0.0,
-            "ceiling": 2.0
-          },
-          {
-            "count": 4.0,
-            "floor": 2.0,
-            "ceiling": 1.7976931348623157e308
-          }
-        ]
+        "size": 3,
+        "floor": 0.0,
+        "initial_step": 2.0,
+        "step_multiplier": 4.0,
+        "counts": [1.0, 3.0, 4.0]
       }
     },
     "b": {
       "histogram": {
-        "buckets": [
-          {
-            "count": 4,
-            "floor": -9223372036854775808,
-            "ceiling": 0
-          },
-          {
-            "count": 1,
-            "floor": 0,
-            "ceiling": 2
-          },
-          {
-            "count": 3,
-            "floor": 2,
-            "ceiling": 9223372036854775807
-          }
+        "floor": 0,
+        "step": 2,
+        "counts": [
+          4,
+          1,
+          3
+        ],
+        "size": 3
+      },
+    "condensed_histogram": {
+        "size": 3,
+        "floor": 0,
+        "step": 2,
+        "counts": [
+          1
+        ],
+        "indexes": [
+          1
         ]
       },
       "int": -2,

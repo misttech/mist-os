@@ -8,12 +8,30 @@ realm_builder\:CHILD_NAME/test:
       array:0xd = [1, 10, -3]
       array:0xe = [1, 10, 2]
       array:0xf = [0.25, 1.25, -0.75]
-      histogram:0x10 = [[<min>,-10)=10, [-10,-5)=5, [-5,0)=5, [0,5)=5, [5,<max>)=15]
-      histogram:0x11 = [[0,5)=5, [5,10)=5, [10,15)=5, [15,20)=5, [20,<max>)=20]
-      histogram:0x12 = [[-inf,0)=11, [0,0.5)=5, [0.5,1)=5, [1,1.5)=4, [1.5,inf)=15]
-      histogram:0x13 = [[<min>,-10)=10, [-10,-5)=5, [-5,0)=5, [0,10)=10, [10,<max>)=10]
-      histogram:0x14 = [[0,0)=0, [0,1)=1, [1,2)=1, [2,4)=2, [4,<max>)=36]
-      histogram:0x15 = [[-inf,0)=11, [0,1.25)=12, [1.25,3.75)=17, [3.75,11.25)=0, [11.25,inf)=0]
+      histogram:0x10:
+        type = linear
+        size = 5
+        buckets = [[<min>,-10)=10, [-10,-5)=5, [-5,0)=5, [0,5)=5, [5,<max>)=15]
+      histogram:0x11:
+        type = linear
+        size = 5
+        buckets = [[<min>,5)=5, [5,10)=5, [10,15)=5, [15,20)=5, [20,<max>)=20]
+      histogram:0x12:
+        type = linear
+        size = 5
+        buckets = [[-inf,0)=11, [0,0.5)=5, [0.5,1)=5, [1,1.5)=4, [1.5,inf)=15]
+      histogram:0x13:
+        type = exponential
+        size = 5
+        buckets = [[<min>,-10)=10, [-10,-5)=5, [-5,0)=5, [0,10)=10, [10,<max>)=10]
+      histogram:0x14:
+        type = exponential
+        size = 5
+        buckets = [[0,1)=1, [1,2)=1, [2,4)=2, [4,<max>)=36]
+      histogram:0x15:
+        type = exponential
+        size = 7
+        buckets = [[-inf,0)=11, [0,1.25)=12, [1.25,3.75)=17]
       table:0x0:
         binary_data = Binary:
 0000000020 00 11 12 05                                   ....
@@ -57,4 +75,3 @@ realm_builder\:CHILD_NAME/test:
             double_value = 100.000000
             name = (2,2)
             value = 4
-        

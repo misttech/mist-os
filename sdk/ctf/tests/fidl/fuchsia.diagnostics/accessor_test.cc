@@ -63,180 +63,75 @@ const char EXPECTED_DATA_BUCKETS_HISTOGRAMS[] = R"JSON({
             },
             "exponential_histograms": {
                 "double": {
-                    "buckets": [
-                        {
-                            "ceiling": 1.5,
-                            "count": 0.0,
-                            "floor": -1.7976931348623157e308
-                        },
-                        {
-                            "ceiling": 3.5,
-                            "count": 0.0,
-                            "floor": 1.5
-                        },
-                        {
-                            "ceiling": 8.5,
-                            "count": 1.0,
-                            "floor": 3.5
-                        },
-                        {
-                            "ceiling": 26.0,
-                            "count": 0.0,
-                            "floor": 8.5
-                        },
-                        {
-                            "ceiling": 1.7976931348623157e308,
-                            "count": 0.0,
-                            "floor": 26.0
-                        }
-                    ]
+                    "counts": [
+                        1.0
+                    ],
+                    "floor": 1.5,
+                    "indexes": [
+                        2
+                    ],
+                    "initial_step": 2.0,
+                    "size": 5,
+                    "step_multiplier": 3.5
                 },
                 "int": {
-                    "buckets": [
-                        {
-                            "ceiling": -10,
-                            "count": 0,
-                            "floor": -9223372036854775808
-                        },
-                        {
-                            "ceiling": -8,
-                            "count": 0,
-                            "floor": -10
-                        },
-                        {
-                            "ceiling": -4,
-                            "count": 1,
-                            "floor": -8
-                        },
-                        {
-                            "ceiling": 8,
-                            "count": 0,
-                            "floor": -4
-                        },
-                        {
-                            "ceiling": 9223372036854775807,
-                            "count": 0,
-                            "floor": 8
-                        }
-                    ]
+                    "counts": [
+                        1
+                    ],
+                    "floor": -10,
+                    "indexes": [
+                        2
+                    ],
+                    "initial_step": 2,
+                    "size": 5,
+                    "step_multiplier": 3
                 },
                 "uint": {
-                    "buckets": [
-                        {
-                            "ceiling": 1,
-                            "count": 0,
-                            "floor": 0
-                        },
-                        {
-                            "ceiling": 3,
-                            "count": 0,
-                            "floor": 1
-                        },
-                        {
-                            "ceiling": 7,
-                            "count": 1,
-                            "floor": 3
-                        },
-                        {
-                            "ceiling": 19,
-                            "count": 0,
-                            "floor": 7
-                        },
-                        {
-                            "ceiling": 18446744073709551615,
-                            "count": 0,
-                            "floor": 19
-                        }
-                    ]
+                    "counts": [
+                        1
+                    ],
+                    "floor": 1,
+                    "indexes": [
+                        2
+                    ],
+                    "initial_step": 2,
+                    "size": 5,
+                    "step_multiplier": 3
                 }
             },
             "linear_histgorams": {
                 "double": {
-                    "buckets": [
-                        {
-                            "ceiling": 1.5,
-                            "count": 0.0,
-                            "floor": -1.7976931348623157e308
-                        },
-                        {
-                            "ceiling": 4.0,
-                            "count": 0.0,
-                            "floor": 1.5
-                        },
-                        {
-                            "ceiling": 6.5,
-                            "count": 1.0,
-                            "floor": 4.0
-                        },
-                        {
-                            "ceiling": 9.0,
-                            "count": 0.0,
-                            "floor": 6.5
-                        },
-                        {
-                            "ceiling": 1.7976931348623157e308,
-                            "count": 0.0,
-                            "floor": 9.0
-                        }
-                    ]
+                    "counts": [
+                        1.0
+                    ],
+                    "floor": 1.5,
+                    "indexes": [
+                        2
+                    ],
+                    "size": 5,
+                    "step": 2.5
                 },
                 "int": {
-                    "buckets": [
-                        {
-                            "ceiling": -10,
-                            "count": 0,
-                            "floor": -9223372036854775808
-                        },
-                        {
-                            "ceiling": -8,
-                            "count": 0,
-                            "floor": -10
-                        },
-                        {
-                            "ceiling": -6,
-                            "count": 0,
-                            "floor": -8
-                        },
-                        {
-                            "ceiling": -4,
-                            "count": 1,
-                            "floor": -6
-                        },
-                        {
-                            "ceiling": 9223372036854775807,
-                            "count": 0,
-                            "floor": -4
-                        }
-                    ]
+                    "counts": [
+                        1
+                    ],
+                    "floor": -10,
+                    "indexes": [
+                        3
+                    ],
+                    "size": 5,
+                    "step": 2
                 },
                 "uint": {
-                    "buckets": [
-                        {
-                            "ceiling": 1,
-                            "count": 0,
-                            "floor": 0
-                        },
-                        {
-                            "ceiling": 3,
-                            "count": 0,
-                            "floor": 1
-                        },
-                        {
-                            "ceiling": 5,
-                            "count": 1,
-                            "floor": 3
-                        },
-                        {
-                            "ceiling": 7,
-                            "count": 0,
-                            "floor": 5
-                        },
-                        {
-                            "ceiling": 18446744073709551615,
-                            "count": 0,
-                            "floor": 7
-                        }
-                    ]
+                    "counts": [
+                        1
+                    ],
+                    "floor": 1,
+                    "indexes": [
+                        2
+                    ],
+                    "size": 5,
+                    "step": 2
                 }
             },
             "numeric": {

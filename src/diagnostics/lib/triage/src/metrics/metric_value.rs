@@ -125,9 +125,12 @@ impl From<DiagnosticProperty> for MetricValue {
             DiagnosticProperty::UintArray(_name, ArrayContent::Values(values)) => {
                 Self::Vector(super::map_vec(&values, |value| Self::Int(*value as i64)))
             }
-            DiagnosticProperty::DoubleArray(_name, ArrayContent::Buckets(_))
-            | DiagnosticProperty::IntArray(_name, ArrayContent::Buckets(_))
-            | DiagnosticProperty::UintArray(_name, ArrayContent::Buckets(_)) => {
+            DiagnosticProperty::DoubleArray(_name, ArrayContent::LinearHistogram(_))
+            | DiagnosticProperty::IntArray(_name, ArrayContent::LinearHistogram(_))
+            | DiagnosticProperty::UintArray(_name, ArrayContent::LinearHistogram(_))
+            | DiagnosticProperty::DoubleArray(_name, ArrayContent::ExponentialHistogram(_))
+            | DiagnosticProperty::IntArray(_name, ArrayContent::ExponentialHistogram(_))
+            | DiagnosticProperty::UintArray(_name, ArrayContent::ExponentialHistogram(_)) => {
                 unhandled_type("Histogram is not supported")
             }
             DiagnosticProperty::StringList(_name, _list) => {
@@ -422,9 +425,12 @@ pub(crate) mod test {
                 DoubleArray(Key, ArrayContent<f64>),
                 IntArray(Key, ArrayContent<i64>),
                 UintArray(Key, ArrayContent<u64>),
-                DoubleArray(Key, Bucket<f64>),
-                IntArray(Key, Bucket<i64>),
-                UintArray(Key, Bucket<u64>),
+                DoubleArray(Key, LinearHistogram<f64>),
+                IntArray(Key, LinearHistogram<i64>),
+                UintArray(Key, LinearHistogram<u64>),
+                DoubleArray(Key, ExponentialHistogram<f64>),
+                IntArray(Key, ExponentialHistogram<i64>),
+                UintArray(Key, ExponentialHistogram<u64>),
         */
         macro_rules! test_from {
             ($diagnostic:path, $metric:path, $value:expr) => {

@@ -36,7 +36,7 @@ async fn accessor_truncation_test() {
     assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 3);
 
     let data = reader
-        .with_aggregated_result_bytes_limit(2000)
+        .with_aggregated_result_bytes_limit(1000)
         .add_selector("child_a:root")
         .with_minimum_schema_count(3)
         .snapshot::<Inspect>()
@@ -94,8 +94,8 @@ async fn accessor_truncation_test() {
         .expect("got inspect data");
 
     assert_eq!(data.len(), 6);
-    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 2);
-    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_b"), 2);
+    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_a"), 1);
+    assert_eq!(count_dropped_schemas_per_moniker(&data, "child_b"), 1);
 }
 
 fn count_dropped_schemas_per_moniker(data: &Vec<Data<Inspect>>, moniker: &str) -> i64 {

@@ -16,7 +16,7 @@ use {
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::bounds::Bounded,
     selectors::{self, ValidateExt},
-    serde::Deserialize,
+    serde::{Deserialize, Serialize},
     std::{
         borrow::{Borrow, Cow},
         cmp::Ordering,
@@ -501,24 +501,47 @@ impl Error {
     }
 }
 
-/// A bucket of a histogram property.
-#[derive(Debug, Deserialize, PartialEq, Clone)]
-pub struct Bucket<T> {
-    /// The floor of the bucket range.
+/// A linear histogram property.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct LinearHistogram<T> {
+    /// The number of buckets. If indexes is None this should equal counts.len().
+    pub size: usize,
+
+    /// The floor of the lowest bucket (not counting the negative-infinity bucket).
     pub floor: T,
 
-    /// The ceiling of the bucket range.
-    #[serde(alias = "upper_bound")]
-    pub ceiling: T,
+    /// The increment for each bucket range.
+    pub step: T,
 
-    /// The number of items in this bucket.
-    pub count: T,
+    /// The number of items in each bucket.
+    pub counts: Vec<T>,
+
+    /// If Some<_>, the indexes of nonzero counts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexes: Option<Vec<usize>>,
 }
 
-impl<T> Bucket<T> {
-    fn new(floor: T, ceiling: T, count: T) -> Self {
-        Self { floor, ceiling, count }
-    }
+/// An exponential histogram property.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct ExponentialHistogram<T> {
+    /// The number of buckets. If indexes is None this should equal counts.len().
+    pub size: usize,
+
+    /// The floor of the lowest bucket (not counting the negative-infinity bucket).
+    pub floor: T,
+
+    /// The increment for the second floor.
+    pub initial_step: T,
+
+    /// The multiplier for each successive floor.
+    pub step_multiplier: T,
+
+    /// The number of items in each bucket.
+    pub counts: Vec<T>,
+
+    /// If Some<_>, the indexes of nonzero counts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexes: Option<Vec<usize>>,
 }
 
 /// Represents the content of a DiagnosticsHierarchy array property: a regular array or a
@@ -528,22 +551,69 @@ pub enum ArrayContent<T> {
     /// The contents of an array.
     Values(Vec<T>),
 
-    /// The contents of a histogram.
-    Buckets(Vec<Bucket<T>>),
+    /// The data for a linear histogram.
+    LinearHistogram(LinearHistogram<T>),
+
+    // The data for an exponential histogram.
+    ExponentialHistogram(ExponentialHistogram<T>),
 }
 
-impl<T: Add<Output = T> + AddAssign + Copy + MulAssign + Bounded> ArrayContent<T> {
+impl<T> ArrayContent<T>
+where
+    T: Add<Output = T> + num_traits::Zero + AddAssign + Copy + MulAssign + PartialEq + Bounded,
+{
     /// Creates a new ArrayContent parsing the `values` based on the given `format`.
     pub fn new(values: Vec<T>, format: ArrayFormat) -> Result<Self, Error> {
         match format {
             ArrayFormat::Default => Ok(Self::Values(values)),
             ArrayFormat::LinearHistogram => {
-                let buckets = Self::buckets_for_linear_hist(values)?;
-                Ok(Self::Buckets(buckets))
+                // Check that the minimum required values are available:
+                // floor, stepsize, underflow, bucket 0, overflow
+                if values.len() < 5 {
+                    return Err(Error::missing_histogram_elements(
+                        ArrayFormat::LinearHistogram,
+                        values.len(),
+                        5,
+                    ));
+                }
+                let original_counts = &values[2..];
+                let (counts, indexes) =
+                    match serialization::maybe_condense_histogram(original_counts, &None) {
+                        None => (original_counts.to_vec(), None),
+                        Some((counts, indexes)) => (counts, Some(indexes)),
+                    };
+                Ok(Self::LinearHistogram(LinearHistogram {
+                    floor: values[0],
+                    step: values[1],
+                    counts,
+                    indexes,
+                    size: values.len() - 2,
+                }))
             }
             ArrayFormat::ExponentialHistogram => {
-                let buckets = Self::buckets_for_exp_hist(values)?;
-                Ok(Self::Buckets(buckets))
+                // Check that the minimum required values are available:
+                // floor, initial step, step multiplier, underflow, bucket 0, overflow
+                if values.len() < 6 {
+                    return Err(Error::missing_histogram_elements(
+                        ArrayFormat::LinearHistogram,
+                        values.len(),
+                        5,
+                    ));
+                }
+                let original_counts = &values[3..];
+                let (counts, indexes) =
+                    match serialization::maybe_condense_histogram(original_counts, &None) {
+                        None => (original_counts.to_vec(), None),
+                        Some((counts, indexes)) => (counts, Some(indexes)),
+                    };
+                Ok(Self::ExponentialHistogram(ExponentialHistogram {
+                    floor: values[0],
+                    initial_step: values[1],
+                    step_multiplier: values[2],
+                    counts,
+                    indexes,
+                    size: values.len() - 3,
+                }))
             }
         }
     }
@@ -552,7 +622,8 @@ impl<T: Add<Output = T> + AddAssign + Copy + MulAssign + Bounded> ArrayContent<T
     pub fn len(&self) -> usize {
         match self {
             Self::Values(vals) => vals.len(),
-            Self::Buckets(buckets) => buckets.len(),
+            Self::LinearHistogram(LinearHistogram { size, .. })
+            | Self::ExponentialHistogram(ExponentialHistogram { size, .. }) => *size,
         }
     }
 
@@ -561,60 +632,21 @@ impl<T: Add<Output = T> + AddAssign + Copy + MulAssign + Bounded> ArrayContent<T
     pub fn raw_values(&self) -> Cow<'_, Vec<T>> {
         match self {
             Self::Values(values) => Cow::Borrowed(&values),
-            Self::Buckets(buckets) => Cow::Owned(buckets.iter().map(|b| b.count).collect()),
+            Self::LinearHistogram(LinearHistogram { size, counts, indexes, .. })
+            | Self::ExponentialHistogram(ExponentialHistogram { size, counts, indexes, .. }) => {
+                if let Some(indexes) = indexes {
+                    let mut values = vec![T::zero(); *size];
+                    for (count, index) in counts.iter().zip(indexes.iter()) {
+                        if index <= size {
+                            values[*index] = *count;
+                        }
+                    }
+                    Cow::Owned(values)
+                } else {
+                    Cow::Borrowed(&counts)
+                }
+            }
         }
-    }
-
-    fn buckets_for_linear_hist(values: Vec<T>) -> Result<Vec<Bucket<T>>, Error> {
-        // Check that the minimum required values are available:
-        // floor, stepsize, underflow, bucket 0, overflow
-        if values.len() < 5 {
-            return Err(Error::missing_histogram_elements(
-                ArrayFormat::LinearHistogram,
-                values.len(),
-                5,
-            ));
-        }
-        let mut floor = values[0];
-        let step_size = values[1];
-
-        let mut result = Vec::new();
-        result.push(Bucket::new(T::min_value(), floor, values[2]));
-        for i in 3..values.len() - 1 {
-            result.push(Bucket::new(floor, floor + step_size, values[i]));
-            floor += step_size;
-        }
-        result.push(Bucket::new(floor, T::max_value(), values[values.len() - 1]));
-        Ok(result)
-    }
-
-    fn buckets_for_exp_hist(values: Vec<T>) -> Result<Vec<Bucket<T>>, Error> {
-        // Check that the minimum required values are available:
-        // floor, initial step, step multiplier, underflow, bucket 0, overflow
-        if values.len() < 6 {
-            return Err(Error::missing_histogram_elements(
-                ArrayFormat::ExponentialHistogram,
-                values.len(),
-                6,
-            ));
-        }
-        let floor = values[0];
-        let initial_step = values[1];
-        let step_multiplier = values[2];
-
-        let mut result = vec![Bucket::new(T::min_value(), floor, values[3])];
-
-        let mut offset = initial_step;
-        let mut current_floor = floor;
-        for i in 4..values.len() - 1 {
-            let ceiling = floor + offset;
-            result.push(Bucket::new(current_floor, ceiling, values[i]));
-            offset *= step_multiplier;
-            current_floor = ceiling;
-        }
-
-        result.push(Bucket::new(current_floor, T::max_value(), values[values.len() - 1]));
-        Ok(result)
     }
 }
 
@@ -937,6 +969,45 @@ mod tests {
     use selectors::VerboseError;
     use std::sync::Arc;
 
+    impl<T> ArrayContent<T>
+    where
+        T: Add<Output = T> + num_traits::Zero + AddAssign + Copy + MulAssign + PartialEq + Bounded,
+    {
+        fn condense_counts(counts: &[T]) -> (Vec<T>, Vec<usize>) {
+            let mut condensed_counts = vec![];
+            let mut indexes = vec![];
+            for (index, count) in counts.iter().enumerate() {
+                if *count != T::zero() {
+                    condensed_counts.push(*count);
+                    indexes.push(index);
+                }
+            }
+            (condensed_counts, indexes)
+        }
+
+        pub(crate) fn condense_histogram(&mut self) {
+            match self {
+                Self::Values(_) => return,
+                Self::LinearHistogram(histogram) => {
+                    if histogram.indexes.is_some() {
+                        return;
+                    }
+                    let (counts, indexes) = Self::condense_counts(&histogram.counts);
+                    histogram.counts = counts;
+                    histogram.indexes = Some(indexes);
+                }
+                Self::ExponentialHistogram(histogram) => {
+                    if histogram.indexes.is_some() {
+                        return;
+                    }
+                    let (counts, indexes) = Self::condense_counts(&histogram.counts);
+                    histogram.counts = counts;
+                    histogram.indexes = Some(indexes);
+                }
+            }
+        }
+    }
+
     fn validate_hierarchy_iteration(
         mut results_vec: Vec<(Vec<String>, Option<Property>)>,
         test_hierarchy: DiagnosticsHierarchy,
@@ -1144,131 +1215,256 @@ mod tests {
     fn linear_histogram_array_value() {
         let values = vec![1, 2, 5, 7, 9, 11, 13];
         let array = ArrayContent::<i64>::new(values, ArrayFormat::LinearHistogram);
-        assert_matches!(array, Ok(ArrayContent::Buckets(buckets)) if buckets == vec![
-            Bucket { floor: std::i64::MIN, ceiling: 1, count: 5 },
-            Bucket { floor: 1, ceiling: 3, count: 7 },
-            Bucket { floor: 3, ceiling: 5, count: 9 },
-            Bucket { floor: 5, ceiling: 7, count: 11 },
-            Bucket { floor: 7, ceiling: std::i64::MAX, count: 13 },
-        ]);
+        assert_matches!(array, Ok(ArrayContent::LinearHistogram(hist))
+            if hist == LinearHistogram {
+                floor: 1,
+                step: 2,
+                counts: vec![5, 7, 9, 11, 13],
+                indexes: None,
+                size: 5,
+            }
+        );
     }
 
     #[fuchsia::test]
     fn exponential_histogram_array_value() {
         let values = vec![1.0, 2.0, 5.0, 7.0, 9.0, 11.0, 15.0];
         let array = ArrayContent::<f64>::new(values, ArrayFormat::ExponentialHistogram);
-        assert_matches!(array, Ok(ArrayContent::Buckets(buckets)) if buckets == vec![
-                Bucket { floor: std::f64::MIN, ceiling: 1.0, count: 7.0 },
-                Bucket { floor: 1.0, ceiling: 3.0, count: 9.0 },
-                Bucket { floor: 3.0, ceiling: 11.0, count: 11.0 },
-                Bucket { floor: 11.0, ceiling: std::f64::MAX, count: 15.0 },
-        ]);
+        assert_matches!(array, Ok(ArrayContent::ExponentialHistogram(hist))
+            if hist == ExponentialHistogram {
+                floor: 1.0,
+                initial_step: 2.0,
+                step_multiplier: 5.0,
+                counts: vec![7.0, 9.0, 11.0, 15.0],
+                indexes: None,
+                size: 4,
+            }
+        );
     }
 
     #[fuchsia::test]
-    fn deserialize_buckets() -> Result<(), serde_json::Error> {
-        let json_string = r#"{
+    fn deserialize_linear_int_histogram() -> Result<(), serde_json::Error> {
+        let json = r#"{
             "root": {
                 "histogram": {
-                  "buckets": [
-                    {
-                      "count": 4,
-                      "floor": -9223372036854775808,
-                      "ceiling": 0
-                    },
-                    {
-                      "count": 1,
-                      "floor": 0,
-                      "upper_bound": 2
-                    },
-                    {
-                      "count": 3,
-                      "floor": 2,
-                      "ceiling": 9223372036854775807
-                    }
-                  ]
+                    "floor": -2,
+                    "step": 3,
+                    "counts": [4, 5, 6],
+                    "size": 3
                 }
             }
-          }"#;
-        let json_bad_missing_field = r#"{
-            "root": {
-                "histogram": {
-                  "buckets": [
-                    {
-                      "count": 4,
-                      "floor": -9223372036854775808
-                    },
-                    {
-                      "count": 1,
-                      "floor": 0,
-                      "upper_bound": 2
-                    },
-                    {
-                      "count": 3,
-                      "floor": 2,
-                      "ceiling": 9223372036854775807
-                    }
-                  ]
-                }
-            }
-          }"#;
-        let json_bad_extra_field = r#"{
-            "root": {
-                "histogram": {
-                  "buckets": [
-                    {
-                      "count": 4,
-                      "floor": -9223372036854775808,
-                      "ceiling": 0,
-                      "upper_bound": 0
-                    },
-                    {
-                      "count": 1,
-                      "floor": 0,
-                      "upper_bound": 2
-                    },
-                    {
-                      "count": 3,
-                      "floor": 2,
-                      "ceiling": 9223372036854775807
-                    }
-                  ]
-                }
-            }
-          }"#;
-
-        let expected_hierarchy = DiagnosticsHierarchy::new(
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        let expected = DiagnosticsHierarchy::new(
             "root".to_string(),
             vec![Property::IntArray(
                 "histogram".to_string(),
-                ArrayContent::new(vec![0, 2, 4, 1, 3], ArrayFormat::LinearHistogram).unwrap(),
+                ArrayContent::new(vec![-2, 3, 4, 5, 6], ArrayFormat::LinearHistogram).unwrap(),
             )],
             vec![],
         );
-        let parsed_hierarchy: DiagnosticsHierarchy = serde_json::from_str(json_string)?;
-        let missing_hierarchy: Result<DiagnosticsHierarchy, serde_json::Error> =
-            serde_json::from_str(json_bad_missing_field);
-        let extra_hierarchy: Result<DiagnosticsHierarchy, serde_json::Error> =
-            serde_json::from_str(json_bad_extra_field);
-
-        assert_eq!(expected_hierarchy, parsed_hierarchy);
-        assert_matches!(missing_hierarchy, Err(_));
-        assert_matches!(extra_hierarchy, Err(_));
+        assert_eq!(parsed, expected);
         Ok(())
     }
 
     #[fuchsia::test]
-    fn exponential_histogram_buckets() {
+    fn deserialize_exponential_int_histogram() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": 1,
+                    "initial_step": 3,
+                    "step_multiplier": 2,
+                    "counts": [4, 5, 6],
+                    "size": 3
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        let expected = DiagnosticsHierarchy::new(
+            "root".to_string(),
+            vec![Property::IntArray(
+                "histogram".to_string(),
+                ArrayContent::new(vec![1, 3, 2, 4, 5, 6], ArrayFormat::ExponentialHistogram)
+                    .unwrap(),
+            )],
+            vec![],
+        );
+        assert_eq!(parsed, expected);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn deserialize_linear_uint_histogram() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": 2,
+                    "step": 3,
+                    "counts": [4, 9223372036854775808, 6],
+                    "size": 3
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        let expected = DiagnosticsHierarchy::new(
+            "root".to_string(),
+            vec![Property::UintArray(
+                "histogram".to_string(),
+                ArrayContent::new(
+                    vec![2, 3, 4, 9_223_372_036_854_775_808, 6],
+                    ArrayFormat::LinearHistogram,
+                )
+                .unwrap(),
+            )],
+            vec![],
+        );
+        assert_eq!(parsed, expected);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn deserialize_linear_double_histogram() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": 2.0,
+                    "step": 3.0,
+                    "counts": [4.0, 5.0, 6.0],
+                    "size": 3
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        let expected = DiagnosticsHierarchy::new(
+            "root".to_string(),
+            vec![Property::DoubleArray(
+                "histogram".to_string(),
+                ArrayContent::new(vec![2.0, 3.0, 4.0, 5.0, 6.0], ArrayFormat::LinearHistogram)
+                    .unwrap(),
+            )],
+            vec![],
+        );
+        assert_eq!(parsed, expected);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn deserialize_sparse_histogram() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": 2,
+                    "step": 3,
+                    "counts": [4, 5, 6],
+                    "indexes": [1, 2, 4],
+                    "size": 8
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        let mut histogram =
+            ArrayContent::new(vec![2, 3, 0, 4, 5, 0, 6, 0, 0, 0], ArrayFormat::LinearHistogram)
+                .unwrap();
+        histogram.condense_histogram();
+        let expected = DiagnosticsHierarchy::new(
+            "root".to_string(),
+            vec![Property::IntArray("histogram".to_string(), histogram)],
+            vec![],
+        );
+        assert_eq!(parsed, expected);
+        Ok(())
+    }
+
+    // If a struct can't be parsed as a valid histogram, it will be created as a Node. So if
+    // there's a node "histogram" (as opposed to a property "histogram") then it didn't parse
+    // as a histogram.
+
+    #[fuchsia::test]
+    fn reject_histogram_incompatible_values() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": -2,
+                    "step": 3,
+                    "counts": [4, 9223372036854775808, 6],
+                    "size": 3
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        assert_data_tree!(parsed, root: {histogram: contains {} });
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn reject_histogram_bad_sparse_list() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": -2,
+                    "step": 3,
+                    "counts": [4, 5, 6],
+                    "indexes": [0, 1, 2, 3],
+                    "size": 8
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        assert_data_tree!(parsed, root: {histogram: contains {} });
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn reject_histogram_bad_index() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": -2,
+                    "step": 3,
+                    "counts": [4, 5, 6],
+                    "indexes": [0, 1, 4],
+                    "size": 4
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        assert_data_tree!(parsed, root: {histogram: contains {} });
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn reject_histogram_wrong_field() -> Result<(), serde_json::Error> {
+        let json = r#"{
+            "root": {
+                "histogram": {
+                    "floor": 2,
+                    "step": 3,
+                    "counts": [4, 5, 6],
+                    "incorrect": [0, 1, 3],
+                    "size": 4
+                }
+            }
+        }"#;
+        let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+        assert_data_tree!(parsed, root: {histogram: contains {} });
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn exponential_histogram() {
         let values = vec![0, 2, 4, 0, 1, 2, 3, 4, 5];
         let array = ArrayContent::new(values, ArrayFormat::ExponentialHistogram);
-        assert_matches!(array, Ok(ArrayContent::Buckets(buckets)) if buckets == vec![
-                Bucket { floor: i64::min_value(), ceiling: 0, count: 0 },
-                Bucket { floor: 0, ceiling: 2, count: 1 },
-                Bucket { floor: 2, ceiling: 8, count: 2 },
-                Bucket { floor: 8, ceiling: 32, count: 3 },
-                Bucket { floor: 32, ceiling: 128, count: 4 },
-                Bucket { floor: 128, ceiling: i64::max_value(), count: 5 },
-        ]);
+        assert_matches!(array, Ok(ArrayContent::ExponentialHistogram(hist))
+            if hist == ExponentialHistogram {
+                floor: 0,
+                initial_step: 2,
+                step_multiplier: 4,
+                counts: vec![0, 1, 2, 3, 4, 5],
+                indexes: None,
+                size: 6,
+            }
+        );
     }
 
     #[fuchsia::test]

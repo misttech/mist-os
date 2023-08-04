@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{ArrayContent, Bucket, DiagnosticsHierarchy, Property},
-    lazy_static::lazy_static,
+    crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
     paste,
     serde::{
         de::{self, MapAccess, SeqAccess, Visitor},
@@ -12,10 +11,6 @@ use {
     },
     std::{cmp::Eq, collections::HashMap, fmt, hash::Hash, marker::PhantomData, str::FromStr},
 };
-
-lazy_static! {
-    static ref HISTOGRAM_OBJECT_KEY: String = "buckets".to_string();
-}
 
 struct RootVisitor<Key> {
     // Key is unused.
@@ -83,7 +78,12 @@ enum FieldValue<Key> {
     Double(f64),
     Bool(bool),
     Array(Vec<NumericValue>),
-    Histogram(Vec<Bucket<NumericValue>>),
+    LinearIntHistogram(LinearHistogram<i64>),
+    LinearUintHistogram(LinearHistogram<u64>),
+    LinearDoubleHistogram(LinearHistogram<f64>),
+    ExponentialIntHistogram(ExponentialHistogram<i64>),
+    ExponentialUintHistogram(ExponentialHistogram<u64>),
+    ExponentialDoubleHistogram(ExponentialHistogram<f64>),
     Node(HashMap<Key, FieldValue<Key>>),
     StringList(Vec<String>),
 }
@@ -98,7 +98,26 @@ impl<Key: Clone> IntoProperty<Key> for FieldValue<Key> {
             Self::Double(value) => Some(Property::Double(key.clone(), value)),
             Self::Bool(value) => Some(Property::Bool(key.clone(), value)),
             Self::Array(values) => values.into_property(key),
-            Self::Histogram(buckets) => buckets.into_property(key),
+            Self::ExponentialIntHistogram(histogram) => {
+                Some(Property::IntArray(key.clone(), ArrayContent::ExponentialHistogram(histogram)))
+            }
+            Self::ExponentialUintHistogram(histogram) => Some(Property::UintArray(
+                key.clone(),
+                ArrayContent::ExponentialHistogram(histogram),
+            )),
+            Self::ExponentialDoubleHistogram(histogram) => Some(Property::DoubleArray(
+                key.clone(),
+                ArrayContent::ExponentialHistogram(histogram),
+            )),
+            Self::LinearIntHistogram(histogram) => {
+                Some(Property::IntArray(key.clone(), ArrayContent::LinearHistogram(histogram)))
+            }
+            Self::LinearUintHistogram(histogram) => {
+                Some(Property::UintArray(key.clone(), ArrayContent::LinearHistogram(histogram)))
+            }
+            Self::LinearDoubleHistogram(histogram) => {
+                Some(Property::DoubleArray(key.clone(), ArrayContent::LinearHistogram(histogram)))
+            }
             Self::StringList(list) => Some(Property::StringList(key.clone(), list)),
             Self::Node(_) => None,
         }
@@ -145,6 +164,273 @@ struct FieldVisitor<Key> {
     marker: PhantomData<Key>,
 }
 
+// Histogram type may be: linear or exponential; double, int, or uint.
+// If it's linear, step will be Some and initial_step and step_multiplier will be None.
+// if it's exponential, step will be None and initial_step and step_multiplier will be Some.
+// In all cases, size must be usize (u64).
+// indexes will be either None or Some(Vec<NumericValue>) which must be convertible to Vec<usize>.
+// counts will be Vec<NumericValue>.
+// If the histogram is double, every number must be f64 and counts must convert to Vec<f64>.
+// If it's not double, the numbers will be some mix of i64 and u64. If even one can't fit in
+// an i64, then the histogram must be represented as u64 and none of the numbers can be
+// negative.
+// The deserializer will have used i64 for any number that fits, and we can assume most
+// histograms will fit in i64, so first we check if all numbers are i64 and counts can convert
+// to Vec<i64>. If not, then we have to check if a mix of i64 and u64 can all be u64.
+
+fn value_as_u64<Key>(value: &FieldValue<Key>) -> Option<u64> {
+    match value {
+        FieldValue::Uint(value) => Some(*value),
+        FieldValue::Int(value) => u64::try_from(*value).ok(),
+        _ => None,
+    }
+}
+
+fn value_as_i64<Key>(value: &FieldValue<Key>) -> Option<i64> {
+    match value {
+        FieldValue::Int(value) => Some(*value),
+        FieldValue::Uint(value) => i64::try_from(*value).ok(),
+        _ => None,
+    }
+}
+
+// Try to convert indexes to Option<Vec<usize>> and declared_len to usize, and check consistency of
+// several sizes. Return Err(()) if anything goes wrong, and the converted (indexes, declared_len)
+// if it's all good,
+fn sanitize_histogram_parameters<Key>(
+    indexes: Option<&FieldValue<Key>>,
+    n_parameters: usize,
+    dict_len: usize,
+    counts: &FieldValue<Key>,
+    size: &FieldValue<Key>,
+) -> Result<(Option<Vec<usize>>, usize), ()> {
+    let size = match size {
+        FieldValue::Uint(size) => *size as usize,
+        FieldValue::Int(size) if *size >= 0 => *size as usize,
+        _ => return Err(()),
+    };
+    // An empty array will be cast as a StringList. A condensed histogram of all-zeroes will thus
+    // have empty StringList counts and indexes. If we sanitize successfully, we'll return an
+    // empty Vec<usize> for indexes, and we will have verified that counts is empty too.
+    let counts_len = match counts {
+        FieldValue::Array(counts) => counts.len(),
+        FieldValue::StringList(counts) if counts.len() == 0 => 0,
+        _ => return Err(()),
+    };
+    if size < 3 {
+        // We need at least 3 (overflow + 1) buckets to be a valid histogram
+        return Err(());
+    }
+    // It's OK if indexes is None. If it's Some, it must be a Vec<NumericValue> that converts to a
+    // Vec<usize>. Also, check that various lengths are consistent.
+    match indexes {
+        None => {
+            if counts_len != size || dict_len != n_parameters - 1 {
+                return Err(());
+            }
+            Ok((None, size))
+        }
+        Some(FieldValue::StringList(indexes)) if indexes.len() == 0 => {
+            if counts_len != 0 || dict_len != n_parameters {
+                return Err(());
+            }
+            Ok((Some(vec![]), size))
+        }
+        Some(FieldValue::Array(indexes)) => {
+            if indexes.len() != counts_len || counts_len > size || dict_len != n_parameters {
+                return Err(());
+            }
+            let indexes = indexes
+                .iter()
+                .map(|value| match value.as_u64() {
+                    None => None,
+                    Some(i) if (i as usize) < size => Some(i as usize),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>();
+            match indexes {
+                None => Err(()),
+                Some(indexes) => Ok((Some(indexes), size)),
+            }
+        }
+        _ => Err(()),
+    }
+}
+
+fn match_linear_histogram<Key>(
+    floor: &FieldValue<Key>,
+    step: &FieldValue<Key>,
+    counts: &FieldValue<Key>,
+    indexes: Option<&FieldValue<Key>>,
+    size: &FieldValue<Key>,
+    dict_len: usize,
+) -> Option<FieldValue<Key>> {
+    let (indexes, size) = match sanitize_histogram_parameters(indexes, 5, dict_len, counts, size) {
+        Ok((indexes, size)) => (indexes, size),
+        Err(()) => return None,
+    };
+    // A double histogram will have all types double. An int or uint histogram may have a mix
+    // of int and uint members.
+    match (floor, step, counts) {
+        (FieldValue::Double(floor), FieldValue::Double(step), counts) => {
+            let counts = match parse_f64_list(counts) {
+                None => return None,
+                Some(counts) => counts,
+            };
+            Some(FieldValue::LinearDoubleHistogram(LinearHistogram {
+                floor: *floor,
+                step: *step,
+                counts,
+                indexes,
+                size,
+            }))
+        }
+        (floor, step, counts) => {
+            let counts_i64 = parse_i64_list(counts);
+            if let (Some(counts), Some(floor), Some(step)) =
+                (counts_i64, value_as_i64(floor), value_as_i64(step))
+            {
+                return Some(FieldValue::LinearIntHistogram(LinearHistogram {
+                    floor: floor,
+                    step: step,
+                    counts,
+                    indexes,
+                    size,
+                }));
+            }
+            // At this point, it's unsigned, or nothing.
+            if let (Some(counts), Some(floor), Some(step)) =
+                (parse_u64_list(counts), value_as_u64(floor), value_as_u64(step))
+            {
+                return Some(FieldValue::LinearUintHistogram(LinearHistogram {
+                    floor,
+                    step,
+                    counts,
+                    indexes,
+                    size,
+                }));
+            }
+            None
+        }
+    }
+}
+
+fn match_exponential_histogram<Key>(
+    floor: &FieldValue<Key>,
+    initial_step: &FieldValue<Key>,
+    step_multiplier: &FieldValue<Key>,
+    counts: &FieldValue<Key>,
+    indexes: Option<&FieldValue<Key>>,
+    size: &FieldValue<Key>,
+    dict_len: usize,
+) -> Option<FieldValue<Key>> {
+    let (indexes, size) = match sanitize_histogram_parameters(indexes, 6, dict_len, counts, size) {
+        Ok((indexes, size)) => (indexes, size),
+        Err(()) => return None,
+    };
+    match (floor, initial_step, step_multiplier, counts) {
+        (
+            FieldValue::Double(floor),
+            FieldValue::Double(initial_step),
+            FieldValue::Double(step_multiplier),
+            counts,
+        ) => {
+            let counts = match parse_f64_list(counts) {
+                None => return None,
+                Some(counts) => counts,
+            };
+            Some(FieldValue::ExponentialDoubleHistogram(ExponentialHistogram {
+                floor: *floor,
+                initial_step: *initial_step,
+                step_multiplier: *step_multiplier,
+                counts,
+                indexes,
+                size,
+            }))
+        }
+        (floor, initial_step, step_multiplier, counts) => {
+            let counts_i64 = parse_i64_list(counts);
+            if let (Some(counts), Some(floor), Some(initial_step), Some(step_multiplier)) = (
+                counts_i64,
+                value_as_i64(floor),
+                value_as_i64(initial_step),
+                value_as_i64(step_multiplier),
+            ) {
+                return Some(FieldValue::ExponentialIntHistogram(ExponentialHistogram {
+                    floor,
+                    initial_step,
+                    step_multiplier,
+                    counts,
+                    indexes,
+                    size,
+                }));
+            }
+            // At this point, it's unsigned, or nothing.
+            if let (Some(counts), Some(floor), Some(initial_step), Some(step_multiplier)) = (
+                parse_u64_list(counts),
+                value_as_u64(floor),
+                value_as_u64(initial_step),
+                value_as_u64(step_multiplier),
+            ) {
+                return Some(FieldValue::ExponentialUintHistogram(ExponentialHistogram {
+                    floor,
+                    initial_step,
+                    step_multiplier,
+                    counts,
+                    indexes,
+                    size,
+                }));
+            }
+            None
+        }
+    }
+}
+
+fn match_histogram<Key>(dict: &HashMap<Key, FieldValue<Key>>) -> Option<FieldValue<Key>>
+where
+    Key: FromStr + Hash + Eq,
+{
+    // Quick checks for efficiency - most maps won't be histograms.
+    let dict_len = dict.len();
+    if dict_len < 4 || dict_len > 6 {
+        return None;
+    }
+    let floor = dict.get(&Key::from_str("floor").ok().unwrap());
+    if floor.is_none() {
+        return None;
+    }
+    let step = dict.get(&Key::from_str("step").ok().unwrap());
+    let initial_step = dict.get(&Key::from_str("initial_step").ok().unwrap());
+    let step_multiplier = dict.get(&Key::from_str("step_multiplier").ok().unwrap());
+    let counts = dict.get(&Key::from_str("counts").ok().unwrap());
+    let indexes = dict.get(&Key::from_str("indexes").ok().unwrap());
+    let size = dict.get(&Key::from_str("size").ok().unwrap());
+    // Indexes may be None if the histogram isn't condensed.
+    match (floor, step, initial_step, step_multiplier, counts, indexes, size) {
+        (Some(floor), Some(step), None, None, Some(counts), indexes, Some(size)) => {
+            match_linear_histogram(floor, step, counts, indexes, size, dict_len)
+        }
+        (
+            Some(floor),
+            None,
+            Some(initial_step),
+            Some(step_multiplier),
+            Some(counts),
+            indexes,
+            Some(size),
+        ) => match_exponential_histogram(
+            floor,
+            initial_step,
+            step_multiplier,
+            counts,
+            indexes,
+            size,
+            dict_len,
+        ),
+        _ => None,
+    }
+}
+
 impl<'de, Key> Visitor<'de> for FieldVisitor<Key>
 where
     Key: FromStr + Hash + Eq,
@@ -163,22 +449,17 @@ where
         while let Some(entry) = map.next_entry::<String, FieldValue<Key>>()? {
             entries.push(entry);
         }
-        // Histograms are of the type: { buckets: [ { } ]}, therefore here we expect to have an
-        // object with a single entry, whose key is buckets and the value is a Histogram.
-        if entries.len() == 1
-            && entries[0].0 == *HISTOGRAM_OBJECT_KEY
-            && matches!(entries[0].1, FieldValue::Histogram(_))
-        {
-            let histogram_value = entries.pop().unwrap().1;
-            return Ok(histogram_value);
-        }
 
         let node = entries
             .into_iter()
             .map(|(key, value)| Key::from_str(&key).map(|key| (key, value)))
             .collect::<Result<HashMap<Key, FieldValue<Key>>, _>>()
             .map_err(|_| de::Error::custom("failed to parse key"))?;
-        Ok(FieldValue::Node(node))
+        if let Some(histogram) = match_histogram(&node) {
+            Ok(histogram)
+        } else {
+            Ok(FieldValue::Node(node))
+        }
     }
 
     fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
@@ -218,26 +499,24 @@ where
         while let Some(elem) = seq.next_element::<SeqItem>()? {
             result.push(elem);
         }
-        // There can be three types of sequences: the histogram
-        // (containing buckets), regular arrays (containing numeric values),
+        // There can be two types of sequences: regular arrays (containing numeric values),
         // and string lists (containing only strings). There cannot be a
         // sequence containing a mix of them.
         let mut array = vec![];
-        let mut histogram = vec![];
         let mut strings = vec![];
         for item in result {
             match item {
                 SeqItem::Value(x) => array.push(x),
-                SeqItem::Bucket(x) => histogram.push(x),
                 SeqItem::StringValue(x) => strings.push(x),
             }
         }
 
-        match (!array.is_empty(), !histogram.is_empty(), !strings.is_empty()) {
-            (true, false, false) => Ok(FieldValue::Array(array)),
-            (false, true, false) => Ok(FieldValue::Histogram(histogram)),
-            (false, false, _) => {
+        match (!array.is_empty(), !strings.is_empty()) {
+            (true, false) => Ok(FieldValue::Array(array)),
+            (false, _) => {
                 // Numeric arrays cannot be empty, but string lists can.
+                // Histograms can contain empty arrays of numbers, but we'll check for empty
+                // StringList in the histogram-matching code, and know what it means.
                 Ok(FieldValue::StringList(strings))
             }
             _ => Err(de::Error::custom("unexpected sequence containing mixed values")),
@@ -249,7 +528,6 @@ where
 #[serde(untagged)]
 enum SeqItem {
     Value(NumericValue),
-    Bucket(Bucket<NumericValue>),
     StringValue(String),
 }
 
@@ -310,21 +588,6 @@ impl<Key: Clone> IntoProperty<Key> for Vec<NumericValue> {
     }
 }
 
-impl<Key: Clone> IntoProperty<Key> for Vec<Bucket<NumericValue>> {
-    fn into_property(self, key: &Key) -> Option<Property<Key>> {
-        if let Some(buckets) = parse_f64_buckets(&self) {
-            return Some(Property::DoubleArray(key.clone(), ArrayContent::Buckets(buckets)));
-        }
-        if let Some(buckets) = parse_i64_buckets(&self) {
-            return Some(Property::IntArray(key.clone(), ArrayContent::Buckets(buckets)));
-        }
-        if let Some(buckets) = parse_u64_buckets(&self) {
-            return Some(Property::UintArray(key.clone(), ArrayContent::Buckets(buckets)));
-        }
-        None
-    }
-}
-
 macro_rules! parse_numeric_vec_impls {
     ($($type:ty),*) => {
         $(
@@ -333,25 +596,15 @@ macro_rules! parse_numeric_vec_impls {
                     vec.iter().map(|value| value.[<as_ $type>]()).collect::<Option<Vec<_>>>()
                 }
 
-                fn [<parse_ $type _buckets>](buckets: &Vec<Bucket<NumericValue>>)
-                    -> Option<Vec<Bucket<$type>>>
-                {
-                    buckets.iter().map(|bucket| {
-                        let floor = match bucket.floor.[<as_ $type>]() {
-                            Some(f) => f,
-                            _ => return None,
-                        };
-                        let ceiling = match bucket.ceiling.[<as_ $type>]() {
-                            Some(u) => u,
-                            _ => return None,
-                        };
-                        let count = match bucket.count.[<as_ $type>]() {
-                            Some(c) => c,
-                            _ => return None,
-                        };
-                        Some(Bucket { floor, ceiling, count })
-                    })
-                    .collect::<Option<Vec<_>>>()
+                // Histograms can contain empty lists for counts and indexes. These will be
+                // deserialized as empty StringLists and should parse to empty vecs
+                // of any numeric type.
+                fn [<parse_ $type _list>]<Key>(list: &FieldValue<Key>) -> Option<Vec<$type>> {
+                    match list {
+                        FieldValue::StringList(list) if list.len() == 0 => Some(vec![]),
+                        FieldValue::Array(vec) => [<parse_ $type _vec>](vec),
+                        _ => None,
+                    }
                 }
             }
         )*
@@ -362,9 +615,9 @@ macro_rules! parse_numeric_vec_impls {
 // fn parse_f64_vec()
 // fn parse_u64_vec()
 // fn parse_i64_vec()
-// fn parse_f64_buckets()
-// fn parse_u64_buckets()
-// fn parse_i64_buckets()
+// fn parse_f64_list()
+// fn parse_u64_list()
+// fn parse_i64_list()
 parse_numeric_vec_impls!(f64, u64, i64);
 
 struct NumericValueVisitor;
@@ -423,7 +676,7 @@ mod tests {
     fn test_exp_histogram() {
         let mut hierarchy = DiagnosticsHierarchy::new(
             "root".to_string(),
-            vec![Property::UintArray(
+            vec![Property::IntArray(
                 "histogram".to_string(),
                 ArrayContent::new(
                     vec![1000, 1000, 2, 1, 2, 3, 4, 5, 6],
@@ -436,14 +689,11 @@ mod tests {
         let expected_json = serde_json::json!({
             "root": {
                 "histogram": {
-                    "buckets": [
-                        {"count": 1, "floor": 0, "ceiling": 1000},
-                        {"count": 2, "floor": 1000, "ceiling": 2000},
-                        {"count": 3, "floor": 2000, "ceiling": 3000},
-                        {"count": 4, "floor": 3000, "ceiling": 5000},
-                        {"count": 5, "floor": 5000, "ceiling": 9000},
-                        {"count": 6, "floor": 9000, "ceiling": u64::MAX}
-                    ]
+                    "floor": 1000,
+                    "initial_step": 1000,
+                    "step_multiplier": 2,
+                    "counts": [1, 2, 3, 4, 5, 6],
+                    "size": 6
                 }
             }
         });
@@ -510,28 +760,11 @@ mod tests {
                 \"a\": {
                     \"double\": 2.5,
                     \"histogram\": {
-                        \"buckets\": [
-                            {
-                                \"ceiling\": 0.0,
-                                \"count\": 1.0,
-                                \"floor\": -1.7976931348623157e308
-                            },
-                            {
-                                \"count\": 3.0,
-                                \"floor\": 0.0,
-                                \"ceiling\": 2.0
-                            },
-                            {
-                                \"count\": 4.0,
-                                \"floor\": 2.0,
-                                \"ceiling\": 8.0
-                            },
-                            {
-                                \"ceiling\": 1.7976931348623157e308,
-                                \"count\": 7.0,
-                                \"floor\": 8.0
-                            }
-                        ]
+                        \"floor\": 0.0,
+                        \"initial_step\": 2.0,
+                        \"step_multiplier\": 4.0,
+                        \"counts\": [1.0, 3.0, 4.0, 7.0],
+                        \"size\": 4
                     }
                 },
                 \"array\": [
@@ -543,23 +776,10 @@ mod tests {
                 \"empty_string_list\": [],
                 \"b\": {
                     \"histogram\": {
-                        \"buckets\": [
-                            {
-                                \"count\": 4,
-                                \"floor\": -9223372036854775808,
-                                \"ceiling\": 0
-                            },
-                            {
-                                \"count\": 1,
-                                \"floor\": 0,
-                                \"ceiling\": 2
-                            },
-                            {
-                                \"count\": 3,
-                                \"floor\": 2,
-                                \"ceiling\": 9223372036854775807
-                            }
-                        ]
+                        \"floor\": 0,
+                        \"step\": 2,
+                        \"counts\": [4, 1, 3],
+                        \"size\": 3
                     },
                     \"int\": -2,
                     \"string\": \"some value\"

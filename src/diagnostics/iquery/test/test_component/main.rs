@@ -140,7 +140,7 @@ async fn main() -> Result<(), Error> {
                 floor: 0.0,
                 initial_step: 1.25,
                 step_multiplier: 3.0,
-                buckets: 3,
+                buckets: 5,
             },
         ),
         PopulateParams { floor: -1.0, step: 0.1, count: 40 },

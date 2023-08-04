@@ -24,3 +24,4 @@
 
 mod deserialize;
 mod serialize;
+pub(crate) use serialize::maybe_condense_histogram;

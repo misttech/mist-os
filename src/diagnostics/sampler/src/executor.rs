@@ -96,7 +96,9 @@ use {
     crate::diagnostics::*,
     anyhow::{format_err, Context, Error},
     diagnostics_data::{self, Data, InspectHandleName},
-    diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property},
+    diagnostics_hierarchy::{
+        ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
+    },
     diagnostics_reader::{ArchiveReader, Inspect},
     fidl_fuchsia_metrics::{
         HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker,
@@ -113,7 +115,7 @@ use {
     },
     std::{
         collections::{HashMap, HashSet},
-        convert::{TryFrom, TryInto},
+        convert::TryInto,
         sync::Arc,
     },
     tracing::{info, warn},
@@ -924,59 +926,117 @@ fn compute_histogram_diff(
         .collect::<Result<Vec<HistogramBucket>, Error>>()
 }
 
+fn build_cobalt_histogram(counts: impl Iterator<Item = u64>) -> Vec<HistogramBucket> {
+    counts
+        .enumerate()
+        .map(|(index, count)| HistogramBucket { index: index as u32, count })
+        .collect()
+}
+
+fn build_sparse_cobalt_histogram<'a>(
+    counts: impl Iterator<Item = u64>,
+    indexes: &[usize],
+    size: usize,
+) -> Vec<HistogramBucket> {
+    let mut histogram =
+        Vec::from_iter((0..size).map(|index| HistogramBucket { index: index as u32, count: 0 }));
+    for (index, count) in indexes.iter().zip(counts) {
+        histogram[*index].count = count;
+    }
+    histogram
+}
+
 fn convert_inspect_histogram_to_cobalt_histogram(
     inspect_histogram: &Property,
     data_source: &MetricCacheKey,
 ) -> Result<Vec<HistogramBucket>, Error> {
-    let histogram_bucket_constructor =
-        |index: usize, count: u64| -> Result<HistogramBucket, Error> {
-            match u32::try_from(index) {
-                Ok(index) => Ok(HistogramBucket { index, count }),
-                Err(_) => Err(format_err!(
-                    concat!(
-                        "Selector referenced an Inspect IntArray",
-                        " that was specified as an IntHistogram type ",
-                        " but a bucket contained a negative count. This",
-                        " is incompatible with Cobalt histograms which only",
-                        " support positive histogram counts.",
-                        " vector. Selector: {:?}, Inspect type: {}"
-                    ),
-                    data_source,
-                    inspect_histogram.discriminant_name()
-                )),
+    macro_rules! err {($($message:expr),+) => {
+        Err(format_err!(
+            concat!($($message),+ , " Selector: {:?}, Inspect type: {}"),
+            data_source,
+            inspect_histogram.discriminant_name()
+        ))
+    }}
+
+    let sanitize_size = |size: usize| -> Result<(), Error> {
+        if size > u32::MAX as usize {
+            return err!(
+                "Selector referenced an Inspect array",
+                " that was specified as a histogram type ",
+                " but contained an index too large for a u32."
+            );
+        }
+        Ok(())
+    };
+
+    let sanitize_indexes = |indexes: &[usize], size: usize| -> Result<(), Error> {
+        for index in indexes.iter() {
+            if *index >= size {
+                return err!(
+                    "Selector referenced an Inspect array",
+                    " that was specified as a histogram type ",
+                    " but contained an invalid index."
+                );
             }
-        };
+        }
+        Ok(())
+    };
 
-    match inspect_histogram {
-        Property::IntArray(_, ArrayContent::Buckets(bucket_vec)) => bucket_vec
-            .iter()
-            .enumerate()
-            .map(|(index, bucket)| {
-                if bucket.count < 0 {
-                    return Err(format_err!(
-                        concat!(
-                            "Selector referenced an Inspect IntArray",
-                            " that was specified as an IntHistogram type ",
-                            " but a bucket contained a negative count. This",
-                            " is incompatible with Cobalt histograms which only",
-                            " support positive histogram counts.",
-                            " vector. Selector: {:?}, Inspect type: {}"
-                        ),
-                        data_source,
-                        inspect_histogram.discriminant_name()
-                    ));
+    let sanitize_counts = |counts: &[i64]| -> Result<(), Error> {
+        for count in counts.iter() {
+            if *count < 0 {
+                return err!(
+                    "Selector referenced an Inspect IntArray",
+                    " that was specified as an IntHistogram type ",
+                    " but a bucket contained a negative count. This",
+                    " is incompatible with Cobalt histograms which only",
+                    " support positive histogram counts."
+                );
+            }
+        }
+        Ok(())
+    };
+
+    let histogram = match inspect_histogram {
+        Property::IntArray(
+            _,
+            ArrayContent::LinearHistogram(LinearHistogram { counts, indexes, size, .. }),
+        )
+        | Property::IntArray(
+            _,
+            ArrayContent::ExponentialHistogram(ExponentialHistogram {
+                counts, indexes, size, ..
+            }),
+        ) => {
+            sanitize_size(*size)?;
+            sanitize_counts(counts)?;
+            match (indexes, counts) {
+                (None, counts) => build_cobalt_histogram(counts.iter().map(|c| *c as u64)),
+                (Some(indexes), counts) => {
+                    sanitize_indexes(indexes, *size)?;
+                    build_sparse_cobalt_histogram(counts.iter().map(|c| *c as u64), indexes, *size)
                 }
-
-                // Count is a non-negative i64, so casting with `as` is safe from
-                // truncations.
-                histogram_bucket_constructor(index, bucket.count as u64)
-            })
-            .collect::<Result<Vec<HistogramBucket>, Error>>(),
-        Property::UintArray(_, ArrayContent::Buckets(bucket_vec)) => bucket_vec
-            .iter()
-            .enumerate()
-            .map(|(index, bucket)| histogram_bucket_constructor(index, bucket.count))
-            .collect::<Result<Vec<HistogramBucket>, Error>>(),
+            }
+        }
+        Property::UintArray(
+            _,
+            ArrayContent::LinearHistogram(LinearHistogram { counts, indexes, size, .. }),
+        )
+        | Property::UintArray(
+            _,
+            ArrayContent::ExponentialHistogram(ExponentialHistogram {
+                counts, indexes, size, ..
+            }),
+        ) => {
+            sanitize_size(*size)?;
+            match (indexes, counts) {
+                (None, counts) => build_cobalt_histogram(counts.iter().map(|c| *c)),
+                (Some(indexes), counts) => {
+                    sanitize_indexes(indexes, *size)?;
+                    build_sparse_cobalt_histogram(counts.iter().map(|c| *c), indexes, *size)
+                }
+            }
+        }
         _ => {
             // TODO(fxbug.dev/42067): Does cobalt support floors or step counts that are
             // not ints? if so, we can support that as well with double arrays if the
@@ -992,7 +1052,8 @@ fn convert_inspect_histogram_to_cobalt_histogram(
                 inspect_histogram.discriminant_name()
             ));
         }
-    }
+    };
+    Ok(histogram)
 }
 
 fn process_int(
@@ -1151,7 +1212,7 @@ fn process_schema_errors(errors: &Option<Vec<diagnostics_data::InspectError>>, m
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_hierarchy::{hierarchy, Bucket};
+    use diagnostics_hierarchy::hierarchy;
     use futures::executor;
 
     /// Test inserting a string into the hierarchy that requires escaping.
@@ -1645,28 +1706,64 @@ mod tests {
         });
     }
 
-    fn create_inspect_bucket_vec<T: Copy>(hist: Vec<T>) -> Vec<Bucket<T>> {
-        hist.iter()
-            .map(|val| Bucket {
-                // Cobalt doesn't use the Inspect floor and ceiling, so
-                // lets use val for them since its the only thing available
-                // with type T.
-                floor: *val,
-                ceiling: *val,
-                count: *val,
-            })
-            .collect()
-    }
-    fn convert_vector_to_int_histogram(hist: Vec<i64>) -> Property<String> {
-        let bucket_vec = create_inspect_bucket_vec::<i64>(hist);
-
-        Property::IntArray("Bloop".to_string(), ArrayContent::Buckets(bucket_vec))
+    fn convert_vector_to_int_histogram(hist: Vec<i64>) -> Property {
+        let size = hist.len();
+        Property::IntArray(
+            "Bloop".to_string(),
+            ArrayContent::LinearHistogram(LinearHistogram {
+                floor: 1,
+                step: 1,
+                counts: hist,
+                size,
+                indexes: None,
+            }),
+        )
     }
 
     fn convert_vector_to_uint_histogram(hist: Vec<u64>) -> Property<String> {
-        let bucket_vec = create_inspect_bucket_vec::<u64>(hist);
+        let size = hist.len();
+        Property::UintArray(
+            "Bloop".to_string(),
+            ArrayContent::LinearHistogram(LinearHistogram {
+                floor: 1,
+                step: 1,
+                counts: hist,
+                size,
+                indexes: None,
+            }),
+        )
+    }
 
-        Property::UintArray("Bloop".to_string(), ArrayContent::Buckets(bucket_vec))
+    // Produce condensed histograms. Size is arbitrary 100 - indexes must be less than that.
+    fn convert_vectors_to_int_histogram(counts: Vec<i64>, indexes: Vec<usize>) -> Property<String> {
+        let size = 100;
+        Property::IntArray(
+            "Bloop".to_string(),
+            ArrayContent::LinearHistogram(LinearHistogram {
+                floor: 1,
+                step: 1,
+                counts,
+                size,
+                indexes: Some(indexes),
+            }),
+        )
+    }
+
+    fn convert_vectors_to_uint_histogram(
+        counts: Vec<u64>,
+        indexes: Vec<usize>,
+    ) -> Property<String> {
+        let size = 100;
+        Property::UintArray(
+            "Bloop".to_string(),
+            ArrayContent::LinearHistogram(LinearHistogram {
+                floor: 1,
+                step: 1,
+                counts,
+                size,
+                indexes: Some(indexes),
+            }),
+        )
     }
 
     struct IntHistogramTesterParams {
@@ -1799,6 +1896,29 @@ mod tests {
             process_ok: true,
             event_made: true,
             diff: vec![(0, 2), (1, 1), (2, 1), (3, 1)],
+        });
+    }
+
+    // Test that we can handle condensed int and uint histograms, even with indexes out of order
+    #[fuchsia::test]
+    fn test_normal_process_condensed_histograms() {
+        let new_u64_sample = convert_vectors_to_int_histogram(vec![2, 6], vec![3, 5]);
+        let old_u64_sample = Some(convert_vectors_to_int_histogram(vec![1], vec![5]));
+        process_int_histogram_tester(IntHistogramTesterParams {
+            new_val: new_u64_sample,
+            old_val: old_u64_sample,
+            process_ok: true,
+            event_made: true,
+            diff: vec![(3, 2), (5, 5)],
+        });
+        let new_i64_sample = convert_vectors_to_uint_histogram(vec![2, 4], vec![5, 3]);
+        let old_i64_sample = None;
+        process_int_histogram_tester(IntHistogramTesterParams {
+            new_val: new_i64_sample,
+            old_val: old_i64_sample,
+            process_ok: true,
+            event_made: true,
+            diff: vec![(3, 4), (5, 2)],
         });
     }
 

@@ -44,7 +44,7 @@ pub use {
         error::ReaderError, readable_tree::ReadableTree, tree_reader::read,
         tree_reader::read_with_timeout,
     },
-    diagnostics_hierarchy::{ArrayContent, ArrayFormat, Bucket, DiagnosticsHierarchy, Property},
+    diagnostics_hierarchy::{ArrayContent, ArrayFormat, DiagnosticsHierarchy, Property},
     inspect_format::LinkNodeDisposition,
 };
 
@@ -693,7 +693,7 @@ mod tests {
                 floor: 1,
                 initial_step: 1,
                 step_multiplier: 2,
-                buckets: 4,
+                buckets: 5,
             },
         );
         for x in [1, 2, 3, 4].iter() {
@@ -710,24 +710,24 @@ mod tests {
                 "property-double": -3.4,
                 "property-bool": true,
                 "property-string": string_data,
-                "property-int-array": vec![
-                    Bucket { floor: i64::MIN, ceiling: 1, count: 1 },
-                    Bucket { floor: 1, ceiling: 3, count: 1 },
-                    Bucket { floor: 3, ceiling: 5, count: 1 },
-                    Bucket { floor: 5, ceiling: 7, count: 1 },
-                    Bucket { floor: 7, ceiling: i64::MAX, count: 1 }
-                ],
+                "property-int-array": LinearHistogram {
+                    floor: 1i64,
+                    step: 2,
+                    counts: vec![1, 1, 1, 1, 1],
+                    indexes: None,
+                    size: 5
+                },
                 "child-1-1": {
                     "property-int": -9i64,
                     "property-bytes": bytes_data,
-                    "property-uint-array": vec![
-                        Bucket { floor: 0, ceiling: 1, count: 0 },
-                        Bucket { floor: 1, ceiling: 2, count: 1 },
-                        Bucket { floor: 2, ceiling: 3, count: 1 },
-                        Bucket { floor: 3, ceiling: 5, count: 2 },
-                        Bucket { floor: 5, ceiling: 9, count: 0 },
-                        Bucket { floor: 9, ceiling: u64::MAX, count: 0 },
-                    ],
+                    "property-uint-array": ExponentialHistogram {
+                        floor: 1u64,
+                        initial_step: 1,
+                        step_multiplier: 2,
+                        counts: vec![1, 1, 2],
+                        indexes: Some(vec![1, 2, 3]),
+                        size: 7
+                    },
                 }
             },
             "child-2": {
