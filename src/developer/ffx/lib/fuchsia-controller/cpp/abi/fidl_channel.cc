@@ -7,6 +7,7 @@
 #include "convert.h"
 #include "error.h"
 #include "mod.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 namespace fidl_channel {
 
@@ -151,20 +152,20 @@ PyObject *FidlChannel_read(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
     PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
     return nullptr;
   }
-  auto res = PyTuple_New(2);
+  auto res = py::Object(PyTuple_New(2));
   if (res == nullptr) {
     return nullptr;
   }
-  auto buf = PyByteArray_FromStringAndSize(const_cast<const char *>(c_buf),
-                                           static_cast<Py_ssize_t>(actual_bytes_count));
+  auto buf = py::Object(PyByteArray_FromStringAndSize(const_cast<const char *>(c_buf),
+                                                      static_cast<Py_ssize_t>(actual_bytes_count)));
   if (buf == nullptr) {
     return nullptr;
   }
-  auto handles_list = PyList_New(static_cast<Py_ssize_t>(actual_handles_count));
+  auto handles_list = py::Object(PyList_New(static_cast<Py_ssize_t>(actual_handles_count)));
   if (handles_list == nullptr) {
     return nullptr;
   }
-  PyTuple_SET_ITEM(res, 0, buf);
+  PyTuple_SET_ITEM(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < actual_handles_count; ++i) {
     zx_handle_t handle = handles[i];
     auto handle_obj =
@@ -172,10 +173,10 @@ PyObject *FidlChannel_read(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
     if (handle_obj == nullptr) {
       return nullptr;
     }
-    PyList_SET_ITEM(handles_list, static_cast<Py_ssize_t>(i), handle_obj);
+    PyList_SET_ITEM(handles_list.get(), static_cast<Py_ssize_t>(i), handle_obj);
   }
-  PyTuple_SET_ITEM(res, 1, handles_list);
-  return res;
+  PyTuple_SET_ITEM(res.get(), 1, handles_list.take());
+  return res.take();
 }
 
 PyObject *FidlChannel_as_int(FidlChannel *self, PyObject *Py_UNUSED(arg)) {

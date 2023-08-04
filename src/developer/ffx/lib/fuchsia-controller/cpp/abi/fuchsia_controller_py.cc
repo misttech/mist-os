@@ -5,21 +5,13 @@
 
 #include <Python.h>
 
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <string>
-
 #include "error.h"
 #include "fidl_channel.h"
 #include "fuchsia_controller.h"
 #include "isolate_directory.h"
 #include "macros.h"
 #include "mod.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 extern struct PyModuleDef fuchsia_controller_py;
 
@@ -250,45 +242,40 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   if (PyType_Ready(&isolate::IsolateDirType) < 0) {
     return nullptr;
   }
-  PyObject *m = PyModule_Create(&fuchsia_controller_py);
+  auto m = py::Object(PyModule_Create(&fuchsia_controller_py));
   if (m == nullptr) {
     return nullptr;
   }
-  auto state = reinterpret_cast<mod::FuchsiaControllerState *>(PyModule_GetState(m));
+  auto state = reinterpret_cast<mod::FuchsiaControllerState *>(PyModule_GetState(m.get()));
   create_ffx_lib_context(&state->ctx, state->ERR_SCRATCH, mod::ERR_SCRATCH_LEN);
   Py_INCREF(&ContextType);
-  if (PyModule_AddObject(m, "Context", reinterpret_cast<PyObject *>(&ContextType)) < 0) {
+  if (PyModule_AddObject(m.get(), "Context", reinterpret_cast<PyObject *>(&ContextType)) < 0) {
     Py_DECREF(&ContextType);
-    Py_DECREF(m);
     return nullptr;
   }
-  if (PyModule_AddObject(m, "IsolateDir", reinterpret_cast<PyObject *>(&isolate::IsolateDirType)) <
-      0) {
+  if (PyModule_AddObject(m.get(), "IsolateDir",
+                         reinterpret_cast<PyObject *>(&isolate::IsolateDirType)) < 0) {
     Py_DECREF(&isolate::IsolateDirType);
-    Py_DECREF(m);
     return nullptr;
   }
   auto zx_status_type = error::ZxStatusType_Create();
-  if (PyModule_AddObject(m, "ZxStatus", reinterpret_cast<PyObject *>(zx_status_type)) < 0) {
+  if (PyModule_AddObject(m.get(), "ZxStatus", reinterpret_cast<PyObject *>(zx_status_type)) < 0) {
     Py_DECREF(zx_status_type);
-    Py_DECREF(m);
     return nullptr;
   }
   Py_INCREF(&fidl_handle::FidlHandleType);
-  if (PyModule_AddObject(m, "FidlHandle",
+  if (PyModule_AddObject(m.get(), "FidlHandle",
                          reinterpret_cast<PyObject *>(&fidl_handle::FidlHandleType)) < 0) {
     Py_DECREF(&fidl_handle::FidlHandleType);
-    Py_DECREF(m);
     return nullptr;
   }
   Py_INCREF(&fidl_channel::FidlChannelType);
-  if (PyModule_AddObject(m, "FidlChannel",
+  if (PyModule_AddObject(m.get(), "FidlChannel",
                          reinterpret_cast<PyObject *>(&fidl_channel::FidlChannelType)) < 0) {
     Py_DECREF(&fidl_channel::FidlChannelType);
-    Py_DECREF(m);
     return nullptr;
   }
-  return m;
+  return m.take();
 }
 
 }  // namespace
