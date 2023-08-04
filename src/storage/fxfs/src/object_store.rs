@@ -1752,7 +1752,7 @@ impl ObjectStore {
                     .tree
                     .find(&ObjectKey::object(object_id))
                     .await?
-                    .ok_or(anyhow!(FxfsError::NotFound))?,
+                    .ok_or(FxfsError::NotFound)?,
                 op: Operation::ReplaceOrInsert,
             })
         }
