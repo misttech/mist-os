@@ -291,7 +291,7 @@ class ChildPreReleaseable : public base_mixin {
 template <typename D>
 class MadeVisibleable : public base_mixin {
  protected:
-  static constexpr void MadeVisibleOp(zx_protocol_device_t* proto) {
+  static constexpr void InitOp(zx_protocol_device_t* proto) {
     internal::CheckMadeVisibleable<D>();
     proto->made_visible = MadeVisible;
   }

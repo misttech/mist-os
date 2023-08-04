@@ -583,8 +583,14 @@ zx_status_t Device::CreateNode() {
 
   auto task =
       bridge.consumer.promise()
-          .or_else([this](std::variant<zx_status_t, fdf::NodeError>& status) {
-            if (auto error = std::get_if<zx_status_t>(&status); error) {
+          .then([this](fpromise::result<void, std::variant<zx_status_t, fdf::NodeError>>& result) {
+            if (result.is_ok()) {
+              if (HasOp(ops_, &zx_protocol_device_t::made_visible)) {
+                ops_->made_visible(compat_symbol_.context);
+              }
+              return;
+            }
+            if (auto error = std::get_if<zx_status_t>(&result.error()); error) {
               if (*error == ZX_ERR_PEER_CLOSED) {
                 // This is a warning because it can happen during shutdown.
                 FDF_LOGL(WARNING, *logger_, "%s: Node channel closed while adding device", Name());
@@ -592,7 +598,7 @@ zx_status_t Device::CreateNode() {
                 FDF_LOGL(ERROR, *logger_, "Failed to add device: %s: status: %s", Name(),
                          zx_status_get_string(*error));
               }
-            } else if (auto error = std::get_if<fdf::NodeError>(&status); error) {
+            } else if (auto error = std::get_if<fdf::NodeError>(&result.error()); error) {
               if (*error == fdf::NodeError::kNodeRemoved) {
                 // This is a warning because it can happen if the parent driver is unbound while we
                 // are still setting up.
@@ -602,8 +608,6 @@ zx_status_t Device::CreateNode() {
                 FDF_LOGL(ERROR, *logger_, "Failed to add device: NodeError: '%s': %u", Name(),
                          static_cast<unsigned int>(*error));
               }
-            } else if (HasOp(ops_, &zx_protocol_device_t::made_visible)) {
-              ops_->made_visible(compat_symbol_.context);
             }
           })
           .wrap_with(scope_);

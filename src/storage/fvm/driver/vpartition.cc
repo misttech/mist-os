@@ -513,17 +513,9 @@ void VPartition::DdkRelease() { delete this; }
 
 zx_device_t* VPartition::GetParent() const { return mgr_->parent(); }
 
-void VPartition::DdkInit(ddk::InitTxn init_txn) {
-  init_txn.Reply(ZX_OK);
-  // Signal to the VPartitionManager that the device has been initialized.
-  if (on_init_) {
-    sync_completion_signal(on_init_);
-  }
-}
-
-zx_status_t VPartition::AddWaitForInit(std::unique_ptr<VPartition> vp, const std::string& name,
-                                       sync_completion_t* on_init) {
-  vp->on_init_ = on_init;
+zx_status_t VPartition::AddSignalVisible(std::unique_ptr<VPartition> vp, const std::string& name,
+                                         sync_completion_t* on_visible) {
+  vp->on_visible_ = on_visible;
   if (zx_status_t status = vp->DdkAdd(name.c_str()); status != ZX_OK) {
     return status;
   }
@@ -531,6 +523,15 @@ zx_status_t VPartition::AddWaitForInit(std::unique_ptr<VPartition> vp, const std
   // device is released.
   static_cast<void>(vp.release());
   return ZX_OK;
+}
+
+void VPartition::DdkMadeVisible() {
+  if (on_visible_) {
+    sync_completion_signal(on_visible_);
+    // TODO(fxbug.dev/126961): DdkMadeVisible gets called multiple times in DFv1 currently, so make
+    // sure we don't signal twice.
+    on_visible_ = nullptr;
+  }
 }
 
 }  // namespace fvm
