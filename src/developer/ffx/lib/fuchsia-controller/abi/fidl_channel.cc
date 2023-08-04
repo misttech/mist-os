@@ -66,30 +66,67 @@ PyObject *FidlChannel_write(FidlChannel *self, PyObject *buf) {
   if (handles_len < 0) {
     return nullptr;
   }
-  zx_handle_t c_handles[handles_len];
+  zx_handle_disposition_t c_handles[handles_len];
   for (Py_ssize_t i = 0; i < handles_len; ++i) {
     auto obj = PyList_GetItem(handles, i);
     if (obj == nullptr) {
+      return nullptr;
+    }
+    auto operation_obj = PyTuple_GetItem(obj, 0);
+    if (operation_obj == nullptr) {
       return nullptr;
     }
     auto handle_obj = PyTuple_GetItem(obj, 1);
     if (handle_obj == nullptr) {
       return nullptr;
     }
+    auto type_obj = PyTuple_GetItem(obj, 2);
+    if (type_obj == nullptr) {
+      return nullptr;
+    }
+    auto rights_obj = PyTuple_GetItem(obj, 3);
+    if (rights_obj == nullptr) {
+      return nullptr;
+    }
+    auto result_obj = PyTuple_GetItem(obj, 4);
+    if (result_obj == nullptr) {
+      return nullptr;
+    }
     zx_handle_t handle = convert::PyLong_AsU32(handle_obj);
     if (handle == convert::MINUS_ONE_U32) {
       return nullptr;
     }
-    // TODO(b/289226682): Need to use some kind of write_etc implementation for this.
-    c_handles[i] = handle;
+    zx_rights_t rights = convert::PyLong_AsU32(rights_obj);
+    if (rights == convert::MINUS_ONE_U32) {
+      return nullptr;
+    }
+    zx_obj_type_t obj_type = convert::PyLong_AsU32(type_obj);
+    if (obj_type == convert::MINUS_ONE_U32) {
+      return nullptr;
+    }
+    zx_status_t result = static_cast<zx_status_t>(convert::PyLong_AsU32(result_obj));
+    if (static_cast<uint32_t>(result) == convert::MINUS_ONE_U32) {
+      return nullptr;
+    }
+    zx_handle_op_t operation = convert::PyLong_AsU32(operation_obj);
+    if (operation == convert::MINUS_ONE_U32) {
+      return nullptr;
+    }
+    c_handles[i] = {
+        .operation = operation,
+        .handle = handle,
+        .type = obj_type,
+        .rights = rights,
+        .result = result,
+    };
   }
   Py_buffer view;
   if (PyObject_GetBuffer(bytes, &view, PyBUF_CONTIG_RO) < 0) {
     return nullptr;
   }
-  if (ffx_channel_write(mod::get_module_state()->ctx, self->super.handle,
-                        reinterpret_cast<const char *>(view.buf), static_cast<uint64_t>(view.len),
-                        c_handles, handles_len) != ZX_OK) {
+  if (ffx_channel_write_etc(mod::get_module_state()->ctx, self->super.handle,
+                            reinterpret_cast<const char *>(view.buf),
+                            static_cast<uint64_t>(view.len), c_handles, handles_len) != ZX_OK) {
     mod::dump_python_err();
     PyBuffer_Release(&view);
     return nullptr;
@@ -145,10 +182,19 @@ PyObject *FidlChannel_as_int(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
   return PyLong_FromUnsignedLongLong(self->super.handle);
 }
 
+PyObject *FidlChannel_take(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
+  auto result = PyLong_FromUnsignedLongLong(self->super.handle);
+  self->super.handle = 0;
+  return result;
+}
+
 PyMethodDef FidlChannel_methods[] = {
     {"write", reinterpret_cast<PyCFunction>(FidlChannel_write), METH_O, nullptr},
     {"read", reinterpret_cast<PyCFunction>(FidlChannel_read), METH_NOARGS, nullptr},
     {"as_int", reinterpret_cast<PyCFunction>(FidlChannel_as_int), METH_NOARGS, nullptr},
+    {"take", reinterpret_cast<PyCFunction>(FidlChannel_take), METH_NOARGS,
+     "Takes the underlying fidl handle, setting it internally to zero (thus invalidating the "
+     "underlying channel). This is used for sending a handle through FIDL function calls."},
     {nullptr, nullptr, 0, nullptr}};
 
 DES_MIX PyTypeObject FidlChannelType = {

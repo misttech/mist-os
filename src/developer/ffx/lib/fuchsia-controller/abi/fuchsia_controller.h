@@ -43,6 +43,9 @@ extern void ffx_close_handle(zx_handle_t handle);
 extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
                                      const char* out_buf, uint64_t out_len, zx_handle_t* hdls,
                                      uint64_t hdls_len);
+extern zx_status_t ffx_channel_write_etc(ffx_lib_context_t* ctx, zx_handle_t handle,
+                                         const char* out_buf, uint64_t out_len,
+                                         zx_handle_disposition_t* hdls, uint64_t hdls_len);
 extern zx_status_t ffx_channel_read(ffx_lib_context_t* ctx, zx_handle_t handle, char* out_buf,
                                     uint64_t out_len, zx_handle_t* hdls, uint64_t hdls_len,
                                     uint64_t* actual_bytes_count, uint64_t* actual_handles_count);

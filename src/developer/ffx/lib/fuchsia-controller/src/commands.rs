@@ -6,7 +6,7 @@ use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use crate::waker::handle_notifier_waker;
-use fidl::{AsHandleRef, HandleBased};
+use fidl::{AsHandleRef, HandleBased, HandleDisposition, HandleOp, ObjectType, Rights, Status};
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
 use std::mem::ManuallyDrop;
@@ -66,6 +66,12 @@ pub(crate) enum LibraryCommand {
         channel: fidl::Channel,
         buf: ExtBuffer<u8>,
         handles: ExtBuffer<fidl::Handle>,
+        responder: Responder<zx_status::Status>,
+    },
+    ChannelWriteEtc {
+        channel: fidl::Channel,
+        buf: ExtBuffer<u8>,
+        handles: ExtBuffer<zx_types::zx_handle_disposition_t>,
         responder: Responder<zx_status::Status>,
     },
     SocketRead {
@@ -222,6 +228,54 @@ impl LibraryCommand {
             Self::ChannelWrite { channel, buf, mut handles, responder } => {
                 let channel = ManuallyDrop::new(channel);
                 let status = match channel.write(&buf, &mut handles) {
+                    Ok(_) => zx_status::Status::OK,
+                    Err(e) => e,
+                };
+                responder.send(status).unwrap();
+            }
+            Self::ChannelWriteEtc { channel, buf, mut handles, responder } => {
+                let channel = ManuallyDrop::new(channel);
+                let mut handle_dispositions =
+                    Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
+                // The verification pass is just to eliminate some headaches around lifetime checks
+                // regarding the allocation of channels from raw handle numbers.
+                for i in 0..handles.len() {
+                    let disp = handles[i];
+                    if disp.operation != zx_types::ZX_HANDLE_OP_MOVE {
+                        responder.send(zx_status::Status::NOT_SUPPORTED).unwrap();
+                        return;
+                    }
+                    if Rights::from_bits(disp.rights).is_none() {
+                        responder.send(zx_status::Status::INVALID_ARGS).unwrap();
+                        return;
+                    }
+                }
+                for i in 0..handles.len() {
+                    let disp = std::mem::replace(
+                        &mut handles[i],
+                        zx_types::zx_handle_disposition_t {
+                            operation: 0,
+                            handle: 0,
+                            type_: 0,
+                            result: 0,
+                            rights: 0,
+                        },
+                    );
+                    let handle_op = HandleOp::Move(unsafe { fidl::Handle::from_raw(disp.handle) });
+                    let object_type = ObjectType::from_raw(disp.type_);
+                    let rights = Rights::from_bits(disp.rights).unwrap();
+                    let result = Status::from_raw(disp.result);
+                    handle_dispositions.push(HandleDisposition {
+                        handle_op,
+                        object_type,
+                        rights,
+                        result,
+                    });
+                }
+                let status = match channel.write_etc(
+                    &buf,
+                    handle_dispositions.as_mut_slice() as &mut [HandleDisposition<'_>],
+                ) {
                     Ok(_) => zx_status::Status::OK,
                     Err(e) => e,
                 };

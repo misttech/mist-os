@@ -31,8 +31,17 @@ PyObject *FidlHandle_as_int(FidlHandle *self, PyObject *Py_UNUSED(arg)) {
   return PyLong_FromUnsignedLongLong(self->handle);
 }
 
+PyObject *FidlHandle_take(FidlHandle *self, PyObject *Py_UNUSED(arg)) {
+  auto result = PyLong_FromUnsignedLongLong(self->handle);
+  self->handle = 0;
+  return result;
+}
+
 PyMethodDef FidlChannel_methods[] = {
     {"as_int", reinterpret_cast<PyCFunction>(FidlHandle_as_int), METH_NOARGS, nullptr},
+    {"take", reinterpret_cast<PyCFunction>(FidlHandle_take), METH_NOARGS,
+     "Takes the underlying fidl handle, setting it internally to zero (thus invalidating the "
+     "underlying channel). This is used for sending a handle through FIDL function calls."},
     {nullptr, nullptr, 0, nullptr}};
 
 DES_MIX PyTypeObject FidlHandleType = {

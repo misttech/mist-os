@@ -225,6 +225,30 @@ pub unsafe extern "C" fn ffx_channel_write(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ffx_channel_write_etc(
+    ctx: *const LibContext,
+    handle: zx_types::zx_handle_t,
+    out_buf: *mut u8,
+    out_len: u64,
+    hdls: *mut zx_types::zx_handle_disposition_t,
+    hdls_len: u64,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (responder, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(handle) };
+    let channel = fidl::Channel::from_handle(handle);
+    ctx.run(LibraryCommand::ChannelWriteEtc {
+        channel,
+        buf: ExtBuffer::new(out_buf, out_len as usize),
+        // Construction of HandleDisposition structs has to happen in the main thread, as it
+        // contains a lifetime bound.
+        handles: ExtBuffer::new(hdls, hdls_len as usize),
+        responder,
+    });
+    rx.recv().unwrap()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ffx_channel_read(
     ctx: *const LibContext,
     handle: zx_types::zx_handle_t,
@@ -511,6 +535,17 @@ mod test {
     #[test]
     fn channel_write_then_read_some_data() {
         let lib_ctx = testing_lib_context();
+        // For anyone reading these, the handles sent to the write and write_etc functions are
+        // presumed to be owned by said functions when called. The behavior here is written under
+        // the assumption that the tests are going to pass. If they don't there is a lot of global
+        // state under the FIDL host-side handle emulation that is going to look very strange, and
+        // will likely cause tests outside of this one to fail due to double-closing of channels.
+        // Since tests run in parallel it is possible for another test to open a new channel with
+        // the same raw handle number _before_ one of these channels is closed, thus causing a
+        // double close error.
+        //
+        // Just something to keep in mind, especially if attempting to extend this code with more
+        // potential failure cases.
         let (a, b) = fidl::Channel::create();
         let (c, d) = fidl::Channel::create();
         let c_handle = c.raw_handle();
@@ -545,6 +580,137 @@ mod test {
         assert_eq!(result, zx_status::Status::OK);
         assert_eq!(&buf, &[1, 2]);
         assert_eq!(&handles, &[c_handle, d_handle]);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn channel_write_etc_then_read_some_data() {
+        let lib_ctx = testing_lib_context();
+        let (a, b) = fidl::Channel::create();
+        let (c, d) = fidl::Channel::create();
+        let c_handle = c.raw_handle();
+        let d_handle = d.raw_handle();
+        let mut write_buf = [1u8, 2u8];
+        let mut handles_buf: [zx_types::zx_handle_disposition_t; 2] = [
+            zx_types::zx_handle_disposition_t {
+                operation: zx_types::ZX_HANDLE_OP_MOVE,
+                handle: c.raw_handle(),
+                type_: zx_types::ZX_OBJ_TYPE_CHANNEL,
+                rights: zx_types::ZX_RIGHT_SAME_RIGHTS,
+                result: zx_types::ZX_OK,
+            },
+            zx_types::zx_handle_disposition_t {
+                operation: zx_types::ZX_HANDLE_OP_MOVE,
+                handle: d.raw_handle(),
+                type_: zx_types::ZX_OBJ_TYPE_CHANNEL,
+                rights: zx_types::ZX_RIGHT_SAME_RIGHTS,
+                result: zx_types::ZX_OK,
+            },
+        ];
+        let result = unsafe {
+            ffx_channel_write_etc(
+                lib_ctx,
+                b.raw_handle(),
+                write_buf.as_mut_ptr(),
+                2,
+                handles_buf.as_mut_ptr().cast(),
+                2,
+            )
+        };
+        assert_eq!(handles_buf[0].handle, 0);
+        assert_eq!(handles_buf[1].handle, 0);
+        assert_eq!(result, zx_status::Status::OK);
+        let mut buf = [0u8; 2];
+        let mut handles = [0u32; 2];
+        let result = unsafe {
+            ffx_channel_read(
+                lib_ctx,
+                a.raw_handle(),
+                buf.as_mut_ptr(),
+                buf.len() as u64,
+                handles.as_mut_ptr(),
+                handles.len() as u64,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(&buf, &[1, 2]);
+        assert_eq!(&handles, &[c_handle, d_handle]);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn channel_write_etc_unsupported_op() {
+        let lib_ctx = testing_lib_context();
+        let (_a, b) = fidl::Channel::create();
+        let (c, d) = fidl::Channel::create();
+        let mut write_buf = [1u8, 2u8];
+        let mut handles_buf: [zx_types::zx_handle_disposition_t; 2] = [
+            zx_types::zx_handle_disposition_t {
+                operation: zx_types::ZX_HANDLE_OP_DUPLICATE,
+                handle: c.raw_handle(),
+                type_: zx_types::ZX_OBJ_TYPE_CHANNEL,
+                rights: zx_types::ZX_RIGHT_SAME_RIGHTS,
+                result: zx_types::ZX_OK,
+            },
+            zx_types::zx_handle_disposition_t {
+                operation: zx_types::ZX_HANDLE_OP_MOVE,
+                handle: d.raw_handle(),
+                type_: zx_types::ZX_OBJ_TYPE_CHANNEL,
+                rights: zx_types::ZX_RIGHT_SAME_RIGHTS,
+                result: zx_types::ZX_OK,
+            },
+        ];
+        let result = unsafe {
+            ffx_channel_write_etc(
+                lib_ctx,
+                b.raw_handle(),
+                write_buf.as_mut_ptr(),
+                2,
+                handles_buf.as_mut_ptr().cast(),
+                2,
+            )
+        };
+        assert_eq!(result, zx_status::Status::NOT_SUPPORTED);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn channel_write_etc_invalid_arg() {
+        let lib_ctx = testing_lib_context();
+        let (_a, b) = fidl::Channel::create();
+        let (c, d) = fidl::Channel::create();
+        let c = c.into_raw();
+        let d = d.into_raw();
+        let mut write_buf = [1u8, 2u8];
+        let mut handles_buf: [zx_types::zx_handle_disposition_t; 2] = [
+            zx_types::zx_handle_disposition_t {
+                operation: zx_types::ZX_HANDLE_OP_MOVE,
+                handle: c,
+                type_: zx_types::ZX_OBJ_TYPE_CHANNEL,
+                rights: 1 << 30,
+                result: zx_types::ZX_OK,
+            },
+            zx_types::zx_handle_disposition_t {
+                operation: zx_types::ZX_HANDLE_OP_MOVE,
+                handle: d,
+                type_: zx_types::ZX_OBJ_TYPE_CHANNEL,
+                rights: zx_types::ZX_RIGHT_SAME_RIGHTS,
+                result: zx_types::ZX_OK,
+            },
+        ];
+        let result = unsafe {
+            ffx_channel_write_etc(
+                lib_ctx,
+                b.raw_handle(),
+                write_buf.as_mut_ptr(),
+                2,
+                handles_buf.as_mut_ptr().cast(),
+                2,
+            )
+        };
+        assert_eq!(result, zx_status::Status::INVALID_ARGS);
         unsafe { destroy_ffx_lib_context(lib_ctx) }
     }
 
