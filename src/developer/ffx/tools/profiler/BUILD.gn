@@ -43,7 +43,10 @@ ffx_tool("ffx_profiler") {
 }
 
 group("profiler") {
-  public_deps = [ ":ffx_profiler" ]
+  public_deps = [
+    ":ffx_profiler",
+    ":ffx_profiler_host_tool",
+  ]
 }
 
 group("bin") {
