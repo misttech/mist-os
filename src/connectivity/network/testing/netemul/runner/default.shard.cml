@@ -16,10 +16,6 @@
         {
             event_stream: [ "destroyed" ],
             from: "parent",
-
-            // TODO(https://fxbug.dev/81980): Remove path when fully migrated to events_v2
-            // and component manager exposes the event stream at the correct path.
-            path: "/svc/fuchsia.component.EventStream",
         },
     ],
     expose: [

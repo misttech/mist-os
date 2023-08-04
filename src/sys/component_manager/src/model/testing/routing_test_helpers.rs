@@ -462,10 +462,7 @@ impl RoutingTest {
                 UseDecl::Service(s) => Some(s.target_path.dirname().into()),
                 UseDecl::Protocol(s) => Some(s.target_path.dirname().into()),
                 UseDecl::Storage(s) => Some(s.target_path.to_string()),
-                UseDecl::EventStream(s) => {
-                    // TODO(fxbug.dev/81980): Route EventStream path
-                    Some(s.target_path.dirname().into())
-                }
+                UseDecl::EventStream(s) => Some(s.target_path.dirname().into()),
             })
             .collect();
         let mut expected_paths = vec![];
