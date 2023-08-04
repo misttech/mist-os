@@ -302,6 +302,14 @@ impl Sdk {
         &self.version
     }
 
+    pub fn get_version_string(&self) -> Option<String> {
+        match &self.version {
+            SdkVersion::Version(version) => Some(version.to_string()),
+            SdkVersion::InTree => Some(in_tree_sdk_version()),
+            SdkVersion::Unknown => None,
+        }
+    }
+
     /// For tests only
     #[doc(hidden)]
     pub fn get_empty_sdk_with_version(version: SdkVersion) -> Sdk {

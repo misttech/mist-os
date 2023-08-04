@@ -41,6 +41,7 @@ pub static GA4_METRICS_INSTANCE: OnceLock<Arc<Mutex<GA4MetricsService>>> = OnceL
 pub async fn init_with_invoker(
     app_name: String,
     build_version: Option<String>,
+    sdk_version: String,
     ga_product_code: String,
     ga4_product_code: String,
     ga4_key: String,
@@ -50,6 +51,7 @@ pub async fn init_with_invoker(
         &PathBuf::from(&analytics_folder()),
         app_name,
         build_version.unwrap_or(UNKNOWN_VERSION.into()),
+        sdk_version,
         ga_product_code,
         ga4_product_code,
         ga4_key,
@@ -71,12 +73,21 @@ pub async fn init_with_invoker(
 pub async fn init_ga4(
     app_name: String,
     build_version: Option<String>,
+    sdk_version: String,
     ga_product_code: String,
     ga4_product_code: String,
     ga4_key: String,
 ) {
-    init_with_invoker(app_name, build_version, ga_product_code, ga4_product_code, ga4_key, None)
-        .await;
+    init_with_invoker(
+        app_name,
+        build_version,
+        sdk_version,
+        ga_product_code,
+        ga4_product_code,
+        ga4_key,
+        None,
+    )
+    .await;
 }
 
 /// This function initializes the metrics service with a default of NONE for the invoker
@@ -85,6 +96,7 @@ pub async fn init(app_name: String, build_version: Option<String>, ga_product_co
     init_with_invoker(
         app_name,
         build_version,
+        "UNKNOWN_SDK".to_string(),
         ga_product_code,
         "UNKNOWN_GA4_PROPERTY".to_string(),
         "UNKNOWN_GA4_KEY".to_string(),
@@ -98,6 +110,7 @@ pub async fn init(app_name: String, build_version: Option<String>, ga_product_co
 pub async fn init_ga4_metrics_service(
     app_name: String,
     build_version: Option<String>,
+    sdk_version: String,
     ga4_product_code: String,
     ga4_key: String,
     invoker: Option<String>,
@@ -106,6 +119,7 @@ pub async fn init_ga4_metrics_service(
         &PathBuf::from(&analytics_folder()),
         app_name,
         build_version.unwrap_or(UNKNOWN_VERSION.into()),
+        sdk_version,
         "deprecated".to_string(),
         ga4_product_code,
         ga4_key,

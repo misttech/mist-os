@@ -21,11 +21,16 @@ pub const GA4_KEY: &str = "mHeVJ5GxQTCvAVCmVHn_dw";
 
 pub const ANALYTICS_CLIENTID_CUSTOM_DIMENSION_KEY: &str = "cd5";
 
-pub async fn init_metrics_svc(build_info: VersionInfo, invoker: Option<String>) {
+pub async fn init_metrics_svc(
+    build_info: VersionInfo,
+    invoker: Option<String>,
+    sdk_version: String,
+) {
     let build_version = build_info.build_version;
     init_with_invoker(
         String::from("ffx"),
         build_version,
+        sdk_version,
         GA_PROPERTY_ID.to_string(),
         GA4_PROPERTY_ID.to_string(),
         GA4_KEY.to_string(),
@@ -129,7 +134,7 @@ mod tests {
         //     exec_path: None, build_id: None,
         //     __non_exhaustive: ()};
         let version_info = VersionInfo::default();
-        init_metrics_svc(version_info, None).await;
+        init_metrics_svc(version_info, None, String::from("test_version")).await;
         let mut custom_dimensions = BTreeMap::new();
         add_client_id_as_custom_dimension(&mut custom_dimensions).await;
         assert_eq!("No uuid", &custom_dimensions["cd5"]);

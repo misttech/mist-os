@@ -14,6 +14,7 @@ use std::{
 
 use crate::{FfxContext, Result};
 
+const UNKNOWN_SDK: &str = "Unknown SDK";
 pub struct MetricsSession {
     enabled: bool,
     session_start: Instant,
@@ -43,8 +44,14 @@ impl MetricsSession {
         let invoker = context.get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
         let build_info = context.build_info();
         let enabled = context.analytics_enabled().await;
-
-        init_metrics_svc(build_info, invoker.clone()).await;
+        let sdk_version;
+        if enabled {
+            sdk_version =
+                get_sdk_version(&context).await.unwrap_or_else(|| UNKNOWN_SDK.to_string());
+        } else {
+            sdk_version = UNKNOWN_SDK.to_string();
+        }
+        init_metrics_svc(build_info, invoker.clone(), sdk_version).await;
         if !enabled {
             opt_out_for_this_invocation().await?
         }
@@ -97,5 +104,12 @@ impl MetricsSession {
         let stats = CommandStats { success, command_duration, analytics_duration };
         tracing::info!("Command finished. {stats}",);
         Ok(stats)
+    }
+}
+
+async fn get_sdk_version(context: &EnvironmentContext) -> Option<String> {
+    match context.get_sdk().await {
+        Ok(sdk) => sdk.get_version_string(),
+        Err(_) => None,
     }
 }

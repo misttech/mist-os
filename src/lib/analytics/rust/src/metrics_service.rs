@@ -252,12 +252,15 @@ mod tests {
 
     const APP_NAME: &str = "my cool app";
     const BUILD_VERSION: &str = "12/09/20 00:00:00";
+    const SDK_VERSION: &str = "99.99.99.99.1";
+
     // const LAUNCH_ARGS: &str = "config analytics enable";
 
     fn test_metrics_svc(
         app_support_dir_path: &PathBuf,
         app_name: String,
         build_version: String,
+        sdk_version: String,
         ga_product_code: String,
         ga4_product_code: String,
         ga4_key: String,
@@ -269,6 +272,7 @@ mod tests {
                 app_support_dir_path,
                 app_name,
                 build_version,
+                sdk_version,
                 ga_product_code,
                 ga4_product_code,
                 ga4_key,
@@ -288,6 +292,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),

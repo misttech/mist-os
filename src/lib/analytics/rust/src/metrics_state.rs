@@ -22,6 +22,7 @@ pub const UNKNOWN_GA4_KEY: &str = "unknown ga4 key";
 pub struct MetricsState {
     pub(crate) app_name: String,
     pub(crate) build_version: String,
+    pub(crate) sdk_version: String,
     pub(crate) ga_product_code: String,
     pub(crate) ga4_product_code: String,
     pub(crate) ga4_key: String,
@@ -45,6 +46,7 @@ impl MetricsState {
         metrics_dir: &PathBuf,
         app_name: String,
         build_version: String,
+        sdk_version: String,
         ga_product_code: String,
         ga4_product_code: String,
         ga4_key: String,
@@ -55,6 +57,7 @@ impl MetricsState {
             metrics_dir,
             app_name,
             build_version,
+            sdk_version,
             ga_product_code,
             ga4_product_code,
             ga4_key,
@@ -67,6 +70,7 @@ impl MetricsState {
         metrics_dir: &PathBuf,
         app_name: String,
         build_version: String,
+        sdk_version: String,
         ga_product_code: String,
         ga4_product_code: String,
         ga4_key: String,
@@ -80,6 +84,7 @@ impl MetricsState {
         }
         metrics.app_name = app_name;
         metrics.build_version = build_version;
+        metrics.sdk_version = sdk_version;
         metrics.metrics_dir = PathBuf::from(metrics_dir);
         metrics.ga_product_code = ga_product_code;
         metrics.ga4_product_code = ga4_product_code;
@@ -182,6 +187,7 @@ impl Default for MetricsState {
         MetricsState {
             app_name: String::from(UNKNOWN_APP_NAME),
             build_version: String::from(UNKNOWN_VERSION),
+            sdk_version: String::from(UNKNOWN_VERSION),
             ga_product_code: UNKNOWN_PROPERTY_ID.to_string(),
             ga4_product_code: UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             ga4_key: UNKNOWN_GA4_KEY.to_string(),
@@ -269,12 +275,14 @@ mod tests {
 
     const APP_NAME: &str = "ffx";
     const BUILD_VERSION: &str = "12/09/20 00:00:00";
+    const SDK_VERSION: &str = "99.99.99.99.1";
 
     #[test]
     fn new_metrics() {
         let _m = MetricsState {
             app_name: String::from(APP_NAME),
             build_version: String::from(BUILD_VERSION),
+            sdk_version: String::from(SDK_VERSION),
             ga_product_code: UNKNOWN_PROPERTY_ID.to_string(),
             ga4_product_code: UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             ga4_key: UNKNOWN_GA4_KEY.to_string(),
@@ -292,6 +300,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),
@@ -323,6 +332,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),
@@ -352,6 +362,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),
@@ -377,6 +388,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),
@@ -399,6 +411,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),
@@ -422,6 +435,7 @@ mod tests {
             &dir,
             String::from(APP_NAME),
             String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
             UNKNOWN_PROPERTY_ID.to_string(),
             UNKNOWN_GA4_PRODUCT_CODE.to_string(),
             UNKNOWN_GA4_KEY.to_string(),
