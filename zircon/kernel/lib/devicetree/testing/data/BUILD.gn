@@ -29,6 +29,7 @@ dts_synthetic = [
   "synthetic/complex_with_alias.dts",
   "synthetic/complex_with_alias_first.dts",
   "synthetic/cpus_riscv.dts",
+  "synthetic/cpus_riscv_nested_clusters.dts",
   "synthetic/cpus_no_cpu_map_riscv.dts",
   "synthetic/empty.dts",
   "synthetic/memory_complex.dts",

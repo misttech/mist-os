@@ -535,9 +535,9 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   bool has_cpu_map_ = false;
 
   // Used to track parent-child relationships when building the flattened cpu-map.
-  std::optional<uint32_t> current_socket_ = 0;
-  std::optional<uint32_t> current_cluster_ = 0;
-  std::optional<uint32_t> current_core_ = 0;
+  std::optional<uint32_t> current_socket_;
+  std::optional<uint32_t> current_cluster_;
+  std::optional<uint32_t> current_core_;
 
   CpuEntry* cpu_entries_ = nullptr;
   uint32_t cpu_entry_count_ = 0;

@@ -11,6 +11,7 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -61,6 +62,19 @@ devicetree::ScanState DevictreeCpuTopologyItem::OnNode(const devicetree::NodePat
 }
 
 devicetree::ScanState DevictreeCpuTopologyItem::OnSubtree(const devicetree::NodePath& path) {
+  // Clusters can contain other clusters, when exiting a cluster, restore the containing cluster
+  // to cluster containing the current cluster if any.
+  if (current_cluster_) {
+    if (path.IsDescendentOf("/cpus/cpu-map") && IsCpuMapNode(path.back(), "cluster")) {
+      // Restore the previous cluster.
+      if (map_entries_) {
+        current_cluster_ = map_entries_[*current_cluster_].cluster_index;
+      } else {
+        current_cluster_ = std::nullopt;
+      }
+    }
+  }
+
   // Allocated and filled up, means we are done going through the tree.
   if (cpu_entries_ && cpu_entry_index_ == cpu_entry_count_) {
     if (!has_cpu_map_) {
@@ -173,7 +187,8 @@ devicetree::ScanState DevictreeCpuTopologyItem::AddEntryNodeSecondScan(
   if (IsCpuMapNode(name, "cluster")) {
     map_entries_[map_entry_index_] = CpuMapEntry{
         .type = TopologyEntryType::kCluster,
-        .parent_index = current_socket_.value_or(map_entry_index_),
+        .parent_index = current_cluster_.value_or(current_socket_.value_or(map_entry_index_)),
+        .cluster_index = current_cluster_,
     };
     current_cluster_ = map_entry_index_;
     map_entry_index_++;
@@ -349,7 +364,8 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
   cpp20::span entries(map_entries_, map_entry_count_);
 
   struct ClusterPerf {
-    uint32_t cluster_index = 0;
+    size_t cluster_index = 0;
+    size_t cluster_parent = 0;
     uint32_t perf = 1;
   };
 
@@ -366,7 +382,18 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
     if (entry.type == TopologyEntryType::kCluster) {
       perf[current_cluster].cluster_index = static_cast<uint32_t>(i);
       perf[current_cluster].perf = 1;
+      perf[current_cluster].cluster_parent = i;
+
+      if (entry.cluster_index) {
+        for (size_t j = current_cluster - 1; j >= 0 && j < current_cluster; --j) {
+          if (perf[j].cluster_index == *entry.cluster_index) {
+            perf[current_cluster].cluster_parent = j;
+            break;
+          }
+        }
+      }
       current_cluster++;
+
       continue;
     }
     // Not a Thread.
@@ -386,15 +413,25 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
       continue;
     }
 
-    auto capcacity_value = capacity->AsUint32();
-    if (!capcacity_value) {
+    auto capacity_value = capacity->AsUint32();
+    if (!capacity_value) {
       continue;
     }
 
-    auto& cluster_perf = perf[current_cluster - 1];
-    if (cluster_perf.perf < *capcacity_value) {
-      cluster_perf.perf = *capcacity_value;
-      max_cap = std::max(cluster_perf.perf, max_cap);
+    auto* cluster_perf = &perf[current_cluster - 1];
+    size_t cluster_perf_index = current_cluster - 1;
+    if (cluster_perf->perf < *capacity_value) {
+      cluster_perf->perf = *capacity_value;
+      // Bubble the performance toward parent clusters.
+      while (cluster_perf->cluster_parent != perf[cluster_perf_index].cluster_index) {
+        cluster_perf_index = cluster_perf->cluster_parent;
+        cluster_perf = &perf[cluster_perf->cluster_parent];
+        if (cluster_perf->perf >= *capacity_value) {
+          break;
+        }
+        cluster_perf->perf = *capacity_value;
+      }
+      max_cap = std::max(cluster_perf->perf, max_cap);
     }
   }
 
