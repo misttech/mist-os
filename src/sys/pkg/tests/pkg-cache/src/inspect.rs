@@ -87,7 +87,9 @@ async fn base_packages() {
         hierarchy,
         root: contains {
             "base-packages": {
-                "system_image/0": AnyProperty
+                "system_image/0": {
+                    "hash": AnyProperty
+                }
             }
         }
     );

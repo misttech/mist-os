@@ -129,7 +129,11 @@ impl BasePackages {
                 if let Some(this) = this.upgrade() {
                     let root = inspector.root();
                     let () = this.root_paths_and_hashes.iter().for_each(|(path, hash)| {
-                        root.record_string(path.to_string(), hash.to_string())
+                        // Packages are encoded as nodes instead of string properties because the
+                        // privacy allowlist prefers to wildcard nodes instead of properties.
+                        root.record_child(path.to_string(), |n| {
+                            n.record_string("hash", hash.to_string())
+                        })
                     });
                 }
                 Ok(inspector)
@@ -287,8 +291,12 @@ mod tests {
         // Note base-subpackage is not present.
         assert_data_tree!(env.inspector, root: {
             "base-packages": {
-                "a-base-package/0": a_base_package.meta_far_merkle_root().to_string(),
-                "system_image/0": env.system_image.meta_far_merkle_root().to_string(),
+                "a-base-package/0": {
+                    "hash": a_base_package.meta_far_merkle_root().to_string(),
+                },
+                "system_image/0": {
+                    "hash": env.system_image.meta_far_merkle_root().to_string(),
+                }
             }
         });
     }
