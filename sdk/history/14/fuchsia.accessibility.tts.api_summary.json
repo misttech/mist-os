@@ -2,97 +2,71 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.tts/Engine.Cancel",
+        "strictness": "strict",
         "ordinal": "1118196852984701679",
-        "type": "() -> ()"
+        "direction": "two_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.tts/Engine.Enqueue",
+        "strictness": "strict",
         "ordinal": "6174577865315612530",
-        "type": "(fuchsia.accessibility.tts/Utterance utterance) -> (fuchsia.accessibility.tts/Engine_Enqueue_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.tts/EngineEnqueueRequest",
+        "response": "fuchsia.accessibility.tts/Engine_Enqueue_Response",
+        "error": "fuchsia.accessibility.tts/Error"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.tts/Engine.Speak",
+        "strictness": "strict",
         "ordinal": "4723084893407136867",
-        "type": "() -> (fuchsia.accessibility.tts/Engine_Speak_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.accessibility.tts/Engine_Speak_Response",
+        "error": "fuchsia.accessibility.tts/Error"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.accessibility.tts/Engine"
+        "name": "fuchsia.accessibility.tts/Engine",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.tts/EngineEnqueueRequest.utterance",
+        "ordinal": "1",
+        "type": "fuchsia.accessibility.tts/Utterance"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.tts/EngineEnqueueRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.tts/EngineRegistry.RegisterEngine",
+        "strictness": "strict",
         "ordinal": "2190398625016026734",
-        "type": "(client_end:fuchsia.accessibility.tts/Engine engine) -> (fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.tts/EngineRegistryRegisterEngineRequest",
+        "response": "fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Response",
+        "error": "fuchsia.accessibility.tts/Error"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.accessibility.tts/EngineRegistry"
+        "name": "fuchsia.accessibility.tts/EngineRegistry",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.tts/EngineRegistryRegisterEngineRequest.engine",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.accessibility.tts/Engine"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.accessibility.tts/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.accessibility.tts/EngineRegistry_RegisterEngine_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.accessibility.tts/Engine_Enqueue_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/Engine_Enqueue_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.accessibility.tts/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/Engine_Enqueue_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.accessibility.tts/Engine_Enqueue_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.accessibility.tts/Engine_Enqueue_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.accessibility.tts/Engine_Speak_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/Engine_Speak_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.accessibility.tts/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/Engine_Speak_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.accessibility.tts/Engine_Speak_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.accessibility.tts/Engine_Speak_Result",
-        "strictness": "strict"
+        "name": "fuchsia.accessibility.tts/EngineRegistryRegisterEngineRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -123,33 +97,29 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.tts/TtsManager.OpenEngine",
+        "strictness": "strict",
         "ordinal": "4368879379442939281",
-        "type": "(server_end:fuchsia.accessibility.tts/Engine engine_request) -> (fuchsia.accessibility.tts/TtsManager_OpenEngine_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.tts/TtsManagerOpenEngineRequest",
+        "response": "fuchsia.accessibility.tts/TtsManager_OpenEngine_Response",
+        "error": "fuchsia.accessibility.tts/Error"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.accessibility.tts/TtsManager"
+        "name": "fuchsia.accessibility.tts/TtsManager",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.tts/TtsManagerOpenEngineRequest.engine_request",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.accessibility.tts/Engine"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.accessibility.tts/TtsManager_OpenEngine_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/TtsManager_OpenEngine_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.accessibility.tts/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.accessibility.tts/TtsManager_OpenEngine_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.accessibility.tts/TtsManager_OpenEngine_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.accessibility.tts/TtsManager_OpenEngine_Result",
-        "strictness": "strict"
+        "name": "fuchsia.accessibility.tts/TtsManagerOpenEngineRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

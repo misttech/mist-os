@@ -19,13 +19,6 @@ type wraparoundType struct {
 	parentType fidlgen.DeclType
 }
 
-func strictness(strict fidlgen.Strictness) Strictness {
-	if strict {
-		return isStrict
-	}
-	return isFlexible
-}
-
 func (b *wraparoundType) Serialize() ElementStr {
 	e := b.named.Serialize()
 	e.Kind = Kind(b.parentType)

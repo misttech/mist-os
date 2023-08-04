@@ -38,33 +38,28 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.session/Launcher.Launch",
+        "strictness": "strict",
         "ordinal": "8535627687619344474",
-        "type": "(fuchsia.session/LaunchConfiguration configuration) -> (fuchsia.session/Launcher_Launch_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.session/LauncherLaunchRequest",
+        "response": "fuchsia.session/Launcher_Launch_Response",
+        "error": "fuchsia.session/LaunchError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.session/Launcher"
+        "name": "fuchsia.session/Launcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.session/LauncherLaunchRequest.configuration",
+        "ordinal": "1",
+        "type": "fuchsia.session/LaunchConfiguration"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.session/Launcher_Launch_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.session/Launcher_Launch_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.session/LaunchError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.session/Launcher_Launch_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.session/Launcher_Launch_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.session/Launcher_Launch_Result",
-        "strictness": "strict"
+        "name": "fuchsia.session/LauncherLaunchRequest"
     },
     {
         "kind": "enum/member",
@@ -95,33 +90,17 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.session/Restarter.Restart",
+        "strictness": "strict",
         "ordinal": "5822320773243200942",
-        "type": "() -> (fuchsia.session/Restarter_Restart_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.session/Restarter_Restart_Response",
+        "error": "fuchsia.session/RestartError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.session/Restarter"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.session/Restarter_Restart_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.session/Restarter_Restart_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.session/RestartError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.session/Restarter_Restart_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.session/Restarter_Restart_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.session/Restarter_Restart_Result",
-        "strictness": "strict"
+        "name": "fuchsia.session/Restarter",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "library",

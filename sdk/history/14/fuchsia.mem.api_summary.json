@@ -31,8 +31,8 @@
     {
         "kind": "union",
         "name": "fuchsia.mem/Data",
-        "resourceness": "resource",
-        "strictness": "flexible"
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

@@ -36,12 +36,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.buildinfo/Provider.GetBuildInfo",
+        "strictness": "strict",
         "ordinal": "3239336539727600531",
-        "type": "() -> (fuchsia.buildinfo/BuildInfo build_info)"
+        "direction": "two_way",
+        "response": "fuchsia.buildinfo/ProviderGetBuildInfoResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.buildinfo/Provider"
+        "name": "fuchsia.buildinfo/Provider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.buildinfo/ProviderGetBuildInfoResponse.build_info",
+        "ordinal": "1",
+        "type": "fuchsia.buildinfo/BuildInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.buildinfo/ProviderGetBuildInfoResponse"
     },
     {
         "kind": "library",

@@ -55,30 +55,104 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysinfo/SysInfo.GetBoardName",
+        "strictness": "strict",
         "ordinal": "7866048739066619412",
-        "type": "() -> (int32 status,string:<32,optional> name)"
+        "direction": "two_way",
+        "response": "fuchsia.sysinfo/SysInfoGetBoardNameResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysinfo/SysInfo.GetBoardRevision",
+        "strictness": "strict",
         "ordinal": "4454148926824704460",
-        "type": "() -> (int32 status,uint32 revision)"
+        "direction": "two_way",
+        "response": "fuchsia.sysinfo/SysInfoGetBoardRevisionResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysinfo/SysInfo.GetBootloaderVendor",
+        "strictness": "strict",
         "ordinal": "2671181873722302487",
-        "type": "() -> (int32 status,string:<32,optional> vendor)"
+        "direction": "two_way",
+        "response": "fuchsia.sysinfo/SysInfoGetBootloaderVendorResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sysinfo/SysInfo.GetInterruptControllerInfo",
+        "strictness": "strict",
         "ordinal": "3577046343573180828",
-        "type": "() -> (int32 status,box<fuchsia.sysinfo/InterruptControllerInfo> info)"
+        "direction": "two_way",
+        "response": "fuchsia.sysinfo/SysInfoGetInterruptControllerInfoResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sysinfo/SysInfo"
+        "name": "fuchsia.sysinfo/SysInfo",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetBoardNameResponse.name",
+        "ordinal": "2",
+        "type": "string:<32,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetBoardNameResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sysinfo/SysInfoGetBoardNameResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetBoardRevisionResponse.revision",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetBoardRevisionResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sysinfo/SysInfoGetBoardRevisionResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetBootloaderVendorResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetBootloaderVendorResponse.vendor",
+        "ordinal": "2",
+        "type": "string:<32,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sysinfo/SysInfoGetBootloaderVendorResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetInterruptControllerInfoResponse.info",
+        "ordinal": "2",
+        "type": "box<fuchsia.sysinfo/InterruptControllerInfo>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysinfo/SysInfoGetInterruptControllerInfoResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sysinfo/SysInfoGetInterruptControllerInfoResponse"
     },
     {
         "kind": "library",

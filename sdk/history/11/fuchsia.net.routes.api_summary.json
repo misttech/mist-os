@@ -47,12 +47,28 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.routes/State.Resolve",
+        "strictness": "strict",
         "ordinal": "1531712296228872112",
-        "type": "(fuchsia.net/IpAddress destination) -> (fuchsia.net.routes/State_Resolve_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.routes/StateResolveRequest",
+        "response": "fuchsia.net.routes/State_Resolve_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.routes/State"
+        "name": "fuchsia.net.routes/State",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.routes/StateResolveRequest.destination",
+        "ordinal": "1",
+        "type": "fuchsia.net/IpAddress"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.routes/StateResolveRequest"
     },
     {
         "kind": "struct/member",
@@ -63,23 +79,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.net.routes/State_Resolve_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.routes/State_Resolve_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.routes/State_Resolve_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.routes/State_Resolve_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.routes/State_Resolve_Result",
-        "strictness": "strict"
     },
     {
         "kind": "library",

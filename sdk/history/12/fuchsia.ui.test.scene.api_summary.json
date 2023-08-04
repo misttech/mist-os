@@ -2,24 +2,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.scene/Controller.AttachClientView",
+        "strictness": "strict",
         "ordinal": "2818516817430476641",
-        "type": "(fuchsia.ui.test.scene/ControllerAttachClientViewRequest payload) -> (uint64 view_ref_koid)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.scene/ControllerAttachClientViewRequest",
+        "response": "fuchsia.ui.test.scene/ControllerAttachClientViewResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.scene/Controller.PresentClientView",
+        "strictness": "strict",
         "ordinal": "5815052630321335465",
-        "type": "(fuchsia.ui.test.scene/ControllerPresentClientViewRequest payload)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.test.scene/ControllerPresentClientViewRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.scene/Controller.RegisterViewTreeWatcher",
+        "strictness": "strict",
         "ordinal": "87542316747800676",
-        "type": "(server_end:fuchsia.ui.observation.geometry/ViewTreeWatcher watcher) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.scene/ControllerRegisterViewTreeWatcherRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.scene/Controller"
+        "name": "fuchsia.ui.test.scene/Controller",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -33,6 +42,16 @@
         "resourceness": "resource"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.scene/ControllerAttachClientViewResponse.view_ref_koid",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.test.scene/ControllerAttachClientViewResponse"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.ui.test.scene/ControllerPresentClientViewRequest.viewport_creation_token",
         "ordinal": "1",
@@ -41,6 +60,17 @@
     {
         "kind": "table",
         "name": "fuchsia.ui.test.scene/ControllerPresentClientViewRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.scene/ControllerRegisterViewTreeWatcherRequest.watcher",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.ui.observation.geometry/ViewTreeWatcher"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.test.scene/ControllerRegisterViewTreeWatcherRequest",
         "resourceness": "resource"
     },
     {

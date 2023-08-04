@@ -40,18 +40,39 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.views/Focuser.RequestFocus",
+        "strictness": "strict",
         "ordinal": "385346384312702933",
-        "type": "(fuchsia.ui.views/ViewRef view_ref) -> (fuchsia.ui.views/Focuser_RequestFocus_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.views/FocuserRequestFocusRequest",
+        "response": "fuchsia.ui.views/Focuser_RequestFocus_Response",
+        "error": "fuchsia.ui.views/Error"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.views/Focuser.SetAutoFocus",
+        "strictness": "strict",
         "ordinal": "5192627660017276169",
-        "type": "(fuchsia.ui.views/FocuserSetAutoFocusRequest payload) -> (fuchsia.ui.views/Focuser_SetAutoFocus_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.views/FocuserSetAutoFocusRequest",
+        "response": "fuchsia.ui.views/Focuser_SetAutoFocus_Response",
+        "error": "fuchsia.ui.views/AutoFocusError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.views/Focuser"
+        "name": "fuchsia.ui.views/Focuser",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.views/FocuserRequestFocusRequest.view_ref",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.views/FocuserRequestFocusRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -65,56 +86,18 @@
         "resourceness": "resource"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.ui.views/Focuser_RequestFocus_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.views/Focuser_RequestFocus_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.views/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.views/Focuser_RequestFocus_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.ui.views/Focuser_RequestFocus_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.ui.views/Focuser_RequestFocus_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.ui.views/Focuser_SetAutoFocus_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.views/Focuser_SetAutoFocus_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.views/AutoFocusError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.views/Focuser_SetAutoFocus_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.ui.views/Focuser_SetAutoFocus_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.ui.views/Focuser_SetAutoFocus_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "protocol/member",
         "name": "fuchsia.ui.views/View.Present",
+        "strictness": "strict",
         "ordinal": "7969378779654942110",
-        "type": "(fuchsia.ui.views/ViewToken view_token)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.views/ViewPresentRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.views/View"
+        "name": "fuchsia.ui.views/View",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -157,6 +140,17 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.ui.views/ViewPresentRequest.view_token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.views/ViewPresentRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.ui.views/ViewRef.reference",
         "ordinal": "1",
         "type": "zx/Handle:EVENTPAIR"
@@ -180,22 +174,42 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.views/ViewRefFocused.Watch",
+        "strictness": "strict",
         "ordinal": "4350003391021357493",
-        "type": "() -> (fuchsia.ui.views/FocusState state)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.views/ViewRefFocusedWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.views/ViewRefFocused"
+        "name": "fuchsia.ui.views/ViewRefFocused",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.views/ViewRefFocusedWatchResponse.state",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/FocusState"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.views/ViewRefFocusedWatchResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.views/ViewRefInstalled.Watch",
+        "strictness": "strict",
         "ordinal": "9069901056194410865",
-        "type": "(fuchsia.ui.views/ViewRef view_ref) -> (fuchsia.ui.views/ViewRefInstalled_Watch_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.views/ViewRefInstalledWatchRequest",
+        "response": "fuchsia.ui.views/ViewRefInstalled_Watch_Response",
+        "error": "fuchsia.ui.views/ViewRefInstalledError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.views/ViewRefInstalled"
+        "name": "fuchsia.ui.views/ViewRefInstalled",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -209,25 +223,15 @@
         "type": "uint32"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.ui.views/ViewRefInstalled_Watch_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.views/ViewRefInstalled_Watch_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.views/ViewRefInstalledError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.views/ViewRefInstalled_Watch_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.ui.views/ViewRefInstalledWatchRequest.view_ref",
         "ordinal": "1",
-        "type": "fuchsia.ui.views/ViewRefInstalled_Watch_Response"
+        "type": "fuchsia.ui.views/ViewRef"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.ui.views/ViewRefInstalled_Watch_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.ui.views/ViewRefInstalledWatchRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

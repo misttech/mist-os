@@ -284,42 +284,114 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputDevice.GetDescriptor",
+        "strictness": "strict",
         "ordinal": "4428799916562230578",
-        "type": "() -> (fuchsia.input.report/DeviceDescriptor descriptor)"
+        "direction": "two_way",
+        "response": "fuchsia.input.report/InputDeviceGetDescriptorResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputDevice.GetFeatureReport",
+        "strictness": "strict",
         "ordinal": "5294682407360339734",
-        "type": "() -> (fuchsia.input.report/InputDevice_GetFeatureReport_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.input.report/InputDevice_GetFeatureReport_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputDevice.GetInputReport",
+        "strictness": "strict",
         "ordinal": "5139395162123862600",
-        "type": "(fuchsia.input.report/DeviceType device_type) -> (fuchsia.input.report/InputDevice_GetInputReport_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.input.report/InputDeviceGetInputReportRequest",
+        "response": "fuchsia.input.report/InputDevice_GetInputReport_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputDevice.GetInputReportsReader",
+        "strictness": "strict",
         "ordinal": "7555298015256750913",
-        "type": "(server_end:fuchsia.input.report/InputReportsReader reader)"
+        "direction": "one_way",
+        "request": "fuchsia.input.report/InputDeviceGetInputReportsReaderRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputDevice.SendOutputReport",
+        "strictness": "strict",
         "ordinal": "466765262340648762",
-        "type": "(fuchsia.input.report/OutputReport report) -> (fuchsia.input.report/InputDevice_SendOutputReport_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.input.report/InputDeviceSendOutputReportRequest",
+        "response": "fuchsia.input.report/InputDevice_SendOutputReport_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputDevice.SetFeatureReport",
+        "strictness": "strict",
         "ordinal": "8537033744562275055",
-        "type": "(fuchsia.input.report/FeatureReport report) -> (fuchsia.input.report/InputDevice_SetFeatureReport_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.input.report/InputDeviceSetFeatureReportRequest",
+        "response": "fuchsia.input.report/InputDevice_SetFeatureReport_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.input.report/InputDevice"
+        "name": "fuchsia.input.report/InputDevice",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.input.report/InputDeviceGetDescriptorResponse.descriptor",
+        "ordinal": "1",
+        "type": "fuchsia.input.report/DeviceDescriptor"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.input.report/InputDeviceGetDescriptorResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.input.report/InputDeviceGetInputReportRequest.device_type",
+        "ordinal": "1",
+        "type": "fuchsia.input.report/DeviceType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.input.report/InputDeviceGetInputReportRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.input.report/InputDeviceGetInputReportsReaderRequest.reader",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.input.report/InputReportsReader"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.input.report/InputDeviceGetInputReportsReaderRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.input.report/InputDeviceSendOutputReportRequest.report",
+        "ordinal": "1",
+        "type": "fuchsia.input.report/OutputReport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.input.report/InputDeviceSendOutputReportRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.input.report/InputDeviceSetFeatureReportRequest.report",
+        "ordinal": "1",
+        "type": "fuchsia.input.report/FeatureReport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.input.report/InputDeviceSetFeatureReportRequest"
     },
     {
         "kind": "struct/member",
@@ -332,23 +404,6 @@
         "name": "fuchsia.input.report/InputDevice_GetFeatureReport_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_GetFeatureReport_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_GetFeatureReport_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.input.report/InputDevice_GetFeatureReport_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.input.report/InputDevice_GetFeatureReport_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.input.report/InputDevice_GetInputReport_Response.report",
         "ordinal": "1",
@@ -357,65 +412,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.input.report/InputDevice_GetInputReport_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_GetInputReport_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_GetInputReport_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.input.report/InputDevice_GetInputReport_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.input.report/InputDevice_GetInputReport_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.input.report/InputDevice_SendOutputReport_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_SendOutputReport_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_SendOutputReport_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.input.report/InputDevice_SendOutputReport_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.input.report/InputDevice_SendOutputReport_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.input.report/InputDevice_SetFeatureReport_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_SetFeatureReport_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputDevice_SetFeatureReport_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.input.report/InputDevice_SetFeatureReport_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.input.report/InputDevice_SetFeatureReport_Result",
-        "strictness": "strict"
     },
     {
         "kind": "table/member",
@@ -472,12 +468,17 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.input.report/InputReportsReader.ReadInputReports",
+        "strictness": "strict",
         "ordinal": "3861255986002273625",
-        "type": "() -> (fuchsia.input.report/InputReportsReader_ReadInputReports_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.input.report/InputReportsReader_ReadInputReports_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.input.report/InputReportsReader"
+        "name": "fuchsia.input.report/InputReportsReader",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -488,23 +489,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.input.report/InputReportsReader_ReadInputReports_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputReportsReader_ReadInputReports_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.input.report/InputReportsReader_ReadInputReports_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.input.report/InputReportsReader_ReadInputReports_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.input.report/InputReportsReader_ReadInputReports_Result",
-        "strictness": "strict"
     },
     {
         "kind": "const",

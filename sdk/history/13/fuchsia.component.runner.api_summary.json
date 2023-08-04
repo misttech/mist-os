@@ -2,24 +2,41 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component.runner/ComponentController.Kill",
+        "strictness": "strict",
         "ordinal": "4514346391631670964",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.component.runner/ComponentController.OnPublishDiagnostics",
+        "strictness": "strict",
         "ordinal": "2240216199992207687",
-        "type": " -> (fuchsia.diagnostics.types/ComponentDiagnostics payload)"
+        "direction": "event",
+        "request": "fuchsia.component.runner/ComponentControllerOnPublishDiagnosticsRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.component.runner/ComponentController.Stop",
+        "strictness": "strict",
         "ordinal": "4804506821232171874",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.component.runner/ComponentController"
+        "name": "fuchsia.component.runner/ComponentController",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.runner/ComponentControllerOnPublishDiagnosticsRequest.payload",
+        "ordinal": "1",
+        "type": "fuchsia.diagnostics.types/ComponentDiagnostics"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.runner/ComponentControllerOnPublishDiagnosticsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -41,12 +58,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component.runner/ComponentRunner.Start",
+        "strictness": "strict",
         "ordinal": "780715659970866697",
-        "type": "(fuchsia.component.runner/ComponentStartInfo start_info,server_end:fuchsia.component.runner/ComponentController controller)"
+        "direction": "one_way",
+        "request": "fuchsia.component.runner/ComponentRunnerStartRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.component.runner/ComponentRunner"
+        "name": "fuchsia.component.runner/ComponentRunner",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.runner/ComponentRunnerStartRequest.controller",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.component.runner/ComponentController"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.runner/ComponentRunnerStartRequest.start_info",
+        "ordinal": "1",
+        "type": "fuchsia.component.runner/ComponentStartInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.runner/ComponentRunnerStartRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

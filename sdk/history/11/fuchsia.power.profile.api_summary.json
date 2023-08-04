@@ -23,12 +23,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.power.profile/Watcher.Watch",
+        "strictness": "strict",
         "ordinal": "6857221174245763399",
-        "type": "() -> (fuchsia.power.profile/Profile profile)"
+        "direction": "two_way",
+        "response": "fuchsia.power.profile/WatcherWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.power.profile/Watcher"
+        "name": "fuchsia.power.profile/Watcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.power.profile/WatcherWatchResponse.profile",
+        "ordinal": "1",
+        "type": "fuchsia.power.profile/Profile"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.power.profile/WatcherWatchResponse"
     },
     {
         "kind": "library",

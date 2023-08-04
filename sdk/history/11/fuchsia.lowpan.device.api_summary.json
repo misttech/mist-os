@@ -147,28 +147,75 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Counters.Get",
+        "strictness": "strict",
         "ordinal": "766330213047163428",
-        "type": "() -> (fuchsia.lowpan.device/AllCounters counters)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/CountersGetResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Counters.Reset",
+        "strictness": "strict",
         "ordinal": "5546641446070450093",
-        "type": "() -> (fuchsia.lowpan.device/AllCounters counters)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/CountersResetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/Counters"
+        "name": "fuchsia.lowpan.device/Counters",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/CountersConnector.Connect",
+        "strictness": "strict",
         "ordinal": "7056160397832933768",
-        "type": "(string:32 name,server_end:fuchsia.lowpan.device/Counters server_end)"
+        "direction": "one_way",
+        "request": "fuchsia.lowpan.device/CountersConnectorConnectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/CountersConnector"
+        "name": "fuchsia.lowpan.device/CountersConnector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/CountersConnectorConnectRequest.name",
+        "ordinal": "1",
+        "type": "string:32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/CountersConnectorConnectRequest.server_end",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.lowpan.device/Counters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/CountersConnectorConnectRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/CountersGetResponse.counters",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/AllCounters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/CountersGetResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/CountersResetResponse.counters",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/AllCounters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/CountersResetResponse"
     },
     {
         "kind": "union/member",
@@ -184,78 +231,199 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Device.GetSupportedNetworkTypes",
+        "strictness": "strict",
         "ordinal": "7894653628486606527",
-        "type": "() -> (vector<string:64>:16 network_types)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/DeviceGetSupportedNetworkTypesResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Device.LeaveNetwork",
+        "strictness": "strict",
         "ordinal": "7390862528170083646",
-        "type": "() -> ()"
+        "direction": "two_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Device.ProvisionNetwork",
+        "strictness": "strict",
         "ordinal": "3819338810301444214",
-        "type": "(fuchsia.lowpan.device/ProvisioningParams params) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.lowpan.device/DeviceProvisionNetworkRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Device.SetActive",
+        "strictness": "strict",
         "ordinal": "6171764923186230347",
-        "type": "(bool active) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.lowpan.device/DeviceSetActiveRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/Device.WatchDeviceState",
+        "strictness": "strict",
         "ordinal": "6429985472486888009",
-        "type": "() -> (fuchsia.lowpan.device/DeviceState device_combined_state)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/DeviceWatchDeviceStateResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/Device"
+        "name": "fuchsia.lowpan.device/Device",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/DeviceConnector.Connect",
+        "strictness": "strict",
         "ordinal": "7153700053869029258",
-        "type": "(string:32 name,server_end:fuchsia.lowpan.device/Device server_end)"
+        "direction": "one_way",
+        "request": "fuchsia.lowpan.device/DeviceConnectorConnectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/DeviceConnector"
+        "name": "fuchsia.lowpan.device/DeviceConnector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceConnectorConnectRequest.name",
+        "ordinal": "1",
+        "type": "string:32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceConnectorConnectRequest.server_end",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.lowpan.device/Device"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceConnectorConnectRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/DeviceExtra.GetCredential",
+        "strictness": "strict",
         "ordinal": "8644482637790727403",
-        "type": "() -> (fuchsia.lowpan.device/Credential:optional credential)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/DeviceExtraGetCredentialResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/DeviceExtra.GetCurrentMacAddress",
+        "strictness": "strict",
         "ordinal": "8107421971628528861",
-        "type": "() -> (fuchsia.lowpan/MacAddress address)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/DeviceExtraGetCurrentMacAddressResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/DeviceExtra.WatchIdentity",
+        "strictness": "strict",
         "ordinal": "837490900382444486",
-        "type": "() -> (fuchsia.lowpan.device/Identity identity)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/DeviceExtraWatchIdentityResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/DeviceExtra"
+        "name": "fuchsia.lowpan.device/DeviceExtra",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/DeviceExtraConnector.Connect",
+        "strictness": "strict",
         "ordinal": "2979622116500015843",
-        "type": "(string:32 name,server_end:fuchsia.lowpan.device/DeviceExtra server_end)"
+        "direction": "one_way",
+        "request": "fuchsia.lowpan.device/DeviceExtraConnectorConnectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/DeviceExtraConnector"
+        "name": "fuchsia.lowpan.device/DeviceExtraConnector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceExtraConnectorConnectRequest.name",
+        "ordinal": "1",
+        "type": "string:32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceExtraConnectorConnectRequest.server_end",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.lowpan.device/DeviceExtra"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceExtraConnectorConnectRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceExtraGetCredentialResponse.credential",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/Credential:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceExtraGetCredentialResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceExtraGetCurrentMacAddressResponse.address",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan/MacAddress"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceExtraGetCurrentMacAddressResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceExtraWatchIdentityResponse.identity",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/Identity"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceExtraWatchIdentityResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceGetSupportedNetworkTypesResponse.network_types",
+        "ordinal": "1",
+        "type": "vector<string:64>:16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceGetSupportedNetworkTypesResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceProvisionNetworkRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/ProvisioningParams"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceProvisionNetworkRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceSetActiveRequest.active",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceSetActiveRequest"
     },
     {
         "kind": "table/member",
@@ -274,24 +442,59 @@
         "name": "fuchsia.lowpan.device/DeviceState"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/DeviceWatchDeviceStateResponse.device_combined_state",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/DeviceState"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/DeviceWatchDeviceStateResponse"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/EnergyScan.StartEnergyScan",
+        "strictness": "strict",
         "ordinal": "5415904696099511046",
-        "type": "(fuchsia.lowpan.device/EnergyScanParameters params,server_end:fuchsia.lowpan.device/EnergyScanResultStream stream)"
+        "direction": "one_way",
+        "request": "fuchsia.lowpan.device/EnergyScanStartEnergyScanRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/EnergyScan"
+        "name": "fuchsia.lowpan.device/EnergyScan",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/EnergyScanConnector.Connect",
+        "strictness": "strict",
         "ordinal": "1186319672397181584",
-        "type": "(string:32 name,server_end:fuchsia.lowpan.device/EnergyScan server_end)"
+        "direction": "one_way",
+        "request": "fuchsia.lowpan.device/EnergyScanConnectorConnectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/EnergyScanConnector"
+        "name": "fuchsia.lowpan.device/EnergyScanConnector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/EnergyScanConnectorConnectRequest.name",
+        "ordinal": "1",
+        "type": "string:32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/EnergyScanConnectorConnectRequest.server_end",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.lowpan.device/EnergyScan"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/EnergyScanConnectorConnectRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -334,12 +537,43 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.device/EnergyScanResultStream.Next",
+        "strictness": "strict",
         "ordinal": "9151659672405371550",
-        "type": "() -> (vector<fuchsia.lowpan.device/EnergyScanResult>:32 results)"
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.device/EnergyScanResultStreamNextResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lowpan.device/EnergyScanResultStream"
+        "name": "fuchsia.lowpan.device/EnergyScanResultStream",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/EnergyScanResultStreamNextResponse.results",
+        "ordinal": "1",
+        "type": "vector<fuchsia.lowpan.device/EnergyScanResult>:32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/EnergyScanResultStreamNextResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/EnergyScanStartEnergyScanRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.device/EnergyScanParameters"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.device/EnergyScanStartEnergyScanRequest.stream",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.lowpan.device/EnergyScanResultStream"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.device/EnergyScanStartEnergyScanRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

@@ -62,36 +62,46 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Provider.GetKnownCategories",
+        "strictness": "strict",
         "ordinal": "6871097577080879238",
-        "type": "() -> (vector<fuchsia.tracing/KnownCategory>:5000 categories)"
+        "direction": "two_way",
+        "response": "fuchsia.tracing.provider/ProviderGetKnownCategoriesResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Provider.Initialize",
+        "strictness": "strict",
         "ordinal": "712437801310847223",
-        "type": "(fuchsia.tracing.provider/ProviderConfig config)"
+        "direction": "one_way",
+        "request": "fuchsia.tracing.provider/ProviderInitializeRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Provider.Start",
+        "strictness": "strict",
         "ordinal": "6606265397910349845",
-        "type": "(fuchsia.tracing.provider/StartOptions options)"
+        "direction": "one_way",
+        "request": "fuchsia.tracing.provider/ProviderStartRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Provider.Stop",
+        "strictness": "strict",
         "ordinal": "1386537951479561712",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Provider.Terminate",
+        "strictness": "strict",
         "ordinal": "7734197899917469361",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.tracing.provider/Provider"
+        "name": "fuchsia.tracing.provider/Provider",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -123,20 +133,120 @@
         "resourceness": "resource"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/ProviderGetKnownCategoriesResponse.categories",
+        "ordinal": "1",
+        "type": "vector<fuchsia.tracing/KnownCategory>:5000"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.tracing.provider/ProviderGetKnownCategoriesResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/ProviderInitializeRequest.config",
+        "ordinal": "1",
+        "type": "fuchsia.tracing.provider/ProviderConfig"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.tracing.provider/ProviderInitializeRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/ProviderStartRequest.options",
+        "ordinal": "1",
+        "type": "fuchsia.tracing.provider/StartOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.tracing.provider/ProviderStartRequest"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Registry.RegisterProvider",
+        "strictness": "strict",
         "ordinal": "8483847379270256540",
-        "type": "(client_end:fuchsia.tracing.provider/Provider provider,uint64 pid,string:100 name)"
+        "direction": "one_way",
+        "request": "fuchsia.tracing.provider/RegistryRegisterProviderRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.tracing.provider/Registry.RegisterProviderSynchronously",
+        "strictness": "strict",
         "ordinal": "5203325810517249814",
-        "type": "(client_end:fuchsia.tracing.provider/Provider provider,uint64 pid,string:100 name) -> (int32 s,bool started)"
+        "direction": "two_way",
+        "request": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyRequest",
+        "response": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.tracing.provider/Registry"
+        "name": "fuchsia.tracing.provider/Registry",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderRequest.name",
+        "ordinal": "3",
+        "type": "string:100"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderRequest.pid",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderRequest.provider",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.tracing.provider/Provider"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyRequest.name",
+        "ordinal": "3",
+        "type": "string:100"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyRequest.pid",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyRequest.provider",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.tracing.provider/Provider"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyResponse.s",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyResponse.started",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.tracing.provider/RegistryRegisterProviderSynchronouslyResponse"
     },
     {
         "kind": "struct/member",

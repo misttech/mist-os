@@ -125,22 +125,28 @@ func serialize(e []element) []ElementStr {
 	return ret
 }
 
-// filterStructs takes the list of structs, and excludes all structs that are
-// used as anonymous transactional message bodies, as those are explicitly
-// disregarded by the summarizer. All structs used as payloads are added to the
-// payload map.
+// filterStructs filters out structs that should not be included in API summaries.
 func filterStructs(structs []fidlgen.Struct, mtum fidlgen.MethodTypeUsageMap) []fidlgen.Struct {
 	var out []fidlgen.Struct
 	for _, s := range structs {
 		if k, ok := mtum[s.Name]; ok {
-			if s.IsAnonymous() && k != fidlgen.UsedOnlyAsPayload {
-				// Structs that are only used as anonymous message bodies are not
-				// included in the summary output because their arguments are flattened
-				// into the method signature instead.
+			if k == fidlgen.UsedOnlyAsPayload && len(s.Members) == 0 {
 				continue
 			}
 		}
 		out = append(out, s)
+	}
+	return out
+}
+
+// filterUnions filters out unions that should not be included in API summaries.
+func filterUnions(unions []fidlgen.Union) []fidlgen.Union {
+	var out []fidlgen.Union
+	for _, u := range unions {
+		if u.HasAttribute("result") {
+			continue
+		}
+		out = append(out, u)
 	}
 	return out
 }
@@ -163,7 +169,7 @@ func Summarize(root fidlgen.Root) summary {
 	s.addEnums(root.Enums)
 	s.addStructs(filterStructs(root.Structs, mtum))
 	s.addTables(root.Tables)
-	s.addUnions(root.Unions)
+	s.addUnions(filterUnions(root.Unions))
 	s.addProtocols(root.Protocols)
 	s.addElement(&library{r: root})
 

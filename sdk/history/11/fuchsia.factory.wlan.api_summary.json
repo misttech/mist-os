@@ -2,18 +2,72 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.factory.wlan/Iovar.Get",
+        "strictness": "strict",
         "ordinal": "6404874362106450474",
-        "type": "(int32 iface_idx,int32 cmd,vector<uint8>:16384 request) -> (fuchsia.factory.wlan/Iovar_Get_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.factory.wlan/IovarGetRequest",
+        "response": "fuchsia.factory.wlan/Iovar_Get_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.factory.wlan/Iovar.Set",
+        "strictness": "strict",
         "ordinal": "6673168730434629670",
-        "type": "(int32 iface_idx,int32 cmd,vector<uint8>:16384 request) -> (fuchsia.factory.wlan/Iovar_Set_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.factory.wlan/IovarSetRequest",
+        "response": "fuchsia.factory.wlan/Iovar_Set_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.factory.wlan/Iovar"
+        "name": "fuchsia.factory.wlan/Iovar",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.factory.wlan/IovarGetRequest.cmd",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.factory.wlan/IovarGetRequest.iface_idx",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.factory.wlan/IovarGetRequest.request",
+        "ordinal": "3",
+        "type": "vector<uint8>:16384"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.factory.wlan/IovarGetRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.factory.wlan/IovarSetRequest.cmd",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.factory.wlan/IovarSetRequest.iface_idx",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.factory.wlan/IovarSetRequest.request",
+        "ordinal": "3",
+        "type": "vector<uint8>:16384"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.factory.wlan/IovarSetRequest"
     },
     {
         "kind": "struct/member",
@@ -24,44 +78,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.factory.wlan/Iovar_Get_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.factory.wlan/Iovar_Get_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.factory.wlan/Iovar_Get_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.factory.wlan/Iovar_Get_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.factory.wlan/Iovar_Get_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.factory.wlan/Iovar_Set_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.factory.wlan/Iovar_Set_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.factory.wlan/Iovar_Set_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.factory.wlan/Iovar_Set_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.factory.wlan/Iovar_Set_Result",
-        "strictness": "strict"
     },
     {
         "kind": "const",

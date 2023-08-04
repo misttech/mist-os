@@ -2,24 +2,44 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.power.sensor/Device.GetPowerWatts",
+        "strictness": "strict",
         "ordinal": "6137197282480723323",
-        "type": "() -> (fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.power.sensor/Device.GetSensorName",
+        "strictness": "strict",
         "ordinal": "4392776413076894234",
-        "type": "() -> (string:256 name)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.power.sensor/DeviceGetSensorNameResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.power.sensor/Device.GetVoltageVolts",
+        "strictness": "strict",
         "ordinal": "5407987806620638263",
-        "type": "() -> (fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hardware.power.sensor/Device"
+        "name": "fuchsia.hardware.power.sensor/Device",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.power.sensor/DeviceGetSensorNameResponse.name",
+        "ordinal": "1",
+        "type": "string:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.power.sensor/DeviceGetSensorNameResponse"
     },
     {
         "kind": "struct/member",
@@ -32,23 +52,6 @@
         "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response.voltage",
         "ordinal": "1",
@@ -57,23 +60,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result",
-        "strictness": "strict"
     },
     {
         "kind": "const",

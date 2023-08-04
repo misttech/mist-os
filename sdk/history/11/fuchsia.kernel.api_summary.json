@@ -2,28 +2,76 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/Counter.GetInspectVmo",
+        "strictness": "strict",
         "ordinal": "7974101319142677377",
-        "type": "() -> (int32 status,fuchsia.mem/Buffer buffer)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/CounterGetInspectVmoResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/Counter.UpdateInspectVmo",
+        "strictness": "strict",
         "ordinal": "2100343708672086943",
-        "type": "() -> (int32 status)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/CounterUpdateInspectVmoResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/Counter"
+        "name": "fuchsia.kernel/Counter",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/CounterGetInspectVmoResponse.buffer",
+        "ordinal": "2",
+        "type": "fuchsia.mem/Buffer"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/CounterGetInspectVmoResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/CounterGetInspectVmoResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/CounterUpdateInspectVmoResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/CounterUpdateInspectVmoResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/CpuResource.Get",
+        "strictness": "strict",
         "ordinal": "4747093326996575716",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/CpuResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/CpuResource"
+        "name": "fuchsia.kernel/CpuResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/CpuResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/CpuResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -50,68 +98,191 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/DebugBroker.SendDebugCommand",
+        "strictness": "strict",
         "ordinal": "2225465377324625910",
-        "type": "(string:1024 command) -> (int32 status)"
+        "direction": "two_way",
+        "request": "fuchsia.kernel/DebugBrokerSendDebugCommandRequest",
+        "response": "fuchsia.kernel/DebugBrokerSendDebugCommandResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/DebugBroker.SetTracingEnabled",
+        "strictness": "strict",
         "ordinal": "1361046756353749774",
-        "type": "(bool enabled) -> (int32 status)"
+        "direction": "two_way",
+        "request": "fuchsia.kernel/DebugBrokerSetTracingEnabledRequest",
+        "response": "fuchsia.kernel/DebugBrokerSetTracingEnabledResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/DebugBroker"
+        "name": "fuchsia.kernel/DebugBroker",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/DebugBrokerSendDebugCommandRequest.command",
+        "ordinal": "1",
+        "type": "string:1024"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/DebugBrokerSendDebugCommandRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/DebugBrokerSendDebugCommandResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/DebugBrokerSendDebugCommandResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/DebugBrokerSetTracingEnabledRequest.enabled",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/DebugBrokerSetTracingEnabledRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/DebugBrokerSetTracingEnabledResponse.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/DebugBrokerSetTracingEnabledResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/DebugResource.Get",
+        "strictness": "strict",
         "ordinal": "2123965638151660660",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/DebugResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/DebugResource"
+        "name": "fuchsia.kernel/DebugResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/DebugResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/DebugResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/HypervisorResource.Get",
+        "strictness": "strict",
         "ordinal": "2031441404809979042",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/HypervisorResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/HypervisorResource"
+        "name": "fuchsia.kernel/HypervisorResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/HypervisorResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/HypervisorResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/InfoResource.Get",
+        "strictness": "strict",
         "ordinal": "2155233879084769383",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/InfoResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/InfoResource"
+        "name": "fuchsia.kernel/InfoResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/InfoResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/InfoResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/IoportResource.Get",
+        "strictness": "strict",
         "ordinal": "5598546592714442027",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/IoportResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/IoportResource"
+        "name": "fuchsia.kernel/IoportResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/IoportResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/IoportResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/IrqResource.Get",
+        "strictness": "strict",
         "ordinal": "5268056273734091241",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/IrqResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/IrqResource"
+        "name": "fuchsia.kernel/IrqResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/IrqResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/IrqResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -262,12 +433,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/MmioResource.Get",
+        "strictness": "strict",
         "ordinal": "7382661600629358203",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/MmioResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/MmioResource"
+        "name": "fuchsia.kernel/MmioResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/MmioResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/MmioResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -366,80 +552,205 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/PowerResource.Get",
+        "strictness": "strict",
         "ordinal": "3138438062431922278",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/PowerResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/PowerResource"
+        "name": "fuchsia.kernel/PowerResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/PowerResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/PowerResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/RootJob.Get",
+        "strictness": "strict",
         "ordinal": "8335237394535366316",
-        "type": "() -> (zx/Handle:JOB job)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/RootJobGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/RootJob"
+        "name": "fuchsia.kernel/RootJob",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/RootJobForInspect.Get",
+        "strictness": "strict",
         "ordinal": "8335237394535366316",
-        "type": "() -> (zx/Handle:JOB job)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/RootJobGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/RootJobForInspect"
+        "name": "fuchsia.kernel/RootJobForInspect",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/RootJobGetResponse.job",
+        "ordinal": "1",
+        "type": "zx/Handle:JOB"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/RootJobGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/SmcResource.Get",
+        "strictness": "strict",
         "ordinal": "4119875881902861799",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/SmcResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/SmcResource"
+        "name": "fuchsia.kernel/SmcResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/SmcResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/SmcResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/Stats.GetCpuLoad",
+        "strictness": "strict",
         "ordinal": "5516644586577151590",
-        "type": "(int64 duration) -> (vector<float32>:512 per_cpu_load)"
+        "direction": "two_way",
+        "request": "fuchsia.kernel/StatsGetCpuLoadRequest",
+        "response": "fuchsia.kernel/StatsGetCpuLoadResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/Stats.GetCpuStats",
+        "strictness": "strict",
         "ordinal": "5120072178135245214",
-        "type": "() -> (fuchsia.kernel/CpuStats stats)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/StatsGetCpuStatsResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/Stats.GetMemoryStats",
+        "strictness": "strict",
         "ordinal": "7522831701532479604",
-        "type": "() -> (fuchsia.kernel/MemoryStats stats)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/StatsGetMemoryStatsResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/Stats.GetMemoryStatsExtended",
+        "strictness": "strict",
         "ordinal": "6988074761686925983",
-        "type": "() -> (fuchsia.kernel/MemoryStatsExtended stats)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/StatsGetMemoryStatsExtendedResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/Stats"
+        "name": "fuchsia.kernel/Stats",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/StatsGetCpuLoadRequest.duration",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/StatsGetCpuLoadRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/StatsGetCpuLoadResponse.per_cpu_load",
+        "ordinal": "1",
+        "type": "vector<float32>:512"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/StatsGetCpuLoadResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/StatsGetCpuStatsResponse.stats",
+        "ordinal": "1",
+        "type": "fuchsia.kernel/CpuStats"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/StatsGetCpuStatsResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/StatsGetMemoryStatsExtendedResponse.stats",
+        "ordinal": "1",
+        "type": "fuchsia.kernel/MemoryStatsExtended"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/StatsGetMemoryStatsExtendedResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/StatsGetMemoryStatsResponse.stats",
+        "ordinal": "1",
+        "type": "fuchsia.kernel/MemoryStats"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/StatsGetMemoryStatsResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.kernel/VmexResource.Get",
+        "strictness": "strict",
         "ordinal": "3736636248880907929",
-        "type": "() -> (zx/Handle:RESOURCE resource)"
+        "direction": "two_way",
+        "response": "fuchsia.kernel/VmexResourceGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.kernel/VmexResource"
+        "name": "fuchsia.kernel/VmexResource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.kernel/VmexResourceGetResponse.resource",
+        "ordinal": "1",
+        "type": "zx/Handle:RESOURCE"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.kernel/VmexResourceGetResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

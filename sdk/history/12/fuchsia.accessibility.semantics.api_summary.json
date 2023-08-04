@@ -493,62 +493,194 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticListener.HitTest",
+        "strictness": "strict",
         "ordinal": "7674204493811420961",
-        "type": "(fuchsia.math/PointF local_point) -> (fuchsia.accessibility.semantics/Hit result)"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.semantics/SemanticListenerHitTestRequest",
+        "response": "fuchsia.accessibility.semantics/SemanticListenerHitTestResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticListener.OnAccessibilityActionRequested",
+        "strictness": "strict",
         "ordinal": "7692571035718497079",
-        "type": "(uint32 node_id,fuchsia.accessibility.semantics/Action action) -> (bool handled)"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedRequest",
+        "response": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticListener.OnSemanticsModeChanged",
+        "strictness": "strict",
         "ordinal": "4364437205430282903",
-        "type": "(bool updates_enabled) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.semantics/SemanticListenerOnSemanticsModeChangedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.accessibility.semantics/SemanticListener"
+        "name": "fuchsia.accessibility.semantics/SemanticListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerHitTestRequest.local_point",
+        "ordinal": "1",
+        "type": "fuchsia.math/PointF"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerHitTestRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerHitTestResponse.result",
+        "ordinal": "1",
+        "type": "fuchsia.accessibility.semantics/Hit"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerHitTestResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedRequest.action",
+        "ordinal": "2",
+        "type": "fuchsia.accessibility.semantics/Action"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedRequest.node_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedResponse.handled",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnAccessibilityActionRequestedResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnSemanticsModeChangedRequest.updates_enabled",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticListenerOnSemanticsModeChangedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticTree.CommitUpdates",
+        "strictness": "strict",
         "ordinal": "6443581006430455597",
-        "type": "() -> ()"
+        "direction": "two_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticTree.DeleteSemanticNodes",
+        "strictness": "strict",
         "ordinal": "6436973710380747200",
-        "type": "(vector<uint32>:2048 node_ids)"
+        "direction": "one_way",
+        "request": "fuchsia.accessibility.semantics/SemanticTreeDeleteSemanticNodesRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticTree.SendSemanticEvent",
+        "strictness": "strict",
         "ordinal": "4952750715286042061",
-        "type": "(fuchsia.accessibility.semantics/SemanticEvent semantic_event) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.accessibility.semantics/SemanticTreeSendSemanticEventRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticTree.UpdateSemanticNodes",
+        "strictness": "strict",
         "ordinal": "2518128364492660845",
-        "type": "(vector<fuchsia.accessibility.semantics/Node>:2048 nodes)"
+        "direction": "one_way",
+        "request": "fuchsia.accessibility.semantics/SemanticTreeUpdateSemanticNodesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.accessibility.semantics/SemanticTree"
+        "name": "fuchsia.accessibility.semantics/SemanticTree",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticTreeDeleteSemanticNodesRequest.node_ids",
+        "ordinal": "1",
+        "type": "vector<uint32>:2048"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticTreeDeleteSemanticNodesRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticTreeSendSemanticEventRequest.semantic_event",
+        "ordinal": "1",
+        "type": "fuchsia.accessibility.semantics/SemanticEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticTreeSendSemanticEventRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticTreeUpdateSemanticNodesRequest.nodes",
+        "ordinal": "1",
+        "type": "vector<fuchsia.accessibility.semantics/Node>:2048"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticTreeUpdateSemanticNodesRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.accessibility.semantics/SemanticsManager.RegisterViewForSemantics",
+        "strictness": "strict",
         "ordinal": "6091141528841792308",
-        "type": "(fuchsia.ui.views/ViewRef view_ref,client_end:fuchsia.accessibility.semantics/SemanticListener listener,server_end:fuchsia.accessibility.semantics/SemanticTree semantic_tree_request)"
+        "direction": "one_way",
+        "request": "fuchsia.accessibility.semantics/SemanticsManagerRegisterViewForSemanticsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.accessibility.semantics/SemanticsManager"
+        "name": "fuchsia.accessibility.semantics/SemanticsManager",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticsManagerRegisterViewForSemanticsRequest.listener",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.accessibility.semantics/SemanticListener"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticsManagerRegisterViewForSemanticsRequest.semantic_tree_request",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.accessibility.semantics/SemanticTree"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.accessibility.semantics/SemanticsManagerRegisterViewForSemanticsRequest.view_ref",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.accessibility.semantics/SemanticsManagerRegisterViewForSemanticsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

@@ -2,12 +2,15 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.fs/Admin.Shutdown",
+        "strictness": "strict",
         "ordinal": "6086240806105500302",
-        "type": "() -> ()"
+        "direction": "two_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.fs/Admin"
+        "name": "fuchsia.fs/Admin",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",

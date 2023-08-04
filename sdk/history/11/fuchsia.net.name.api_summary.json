@@ -67,65 +67,96 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.name/DnsServerWatcher.WatchServers",
+        "strictness": "strict",
         "ordinal": "6289435752595043890",
-        "type": "() -> (vector<fuchsia.net.name/DnsServer> servers)"
+        "direction": "two_way",
+        "response": "fuchsia.net.name/DnsServerWatcherWatchServersResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.name/DnsServerWatcher"
+        "name": "fuchsia.net.name/DnsServerWatcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/DnsServerWatcherWatchServersResponse.servers",
+        "ordinal": "1",
+        "type": "vector<fuchsia.net.name/DnsServer>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.name/DnsServerWatcherWatchServersResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.name/Lookup.LookupHostname",
+        "strictness": "strict",
         "ordinal": "1965094522514342692",
-        "type": "(fuchsia.net/IpAddress addr) -> (fuchsia.net.name/Lookup_LookupHostname_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.name/LookupLookupHostnameRequest",
+        "response": "fuchsia.net.name/Lookup_LookupHostname_Response",
+        "error": "fuchsia.net.name/LookupError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.name/Lookup.LookupIp",
+        "strictness": "strict",
         "ordinal": "6423396061567566288",
-        "type": "(string:255 hostname,fuchsia.net.name/LookupIpOptions options) -> (fuchsia.net.name/Lookup_LookupIp_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.name/LookupLookupIpRequest",
+        "response": "fuchsia.net.name/Lookup_LookupIp_Response",
+        "error": "fuchsia.net.name/LookupError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.name/Lookup"
+        "name": "fuchsia.net.name/Lookup",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.name/LookupAdmin.GetDnsServers",
+        "strictness": "strict",
         "ordinal": "7008449565845288975",
-        "type": "() -> (vector<fuchsia.net/SocketAddress> servers)"
+        "direction": "two_way",
+        "response": "fuchsia.net.name/LookupAdminGetDnsServersResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.name/LookupAdmin.SetDnsServers",
+        "strictness": "strict",
         "ordinal": "6188713333289893526",
-        "type": "(vector<fuchsia.net/SocketAddress> servers) -> (fuchsia.net.name/LookupAdmin_SetDnsServers_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.name/LookupAdminSetDnsServersRequest",
+        "response": "fuchsia.net.name/LookupAdmin_SetDnsServers_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.name/LookupAdmin"
+        "name": "fuchsia.net.name/LookupAdmin",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/LookupAdminGetDnsServersResponse.servers",
+        "ordinal": "1",
+        "type": "vector<fuchsia.net/SocketAddress>"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Response"
+        "name": "fuchsia.net.name/LookupAdminGetDnsServersResponse"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/LookupAdminSetDnsServersRequest.servers",
         "ordinal": "1",
-        "type": "fuchsia.net.name/LookupAdmin_SetDnsServers_Response"
+        "type": "vector<fuchsia.net/SocketAddress>"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.net.name/LookupAdminSetDnsServersRequest"
     },
     {
         "kind": "enum/member",
@@ -176,6 +207,32 @@
         "name": "fuchsia.net.name/LookupIpOptions"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/LookupLookupHostnameRequest.addr",
+        "ordinal": "1",
+        "type": "fuchsia.net/IpAddress"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.name/LookupLookupHostnameRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/LookupLookupIpRequest.hostname",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/LookupLookupIpRequest.options",
+        "ordinal": "2",
+        "type": "fuchsia.net.name/LookupIpOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.name/LookupLookupIpRequest"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.net.name/LookupResult.addresses",
         "ordinal": "1",
@@ -196,23 +253,6 @@
         "name": "fuchsia.net.name/Lookup_LookupHostname_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.net.name/Lookup_LookupHostname_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.net.name/LookupError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.name/Lookup_LookupHostname_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.name/Lookup_LookupHostname_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.name/Lookup_LookupHostname_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.net.name/Lookup_LookupIp_Response.result",
         "ordinal": "1",
@@ -221,23 +261,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.net.name/Lookup_LookupIp_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.name/Lookup_LookupIp_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.net.name/LookupError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.name/Lookup_LookupIp_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.name/Lookup_LookupIp_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.name/Lookup_LookupIp_Result",
-        "strictness": "strict"
     },
     {
         "kind": "const",

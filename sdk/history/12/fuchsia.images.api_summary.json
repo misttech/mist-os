@@ -108,36 +108,153 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.AddBufferCollection",
+        "strictness": "strict",
         "ordinal": "7367545316235049989",
-        "type": "(uint32 buffer_collection_id,fuchsia.sysmem/BufferCollectionToken buffer_collection_token)"
+        "direction": "one_way",
+        "request": "fuchsia.images/ImagePipe2AddBufferCollectionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.AddImage",
+        "strictness": "strict",
         "ordinal": "2546337025867051925",
-        "type": "(uint32 image_id,uint32 buffer_collection_id,uint32 buffer_collection_index,fuchsia.sysmem/ImageFormat_2 image_format)"
+        "direction": "one_way",
+        "request": "fuchsia.images/ImagePipe2AddImageRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.PresentImage",
+        "strictness": "strict",
         "ordinal": "8345087712037704762",
-        "type": "(uint32 image_id,uint64 presentation_time,vector<zx/Handle:EVENT>:16 acquire_fences,vector<zx/Handle:EVENT>:16 release_fences) -> (fuchsia.images/PresentationInfo presentation_info)"
+        "direction": "two_way",
+        "request": "fuchsia.images/ImagePipe2PresentImageRequest",
+        "response": "fuchsia.images/ImagePipe2PresentImageResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.RemoveBufferCollection",
+        "strictness": "strict",
         "ordinal": "1638953428188340889",
-        "type": "(uint32 buffer_collection_id)"
+        "direction": "one_way",
+        "request": "fuchsia.images/ImagePipe2RemoveBufferCollectionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.RemoveImage",
+        "strictness": "strict",
         "ordinal": "1650830745147871080",
-        "type": "(uint32 image_id)"
+        "direction": "one_way",
+        "request": "fuchsia.images/ImagePipe2RemoveImageRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.images/ImagePipe2"
+        "name": "fuchsia.images/ImagePipe2",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddBufferCollectionRequest.buffer_collection_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddBufferCollectionRequest.buffer_collection_token",
+        "ordinal": "2",
+        "type": "fuchsia.sysmem/BufferCollectionToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2AddBufferCollectionRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddImageRequest.buffer_collection_id",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddImageRequest.buffer_collection_index",
+        "ordinal": "3",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddImageRequest.image_format",
+        "ordinal": "4",
+        "type": "fuchsia.sysmem/ImageFormat_2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddImageRequest.image_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2AddImageRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2PresentImageRequest.acquire_fences",
+        "ordinal": "3",
+        "type": "vector<zx/Handle:EVENT>:16"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2PresentImageRequest.image_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2PresentImageRequest.presentation_time",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2PresentImageRequest.release_fences",
+        "ordinal": "4",
+        "type": "vector<zx/Handle:EVENT>:16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2PresentImageRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2PresentImageResponse.presentation_info",
+        "ordinal": "1",
+        "type": "fuchsia.images/PresentationInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2PresentImageResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2RemoveBufferCollectionRequest.buffer_collection_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2RemoveBufferCollectionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2RemoveImageRequest.image_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2RemoveImageRequest"
     },
     {
         "kind": "const",

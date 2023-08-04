@@ -119,12 +119,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.fonts/FontSetEventListener.OnFontSetUpdated",
+        "strictness": "strict",
         "ordinal": "1084473405949379065",
-        "type": "(fuchsia.fonts/FontSetUpdatedEvent event) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.fonts/FontSetEventListenerOnFontSetUpdatedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.fonts/FontSetEventListener"
+        "name": "fuchsia.fonts/FontSetEventListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/FontSetEventListenerOnFontSetUpdatedRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.fonts/FontSetUpdatedEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/FontSetEventListenerOnFontSetUpdatedRequest"
     },
     {
         "kind": "table",
@@ -220,36 +234,145 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.fonts/Provider.GetFamilyInfo",
+        "strictness": "strict",
         "ordinal": "2858555626765225395",
-        "type": "(string:128 family) -> (box<fuchsia.fonts/FamilyInfo> family_info)"
+        "direction": "two_way",
+        "request": "fuchsia.fonts/ProviderGetFamilyInfoRequest",
+        "response": "fuchsia.fonts/ProviderGetFamilyInfoResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.fonts/Provider.GetFont",
+        "strictness": "strict",
         "ordinal": "7903442241602193259",
-        "type": "(fuchsia.fonts/Request request) -> (box<fuchsia.fonts/Response> response)"
+        "direction": "two_way",
+        "request": "fuchsia.fonts/ProviderGetFontRequest",
+        "response": "fuchsia.fonts/ProviderGetFontResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.fonts/Provider.GetFontFamilyInfo",
+        "strictness": "strict",
         "ordinal": "8440007951307360714",
-        "type": "(fuchsia.fonts/FamilyName family) -> (fuchsia.fonts/FontFamilyInfo family_info)"
+        "direction": "two_way",
+        "request": "fuchsia.fonts/ProviderGetFontFamilyInfoRequest",
+        "response": "fuchsia.fonts/ProviderGetFontFamilyInfoResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.fonts/Provider.GetTypeface",
+        "strictness": "strict",
         "ordinal": "6089379408366995057",
-        "type": "(fuchsia.fonts/TypefaceRequest request) -> (fuchsia.fonts/TypefaceResponse response)"
+        "direction": "two_way",
+        "request": "fuchsia.fonts/ProviderGetTypefaceRequest",
+        "response": "fuchsia.fonts/ProviderGetTypefaceResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.fonts/Provider.RegisterFontSetEventListener",
+        "strictness": "strict",
         "ordinal": "1830881461319461196",
-        "type": "(client_end:fuchsia.fonts/FontSetEventListener listener) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.fonts/ProviderRegisterFontSetEventListenerRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.fonts/Provider"
+        "name": "fuchsia.fonts/Provider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetFamilyInfoRequest.family",
+        "ordinal": "1",
+        "type": "string:128"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetFamilyInfoRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetFamilyInfoResponse.family_info",
+        "ordinal": "1",
+        "type": "box<fuchsia.fonts/FamilyInfo>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetFamilyInfoResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetFontFamilyInfoRequest.family",
+        "ordinal": "1",
+        "type": "fuchsia.fonts/FamilyName"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetFontFamilyInfoRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetFontFamilyInfoResponse.family_info",
+        "ordinal": "1",
+        "type": "fuchsia.fonts/FontFamilyInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetFontFamilyInfoResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetFontRequest.request",
+        "ordinal": "1",
+        "type": "fuchsia.fonts/Request"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetFontRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetFontResponse.response",
+        "ordinal": "1",
+        "type": "box<fuchsia.fonts/Response>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetFontResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetTypefaceRequest.request",
+        "ordinal": "1",
+        "type": "fuchsia.fonts/TypefaceRequest"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetTypefaceRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderGetTypefaceResponse.response",
+        "ordinal": "1",
+        "type": "fuchsia.fonts/TypefaceResponse"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderGetTypefaceResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.fonts/ProviderRegisterFontSetEventListenerRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.fonts/FontSetEventListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.fonts/ProviderRegisterFontSetEventListenerRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "const",

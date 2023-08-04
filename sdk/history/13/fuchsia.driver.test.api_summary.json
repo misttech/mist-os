@@ -18,12 +18,18 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.test/Realm.Start",
+        "strictness": "strict",
         "ordinal": "4451408685211490042",
-        "type": "(fuchsia.driver.test/RealmArgs args) -> (fuchsia.driver.test/Realm_Start_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.driver.test/RealmStartRequest",
+        "response": "fuchsia.driver.test/Realm_Start_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.driver.test/Realm"
+        "name": "fuchsia.driver.test/Realm",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -91,25 +97,15 @@
         "resourceness": "resource"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.driver.test/Realm_Start_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.test/Realm_Start_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.test/Realm_Start_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.driver.test/RealmStartRequest.args",
         "ordinal": "1",
-        "type": "fuchsia.driver.test/Realm_Start_Response"
+        "type": "fuchsia.driver.test/RealmArgs"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.driver.test/Realm_Start_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.driver.test/RealmStartRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

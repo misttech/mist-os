@@ -108,32 +108,110 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/HostNameResolver.ResolveHostName",
+        "strictness": "strict",
         "ordinal": "6121555628597167213",
-        "type": "(string:255 host,int64 timeout,fuchsia.net.mdns/HostNameResolutionOptions options) -> (vector<fuchsia.net.mdns/HostAddress>:64 addresses)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/HostNameResolverResolveHostNameRequest",
+        "response": "fuchsia.net.mdns/HostNameResolverResolveHostNameResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/HostNameResolver"
+        "name": "fuchsia.net.mdns/HostNameResolver",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameResolverResolveHostNameRequest.host",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameResolverResolveHostNameRequest.options",
+        "ordinal": "3",
+        "type": "fuchsia.net.mdns/HostNameResolutionOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameResolverResolveHostNameRequest.timeout",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/HostNameResolverResolveHostNameRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameResolverResolveHostNameResponse.addresses",
+        "ordinal": "1",
+        "type": "vector<fuchsia.net.mdns/HostAddress>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/HostNameResolverResolveHostNameResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/HostNameSubscriber.SubscribeToHostName",
+        "strictness": "strict",
         "ordinal": "2573461891356508394",
-        "type": "(string:255 host,fuchsia.net.mdns/HostNameSubscriptionOptions options,client_end:fuchsia.net.mdns/HostNameSubscriptionListener listener)"
+        "direction": "one_way",
+        "request": "fuchsia.net.mdns/HostNameSubscriberSubscribeToHostNameRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/HostNameSubscriber"
+        "name": "fuchsia.net.mdns/HostNameSubscriber",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameSubscriberSubscribeToHostNameRequest.host",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameSubscriberSubscribeToHostNameRequest.listener",
+        "ordinal": "3",
+        "type": "client_end:fuchsia.net.mdns/HostNameSubscriptionListener"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameSubscriberSubscribeToHostNameRequest.options",
+        "ordinal": "2",
+        "type": "fuchsia.net.mdns/HostNameSubscriptionOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/HostNameSubscriberSubscribeToHostNameRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/HostNameSubscriptionListener.OnAddressesChanged",
+        "strictness": "strict",
         "ordinal": "4969131799084799090",
-        "type": "(vector<fuchsia.net.mdns/HostAddress>:64 addresses) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/HostNameSubscriptionListenerOnAddressesChangedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/HostNameSubscriptionListener"
+        "name": "fuchsia.net.mdns/HostNameSubscriptionListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/HostNameSubscriptionListenerOnAddressesChangedRequest.addresses",
+        "ordinal": "1",
+        "type": "vector<fuchsia.net.mdns/HostAddress>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/HostNameSubscriptionListenerOnAddressesChangedRequest"
     },
     {
         "kind": "table/member",
@@ -249,33 +327,47 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ProxyHostPublisher.PublishProxyHost",
+        "strictness": "strict",
         "ordinal": "7177611877415482306",
-        "type": "(string:255 host,vector<fuchsia.net/IpAddress>:64 addresses,fuchsia.net.mdns/ProxyHostPublicationOptions options,server_end:fuchsia.net.mdns/ServiceInstancePublisher service_instance_publisher) -> (fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ProxyHostPublisherPublishProxyHostRequest",
+        "response": "fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Response",
+        "error": "fuchsia.net.mdns/PublishProxyHostError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ProxyHostPublisher"
+        "name": "fuchsia.net.mdns/ProxyHostPublisher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ProxyHostPublisherPublishProxyHostRequest.addresses",
+        "ordinal": "2",
+        "type": "vector<fuchsia.net/IpAddress>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ProxyHostPublisherPublishProxyHostRequest.host",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ProxyHostPublisherPublishProxyHostRequest.options",
+        "ordinal": "3",
+        "type": "fuchsia.net.mdns/ProxyHostPublicationOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ProxyHostPublisherPublishProxyHostRequest.service_instance_publisher",
+        "ordinal": "4",
+        "type": "server_end:fuchsia.net.mdns/ServiceInstancePublisher"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.net.mdns/PublishProxyHostError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.mdns/ProxyHostPublisher_PublishProxyHost_Result",
-        "strictness": "strict"
+        "name": "fuchsia.net.mdns/ProxyHostPublisherPublishProxyHostRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -352,24 +444,74 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/PublicationResponder.OnPublication",
+        "strictness": "strict",
         "ordinal": "8203312969938926854",
-        "type": "(fuchsia.net.mdns/PublicationCause publication_cause,string:<63,optional> subtype,vector<fuchsia.net/IpAddress>:64 source_addresses) -> (box<fuchsia.net.mdns/Publication> publication)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/PublicationResponderOnPublicationRequest",
+        "response": "fuchsia.net.mdns/PublicationResponderOnPublicationResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/PublicationResponder.Reannounce",
+        "strictness": "strict",
         "ordinal": "2688873459436127115",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/PublicationResponder.SetSubtypes",
+        "strictness": "strict",
         "ordinal": "6166520075207252447",
-        "type": " -> (vector<string:63>:256 subtypes)"
+        "direction": "event",
+        "request": "fuchsia.net.mdns/PublicationResponderSetSubtypesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/PublicationResponder"
+        "name": "fuchsia.net.mdns/PublicationResponder",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublicationResponderOnPublicationRequest.publication_cause",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/PublicationCause"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublicationResponderOnPublicationRequest.source_addresses",
+        "ordinal": "3",
+        "type": "vector<fuchsia.net/IpAddress>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublicationResponderOnPublicationRequest.subtype",
+        "ordinal": "2",
+        "type": "string:<63,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/PublicationResponderOnPublicationRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublicationResponderOnPublicationResponse.publication",
+        "ordinal": "1",
+        "type": "box<fuchsia.net.mdns/Publication>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/PublicationResponderOnPublicationResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublicationResponderSetSubtypesRequest.subtypes",
+        "ordinal": "1",
+        "type": "vector<string:63>:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/PublicationResponderSetSubtypesRequest"
     },
     {
         "kind": "enum/member",
@@ -406,43 +548,100 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/Publisher.PublishServiceInstance",
+        "strictness": "strict",
         "ordinal": "3968259631809529751",
-        "type": "(string:22 service,string:63 instance,fuchsia.net.mdns/Media media,bool perform_probe,client_end:fuchsia.net.mdns/PublicationResponder publication_responder) -> (fuchsia.net.mdns/Publisher_PublishServiceInstance_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest",
+        "response": "fuchsia.net.mdns/Publisher_PublishServiceInstance_Response",
+        "error": "fuchsia.net.mdns/Error"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/Publisher"
+        "name": "fuchsia.net.mdns/Publisher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest.instance",
+        "ordinal": "2",
+        "type": "string:63"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest.media",
+        "ordinal": "3",
+        "type": "fuchsia.net.mdns/Media"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest.perform_probe",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest.publication_responder",
+        "ordinal": "5",
+        "type": "client_end:fuchsia.net.mdns/PublicationResponder"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.net.mdns/Publisher_PublishServiceInstance_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/Publisher_PublishServiceInstance_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.net.mdns/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/Publisher_PublishServiceInstance_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.mdns/Publisher_PublishServiceInstance_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.mdns/Publisher_PublishServiceInstance_Result",
-        "strictness": "strict"
+        "name": "fuchsia.net.mdns/PublisherPublishServiceInstanceRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/Resolver.ResolveHostName",
+        "strictness": "strict",
         "ordinal": "4362628289501761098",
-        "type": "(string:255 host,int64 timeout) -> (fuchsia.net/Ipv4Address:optional v4_address,fuchsia.net/Ipv6Address:optional v6_address)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ResolverResolveHostNameRequest",
+        "response": "fuchsia.net.mdns/ResolverResolveHostNameResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/Resolver"
+        "name": "fuchsia.net.mdns/Resolver",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ResolverResolveHostNameRequest.host",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ResolverResolveHostNameRequest.timeout",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ResolverResolveHostNameRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ResolverResolveHostNameResponse.v4_address",
+        "ordinal": "1",
+        "type": "fuchsia.net/Ipv4Address:optional"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ResolverResolveHostNameResponse.v6_address",
+        "ordinal": "2",
+        "type": "fuchsia.net/Ipv6Address:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ResolverResolveHostNameResponse"
     },
     {
         "kind": "enum/member",
@@ -616,24 +815,65 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder.OnPublication",
+        "strictness": "strict",
         "ordinal": "8175508291433361866",
-        "type": "(fuchsia.net.mdns/ServiceInstancePublicationCause publication_cause,string:<63,optional> subtype,vector<fuchsia.net/IpAddress>:64 source_addresses) -> (fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceInstancePublicationResponderOnPublicationRequest",
+        "response": "fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Response",
+        "error": "fuchsia.net.mdns/OnPublicationError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder.Reannounce",
+        "strictness": "strict",
         "ordinal": "1966060850097480104",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder.SetSubtypes",
+        "strictness": "strict",
         "ordinal": "2413908983074198185",
-        "type": " -> (vector<string:63>:256 subtypes)"
+        "direction": "event",
+        "request": "fuchsia.net.mdns/ServiceInstancePublicationResponderSetSubtypesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder"
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponderOnPublicationRequest.publication_cause",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceInstancePublicationCause"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponderOnPublicationRequest.source_addresses",
+        "ordinal": "3",
+        "type": "vector<fuchsia.net/IpAddress>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponderOnPublicationRequest.subtype",
+        "ordinal": "2",
+        "type": "string:<63,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponderOnPublicationRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponderSetSubtypesRequest.subtypes",
+        "ordinal": "1",
+        "type": "vector<string:63>:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponderSetSubtypesRequest"
     },
     {
         "kind": "struct/member",
@@ -646,52 +886,49 @@
         "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.net.mdns/OnPublicationError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.mdns/ServiceInstancePublicationResponder_OnPublication_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceInstancePublisher.PublishServiceInstance",
+        "strictness": "strict",
         "ordinal": "2726363364854553246",
-        "type": "(string:22 service,string:63 instance,fuchsia.net.mdns/ServiceInstancePublicationOptions options,client_end:fuchsia.net.mdns/ServiceInstancePublicationResponder publication_responder) -> (fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceInstancePublisherPublishServiceInstanceRequest",
+        "response": "fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Response",
+        "error": "fuchsia.net.mdns/PublishServiceInstanceError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ServiceInstancePublisher"
+        "name": "fuchsia.net.mdns/ServiceInstancePublisher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublisherPublishServiceInstanceRequest.instance",
+        "ordinal": "2",
+        "type": "string:63"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublisherPublishServiceInstanceRequest.options",
+        "ordinal": "3",
+        "type": "fuchsia.net.mdns/ServiceInstancePublicationOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublisherPublishServiceInstanceRequest.publication_responder",
+        "ordinal": "4",
+        "type": "client_end:fuchsia.net.mdns/ServiceInstancePublicationResponder"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstancePublisherPublishServiceInstanceRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.net.mdns/PublishServiceInstanceError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.mdns/ServiceInstancePublisher_PublishServiceInstance_Result",
-        "strictness": "strict"
+        "name": "fuchsia.net.mdns/ServiceInstancePublisherPublishServiceInstanceRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -724,84 +961,285 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceInstanceResolver.ResolveServiceInstance",
+        "strictness": "strict",
         "ordinal": "117323156253781975",
-        "type": "(string:22 service,string:63 instance,int64 timeout,fuchsia.net.mdns/ServiceInstanceResolutionOptions options) -> (fuchsia.net.mdns/ServiceInstance instance)"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceRequest",
+        "response": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ServiceInstanceResolver"
+        "name": "fuchsia.net.mdns/ServiceInstanceResolver",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceRequest.instance",
+        "ordinal": "2",
+        "type": "string:63"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceRequest.options",
+        "ordinal": "4",
+        "type": "fuchsia.net.mdns/ServiceInstanceResolutionOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceRequest.timeout",
+        "ordinal": "3",
+        "type": "int64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceResponse.instance",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceInstance"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceInstanceResolverResolveServiceInstanceResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriber.OnInstanceChanged",
+        "strictness": "strict",
         "ordinal": "2655476207836107828",
-        "type": "(fuchsia.net.mdns/ServiceInstance instance) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriberOnInstanceChangedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriber.OnInstanceDiscovered",
+        "strictness": "strict",
         "ordinal": "8406535639500966578",
-        "type": "(fuchsia.net.mdns/ServiceInstance instance) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriberOnInstanceDiscoveredRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriber.OnInstanceLost",
+        "strictness": "strict",
         "ordinal": "6624191935769835327",
-        "type": "(string:22 service,string:63 instance) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriberOnInstanceLostRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriber.OnQuery",
+        "strictness": "strict",
         "ordinal": "2090961159512073205",
-        "type": "(fuchsia.net.mdns/ResourceType resource_type) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriberOnQueryRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ServiceSubscriber"
+        "name": "fuchsia.net.mdns/ServiceSubscriber",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriber2.SubscribeToAllServices",
+        "strictness": "strict",
         "ordinal": "8958102574896514152",
-        "type": "(fuchsia.net.mdns/ServiceSubscriptionOptions options,client_end:fuchsia.net.mdns/ServiceSubscriptionListener listener)"
+        "direction": "one_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToAllServicesRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriber2.SubscribeToService",
+        "strictness": "strict",
         "ordinal": "8716457424611914922",
-        "type": "(string:22 service,fuchsia.net.mdns/ServiceSubscriptionOptions options,client_end:fuchsia.net.mdns/ServiceSubscriptionListener listener)"
+        "direction": "one_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToServiceRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ServiceSubscriber2"
+        "name": "fuchsia.net.mdns/ServiceSubscriber2",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToAllServicesRequest.listener",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.net.mdns/ServiceSubscriptionListener"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToAllServicesRequest.options",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceSubscriptionOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToAllServicesRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToServiceRequest.listener",
+        "ordinal": "3",
+        "type": "client_end:fuchsia.net.mdns/ServiceSubscriptionListener"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToServiceRequest.options",
+        "ordinal": "2",
+        "type": "fuchsia.net.mdns/ServiceSubscriptionOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToServiceRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriber2SubscribeToServiceRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceChangedRequest.instance",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceInstance"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceChangedRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceDiscoveredRequest.instance",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceInstance"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceDiscoveredRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceLostRequest.instance",
+        "ordinal": "2",
+        "type": "string:63"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceLostRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnInstanceLostRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnQueryRequest.resource_type",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ResourceType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriberOnQueryRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriptionListener.OnInstanceChanged",
+        "strictness": "strict",
         "ordinal": "9053121089991706921",
-        "type": "(fuchsia.net.mdns/ServiceInstance instance) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceChangedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriptionListener.OnInstanceDiscovered",
+        "strictness": "strict",
         "ordinal": "589837539803046278",
-        "type": "(fuchsia.net.mdns/ServiceInstance instance) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceDiscoveredRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriptionListener.OnInstanceLost",
+        "strictness": "strict",
         "ordinal": "3371840517565695708",
-        "type": "(string:22 service,string:63 instance) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceLostRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/ServiceSubscriptionListener.OnQuery",
+        "strictness": "strict",
         "ordinal": "5714708265784161809",
-        "type": "(fuchsia.net.mdns/ResourceType resource_type) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.mdns/ServiceSubscriptionListenerOnQueryRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/ServiceSubscriptionListener"
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceChangedRequest.instance",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceInstance"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceChangedRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceDiscoveredRequest.instance",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ServiceInstance"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceDiscoveredRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceLostRequest.instance",
+        "ordinal": "2",
+        "type": "string:63"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceLostRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnInstanceLostRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnQueryRequest.resource_type",
+        "ordinal": "1",
+        "type": "fuchsia.net.mdns/ResourceType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/ServiceSubscriptionListenerOnQueryRequest"
     },
     {
         "kind": "table/member",
@@ -834,12 +1272,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.mdns/Subscriber.SubscribeToService",
+        "strictness": "strict",
         "ordinal": "4186723686616702527",
-        "type": "(string:22 service,client_end:fuchsia.net.mdns/ServiceSubscriber subscriber)"
+        "direction": "one_way",
+        "request": "fuchsia.net.mdns/SubscriberSubscribeToServiceRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.mdns/Subscriber"
+        "name": "fuchsia.net.mdns/Subscriber",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/SubscriberSubscribeToServiceRequest.service",
+        "ordinal": "1",
+        "type": "string:22"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.mdns/SubscriberSubscribeToServiceRequest.subscriber",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.net.mdns/ServiceSubscriber"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.mdns/SubscriberSubscribeToServiceRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

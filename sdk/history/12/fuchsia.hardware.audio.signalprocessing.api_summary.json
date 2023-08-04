@@ -2,12 +2,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Connector.SignalProcessingConnect",
+        "strictness": "strict",
         "ordinal": "757045078484476565",
-        "type": "(server_end:fuchsia.hardware.audio.signalprocessing/SignalProcessing protocol)"
+        "direction": "one_way",
+        "request": "fuchsia.hardware.audio.signalprocessing/ConnectorSignalProcessingConnectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hardware.audio.signalprocessing/Connector"
+        "name": "fuchsia.hardware.audio.signalprocessing/Connector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ConnectorSignalProcessingConnectRequest.protocol",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.hardware.audio.signalprocessing/SignalProcessing"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio.signalprocessing/ConnectorSignalProcessingConnectRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -738,24 +753,55 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader.GetElements",
+        "strictness": "strict",
         "ordinal": "1951465235598395128",
-        "type": "() -> (fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader.GetTopologies",
+        "strictness": "strict",
         "ordinal": "8358600897224061110",
-        "type": "() -> (fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader.WatchElementState",
+        "strictness": "strict",
         "ordinal": "5930581514082911599",
-        "type": "(uint64 processing_element_id) -> (fuchsia.hardware.audio.signalprocessing/ElementState state)"
+        "direction": "two_way",
+        "request": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateRequest",
+        "response": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader"
+        "name": "fuchsia.hardware.audio.signalprocessing/Reader",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateRequest.processing_element_id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateResponse.state",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/ElementState"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateResponse"
     },
     {
         "kind": "struct/member",
@@ -768,23 +814,6 @@
         "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response.topologies",
         "ordinal": "1",
@@ -795,97 +824,83 @@
         "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.GetElements",
+        "strictness": "strict",
         "ordinal": "1951465235598395128",
-        "type": "() -> (fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio.signalprocessing/Reader_GetElements_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.GetTopologies",
+        "strictness": "strict",
         "ordinal": "8358600897224061110",
-        "type": "() -> (fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.SetElementState",
+        "strictness": "strict",
         "ordinal": "4090309513321027828",
-        "type": "(uint64 processing_element_id,fuchsia.hardware.audio.signalprocessing/ElementState state) -> (fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetElementStateRequest",
+        "response": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.SetTopology",
+        "strictness": "strict",
         "ordinal": "2133157679624780044",
-        "type": "(uint64 topology_id) -> (fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetTopologyRequest",
+        "response": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.WatchElementState",
+        "strictness": "strict",
         "ordinal": "5930581514082911599",
-        "type": "(uint64 processing_element_id) -> (fuchsia.hardware.audio.signalprocessing/ElementState state)"
+        "direction": "two_way",
+        "request": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateRequest",
+        "response": "fuchsia.hardware.audio.signalprocessing/ReaderWatchElementStateResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing"
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetElementStateRequest.processing_element_id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetElementStateRequest.state",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio.signalprocessing/ElementState"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Response"
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetElementStateRequest"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetTopologyRequest.topology_id",
         "ordinal": "1",
-        "type": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetElementState_Result",
-        "strictness": "strict"
+        "type": "uint64"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing_SetTopology_Result",
-        "strictness": "strict"
+        "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetTopologyRequest"
     },
     {
         "kind": "enum/member",

@@ -2,12 +2,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/AdvertisedPeripheral.OnConnected",
+        "strictness": "strict",
         "ordinal": "6952281387315409272",
-        "type": "(fuchsia.bluetooth.le/Peer peer,client_end:fuchsia.bluetooth.le/Connection connection) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/AdvertisedPeripheralOnConnectedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.bluetooth.le/AdvertisedPeripheral"
+        "name": "fuchsia.bluetooth.le/AdvertisedPeripheral",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/AdvertisedPeripheralOnConnectedRequest.connection",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.bluetooth.le/Connection"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/AdvertisedPeripheralOnConnectedRequest.peer",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/Peer"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/AdvertisedPeripheralOnConnectedRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -115,7 +136,9 @@
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.bluetooth.le/AdvertisingHandle"
+        "name": "fuchsia.bluetooth.le/AdvertisingHandle",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -175,66 +198,145 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.ConnectPeripheral",
+        "strictness": "strict",
         "ordinal": "8164300664993142618",
-        "type": "(string:16 identifier,fuchsia.bluetooth.le/ConnectionOptions options,server_end:fuchsia.bluetooth.gatt/Client gatt_client) -> (fuchsia.bluetooth/Status status)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CentralConnectPeripheralRequest",
+        "response": "fuchsia.bluetooth.le/CentralConnectPeripheralResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.DisconnectPeripheral",
+        "strictness": "strict",
         "ordinal": "762287950220452605",
-        "type": "(string:16 identifier) -> (fuchsia.bluetooth/Status status)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CentralDisconnectPeripheralRequest",
+        "response": "fuchsia.bluetooth.le/CentralDisconnectPeripheralResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.GetPeripheral",
+        "strictness": "strict",
         "ordinal": "684364827058770906",
-        "type": "(string:16 identifier) -> (box<fuchsia.bluetooth.le/RemoteDevice> peripheral)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CentralGetPeripheralRequest",
+        "response": "fuchsia.bluetooth.le/CentralGetPeripheralResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.GetPeripherals",
+        "strictness": "strict",
         "ordinal": "4015653360434054056",
-        "type": "(vector<string:36>:optional service_uuids) -> (vector<fuchsia.bluetooth.le/RemoteDevice> peripherals)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CentralGetPeripheralsRequest",
+        "response": "fuchsia.bluetooth.le/CentralGetPeripheralsResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.OnDeviceDiscovered",
+        "strictness": "strict",
         "ordinal": "506895609942666678",
-        "type": " -> (fuchsia.bluetooth.le/RemoteDevice device)"
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/CentralOnDeviceDiscoveredRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.OnPeripheralDisconnected",
+        "strictness": "strict",
         "ordinal": "5642002732075263711",
-        "type": " -> (string:16 identifier)"
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/CentralOnPeripheralDisconnectedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.OnScanStateChanged",
+        "strictness": "strict",
         "ordinal": "6885682926580682047",
-        "type": " -> (bool scanning)"
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/CentralOnScanStateChangedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.Scan",
+        "strictness": "strict",
         "ordinal": "4753287824271204703",
-        "type": "(fuchsia.bluetooth.le/ScanOptions options,server_end:fuchsia.bluetooth.le/ScanResultWatcher result_watcher) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CentralScanRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.StartScan",
+        "strictness": "strict",
         "ordinal": "1059699466289877803",
-        "type": "(box<fuchsia.bluetooth.le/ScanFilter> filter) -> (fuchsia.bluetooth/Status status)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CentralStartScanRequest",
+        "response": "fuchsia.bluetooth.le/CentralStartScanResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Central.StopScan",
+        "strictness": "strict",
         "ordinal": "6879792045015185312",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.bluetooth.le/Central"
+        "name": "fuchsia.bluetooth.le/Central",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectPeripheralRequest.gatt_client",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.bluetooth.gatt/Client"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectPeripheralRequest.identifier",
+        "ordinal": "1",
+        "type": "string:16"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectPeripheralRequest.options",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/ConnectionOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralConnectPeripheralRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectPeripheralResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/Status"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralConnectPeripheralResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralDisconnectPeripheralRequest.identifier",
+        "ordinal": "1",
+        "type": "string:16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralDisconnectPeripheralRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralDisconnectPeripheralResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/Status"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralDisconnectPeripheralResponse"
     },
     {
         "kind": "enum/member",
@@ -263,8 +365,117 @@
         "type": "uint32"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralRequest.identifier",
+        "ordinal": "1",
+        "type": "string:16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralResponse.peripheral",
+        "ordinal": "1",
+        "type": "box<fuchsia.bluetooth.le/RemoteDevice>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralsRequest.service_uuids",
+        "ordinal": "1",
+        "type": "vector<string:36>:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralsResponse.peripherals",
+        "ordinal": "1",
+        "type": "vector<fuchsia.bluetooth.le/RemoteDevice>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralGetPeripheralsResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralOnDeviceDiscoveredRequest.device",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/RemoteDevice"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralOnDeviceDiscoveredRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralOnPeripheralDisconnectedRequest.identifier",
+        "ordinal": "1",
+        "type": "string:16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralOnPeripheralDisconnectedRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralOnScanStateChangedRequest.scanning",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralOnScanStateChangedRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralScanRequest.options",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/ScanOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralScanRequest.result_watcher",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.bluetooth.le/ScanResultWatcher"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralScanRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralStartScanRequest.filter",
+        "ordinal": "1",
+        "type": "box<fuchsia.bluetooth.le/ScanFilter>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralStartScanRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralStartScanResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/Status"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralStartScanResponse"
+    },
+    {
         "kind": "protocol",
-        "name": "fuchsia.bluetooth.le/Connection"
+        "name": "fuchsia.bluetooth.le/Connection",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -427,24 +638,53 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Peripheral.Advertise",
+        "strictness": "strict",
         "ordinal": "3287285943277633919",
-        "type": "(fuchsia.bluetooth.le/AdvertisingParameters parameters,client_end:fuchsia.bluetooth.le/AdvertisedPeripheral advertised_peripheral) -> (fuchsia.bluetooth.le/Peripheral_Advertise_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/PeripheralAdvertiseRequest",
+        "response": "fuchsia.bluetooth.le/Peripheral_Advertise_Response",
+        "error": "fuchsia.bluetooth.le/PeripheralError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Peripheral.OnPeerConnected",
+        "strictness": "strict",
         "ordinal": "1590717649738392406",
-        "type": " -> (fuchsia.bluetooth.le/Peer peer,client_end:fuchsia.bluetooth.le/Connection connection)"
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/PeripheralOnPeerConnectedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/Peripheral.StartAdvertising",
+        "strictness": "strict",
         "ordinal": "6374213901444190077",
-        "type": "(fuchsia.bluetooth.le/AdvertisingParameters parameters,server_end:fuchsia.bluetooth.le/AdvertisingHandle handle) -> (fuchsia.bluetooth.le/Peripheral_StartAdvertising_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest",
+        "response": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Response",
+        "error": "fuchsia.bluetooth.le/PeripheralError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.bluetooth.le/Peripheral"
+        "name": "fuchsia.bluetooth.le/Peripheral",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeripheralAdvertiseRequest.advertised_peripheral",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.bluetooth.le/AdvertisedPeripheral"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeripheralAdvertiseRequest.parameters",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/AdvertisingParameters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/PeripheralAdvertiseRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -483,46 +723,38 @@
         "type": "uint32"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.bluetooth.le/Peripheral_Advertise_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.bluetooth.le/Peripheral_Advertise_Result.err",
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeripheralOnPeerConnectedRequest.connection",
         "ordinal": "2",
-        "type": "fuchsia.bluetooth.le/PeripheralError"
+        "type": "client_end:fuchsia.bluetooth.le/Connection"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.bluetooth.le/Peripheral_Advertise_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeripheralOnPeerConnectedRequest.peer",
         "ordinal": "1",
-        "type": "fuchsia.bluetooth.le/Peripheral_Advertise_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.bluetooth.le/Peripheral_Advertise_Result",
-        "strictness": "strict"
+        "type": "fuchsia.bluetooth.le/Peer"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Response"
+        "name": "fuchsia.bluetooth.le/PeripheralOnPeerConnectedRequest",
+        "resourceness": "resource"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Result.err",
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest.handle",
         "ordinal": "2",
-        "type": "fuchsia.bluetooth.le/PeripheralError"
+        "type": "server_end:fuchsia.bluetooth.le/AdvertisingHandle"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest.parameters",
         "ordinal": "1",
-        "type": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Response"
+        "type": "fuchsia.bluetooth.le/AdvertisingParameters"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -651,12 +883,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/ScanResultWatcher.Watch",
+        "strictness": "strict",
         "ordinal": "8158853666206330906",
-        "type": "() -> (vector<fuchsia.bluetooth.le/Peer> updated)"
+        "direction": "two_way",
+        "response": "fuchsia.bluetooth.le/ScanResultWatcherWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.bluetooth.le/ScanResultWatcher"
+        "name": "fuchsia.bluetooth.le/ScanResultWatcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/ScanResultWatcherWatchResponse.updated",
+        "ordinal": "1",
+        "type": "vector<fuchsia.bluetooth.le/Peer>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/ScanResultWatcherWatchResponse"
     },
     {
         "kind": "struct/member",

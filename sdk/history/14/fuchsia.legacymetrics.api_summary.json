@@ -85,18 +85,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.legacymetrics/MetricsRecorder.OnCloseSoon",
+        "strictness": "strict",
         "ordinal": "2887687357176154771",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.legacymetrics/MetricsRecorder.Record",
+        "strictness": "strict",
         "ordinal": "221414131739248768",
-        "type": "(vector<fuchsia.legacymetrics/Event> events) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.legacymetrics/MetricsRecorderRecordRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.legacymetrics/MetricsRecorder"
+        "name": "fuchsia.legacymetrics/MetricsRecorder",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.legacymetrics/MetricsRecorderRecordRequest.events",
+        "ordinal": "1",
+        "type": "vector<fuchsia.legacymetrics/Event>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.legacymetrics/MetricsRecorderRecordRequest"
     },
     {
         "kind": "table/member",

@@ -2,12 +2,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.memory.inspection/Collector.CollectJsonStats",
+        "strictness": "strict",
         "ordinal": "3770591835757971852",
-        "type": "(zx/Handle:<SOCKET,zx.WRITE,zx.WAIT> socket)"
+        "direction": "one_way",
+        "request": "fuchsia.memory.inspection/CollectorCollectJsonStatsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.memory.inspection/Collector"
+        "name": "fuchsia.memory.inspection/Collector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.memory.inspection/CollectorCollectJsonStatsRequest.socket",
+        "ordinal": "1",
+        "type": "zx/Handle:<SOCKET,zx.WRITE,zx.WAIT>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.memory.inspection/CollectorCollectJsonStatsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

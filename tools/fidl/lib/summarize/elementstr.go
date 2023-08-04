@@ -17,21 +17,41 @@ import (
 // https://fuchsia.dev/fuchsia-src/reference/fidl/language/language#strict-vs-flexible
 type Strictness string
 
-var (
-	noStrictness Strictness = ""
-	isStrict     Strictness = "strict"
-	isFlexible   Strictness = "flexible"
+const (
+	isStrict   Strictness = "strict"
+	isFlexible Strictness = "flexible"
 )
 
 // Resourceness describes if an element is a value or resource type:
 // https://fuchsia.dev/fuchsia-src/reference/fidl/language/language#value-vs-resource
 type Resourceness string
 
-var (
+const (
 	// isValue is the default, so we omit it altogether.
 	isValue Resourceness = ""
 	// isResource means the type is allowed to contain handles.
 	isResource Resourceness = "resource"
+)
+
+// Openness describes if a protocol is closed, ajar, or open:
+// https://fuchsia.dev/fuchsia-src/reference/fidl/language/language#unknown-interactions
+type Openness string
+
+const (
+	isClosed Openness = "closed"
+	isAjar   Openness = "ajar"
+	isOpen   Openness = "open"
+)
+
+// Transport describes the transport over which a protocol is defined.
+// https://fuchsia.dev/fuchsia-src/reference/fidl/language/attributes#transport
+type Transport string
+
+const (
+	channelTransport Transport = "channel"
+	driverTransport  Transport = "driver"
+	banjoTransport   Transport = "banjo"
+	syscallTransport Transport = "syscall"
 )
 
 // Kind corresponds to fidl::flat::Element::Kind in fidlc, e.g. const, enum,
@@ -58,7 +78,7 @@ const (
 )
 
 // Type is the FIDL type of an element. For enums and bits, this is the
-// underlying primitive type. For methods, this is the entire method signature.
+// underlying primitive type.
 type Type string
 
 // Name is the fully qualified name of the element:
@@ -74,6 +94,15 @@ type Value string
 // which have no explicit ordinals in FIDL source, it is a one-based index.
 type Ordinal string
 
+// Direction indicates if a method is one-way, two-way, or an event.
+type Direction string
+
+const (
+	isOneWay Direction = "one_way"
+	isTwoWay Direction = "two_way"
+	isEvent  Direction = "event"
+)
+
 // fidlConstToValue converts the fidlgen view of a constant value to
 // summary's Value.
 func fidlConstToValue(fc *fidlgen.Constant) Value {
@@ -87,17 +116,22 @@ func fidlConstToValue(fc *fidlgen.Constant) Value {
 // ElementStr is a generic stringly-typed view of an Element. The aim is to keep
 // the structure as flat as possible, and omit fields which have no bearing to
 // the Kind of element represented.
-//
-// Keep the fields sorted by name, otherwise JSON marshaling will not match the
-// fx format-code style.
 type ElementStr struct {
 	Kind         `json:"kind"`
 	Name         `json:"name"`
-	Resourceness `json:"resourceness,omitempty"`
 	Strictness   `json:"strictness,omitempty"`
+	Resourceness `json:"resourceness,omitempty"`
 	Ordinal      `json:"ordinal,omitempty"`
 	Type         `json:"type,omitempty"`
 	Value        `json:"value,omitempty"`
+	// Protocols only
+	Openness  `json:"openness,omitempty"`
+	Transport `json:"transport,omitempty"`
+	// Methods only
+	Direction `json:"direction,omitempty"`
+	Request   Type `json:"request,omitempty"`
+	Response  Type `json:"response,omitempty"`
+	Error     Type `json:"error,omitempty"`
 }
 
 func (e ElementStr) Less(other ElementStr) bool {

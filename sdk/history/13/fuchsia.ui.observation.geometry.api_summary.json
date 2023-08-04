@@ -151,12 +151,16 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.observation.geometry/ViewTreeWatcher.Watch",
+        "strictness": "strict",
         "ordinal": "4356793488538879867",
-        "type": "() -> (fuchsia.ui.observation.geometry/WatchResponse payload)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.observation.geometry/WatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.observation.geometry/ViewTreeWatcher"
+        "name": "fuchsia.ui.observation.geometry/ViewTreeWatcher",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",

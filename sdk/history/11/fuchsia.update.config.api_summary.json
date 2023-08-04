@@ -2,22 +2,32 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.update.config/OptOut.Get",
+        "strictness": "strict",
         "ordinal": "9047833021330898136",
-        "type": "() -> (fuchsia.update.config/OptOutPreference value)"
+        "direction": "two_way",
+        "response": "fuchsia.update.config/OptOutGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.update.config/OptOut"
+        "name": "fuchsia.update.config/OptOut",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.update.config/OptOutAdmin.Set",
+        "strictness": "strict",
         "ordinal": "8978221073431527207",
-        "type": "(fuchsia.update.config/OptOutPreference value) -> (fuchsia.update.config/OptOutAdmin_Set_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.update.config/OptOutAdminSetRequest",
+        "response": "fuchsia.update.config/OptOutAdmin_Set_Response",
+        "error": "fuchsia.update.config/OptOutAdminError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.update.config/OptOutAdmin"
+        "name": "fuchsia.update.config/OptOutAdmin",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -31,25 +41,24 @@
         "type": "uint32"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.update.config/OptOutAdmin_Set_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.update.config/OptOutAdmin_Set_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.update.config/OptOutAdminError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.update.config/OptOutAdmin_Set_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.update.config/OptOutAdminSetRequest.value",
         "ordinal": "1",
-        "type": "fuchsia.update.config/OptOutAdmin_Set_Response"
+        "type": "fuchsia.update.config/OptOutPreference"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.update.config/OptOutAdmin_Set_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.update.config/OptOutAdminSetRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update.config/OptOutGetResponse.value",
+        "ordinal": "1",
+        "type": "fuchsia.update.config/OptOutPreference"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.update.config/OptOutGetResponse"
     },
     {
         "kind": "enum/member",

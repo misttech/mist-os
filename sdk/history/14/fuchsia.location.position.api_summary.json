@@ -2,12 +2,17 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.location.position/EmergencyProvider.GetCurrent",
+        "strictness": "strict",
         "ordinal": "7576248232984301873",
-        "type": "() -> (fuchsia.location.position/EmergencyProvider_GetCurrent_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.location.position/EmergencyProvider_GetCurrent_Response",
+        "error": "fuchsia.location/Error"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.location.position/EmergencyProvider"
+        "name": "fuchsia.location.position/EmergencyProvider",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -18,23 +23,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.location.position/EmergencyProvider_GetCurrent_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.location.position/EmergencyProvider_GetCurrent_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.location/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.location.position/EmergencyProvider_GetCurrent_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.location.position/EmergencyProvider_GetCurrent_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.location.position/EmergencyProvider_GetCurrent_Result",
-        "strictness": "strict"
     },
     {
         "kind": "struct/member",

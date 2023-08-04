@@ -18,12 +18,17 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.castsysteminfo/Provider.GetSystemInfo",
+        "strictness": "strict",
         "ordinal": "7926791442055649115",
-        "type": "() -> (fuchsia.castsysteminfo/Provider_GetSystemInfo_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.castsysteminfo/Provider_GetSystemInfo_Response",
+        "error": "fuchsia.castsysteminfo/ErrorCode"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.castsysteminfo/Provider"
+        "name": "fuchsia.castsysteminfo/Provider",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -34,23 +39,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.castsysteminfo/Provider_GetSystemInfo_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castsysteminfo/Provider_GetSystemInfo_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.castsysteminfo/ErrorCode"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castsysteminfo/Provider_GetSystemInfo_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.castsysteminfo/Provider_GetSystemInfo_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.castsysteminfo/Provider_GetSystemInfo_Result",
-        "strictness": "strict"
     },
     {
         "kind": "table/member",

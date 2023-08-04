@@ -2,18 +2,24 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.reachability/Monitor.SetOptions",
+        "strictness": "strict",
         "ordinal": "3336717261845512787",
-        "type": "(fuchsia.net.reachability/MonitorOptions payload)"
+        "direction": "one_way",
+        "request": "fuchsia.net.reachability/MonitorOptions"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.reachability/Monitor.Watch",
+        "strictness": "strict",
         "ordinal": "4043849367163201151",
-        "type": "() -> (fuchsia.net.reachability/Snapshot payload)"
+        "direction": "two_way",
+        "response": "fuchsia.net.reachability/Snapshot"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.reachability/Monitor"
+        "name": "fuchsia.net.reachability/Monitor",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table",

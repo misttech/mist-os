@@ -22,76 +22,233 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.ConnectToStream",
+        "strictness": "strict",
         "ordinal": "2957323947516150979",
-        "type": "(uint32 index,server_end:fuchsia.camera3/Stream request)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/DeviceConnectToStreamRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.GetConfigurations",
+        "strictness": "strict",
         "ordinal": "2794379668574107526",
-        "type": "() -> (vector<fuchsia.camera3/Configuration>:256 configurations)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/DeviceGetConfigurationsResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.GetConfigurations2",
+        "strictness": "strict",
         "ordinal": "2767203991460755967",
-        "type": "() -> (vector<fuchsia.camera3/Configuration2>:256 configurations)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/DeviceGetConfigurations2Response"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.GetIdentifier",
+        "strictness": "strict",
         "ordinal": "1447856357228576327",
-        "type": "() -> (string:<256,optional> identifier)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/DeviceGetIdentifierResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.Rebind",
+        "strictness": "strict",
         "ordinal": "2630413880750002627",
-        "type": "(server_end:fuchsia.camera3/Device request)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/DeviceRebindRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.SetCurrentConfiguration",
+        "strictness": "strict",
         "ordinal": "1285316515366255495",
-        "type": "(uint32 index)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/DeviceSetCurrentConfigurationRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.SetSoftwareMuteState",
+        "strictness": "strict",
         "ordinal": "7760155940715061413",
-        "type": "(bool muted) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.camera3/DeviceSetSoftwareMuteStateRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.WatchCurrentConfiguration",
+        "strictness": "strict",
         "ordinal": "8827762436321326263",
-        "type": "() -> (uint32 index)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/DeviceWatchCurrentConfigurationResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Device.WatchMuteState",
+        "strictness": "strict",
         "ordinal": "3147970571782779643",
-        "type": "() -> (bool software_muted,bool hardware_muted)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/DeviceWatchMuteStateResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.camera3/Device"
+        "name": "fuchsia.camera3/Device",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceConnectToStreamRequest.index",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceConnectToStreamRequest.request",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.camera3/Stream"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceConnectToStreamRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceGetConfigurations2Response.configurations",
+        "ordinal": "1",
+        "type": "vector<fuchsia.camera3/Configuration2>:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceGetConfigurations2Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceGetConfigurationsResponse.configurations",
+        "ordinal": "1",
+        "type": "vector<fuchsia.camera3/Configuration>:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceGetConfigurationsResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceGetIdentifierResponse.identifier",
+        "ordinal": "1",
+        "type": "string:<256,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceGetIdentifierResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceRebindRequest.request",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.camera3/Device"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceRebindRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceSetCurrentConfigurationRequest.index",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceSetCurrentConfigurationRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceSetSoftwareMuteStateRequest.muted",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceSetSoftwareMuteStateRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceWatchCurrentConfigurationResponse.index",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceWatchCurrentConfigurationResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceWatchMuteStateResponse.hardware_muted",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceWatchMuteStateResponse.software_muted",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceWatchMuteStateResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/DeviceWatcher.ConnectToDevice",
+        "strictness": "strict",
         "ordinal": "6852044874669255469",
-        "type": "(uint64 id,server_end:fuchsia.camera3/Device request)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/DeviceWatcherConnectToDeviceRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/DeviceWatcher.WatchDevices",
+        "strictness": "strict",
         "ordinal": "6861326589538239861",
-        "type": "() -> (vector<fuchsia.camera3/WatchDevicesEvent>:256 events)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/DeviceWatcherWatchDevicesResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.camera3/DeviceWatcher"
+        "name": "fuchsia.camera3/DeviceWatcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceWatcherConnectToDeviceRequest.id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceWatcherConnectToDeviceRequest.request",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.camera3/Device"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceWatcherConnectToDeviceRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/DeviceWatcherWatchDevicesResponse.events",
+        "ordinal": "1",
+        "type": "vector<fuchsia.camera3/WatchDevicesEvent>:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/DeviceWatcherWatchDevicesResponse"
     },
     {
         "kind": "struct/member",
@@ -252,78 +409,146 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.GetNextFrame",
+        "strictness": "strict",
         "ordinal": "5406211673788630616",
-        "type": "() -> (fuchsia.camera3/FrameInfo info)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamGetNextFrameResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.GetNextFrame2",
+        "strictness": "strict",
         "ordinal": "8161269809014271760",
-        "type": "() -> (fuchsia.camera3/FrameInfo2 info)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamGetNextFrame2Response"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.GetProperties",
+        "strictness": "strict",
         "ordinal": "1397849957402891767",
-        "type": "() -> (fuchsia.camera3/StreamProperties properties)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamGetPropertiesResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.GetProperties2",
+        "strictness": "strict",
         "ordinal": "8085207531607802769",
-        "type": "() -> (fuchsia.camera3/StreamProperties2 properties)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamGetProperties2Response"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.Rebind",
+        "strictness": "strict",
         "ordinal": "8482617449373031407",
-        "type": "(server_end:fuchsia.camera3/Stream request)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/StreamRebindRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.SetBufferCollection",
+        "strictness": "strict",
         "ordinal": "8289637921540160621",
-        "type": "(fuchsia.sysmem/BufferCollectionToken:optional token)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/StreamSetBufferCollectionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.SetCropRegion",
+        "strictness": "strict",
         "ordinal": "8277025934920991490",
-        "type": "(fuchsia.math/RectF:optional region)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/StreamSetCropRegionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.SetResolution",
+        "strictness": "strict",
         "ordinal": "7994665628137649379",
-        "type": "(fuchsia.math/Size coded_size)"
+        "direction": "one_way",
+        "request": "fuchsia.camera3/StreamSetResolutionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.WatchBufferCollection",
+        "strictness": "strict",
         "ordinal": "3879945243421435350",
-        "type": "() -> (fuchsia.sysmem/BufferCollectionToken token)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamWatchBufferCollectionResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.WatchCropRegion",
+        "strictness": "strict",
         "ordinal": "5487676828784769936",
-        "type": "() -> (fuchsia.math/RectF:optional region)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamWatchCropRegionResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.WatchOrientation",
+        "strictness": "strict",
         "ordinal": "2237476309241044436",
-        "type": "() -> (fuchsia.camera3/Orientation orientation)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamWatchOrientationResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.WatchResolution",
+        "strictness": "strict",
         "ordinal": "7816886375469476479",
-        "type": "() -> (fuchsia.math/Size coded_size)"
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamWatchResolutionResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.camera3/Stream"
+        "name": "fuchsia.camera3/Stream",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamGetNextFrame2Response.info",
+        "ordinal": "1",
+        "type": "fuchsia.camera3/FrameInfo2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamGetNextFrame2Response",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamGetNextFrameResponse.info",
+        "ordinal": "1",
+        "type": "fuchsia.camera3/FrameInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamGetNextFrameResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamGetProperties2Response.properties",
+        "ordinal": "1",
+        "type": "fuchsia.camera3/StreamProperties2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamGetProperties2Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamGetPropertiesResponse.properties",
+        "ordinal": "1",
+        "type": "fuchsia.camera3/StreamProperties"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamGetPropertiesResponse"
     },
     {
         "kind": "struct/member",
@@ -374,6 +599,89 @@
     {
         "kind": "table",
         "name": "fuchsia.camera3/StreamProperties2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamRebindRequest.request",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.camera3/Stream"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamRebindRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamSetBufferCollectionRequest.token",
+        "ordinal": "1",
+        "type": "fuchsia.sysmem/BufferCollectionToken:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamSetBufferCollectionRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamSetCropRegionRequest.region",
+        "ordinal": "1",
+        "type": "fuchsia.math/RectF:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamSetCropRegionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamSetResolutionRequest.coded_size",
+        "ordinal": "1",
+        "type": "fuchsia.math/Size"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamSetResolutionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamWatchBufferCollectionResponse.token",
+        "ordinal": "1",
+        "type": "fuchsia.sysmem/BufferCollectionToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamWatchBufferCollectionResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamWatchCropRegionResponse.region",
+        "ordinal": "1",
+        "type": "fuchsia.math/RectF:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamWatchCropRegionResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamWatchOrientationResponse.orientation",
+        "ordinal": "1",
+        "type": "fuchsia.camera3/Orientation"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamWatchOrientationResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamWatchResolutionResponse.coded_size",
+        "ordinal": "1",
+        "type": "fuchsia.math/Size"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamWatchResolutionResponse"
     },
     {
         "kind": "union/member",

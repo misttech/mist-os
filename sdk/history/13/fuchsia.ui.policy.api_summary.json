@@ -2,28 +2,70 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/DeviceListenerRegistry.RegisterListener",
+        "strictness": "strict",
         "ordinal": "3431319511893564027",
-        "type": "(client_end:fuchsia.ui.policy/MediaButtonsListener listener) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.policy/DeviceListenerRegistryRegisterListenerRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/DeviceListenerRegistry.RegisterMediaButtonsListener",
+        "strictness": "strict",
         "ordinal": "4045975772836867696",
-        "type": "(client_end:fuchsia.ui.policy/MediaButtonsListener listener)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/DeviceListenerRegistryRegisterMediaButtonsListenerRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.policy/DeviceListenerRegistry"
+        "name": "fuchsia.ui.policy/DeviceListenerRegistry",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterListenerRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.ui.policy/MediaButtonsListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterListenerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterMediaButtonsListenerRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.ui.policy/MediaButtonsListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/DeviceListenerRegistryRegisterMediaButtonsListenerRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/DisplayBacklight.SetMinimumRgb",
+        "strictness": "strict",
         "ordinal": "2693226552535686307",
-        "type": "(uint8 minimum_rgb) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.policy/DisplayBacklightSetMinimumRgbRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.policy/DisplayBacklight"
+        "name": "fuchsia.ui.policy/DisplayBacklight",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/DisplayBacklightSetMinimumRgbRequest.minimum_rgb",
+        "ordinal": "1",
+        "type": "uint8"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/DisplayBacklightSetMinimumRgbRequest"
     },
     {
         "kind": "enum/member",
@@ -64,60 +106,180 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/MediaButtonsListener.OnEvent",
+        "strictness": "strict",
         "ordinal": "1650308738712569724",
-        "type": "(fuchsia.ui.input/MediaButtonsEvent event) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.policy/MediaButtonsListenerOnEventRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/MediaButtonsListener.OnMediaButtonsEvent",
+        "strictness": "strict",
         "ordinal": "3179656525909478912",
-        "type": "(fuchsia.ui.input/MediaButtonsEvent event)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/MediaButtonsListenerOnMediaButtonsEventRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.policy/MediaButtonsListener"
+        "name": "fuchsia.ui.policy/MediaButtonsListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/MediaButtonsListenerOnEventRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/MediaButtonsEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/MediaButtonsListenerOnEventRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/MediaButtonsListenerOnMediaButtonsEventRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/MediaButtonsEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/MediaButtonsListenerOnMediaButtonsEventRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/PointerCaptureListenerHACK.OnPointerEvent",
+        "strictness": "strict",
         "ordinal": "2854157734929817839",
-        "type": "(fuchsia.ui.input/PointerEvent event)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/PointerCaptureListenerHackOnPointerEventRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.policy/PointerCaptureListenerHACK"
+        "name": "fuchsia.ui.policy/PointerCaptureListenerHACK",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PointerCaptureListenerHackOnPointerEventRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/PointerEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/PointerCaptureListenerHackOnPointerEventRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/Presentation.CapturePointerEventsHACK",
+        "strictness": "strict",
         "ordinal": "7246966151937421359",
-        "type": "(client_end:fuchsia.ui.policy/PointerCaptureListenerHACK listener)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/PresentationCapturePointerEventsHackRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.policy/Presentation"
+        "name": "fuchsia.ui.policy/Presentation",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresentationCapturePointerEventsHackRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.ui.policy/PointerCaptureListenerHACK"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/PresentationCapturePointerEventsHackRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/Presenter.PresentOrReplaceView",
+        "strictness": "strict",
         "ordinal": "3073099007217802299",
-        "type": "(fuchsia.ui.views/ViewHolderToken view_holder_token,server_end:<fuchsia.ui.policy/Presentation,optional> presentation_request)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/PresenterPresentOrReplaceViewRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/Presenter.PresentOrReplaceView2",
+        "strictness": "strict",
         "ordinal": "8222224138800966336",
-        "type": "(fuchsia.ui.views/ViewHolderToken view_holder_token,fuchsia.ui.views/ViewRef view_ref,server_end:<fuchsia.ui.policy/Presentation,optional> presentation_request)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/PresenterPresentOrReplaceView2Request"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.policy/Presenter.PresentView",
+        "strictness": "strict",
         "ordinal": "6107263760896956875",
-        "type": "(fuchsia.ui.views/ViewHolderToken view_holder_token,server_end:<fuchsia.ui.policy/Presentation,optional> presentation_request)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.policy/PresenterPresentViewRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.policy/Presenter"
+        "name": "fuchsia.ui.policy/Presenter",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceView2Request.presentation_request",
+        "ordinal": "3",
+        "type": "server_end:<fuchsia.ui.policy/Presentation,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceView2Request.view_holder_token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewHolderToken"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceView2Request.view_ref",
+        "ordinal": "2",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceView2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceViewRequest.presentation_request",
+        "ordinal": "2",
+        "type": "server_end:<fuchsia.ui.policy/Presentation,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceViewRequest.view_holder_token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewHolderToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/PresenterPresentOrReplaceViewRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentViewRequest.presentation_request",
+        "ordinal": "2",
+        "type": "server_end:<fuchsia.ui.policy/Presentation,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.policy/PresenterPresentViewRequest.view_holder_token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewHolderToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.policy/PresenterPresentViewRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

@@ -2,22 +2,48 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.diagnostics/ArchiveAccessor.StreamDiagnostics",
+        "strictness": "strict",
         "ordinal": "2361924900314496062",
-        "type": "(fuchsia.diagnostics/StreamParameters stream_parameters,server_end:fuchsia.diagnostics/BatchIterator result_stream)"
+        "direction": "one_way",
+        "request": "fuchsia.diagnostics/ArchiveAccessorStreamDiagnosticsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.diagnostics/ArchiveAccessor"
+        "name": "fuchsia.diagnostics/ArchiveAccessor",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.diagnostics/ArchiveAccessorStreamDiagnosticsRequest.result_stream",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.diagnostics/BatchIterator"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.diagnostics/ArchiveAccessorStreamDiagnosticsRequest.stream_parameters",
+        "ordinal": "1",
+        "type": "fuchsia.diagnostics/StreamParameters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.diagnostics/ArchiveAccessorStreamDiagnosticsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.diagnostics/BatchIterator.GetNext",
+        "strictness": "strict",
         "ordinal": "8654095804583269541",
-        "type": "() -> (fuchsia.diagnostics/BatchIterator_GetNext_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.diagnostics/BatchIterator_GetNext_Response",
+        "error": "fuchsia.diagnostics/ReaderError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.diagnostics/BatchIterator"
+        "name": "fuchsia.diagnostics/BatchIterator",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -29,24 +55,6 @@
         "kind": "struct",
         "name": "fuchsia.diagnostics/BatchIterator_GetNext_Response",
         "resourceness": "resource"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.diagnostics/BatchIterator_GetNext_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.diagnostics/ReaderError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.diagnostics/BatchIterator_GetNext_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.diagnostics/BatchIterator_GetNext_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.diagnostics/BatchIterator_GetNext_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
     },
     {
         "kind": "union/member",
@@ -122,8 +130,8 @@
     {
         "kind": "union",
         "name": "fuchsia.diagnostics/FormattedContent",
-        "resourceness": "resource",
-        "strictness": "flexible"
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -154,18 +162,44 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.diagnostics/LogSettings.RegisterInterest",
+        "strictness": "strict",
         "ordinal": "332558376842655227",
-        "type": "(vector<fuchsia.diagnostics/LogInterestSelector>:64 selectors)"
+        "direction": "one_way",
+        "request": "fuchsia.diagnostics/LogSettingsRegisterInterestRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.diagnostics/LogSettings.SetInterest",
+        "strictness": "strict",
         "ordinal": "8196215806791589776",
-        "type": "(vector<fuchsia.diagnostics/LogInterestSelector>:64 selectors) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.diagnostics/LogSettingsSetInterestRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.diagnostics/LogSettings"
+        "name": "fuchsia.diagnostics/LogSettings",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.diagnostics/LogSettingsRegisterInterestRequest.selectors",
+        "ordinal": "1",
+        "type": "vector<fuchsia.diagnostics/LogInterestSelector>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.diagnostics/LogSettingsRegisterInterestRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.diagnostics/LogSettingsSetInterestRequest.selectors",
+        "ordinal": "1",
+        "type": "vector<fuchsia.diagnostics/LogInterestSelector>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.diagnostics/LogSettingsSetInterestRequest"
     },
     {
         "kind": "const",

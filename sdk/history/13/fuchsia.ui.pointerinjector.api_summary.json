@@ -73,8 +73,8 @@
     {
         "kind": "union",
         "name": "fuchsia.ui.pointerinjector/Context",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "union/member",
@@ -96,12 +96,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.pointerinjector/Device.Inject",
+        "strictness": "strict",
         "ordinal": "82058939547254592",
-        "type": "(vector<fuchsia.ui.pointerinjector/Event>:128 events) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.pointerinjector/DeviceInjectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.pointerinjector/Device"
+        "name": "fuchsia.ui.pointerinjector/Device",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointerinjector/DeviceInjectRequest.events",
+        "ordinal": "1",
+        "type": "vector<fuchsia.ui.pointerinjector/Event>:128"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.pointerinjector/DeviceInjectRequest"
     },
     {
         "kind": "enum/member",
@@ -261,12 +275,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.pointerinjector/Registry.Register",
+        "strictness": "strict",
         "ordinal": "718395677124749824",
-        "type": "(fuchsia.ui.pointerinjector/Config config,server_end:fuchsia.ui.pointerinjector/Device injector) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.pointerinjector/RegistryRegisterRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.pointerinjector/Registry"
+        "name": "fuchsia.ui.pointerinjector/Registry",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointerinjector/RegistryRegisterRequest.config",
+        "ordinal": "1",
+        "type": "fuchsia.ui.pointerinjector/Config"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointerinjector/RegistryRegisterRequest.injector",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.ui.pointerinjector/Device"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.pointerinjector/RegistryRegisterRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "union/member",
@@ -277,8 +312,8 @@
     {
         "kind": "union",
         "name": "fuchsia.ui.pointerinjector/Target",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

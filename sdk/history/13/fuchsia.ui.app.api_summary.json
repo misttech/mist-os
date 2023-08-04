@@ -13,18 +13,35 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/View.Attach",
+        "strictness": "strict",
         "ordinal": "8955752207985670062",
-        "type": "(zx/Handle:EVENTPAIR view_token)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.app/ViewAttachRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/View.SetConfig",
+        "strictness": "strict",
         "ordinal": "6175847024784405768",
-        "type": "(fuchsia.ui.app/ViewConfig config)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.app/ViewSetConfigRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.app/View"
+        "name": "fuchsia.ui.app/View",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.app/ViewAttachRequest.view_token",
+        "ordinal": "1",
+        "type": "zx/Handle:EVENTPAIR"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.app/ViewAttachRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -39,18 +56,68 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/ViewProvider.CreateView2",
+        "strictness": "strict",
         "ordinal": "8697758317325517954",
-        "type": "(fuchsia.ui.app/CreateView2Args args)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.app/ViewProviderCreateView2Request"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.app/ViewProvider.CreateViewWithViewRef",
+        "strictness": "strict",
         "ordinal": "6371788243217062534",
-        "type": "(zx/Handle:EVENTPAIR token,fuchsia.ui.views/ViewRefControl view_ref_control,fuchsia.ui.views/ViewRef view_ref)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.app/ViewProviderCreateViewWithViewRefRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.app/ViewProvider"
+        "name": "fuchsia.ui.app/ViewProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.app/ViewProviderCreateView2Request.args",
+        "ordinal": "1",
+        "type": "fuchsia.ui.app/CreateView2Args"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.app/ViewProviderCreateView2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.app/ViewProviderCreateViewWithViewRefRequest.token",
+        "ordinal": "1",
+        "type": "zx/Handle:EVENTPAIR"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.app/ViewProviderCreateViewWithViewRefRequest.view_ref",
+        "ordinal": "3",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.app/ViewProviderCreateViewWithViewRefRequest.view_ref_control",
+        "ordinal": "2",
+        "type": "fuchsia.ui.views/ViewRefControl"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.app/ViewProviderCreateViewWithViewRefRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.app/ViewSetConfigRequest.config",
+        "ordinal": "1",
+        "type": "fuchsia.ui.app/ViewConfig"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.app/ViewSetConfigRequest"
     },
     {
         "kind": "library",

@@ -18,12 +18,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.auth.oldtokens/CredentialsProducer.GetUpdatedCredentials",
+        "strictness": "strict",
         "ordinal": "140450894918238212",
-        "type": "() -> (vector<fuchsia.auth.oldtokens/Credential> credentials)"
+        "direction": "two_way",
+        "response": "fuchsia.auth.oldtokens/CredentialsProducerGetUpdatedCredentialsResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.auth.oldtokens/CredentialsProducer"
+        "name": "fuchsia.auth.oldtokens/CredentialsProducer",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.auth.oldtokens/CredentialsProducerGetUpdatedCredentialsResponse.credentials",
+        "ordinal": "1",
+        "type": "vector<fuchsia.auth.oldtokens/Credential>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.auth.oldtokens/CredentialsProducerGetUpdatedCredentialsResponse"
     },
     {
         "kind": "library",

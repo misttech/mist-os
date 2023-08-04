@@ -37,24 +37,49 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/Log.DumpLogsSafe",
+        "strictness": "strict",
         "ordinal": "1505222195749004569",
-        "type": "(client_end:fuchsia.logger/LogListenerSafe log_listener,box<fuchsia.logger/LogFilterOptions> options)"
+        "direction": "one_way",
+        "request": "fuchsia.logger/LogDumpLogsSafeRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/Log.ListenSafe",
+        "strictness": "strict",
         "ordinal": "5643638173917143473",
-        "type": "(client_end:fuchsia.logger/LogListenerSafe log_listener,box<fuchsia.logger/LogFilterOptions> options)"
+        "direction": "one_way",
+        "request": "fuchsia.logger/LogListenSafeRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/Log.ListenSafeWithSelectors",
+        "strictness": "strict",
         "ordinal": "1960844265602547838",
-        "type": "(client_end:fuchsia.logger/LogListenerSafe log_listener,box<fuchsia.logger/LogFilterOptions> options,vector<fuchsia.diagnostics/LogInterestSelector>:64 selectors)"
+        "direction": "one_way",
+        "request": "fuchsia.logger/LogListenSafeWithSelectorsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.logger/Log"
+        "name": "fuchsia.logger/Log",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogDumpLogsSafeRequest.log_listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.logger/LogListenerSafe"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogDumpLogsSafeRequest.options",
+        "ordinal": "2",
+        "type": "box<fuchsia.logger/LogFilterOptions>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogDumpLogsSafeRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -144,26 +169,93 @@
         "type": "int8"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenSafeRequest.log_listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.logger/LogListenerSafe"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenSafeRequest.options",
+        "ordinal": "2",
+        "type": "box<fuchsia.logger/LogFilterOptions>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogListenSafeRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest.log_listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.logger/LogListenerSafe"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest.options",
+        "ordinal": "2",
+        "type": "box<fuchsia.logger/LogFilterOptions>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest.selectors",
+        "ordinal": "3",
+        "type": "vector<fuchsia.diagnostics/LogInterestSelector>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogListenerSafe.Done",
+        "strictness": "strict",
         "ordinal": "3789886091192272056",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogListenerSafe.Log",
+        "strictness": "strict",
         "ordinal": "5882719137999207690",
-        "type": "(fuchsia.logger/LogMessage log) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.logger/LogListenerSafeLogRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogListenerSafe.LogMany",
+        "strictness": "strict",
         "ordinal": "139706434677727850",
-        "type": "(vector<fuchsia.logger/LogMessage> log) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.logger/LogListenerSafeLogManyRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.logger/LogListenerSafe"
+        "name": "fuchsia.logger/LogListenerSafe",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenerSafeLogManyRequest.log",
+        "ordinal": "1",
+        "type": "vector<fuchsia.logger/LogMessage>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogListenerSafeLogManyRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogListenerSafeLogRequest.log",
+        "ordinal": "1",
+        "type": "fuchsia.logger/LogMessage"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogListenerSafeLogRequest"
     },
     {
         "kind": "struct/member",
@@ -214,24 +306,55 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.Connect",
+        "strictness": "strict",
         "ordinal": "7263263143300023835",
-        "type": "(zx/Handle:SOCKET socket)"
+        "direction": "one_way",
+        "request": "fuchsia.logger/LogSinkConnectRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.ConnectStructured",
+        "strictness": "strict",
         "ordinal": "7157386067685058380",
-        "type": "(zx/Handle:SOCKET socket)"
+        "direction": "one_way",
+        "request": "fuchsia.logger/LogSinkConnectStructuredRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.WaitForInterestChange",
+        "strictness": "strict",
         "ordinal": "2138400952013124162",
-        "type": "() -> (fuchsia.logger/LogSink_WaitForInterestChange_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.logger/LogSink_WaitForInterestChange_Response",
+        "error": "fuchsia.logger/InterestChangeError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.logger/LogSink"
+        "name": "fuchsia.logger/LogSink",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogSinkConnectRequest.socket",
+        "ordinal": "1",
+        "type": "zx/Handle:SOCKET"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogSinkConnectRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.logger/LogSinkConnectStructuredRequest.socket",
+        "ordinal": "1",
+        "type": "zx/Handle:SOCKET"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.logger/LogSinkConnectStructuredRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -242,23 +365,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.logger/LogSink_WaitForInterestChange_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.logger/LogSink_WaitForInterestChange_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.logger/InterestChangeError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.logger/LogSink_WaitForInterestChange_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.logger/LogSink_WaitForInterestChange_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.logger/LogSink_WaitForInterestChange_Result",
-        "strictness": "strict"
     },
     {
         "kind": "const",

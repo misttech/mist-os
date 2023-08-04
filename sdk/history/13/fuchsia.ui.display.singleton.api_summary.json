@@ -2,12 +2,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.display.singleton/Info.GetMetrics",
+        "strictness": "strict",
         "ordinal": "7882165022234155198",
-        "type": "() -> (fuchsia.ui.display.singleton/Metrics info)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.display.singleton/InfoGetMetricsResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.display.singleton/Info"
+        "name": "fuchsia.ui.display.singleton/Info",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.display.singleton/InfoGetMetricsResponse.info",
+        "ordinal": "1",
+        "type": "fuchsia.ui.display.singleton/Metrics"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.display.singleton/InfoGetMetricsResponse"
     },
     {
         "kind": "table/member",

@@ -18,12 +18,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hwinfo/Board.GetInfo",
+        "strictness": "strict",
         "ordinal": "610414304123750660",
-        "type": "() -> (fuchsia.hwinfo/BoardInfo info)"
+        "direction": "two_way",
+        "response": "fuchsia.hwinfo/BoardGetInfoResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hwinfo/Board"
+        "name": "fuchsia.hwinfo/Board",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hwinfo/BoardGetInfoResponse.info",
+        "ordinal": "1",
+        "type": "fuchsia.hwinfo/BoardInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hwinfo/BoardGetInfoResponse"
     },
     {
         "kind": "table/member",
@@ -50,12 +64,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hwinfo/Device.GetInfo",
+        "strictness": "strict",
         "ordinal": "5532228344641267665",
-        "type": "() -> (fuchsia.hwinfo/DeviceInfo info)"
+        "direction": "two_way",
+        "response": "fuchsia.hwinfo/DeviceGetInfoResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hwinfo/Device"
+        "name": "fuchsia.hwinfo/Device",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hwinfo/DeviceGetInfoResponse.info",
+        "ordinal": "1",
+        "type": "fuchsia.hwinfo/DeviceInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hwinfo/DeviceGetInfoResponse"
     },
     {
         "kind": "table/member",
@@ -88,12 +116,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hwinfo/Product.GetInfo",
+        "strictness": "strict",
         "ordinal": "1271284330134591528",
-        "type": "() -> (fuchsia.hwinfo/ProductInfo info)"
+        "direction": "two_way",
+        "response": "fuchsia.hwinfo/ProductGetInfoResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hwinfo/Product"
+        "name": "fuchsia.hwinfo/Product",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hwinfo/ProductGetInfoResponse.info",
+        "ordinal": "1",
+        "type": "fuchsia.hwinfo/ProductInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hwinfo/ProductGetInfoResponse"
     },
     {
         "kind": "table/member",

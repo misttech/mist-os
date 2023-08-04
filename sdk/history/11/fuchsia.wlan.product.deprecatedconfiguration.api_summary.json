@@ -2,33 +2,28 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator.SuggestAccessPointMacAddress",
+        "strictness": "strict",
         "ordinal": "5615410737490055052",
-        "type": "(fuchsia.net/MacAddress mac) -> (fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfiguratorSuggestAccessPointMacAddressRequest",
+        "response": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Response",
+        "error": "fuchsia.wlan.product.deprecatedconfiguration/SuggestMacAddressError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator"
+        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfiguratorSuggestAccessPointMacAddressRequest.mac",
+        "ordinal": "1",
+        "type": "fuchsia.net/MacAddress"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.wlan.product.deprecatedconfiguration/SuggestMacAddressError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfigurator_SuggestAccessPointMacAddress_Result",
-        "strictness": "strict"
+        "name": "fuchsia.wlan.product.deprecatedconfiguration/DeprecatedConfiguratorSuggestAccessPointMacAddressRequest"
     },
     {
         "kind": "enum/member",

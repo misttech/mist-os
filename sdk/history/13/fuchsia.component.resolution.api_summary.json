@@ -82,18 +82,28 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component.resolution/Resolver.Resolve",
+        "strictness": "strict",
         "ordinal": "6339326548187935461",
-        "type": "(string:2083 component_url) -> (fuchsia.component.resolution/Resolver_Resolve_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.component.resolution/ResolverResolveRequest",
+        "response": "fuchsia.component.resolution/Resolver_Resolve_Response",
+        "error": "fuchsia.component.resolution/ResolverError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.component.resolution/Resolver.ResolveWithContext",
+        "strictness": "strict",
         "ordinal": "5576776708309151933",
-        "type": "(string:2083 component_url,fuchsia.component.resolution/Context context) -> (fuchsia.component.resolution/Resolver_ResolveWithContext_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.component.resolution/ResolverResolveWithContextRequest",
+        "response": "fuchsia.component.resolution/Resolver_ResolveWithContext_Response",
+        "error": "fuchsia.component.resolution/ResolverError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.component.resolution/Resolver"
+        "name": "fuchsia.component.resolution/Resolver",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -163,6 +173,32 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.component.resolution/ResolverResolveRequest.component_url",
+        "ordinal": "1",
+        "type": "string:2083"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.resolution/ResolverResolveRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.resolution/ResolverResolveWithContextRequest.component_url",
+        "ordinal": "1",
+        "type": "string:2083"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.resolution/ResolverResolveWithContextRequest.context",
+        "ordinal": "2",
+        "type": "fuchsia.component.resolution/Context"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.resolution/ResolverResolveWithContextRequest"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.component.resolution/Resolver_ResolveWithContext_Response.component",
         "ordinal": "1",
         "type": "fuchsia.component.resolution/Component"
@@ -171,24 +207,6 @@
         "kind": "struct",
         "name": "fuchsia.component.resolution/Resolver_ResolveWithContext_Response",
         "resourceness": "resource"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.component.resolution/Resolver_ResolveWithContext_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.component.resolution/ResolverError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.component.resolution/Resolver_ResolveWithContext_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.component.resolution/Resolver_ResolveWithContext_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.component.resolution/Resolver_ResolveWithContext_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
     },
     {
         "kind": "struct/member",
@@ -200,24 +218,6 @@
         "kind": "struct",
         "name": "fuchsia.component.resolution/Resolver_Resolve_Response",
         "resourceness": "resource"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.component.resolution/Resolver_Resolve_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.component.resolution/ResolverError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.component.resolution/Resolver_Resolve_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.component.resolution/Resolver_Resolve_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.component.resolution/Resolver_Resolve_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
     },
     {
         "kind": "library",

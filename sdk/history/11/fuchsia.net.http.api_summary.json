@@ -14,8 +14,8 @@
     {
         "kind": "union",
         "name": "fuchsia.net.http/Body",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -67,28 +67,89 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.http/Loader.Fetch",
+        "strictness": "strict",
         "ordinal": "7411081923589316649",
-        "type": "(fuchsia.net.http/Request request) -> (fuchsia.net.http/Response response)"
+        "direction": "two_way",
+        "request": "fuchsia.net.http/LoaderFetchRequest",
+        "response": "fuchsia.net.http/LoaderFetchResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.http/Loader.Start",
+        "strictness": "strict",
         "ordinal": "8170993578248361102",
-        "type": "(fuchsia.net.http/Request request,client_end:fuchsia.net.http/LoaderClient client)"
+        "direction": "one_way",
+        "request": "fuchsia.net.http/LoaderStartRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.http/Loader"
+        "name": "fuchsia.net.http/Loader",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.http/LoaderClient.OnResponse",
+        "strictness": "strict",
         "ordinal": "6438698410076716937",
-        "type": "(fuchsia.net.http/Response response) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.net.http/LoaderClientOnResponseRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.http/LoaderClient"
+        "name": "fuchsia.net.http/LoaderClient",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.http/LoaderClientOnResponseRequest.response",
+        "ordinal": "1",
+        "type": "fuchsia.net.http/Response"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.http/LoaderClientOnResponseRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.http/LoaderFetchRequest.request",
+        "ordinal": "1",
+        "type": "fuchsia.net.http/Request"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.http/LoaderFetchRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.http/LoaderFetchResponse.response",
+        "ordinal": "1",
+        "type": "fuchsia.net.http/Response"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.http/LoaderFetchResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.http/LoaderStartRequest.client",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.net.http/LoaderClient"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.http/LoaderStartRequest.request",
+        "ordinal": "1",
+        "type": "fuchsia.net.http/Request"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.http/LoaderStartRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

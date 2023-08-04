@@ -94,7 +94,7 @@ func (r *Report) addToDiff(rep ReportItem) {
 func (r Report) WriteJSON(w io.Writer) error {
 	e := json.NewEncoder(w)
 	e.SetEscapeHTML(false)
-	e.SetIndent("", "  ")
+	e.SetIndent("", "    ")
 	if err := e.Encode(r); err != nil {
 		return fmt.Errorf("while writing JSON: %w", err)
 	}
@@ -172,10 +172,16 @@ func (r *Report) compare(before, after *summarize.ElementStr) {
 	case before.Name != after.Name:
 		panic(fmt.Sprintf("before name %q != after name %q", before.Name, after.Name))
 	case before.Kind != after.Kind,
+		before.Strictness != after.Strictness,
+		before.Resourceness != after.Resourceness,
 		before.Type != after.Type,
 		before.Value != after.Value,
-		before.Resourceness != after.Resourceness,
-		before.Strictness != after.Strictness:
+		before.Openness != after.Openness,
+		before.Transport != after.Transport,
+		before.Direction != after.Direction,
+		before.Request != after.Request,
+		before.Response != after.Response,
+		before.Error != after.Error:
 		ret.Conclusion = APIBreaking
 	case before.Ordinal != after.Ordinal:
 		if before.Kind == "struct/member" {

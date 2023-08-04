@@ -19,18 +19,37 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.i2c/Device.GetName",
+        "strictness": "strict",
         "ordinal": "8381876914474840322",
-        "type": "() -> (fuchsia.hardware.i2c/Device_GetName_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.hardware.i2c/Device_GetName_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.i2c/Device.Transfer",
+        "strictness": "strict",
         "ordinal": "871058866166117179",
-        "type": "(vector<fuchsia.hardware.i2c/Transaction>:256 transactions) -> (fuchsia.hardware.i2c/Device_Transfer_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.hardware.i2c/DeviceTransferRequest",
+        "response": "fuchsia.hardware.i2c/Device_Transfer_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.hardware.i2c/Device"
+        "name": "fuchsia.hardware.i2c/Device",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.i2c/DeviceTransferRequest.transactions",
+        "ordinal": "1",
+        "type": "vector<fuchsia.hardware.i2c/Transaction>:256"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.i2c/DeviceTransferRequest"
     },
     {
         "kind": "struct/member",
@@ -43,23 +62,6 @@
         "name": "fuchsia.hardware.i2c/Device_GetName_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.i2c/Device_GetName_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.i2c/Device_GetName_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.i2c/Device_GetName_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.i2c/Device_GetName_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.hardware.i2c/Device_Transfer_Response.read_data",
         "ordinal": "1",
@@ -68,23 +70,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.i2c/Device_Transfer_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.i2c/Device_Transfer_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.i2c/Device_Transfer_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.i2c/Device_Transfer_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.i2c/Device_Transfer_Result",
-        "strictness": "strict"
     },
     {
         "kind": "const",

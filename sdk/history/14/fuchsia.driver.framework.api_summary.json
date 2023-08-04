@@ -24,33 +24,18 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/CompositeNodeManager.AddSpec",
+        "strictness": "strict",
         "ordinal": "5930736293275290740",
-        "type": "(fuchsia.driver.framework/CompositeNodeSpec payload) -> (fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.driver.framework/CompositeNodeSpec",
+        "response": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Response",
+        "error": "fuchsia.driver.framework/CompositeNodeSpecError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.driver.framework/CompositeNodeManager"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.driver.framework/CompositeNodeSpecError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.driver.framework/CompositeNodeManager_AddSpec_Result",
-        "strictness": "strict"
+        "name": "fuchsia.driver.framework/CompositeNodeManager",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -225,12 +210,18 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/Node.AddChild",
+        "strictness": "strict",
         "ordinal": "8633697350522413353",
-        "type": "(fuchsia.driver.framework/NodeAddArgs args,server_end:fuchsia.driver.framework/NodeController controller,server_end:<fuchsia.driver.framework/Node,optional> node) -> (fuchsia.driver.framework/Node_AddChild_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.driver.framework/NodeAddChildRequest",
+        "response": "fuchsia.driver.framework/Node_AddChild_Response",
+        "error": "fuchsia.driver.framework/NodeError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.driver.framework/Node"
+        "name": "fuchsia.driver.framework/Node",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -268,26 +259,57 @@
         "resourceness": "resource"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeAddChildRequest.args",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/NodeAddArgs"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeAddChildRequest.controller",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.driver.framework/NodeController"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/NodeAddChildRequest.node",
+        "ordinal": "3",
+        "type": "server_end:<fuchsia.driver.framework/Node,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/NodeAddChildRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/NodeController.OnBind",
+        "strictness": "strict",
         "ordinal": "5905369594807853098",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/NodeController.Remove",
+        "strictness": "strict",
         "ordinal": "6123359741742396225",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/NodeController.RequestBind",
+        "strictness": "strict",
         "ordinal": "4735909333556220047",
-        "type": "(fuchsia.driver.framework/NodeControllerRequestBindRequest payload) -> (fuchsia.driver.framework/NodeController_RequestBind_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.driver.framework/NodeControllerRequestBindRequest",
+        "response": "fuchsia.driver.framework/NodeController_RequestBind_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.driver.framework/NodeController"
+        "name": "fuchsia.driver.framework/NodeController",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -304,27 +326,6 @@
     {
         "kind": "table",
         "name": "fuchsia.driver.framework/NodeControllerRequestBindRequest"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.driver.framework/NodeController_RequestBind_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.framework/NodeController_RequestBind_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.framework/NodeController_RequestBind_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.driver.framework/NodeController_RequestBind_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.driver.framework/NodeController_RequestBind_Result",
-        "strictness": "strict"
     },
     {
         "kind": "enum/member",
@@ -459,27 +460,6 @@
     {
         "kind": "table",
         "name": "fuchsia.driver.framework/NodeSymbol"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.driver.framework/Node_AddChild_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.framework/Node_AddChild_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.driver.framework/NodeError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.framework/Node_AddChild_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.driver.framework/Node_AddChild_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.driver.framework/Node_AddChild_Result",
-        "strictness": "strict"
     },
     {
         "kind": "struct/member",

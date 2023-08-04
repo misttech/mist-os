@@ -12,7 +12,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgentest"
 )
 
-var (
+const (
 	// zxLibrary is a shortened version of zx_common.fidl, for tests.
 	zxLibrary = `
 library zx;
@@ -935,12 +935,43 @@ protocol Calculator {
     {
         "kind": "protocol/member",
         "name": "l/Calculator.Add",
+        "strictness": "strict",
         "ordinal": "250442423443911233",
-        "type": "(int32 a,int32 b) -> (int32 sum)"
+        "direction": "two_way",
+        "request": "l/CalculatorAddRequest",
+        "response": "l/CalculatorAddResponse"
     },
     {
         "kind": "protocol",
-        "name": "l/Calculator"
+        "name": "l/Calculator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/CalculatorAddRequest.a",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/CalculatorAddRequest.b",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "l/CalculatorAddRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/CalculatorAddResponse.sum",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "l/CalculatorAddResponse"
     },
     {
         "kind": "library",
@@ -955,8 +986,8 @@ protocol Calculator {
 library l;
 type Foo = struct {};
 type Bar = struct {};
-protocol P {
-    M(struct { b box<Bar>; }) -> (struct { c Foo; });
+open protocol P {
+    flexible M(struct { b box<Bar>; }) -> (struct { c Foo; });
 };
 `,
 			expected: `[
@@ -971,12 +1002,37 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.M",
+        "strictness": "flexible",
         "ordinal": "1416054259560567967",
-        "type": "(box<l/Bar> b) -> (l/Foo c)"
+        "direction": "two_way",
+        "request": "l/PMRequest",
+        "response": "l/P_M_Response"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/PMRequest.b",
+        "ordinal": "1",
+        "type": "box<l/Bar>"
+    },
+    {
+        "kind": "struct",
+        "name": "l/PMRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/P_M_Response.c",
+        "ordinal": "1",
+        "type": "l/Foo"
+    },
+    {
+        "kind": "struct",
+        "name": "l/P_M_Response"
     },
     {
         "kind": "library",
@@ -1005,35 +1061,91 @@ protocol P2 {
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "l/P2.M1",
+        "strictness": "strict",
         "ordinal": "837411832102395320",
-        "type": "(client_end:l/P a)"
+        "direction": "one_way",
+        "request": "l/P2M1Request"
     },
     {
         "kind": "protocol/member",
         "name": "l/P2.M2",
+        "strictness": "strict",
         "ordinal": "7643406716745546297",
-        "type": "(client_end:<l/P,optional> a)"
+        "direction": "one_way",
+        "request": "l/P2M2Request"
     },
     {
         "kind": "protocol/member",
         "name": "l/P2.M3",
+        "strictness": "strict",
         "ordinal": "2712856865629095774",
-        "type": "(server_end:l/P a)"
+        "direction": "one_way",
+        "request": "l/P2M3Request"
     },
     {
         "kind": "protocol/member",
         "name": "l/P2.M4",
+        "strictness": "strict",
         "ordinal": "8900715097515580538",
-        "type": "(server_end:<l/P,optional> a)"
+        "direction": "one_way",
+        "request": "l/P2M4Request"
     },
     {
         "kind": "protocol",
-        "name": "l/P2"
+        "name": "l/P2",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/P2M1Request.a",
+        "ordinal": "1",
+        "type": "client_end:l/P"
+    },
+    {
+        "kind": "struct",
+        "name": "l/P2M1Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/P2M2Request.a",
+        "ordinal": "1",
+        "type": "client_end:<l/P,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "l/P2M2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/P2M3Request.a",
+        "ordinal": "1",
+        "type": "server_end:l/P"
+    },
+    {
+        "kind": "struct",
+        "name": "l/P2M3Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/P2M4Request.a",
+        "ordinal": "1",
+        "type": "server_end:<l/P,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "l/P2M4Request",
+        "resourceness": "resource"
     },
     {
         "kind": "library",
@@ -1057,51 +1169,60 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.F1",
+        "strictness": "strict",
         "ordinal": "5135084091202286418",
-        "type": " -> (int32 a)"
+        "direction": "event",
+        "request": "l/PF1Request"
     },
     {
         "kind": "protocol/member",
         "name": "l/P.F2",
+        "strictness": "strict",
         "ordinal": "2448214607574469420",
-        "type": "() -> (int32 a)"
+        "direction": "two_way",
+        "response": "l/PF2Response"
     },
     {
         "kind": "protocol/member",
         "name": "l/P.F3",
+        "strictness": "strict",
         "ordinal": "542295173779636617",
-        "type": "() -> (l/P_F3_Result result)"
+        "direction": "two_way",
+        "response": "l/P_F3_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
         "name": "l/P.F4",
+        "strictness": "strict",
         "ordinal": "7474367752247153959",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
-        "kind": "struct",
-        "name": "l/P_F3_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_F3_Result.err",
-        "ordinal": "2",
+        "kind": "struct/member",
+        "name": "l/PF1Request.a",
+        "ordinal": "1",
         "type": "int32"
     },
     {
-        "kind": "union/member",
-        "name": "l/P_F3_Result.response",
-        "ordinal": "1",
-        "type": "l/P_F3_Response"
+        "kind": "struct",
+        "name": "l/PF1Request"
     },
     {
-        "kind": "union",
-        "name": "l/P_F3_Result",
-        "strictness": "strict"
+        "kind": "struct/member",
+        "name": "l/PF2Response.a",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "l/PF2Response"
     },
     {
         "kind": "library",
@@ -1126,35 +1247,25 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.M1",
+        "strictness": "strict",
         "ordinal": "6412048159635322006",
-        "type": " -> (bool a)"
+        "direction": "event",
+        "request": "l/Payload"
     },
     {
         "kind": "protocol/member",
         "name": "l/P.M2",
+        "strictness": "strict",
         "ordinal": "4975997396601956357",
-        "type": "() -> (l/P_M2_Result result)"
+        "direction": "two_way",
+        "response": "l/Payload",
+        "error": "uint32"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_M2_Result.err",
-        "ordinal": "2",
-        "type": "uint32"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_M2_Result.response",
-        "ordinal": "1",
-        "type": "l/Payload"
-    },
-    {
-        "kind": "union",
-        "name": "l/P_M2_Result",
-        "strictness": "strict"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",
@@ -1192,18 +1303,26 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.M1",
+        "strictness": "strict",
         "ordinal": "6412048159635322006",
-        "type": "(l/U payload) -> (l/T payload)"
+        "direction": "two_way",
+        "request": "l/U",
+        "response": "l/T"
     },
     {
         "kind": "protocol/member",
         "name": "l/P.M2",
+        "strictness": "strict",
         "ordinal": "4975997396601956357",
-        "type": "(l/PM2Request payload) -> (l/PM2Response payload)"
+        "direction": "two_way",
+        "request": "l/PM2Request",
+        "response": "l/PM2Response"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -1270,18 +1389,26 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.M1",
+        "strictness": "strict",
         "ordinal": "6412048159635322006",
-        "type": "() -> (l/P_M1_Result result)"
+        "direction": "two_way",
+        "response": "l/P_M1_Response",
+        "error": "uint32"
     },
     {
         "kind": "protocol/member",
         "name": "l/P.M2",
+        "strictness": "strict",
         "ordinal": "4975997396601956357",
-        "type": "() -> (l/P_M2_Result result)"
+        "direction": "two_way",
+        "response": "l/T",
+        "error": "int32"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "union/member",
@@ -1293,40 +1420,6 @@ protocol P {
         "kind": "union",
         "name": "l/P_M1_Response",
         "strictness": "flexible"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_M1_Result.err",
-        "ordinal": "2",
-        "type": "uint32"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_M1_Result.response",
-        "ordinal": "1",
-        "type": "l/P_M1_Response"
-    },
-    {
-        "kind": "union",
-        "name": "l/P_M1_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_M2_Result.err",
-        "ordinal": "2",
-        "type": "int32"
-    },
-    {
-        "kind": "union/member",
-        "name": "l/P_M2_Result.response",
-        "ordinal": "1",
-        "type": "l/T"
-    },
-    {
-        "kind": "union",
-        "name": "l/P_M2_Result",
-        "strictness": "strict"
     },
     {
         "kind": "table/member",
@@ -1435,24 +1528,61 @@ protocol Calculator {
     {
         "kind": "protocol/member",
         "name": "l/Calculator.Add",
+        "strictness": "strict",
         "ordinal": "250442423443911233",
-        "type": "(l2/T a,l/Bar b) -> (l/Foo c)"
+        "direction": "two_way",
+        "request": "l/CalculatorAddRequest",
+        "response": "l/CalculatorAddResponse"
     },
     {
         "kind": "protocol/member",
         "name": "l/Calculator.Halve",
+        "strictness": "strict",
         "ordinal": "7372493581703395840",
-        "type": "(int32 num) -> (int32 num)"
+        "direction": "two_way",
+        "request": "l2/UnaryArg",
+        "response": "l2/UnaryArg"
     },
     {
         "kind": "protocol/member",
         "name": "l/Calculator.Invert",
+        "strictness": "strict",
         "ordinal": "2134776808183153853",
-        "type": "(int32 num) -> (int32 num)"
+        "direction": "two_way",
+        "request": "l2/UnaryArg",
+        "response": "l2/UnaryArg"
     },
     {
         "kind": "protocol",
-        "name": "l/Calculator"
+        "name": "l/Calculator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/CalculatorAddRequest.a",
+        "ordinal": "1",
+        "type": "l2/T"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/CalculatorAddRequest.b",
+        "ordinal": "2",
+        "type": "l/Bar"
+    },
+    {
+        "kind": "struct",
+        "name": "l/CalculatorAddRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "l/CalculatorAddResponse.c",
+        "ordinal": "1",
+        "type": "l/Foo"
+    },
+    {
+        "kind": "struct",
+        "name": "l/CalculatorAddResponse"
     },
     {
         "kind": "struct",
@@ -1479,12 +1609,16 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.Foo",
+        "strictness": "strict",
         "ordinal": "3518338923794038768",
-        "type": "() -> (l2/TableResponseFooResponse payload)"
+        "direction": "two_way",
+        "response": "l2/TableResponseFooResponse"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "library",
@@ -1507,12 +1641,17 @@ protocol P {
     {
         "kind": "protocol/member",
         "name": "l/P.Foo",
+        "strictness": "strict",
         "ordinal": "1974636303379855936",
-        "type": "() -> (l2/ErrorSyntax_Foo_Result result)"
+        "direction": "two_way",
+        "response": "l2/ErrorSyntax_Foo_Response",
+        "error": "uint32"
     },
     {
         "kind": "protocol",
-        "name": "l/P"
+        "name": "l/P",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "library",

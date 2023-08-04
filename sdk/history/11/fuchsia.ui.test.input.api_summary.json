@@ -18,28 +18,37 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Keyboard.SimulateUsAsciiTextEntry",
+        "strictness": "strict",
         "ordinal": "8147418876553280763",
-        "type": "(fuchsia.ui.test.input/KeyboardSimulateUsAsciiTextEntryRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/KeyboardSimulateUsAsciiTextEntryRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/Keyboard"
+        "name": "fuchsia.ui.test.input/Keyboard",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/KeyboardInputListener.ReportReady",
+        "strictness": "strict",
         "ordinal": "5440094144530781979",
-        "type": "() -> ()"
+        "direction": "two_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/KeyboardInputListener.ReportTextInput",
+        "strictness": "strict",
         "ordinal": "5571992869676352977",
-        "type": "(fuchsia.ui.test.input/KeyboardInputListenerReportTextInputRequest payload)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.test.input/KeyboardInputListenerReportTextInputRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/KeyboardInputListener"
+        "name": "fuchsia.ui.test.input/KeyboardInputListener",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -70,12 +79,16 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/MediaButtonsDevice.SimulateButtonPress",
+        "strictness": "strict",
         "ordinal": "2696965173777188274",
-        "type": "(fuchsia.ui.test.input/MediaButtonsDeviceSimulateButtonPressRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/MediaButtonsDeviceSimulateButtonPressRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/MediaButtonsDevice"
+        "name": "fuchsia.ui.test.input/MediaButtonsDevice",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -90,12 +103,16 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Mouse.SimulateMouseEvent",
+        "strictness": "strict",
         "ordinal": "6180449199587882639",
-        "type": "(fuchsia.ui.test.input/MouseSimulateMouseEventRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/MouseSimulateMouseEventRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/Mouse"
+        "name": "fuchsia.ui.test.input/Mouse",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -157,12 +174,16 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/MouseInputListener.ReportMouseInput",
+        "strictness": "strict",
         "ordinal": "8653703177427418899",
-        "type": "(fuchsia.ui.test.input/MouseInputListenerReportMouseInputRequest payload)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.test.input/MouseInputListenerReportMouseInputRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/MouseInputListener"
+        "name": "fuchsia.ui.test.input/MouseInputListener",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -271,30 +292,40 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Registry.RegisterKeyboard",
+        "strictness": "strict",
         "ordinal": "2962358610450991928",
-        "type": "(fuchsia.ui.test.input/RegistryRegisterKeyboardRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterKeyboardRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Registry.RegisterMediaButtonsDevice",
+        "strictness": "strict",
         "ordinal": "4182475053739185705",
-        "type": "(fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Registry.RegisterMouse",
+        "strictness": "strict",
         "ordinal": "1095220685759453917",
-        "type": "(fuchsia.ui.test.input/RegistryRegisterMouseRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterMouseRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Registry.RegisterTouchScreen",
+        "strictness": "strict",
         "ordinal": "4643127998283697011",
-        "type": "(fuchsia.ui.test.input/RegistryRegisterTouchScreenRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterTouchScreenRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/Registry"
+        "name": "fuchsia.ui.test.input/Registry",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -349,12 +380,16 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/TouchInputListener.ReportTouchInput",
+        "strictness": "strict",
         "ordinal": "3971555865802588842",
-        "type": "(fuchsia.ui.test.input/TouchInputListenerReportTouchInputRequest payload)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.test.input/TouchInputListenerReportTouchInputRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/TouchInputListener"
+        "name": "fuchsia.ui.test.input/TouchInputListener",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -393,18 +428,24 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/TouchScreen.SimulateSwipe",
+        "strictness": "strict",
         "ordinal": "931107570510498276",
-        "type": "(fuchsia.ui.test.input/TouchScreenSimulateSwipeRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/TouchScreenSimulateSwipeRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/TouchScreen.SimulateTap",
+        "strictness": "strict",
         "ordinal": "2522483344405768189",
-        "type": "(fuchsia.ui.test.input/TouchScreenSimulateTapRequest payload) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/TouchScreenSimulateTapRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.test.input/TouchScreen"
+        "name": "fuchsia.ui.test.input/TouchScreen",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",

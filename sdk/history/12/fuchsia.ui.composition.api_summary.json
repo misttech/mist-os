@@ -2,33 +2,29 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Allocator.RegisterBufferCollection",
+        "strictness": "strict",
         "ordinal": "5281454237183706654",
-        "type": "(fuchsia.ui.composition/RegisterBufferCollectionArgs args) -> (fuchsia.ui.composition/Allocator_RegisterBufferCollection_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/AllocatorRegisterBufferCollectionRequest",
+        "response": "fuchsia.ui.composition/Allocator_RegisterBufferCollection_Response",
+        "error": "fuchsia.ui.composition/RegisterBufferCollectionError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/Allocator"
+        "name": "fuchsia.ui.composition/Allocator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/AllocatorRegisterBufferCollectionRequest.args",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/RegisterBufferCollectionArgs"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.ui.composition/Allocator_RegisterBufferCollection_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/Allocator_RegisterBufferCollection_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.composition/RegisterBufferCollectionError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/Allocator_RegisterBufferCollection_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.ui.composition/Allocator_RegisterBufferCollection_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.ui.composition/Allocator_RegisterBufferCollection_Result",
-        "strictness": "strict"
+        "name": "fuchsia.ui.composition/AllocatorRegisterBufferCollectionRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -82,18 +78,45 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ChildViewWatcher.GetStatus",
+        "strictness": "strict",
         "ordinal": "2117290465811006019",
-        "type": "() -> (fuchsia.ui.composition/ChildViewStatus status)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.composition/ChildViewWatcherGetStatusResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ChildViewWatcher.GetViewRef",
+        "strictness": "strict",
         "ordinal": "4264694043432782004",
-        "type": "() -> (fuchsia.ui.views/ViewRef view_ref)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.composition/ChildViewWatcherGetViewRefResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/ChildViewWatcher"
+        "name": "fuchsia.ui.composition/ChildViewWatcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/ChildViewWatcherGetStatusResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ChildViewStatus"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/ChildViewWatcherGetStatusResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/ChildViewWatcherGetViewRefResponse.view_ref",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/ChildViewWatcherGetViewRefResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -136,232 +159,477 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.AddChild",
+        "strictness": "strict",
         "ordinal": "7469408904478923380",
-        "type": "(fuchsia.ui.composition/TransformId parent_transform_id,fuchsia.ui.composition/TransformId child_transform_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandAddChildRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.Clear",
+        "strictness": "strict",
         "ordinal": "5676929699918548030",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.CreateFilledRect",
+        "strictness": "strict",
         "ordinal": "6801057051102170205",
-        "type": "(fuchsia.ui.composition/ContentId rect_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandCreateFilledRectRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.CreateImage",
+        "strictness": "strict",
         "ordinal": "2808812557944221101",
-        "type": "(fuchsia.ui.composition/ContentId image_id,fuchsia.ui.composition/BufferCollectionImportToken import_token,uint32 vmo_index,fuchsia.ui.composition/ImageProperties properties)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandCreateImageRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.CreateTransform",
+        "strictness": "strict",
         "ordinal": "6774586250711265200",
-        "type": "(fuchsia.ui.composition/TransformId transform_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandCreateTransformRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.CreateView",
+        "strictness": "strict",
         "ordinal": "5784459115908974464",
-        "type": "(fuchsia.ui.views/ViewCreationToken token,server_end:fuchsia.ui.composition/ParentViewportWatcher parent_viewport_watcher)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandCreateViewRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.CreateView2",
+        "strictness": "strict",
         "ordinal": "3749873689563086174",
-        "type": "(fuchsia.ui.views/ViewCreationToken token,fuchsia.ui.views/ViewIdentityOnCreation view_identity,fuchsia.ui.composition/ViewBoundProtocols protocols,server_end:fuchsia.ui.composition/ParentViewportWatcher parent_viewport_watcher)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandCreateView2Request"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.CreateViewport",
+        "strictness": "strict",
         "ordinal": "164486650334778428",
-        "type": "(fuchsia.ui.composition/ContentId viewport_id,fuchsia.ui.views/ViewportCreationToken token,fuchsia.ui.composition/ViewportProperties properties,server_end:fuchsia.ui.composition/ChildViewWatcher child_view_watcher)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandCreateViewportRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.OnError",
+        "strictness": "strict",
         "ordinal": "138472075924704141",
-        "type": " -> (fuchsia.ui.composition/FlatlandError error)"
+        "direction": "event",
+        "request": "fuchsia.ui.composition/FlatlandOnErrorRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.OnFramePresented",
+        "strictness": "strict",
         "ordinal": "6261197664938893677",
-        "type": " -> (fuchsia.scenic.scheduling/FramePresentedInfo frame_presented_info)"
+        "direction": "event",
+        "request": "fuchsia.ui.composition/FlatlandOnFramePresentedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.OnNextFrameBegin",
+        "strictness": "strict",
         "ordinal": "1222334072545405002",
-        "type": " -> (fuchsia.ui.composition/OnNextFrameBeginValues values)"
+        "direction": "event",
+        "request": "fuchsia.ui.composition/FlatlandOnNextFrameBeginRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.Present",
+        "strictness": "strict",
         "ordinal": "5813235254949498567",
-        "type": "(fuchsia.ui.composition/PresentArgs args)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandPresentRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.ReleaseFilledRect",
+        "strictness": "strict",
         "ordinal": "8327941579518087067",
-        "type": "(fuchsia.ui.composition/ContentId rect_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandReleaseFilledRectRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.ReleaseImage",
+        "strictness": "strict",
         "ordinal": "831002082456813841",
-        "type": "(fuchsia.ui.composition/ContentId image_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandReleaseImageRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.ReleaseTransform",
+        "strictness": "strict",
         "ordinal": "772704354011782178",
-        "type": "(fuchsia.ui.composition/TransformId transform_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandReleaseTransformRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.ReleaseView",
+        "strictness": "strict",
         "ordinal": "6572346945900113070",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.ReleaseViewport",
+        "strictness": "strict",
         "ordinal": "841407092489360377",
-        "type": "(fuchsia.ui.composition/ContentId viewport_id) -> (fuchsia.ui.views/ViewportCreationToken token)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/FlatlandReleaseViewportRequest",
+        "response": "fuchsia.ui.composition/FlatlandReleaseViewportResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.RemoveChild",
+        "strictness": "strict",
         "ordinal": "4744205278836733562",
-        "type": "(fuchsia.ui.composition/TransformId parent_transform_id,fuchsia.ui.composition/TransformId child_transform_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandRemoveChildRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetClipBoundary",
+        "strictness": "strict",
         "ordinal": "7279932724241113810",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.math/Rect:optional rect)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetClipBoundaryRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetContent",
+        "strictness": "strict",
         "ordinal": "5679830507065641058",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.ui.composition/ContentId content_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetContentRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetDebugName",
+        "strictness": "strict",
         "ordinal": "5091516843731617928",
-        "type": "(string:64 name)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetDebugNameRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetHitRegions",
+        "strictness": "strict",
         "ordinal": "3587628904518745316",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,vector<fuchsia.ui.composition/HitRegion>:64 regions)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetHitRegionsRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetImageBlendingFunction",
+        "strictness": "strict",
         "ordinal": "1222122650485611387",
-        "type": "(fuchsia.ui.composition/ContentId image_id,fuchsia.ui.composition/BlendMode blend_mode)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetImageBlendingFunctionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetImageDestinationSize",
+        "strictness": "strict",
         "ordinal": "8533469834565223494",
-        "type": "(fuchsia.ui.composition/ContentId image_id,fuchsia.math/SizeU size)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetImageDestinationSizeRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetImageFlip",
+        "strictness": "strict",
         "ordinal": "2428019831105840828",
-        "type": "(fuchsia.ui.composition/ContentId image_id,fuchsia.ui.composition/ImageFlip flip)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetImageFlipRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetImageOpacity",
+        "strictness": "strict",
         "ordinal": "3290412719197192047",
-        "type": "(fuchsia.ui.composition/ContentId image_id,float32 val)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetImageOpacityRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetImageSampleRegion",
+        "strictness": "strict",
         "ordinal": "577467431821634344",
-        "type": "(fuchsia.ui.composition/ContentId image_id,fuchsia.math/RectF rect)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetImageSampleRegionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetInfiniteHitRegion",
+        "strictness": "strict",
         "ordinal": "2799016822254507362",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.ui.composition/HitTestInteraction hit_test)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetInfiniteHitRegionRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetOpacity",
+        "strictness": "strict",
         "ordinal": "3996377510281753338",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,float32 value)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetOpacityRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetOrientation",
+        "strictness": "strict",
         "ordinal": "5266169265892003548",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.ui.composition/Orientation orientation)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetOrientationRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetRootTransform",
+        "strictness": "strict",
         "ordinal": "7962586636810087640",
-        "type": "(fuchsia.ui.composition/TransformId transform_id)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetRootTransformRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetScale",
+        "strictness": "strict",
         "ordinal": "2207175515135634356",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.math/VecF scale)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetScaleRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetSolidFill",
+        "strictness": "strict",
         "ordinal": "3663378413147840421",
-        "type": "(fuchsia.ui.composition/ContentId rect_id,fuchsia.ui.composition/ColorRgba color,fuchsia.math/SizeU size)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetSolidFillRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetTranslation",
+        "strictness": "strict",
         "ordinal": "8674840540203426630",
-        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.math/Vec translation)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetTranslationRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetViewportProperties",
+        "strictness": "strict",
         "ordinal": "7398121064931122079",
-        "type": "(fuchsia.ui.composition/ContentId viewport_id,fuchsia.ui.composition/ViewportProperties properties)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandSetViewportPropertiesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/Flatland"
+        "name": "fuchsia.ui.composition/Flatland",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandAddChildRequest.child_transform_id",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandAddChildRequest.parent_transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandAddChildRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateFilledRectRequest.rect_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandCreateFilledRectRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateImageRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateImageRequest.import_token",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/BufferCollectionImportToken"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateImageRequest.properties",
+        "ordinal": "4",
+        "type": "fuchsia.ui.composition/ImageProperties"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateImageRequest.vmo_index",
+        "ordinal": "3",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandCreateImageRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateTransformRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandCreateTransformRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateView2Request.parent_viewport_watcher",
+        "ordinal": "4",
+        "type": "server_end:fuchsia.ui.composition/ParentViewportWatcher"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateView2Request.protocols",
+        "ordinal": "3",
+        "type": "fuchsia.ui.composition/ViewBoundProtocols"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateView2Request.token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewCreationToken"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateView2Request.view_identity",
+        "ordinal": "2",
+        "type": "fuchsia.ui.views/ViewIdentityOnCreation"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandCreateView2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewRequest.parent_viewport_watcher",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.ui.composition/ParentViewportWatcher"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewRequest.token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewCreationToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewportRequest.child_view_watcher",
+        "ordinal": "4",
+        "type": "server_end:fuchsia.ui.composition/ChildViewWatcher"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewportRequest.properties",
+        "ordinal": "3",
+        "type": "fuchsia.ui.composition/ViewportProperties"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewportRequest.token",
+        "ordinal": "2",
+        "type": "fuchsia.ui.views/ViewportCreationToken"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewportRequest.viewport_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandCreateViewportRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/FlatlandDisplay.SetContent",
+        "strictness": "strict",
         "ordinal": "7442226122094379672",
-        "type": "(fuchsia.ui.views/ViewportCreationToken token,server_end:fuchsia.ui.composition/ChildViewWatcher child_view_watcher)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandDisplaySetContentRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/FlatlandDisplay.SetDevicePixelRatio",
+        "strictness": "strict",
         "ordinal": "4119736413317661092",
-        "type": "(fuchsia.math/VecF device_pixel_ratio)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandDisplaySetDevicePixelRatioRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/FlatlandDisplay"
+        "name": "fuchsia.ui.composition/FlatlandDisplay",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandDisplaySetContentRequest.child_view_watcher",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.ui.composition/ChildViewWatcher"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandDisplaySetContentRequest.token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewportCreationToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandDisplaySetContentRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandDisplaySetDevicePixelRatioRequest.device_pixel_ratio",
+        "ordinal": "1",
+        "type": "fuchsia.math/VecF"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandDisplaySetDevicePixelRatioRequest"
     },
     {
         "kind": "enum/member",
@@ -383,6 +651,381 @@
         "name": "fuchsia.ui.composition/FlatlandError",
         "strictness": "strict",
         "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandOnErrorRequest.error",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/FlatlandError"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandOnErrorRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandOnFramePresentedRequest.frame_presented_info",
+        "ordinal": "1",
+        "type": "fuchsia.scenic.scheduling/FramePresentedInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandOnFramePresentedRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandOnNextFrameBeginRequest.values",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/OnNextFrameBeginValues"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandOnNextFrameBeginRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandPresentRequest.args",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/PresentArgs"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandPresentRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReleaseFilledRectRequest.rect_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandReleaseFilledRectRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReleaseImageRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandReleaseImageRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReleaseTransformRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandReleaseTransformRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReleaseViewportRequest.viewport_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandReleaseViewportRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReleaseViewportResponse.token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewportCreationToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandReleaseViewportResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandRemoveChildRequest.child_transform_id",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandRemoveChildRequest.parent_transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandRemoveChildRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetClipBoundaryRequest.rect",
+        "ordinal": "2",
+        "type": "fuchsia.math/Rect:optional"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetClipBoundaryRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetClipBoundaryRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetContentRequest.content_id",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetContentRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetContentRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetDebugNameRequest.name",
+        "ordinal": "1",
+        "type": "string:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetDebugNameRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetHitRegionsRequest.regions",
+        "ordinal": "2",
+        "type": "vector<fuchsia.ui.composition/HitRegion>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetHitRegionsRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetHitRegionsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageBlendingFunctionRequest.blend_mode",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/BlendMode"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageBlendingFunctionRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetImageBlendingFunctionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageDestinationSizeRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageDestinationSizeRequest.size",
+        "ordinal": "2",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetImageDestinationSizeRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageFlipRequest.flip",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/ImageFlip"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageFlipRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetImageFlipRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageOpacityRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageOpacityRequest.val",
+        "ordinal": "2",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetImageOpacityRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageSampleRegionRequest.image_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetImageSampleRegionRequest.rect",
+        "ordinal": "2",
+        "type": "fuchsia.math/RectF"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetImageSampleRegionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetInfiniteHitRegionRequest.hit_test",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/HitTestInteraction"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetInfiniteHitRegionRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetInfiniteHitRegionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetOpacityRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetOpacityRequest.value",
+        "ordinal": "2",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetOpacityRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetOrientationRequest.orientation",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/Orientation"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetOrientationRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetOrientationRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetRootTransformRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetRootTransformRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetScaleRequest.scale",
+        "ordinal": "2",
+        "type": "fuchsia.math/VecF"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetScaleRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetScaleRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetSolidFillRequest.color",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/ColorRgba"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetSolidFillRequest.rect_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetSolidFillRequest.size",
+        "ordinal": "3",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetSolidFillRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetTranslationRequest.transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetTranslationRequest.translation",
+        "ordinal": "2",
+        "type": "fuchsia.math/Vec"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetTranslationRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetViewportPropertiesRequest.properties",
+        "ordinal": "2",
+        "type": "fuchsia.ui.composition/ViewportProperties"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandSetViewportPropertiesRequest.viewport_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ContentId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandSetViewportPropertiesRequest"
     },
     {
         "kind": "table/member",
@@ -570,18 +1213,44 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ParentViewportWatcher.GetLayout",
+        "strictness": "strict",
         "ordinal": "17097807764185138",
-        "type": "() -> (fuchsia.ui.composition/LayoutInfo info)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.composition/ParentViewportWatcherGetLayoutResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ParentViewportWatcher.GetStatus",
+        "strictness": "strict",
         "ordinal": "8982994807715372710",
-        "type": "() -> (fuchsia.ui.composition/ParentViewportStatus status)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.composition/ParentViewportWatcherGetStatusResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/ParentViewportWatcher"
+        "name": "fuchsia.ui.composition/ParentViewportWatcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/ParentViewportWatcherGetLayoutResponse.info",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/LayoutInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/ParentViewportWatcherGetLayoutResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/ParentViewportWatcherGetStatusResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ParentViewportStatus"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/ParentViewportWatcherGetStatusResponse"
     },
     {
         "kind": "table/member",
@@ -725,24 +1394,38 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ScreenCapture.Configure",
+        "strictness": "strict",
         "ordinal": "4282460290342498265",
-        "type": "(fuchsia.ui.composition/ScreenCaptureConfig payload) -> (fuchsia.ui.composition/ScreenCapture_Configure_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/ScreenCaptureConfig",
+        "response": "fuchsia.ui.composition/ScreenCapture_Configure_Response",
+        "error": "fuchsia.ui.composition/ScreenCaptureError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ScreenCapture.GetNextFrame",
+        "strictness": "strict",
         "ordinal": "6137304034563376295",
-        "type": "(fuchsia.ui.composition/GetNextFrameArgs payload) -> (fuchsia.ui.composition/ScreenCapture_GetNextFrame_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/GetNextFrameArgs",
+        "response": "fuchsia.ui.composition/FrameInfo",
+        "error": "fuchsia.ui.composition/ScreenCaptureError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/ScreenCapture.ReleaseFrame",
+        "strictness": "strict",
         "ordinal": "5075642327824030032",
-        "type": "(uint32 buffer_id) -> (fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/ScreenCaptureReleaseFrameRequest",
+        "response": "fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Response",
+        "error": "fuchsia.ui.composition/ScreenCaptureError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/ScreenCapture"
+        "name": "fuchsia.ui.composition/ScreenCapture",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -800,80 +1483,38 @@
         "type": "uint32"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.ui.composition/ScreenCapture_Configure_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/ScreenCapture_Configure_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.composition/ScreenCaptureError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/ScreenCapture_Configure_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/ScreenCaptureReleaseFrameRequest.buffer_id",
         "ordinal": "1",
-        "type": "fuchsia.ui.composition/ScreenCapture_Configure_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.ui.composition/ScreenCapture_Configure_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/ScreenCapture_GetNextFrame_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.composition/ScreenCaptureError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/ScreenCapture_GetNextFrame_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.ui.composition/FrameInfo"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.ui.composition/ScreenCapture_GetNextFrame_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "type": "uint32"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.ui.composition/ScreenCaptureError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.ui.composition/ScreenCapture_ReleaseFrame_Result",
-        "strictness": "strict"
+        "name": "fuchsia.ui.composition/ScreenCaptureReleaseFrameRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Screenshot.Take",
+        "strictness": "strict",
         "ordinal": "5851323354752823248",
-        "type": "(fuchsia.ui.composition/ScreenshotTakeRequest payload) -> (fuchsia.ui.composition/ScreenshotTakeResponse payload)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/ScreenshotTakeRequest",
+        "response": "fuchsia.ui.composition/ScreenshotTakeResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Screenshot.TakeFile",
+        "strictness": "strict",
         "ordinal": "5119166300187470083",
-        "type": "(fuchsia.ui.composition/ScreenshotTakeFileRequest payload) -> (fuchsia.ui.composition/ScreenshotTakeFileResponse payload)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.composition/ScreenshotTakeFileRequest",
+        "response": "fuchsia.ui.composition/ScreenshotTakeFileResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.composition/Screenshot"
+        "name": "fuchsia.ui.composition/Screenshot",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",

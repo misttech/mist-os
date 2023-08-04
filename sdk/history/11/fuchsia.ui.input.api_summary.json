@@ -185,44 +185,120 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/ImeService.GetInputMethodEditor",
+        "strictness": "strict",
         "ordinal": "1480890716194628092",
-        "type": "(fuchsia.ui.input/KeyboardType keyboard_type,fuchsia.ui.input/InputMethodAction action,fuchsia.ui.input/TextInputState initial_state,client_end:fuchsia.ui.input/InputMethodEditorClient client,server_end:fuchsia.ui.input/InputMethodEditor editor)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/ImeService.HideKeyboard",
+        "strictness": "strict",
         "ordinal": "8532052555131062781",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/ImeService.ShowKeyboard",
+        "strictness": "strict",
         "ordinal": "4101981143447698672",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input/ImeService"
+        "name": "fuchsia.ui.input/ImeService",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest.action",
+        "ordinal": "2",
+        "type": "fuchsia.ui.input/InputMethodAction"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest.client",
+        "ordinal": "4",
+        "type": "client_end:fuchsia.ui.input/InputMethodEditorClient"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest.editor",
+        "ordinal": "5",
+        "type": "server_end:fuchsia.ui.input/InputMethodEditor"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest.initial_state",
+        "ordinal": "3",
+        "type": "fuchsia.ui.input/TextInputState"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest.keyboard_type",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/KeyboardType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/ImeServiceGetInputMethodEditorRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputDevice.DispatchReport",
+        "strictness": "strict",
         "ordinal": "9143281205184959647",
-        "type": "(fuchsia.ui.input/InputReport report)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputDeviceDispatchReportRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input/InputDevice"
+        "name": "fuchsia.ui.input/InputDevice",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputDeviceDispatchReportRequest.report",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/InputReport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputDeviceDispatchReportRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputDeviceRegistry.RegisterDevice",
+        "strictness": "strict",
         "ordinal": "8020510846883885321",
-        "type": "(fuchsia.ui.input/DeviceDescriptor descriptor,server_end:fuchsia.ui.input/InputDevice input_device)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputDeviceRegistryRegisterDeviceRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input/InputDeviceRegistry"
+        "name": "fuchsia.ui.input/InputDeviceRegistry",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputDeviceRegistryRegisterDeviceRequest.descriptor",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/DeviceDescriptor"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputDeviceRegistryRegisterDeviceRequest.input_device",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.ui.input/InputDevice"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputDeviceRegistryRegisterDeviceRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "union/member",
@@ -301,58 +377,153 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditor.DispatchKey3",
+        "strictness": "strict",
         "ordinal": "3320110035252677036",
-        "type": "(fuchsia.ui.input3/KeyEvent event) -> (bool handled)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.input/InputMethodEditorDispatchKey3Request",
+        "response": "fuchsia.ui.input/InputMethodEditorDispatchKey3Response"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditor.Hide",
+        "strictness": "strict",
         "ordinal": "2899769328688524702",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditor.InjectInput",
+        "strictness": "strict",
         "ordinal": "237273810823608363",
-        "type": "(fuchsia.ui.input/InputEvent event)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputMethodEditorInjectInputRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditor.SetKeyboardType",
+        "strictness": "strict",
         "ordinal": "1512753079355167879",
-        "type": "(fuchsia.ui.input/KeyboardType keyboard_type)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputMethodEditorSetKeyboardTypeRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditor.SetState",
+        "strictness": "strict",
         "ordinal": "1347833818391875397",
-        "type": "(fuchsia.ui.input/TextInputState state)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputMethodEditorSetStateRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditor.Show",
+        "strictness": "strict",
         "ordinal": "1853794995948683310",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input/InputMethodEditor"
+        "name": "fuchsia.ui.input/InputMethodEditor",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditorClient.DidUpdateState",
+        "strictness": "strict",
         "ordinal": "2767491018424805277",
-        "type": "(fuchsia.ui.input/TextInputState state,fuchsia.ui.input/InputEvent:optional event)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputMethodEditorClientDidUpdateStateRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input/InputMethodEditorClient.OnAction",
+        "strictness": "strict",
         "ordinal": "1856645167774651288",
-        "type": "(fuchsia.ui.input/InputMethodAction action)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.input/InputMethodEditorClientOnActionRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input/InputMethodEditorClient"
+        "name": "fuchsia.ui.input/InputMethodEditorClient",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorClientDidUpdateStateRequest.event",
+        "ordinal": "2",
+        "type": "fuchsia.ui.input/InputEvent:optional"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorClientDidUpdateStateRequest.state",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/TextInputState"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorClientDidUpdateStateRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorClientOnActionRequest.action",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/InputMethodAction"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorClientOnActionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorDispatchKey3Request.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input3/KeyEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorDispatchKey3Request"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorDispatchKey3Response.handled",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorDispatchKey3Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorInjectInputRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/InputEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorInjectInputRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorSetKeyboardTypeRequest.keyboard_type",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/KeyboardType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorSetKeyboardTypeRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input/InputMethodEditorSetStateRequest.state",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input/TextInputState"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input/InputMethodEditorSetStateRequest"
     },
     {
         "kind": "struct/member",

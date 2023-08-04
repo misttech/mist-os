@@ -2,12 +2,15 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.process.lifecycle/Lifecycle.Stop",
+        "strictness": "strict",
         "ordinal": "7255711254080941845",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.process.lifecycle/Lifecycle"
+        "name": "fuchsia.process.lifecycle/Lifecycle",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "library",

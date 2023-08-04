@@ -18,12 +18,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.product.deprecatedclient/DeprecatedClient.Status",
+        "strictness": "strict",
         "ordinal": "8971550464597086191",
-        "type": "() -> (fuchsia.wlan.product.deprecatedclient/WlanStatus status)"
+        "direction": "two_way",
+        "response": "fuchsia.wlan.product.deprecatedclient/DeprecatedClientStatusResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.wlan.product.deprecatedclient/DeprecatedClient"
+        "name": "fuchsia.wlan.product.deprecatedclient/DeprecatedClient",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.product.deprecatedclient/DeprecatedClientStatusResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.product.deprecatedclient/WlanStatus"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.product.deprecatedclient/DeprecatedClientStatusResponse"
     },
     {
         "kind": "enum/member",

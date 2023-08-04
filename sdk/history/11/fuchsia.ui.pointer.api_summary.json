@@ -182,12 +182,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.pointer/MouseSource.Watch",
+        "strictness": "strict",
         "ordinal": "6566088352838298548",
-        "type": "() -> (vector<fuchsia.ui.pointer/MouseEvent>:128 events)"
+        "direction": "two_way",
+        "response": "fuchsia.ui.pointer/MouseSourceWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.pointer/MouseSource"
+        "name": "fuchsia.ui.pointer/MouseSource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointer/MouseSourceWatchResponse.events",
+        "ordinal": "1",
+        "type": "vector<fuchsia.ui.pointer/MouseEvent>:128"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.pointer/MouseSourceWatchResponse"
     },
     {
         "kind": "enum/member",
@@ -423,18 +437,61 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.pointer/TouchSource.UpdateResponse",
+        "strictness": "strict",
         "ordinal": "7814988013074221450",
-        "type": "(fuchsia.ui.pointer/TouchInteractionId interaction,fuchsia.ui.pointer/TouchResponse response) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.pointer/TouchSourceUpdateResponseRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.pointer/TouchSource.Watch",
+        "strictness": "strict",
         "ordinal": "253418817924955261",
-        "type": "(vector<fuchsia.ui.pointer/TouchResponse>:128 responses) -> (vector<fuchsia.ui.pointer/TouchEvent>:128 events)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.pointer/TouchSourceWatchRequest",
+        "response": "fuchsia.ui.pointer/TouchSourceWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.pointer/TouchSource"
+        "name": "fuchsia.ui.pointer/TouchSource",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointer/TouchSourceUpdateResponseRequest.interaction",
+        "ordinal": "1",
+        "type": "fuchsia.ui.pointer/TouchInteractionId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointer/TouchSourceUpdateResponseRequest.response",
+        "ordinal": "2",
+        "type": "fuchsia.ui.pointer/TouchResponse"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.pointer/TouchSourceUpdateResponseRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointer/TouchSourceWatchRequest.responses",
+        "ordinal": "1",
+        "type": "vector<fuchsia.ui.pointer/TouchResponse>:128"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.pointer/TouchSourceWatchRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.pointer/TouchSourceWatchResponse.events",
+        "ordinal": "1",
+        "type": "vector<fuchsia.ui.pointer/TouchEvent>:128"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.pointer/TouchSourceWatchResponse"
     },
     {
         "kind": "struct/member",

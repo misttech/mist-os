@@ -61,12 +61,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/ComponentDataRegister.Upsert",
+        "strictness": "strict",
         "ordinal": "731192570736394401",
-        "type": "(fuchsia.feedback/ComponentData data) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.feedback/ComponentDataRegisterUpsertRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.feedback/ComponentDataRegister"
+        "name": "fuchsia.feedback/ComponentDataRegister",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/ComponentDataRegisterUpsertRequest.data",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/ComponentData"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/ComponentDataRegisterUpsertRequest"
     },
     {
         "kind": "table/member",
@@ -124,12 +138,29 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/CrashReporter.FileReport",
+        "strictness": "strict",
         "ordinal": "8027120246585691604",
-        "type": "(fuchsia.feedback/CrashReport report) -> (fuchsia.feedback/CrashReporter_FileReport_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.feedback/CrashReporterFileReportRequest",
+        "response": "fuchsia.feedback/CrashReporter_FileReport_Response",
+        "error": "fuchsia.feedback/FilingError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.feedback/CrashReporter"
+        "name": "fuchsia.feedback/CrashReporter",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/CrashReporterFileReportRequest.report",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/CrashReport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/CrashReporterFileReportRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -140,23 +171,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.feedback/CrashReporter_FileReport_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.feedback/CrashReporter_FileReport_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.feedback/FilingError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.feedback/CrashReporter_FileReport_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.feedback/CrashReporter_FileReport_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.feedback/CrashReporter_FileReport_Result",
-        "strictness": "strict"
     },
     {
         "kind": "table/member",
@@ -183,50 +197,176 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/CrashReportingProductRegister.Upsert",
+        "strictness": "strict",
         "ordinal": "7389523625776848255",
-        "type": "(string:2083 component_url,fuchsia.feedback/CrashReportingProduct product)"
+        "direction": "one_way",
+        "request": "fuchsia.feedback/CrashReportingProductRegisterUpsertRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/CrashReportingProductRegister.UpsertWithAck",
+        "strictness": "strict",
         "ordinal": "5354518795874704541",
-        "type": "(string:2083 component_url,fuchsia.feedback/CrashReportingProduct product) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.feedback/CrashReportingProductRegisterUpsertWithAckRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.feedback/CrashReportingProductRegister"
+        "name": "fuchsia.feedback/CrashReportingProductRegister",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/CrashReportingProductRegisterUpsertRequest.component_url",
+        "ordinal": "1",
+        "type": "string:2083"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/CrashReportingProductRegisterUpsertRequest.product",
+        "ordinal": "2",
+        "type": "fuchsia.feedback/CrashReportingProduct"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/CrashReportingProductRegisterUpsertRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/CrashReportingProductRegisterUpsertWithAckRequest.component_url",
+        "ordinal": "1",
+        "type": "string:2083"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/CrashReportingProductRegisterUpsertWithAckRequest.product",
+        "ordinal": "2",
+        "type": "fuchsia.feedback/CrashReportingProduct"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/CrashReportingProductRegisterUpsertWithAckRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/DataProvider.GetAnnotations",
+        "strictness": "strict",
         "ordinal": "3925814423087957464",
-        "type": "(fuchsia.feedback/GetAnnotationsParameters params) -> (fuchsia.feedback/Annotations annotations)"
+        "direction": "two_way",
+        "request": "fuchsia.feedback/DataProviderGetAnnotationsRequest",
+        "response": "fuchsia.feedback/DataProviderGetAnnotationsResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/DataProvider.GetScreenshot",
+        "strictness": "strict",
         "ordinal": "304213256359974785",
-        "type": "(fuchsia.feedback/ImageEncoding encoding) -> (box<fuchsia.feedback/Screenshot> screenshot)"
+        "direction": "two_way",
+        "request": "fuchsia.feedback/DataProviderGetScreenshotRequest",
+        "response": "fuchsia.feedback/DataProviderGetScreenshotResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/DataProvider.GetSnapshot",
+        "strictness": "strict",
         "ordinal": "8446019104038259648",
-        "type": "(fuchsia.feedback/GetSnapshotParameters params) -> (fuchsia.feedback/Snapshot snapshot)"
+        "direction": "two_way",
+        "request": "fuchsia.feedback/DataProviderGetSnapshotRequest",
+        "response": "fuchsia.feedback/DataProviderGetSnapshotResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.feedback/DataProvider"
+        "name": "fuchsia.feedback/DataProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DataProviderGetAnnotationsRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/GetAnnotationsParameters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DataProviderGetAnnotationsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DataProviderGetAnnotationsResponse.annotations",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/Annotations"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DataProviderGetAnnotationsResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DataProviderGetScreenshotRequest.encoding",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/ImageEncoding"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DataProviderGetScreenshotRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DataProviderGetScreenshotResponse.screenshot",
+        "ordinal": "1",
+        "type": "box<fuchsia.feedback/Screenshot>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DataProviderGetScreenshotResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DataProviderGetSnapshotRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/GetSnapshotParameters"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DataProviderGetSnapshotRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DataProviderGetSnapshotResponse.snapshot",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/Snapshot"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DataProviderGetSnapshotResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/DeviceIdProvider.GetId",
+        "strictness": "strict",
         "ordinal": "1056079312768501980",
-        "type": "() -> (string:64 feedback_id)"
+        "direction": "two_way",
+        "response": "fuchsia.feedback/DeviceIdProviderGetIdResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.feedback/DeviceIdProvider"
+        "name": "fuchsia.feedback/DeviceIdProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/DeviceIdProviderGetIdResponse.feedback_id",
+        "ordinal": "1",
+        "type": "string:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/DeviceIdProviderGetIdResponse"
     },
     {
         "kind": "table/member",
@@ -369,12 +509,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.feedback/LastRebootInfoProvider.Get",
+        "strictness": "strict",
         "ordinal": "847570705385127852",
-        "type": "() -> (fuchsia.feedback/LastReboot last_reboot)"
+        "direction": "two_way",
+        "response": "fuchsia.feedback/LastRebootInfoProviderGetResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.feedback/LastRebootInfoProvider"
+        "name": "fuchsia.feedback/LastRebootInfoProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/LastRebootInfoProviderGetResponse.last_reboot",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/LastReboot"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/LastRebootInfoProviderGetResponse"
     },
     {
         "kind": "const",
@@ -657,8 +811,8 @@
     {
         "kind": "union",
         "name": "fuchsia.feedback/SpecificCrashReport",
-        "resourceness": "resource",
-        "strictness": "flexible"
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

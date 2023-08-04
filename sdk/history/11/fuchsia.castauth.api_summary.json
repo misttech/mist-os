@@ -19,18 +19,37 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.castauth/CastKeySigner.GetCertificateChain",
+        "strictness": "strict",
         "ordinal": "3765234482248766636",
-        "type": "() -> (fuchsia.castauth/CastKeySigner_GetCertificateChain_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.castauth/CastKeySigner_GetCertificateChain_Response",
+        "error": "fuchsia.castauth/ErrorCode"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.castauth/CastKeySigner.SignHash",
+        "strictness": "strict",
         "ordinal": "6727037886655927954",
-        "type": "(fuchsia.castauth/Asn1EncodedHash hash) -> (fuchsia.castauth/CastKeySigner_SignHash_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.castauth/CastKeySignerSignHashRequest",
+        "response": "fuchsia.castauth/CastKeySigner_SignHash_Response",
+        "error": "fuchsia.castauth/ErrorCode"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.castauth/CastKeySigner"
+        "name": "fuchsia.castauth/CastKeySigner",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.castauth/CastKeySignerSignHashRequest.hash",
+        "ordinal": "1",
+        "type": "fuchsia.castauth/Asn1EncodedHash"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.castauth/CastKeySignerSignHashRequest"
     },
     {
         "kind": "struct/member",
@@ -43,23 +62,6 @@
         "name": "fuchsia.castauth/CastKeySigner_GetCertificateChain_Response"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.castauth/CastKeySigner_GetCertificateChain_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.castauth/ErrorCode"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castauth/CastKeySigner_GetCertificateChain_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.castauth/CastKeySigner_GetCertificateChain_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.castauth/CastKeySigner_GetCertificateChain_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.castauth/CastKeySigner_SignHash_Response.signature",
         "ordinal": "1",
@@ -68,23 +70,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.castauth/CastKeySigner_SignHash_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castauth/CastKeySigner_SignHash_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.castauth/ErrorCode"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castauth/CastKeySigner_SignHash_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.castauth/CastKeySigner_SignHash_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.castauth/CastKeySigner_SignHash_Result",
-        "strictness": "strict"
     },
     {
         "kind": "enum/member",

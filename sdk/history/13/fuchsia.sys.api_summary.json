@@ -2,80 +2,186 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/ComponentController.Detach",
+        "strictness": "strict",
         "ordinal": "7105849846090621182",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/ComponentController.Kill",
+        "strictness": "strict",
         "ordinal": "6102146914305738423",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/ComponentController.OnDirectoryReady",
+        "strictness": "strict",
         "ordinal": "7209580991141909880",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/ComponentController.OnTerminated",
+        "strictness": "strict",
         "ordinal": "3884470948497109576",
-        "type": " -> (int64 return_code,fuchsia.sys/TerminationReason termination_reason)"
+        "direction": "event",
+        "request": "fuchsia.sys/ComponentControllerOnTerminatedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/ComponentController"
+        "name": "fuchsia.sys/ComponentController",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/ComponentControllerOnTerminatedRequest.return_code",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/ComponentControllerOnTerminatedRequest.termination_reason",
+        "ordinal": "2",
+        "type": "fuchsia.sys/TerminationReason"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/ComponentControllerOnTerminatedRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Environment.CreateNestedEnvironment",
+        "strictness": "strict",
         "ordinal": "7361762294273467973",
-        "type": "(server_end:fuchsia.sys/Environment environment,server_end:fuchsia.sys/EnvironmentController controller,string label,box<fuchsia.sys/ServiceList> additional_services,fuchsia.sys/EnvironmentOptions options)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Environment.GetDirectory",
+        "strictness": "strict",
         "ordinal": "7391698092370646933",
-        "type": "(server_end:fuchsia.io/Directory directory_request)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/EnvironmentGetDirectoryRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Environment.GetLauncher",
+        "strictness": "strict",
         "ordinal": "4759109014304865643",
-        "type": "(server_end:fuchsia.sys/Launcher launcher)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/EnvironmentGetLauncherRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Environment.GetServices",
+        "strictness": "strict",
         "ordinal": "7762611775962469047",
-        "type": "(server_end:fuchsia.sys/ServiceProvider services)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/EnvironmentGetServicesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/Environment"
+        "name": "fuchsia.sys/Environment",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/EnvironmentController.Detach",
+        "strictness": "strict",
         "ordinal": "8962577917842647182",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/EnvironmentController.Kill",
+        "strictness": "strict",
         "ordinal": "6995401303319080678",
-        "type": "() -> ()"
+        "direction": "two_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/EnvironmentController.OnCreated",
+        "strictness": "strict",
         "ordinal": "2026590462346570969",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/EnvironmentController"
+        "name": "fuchsia.sys/EnvironmentController",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest.additional_services",
+        "ordinal": "4",
+        "type": "box<fuchsia.sys/ServiceList>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest.controller",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.sys/EnvironmentController"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest.environment",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.sys/Environment"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest.label",
+        "ordinal": "3",
+        "type": "string"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest.options",
+        "ordinal": "5",
+        "type": "fuchsia.sys/EnvironmentOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/EnvironmentCreateNestedEnvironmentRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentGetDirectoryRequest.directory_request",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.io/Directory"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/EnvironmentGetDirectoryRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentGetLauncherRequest.launcher",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.sys/Launcher"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/EnvironmentGetLauncherRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/EnvironmentGetServicesRequest.services",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.sys/ServiceProvider"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/EnvironmentGetServicesRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -166,12 +272,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/JobProvider.GetJob",
+        "strictness": "strict",
         "ordinal": "1071969128043400938",
-        "type": "() -> (zx/Handle:JOB job)"
+        "direction": "two_way",
+        "response": "fuchsia.sys/JobProviderGetJobResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/JobProvider"
+        "name": "fuchsia.sys/JobProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/JobProviderGetJobResponse.job",
+        "ordinal": "1",
+        "type": "zx/Handle:JOB"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/JobProviderGetJobResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -223,22 +344,69 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Launcher.CreateComponent",
+        "strictness": "strict",
         "ordinal": "6118071822532238271",
-        "type": "(fuchsia.sys/LaunchInfo launch_info,server_end:<fuchsia.sys/ComponentController,optional> controller)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/LauncherCreateComponentRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/Launcher"
+        "name": "fuchsia.sys/Launcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/LauncherCreateComponentRequest.controller",
+        "ordinal": "2",
+        "type": "server_end:<fuchsia.sys/ComponentController,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/LauncherCreateComponentRequest.launch_info",
+        "ordinal": "1",
+        "type": "fuchsia.sys/LaunchInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/LauncherCreateComponentRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Loader.LoadUrl",
+        "strictness": "strict",
         "ordinal": "2351313287988357240",
-        "type": "(string:2083 url) -> (box<fuchsia.sys/Package> package)"
+        "direction": "two_way",
+        "request": "fuchsia.sys/LoaderLoadUrlRequest",
+        "response": "fuchsia.sys/LoaderLoadUrlResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/Loader"
+        "name": "fuchsia.sys/Loader",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/LoaderLoadUrlRequest.url",
+        "ordinal": "1",
+        "type": "string:2083"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/LoaderLoadUrlRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/LoaderLoadUrlResponse.package",
+        "ordinal": "1",
+        "type": "box<fuchsia.sys/Package>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/LoaderLoadUrlResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "const",
@@ -288,12 +456,39 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/Runner.StartComponent",
+        "strictness": "strict",
         "ordinal": "5699196872919341322",
-        "type": "(fuchsia.sys/Package package,fuchsia.sys/StartupInfo startup_info,server_end:<fuchsia.sys/ComponentController,optional> controller)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/RunnerStartComponentRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/Runner"
+        "name": "fuchsia.sys/Runner",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/RunnerStartComponentRequest.controller",
+        "ordinal": "3",
+        "type": "server_end:<fuchsia.sys/ComponentController,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/RunnerStartComponentRequest.package",
+        "ordinal": "1",
+        "type": "fuchsia.sys/Package"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/RunnerStartComponentRequest.startup_info",
+        "ordinal": "2",
+        "type": "fuchsia.sys/StartupInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/RunnerStartComponentRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -321,12 +516,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.sys/ServiceProvider.ConnectToService",
+        "strictness": "strict",
         "ordinal": "8281255024273997880",
-        "type": "(string service_name,zx/Handle:CHANNEL channel)"
+        "direction": "one_way",
+        "request": "fuchsia.sys/ServiceProviderConnectToServiceRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.sys/ServiceProvider"
+        "name": "fuchsia.sys/ServiceProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/ServiceProviderConnectToServiceRequest.channel",
+        "ordinal": "2",
+        "type": "zx/Handle:CHANNEL"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sys/ServiceProviderConnectToServiceRequest.service_name",
+        "ordinal": "1",
+        "type": "string"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sys/ServiceProviderConnectToServiceRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

@@ -48,8 +48,8 @@
     {
         "kind": "union",
         "name": "fuchsia.diagnostics.types/Task",
-        "resourceness": "resource",
-        "strictness": "flexible"
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

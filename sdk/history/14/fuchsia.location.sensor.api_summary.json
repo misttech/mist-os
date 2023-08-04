@@ -2,12 +2,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.location.sensor/WlanBaseStationWatcher.ReportCurrentStations",
+        "strictness": "strict",
         "ordinal": "2953087884609127114",
-        "type": "(fuchsia.wlan.policy/ScanResultIterator stations)"
+        "direction": "one_way",
+        "request": "fuchsia.location.sensor/WlanBaseStationWatcherReportCurrentStationsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.location.sensor/WlanBaseStationWatcher"
+        "name": "fuchsia.location.sensor/WlanBaseStationWatcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.location.sensor/WlanBaseStationWatcherReportCurrentStationsRequest.stations",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.policy/ScanResultIterator"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.location.sensor/WlanBaseStationWatcherReportCurrentStationsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

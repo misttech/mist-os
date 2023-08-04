@@ -640,8 +640,8 @@
     {
         "kind": "union",
         "name": "fuchsia.ui.gfx/Command",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -1257,12 +1257,45 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.gfx/PoseBufferProvider.SetPoseBuffer",
+        "strictness": "strict",
         "ordinal": "6092637130924467944",
-        "type": "(zx/Handle:VMO buffer,uint32 num_entries,int64 base_time,uint64 time_interval)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.gfx/PoseBufferProviderSetPoseBufferRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.gfx/PoseBufferProvider"
+        "name": "fuchsia.ui.gfx/PoseBufferProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.gfx/PoseBufferProviderSetPoseBufferRequest.base_time",
+        "ordinal": "3",
+        "type": "int64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.gfx/PoseBufferProviderSetPoseBufferRequest.buffer",
+        "ordinal": "1",
+        "type": "zx/Handle:VMO"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.gfx/PoseBufferProviderSetPoseBufferRequest.num_entries",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.gfx/PoseBufferProviderSetPoseBufferRequest.time_interval",
+        "ordinal": "4",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.gfx/PoseBufferProviderSetPoseBufferRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -1593,8 +1626,8 @@
     {
         "kind": "union",
         "name": "fuchsia.ui.gfx/ResourceArgs",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -2435,12 +2468,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.gfx/SnapshotCallbackDEPRECATED.OnData",
+        "strictness": "strict",
         "ordinal": "1283993440746175903",
-        "type": "(fuchsia.mem/Buffer data)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.gfx/SnapshotCallbackDeprecatedOnDataRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.gfx/SnapshotCallbackDEPRECATED"
+        "name": "fuchsia.ui.gfx/SnapshotCallbackDEPRECATED",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.gfx/SnapshotCallbackDeprecatedOnDataRequest.data",
+        "ordinal": "1",
+        "type": "fuchsia.mem/Buffer"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.gfx/SnapshotCallbackDeprecatedOnDataRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

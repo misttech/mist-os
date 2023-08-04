@@ -2,12 +2,28 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.lightsensor/Calibrator.Calibrate",
+        "strictness": "strict",
         "ordinal": "9068981567006939906",
-        "type": "(fuchsia.lightsensor/Rgbc data) -> (fuchsia.lightsensor/Calibrator_Calibrate_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.lightsensor/CalibratorCalibrateRequest",
+        "response": "fuchsia.lightsensor/Calibrator_Calibrate_Response",
+        "error": "fuchsia.lightsensor/Error"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lightsensor/Calibrator"
+        "name": "fuchsia.lightsensor/Calibrator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lightsensor/CalibratorCalibrateRequest.data",
+        "ordinal": "1",
+        "type": "fuchsia.lightsensor/Rgbc"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lightsensor/CalibratorCalibrateRequest"
     },
     {
         "kind": "struct/member",
@@ -18,23 +34,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.lightsensor/Calibrator_Calibrate_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.lightsensor/Calibrator_Calibrate_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.lightsensor/Error"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.lightsensor/Calibrator_Calibrate_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.lightsensor/Calibrator_Calibrate_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.lightsensor/Calibrator_Calibrate_Result",
-        "strictness": "strict"
     },
     {
         "kind": "enum/member",
@@ -112,12 +111,26 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.lightsensor/Sensor.Watch",
+        "strictness": "strict",
         "ordinal": "4249770422999721215",
-        "type": "() -> (fuchsia.lightsensor/LightSensorData data)"
+        "direction": "two_way",
+        "response": "fuchsia.lightsensor/SensorWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.lightsensor/Sensor"
+        "name": "fuchsia.lightsensor/Sensor",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lightsensor/SensorWatchResponse.data",
+        "ordinal": "1",
+        "type": "fuchsia.lightsensor/LightSensorData"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lightsensor/SensorWatchResponse"
     },
     {
         "kind": "library",

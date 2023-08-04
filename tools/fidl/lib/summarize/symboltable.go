@@ -18,53 +18,10 @@ type structPayload struct {
 	fidlgen.Struct
 }
 
-func (p *structPayload) Name() fidlgen.EncodedCompoundIdentifier {
-	return p.Struct.Name
-}
-
-func (p *structPayload) AsParameters(tp typePrinter) string {
-	members := p.Members
-	var ps []string
-	for _, m := range members {
-		ps = append(ps, fmt.Sprintf("%v %v", tp(m.Type), m.Name))
-	}
-	return fmt.Sprintf("(%v)", strings.Join(ps, ","))
-}
-
 // identifierPayload is a wrapper for implementing parameterizer on fidlgen.EncodedCompoundIdentifier.
 type identifierPayload struct {
 	identifier    fidlgen.EncodedCompoundIdentifier
 	isResultUnion bool
-}
-
-func (p *identifierPayload) Name() fidlgen.EncodedCompoundIdentifier {
-	return p.identifier
-}
-
-func (p *identifierPayload) AsParameters(_ typePrinter) string {
-	if p.isResultUnion {
-		return fmt.Sprintf("(%v result)", p.Name())
-	}
-	return fmt.Sprintf("(%v payload)", p.Name())
-}
-
-// parameterizer describes a FIDL type that may be rendered as a set of
-// request/response parameters for a FIDL protocol method.
-type parameterizer interface {
-	// Name returns the name of the type in question.
-	Name() fidlgen.EncodedCompoundIdentifier
-	// AsParameters renders the type in question into a parameter list. This
-	// rendering takes different forms depending on the layout of the underlying
-	// type: structs are "flattened" into a list of their constituent elements,
-	// while tables and unions are always a list pointing to the type in question,
-	// always named "payload."
-	AsParameters(typePrinter) string
-}
-
-// All implementers of parameterizer.
-var _ = []parameterizer{
-	(*structPayload)(nil),
-	(*identifierPayload)(nil),
 }
 
 // symbolTable knows how to represent a symbol's type as a string.
@@ -108,17 +65,6 @@ func (n *symbolTable) addStruct(name fidlgen.EncodedCompoundIdentifier, def *fid
 func (n *symbolTable) isStruct(name fidlgen.EncodedCompoundIdentifier) bool {
 	_, ok := n.structDecls[name]
 	return ok
-}
-
-// getPayload returns the stored payload definition, if one exists.
-func (n *symbolTable) getPayload(name fidlgen.EncodedCompoundIdentifier, isResultUnion bool) parameterizer {
-	if theStruct, ok := n.structDecls[name]; ok {
-		return &structPayload{*theStruct}
-	}
-	return &identifierPayload{
-		identifier:    name,
-		isResultUnion: isResultUnion,
-	}
 }
 
 // fidlTypeString converts the FIDL type declaration into a string per RFC-0050.

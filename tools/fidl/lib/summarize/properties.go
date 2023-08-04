@@ -120,11 +120,31 @@ func newAggregate(
 	}
 }
 
+func strictness(strict fidlgen.Strictness) Strictness {
+	if strict.IsStrict() {
+		return isStrict
+	}
+	return isFlexible
+}
+
 func resourceness(resourceness fidlgen.Resourceness) Resourceness {
 	if resourceness.IsResourceType() {
 		return isResource
 	}
 	return isValue
+}
+
+func openness(openness fidlgen.Openness) Openness {
+	switch openness {
+	case fidlgen.Closed:
+		return isClosed
+	case fidlgen.Ajar:
+		return isAjar
+	case fidlgen.Open:
+		return isOpen
+	default:
+		panic(fmt.Sprintf("unexpected openness: %s", openness))
+	}
 }
 
 func (s *aggregate) Serialize() ElementStr {

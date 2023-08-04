@@ -2,12 +2,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.device.fs/Connector.Connect",
+        "strictness": "strict",
         "ordinal": "3169778387179902201",
-        "type": "(zx/Handle:CHANNEL server)"
+        "direction": "one_way",
+        "request": "fuchsia.device.fs/ConnectorConnectRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.device.fs/Connector"
+        "name": "fuchsia.device.fs/Connector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.device.fs/ConnectorConnectRequest.server",
+        "ordinal": "1",
+        "type": "zx/Handle:CHANNEL"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.device.fs/ConnectorConnectRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "const",

@@ -640,8 +640,8 @@
     {
         "kind": "union",
         "name": "fuchsia.ui.gfx/Command",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -1583,8 +1583,8 @@
     {
         "kind": "union",
         "name": "fuchsia.ui.gfx/ResourceArgs",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -2425,12 +2425,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.gfx/SnapshotCallbackDEPRECATED.OnData",
+        "strictness": "strict",
         "ordinal": "1283993440746175903",
-        "type": "(fuchsia.mem/Buffer data)"
+        "direction": "one_way",
+        "request": "fuchsia.ui.gfx/SnapshotCallbackDeprecatedOnDataRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.gfx/SnapshotCallbackDEPRECATED"
+        "name": "fuchsia.ui.gfx/SnapshotCallbackDEPRECATED",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.gfx/SnapshotCallbackDeprecatedOnDataRequest.data",
+        "ordinal": "1",
+        "type": "fuchsia.mem/Buffer"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.gfx/SnapshotCallbackDeprecatedOnDataRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

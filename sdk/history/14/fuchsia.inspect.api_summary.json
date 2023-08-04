@@ -8,24 +8,32 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.inspect/Tree.GetContent",
+        "strictness": "strict",
         "ordinal": "7845483736674089799",
-        "type": "() -> (fuchsia.inspect/TreeContent content)"
+        "direction": "two_way",
+        "response": "fuchsia.inspect/TreeGetContentResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.inspect/Tree.ListChildNames",
+        "strictness": "strict",
         "ordinal": "6304081299083068579",
-        "type": "(server_end:fuchsia.inspect/TreeNameIterator tree_iterator)"
+        "direction": "one_way",
+        "request": "fuchsia.inspect/TreeListChildNamesRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.inspect/Tree.OpenChild",
+        "strictness": "strict",
         "ordinal": "5939743449266823603",
-        "type": "(string:2040 child_name,server_end:fuchsia.inspect/Tree tree)"
+        "direction": "one_way",
+        "request": "fuchsia.inspect/TreeOpenChildRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.inspect/Tree"
+        "name": "fuchsia.inspect/Tree",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",
@@ -39,14 +47,67 @@
         "resourceness": "resource"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.inspect/TreeGetContentResponse.content",
+        "ordinal": "1",
+        "type": "fuchsia.inspect/TreeContent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.inspect/TreeGetContentResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.inspect/TreeListChildNamesRequest.tree_iterator",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.inspect/TreeNameIterator"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.inspect/TreeListChildNamesRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.inspect/TreeNameIterator.GetNext",
+        "strictness": "strict",
         "ordinal": "7673424535531931820",
-        "type": "() -> (vector<string:2040> name)"
+        "direction": "two_way",
+        "response": "fuchsia.inspect/TreeNameIteratorGetNextResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.inspect/TreeNameIterator"
+        "name": "fuchsia.inspect/TreeNameIterator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.inspect/TreeNameIteratorGetNextResponse.name",
+        "ordinal": "1",
+        "type": "vector<string:2040>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.inspect/TreeNameIteratorGetNextResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.inspect/TreeOpenChildRequest.child_name",
+        "ordinal": "1",
+        "type": "string:2040"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.inspect/TreeOpenChildRequest.tree",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.inspect/Tree"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.inspect/TreeOpenChildRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "library",

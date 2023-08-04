@@ -1923,7 +1923,9 @@ protocol T {};
             "name": "l/T",
             "after": {
                 "kind": "protocol",
-                "name": "l/T"
+                "name": "l/T",
+                "openness": "closed",
+                "transport": "channel"
             },
             "conclusion": "Compatible"
         }
@@ -1947,7 +1949,76 @@ library l;
             "name": "l/T",
             "before": {
                 "kind": "protocol",
-                "name": "l/T"
+                "name": "l/T",
+                "openness": "closed",
+                "transport": "channel"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol change openness",
+			before: `
+library l;
+closed protocol T {};
+`,
+			after: `
+library l;
+ajar protocol T {};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T",
+            "before": {
+                "kind": "protocol",
+                "name": "l/T",
+                "openness": "closed",
+                "transport": "channel"
+            },
+            "after": {
+                "kind": "protocol",
+                "name": "l/T",
+                "openness": "ajar",
+                "transport": "channel"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol change transport",
+			before: `
+library l;
+protocol T {};
+`,
+			after: `
+library l;
+@transport("Driver")
+protocol T {};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T",
+            "before": {
+                "kind": "protocol",
+                "name": "l/T",
+                "openness": "closed",
+                "transport": "channel"
+            },
+            "after": {
+                "kind": "protocol",
+                "name": "l/T",
+                "openness": "closed",
+                "transport": "driver"
             },
             "conclusion": "APIBreaking"
         }
@@ -1976,8 +2047,28 @@ protocol T {
             "after": {
                 "kind": "protocol/member",
                 "name": "l/T.Test",
+                "strictness": "strict",
                 "ordinal": "7985249320572540149",
-                "type": "(int32 t) -> ()"
+                "direction": "two_way",
+                "request": "l/TTestRequest"
+            },
+            "conclusion": "Compatible"
+        },
+        {
+            "name": "l/TTestRequest.t",
+            "after": {
+                "kind": "struct/member",
+                "name": "l/TTestRequest.t",
+                "ordinal": "1",
+                "type": "int32"
+            },
+            "conclusion": "Compatible"
+        },
+        {
+            "name": "l/TTestRequest",
+            "after": {
+                "kind": "struct",
+                "name": "l/TTestRequest"
             },
             "conclusion": "Compatible"
         }
@@ -2006,45 +2097,28 @@ protocol T {
             "before": {
                 "kind": "protocol/member",
                 "name": "l/T.Test",
+                "strictness": "strict",
                 "ordinal": "7985249320572540149",
-                "type": "(int32 t) -> ()"
+                "direction": "two_way",
+                "request": "l/TTestRequest"
             },
             "conclusion": "APIBreaking"
-        }
-    ]
-}
-`,
-		},
-		{
-			name: "protocol member type change",
-			before: `
-library l;
-protocol T {
-  Test(struct { t int32; }) -> ();
-};
-`,
-			after: `
-library l;
-protocol T {
-  Test(struct { t int32; u int32; }) -> ();
-};
-`,
-			expected: `
-{
-    "api_diff": [
+        },
         {
-            "name": "l/T.Test",
+            "name": "l/TTestRequest.t",
             "before": {
-                "kind": "protocol/member",
-                "name": "l/T.Test",
-                "ordinal": "7985249320572540149",
-                "type": "(int32 t) -> ()"
+                "kind": "struct/member",
+                "name": "l/TTestRequest.t",
+                "ordinal": "1",
+                "type": "int32"
             },
-            "after": {
-                "kind": "protocol/member",
-                "name": "l/T.Test",
-                "ordinal": "7985249320572540149",
-                "type": "(int32 t,int32 u) -> ()"
+            "conclusion": "APIBreaking"
+        },
+        {
+            "name": "l/TTestRequest",
+            "before": {
+                "kind": "struct",
+                "name": "l/TTestRequest"
             },
             "conclusion": "APIBreaking"
         }
@@ -2075,16 +2149,420 @@ protocol T {
             "before": {
                 "kind": "protocol/member",
                 "name": "l/T.Test",
+                "strictness": "strict",
                 "ordinal": "7985249320572540149",
-                "type": "(int32 t) -> ()"
+                "direction": "two_way",
+                "request": "l/TTestRequest"
             },
             "after": {
                 "kind": "protocol/member",
                 "name": "l/T.Test",
+                "strictness": "strict",
                 "ordinal": "8693951483982195746",
-                "type": "(int32 t) -> ()"
+                "direction": "two_way",
+                "request": "l/TTestRequest"
             },
             "conclusion": "APICompatibleButABIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member direction change",
+			before: `
+library l;
+protocol T {
+  Test();
+};
+`,
+			after: `
+library l;
+protocol T {
+  -> Test();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "one_way"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "event"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member strictness change to flexible",
+			before: `
+library l;
+open protocol T {
+  strict Test() -> ();
+};
+`,
+			after: `
+library l;
+open protocol T {
+  flexible Test() -> ();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "flexible",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way",
+                "response": "l/T_Test_Response"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member strictness change to strict",
+			before: `
+library l;
+open protocol T {
+  flexible Test() -> ();
+};
+`,
+			after: `
+library l;
+open protocol T {
+  strict Test() -> ();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "flexible",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way",
+                "response": "l/T_Test_Response"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member request add",
+			before: `
+library l;
+type R = struct { t int32; };
+protocol T {
+  Test();
+};
+`,
+			after: `
+library l;
+type R = struct { t int32; };
+protocol T {
+  Test(R);
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "one_way"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "one_way",
+                "request": "l/R"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member request remove",
+			before: `
+library l;
+type R = struct { t int32; };
+protocol T {
+  Test(R);
+};
+`,
+			after: `
+library l;
+type R = struct { t int32; };
+protocol T {
+  Test();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "one_way",
+                "request": "l/R"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "one_way"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member response add",
+			before: `
+library l;
+type R = struct { t int32; };
+protocol T {
+  Test() -> ();
+};
+`,
+			after: `
+library l;
+type R = struct { t int32; };
+protocol T {
+    Test() -> (R);
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way",
+                "response": "l/R"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member response remove",
+			before: `
+library l;
+type R = struct { t int32; };
+protocol T {
+  Test() -> (R);
+};
+`,
+			after: `
+library l;
+type R = struct { t int32; };
+protocol T {
+    Test() -> ();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way",
+                "response": "l/R"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member error add",
+			before: `
+library l;
+protocol T {
+  Test() -> ();
+};
+`,
+			after: `
+library l;
+protocol T {
+    Test() -> () error uint32;
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way",
+                "response": "l/T_Test_Response",
+                "error": "uint32"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member error remove",
+			before: `
+library l;
+protocol T {
+  Test() -> () error uint32;
+};
+`,
+			after: `
+library l;
+protocol T {
+    Test() -> ();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/T.Test",
+            "before": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way",
+                "response": "l/T_Test_Response",
+                "error": "uint32"
+            },
+            "after": {
+                "kind": "protocol/member",
+                "name": "l/T.Test",
+                "strictness": "strict",
+                "ordinal": "7985249320572540149",
+                "direction": "two_way"
+            },
+            "conclusion": "APIBreaking"
+        }
+    ]
+}
+`,
+		},
+		{
+			name: "protocol member type change",
+			before: `
+library l;
+protocol T {
+  Test(struct { t int32; }) -> ();
+};
+`,
+			after: `
+library l;
+protocol T {
+  Test(struct { t int32; u int32; }) -> ();
+};
+`,
+			expected: `
+{
+    "api_diff": [
+        {
+            "name": "l/TTestRequest.u",
+            "after": {
+                "kind": "struct/member",
+                "name": "l/TTestRequest.u",
+                "ordinal": "2",
+                "type": "int32"
+            },
+            "conclusion": "APIBreaking"
         }
     ]
 }

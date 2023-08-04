@@ -149,26 +149,61 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.interfaces/State.GetWatcher",
+        "strictness": "strict",
         "ordinal": "5756202622262852323",
-        "type": "(fuchsia.net.interfaces/WatcherOptions options,server_end:fuchsia.net.interfaces/Watcher watcher)"
+        "direction": "one_way",
+        "request": "fuchsia.net.interfaces/StateGetWatcherRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.interfaces/State"
+        "name": "fuchsia.net.interfaces/State",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.interfaces/StateGetWatcherRequest.options",
+        "ordinal": "1",
+        "type": "fuchsia.net.interfaces/WatcherOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.interfaces/StateGetWatcherRequest.watcher",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.net.interfaces/Watcher"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.interfaces/StateGetWatcherRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.net.interfaces/Watcher.Watch",
+        "strictness": "strict",
         "ordinal": "6126979800581992179",
-        "type": "() -> (fuchsia.net.interfaces/Event event)"
+        "direction": "two_way",
+        "response": "fuchsia.net.interfaces/WatcherWatchResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.net.interfaces/Watcher"
+        "name": "fuchsia.net.interfaces/Watcher",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table",
         "name": "fuchsia.net.interfaces/WatcherOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.interfaces/WatcherWatchResponse.event",
+        "ordinal": "1",
+        "type": "fuchsia.net.interfaces/Event"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.interfaces/WatcherWatchResponse"
     },
     {
         "kind": "library",

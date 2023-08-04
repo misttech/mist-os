@@ -18,33 +18,28 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.castremotecontrol/Launcher.Launch",
+        "strictness": "strict",
         "ordinal": "2290376407434133885",
-        "type": "(string device_id) -> (fuchsia.castremotecontrol/Launcher_Launch_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.castremotecontrol/LauncherLaunchRequest",
+        "response": "fuchsia.castremotecontrol/Launcher_Launch_Response",
+        "error": "fuchsia.castremotecontrol/LaunchError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.castremotecontrol/Launcher"
+        "name": "fuchsia.castremotecontrol/Launcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.castremotecontrol/LauncherLaunchRequest.device_id",
+        "ordinal": "1",
+        "type": "string"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.castremotecontrol/Launcher_Launch_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castremotecontrol/Launcher_Launch_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.castremotecontrol/LaunchError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.castremotecontrol/Launcher_Launch_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.castremotecontrol/Launcher_Launch_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.castremotecontrol/Launcher_Launch_Result",
-        "strictness": "strict"
+        "name": "fuchsia.castremotecontrol/LauncherLaunchRequest"
     },
     {
         "kind": "library",

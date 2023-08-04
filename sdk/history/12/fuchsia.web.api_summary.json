@@ -110,30 +110,69 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Context.CreateFrame",
+        "strictness": "strict",
         "ordinal": "6071032126764842383",
-        "type": "(server_end:fuchsia.web/Frame frame)"
+        "direction": "one_way",
+        "request": "fuchsia.web/ContextCreateFrameRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Context.CreateFrameWithParams",
+        "strictness": "strict",
         "ordinal": "3212907335949729430",
-        "type": "(fuchsia.web/CreateFrameParams params,server_end:fuchsia.web/Frame frame)"
+        "direction": "one_way",
+        "request": "fuchsia.web/ContextCreateFrameWithParamsRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Context.GetCookieManager",
+        "strictness": "strict",
         "ordinal": "520566916948836298",
-        "type": "(server_end:fuchsia.web/CookieManager manager)"
+        "direction": "one_way",
+        "request": "fuchsia.web/ContextGetCookieManagerRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Context.GetRemoteDebuggingPort",
+        "strictness": "strict",
         "ordinal": "336760787858566953",
-        "type": "() -> (fuchsia.web/Context_GetRemoteDebuggingPort_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.web/Context_GetRemoteDebuggingPort_Response",
+        "error": "fuchsia.web/ContextError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/Context"
+        "name": "fuchsia.web/Context",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/ContextCreateFrameRequest.frame",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.web/Frame"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/ContextCreateFrameRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/ContextCreateFrameWithParamsRequest.frame",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.web/Frame"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/ContextCreateFrameWithParamsRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.web/CreateFrameParams"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/ContextCreateFrameWithParamsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -208,14 +247,46 @@
         "type": "uint64"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.web/ContextGetCookieManagerRequest.manager",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.web/CookieManager"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/ContextGetCookieManagerRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.web/ContextProvider.Create",
+        "strictness": "strict",
         "ordinal": "7991349696898447757",
-        "type": "(fuchsia.web/CreateContextParams params,server_end:fuchsia.web/Context context)"
+        "direction": "one_way",
+        "request": "fuchsia.web/ContextProviderCreateRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/ContextProvider"
+        "name": "fuchsia.web/ContextProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/ContextProviderCreateRequest.context",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.web/Context"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/ContextProviderCreateRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.web/CreateContextParams"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/ContextProviderCreateRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -226,23 +297,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.web/Context_GetRemoteDebuggingPort_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Context_GetRemoteDebuggingPort_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.web/ContextError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Context_GetRemoteDebuggingPort_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.web/Context_GetRemoteDebuggingPort_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.web/Context_GetRemoteDebuggingPort_Result",
-        "strictness": "strict"
     },
     {
         "kind": "table/member",
@@ -286,28 +340,95 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/CookieManager.GetCookieList",
+        "strictness": "strict",
         "ordinal": "4115579728738710324",
-        "type": "(string:<65536,optional> url,string:optional name,server_end:fuchsia.web/CookiesIterator cookies)"
+        "direction": "one_way",
+        "request": "fuchsia.web/CookieManagerGetCookieListRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/CookieManager.ObserveCookieChanges",
+        "strictness": "strict",
         "ordinal": "332565268177914034",
-        "type": "(string:<65536,optional> url,string:optional name,server_end:fuchsia.web/CookiesIterator changes)"
+        "direction": "one_way",
+        "request": "fuchsia.web/CookieManagerObserveCookieChangesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/CookieManager"
+        "name": "fuchsia.web/CookieManager",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookieManagerGetCookieListRequest.cookies",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.web/CookiesIterator"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookieManagerGetCookieListRequest.name",
+        "ordinal": "2",
+        "type": "string:optional"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookieManagerGetCookieListRequest.url",
+        "ordinal": "1",
+        "type": "string:<65536,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/CookieManagerGetCookieListRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookieManagerObserveCookieChangesRequest.changes",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.web/CookiesIterator"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookieManagerObserveCookieChangesRequest.name",
+        "ordinal": "2",
+        "type": "string:optional"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookieManagerObserveCookieChangesRequest.url",
+        "ordinal": "1",
+        "type": "string:<65536,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/CookieManagerObserveCookieChangesRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/CookiesIterator.GetNext",
+        "strictness": "strict",
         "ordinal": "7040637768638940541",
-        "type": "() -> (vector<fuchsia.web/Cookie> changed_cookies)"
+        "direction": "two_way",
+        "response": "fuchsia.web/CookiesIteratorGetNextResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/CookiesIterator"
+        "name": "fuchsia.web/CookiesIterator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/CookiesIteratorGetNextResponse.changed_cookies",
+        "ordinal": "1",
+        "type": "vector<fuchsia.web/Cookie>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/CookiesIteratorGetNextResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -429,32 +550,76 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Debug.EnableDevTools",
+        "strictness": "strict",
         "ordinal": "4951111807290132708",
-        "type": "(client_end:fuchsia.web/DevToolsListener listener) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.web/DebugEnableDevToolsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/Debug"
+        "name": "fuchsia.web/Debug",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/DebugEnableDevToolsRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.web/DevToolsListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/DebugEnableDevToolsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/DevToolsListener.OnContextDevToolsAvailable",
+        "strictness": "strict",
         "ordinal": "5414909726047903367",
-        "type": "(server_end:fuchsia.web/DevToolsPerContextListener listener)"
+        "direction": "one_way",
+        "request": "fuchsia.web/DevToolsListenerOnContextDevToolsAvailableRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/DevToolsListener"
+        "name": "fuchsia.web/DevToolsListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/DevToolsListenerOnContextDevToolsAvailableRequest.listener",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.web/DevToolsPerContextListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/DevToolsListenerOnContextDevToolsAvailableRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/DevToolsPerContextListener.OnHttpPortOpen",
+        "strictness": "strict",
         "ordinal": "6787779206751540539",
-        "type": "(uint16 port)"
+        "direction": "one_way",
+        "request": "fuchsia.web/DevToolsPerContextListenerOnHttpPortOpenRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/DevToolsPerContextListener"
+        "name": "fuchsia.web/DevToolsPerContextListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/DevToolsPerContextListenerOnHttpPortOpenRequest.port",
+        "ordinal": "1",
+        "type": "uint16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/DevToolsPerContextListenerOnHttpPortOpenRequest"
     },
     {
         "kind": "table/member",
@@ -482,174 +647,260 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.AddBeforeLoadJavaScript",
+        "strictness": "strict",
         "ordinal": "378491543312237118",
-        "type": "(uint64 id,vector<string:65536> origins,fuchsia.mem/Buffer script) -> (fuchsia.web/Frame_AddBeforeLoadJavaScript_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.web/FrameAddBeforeLoadJavaScriptRequest",
+        "response": "fuchsia.web/Frame_AddBeforeLoadJavaScript_Response",
+        "error": "fuchsia.web/FrameError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.Close",
+        "strictness": "strict",
         "ordinal": "307063091439752017",
-        "type": "(fuchsia.web/FrameCloseRequest payload)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameCloseRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.ConfigureInputTypes",
+        "strictness": "strict",
         "ordinal": "4098433884881338102",
-        "type": "(fuchsia.web/InputTypes types,fuchsia.web/AllowInputState allow)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameConfigureInputTypesRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.CreateView",
+        "strictness": "strict",
         "ordinal": "7649229363771290212",
-        "type": "(fuchsia.ui.views/ViewToken view_token)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameCreateViewRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.CreateView2",
+        "strictness": "strict",
         "ordinal": "2010832293440187191",
-        "type": "(fuchsia.web/CreateView2Args args)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameCreateView2Request"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.CreateViewWithViewRef",
+        "strictness": "strict",
         "ordinal": "2211683798081545900",
-        "type": "(fuchsia.ui.views/ViewToken view_token,fuchsia.ui.views/ViewRefControl view_ref_control,fuchsia.ui.views/ViewRef view_ref)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameCreateViewWithViewRefRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.DisableHeadlessRendering",
+        "strictness": "strict",
         "ordinal": "6675331067819283514",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.EnableHeadlessRendering",
+        "strictness": "strict",
         "ordinal": "8261882837744487723",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.ExecuteJavaScript",
+        "strictness": "strict",
         "ordinal": "8767344405326595394",
-        "type": "(vector<string:65536> origins,fuchsia.mem/Buffer script) -> (fuchsia.web/Frame_ExecuteJavaScript_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.web/FrameExecuteJavaScriptRequest",
+        "response": "fuchsia.web/Frame_ExecuteJavaScript_Response",
+        "error": "fuchsia.web/FrameError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.ExecuteJavaScriptNoResult",
+        "strictness": "strict",
         "ordinal": "1637138819642543459",
-        "type": "(vector<string:65536> origins,fuchsia.mem/Buffer script) -> (fuchsia.web/Frame_ExecuteJavaScriptNoResult_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.web/FrameExecuteJavaScriptNoResultRequest",
+        "response": "fuchsia.web/Frame_ExecuteJavaScriptNoResult_Response",
+        "error": "fuchsia.web/FrameError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.ForceContentDimensions",
+        "strictness": "strict",
         "ordinal": "632476800010275073",
-        "type": "(fuchsia.ui.gfx/vec2:optional web_dips)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameForceContentDimensionsRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.GetMediaPlayer",
+        "strictness": "strict",
         "ordinal": "770034421461655225",
-        "type": "(server_end:fuchsia.media.sessions2/Player player)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameGetMediaPlayerRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.GetNavigationController",
+        "strictness": "strict",
         "ordinal": "4981491263860090504",
-        "type": "(server_end:fuchsia.web/NavigationController controller)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameGetNavigationControllerRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.GetPrivateMemorySize",
+        "strictness": "strict",
         "ordinal": "7698011024338790832",
-        "type": "() -> (uint64 size_bytes)"
+        "direction": "two_way",
+        "response": "fuchsia.web/FrameGetPrivateMemorySizeResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.PostMessage",
+        "strictness": "strict",
         "ordinal": "8439016101501379393",
-        "type": "(string:65536 target_origin,fuchsia.web/WebMessage message) -> (fuchsia.web/Frame_PostMessage_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.web/FramePostMessageRequest",
+        "response": "fuchsia.web/Frame_PostMessage_Response",
+        "error": "fuchsia.web/FrameError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.RemoveBeforeLoadJavaScript",
+        "strictness": "strict",
         "ordinal": "1718452584582337082",
-        "type": "(uint64 id)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameRemoveBeforeLoadJavaScriptRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.ResetContentAreaSettings",
+        "strictness": "strict",
         "ordinal": "7496206735073930845",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetBlockMediaLoading",
+        "strictness": "strict",
         "ordinal": "2382528746458042191",
-        "type": "(bool blocked)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetBlockMediaLoadingRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetConsoleLogSink",
+        "strictness": "strict",
         "ordinal": "1798567658671859835",
-        "type": "(fuchsia.logger/LogSink:optional sink)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetConsoleLogSinkRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetContentAreaSettings",
+        "strictness": "strict",
         "ordinal": "599529461091910270",
-        "type": "(fuchsia.web/ContentAreaSettings settings)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetContentAreaSettingsRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetJavaScriptLogLevel",
+        "strictness": "strict",
         "ordinal": "8395355194562202459",
-        "type": "(fuchsia.web/ConsoleLogLevel level)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetJavaScriptLogLevelRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetMediaSettings",
+        "strictness": "strict",
         "ordinal": "9054620876951306563",
-        "type": "(fuchsia.web/FrameMediaSettings settings)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetMediaSettingsRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetNavigationEventListener",
+        "strictness": "strict",
         "ordinal": "677151895295232598",
-        "type": "(client_end:<fuchsia.web/NavigationEventListener,optional> listener)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetNavigationEventListenerRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetNavigationEventListener2",
+        "strictness": "strict",
         "ordinal": "6884667238559733647",
-        "type": "(client_end:<fuchsia.web/NavigationEventListener,optional> listener,fuchsia.web/NavigationEventListenerFlags flags)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetNavigationEventListener2Request"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetNavigationPolicyProvider",
+        "strictness": "strict",
         "ordinal": "6930163866162062932",
-        "type": "(fuchsia.web/NavigationPolicyProviderParams params,client_end:fuchsia.web/NavigationPolicyProvider provider)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetNavigationPolicyProviderRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetPermissionState",
+        "strictness": "strict",
         "ordinal": "1826014565696225103",
-        "type": "(fuchsia.web/PermissionDescriptor permission,string:65536 web_origin,fuchsia.web/PermissionState state)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetPermissionStateRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetPopupFrameCreationListener",
+        "strictness": "strict",
         "ordinal": "3809460682245661354",
-        "type": "(client_end:<fuchsia.web/PopupFrameCreationListener,optional> listener)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameSetPopupFrameCreationListenerRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/Frame.SetUrlRequestRewriteRules",
+        "strictness": "strict",
         "ordinal": "3332515785459053185",
-        "type": "(vector<fuchsia.web/UrlRequestRewriteRule>:4096 rules) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.web/FrameSetUrlRequestRewriteRulesRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/Frame"
+        "name": "fuchsia.web/Frame",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameAddBeforeLoadJavaScriptRequest.id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameAddBeforeLoadJavaScriptRequest.origins",
+        "ordinal": "2",
+        "type": "vector<string:65536>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameAddBeforeLoadJavaScriptRequest.script",
+        "ordinal": "3",
+        "type": "fuchsia.mem/Buffer"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameAddBeforeLoadJavaScriptRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -660,6 +911,67 @@
     {
         "kind": "table",
         "name": "fuchsia.web/FrameCloseRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameConfigureInputTypesRequest.allow",
+        "ordinal": "2",
+        "type": "fuchsia.web/AllowInputState"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameConfigureInputTypesRequest.types",
+        "ordinal": "1",
+        "type": "fuchsia.web/InputTypes"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameConfigureInputTypesRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameCreateView2Request.args",
+        "ordinal": "1",
+        "type": "fuchsia.web/CreateView2Args"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameCreateView2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameCreateViewRequest.view_token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameCreateViewRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameCreateViewWithViewRefRequest.view_ref",
+        "ordinal": "3",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameCreateViewWithViewRefRequest.view_ref_control",
+        "ordinal": "2",
+        "type": "fuchsia.ui.views/ViewRefControl"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameCreateViewWithViewRefRequest.view_token",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameCreateViewWithViewRefRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -688,14 +1000,111 @@
         "type": "int32"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameExecuteJavaScriptNoResultRequest.origins",
+        "ordinal": "1",
+        "type": "vector<string:65536>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameExecuteJavaScriptNoResultRequest.script",
+        "ordinal": "2",
+        "type": "fuchsia.mem/Buffer"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameExecuteJavaScriptNoResultRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameExecuteJavaScriptRequest.origins",
+        "ordinal": "1",
+        "type": "vector<string:65536>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameExecuteJavaScriptRequest.script",
+        "ordinal": "2",
+        "type": "fuchsia.mem/Buffer"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameExecuteJavaScriptRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameForceContentDimensionsRequest.web_dips",
+        "ordinal": "1",
+        "type": "fuchsia.ui.gfx/vec2:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameForceContentDimensionsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameGetMediaPlayerRequest.player",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.media.sessions2/Player"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameGetMediaPlayerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameGetNavigationControllerRequest.controller",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.web/NavigationController"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameGetNavigationControllerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameGetPrivateMemorySizeResponse.size_bytes",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameGetPrivateMemorySizeResponse"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.web/FrameHost.CreateFrameWithParams",
+        "strictness": "strict",
         "ordinal": "463897614729559848",
-        "type": "(fuchsia.web/CreateFrameParams params,server_end:fuchsia.web/Frame frame)"
+        "direction": "one_way",
+        "request": "fuchsia.web/FrameHostCreateFrameWithParamsRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/FrameHost"
+        "name": "fuchsia.web/FrameHost",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameHostCreateFrameWithParamsRequest.frame",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.web/Frame"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameHostCreateFrameWithParamsRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.web/CreateFrameParams"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameHostCreateFrameWithParamsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -714,46 +1123,170 @@
         "name": "fuchsia.web/FrameMediaSettings"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.web/Frame_AddBeforeLoadJavaScript_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_AddBeforeLoadJavaScript_Result.err",
+        "kind": "struct/member",
+        "name": "fuchsia.web/FramePostMessageRequest.message",
         "ordinal": "2",
-        "type": "fuchsia.web/FrameError"
+        "type": "fuchsia.web/WebMessage"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_AddBeforeLoadJavaScript_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.web/FramePostMessageRequest.target_origin",
         "ordinal": "1",
-        "type": "fuchsia.web/Frame_AddBeforeLoadJavaScript_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.web/Frame_AddBeforeLoadJavaScript_Result",
-        "strictness": "strict"
+        "type": "string:65536"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.web/Frame_ExecuteJavaScriptNoResult_Response"
+        "name": "fuchsia.web/FramePostMessageRequest",
+        "resourceness": "resource"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_ExecuteJavaScriptNoResult_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.web/FrameError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_ExecuteJavaScriptNoResult_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameRemoveBeforeLoadJavaScriptRequest.id",
         "ordinal": "1",
-        "type": "fuchsia.web/Frame_ExecuteJavaScriptNoResult_Response"
+        "type": "uint64"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.web/Frame_ExecuteJavaScriptNoResult_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.web/FrameRemoveBeforeLoadJavaScriptRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetBlockMediaLoadingRequest.blocked",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetBlockMediaLoadingRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetConsoleLogSinkRequest.sink",
+        "ordinal": "1",
+        "type": "fuchsia.logger/LogSink:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetConsoleLogSinkRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetContentAreaSettingsRequest.settings",
+        "ordinal": "1",
+        "type": "fuchsia.web/ContentAreaSettings"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetContentAreaSettingsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetJavaScriptLogLevelRequest.level",
+        "ordinal": "1",
+        "type": "fuchsia.web/ConsoleLogLevel"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetJavaScriptLogLevelRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetMediaSettingsRequest.settings",
+        "ordinal": "1",
+        "type": "fuchsia.web/FrameMediaSettings"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetMediaSettingsRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetNavigationEventListener2Request.flags",
+        "ordinal": "2",
+        "type": "fuchsia.web/NavigationEventListenerFlags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetNavigationEventListener2Request.listener",
+        "ordinal": "1",
+        "type": "client_end:<fuchsia.web/NavigationEventListener,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetNavigationEventListener2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetNavigationEventListenerRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:<fuchsia.web/NavigationEventListener,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetNavigationEventListenerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetNavigationPolicyProviderRequest.params",
+        "ordinal": "1",
+        "type": "fuchsia.web/NavigationPolicyProviderParams"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetNavigationPolicyProviderRequest.provider",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.web/NavigationPolicyProvider"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetNavigationPolicyProviderRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetPermissionStateRequest.permission",
+        "ordinal": "1",
+        "type": "fuchsia.web/PermissionDescriptor"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetPermissionStateRequest.state",
+        "ordinal": "3",
+        "type": "fuchsia.web/PermissionState"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetPermissionStateRequest.web_origin",
+        "ordinal": "2",
+        "type": "string:65536"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetPermissionStateRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetPopupFrameCreationListenerRequest.listener",
+        "ordinal": "1",
+        "type": "client_end:<fuchsia.web/PopupFrameCreationListener,optional>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetPopupFrameCreationListenerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/FrameSetUrlRequestRewriteRulesRequest.rules",
+        "ordinal": "1",
+        "type": "vector<fuchsia.web/UrlRequestRewriteRule>:4096"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/FrameSetUrlRequestRewriteRulesRequest"
     },
     {
         "kind": "struct/member",
@@ -768,45 +1301,6 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.web/Frame_ExecuteJavaScript_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.web/FrameError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_ExecuteJavaScript_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.web/Frame_ExecuteJavaScript_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.web/Frame_ExecuteJavaScript_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.web/Frame_PostMessage_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_PostMessage_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.web/FrameError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/Frame_PostMessage_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.web/Frame_PostMessage_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.web/Frame_PostMessage_Result",
-        "strictness": "strict"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.web/IncomingTransferable.message_port",
         "ordinal": "1",
         "type": "client_end:fuchsia.web/MessagePort"
@@ -814,8 +1308,8 @@
     {
         "kind": "union",
         "name": "fuchsia.web/IncomingTransferable",
-        "resourceness": "resource",
-        "strictness": "flexible"
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "bits/member",
@@ -947,73 +1441,93 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/MessagePort.PostMessage",
+        "strictness": "strict",
         "ordinal": "3156753334913727775",
-        "type": "(fuchsia.web/WebMessage message) -> (fuchsia.web/MessagePort_PostMessage_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.web/MessagePortPostMessageRequest",
+        "response": "fuchsia.web/MessagePort_PostMessage_Response",
+        "error": "fuchsia.web/FrameError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/MessagePort.ReceiveMessage",
+        "strictness": "strict",
         "ordinal": "7821169605653292429",
-        "type": "() -> (fuchsia.web/WebMessage message)"
+        "direction": "two_way",
+        "response": "fuchsia.web/MessagePortReceiveMessageResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/MessagePort"
+        "name": "fuchsia.web/MessagePort",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/MessagePortPostMessageRequest.message",
+        "ordinal": "1",
+        "type": "fuchsia.web/WebMessage"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.web/MessagePort_PostMessage_Response"
+        "name": "fuchsia.web/MessagePortPostMessageRequest",
+        "resourceness": "resource"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.web/MessagePort_PostMessage_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.web/FrameError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/MessagePort_PostMessage_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.web/MessagePortReceiveMessageResponse.message",
         "ordinal": "1",
-        "type": "fuchsia.web/MessagePort_PostMessage_Response"
+        "type": "fuchsia.web/WebMessage"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.web/MessagePort_PostMessage_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.web/MessagePortReceiveMessageResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationController.GoBack",
+        "strictness": "strict",
         "ordinal": "3084083444781194296",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationController.GoForward",
+        "strictness": "strict",
         "ordinal": "4171648912326535041",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationController.LoadUrl",
+        "strictness": "strict",
         "ordinal": "8715216289562165634",
-        "type": "(string:65536 url,fuchsia.web/LoadUrlParams params) -> (fuchsia.web/NavigationController_LoadUrl_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.web/NavigationControllerLoadUrlRequest",
+        "response": "fuchsia.web/NavigationController_LoadUrl_Response",
+        "error": "fuchsia.web/NavigationControllerError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationController.Reload",
+        "strictness": "strict",
         "ordinal": "234097982314475264",
-        "type": "(fuchsia.web/ReloadType type)"
+        "direction": "one_way",
+        "request": "fuchsia.web/NavigationControllerReloadRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationController.Stop",
+        "strictness": "strict",
         "ordinal": "159931083016531946",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/NavigationController"
+        "name": "fuchsia.web/NavigationController",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -1032,25 +1546,31 @@
         "type": "int32"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.web/NavigationController_LoadUrl_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.web/NavigationController_LoadUrl_Result.err",
+        "kind": "struct/member",
+        "name": "fuchsia.web/NavigationControllerLoadUrlRequest.params",
         "ordinal": "2",
-        "type": "fuchsia.web/NavigationControllerError"
+        "type": "fuchsia.web/LoadUrlParams"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.web/NavigationController_LoadUrl_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.web/NavigationControllerLoadUrlRequest.url",
         "ordinal": "1",
-        "type": "fuchsia.web/NavigationController_LoadUrl_Response"
+        "type": "string:65536"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.web/NavigationController_LoadUrl_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.web/NavigationControllerLoadUrlRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/NavigationControllerReloadRequest.type",
+        "ordinal": "1",
+        "type": "fuchsia.web/ReloadType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/NavigationControllerReloadRequest"
     },
     {
         "kind": "union/member",
@@ -1067,18 +1587,22 @@
     {
         "kind": "union",
         "name": "fuchsia.web/NavigationDecision",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationEventListener.OnNavigationStateChanged",
+        "strictness": "strict",
         "ordinal": "4988518051185097654",
-        "type": "(fuchsia.web/NavigationState change) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.web/NavigationEventListenerOnNavigationStateChangedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/NavigationEventListener"
+        "name": "fuchsia.web/NavigationEventListener",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "bits/member",
@@ -1090,6 +1614,17 @@
         "name": "fuchsia.web/NavigationEventListenerFlags",
         "strictness": "strict",
         "type": "uint64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/NavigationEventListenerOnNavigationStateChangedRequest.change",
+        "ordinal": "1",
+        "type": "fuchsia.web/NavigationState"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/NavigationEventListenerOnNavigationStateChangedRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "bits/member",
@@ -1120,12 +1655,38 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/NavigationPolicyProvider.EvaluateRequestedNavigation",
+        "strictness": "strict",
         "ordinal": "6072096192420188854",
-        "type": "(fuchsia.web/RequestedNavigation requested_navigation) -> (fuchsia.web/NavigationDecision decision)"
+        "direction": "two_way",
+        "request": "fuchsia.web/NavigationPolicyProviderEvaluateRequestedNavigationRequest",
+        "response": "fuchsia.web/NavigationPolicyProviderEvaluateRequestedNavigationResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/NavigationPolicyProvider"
+        "name": "fuchsia.web/NavigationPolicyProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/NavigationPolicyProviderEvaluateRequestedNavigationRequest.requested_navigation",
+        "ordinal": "1",
+        "type": "fuchsia.web/RequestedNavigation"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/NavigationPolicyProviderEvaluateRequestedNavigationRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/NavigationPolicyProviderEvaluateRequestedNavigationResponse.decision",
+        "ordinal": "1",
+        "type": "fuchsia.web/NavigationDecision"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/NavigationPolicyProviderEvaluateRequestedNavigationResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -1203,8 +1764,8 @@
     {
         "kind": "union",
         "name": "fuchsia.web/OutgoingTransferable",
-        "resourceness": "resource",
-        "strictness": "flexible"
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -1294,12 +1855,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.web/PopupFrameCreationListener.OnPopupFrameCreated",
+        "strictness": "strict",
         "ordinal": "1851562631161453905",
-        "type": "(client_end:fuchsia.web/Frame frame,fuchsia.web/PopupFrameCreationInfo info) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.web/PopupFrameCreationListenerOnPopupFrameCreatedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.web/PopupFrameCreationListener"
+        "name": "fuchsia.web/PopupFrameCreationListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/PopupFrameCreationListenerOnPopupFrameCreatedRequest.frame",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.web/Frame"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.web/PopupFrameCreationListenerOnPopupFrameCreatedRequest.info",
+        "ordinal": "2",
+        "type": "fuchsia.web/PopupFrameCreationInfo"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.web/PopupFrameCreationListenerOnPopupFrameCreatedRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",

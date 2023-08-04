@@ -19,24 +19,53 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/AnnotationController.GetAnnotations",
+        "strictness": "strict",
         "ordinal": "785749591841055994",
-        "type": "() -> (fuchsia.element/AnnotationController_GetAnnotations_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.element/AnnotationController_GetAnnotations_Response",
+        "error": "fuchsia.element/GetAnnotationsError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/AnnotationController.UpdateAnnotations",
+        "strictness": "strict",
         "ordinal": "6276017981234660998",
-        "type": "(vector<fuchsia.element/Annotation>:1024 annotations_to_set,vector<fuchsia.element/AnnotationKey>:1024 annotations_to_delete) -> (fuchsia.element/AnnotationController_UpdateAnnotations_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.element/AnnotationControllerUpdateAnnotationsRequest",
+        "response": "fuchsia.element/AnnotationController_UpdateAnnotations_Response",
+        "error": "fuchsia.element/UpdateAnnotationsError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/AnnotationController.WatchAnnotations",
+        "strictness": "strict",
         "ordinal": "2682765957598885231",
-        "type": "() -> (fuchsia.element/AnnotationController_WatchAnnotations_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.element/AnnotationController_WatchAnnotations_Response",
+        "error": "fuchsia.element/WatchAnnotationsError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.element/AnnotationController"
+        "name": "fuchsia.element/AnnotationController",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/AnnotationControllerUpdateAnnotationsRequest.annotations_to_delete",
+        "ordinal": "2",
+        "type": "vector<fuchsia.element/AnnotationKey>:1024"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/AnnotationControllerUpdateAnnotationsRequest.annotations_to_set",
+        "ordinal": "1",
+        "type": "vector<fuchsia.element/Annotation>:1024"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.element/AnnotationControllerUpdateAnnotationsRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -50,45 +79,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.element/AnnotationController_GetAnnotations_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.element/GetAnnotationsError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/AnnotationController_GetAnnotations_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.element/AnnotationController_GetAnnotations_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.element/AnnotationController_GetAnnotations_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.element/AnnotationController_UpdateAnnotations_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/AnnotationController_UpdateAnnotations_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.element/UpdateAnnotationsError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/AnnotationController_UpdateAnnotations_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.element/AnnotationController_UpdateAnnotations_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.element/AnnotationController_UpdateAnnotations_Result",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.element/AnnotationController_WatchAnnotations_Response.annotations",
         "ordinal": "1",
@@ -98,24 +88,6 @@
         "kind": "struct",
         "name": "fuchsia.element/AnnotationController_WatchAnnotations_Response",
         "resourceness": "resource"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/AnnotationController_WatchAnnotations_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.element/WatchAnnotationsError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/AnnotationController_WatchAnnotations_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.element/AnnotationController_WatchAnnotations_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.element/AnnotationController_WatchAnnotations_Result",
-        "resourceness": "resource",
-        "strictness": "strict"
     },
     {
         "kind": "struct/member",
@@ -148,30 +120,42 @@
     {
         "kind": "union",
         "name": "fuchsia.element/AnnotationValue",
-        "resourceness": "resource",
-        "strictness": "strict"
+        "strictness": "strict",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/Controller.GetAnnotations",
+        "strictness": "strict",
         "ordinal": "785749591841055994",
-        "type": "() -> (fuchsia.element/AnnotationController_GetAnnotations_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.element/AnnotationController_GetAnnotations_Response",
+        "error": "fuchsia.element/GetAnnotationsError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/Controller.UpdateAnnotations",
+        "strictness": "strict",
         "ordinal": "6276017981234660998",
-        "type": "(vector<fuchsia.element/Annotation>:1024 annotations_to_set,vector<fuchsia.element/AnnotationKey>:1024 annotations_to_delete) -> (fuchsia.element/AnnotationController_UpdateAnnotations_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.element/AnnotationControllerUpdateAnnotationsRequest",
+        "response": "fuchsia.element/AnnotationController_UpdateAnnotations_Response",
+        "error": "fuchsia.element/UpdateAnnotationsError"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/Controller.WatchAnnotations",
+        "strictness": "strict",
         "ordinal": "2682765957598885231",
-        "type": "() -> (fuchsia.element/AnnotationController_WatchAnnotations_Result result)"
+        "direction": "two_way",
+        "response": "fuchsia.element/AnnotationController_WatchAnnotations_Response",
+        "error": "fuchsia.element/WatchAnnotationsError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.element/Controller"
+        "name": "fuchsia.element/Controller",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "enum/member",
@@ -187,33 +171,41 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/GraphicalPresenter.PresentView",
+        "strictness": "strict",
         "ordinal": "4134377975219137658",
-        "type": "(fuchsia.element/ViewSpec view_spec,client_end:<fuchsia.element/AnnotationController,optional> annotation_controller,server_end:<fuchsia.element/ViewController,optional> view_controller_request) -> (fuchsia.element/GraphicalPresenter_PresentView_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.element/GraphicalPresenterPresentViewRequest",
+        "response": "fuchsia.element/GraphicalPresenter_PresentView_Response",
+        "error": "fuchsia.element/PresentViewError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.element/GraphicalPresenter"
+        "name": "fuchsia.element/GraphicalPresenter",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/GraphicalPresenterPresentViewRequest.annotation_controller",
+        "ordinal": "2",
+        "type": "client_end:<fuchsia.element/AnnotationController,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/GraphicalPresenterPresentViewRequest.view_controller_request",
+        "ordinal": "3",
+        "type": "server_end:<fuchsia.element/ViewController,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/GraphicalPresenterPresentViewRequest.view_spec",
+        "ordinal": "1",
+        "type": "fuchsia.element/ViewSpec"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.element/GraphicalPresenter_PresentView_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/GraphicalPresenter_PresentView_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.element/PresentViewError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/GraphicalPresenter_PresentView_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.element/GraphicalPresenter_PresentView_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.element/GraphicalPresenter_PresentView_Result",
-        "strictness": "strict"
+        "name": "fuchsia.element/GraphicalPresenterPresentViewRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "const",
@@ -236,33 +228,35 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/Manager.ProposeElement",
+        "strictness": "strict",
         "ordinal": "3096055942164494594",
-        "type": "(fuchsia.element/Spec spec,server_end:<fuchsia.element/Controller,optional> controller) -> (fuchsia.element/Manager_ProposeElement_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.element/ManagerProposeElementRequest",
+        "response": "fuchsia.element/Manager_ProposeElement_Response",
+        "error": "fuchsia.element/ProposeElementError"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.element/Manager"
+        "name": "fuchsia.element/Manager",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/ManagerProposeElementRequest.controller",
+        "ordinal": "2",
+        "type": "server_end:<fuchsia.element/Controller,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.element/ManagerProposeElementRequest.spec",
+        "ordinal": "1",
+        "type": "fuchsia.element/Spec"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.element/Manager_ProposeElement_Response"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/Manager_ProposeElement_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.element/ProposeElementError"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.element/Manager_ProposeElement_Result.response",
-        "ordinal": "1",
-        "type": "fuchsia.element/Manager_ProposeElement_Response"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.element/Manager_ProposeElement_Result",
-        "strictness": "strict"
+        "name": "fuchsia.element/ManagerProposeElementRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -339,18 +333,22 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/ViewController.Dismiss",
+        "strictness": "strict",
         "ordinal": "8737091014927688668",
-        "type": "()"
+        "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.element/ViewController.OnPresented",
+        "strictness": "strict",
         "ordinal": "2780830280981885109",
-        "type": " -> ()"
+        "direction": "event"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.element/ViewController"
+        "name": "fuchsia.element/ViewController",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "table/member",

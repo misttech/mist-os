@@ -23,22 +23,51 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.memorypressure/Provider.RegisterWatcher",
+        "strictness": "strict",
         "ordinal": "657074398568309929",
-        "type": "(client_end:fuchsia.memorypressure/Watcher watcher)"
+        "direction": "one_way",
+        "request": "fuchsia.memorypressure/ProviderRegisterWatcherRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.memorypressure/Provider"
+        "name": "fuchsia.memorypressure/Provider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.memorypressure/ProviderRegisterWatcherRequest.watcher",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.memorypressure/Watcher"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.memorypressure/ProviderRegisterWatcherRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.memorypressure/Watcher.OnLevelChanged",
+        "strictness": "strict",
         "ordinal": "6184947877153341145",
-        "type": "(fuchsia.memorypressure/Level level) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.memorypressure/WatcherOnLevelChangedRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.memorypressure/Watcher"
+        "name": "fuchsia.memorypressure/Watcher",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.memorypressure/WatcherOnLevelChangedRequest.level",
+        "ordinal": "1",
+        "type": "fuchsia.memorypressure/Level"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.memorypressure/WatcherOnLevelChangedRequest"
     },
     {
         "kind": "library",

@@ -48,12 +48,37 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input3/KeyEventInjector.Inject",
+        "strictness": "strict",
         "ordinal": "2212042399155652937",
-        "type": "(fuchsia.ui.input3/KeyEvent key_event) -> (fuchsia.ui.input3/KeyEventStatus status)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.input3/KeyEventInjectorInjectRequest",
+        "response": "fuchsia.ui.input3/KeyEventInjectorInjectResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input3/KeyEventInjector"
+        "name": "fuchsia.ui.input3/KeyEventInjector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input3/KeyEventInjectorInjectRequest.key_event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input3/KeyEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input3/KeyEventInjectorInjectRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input3/KeyEventInjectorInjectResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input3/KeyEventStatus"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input3/KeyEventInjectorInjectResponse"
     },
     {
         "kind": "enum/member",
@@ -117,22 +142,68 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input3/Keyboard.AddListener",
+        "strictness": "strict",
         "ordinal": "4306977845568814370",
-        "type": "(fuchsia.ui.views/ViewRef view_ref,client_end:fuchsia.ui.input3/KeyboardListener listener) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.ui.input3/KeyboardAddListenerRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input3/Keyboard"
+        "name": "fuchsia.ui.input3/Keyboard",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input3/KeyboardAddListenerRequest.listener",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.ui.input3/KeyboardListener"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input3/KeyboardAddListenerRequest.view_ref",
+        "ordinal": "1",
+        "type": "fuchsia.ui.views/ViewRef"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input3/KeyboardAddListenerRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.ui.input3/KeyboardListener.OnKeyEvent",
+        "strictness": "strict",
         "ordinal": "3383028051256316051",
-        "type": "(fuchsia.ui.input3/KeyEvent event) -> (fuchsia.ui.input3/KeyEventStatus status)"
+        "direction": "two_way",
+        "request": "fuchsia.ui.input3/KeyboardListenerOnKeyEventRequest",
+        "response": "fuchsia.ui.input3/KeyboardListenerOnKeyEventResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.ui.input3/KeyboardListener"
+        "name": "fuchsia.ui.input3/KeyboardListener",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input3/KeyboardListenerOnKeyEventRequest.event",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input3/KeyEvent"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input3/KeyboardListenerOnKeyEventRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.input3/KeyboardListenerOnKeyEventResponse.status",
+        "ordinal": "1",
+        "type": "fuchsia.ui.input3/KeyEventStatus"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.input3/KeyboardListenerOnKeyEventResponse"
     },
     {
         "kind": "bits/member",

@@ -12,12 +12,33 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.update/AttemptsMonitor.OnStart",
+        "strictness": "strict",
         "ordinal": "8496722247515178772",
-        "type": "(fuchsia.update/AttemptOptions options,server_end:fuchsia.update/Monitor monitor) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.update/AttemptsMonitorOnStartRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.update/AttemptsMonitor"
+        "name": "fuchsia.update/AttemptsMonitor",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/AttemptsMonitorOnStartRequest.monitor",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.update/Monitor"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/AttemptsMonitorOnStartRequest.options",
+        "ordinal": "1",
+        "type": "fuchsia.update/AttemptOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.update/AttemptsMonitorOnStartRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "enum/member",
@@ -68,12 +89,27 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.update/CommitStatusProvider.IsCurrentSystemCommitted",
+        "strictness": "strict",
         "ordinal": "5569020245381897649",
-        "type": "() -> (zx/Handle:EVENTPAIR event)"
+        "direction": "two_way",
+        "response": "fuchsia.update/CommitStatusProviderIsCurrentSystemCommittedResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.update/CommitStatusProvider"
+        "name": "fuchsia.update/CommitStatusProvider",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/CommitStatusProviderIsCurrentSystemCommittedResponse.event",
+        "ordinal": "1",
+        "type": "zx/Handle:EVENTPAIR"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.update/CommitStatusProviderIsCurrentSystemCommittedResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "table",
@@ -173,55 +209,96 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.update/Manager.CheckNow",
+        "strictness": "strict",
         "ordinal": "5357633357480737704",
-        "type": "(fuchsia.update/CheckOptions options,client_end:<fuchsia.update/Monitor,optional> monitor) -> (fuchsia.update/Manager_CheckNow_Result result)"
+        "direction": "two_way",
+        "request": "fuchsia.update/ManagerCheckNowRequest",
+        "response": "fuchsia.update/Manager_CheckNow_Response",
+        "error": "fuchsia.update/CheckNotStartedReason"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.update/Manager.MonitorAllUpdateChecks",
+        "strictness": "strict",
         "ordinal": "4858204286291744139",
-        "type": "(client_end:fuchsia.update/AttemptsMonitor attempts_monitor)"
+        "direction": "one_way",
+        "request": "fuchsia.update/ManagerMonitorAllUpdateChecksRequest"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.update/Manager.PerformPendingReboot",
+        "strictness": "strict",
         "ordinal": "7617790142625908637",
-        "type": "() -> (bool rebooting)"
+        "direction": "two_way",
+        "response": "fuchsia.update/ManagerPerformPendingRebootResponse"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.update/Manager"
+        "name": "fuchsia.update/Manager",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/ManagerCheckNowRequest.monitor",
+        "ordinal": "2",
+        "type": "client_end:<fuchsia.update/Monitor,optional>"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/ManagerCheckNowRequest.options",
+        "ordinal": "1",
+        "type": "fuchsia.update/CheckOptions"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.update/Manager_CheckNow_Response"
+        "name": "fuchsia.update/ManagerCheckNowRequest",
+        "resourceness": "resource"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.update/Manager_CheckNow_Result.err",
-        "ordinal": "2",
-        "type": "fuchsia.update/CheckNotStartedReason"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.update/Manager_CheckNow_Result.response",
+        "kind": "struct/member",
+        "name": "fuchsia.update/ManagerMonitorAllUpdateChecksRequest.attempts_monitor",
         "ordinal": "1",
-        "type": "fuchsia.update/Manager_CheckNow_Response"
+        "type": "client_end:fuchsia.update/AttemptsMonitor"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.update/Manager_CheckNow_Result",
-        "strictness": "strict"
+        "kind": "struct",
+        "name": "fuchsia.update/ManagerMonitorAllUpdateChecksRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/ManagerPerformPendingRebootResponse.rebooting",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.update/ManagerPerformPendingRebootResponse"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.update/Monitor.OnState",
+        "strictness": "strict",
         "ordinal": "7871435404436838196",
-        "type": "(fuchsia.update/State state) -> ()"
+        "direction": "two_way",
+        "request": "fuchsia.update/MonitorOnStateRequest"
     },
     {
         "kind": "protocol",
-        "name": "fuchsia.update/Monitor"
+        "name": "fuchsia.update/Monitor",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.update/MonitorOnStateRequest.state",
+        "ordinal": "1",
+        "type": "fuchsia.update/State"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.update/MonitorOnStateRequest"
     },
     {
         "kind": "table",
