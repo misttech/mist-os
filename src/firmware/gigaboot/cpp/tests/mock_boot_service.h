@@ -141,24 +141,29 @@ bool IsProtocol(const efi_guid& guid) {
 // A mock boot service implementation backed by `class Device` base objects.
 class MockStubService : public efi::StubBootServices {
  public:
-  virtual efi_status LocateProtocol(const efi_guid* protocol, void* registration,
-                                    void** intf) override;
-  virtual efi_status LocateHandleBuffer(efi_locate_search_type search_type,
-                                        const efi_guid* protocol, void* search_key,
-                                        size_t* num_handles, efi_handle** buf) override;
+  efi_status LocateProtocol(const efi_guid* protocol, void* registration, void** intf) override;
+  efi_status LocateHandleBuffer(efi_locate_search_type search_type, const efi_guid* protocol,
+                                void* search_key, size_t* num_handles, efi_handle** buf) override;
 
-  virtual efi_status OpenProtocol(efi_handle handle, const efi_guid* protocol, void** intf,
-                                  efi_handle agent_handle, efi_handle controller_handle,
-                                  uint32_t attributes) override;
+  efi_status OpenProtocol(efi_handle handle, const efi_guid* protocol, void** intf,
+                          efi_handle agent_handle, efi_handle controller_handle,
+                          uint32_t attributes) override;
 
-  virtual efi_status CloseProtocol(efi_handle handle, const efi_guid* protocol,
-                                   efi_handle agent_handle, efi_handle controller_handle) override {
+  efi_status CloseProtocol(efi_handle handle, const efi_guid* protocol, efi_handle agent_handle,
+                           efi_handle controller_handle) override {
     return EFI_SUCCESS;
   }
 
-  virtual efi_status GetMemoryMap(size_t* memory_map_size, efi_memory_descriptor* memory_map,
-                                  size_t* map_key, size_t* desc_size,
-                                  uint32_t* desc_version) override;
+  efi_status GetMemoryMap(size_t* memory_map_size, efi_memory_descriptor* memory_map,
+                          size_t* map_key, size_t* desc_size, uint32_t* desc_version) override;
+
+  efi_status CreateEvent(uint32_t type, efi_tpl notify_tpl, efi_event_notify notify_fn,
+                         void* notify_ctx, efi_event* event) override;
+
+  efi_status SetTimer(efi_event event, efi_timer_delay type, uint64_t trigger_time) override;
+
+  efi_status CloseEvent(efi_event event) override;
+  efi_status CheckEvent(efi_event event) override;
 
   void AddDevice(Device* device) { devices_.push_back(device); }
 
@@ -167,11 +172,22 @@ class MockStubService : public efi::StubBootServices {
     memory_map_ = memory_map;
   }
 
+  efi_status SetTimerRetVal(bool ready) {
+    efi_status previous_status = timer_retval_;
+    timer_retval_ = ready ? EFI_SUCCESS : EFI_NOT_READY;
+    return previous_status;
+  }
+
  private:
   std::vector<Device*> devices_;
-
-  size_t mkey_ = 0;
+  std::size_t mkey_ = 0;
   std::vector<efi_memory_descriptor> memory_map_;
+
+  efi_status timer_retval_ = EFI_SUCCESS;
+  // Next available value for an event handle.
+  // This precludes efficient key reuse, but it's simple,
+  // and it's extremely unlikely any one test is going to create that many timers.
+  uintptr_t event_counter_ = 1;
 };
 
 class EfiConfigTable {

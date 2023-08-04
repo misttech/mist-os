@@ -112,20 +112,6 @@ struct ndp_n_hdr_t {
 #define NDP_N_REDIRECTED_HDR 4
 #define NDP_N_MTU 5
 
-#ifndef ntohs
-#define ntohs(n) _swap16(n)
-#define htons(n) _swap16(n)
-static inline uint16_t _swap16(uint16_t n) { return ((uint16_t)(n >> 8)) | ((uint16_t)(n << 8)); }
-#endif
-
-#ifndef ntohl
-#define ntohl(n) _swap32(n)
-#define htonl(n) _swap32(n)
-static inline uint32_t _swap32(uint32_t n) {
-  return (n >> 24) | ((n >> 8) & 0xFF00) | ((n & 0xFF00) << 8) | (n << 24);
-}
-#endif
-
 // Formats an IP6 address into the provided buffer (which must be
 // at least IP6TOAMAX bytes in size), and returns the buffer address.
 char* ip6toa(char* _out, void* ip6addr);

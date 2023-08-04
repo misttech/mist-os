@@ -270,6 +270,36 @@ efi_status MockStubService::GetMemoryMap(size_t* memory_map_size, efi_memory_des
   return EFI_SUCCESS;
 }
 
+efi_status MockStubService::CreateEvent(uint32_t type, efi_tpl notify_tpl,
+                                        efi_event_notify notify_fn, void* notify_ctx,
+                                        efi_event* event) {
+  // Only deal with timers and signals for the time being.
+  if (!(type & (EVT_TIMER | EVT_NOTIFY_SIGNAL)) || event == nullptr) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  *event = reinterpret_cast<efi_event>(event_counter_++);
+  return EFI_SUCCESS;
+}
+
+efi_status MockStubService::SetTimer(efi_event event, efi_timer_delay type, uint64_t trigger_time) {
+  // Very quick and dirty check that this is a valid event.
+  return (reinterpret_cast<uintptr_t>(event) < event_counter_) ? EFI_SUCCESS
+                                                               : EFI_INVALID_PARAMETER;
+}
+
+efi_status MockStubService::CloseEvent(efi_event event) {
+  // Very quick and dirty check that this is a valid event.
+  return (reinterpret_cast<uintptr_t>(event) < event_counter_) ? EFI_SUCCESS
+                                                               : EFI_INVALID_PARAMETER;
+}
+
+efi_status MockStubService::CheckEvent(efi_event event) {
+  // Very quick and dirty check that this is a valid event.
+  return (reinterpret_cast<uintptr_t>(event) < event_counter_) ? timer_retval_
+                                                               : EFI_INVALID_PARAMETER;
+}
+
 void SetGptEntryName(const char* name, gpt_entry_t& entry) {
   size_t dst_len = sizeof(entry.name) / sizeof(uint16_t);
   utf8_to_utf16(reinterpret_cast<const uint8_t*>(name), strlen(name),

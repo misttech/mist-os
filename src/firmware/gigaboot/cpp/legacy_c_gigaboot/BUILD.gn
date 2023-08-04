@@ -22,14 +22,12 @@ config("legacy_includes") {
 # toolchain
 source_set("legacy_c_gigaboot") {
   sources = [
-    "$dir_gigaboot/lib/inet.c",
     "$dir_gigaboot/lib/printf.c",
     "$dir_gigaboot/lib/stdlib.c",
     "$dir_gigaboot/lib/xefi.c",
     "$dir_gigaboot/src/abr.c",
     "$dir_gigaboot/src/device_id.c",
     "$dir_gigaboot/src/inet6.c",
-    "$dir_gigaboot/src/mdns.c",
     "$dir_gigaboot/src/netifc.c",
     "$dir_gigaboot/src/tcp.c",
     "$dir_gigaboot/src/zircon.c",

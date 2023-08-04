@@ -4,6 +4,8 @@
 
 #include "network.h"
 
+#include <numeric>
+
 #include <efi/protocol/managed-network.h>
 #include <gigaboot/cpp/utils.h>
 
@@ -12,7 +14,7 @@ namespace gigaboot {
 namespace {
 
 // Given an efi_mac_addr, return a 6 byte octet "real" MAC address.
-MacAddr mac_addr_from_efi_mac_addr(efi_mac_addr const& addr) {
+MacAddr MacAddrFromEfiMacAddr(efi_mac_addr const& addr) {
   MacAddr eth;
   static_assert(sizeof(addr.addr) >= eth.size(), "Error: source MAC is too small");
   std::copy(std::cbegin(addr.addr), std::cbegin(addr.addr) + eth.size(), std::begin(eth));
@@ -20,7 +22,7 @@ MacAddr mac_addr_from_efi_mac_addr(efi_mac_addr const& addr) {
 }
 
 // Given a "real" MAC address, return an efi_mac_addr.
-efi_mac_addr efi_mac_addr_from_mac_addr(MacAddr addr) {
+efi_mac_addr EfiMacAddrFromMacAddr(MacAddr addr) {
   efi_mac_addr eth = {};
   static_assert(addr.size() <= sizeof(eth.addr), "Error: source MAC is too large");
   std::copy(addr.cbegin(), addr.cend(), std::begin(eth.addr));
@@ -74,6 +76,32 @@ EfiProtocolPtr<efi_managed_network_protocol> FindNetworkIntf() {
 
 }  // namespace
 
+Ip6Header::Ip6Header(uint16_t len, uint8_t next_hdr, const Ip6Addr& src, const Ip6Addr& dst)
+    : vtcf(htonl(6 << 28)),
+      length(htons(len)),
+      next_header(next_hdr),
+      hop_limit(0xFF),
+      source(src),
+      dest(dst) {}
+
+uint16_t CalculateChecksum(cpp20::span<const uint8_t> data, uint64_t start) {
+  cpp20::span<const uint16_t> tmp(reinterpret_cast<const uint16_t*>(data.data()),
+                                  data.size() / sizeof(uint16_t));
+  // The start and result are wider than a u16 to properly hold the overflow bits
+  // from 1s complement addition.
+  uint64_t sum = std::reduce(tmp.begin(), tmp.end(), start);
+  if (data.size() % 2 == 1) {
+    sum += data.back();
+  }
+
+  // 1s complement addition works by wrapping overflow bits and adding them.
+  while (sum > 0xFFFF) {
+    sum = (sum & 0xFFFF) + (sum >> 16);
+  }
+
+  return static_cast<uint16_t>(sum);
+}
+
 fit::result<efi_status, EthernetAgent> EthernetAgent::Create() {
   EfiProtocolPtr<efi_managed_network_protocol> mnp = FindNetworkIntf();
   if (!mnp) {
@@ -86,11 +114,11 @@ fit::result<efi_status, EthernetAgent> EthernetAgent::Create() {
     return fit::error(res);
   }
 
-  MacAddr mac_addr = mac_addr_from_efi_mac_addr(snp_data.CurrentAddress);
+  MacAddr mac_addr = MacAddrFromEfiMacAddr(snp_data.CurrentAddress);
   return fit::ok(EthernetAgent(std::move(mnp), mac_addr));
 }
 
-fit::result<efi_status> EthernetAgent::SendV6Frame(
+fit::result<efi_status> EthernetAgent::SendV6LocalFrame(
     MacAddr dst, cpp20::span<const uint8_t> data, efi_event callback,
     efi_managed_network_sync_completion_token* token) {
   if (!token) {
@@ -101,8 +129,8 @@ fit::result<efi_status> EthernetAgent::SendV6Frame(
   // There is no obvious explanation for this discrepancy in the UEFI docs.
   // It's much more convenient to deal with normal sized MAC addresses, though,
   // so we convert to efi_mac_addr only when necessary.
-  efi_mac_addr dest = efi_mac_addr_from_mac_addr(dst);
-  efi_mac_addr src = efi_mac_addr_from_mac_addr(mac_addr_);
+  efi_mac_addr dest = EfiMacAddrFromMacAddr(dst);
+  efi_mac_addr src = EfiMacAddrFromMacAddr(mac_addr_);
   efi_managed_network_transmit_data tx_data = {
       .DestinationAddress = &dest,
       .SourceAddress = &src,

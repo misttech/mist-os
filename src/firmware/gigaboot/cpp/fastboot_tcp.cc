@@ -11,8 +11,8 @@
 
 #include "fastboot.h"
 #include "gigaboot/src/inet6.h"
-#include "gigaboot/src/mdns.h"
 #include "gigaboot/src/tcp.h"
+#include "mdns.h"
 #include "phys/efi/main.h"
 #include "zircon_boot_ops.h"
 
@@ -105,12 +105,19 @@ zx::result<> FastbootTcpMain() {
   }
 
   Fastboot fastboot({reinterpret_cast<uint8_t *>(download_buffer), kDownloadBufferSize}, zb_ops);
+  auto res = EthernetAgent::Create();
+  if (res.is_error()) {
+    printf("Error creating ethernet agent: %s\n", EfiStatusToString(res.error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
 
-  constexpr uint32_t namegen = 1;
-  mdns_start(namegen, /* fastboot_tcp = */ true);
-
+  EthernetAgent eth_agent = std::move(res.value());
+  MdnsAgent mdns_agent(eth_agent, gEfiSystemTable);
   while (true) {
-    mdns_poll(/* fastboot_tcp = */ true);
+    if (auto poll = mdns_agent.Poll(); poll.is_error()) {
+      printf("mDNS poll error: %s\n", EfiStatusToString(poll.error_value()));
+    }
+
     tcp6_result result = tcp6_accept(&fb_tcp_socket);
 
     if (result == TCP6_RESULT_SUCCESS) {
@@ -129,7 +136,6 @@ zx::result<> FastbootTcpMain() {
       if (disconnect_res != TCP6_RESULT_SUCCESS) {
         // Failed to disconnect; socket is in an unknown state and cannot be recovered. Do not
         // return; see notes at the beginning of function.
-        mdns_stop(/* fastboot_tcp = */ true);
         printf("FATAL: failed to disconnect socket, %d\n", disconnect_res);
         abort();
       }
@@ -138,8 +144,6 @@ zx::result<> FastbootTcpMain() {
   }
 
   gEfiSystemTable->BootServices->FreePages(download_buffer, kDownloadBufferPageCount);
-
-  mdns_stop(/* fastboot_tcp = */ true);
   while (true) {
     auto result = tcp6_close(&fb_tcp_socket);
     if (result == TCP6_RESULT_SUCCESS) {

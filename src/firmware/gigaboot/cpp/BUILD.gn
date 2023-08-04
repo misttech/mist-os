@@ -28,6 +28,8 @@ source_set("lib") {
     "gpt.h",
     "input.cc",
     "input.h",
+    "mdns.cc",
+    "mdns.h",
     "network.cc",
     "network.h",
     "partition.cc",
@@ -42,6 +44,7 @@ source_set("lib") {
     "//sdk/lib/fit",
     "//sdk/lib/zbi-format",
     "//src/firmware/gigaboot/lib:bootbyte",
+    "//src/firmware/gigaboot/lib:inet",
     "//src/firmware/lib/fastboot:fastboot-base",
     "//src/firmware/lib/storage",
     "//src/firmware/lib/zbi:in_tree",
@@ -58,13 +61,15 @@ source_set("lib") {
     "//zircon/third_party/ulib/cksum",
   ]
 
+  include_dirs = [ "../include" ]
+
   if (is_kernel) {
     public_deps += [
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
     ]
 
-    include_dirs = [ "//" ]  # utf_conversion isn't a proper library.
+    include_dirs += [ "//" ]  # utf_conversion isn't a proper library.
   }
 
   # UEFI does not require aligned access

@@ -13,6 +13,8 @@
 #error __ORDER_LITTLE_ENDIAN__ not defined!
 #endif
 
+#ifndef __MACH__
+
 uint16_t htons(uint16_t val) {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   return __builtin_bswap16(val);
@@ -32,3 +34,5 @@ uint32_t htonl(uint32_t val) {
 }
 
 uint32_t ntohl(uint32_t val) { return htonl(val); }
+
+#endif  // __MACH__
