@@ -2,11 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-_prebuilt_gcc_dir = "//prebuilt/third_party/gcc/$host_platform"
-
-_prebuilt_cipd_version =
-    read_file("$_prebuilt_gcc_dir/.versions/gcc.cipd_version", "json")
-
 declare_args() {
   # Directory where the GCC toolchain binaries ("gcc", "nm", etc.) are found.
   # This directory is expected to contain `aarch64-elf-*` and `x86_64-elf-*`
@@ -20,9 +15,19 @@ declare_args() {
 # toolchain, so that recompilations with the new compiler can be triggered.
 gcc_version_string = gcc_tool_dir
 
-if (gcc_tool_dir == "") {
-  gcc_tool_dir = "$_prebuilt_gcc_dir/bin"
-  gcc_version_string = _prebuilt_cipd_version.instance_id
+# TODO(https://fxbug.dev/116909): The `gcc` prebuilt is missing for mac-arm64.
+# This is currently not a blocker as Infra does not build with `gcc` on Mac,
+# but a developer might want to some day.
+if (host_platform != "mac-arm64") {
+  _prebuilt_gcc_dir = "//prebuilt/third_party/gcc/$host_platform"
+
+  _prebuilt_cipd_version =
+      read_file("$_prebuilt_gcc_dir/.versions/gcc.cipd_version", "json")
+
+  if (gcc_tool_dir == "") {
+    gcc_tool_dir = "$_prebuilt_gcc_dir/bin"
+    gcc_version_string = _prebuilt_cipd_version.instance_id
+  }
 }
 
 ifs_extra_switches = []

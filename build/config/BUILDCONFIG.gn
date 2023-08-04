@@ -1074,13 +1074,16 @@ foreach(_target_type,
           import("//build/config/clang/clang.gni")
           import("//build/toolchain/zircon/gcc.gni")
         }
-        _ignored_prefixes_allowlist = [
-          # The clang and gcc toolchains are identified by the "bin/"
-          # subdirectory of their installation, so the parent of that directory
-          # is what's in the ignored-prefixes list.
-          get_path_info(_ignored_prefixes_imports.clang_prefix, "dir"),
-          get_path_info(_ignored_prefixes_imports.gcc_tool_dir, "dir"),
-        ]
+
+        # The clang and gcc toolchains are identified by the "bin/"
+        # subdirectory of their installation, so the parent of that directory
+        # is what's in the ignored-prefixes list.
+        _ignored_prefixes_allowlist =
+            [ get_path_info(_ignored_prefixes_imports.clang_prefix, "dir") ]
+        if (is_gcc) {
+          _ignored_prefixes_allowlist +=
+              [ get_path_info(_ignored_prefixes_imports.gcc_tool_dir, "dir") ]
+        }
       }
       if (hermetic_toolchain) {
         if (!hermetic_deps ||
