@@ -767,27 +767,6 @@ impl Task {
         })
     }
 
-    /// Create a kernel task in the same ThreadGroup as the given `system_task`.
-    ///
-    /// There is no underlying Zircon thread to host the task.
-    pub fn create_kernel_thread(
-        system_task: &CurrentTask,
-        initial_name: CString,
-    ) -> Result<CurrentTask, Errno> {
-        Task::create_task(
-            system_task.kernel(),
-            initial_name,
-            Some(Arc::clone(system_task.fs())),
-            |_pid, _process_group| {
-                Ok(TaskInfo {
-                    thread: None,
-                    thread_group: Arc::clone(&system_task.thread_group),
-                    memory_manager: Arc::clone(&system_task.mm),
-                })
-            },
-        )
-    }
-
     fn create_task<F>(
         kernel: &Arc<Kernel>,
         initial_name: CString,
@@ -841,6 +820,57 @@ impl Task {
 
             pids.add_task(&temp_task);
             pids.add_thread_group(&current_task.thread_group);
+            Ok(())
+        });
+        Ok(current_task)
+    }
+
+    /// Create a kernel task in the same ThreadGroup as the given `system_task`.
+    ///
+    /// There is no underlying Zircon thread to host the task.
+    pub fn create_kernel_thread(
+        system_task: &CurrentTask,
+        initial_name: CString,
+    ) -> Result<CurrentTask, Errno> {
+        let mut pids = system_task.kernel().pids.write();
+        let pid = pids.allocate_pid();
+
+        let priority;
+        let uts_ns;
+        let default_timerslack_ns;
+        {
+            let state = system_task.read();
+            priority = state.priority;
+            uts_ns = state.uts_ns.clone();
+            default_timerslack_ns = state.default_timerslack_ns;
+        }
+
+        let current_task = CurrentTask::new(Self::new(
+            pid,
+            initial_name,
+            Arc::clone(&system_task.thread_group),
+            None,
+            FdTable::default(),
+            Arc::clone(&system_task.mm),
+            Some(Arc::clone(system_task.fs())),
+            system_task.creds(),
+            Arc::clone(&system_task.abstract_socket_namespace),
+            Arc::clone(&system_task.abstract_vsock_namespace),
+            None,
+            Default::default(),
+            None,
+            priority,
+            uts_ns,
+            false,
+            SeccompState::default(),
+            SeccompFilterContainer::default(),
+            UserAddress::NULL.into(),
+            default_timerslack_ns,
+        ));
+        release_on_error!(current_task, &(), {
+            let temp_task = current_task.temp_task();
+            current_task.thread_group.add(&temp_task)?;
+            pids.add_task(&temp_task);
             Ok(())
         });
         Ok(current_task)
