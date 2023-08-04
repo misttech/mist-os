@@ -150,7 +150,7 @@ elif [[ "${mode}" == netboot ]]; then
   jq_filter+=" | select(.bootserver_netboot != null)"
 elif [[ "${mode}" == flash ]]; then
   manifest="${IMAGES_JSON}"
-  paths+=("flash.sh")
+  paths+=("flash.sh" "flash.json")
   jq_filter+=" | select(.fastboot_flash != null)"
 elif [[ "${mode}" == mkzedboot ]]; then
   manifest="${IMAGES_JSON}"
