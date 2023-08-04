@@ -82,7 +82,7 @@ group("l1") {
     "//src/graphics/examples:vkcube-on-scenic",
     "//src/graphics/lib/magma/src/tools",
     "//src/lib/vulkan/tests:image-pipe-swapchain-tests",
-    "//src/ui:ui_packages",
+    "//src/ui:ui_package",
   ]
 }
 

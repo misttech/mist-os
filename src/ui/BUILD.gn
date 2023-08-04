@@ -52,14 +52,3 @@ fuchsia_package("ui_package") {
 
   deps = [ ":ui_component" ]
 }
-
-group("ui_packages") {
-  deps = [
-    ":ui_package",
-    "a11y",
-    "bin/scene_manager",
-    "bin/text:text_manager",
-    "bin/virtual_keyboard_manager",
-    "scenic",
-  ]
-}
