@@ -468,15 +468,25 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
 
   // Generic entry in the devicetree, maintains parent relationship and a view into the properties.
   struct CpuMapEntry {
+    // Type of the entry.
     TopologyEntryType type;
-    uint32_t parent_index;
+    // Index of the parent entry on the cpu map.
+    size_t parent_index;
+    // Index of the cluster entry where this node is contained within the cpu map.
     std::optional<uint32_t> cluster_index;
+    // 'phandle' obtained from the 'core' or 'thread' entries. Nodes containing this 'phandle'
+    // represent a processing unit, and are leaf nodes in the cpu map.
     std::optional<uint32_t> cpu_phandle;
+    // Index of the |CpuEntry| in the |cpus_| representing the resolved link of the |cpu_phandle|
+    // to a |cpu| node.
     std::optional<uint32_t> cpu_index;
+    // Index of |zbi_topology_node_t| in the |ZBI_ITEM_TYPE_CPU_TOPOLOGY| that was generated from
+    // this |CpuMapEntry|.
+    std::optional<size_t> topology_node_index;
   };
 
   // May only be called after |Init| and a full match sequence has been performed.
-  constexpr size_t node_element_count() const { return map_entry_count_; }
+  constexpr size_t node_element_count() const { return topology_node_count_; }
 
   devicetree::ScanState IncreaseEntryNodeCountFirstScan(const devicetree::NodePath& path,
                                                         const devicetree::PropertyDecoder& decoder);
@@ -533,6 +543,8 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   uint32_t cpu_entry_count_ = 0;
   uint32_t cpu_entry_index_ = 0;
   uint32_t cluster_count_ = 0;
+
+  size_t topology_node_count_ = 0;
 
   // Allocation is environment specific, so we delegate that to a lambda.
   mutable const DevicetreeBootShimAllocator* allocator_ = nullptr;
