@@ -5,6 +5,7 @@
 #include "src/lib/fidl_codec/library_loader.h"
 
 #include <zircon/assert.h>
+#include <zircon/rights.h>
 
 #include <fstream>
 #include <ios>
@@ -524,7 +525,8 @@ std::unique_ptr<Type> Library::TypeFromIdentifier(bool is_nullable, const std::s
   }
   Protocol* ifc;
   if (GetProtocolByName(identifier, &ifc)) {
-    return std::make_unique<HandleType>();
+    return std::make_unique<HandleType>(ZX_DEFAULT_CHANNEL_RIGHTS, ZX_OBJ_TYPE_CHANNEL,
+                                        is_nullable);
   }
   return std::make_unique<InvalidType>();
 }

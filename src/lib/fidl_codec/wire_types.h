@@ -22,6 +22,7 @@ namespace fidl_codec {
 // Transaction header size in bytes.
 constexpr uint32_t kTransactionHeaderSize = 16;
 
+class HandleType;
 class LibraryLoader;
 class StructType;
 class TableType;
@@ -46,6 +47,7 @@ class Type {
   virtual const UnionType* AsUnionType() const { return nullptr; }
   virtual const StructType* AsStructType() const { return nullptr; }
   virtual const TableType* AsTableType() const { return nullptr; }
+  virtual const HandleType* AsHandleType() const { return nullptr; }
 
   // Returns true if the type is a ArrayType.
   virtual bool IsArray() const { return false; }
@@ -407,6 +409,7 @@ class HandleType : public Type {
   bool Nullable() const override { return nullable_; }
   zx_obj_type_t ObjectType() const { return obj_type_.value_or(ZX_OBJ_TYPE_NONE); }
   zx_rights_t Rights() const { return rights_.value_or(ZX_RIGHT_SAME_RIGHTS); }
+  const HandleType* AsHandleType() const override { return this; }
 
  private:
   std::optional<zx_rights_t> rights_;
