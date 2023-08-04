@@ -10,7 +10,6 @@ source_set("sync-completion") {
     "completion_wrapper.cc",
   ]
   deps = [
-    "//src/lib/ddk",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
