@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/images/args.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
+import("//zircon/kernel/phys/efi/toolchain.gni")
 
 declare_args() {
   # If true, vboot() image builds print out the exact "futility" command line.
@@ -200,7 +201,8 @@ template("esp") {
     }
 
     if (use_gigaboot) {
-      gigaboot_target = "//src/firmware/gigaboot/cpp:fuchsia(//zircon/kernel/phys/efi:kernel.efi_${target_cpu})"
+      gigaboot_target =
+          "//src/firmware/gigaboot/cpp:fuchsia-efi($efi_toolchain)"
       gigaboot_bin = get_label_info(gigaboot_target, "root_out_dir") + "/" +
                      "fuchsia-efi.efi"
 
