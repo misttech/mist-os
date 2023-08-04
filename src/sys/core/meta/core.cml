@@ -681,5 +681,23 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            protocol: [
+                "fuchsia.virtualization.LinuxManager",
+                "fuchsia.virtualization.TerminaGuestManager",
+            ],
+            from: "#termina-guest-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.virtualization.DebianGuestManager" ],
+            from: "#debian-guest-manager",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.virtualization.ZirconGuestManager" ],
+            from: "#zircon-guest-manager",
+            source_availability: "unknown",
+        },
     ],
 }

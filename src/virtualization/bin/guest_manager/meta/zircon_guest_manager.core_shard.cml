@@ -86,10 +86,4 @@
             to: "#zircon-guest-manager",
         },
     ],
-    expose: [
-        {
-            protocol: [ "fuchsia.virtualization.ZirconGuestManager" ],
-            from: "#zircon-guest-manager",
-        },
-    ],
 }

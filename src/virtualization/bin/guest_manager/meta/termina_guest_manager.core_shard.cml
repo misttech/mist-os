@@ -96,13 +96,4 @@
             to: "#termina-guest-manager",
         },
     ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.virtualization.LinuxManager",
-                "fuchsia.virtualization.TerminaGuestManager",
-            ],
-            from: "#termina-guest-manager",
-        },
-    ],
 }

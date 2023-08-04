@@ -86,10 +86,4 @@
             to: "#debian-guest-manager",
         },
     ],
-    expose: [
-        {
-            protocol: [ "fuchsia.virtualization.DebianGuestManager" ],
-            from: "#debian-guest-manager",
-        },
-    ],
 }
