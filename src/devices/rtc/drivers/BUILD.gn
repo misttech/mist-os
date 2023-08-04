@@ -10,7 +10,7 @@ group("tests") {
     "pl031-rtc:tests",
   ]
 
-  if (current_cpu == "x64") {
+  if (target_cpu == "x64") {
     deps += [ "intel-rtc:tests" ]
   }
 }

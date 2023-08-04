@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-assert(current_cpu == "x64")
+assert(target_cpu == "x64")
 
 driver_bind_rules("intel_rtc_bind") {
   rules = "intel_rtc.bind"
