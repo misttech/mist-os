@@ -356,8 +356,7 @@ Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
       primary_index_(primary_index),
       node_manager_(node_manager),
       dispatcher_(dispatcher),
-      inspect_(std::move(inspect)),
-      tasks_(dispatcher) {
+      inspect_(std::move(inspect)) {
   ZX_ASSERT(primary_index_ == 0 || primary_index_ < parents_.size());
   if (auto primary_parent = GetPrimaryParent()) {
     // By default, we set `driver_host_` to match the primary parent's
@@ -375,8 +374,7 @@ Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
       node_manager_(node_manager),
       dispatcher_(dispatcher),
       driver_host_(driver_host),
-      inspect_(std::move(inspect)),
-      tasks_(dispatcher) {}
+      inspect_(std::move(inspect)) {}
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
@@ -1106,7 +1104,8 @@ void Node::ScheduleStopComponent() {
                 State2String(node_state_));
   node_state_ = NodeState::kWaitingOnDriverComponent;
   if (!driver_component_) {
-    tasks_.Post(fit::bind_member(this, &Node::FinishRemoval));
+    // TODO(fxb/130850): Move this call to an async task.
+    FinishRemoval();
     return;
   }
   // Send an epitaph to the component manager and close the connection. The

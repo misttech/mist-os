@@ -34,10 +34,7 @@ void NodeRemovalTracker::CheckRemovalDone() {
   }
   int pkg_count = 0, all_count = 0;
 
-  // TODO(fxb/130029): Temporary hack to potentially fix an ASAN error involving
-  // iterator invalidation.
-  auto nodes = nodes_;
-  for (const auto& [id, value] : nodes) {
+  for (const auto& [id, value] : nodes_) {
     const auto& [name, node_collection, state] = value;
     if (state != NodeState::kStopping) {
       all_count++;

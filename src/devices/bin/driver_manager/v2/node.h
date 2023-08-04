@@ -12,7 +12,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
-#include <lib/async_patterns/cpp/task_scope.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
 #include <list>
@@ -396,8 +395,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   DevfsDevice devfs_device_;
 
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
-
-  async_patterns::TaskScope tasks_;
 };
 
 }  // namespace dfv2
