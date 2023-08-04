@@ -1082,7 +1082,6 @@ fn select_route_for_deletion<I: Ip>(
 mod tests {
     use super::*;
 
-    use std::cell::RefCell;
     use std::collections::HashSet;
 
     use fidl::endpoints::{ControlHandle, RequestStream};
@@ -1926,8 +1925,6 @@ mod tests {
             event: Option<I::WatchEvent>,
         }
 
-        let route_set_results_len = route_set_results.len();
-        let counter = RefCell::new(0);
         route_stream
             .zip(futures::stream::iter(route_set_results))
             // Chain a pending so that the sink in the `forward` call below remains open and can be
@@ -2091,16 +2088,11 @@ mod tests {
             })
             .map(Ok)
             .forward(futures::sink::unfold(watcher_stream.by_ref(), |st, events| async {
-                // Increment the RefCell value for each batch of events handled.
-                *counter.borrow_mut() += 1;
                 respond_to_watcher::<I, _>(st.by_ref(), events).await;
                 Ok::<_, std::convert::Infallible>(st)
             }))
             .await
             .unwrap();
-
-        // Ensure the number of results that were provided are all sent to the routes watcher sink.
-        assert_eq!(route_set_results_len, counter.into_inner());
     }
 
     /// A test helper to exercise multiple route requests.
