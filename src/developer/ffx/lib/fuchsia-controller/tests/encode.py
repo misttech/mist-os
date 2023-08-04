@@ -134,7 +134,8 @@ class Encode(common.FuchsiaControllerTest):
             ordinal=9999,
         )
         self.assertEqual(b, EXPECTED)
-        self.assertEqual(h, [5])
+        self.assertEqual(len(h), 1)
+        self.assertEqual(h[0][1], 5)
 
     def test_encode_decode_handle(self):
         obj = EncodeObj()
@@ -147,7 +148,8 @@ class Encode(common.FuchsiaControllerTest):
             ordinal=method_ordinal(
                 protocol="fuchsia.controller.test/Noop", method="DoHandleNoop"),
         )
-        msg = decode_fidl_request(bytes=b, handles=h)
+        updated_handles = [hdl[1] for hdl in h]
+        msg = decode_fidl_request(bytes=b, handles=updated_handles)
         self.assertEqual(msg, {"server_end": 10})
 
     def test_encode_string_vector(self):

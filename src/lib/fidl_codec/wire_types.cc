@@ -1048,7 +1048,19 @@ std::unique_ptr<Type> Type::GetType(LibraryLoader* loader, const rapidjson::Valu
     return std::make_unique<StringType>();
   }
   if (kind == "handle") {
-    return std::make_unique<HandleType>();
+    // For some reason object type and rights are stored as strings.
+    std::string rights_string = type["rights"].GetString();
+    std::string obj_type_string = type["obj_type"].GetString();
+    bool nullable = type["nullable"].GetBool();
+    std::optional<zx_obj_type_t> rights;
+    if (auto rights_int = std::atoi(rights_string.c_str()); rights_int != -1) {
+      rights = std::optional<zx_rights_t>(static_cast<zx_obj_type_t>(rights_int));
+    }
+    std::optional<zx_obj_type_t> obj_type;
+    if (auto obj_type_int = std::atoi(obj_type_string.c_str()); obj_type_int != -1) {
+      obj_type = std::optional<zx_obj_type_t>(static_cast<zx_obj_type_t>(obj_type_int));
+    }
+    return std::make_unique<HandleType>(rights, obj_type, nullable);
   }
   if (kind == "array") {
     const rapidjson::Value& element_type = type["element_type"];

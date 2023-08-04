@@ -18,7 +18,7 @@ class Encoder : public Visitor {
  public:
   struct Result {
     std::vector<uint8_t> bytes;
-    std::vector<zx_handle_info_t> handles;
+    std::vector<zx_handle_disposition_t> handles;
   };
 
   WireVersion version() const { return version_; }
@@ -68,7 +68,7 @@ class Encoder : public Visitor {
   void VisitTableValue(const TableValue* node, const Type* for_type) override;
 
   std::vector<uint8_t> bytes_;
-  std::vector<zx_handle_info_t> handles_;
+  std::vector<zx_handle_disposition_t> handles_;
   // Offset we are currently using to write into the buffer.
   size_t current_offset_ = 0;
   // The version used to encode.

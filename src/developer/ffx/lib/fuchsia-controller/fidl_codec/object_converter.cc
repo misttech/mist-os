@@ -283,10 +283,12 @@ void ObjectConverter::VisitHandleType(const fidl_codec::HandleType* type) {
   if (handle == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
     return;
   }
-  // TODO(fxbug.dev/124288): Use the handle disposition properly. This is leaving it
-  // mostly blank.
   zx_handle_disposition_t handle_disp = {
+      .operation = ZX_HANDLE_OP_MOVE,
       .handle = handle,
+      .type = type->ObjectType(),
+      .rights = type->Rights(),
+      .result = ZX_OK,
   };
   result_ = std::make_unique<fidl_codec::HandleValue>(handle_disp);
 }

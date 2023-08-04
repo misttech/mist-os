@@ -72,16 +72,16 @@ PyObject *FidlChannel_write(FidlChannel *self, PyObject *buf) {
     if (obj == nullptr) {
       return nullptr;
     }
-    int res = PyObject_IsInstance(obj, PyObject_Type(reinterpret_cast<PyObject *>(self)));
-    if (res < 0) {
+    auto handle_obj = PyTuple_GetItem(obj, 1);
+    if (handle_obj == nullptr) {
       return nullptr;
     }
-    if (res != 1) {
-      PyErr_SetString(PyExc_TypeError, "All elements in list must be a FidlHandle type.");
+    zx_handle_t handle = convert::PyLong_AsU32(handle_obj);
+    if (handle == convert::MINUS_ONE_U32) {
       return nullptr;
     }
-    auto handle = reinterpret_cast<FidlChannel *>(obj);
-    c_handles[i] = handle->super.handle;
+    // TODO(b/289226682): Need to use some kind of write_etc implementation for this.
+    c_handles[i] = handle;
   }
   Py_buffer view;
   if (PyObject_GetBuffer(bytes, &view, PyBUF_CONTIG_RO) < 0) {

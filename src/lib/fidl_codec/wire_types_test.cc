@@ -82,4 +82,20 @@ TEST(ActualAndRequestedType, PrettyPrint) {
   EXPECT_EQ(os.str(), "0/0");
 }
 
+TEST(HandleType, DefaultConstructor) {
+  HandleType handle_type;
+  EXPECT_EQ(handle_type.Rights(), ZX_RIGHT_SAME_RIGHTS);
+  EXPECT_EQ(handle_type.Nullable(), false);
+  EXPECT_EQ(handle_type.ObjectType(), ZX_OBJ_TYPE_NONE);
+}
+
+TEST(HandleType, ConstructorWithValues) {
+  auto expected_rights = ZX_RIGHT_RESIZE | ZX_RIGHT_READ;
+  auto expected_type = ZX_OBJ_TYPE_CHANNEL;
+  HandleType handle_type(expected_rights, expected_type, true);
+  EXPECT_EQ(handle_type.Rights(), expected_rights);
+  EXPECT_EQ(handle_type.ObjectType(), expected_type);
+  EXPECT_EQ(handle_type.Nullable(), true);
+}
+
 }  // namespace fidl_codec

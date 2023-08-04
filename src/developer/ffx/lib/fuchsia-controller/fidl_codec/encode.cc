@@ -22,7 +22,9 @@ PyMethodDef encode_fidl_message_py_def = {
     "Encodes the FIDL wire format representation of the object. "
     "The only necessary fields are txid and ordinal. Everything else can be set to None. "
     "If the object field is not None, then all parameters are required. "
-    "If object is None, other optional parameters will be ignored."};
+    "If object is None, other optional parameters will be ignored. Returns a tuple. The first item "
+    "is a bytearray, the second is a tuple representing a handle disposition containing, in order "
+    " the operation, handle, type, rights, and result all as integers"};
 
 struct GetPayloadTypeArgs {
   PyObject *obj;
@@ -118,12 +120,35 @@ PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {
   }
   PyTuple_SET_ITEM(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < msg.handles.size(); ++i) {
-    // TODO(fxbug.dev/124288): Just assumes when encoding that everything here is an integer.
-    auto handle_obj = py::Object(PyLong_FromLong(msg.handles[i].handle));
-    if (handle_obj == nullptr) {
+    // This is currently done as a tuple, could also be done as a dict for better readability.
+    auto handle_tuple = py::Object(PyTuple_New(5));
+    auto handle_disp = msg.handles[i];
+    auto operation = py::Object(PyLong_FromLong(handle_disp.operation));
+    if (operation == nullptr) {
       return nullptr;
     }
-    PyList_SET_ITEM(handles_list.get(), static_cast<Py_ssize_t>(i), handle_obj.take());
+    PyTuple_SET_ITEM(handle_tuple.get(), 0, operation.take());
+    auto handle_value = py::Object(PyLong_FromLong(handle_disp.handle));
+    if (handle_value == nullptr) {
+      return nullptr;
+    }
+    PyTuple_SET_ITEM(handle_tuple.get(), 1, handle_value.take());
+    auto type = py::Object(PyLong_FromLong(handle_disp.type));
+    if (type == nullptr) {
+      return nullptr;
+    }
+    PyTuple_SET_ITEM(handle_tuple.get(), 2, type.take());
+    auto rights = py::Object(PyLong_FromLong(handle_disp.rights));
+    if (rights == nullptr) {
+      return nullptr;
+    }
+    PyTuple_SET_ITEM(handle_tuple.get(), 3, rights.take());
+    auto result = py::Object(PyLong_FromLong(handle_disp.result));
+    if (result == nullptr) {
+      return nullptr;
+    }
+    PyTuple_SET_ITEM(handle_tuple.get(), 4, result.take());
+    PyList_SET_ITEM(handles_list.get(), static_cast<Py_ssize_t>(i), handle_tuple.take());
   }
   PyTuple_SET_ITEM(res.get(), 1, handles_list.take());
   return res.take();

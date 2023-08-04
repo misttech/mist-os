@@ -162,8 +162,6 @@ class PythonDictVisitor : public fidl_codec::Visitor {
 
   void VisitHandleValue(const fidl_codec::HandleValue* handle,
                         const fidl_codec::Type* for_type) override {
-    // TODO(fxbug.dev/124288): Use the handle disposition properly. This is leaving it
-    // mostly blank, only copying the handle value explicitly.
     result_ = PyLong_FromUnsignedLongLong(handle->handle().handle);
   }
 
