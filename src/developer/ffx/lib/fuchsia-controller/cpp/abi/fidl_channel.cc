@@ -125,10 +125,11 @@ PyObject *FidlChannel_write(FidlChannel *self, PyObject *buf) {
   if (PyObject_GetBuffer(bytes, &view, PyBUF_CONTIG_RO) < 0) {
     return nullptr;
   }
-  if (ffx_channel_write_etc(mod::get_module_state()->ctx, self->super.handle,
-                            reinterpret_cast<const char *>(view.buf),
-                            static_cast<uint64_t>(view.len), c_handles, handles_len) != ZX_OK) {
-    mod::dump_python_err();
+  auto status = ffx_channel_write_etc(mod::get_module_state()->ctx, self->super.handle,
+                                      reinterpret_cast<const char *>(view.buf),
+                                      static_cast<uint64_t>(view.len), c_handles, handles_len);
+  if (status != ZX_OK) {
+    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
     PyBuffer_Release(&view);
     return nullptr;
   }
@@ -183,6 +184,28 @@ PyObject *FidlChannel_as_int(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
   return PyLong_FromUnsignedLongLong(self->super.handle);
 }
 
+// First arg in this function is FidlChannelType.
+PyObject *FidlChannel_create(PyObject *cls, PyObject *Py_UNUSED(arg)) {
+  zx_handle_t hdl0;
+  zx_handle_t hdl1;
+  ffx_channel_create(mod::get_module_state()->ctx, 0, &hdl0, &hdl1);
+  py::Object tuple(PyTuple_New(2));
+  if (tuple == nullptr) {
+    return nullptr;
+  }
+  py::Object handle_obj0(PyObject_CallFunction(cls, "I", hdl0));
+  if (handle_obj0 == nullptr) {
+    return nullptr;
+  }
+  py::Object handle_obj1(PyObject_CallFunction(cls, "I", hdl1));
+  if (handle_obj1 == nullptr) {
+    return nullptr;
+  }
+  PyTuple_SET_ITEM(tuple.get(), 0, handle_obj0.take());
+  PyTuple_SET_ITEM(tuple.get(), 1, handle_obj1.take());
+  return tuple.take();
+}
+
 PyObject *FidlChannel_take(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
   auto result = PyLong_FromUnsignedLongLong(self->super.handle);
   self->super.handle = 0;
@@ -196,6 +219,8 @@ PyMethodDef FidlChannel_methods[] = {
     {"take", reinterpret_cast<PyCFunction>(FidlChannel_take), METH_NOARGS,
      "Takes the underlying fidl handle, setting it internally to zero (thus invalidating the "
      "underlying channel). This is used for sending a handle through FIDL function calls."},
+    {"create", reinterpret_cast<PyCFunction>(FidlChannel_create), METH_NOARGS | METH_CLASS,
+     "classmethod for creating a pair of FIDL channels. These are connected bidirectionally."},
     {nullptr, nullptr, 0, nullptr}};
 
 DES_MIX PyTypeObject FidlChannelType = {

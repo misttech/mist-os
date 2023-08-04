@@ -40,6 +40,9 @@ extern zx_status_t ffx_connect_remote_control_proxy(ffx_env_context_t* ctx, zx_h
 extern zx_status_t ffx_connect_device_proxy(ffx_env_context_t* ctx, const char* moniker,
                                             const char* capability_name, zx_handle_t* out);
 extern void ffx_close_handle(zx_handle_t handle);
+
+extern void ffx_channel_create(ffx_lib_context_t* ctx, uint32_t options, zx_handle_t* out0,
+                               zx_handle_t* out1);
 extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
                                      const char* out_buf, uint64_t out_len, zx_handle_t* hdls,
                                      uint64_t hdls_len);
@@ -60,8 +63,10 @@ extern zx_status_t ffx_socket_write(ffx_lib_context_t* ctx, zx_handle_t handle, 
 extern int32_t ffx_connect_handle_notifier(ffx_lib_context_t* ctx);
 
 #ifdef __cplusplus
+
 }  // extern "C"
+
 #endif  // __cplusplus
 
-// LINT.ThenChange(../src/lib.rs)
+// LINT.ThenChange(../../src/lib.rs)
 #endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FUCHSIA_CONTROLLER_H_
