@@ -425,11 +425,11 @@ pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::Requ
     Ok((client.into_proxy()?, server.into_stream()?))
 }
 
-/// Indicates whether an unknown method is one-way or two-way.
+/// The type of a client-initiated method.
 #[derive(Copy, Clone, Debug)]
-pub enum UnknownMethodType {
-    /// Unknown method was one-way.
+pub enum MethodType {
+    /// One-way method, also known as fire-and-forget.
     OneWay,
-    /// Unknown method was two-way.
+    /// Two-way method.
     TwoWay,
 }

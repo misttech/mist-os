@@ -628,6 +628,7 @@ impl futures::Stream for ParentRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0xc3cd963aafc873b => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -644,6 +645,7 @@ impl futures::Stream for ParentRequestStream {
                     })
                 }
                 0xf38d08d64f71c79 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -660,6 +662,7 @@ impl futures::Stream for ParentRequestStream {
                     })
                 }
                 0x3e08fd7ca04b2290 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(ParentTakeChildRequest);
                     fidl::encoding::Decoder::decode_into::<ParentTakeChildRequest>(
                         &header,
@@ -671,6 +674,7 @@ impl futures::Stream for ParentRequestStream {
                     Ok(ParentRequest::TakeChild { c: req.c, control_handle })
                 }
                 0x2063f76b1bb45f87 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(ParentTakeChildRequestRequest);
                     fidl::encoding::Decoder::decode_into::<ParentTakeChildRequestRequest>(
                         &header,

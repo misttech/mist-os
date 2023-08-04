@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl::{
-        endpoints::{ControlHandle, UnknownMethodType},
-        AsHandleRef, Event, Status,
-    },
+    fidl::{endpoints::ControlHandle, AsHandleRef, Event, MethodType, Status},
     fidl_fidl_serversuite::{
         AjarTargetControlHandle, AjarTargetControllerControlHandle,
         AjarTargetControllerRequestStream, AjarTargetRequest, AjarTargetRequestStream,
@@ -21,7 +18,7 @@ use {
         OpenTargetFlexibleTwoWayFieldsErrRequest, OpenTargetRequest, OpenTargetRequestStream,
         OpenTargetServerPair, OpenTargetStrictTwoWayErrRequest,
         OpenTargetStrictTwoWayFieldsErrRequest, RunnerRequest, RunnerRequestStream, SendEventError,
-        Test, UnknownMethodType as DynsuiteUnknownMethodType, SERVER_SUITE_VERSION,
+        Test, UnknownMethodType, SERVER_SUITE_VERSION,
     },
     fuchsia_component::server::ServiceFs,
     futures::prelude::*,
@@ -30,9 +27,6 @@ use {
 const DISABLED_TESTS: &[Test] = &[
     // This is always disabled so that we can make sure IsTestEnabled() works.
     Test::IgnoreDisabled,
-    // TODO(fxbug.dev/120742): Should validate txid.
-    Test::OneWayWithNonZeroTxid,
-    Test::TwoWayNoPayloadWithZeroTxid,
     // TODO(fxbug.dev/99738): Should reject V1 wire format.
     Test::V1TwoWayNoPayload,
     Test::V1TwoWayStructPayload,
@@ -80,9 +74,9 @@ fn get_teardown_reason(error: Option<fidl::Error>) -> fidl_fidl_serversuite::Tea
         | fidl::Error::IncorrectHandleSubtype { .. }
         | fidl::Error::MissingExpectedHandleRights { .. } => TeardownReason::DecodingError,
 
-        fidl::Error::UnknownOrdinal { .. } | fidl::Error::InvalidResponseTxid { .. } => {
-            TeardownReason::UnexpectedMessage
-        }
+        fidl::Error::UnknownOrdinal { .. }
+        | fidl::Error::InvalidRequestTxid
+        | fidl::Error::InvalidResponseTxid => TeardownReason::UnexpectedMessage,
 
         fidl::Error::UnsupportedMethod { .. }
         | fidl::Error::ClientChannelClosed { .. }
@@ -228,7 +222,7 @@ async fn run_ajar_target_server(
         match request {
             AjarTargetRequest::_UnknownMethod { ordinal, .. } => {
                 ctl_handle
-                    .send_received_unknown_method(ordinal, DynsuiteUnknownMethodType::OneWay)
+                    .send_received_unknown_method(ordinal, UnknownMethodType::OneWay)
                     .unwrap();
             }
         }
@@ -314,10 +308,10 @@ async fn run_open_target_server(
                     responder.send(Err(reply_error)).unwrap();
                 }
             },
-            OpenTargetRequest::_UnknownMethod { ordinal, unknown_method_type, .. } => {
-                let unknown_method_type = match unknown_method_type {
-                    UnknownMethodType::OneWay => DynsuiteUnknownMethodType::OneWay,
-                    UnknownMethodType::TwoWay => DynsuiteUnknownMethodType::TwoWay,
+            OpenTargetRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                let unknown_method_type = match method_type {
+                    MethodType::OneWay => UnknownMethodType::OneWay,
+                    MethodType::TwoWay => UnknownMethodType::TwoWay,
                 };
                 ctl_handle.send_received_unknown_method(ordinal, unknown_method_type).unwrap();
             }

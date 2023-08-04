@@ -430,6 +430,7 @@ impl futures::Stream for ProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x9b8c7d3d118df13 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ProtocolRequestStrictResponseFlexibleRequest);
                     fidl::encoding::Decoder::decode_into::<
                         ProtocolRequestStrictResponseFlexibleRequest,
@@ -445,6 +446,7 @@ impl futures::Stream for ProtocolRequestStream {
                     })
                 }
                 0x480c77690533acb7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ProtocolRequestFlexibleResponseStrictRequest);
                     fidl::encoding::Decoder::decode_into::<
                         ProtocolRequestFlexibleResponseStrictRequest,

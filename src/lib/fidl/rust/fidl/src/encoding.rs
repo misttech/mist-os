@@ -13,7 +13,7 @@ use {
     crate::handle::{
         Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights, Status,
     },
-    crate::{Error, Result},
+    crate::{Error, MethodType, Result},
     bitflags::bitflags,
     fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types,
     std::{cell::RefCell, cell::RefMut, marker::PhantomData, mem, ptr, str, u32, u64},
@@ -2723,10 +2723,21 @@ impl TransactionHeader {
 
     /// Returns an error if this header has an incompatible magic number.
     #[inline]
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate_magic_number(&self) -> Result<()> {
         match self.magic_number {
             MAGIC_NUMBER_INITIAL => Ok(()),
             n => Err(Error::IncompatibleMagicNumber(n)),
+        }
+    }
+
+    /// Returns an error if this request header has an incorrect transaction id
+    /// for the given method type.
+    #[inline]
+    pub fn validate_request_tx_id(&self, method_type: MethodType) -> Result<()> {
+        match method_type {
+            MethodType::OneWay if self.tx_id != 0 => Err(Error::InvalidRequestTxid),
+            MethodType::TwoWay if self.tx_id == 0 => Err(Error::InvalidRequestTxid),
+            _ => Ok(()),
         }
     }
 
@@ -2768,7 +2779,7 @@ pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u
     let handles = &mut [];
     Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, handles, &mut header)
         .map_err(|_| Error::InvalidHeader)?;
-    header.validate()?;
+    header.validate_magic_number()?;
     Ok((header, body_bytes))
 }
 

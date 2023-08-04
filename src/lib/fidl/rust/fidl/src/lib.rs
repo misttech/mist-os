@@ -11,11 +11,13 @@
 pub mod encoding;
 
 pub mod client;
-pub mod endpoints;
 pub mod epitaph;
 pub mod handle;
 pub mod prelude;
 pub mod server;
+
+pub mod endpoints;
+pub use endpoints::MethodType;
 
 mod persistence;
 pub use persistence::*;

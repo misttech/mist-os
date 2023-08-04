@@ -103,6 +103,12 @@ pub enum Error {
     #[error("A FIDL future was polled after it had already completed.")]
     PollAfterCompletion,
 
+    #[error(
+        "Received request with zero txid for two-way method ordinal, \
+        or nonzero txid for one-way method ordinal."
+    )]
+    InvalidRequestTxid,
+
     #[error("Received response with unknown txid.")]
     InvalidResponseTxid,
 

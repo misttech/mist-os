@@ -1432,8 +1432,7 @@ async fn receive_unknown_one_way_flexible() {
         request,
         UnknownInteractionsProtocolRequest::_UnknownMethod {
             ordinal: 0xff10ff10ff10ff10,
-            unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
-            control_handle: _,
+            method_type: fidl::MethodType::OneWay,
             ..
         }
     );
@@ -1483,8 +1482,7 @@ async fn receive_unknown_two_way_flexible() {
                 request,
                 UnknownInteractionsProtocolRequest::_UnknownMethod {
                     ordinal: 0xff10ff10ff10ff10,
-                    unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
-                    control_handle: _,
+                    method_type: fidl::MethodType::TwoWay,
                     ..
                 }
             );
@@ -1561,11 +1559,7 @@ async fn receive_unknown_one_way_ajar_flexible() {
 
     assert_matches!(
         request,
-        UnknownInteractionsAjarProtocolRequest::_UnknownMethod {
-            ordinal: 0xff10ff10ff10ff10,
-            control_handle: _,
-            ..
-        }
+        UnknownInteractionsAjarProtocolRequest::_UnknownMethod { ordinal: 0xff10ff10ff10ff10, .. }
     );
 }
 

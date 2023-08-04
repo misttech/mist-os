@@ -328,6 +328,7 @@ impl futures::Stream for EmptyProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x132262fd8b200708 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(EmptyProtocolSendRequest);
                     fidl::encoding::Decoder::decode_into::<EmptyProtocolSendRequest>(
                         &header,
@@ -339,6 +340,7 @@ impl futures::Stream for EmptyProtocolRequestStream {
                     Ok(EmptyProtocolRequest::Send_ { e: req.e, control_handle })
                 }
                 0x76a931254962cea => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(EmptyProtocolSendAndReceiveRequest);
                     fidl::encoding::Decoder::decode_into::<EmptyProtocolSendAndReceiveRequest>(
                         &header,

@@ -642,11 +642,11 @@ _UnknownMethod {
     control_handle: TicTacToeControlHandle,
     /// Enum indicating whether the method is a one-way method or a two way
     /// method. This field only exists if the protocol is open.
-    unknown_method_type: fidl::endpoints::UnknownMethodType,
+    method_type: fidl::MethodType,
 }
 ```
 
-`UnknownMethodType` is an enum with two unit variants, `OneWay` and `TwoWay`,
+`MethodType` is an enum with two unit variants, `OneWay` and `TwoWay`,
 which tells which kind of method was called.
 
 Whenever the server receives a flexible unknown event, the request stream will

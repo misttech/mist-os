@@ -269,6 +269,7 @@ impl futures::Stream for ExampleRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0xf5f1179dc411e44 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ExampleFooRequest);
                     fidl::encoding::Decoder::decode_into::<ExampleFooRequest>(
                         &header,

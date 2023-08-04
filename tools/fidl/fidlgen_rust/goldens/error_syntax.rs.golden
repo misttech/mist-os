@@ -348,6 +348,7 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x3179cf8f46814221 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest);
                     fidl::encoding::Decoder::decode_into::<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ExampleUseOfErrorSyntaxControlHandle {
@@ -362,6 +363,7 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
                     })
                 }
                 0x3424ff83ce3004a2 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ExampleUseOfErrorSyntaxCallWhichMayFailRequest);
                     fidl::encoding::Decoder::decode_into::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ExampleUseOfErrorSyntaxControlHandle {

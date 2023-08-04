@@ -939,6 +939,7 @@ impl futures::Stream for MainProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x241e4384443ccb10 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
                     fidl::encoding::Decoder::decode_into::<
@@ -948,6 +949,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayComposed { a: req.a, control_handle })
                 }
                 0x2348a1331ca4cfb0 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
                     fidl::encoding::Decoder::decode_into::<
@@ -964,6 +966,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x6a9be48b574d1557 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
                     fidl::encoding::Decoder::decode_into::<
@@ -980,6 +983,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x6b9feaf9305b0715 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(LocalStructPayload);
                     fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
                         &header,
@@ -991,6 +995,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayLocal { a: req.a, b: req.b, control_handle })
                 }
                 0x743776548de3af0f => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(LocalStructPayload);
                     fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
                         &header,
@@ -1010,6 +1015,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x2839c029915cb8fc => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(LocalStructPayload);
                     fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
                         &header,
@@ -1029,6 +1035,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x2e6b091ae4cee40c => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
                     fidl::encoding::Decoder::decode_into::<
@@ -1038,6 +1045,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayImport { a: req.a, control_handle })
                 }
                 0x20f4a8f65ff69473 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
                     fidl::encoding::Decoder::decode_into::<
@@ -1054,6 +1062,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x3b7b706d42eb9bbd => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req =
                         fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
                     fidl::encoding::Decoder::decode_into::<
@@ -1070,6 +1079,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0xb43565c01ab54ac => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(MainProtocolOneWayAnonRequest);
                     fidl::encoding::Decoder::decode_into::<MainProtocolOneWayAnonRequest>(
                         &header,
@@ -1081,6 +1091,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayAnon { a: req.a, b: req.b, control_handle })
                 }
                 0x8bdc969ff7dd759 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonRequest);
                     fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonRequest>(
                         &header,
@@ -1100,6 +1111,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x5862bf8170c87a36 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonWithErrorRequest);
                     fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(
                         &header,

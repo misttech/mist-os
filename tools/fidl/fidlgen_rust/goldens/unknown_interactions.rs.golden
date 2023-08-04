@@ -2354,6 +2354,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0xd4663d6b2b5048b => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2364,6 +2365,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x2275b8171ae4834f => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2374,6 +2376,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x50e66d328336038 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2387,6 +2390,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x1947e36d61e4493a => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2400,6 +2404,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x5177371967e0e6d1 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2413,6 +2418,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x6f8f9343b34e2ed4 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2426,6 +2432,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x5b47637577c69006 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2439,6 +2446,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x844ff7bb3f186d9 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2452,6 +2460,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x2cbfd5a859d4ac95 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -2465,6 +2474,7 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     })
                 }
                 0x30c9e1b3da57dc37 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4202,6 +4212,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x59282385962da24 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4212,6 +4223,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0x5eda305d6b22f1f7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4225,6 +4237,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0x1323afa3e0541253 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4238,6 +4251,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0x68b32554eb0f6fa7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4251,6 +4265,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0x6e4a94d44b69e785 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4264,6 +4279,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0x4fa35d5433db4d3a => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4277,6 +4293,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0xb22aebf23bb58fd => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4290,6 +4307,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0xcd65d4d29a43c80 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -4303,6 +4321,7 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     })
                 }
                 0x117dde20b92f7b90 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6522,6 +6541,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x4e7273b964d117a6 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6532,6 +6552,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x818bb3a7a910446 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6542,6 +6563,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x734c996b0f37b942 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6555,6 +6577,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x334f4e7fff460ae3 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6568,6 +6591,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x2212805eca592cad => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6581,6 +6605,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x746ebf8659ff23b7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6594,6 +6619,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x6d1c6002c51bb967 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6607,6 +6633,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x2182a49480e5bd2b => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6620,6 +6647,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x453af745d38b20ca => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6633,6 +6661,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x4c26c7ab89cb68d8 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6646,6 +6675,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x4a5bb3397008b7c => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6659,6 +6689,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x3b13f82f44813a32 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6672,6 +6703,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x44301e4e8d514fb6 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6685,6 +6717,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x7f492934b6c76187 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6698,6 +6731,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x61240f878cc37c07 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6711,6 +6745,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0xf2b9611a9089b05 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6724,6 +6759,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x2172940a75f107d7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6737,6 +6773,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     })
                 }
                 0x6d8aab48e1693bf2 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -6753,7 +6790,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     Ok(UnknownInteractionsProtocolRequest::_UnknownMethod {
                         ordinal: header.ordinal,
                         control_handle: UnknownInteractionsProtocolControlHandle { inner: this.inner.clone() },
-                        unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
+                        method_type: fidl::MethodType::OneWay,
                     })
                 }
                 _ if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
@@ -6767,7 +6804,7 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     Ok(UnknownInteractionsProtocolRequest::_UnknownMethod {
                         ordinal: header.ordinal,
                         control_handle: UnknownInteractionsProtocolControlHandle { inner: this.inner.clone() },
-                        unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
+                        method_type: fidl::MethodType::TwoWay,
                     })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
@@ -6841,7 +6878,7 @@ pub enum UnknownInteractionsProtocolRequest {
         /// Ordinal of the method that was called.
         ordinal: u64,
         control_handle: UnknownInteractionsProtocolControlHandle,
-        unknown_method_type: fidl::endpoints::UnknownMethodType,
+        method_type: fidl::MethodType,
     },
 }
 
@@ -7080,11 +7117,11 @@ impl UnknownInteractionsProtocolRequest {
                 "flexible_two_way_table_err"
             }
             UnknownInteractionsProtocolRequest::_UnknownMethod {
-                unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
+                method_type: fidl::MethodType::OneWay,
                 ..
             } => "unknown one-way method",
             UnknownInteractionsProtocolRequest::_UnknownMethod {
-                unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
+                method_type: fidl::MethodType::TwoWay,
                 ..
             } => "unknown two-way method",
         }

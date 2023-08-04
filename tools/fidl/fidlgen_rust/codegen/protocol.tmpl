@@ -405,6 +405,13 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                 {{- range $method := $protocol.Methods }}
                 {{- if $method.HasRequest }}
                 {{ .Ordinal | printf "%#x" }} => {
+                    header.validate_request_tx_id(
+                    {{- if $method.HasResponse -}}
+                        fidl::MethodType::TwoWay
+                    {{- else -}}
+                        fidl::MethodType::OneWay
+                    {{- end -}}
+                    )?;
                     let mut req = fidl::new_empty!({{ $method.Request.FidlType }});
                     fidl::encoding::Decoder::decode_into::<{{ $method.Request.FidlType }}>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = {{ $protocol.ControlHandle }} {
@@ -430,7 +437,7 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                         ordinal: header.ordinal,
                         control_handle: {{ $protocol.ControlHandle }} { inner: this.inner.clone() },
                         {{- if $protocol.TwoWayUnknownInteractions }}
-                        unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay,
+                        method_type: fidl::MethodType::OneWay,
                         {{- end }}
                     })
                 }
@@ -446,7 +453,7 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                     Ok({{ $protocol.Request }}::_UnknownMethod {
                         ordinal: header.ordinal,
                         control_handle: {{ $protocol.ControlHandle }} { inner: this.inner.clone() },
-                        unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay,
+                        method_type: fidl::MethodType::TwoWay,
                     })
                 }
                 {{- end }}
@@ -491,7 +498,7 @@ pub enum {{ $protocol.Request }} {
         ordinal: u64,
         control_handle: {{ $protocol.ControlHandle }},
         {{- if $protocol.TwoWayUnknownInteractions }}
-        unknown_method_type: fidl::endpoints::UnknownMethodType,
+        method_type: fidl::MethodType,
         {{- end }}
     },
     {{- end }}
@@ -550,10 +557,10 @@ impl {{ $protocol.Request }} {
 
             {{- if $protocol.TwoWayUnknownInteractions }}
             {{ $protocol.Request }}::_UnknownMethod {
-                unknown_method_type: fidl::endpoints::UnknownMethodType::OneWay, ..
+                method_type: fidl::MethodType::OneWay, ..
             } => "unknown one-way method",
             {{ $protocol.Request }}::_UnknownMethod {
-                unknown_method_type: fidl::endpoints::UnknownMethodType::TwoWay, ..
+                method_type: fidl::MethodType::TwoWay, ..
             } => "unknown two-way method",
             {{- else if $protocol.OneWayUnknownInteractions }}
             {{ $protocol.Request }}::_UnknownMethod {..} => "unknown one-way method",

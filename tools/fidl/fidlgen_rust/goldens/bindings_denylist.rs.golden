@@ -799,6 +799,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x290bad96051b1b92 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyCppRequest);
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyCppRequest>(
                         &header,
@@ -817,6 +818,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     })
                 }
                 0x75384066a26d87d7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyDartRequest);
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyDartRequest>(
                         &header,
@@ -835,6 +837,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     })
                 }
                 0x657655b981478d99 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyGoRequest);
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyGoRequest>(
                         &header,
@@ -853,6 +856,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     })
                 }
                 0x1e4f89c329617b1e => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyLibfuzzerRequest);
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyLibfuzzerRequest>(
                         &header,
@@ -871,6 +875,7 @@ impl futures::Stream for DenyEachBindingRequestStream {
                     })
                 }
                 0x202ee614a749e98a => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(DenyEachBindingOnlyDenySyzkallerRequest);
                     fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenySyzkallerRequest>(
                         &header,
@@ -1561,6 +1566,7 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x698380acfd29e8f => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ImportsSameNameContextControlHandle {
@@ -1571,6 +1577,7 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     })
                 }
                 0x2874096c521236f8 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ImportsSameNameContextControlHandle {

@@ -920,6 +920,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x6e7a205bdad7941f => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(ComposedProtocolOneWayAnonComposedRequest);
                     fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolOneWayAnonComposedRequest,
@@ -929,6 +930,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     Ok(ComposedProtocolRequest::OneWayAnonComposed { payload: req, control_handle })
                 }
                 0x7083713dee9435f4 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ComposedProtocolTwoWayAnonComposedRequest);
                     fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolTwoWayAnonComposedRequest,
@@ -944,6 +946,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     })
                 }
                 0x4fd32c5e2ffa6828 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req =
                         fidl::new_empty!(ComposedProtocolTwoWayAnonComposedWithErrorRequest);
                     fidl::encoding::Decoder::decode_into::<
@@ -960,6 +963,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     })
                 }
                 0x101636a8fa3e69b8 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
@@ -975,6 +979,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     })
                 }
                 0x45b4d3d31b374054 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(UnionPayload);
                     fidl::encoding::Decoder::decode_into::<UnionPayload>(
                         &header,
@@ -993,6 +998,7 @@ impl futures::Stream for ComposedProtocolRequestStream {
                     })
                 }
                 0x450531e2d20c52ef => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
@@ -2353,6 +2359,7 @@ impl futures::Stream for MainProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x6e7a205bdad7941f => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(ComposedProtocolOneWayAnonComposedRequest);
                     fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolOneWayAnonComposedRequest,
@@ -2361,6 +2368,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayAnonComposed { payload: req, control_handle })
                 }
                 0x7083713dee9435f4 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ComposedProtocolTwoWayAnonComposedRequest);
                     fidl::encoding::Decoder::decode_into::<
                         ComposedProtocolTwoWayAnonComposedRequest,
@@ -2375,6 +2383,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x4fd32c5e2ffa6828 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req =
                         fidl::new_empty!(ComposedProtocolTwoWayAnonComposedWithErrorRequest);
                     fidl::encoding::Decoder::decode_into::<
@@ -2390,6 +2399,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x101636a8fa3e69b8 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
@@ -2401,6 +2411,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayNamedComposed { payload: req, control_handle })
                 }
                 0x45b4d3d31b374054 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(UnionPayload);
                     fidl::encoding::Decoder::decode_into::<UnionPayload>(
                         &header,
@@ -2418,6 +2429,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x450531e2d20c52ef => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
@@ -2435,6 +2447,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x3954b4c6b80956c1 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
@@ -2446,6 +2459,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayLocal { payload: req, control_handle })
                 }
                 0x26998b4c1e8a9a57 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(UnionPayload);
                     fidl::encoding::Decoder::decode_into::<UnionPayload>(
                         &header,
@@ -2463,6 +2477,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x4a7bf9ce881afde7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(TablePayload);
                     fidl::encoding::Decoder::decode_into::<TablePayload>(
                         &header,
@@ -2480,6 +2495,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x774bf445f584ce2c => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(MainProtocolOneWayAnonRequest);
                     fidl::encoding::Decoder::decode_into::<MainProtocolOneWayAnonRequest>(
                         &header,
@@ -2491,6 +2507,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     Ok(MainProtocolRequest::OneWayAnon { payload: req, control_handle })
                 }
                 0x3fd7ad8e52b07e2e => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonRequest);
                     fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonRequest>(
                         &header,
@@ -2508,6 +2525,7 @@ impl futures::Stream for MainProtocolRequestStream {
                     })
                 }
                 0x1d33061a424eb245 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(MainProtocolTwoWayAnonWithErrorRequest);
                     fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(
                         &header,

@@ -260,6 +260,7 @@ impl futures::Stream for SubRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x68a61c2a230db8b8 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(SuperFooRequest);
                     fidl::encoding::Decoder::decode_into::<SuperFooRequest>(
                         &header,
@@ -621,6 +622,7 @@ impl futures::Stream for Super_RequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x68a61c2a230db8b8 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(SuperFooRequest);
                     fidl::encoding::Decoder::decode_into::<SuperFooRequest>(
                         &header,

@@ -970,6 +970,7 @@ impl futures::Stream for ChannelProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x2bc8d7d32bc66ba2 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(ChannelProtocolMethodARequest);
                     fidl::encoding::Decoder::decode_into::<ChannelProtocolMethodARequest>(
                         &header,
@@ -981,6 +982,7 @@ impl futures::Stream for ChannelProtocolRequestStream {
                     Ok(ChannelProtocolRequest::MethodA { a: req.a, b: req.b, control_handle })
                 }
                 0x7b8dd3d6c741c9c6 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ChannelProtocolMethodBRequest);
                     fidl::encoding::Decoder::decode_into::<ChannelProtocolMethodBRequest>(
                         &header,
@@ -1000,6 +1002,7 @@ impl futures::Stream for ChannelProtocolRequestStream {
                     })
                 }
                 0x836fa31201a0a65 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ChannelProtocolTakeHandleRequest);
                     fidl::encoding::Decoder::decode_into::<ChannelProtocolTakeHandleRequest>(
                         &header,
@@ -1018,6 +1021,7 @@ impl futures::Stream for ChannelProtocolRequestStream {
                     })
                 }
                 0x66dbcccc06f7f14f => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(ChannelProtocolMutateSocketRequest);
                     fidl::encoding::Decoder::decode_into::<ChannelProtocolMutateSocketRequest>(
                         &header,
@@ -1545,6 +1549,7 @@ impl futures::Stream for DiscoverableProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x2ff5ba3a2bd170eb => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -1900,6 +1905,7 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x10078afd320d2bfd => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(HandleRightsProtocolNoResponseMethodRequest);
                     fidl::encoding::Decoder::decode_into::<
                         HandleRightsProtocolNoResponseMethodRequest,
@@ -1909,6 +1915,7 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
                     Ok(HandleRightsProtocolRequest::NoResponseMethod { h: req.h, control_handle })
                 }
                 0x52a8f194ac143547 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(HandleRightsProtocolResponseMethodRequest);
                     fidl::encoding::Decoder::decode_into::<
                         HandleRightsProtocolResponseMethodRequest,
@@ -2352,6 +2359,7 @@ impl futures::Stream for ManyParametersRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x59233bcecd338967 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(ManyParametersFifteenRequest);
                     fidl::encoding::Decoder::decode_into::<ManyParametersFifteenRequest>(
                         &header,
@@ -2730,6 +2738,7 @@ impl futures::Stream for MethodWithUnionRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x393e7f5b2b821218 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(MethodWithUnionUnionMethodRequest);
                     fidl::encoding::Decoder::decode_into::<MethodWithUnionUnionMethodRequest>(
                         &header,
@@ -3141,6 +3150,7 @@ impl futures::Stream for TransitionalRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x512cc1ba467fef08 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(TransitionalRequestRequest);
                     fidl::encoding::Decoder::decode_into::<TransitionalRequestRequest>(
                         &header,
@@ -3159,6 +3169,7 @@ impl futures::Stream for TransitionalRequestStream {
                     })
                 }
                 0x3c2ee8512dc7f7e7 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(TransitionalOneWayRequest);
                     fidl::encoding::Decoder::decode_into::<TransitionalOneWayRequest>(
                         &header,
@@ -3768,6 +3779,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x4b212a6c8c5f7bab => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
@@ -3778,6 +3790,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                     })
                 }
                 0x16a329d17f458668 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
@@ -3791,6 +3804,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                     })
                 }
                 0x7d6b2fcf0e2a65bd => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
@@ -3804,6 +3818,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                     })
                 }
                 0x65ab625138c50a77 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(WithAndWithoutRequestResponseWithRequestNoResponseRequest);
                     fidl::encoding::Decoder::decode_into::<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
@@ -3815,6 +3830,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                     })
                 }
                 0x27ee4d2bd405df5f => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(WithAndWithoutRequestResponseWithRequestEmptyResponseRequest);
                     fidl::encoding::Decoder::decode_into::<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
@@ -3829,6 +3845,7 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                     })
                 }
                 0x590e91945d58f5b1 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(WithAndWithoutRequestResponseWithRequestWithResponseRequest);
                     fidl::encoding::Decoder::decode_into::<WithAndWithoutRequestResponseWithRequestWithResponseRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
@@ -4660,6 +4677,7 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x3b902a6d8d24693 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -4676,6 +4694,7 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     })
                 }
                 0x602fd6bd920135e7 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -4692,6 +4711,7 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     })
                 }
                 0x4c371e1673212f43 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -4708,6 +4728,7 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     })
                 }
                 0x13092c5b835b0cbf => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -5447,6 +5468,7 @@ impl futures::Stream for WithProtocolEndsRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x51780563edb15042 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(WithProtocolEndsClientEndsRequest);
                     fidl::encoding::Decoder::decode_into::<WithProtocolEndsClientEndsRequest>(
                         &header,
@@ -5466,6 +5488,7 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                     })
                 }
                 0x70a02c2ba2228a33 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(WithProtocolEndsServerEndsRequest);
                     fidl::encoding::Decoder::decode_into::<WithProtocolEndsServerEndsRequest>(
                         &header,
@@ -5485,6 +5508,7 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                     })
                 }
                 0x3893f0baad26f5d5 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
                     let mut req = fidl::new_empty!(WithProtocolEndsStructContainingEndsRequest);
                     fidl::encoding::Decoder::decode_into::<
                         WithProtocolEndsStructContainingEndsRequest,

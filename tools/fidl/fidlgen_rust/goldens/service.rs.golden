@@ -233,6 +233,7 @@ impl futures::Stream for FirstProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x5828c91b57492931 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,
@@ -514,6 +515,7 @@ impl futures::Stream for SecondProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x70b439758de25c44 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
                         &header,

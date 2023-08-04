@@ -73,7 +73,7 @@ impl WireMetadata {
 
     /// Returns an error if this header has an incompatible magic number.
     #[inline]
-    fn validate(&self) -> Result<()> {
+    fn validate_magic_number(&self) -> Result<()> {
         match self.magic_number {
             MAGIC_NUMBER_INITIAL => Ok(()),
             n => Err(Error::IncompatibleMagicNumber(n)),
@@ -232,7 +232,7 @@ fn decode_wire_metadata(bytes: &[u8]) -> Result<WireMetadata> {
         }
         _ => return Err(Error::InvalidHeader),
     };
-    metadata.validate()?;
+    metadata.validate_magic_number()?;
     Ok(metadata)
 }
 
