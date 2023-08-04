@@ -8,7 +8,6 @@
 #include <assert.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
-#include <zircon/syscalls.h>
 
 __BEGIN_CDECLS
 
@@ -45,80 +44,6 @@ static_assert(FUCHSIA_LOG_FATAL < FUCHSIA_LOG_NONE, "");
 
 // Additional storage for internal log state.
 #define FUCHSIA_SYSLOG_STATE_SIZE (15)
-
-// Opaque structure representing the backend encode state.
-// This structure only has meaning to the backend and application code shouldn't
-// touch these values.
-// LogBuffers store the state of a log record that is in the process of being
-// encoded.
-// A LogBuffer is initialized by calling BeginRecord, and is written to
-// the LogSink by calling FlushRecord.
-// Calling BeginRecord on a LogBuffer will always initialize it to its
-// clean state.
-typedef struct fuchsia_log_buffer {
-  // Record state (for keeping track of backend-specific details)
-  uint64_t record_state[FUCHSIA_SYSLOG_STATE_SIZE];
-
-  // Log data (used by the backend to encode the log into). The format
-  // for this is backend-specific.
-  uint64_t data[FUCHSIA_SYSLOG_BUFFER_SIZE];
-} fuchsia_syslog_log_buffer_t;
-
-// THIS IS DEPRECATED! Please use syslog_begin_record_transitional instead.
-void syslog_begin_record(fuchsia_syslog_log_buffer_t* buffer, FuchsiaLogSeverity severity,
-                         const char* file_name, size_t file_name_length, unsigned int line,
-                         const char* message, size_t message_length, zx_handle_t socket,
-                         uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
-
-// Initializes a LogBuffer
-// buffer -- The buffer to initialize
-
-// severity -- The severity of the log
-// file_name -- The name of the file that generated the log message
-
-// line -- The line number that caused this message to be generated
-
-// message -- The message to output. OWNERSHIP: If severity is LOG_FATAL
-// then the caller maintains ownership of the message buffer and MUST NOT
-// mutate of free the string until FlushRecord is called or the buffer is reset/discarded
-// with another call to BeginRecord.
-
-// socket -- The socket to write the message to.
-
-// dropped_count -- Number of dropped messages
-
-// pid -- The process ID that generated the message.
-
-// tid -- The thread ID that generated the message.
-void syslog_begin_record_transitional(fuchsia_syslog_log_buffer_t* buffer,
-                                      FuchsiaLogSeverity severity, const char* file_name,
-                                      size_t file_name_length, unsigned int line,
-                                      const char* message, size_t message_length,
-                                      zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid,
-                                      zx_koid_t tid);
-
-// Writes a key/value pair to the buffer.
-void syslog_write_key_value_string(fuchsia_syslog_log_buffer_t* buffer, const char* key,
-                                   size_t key_length, const char* value, size_t value_length);
-
-// Writes a key/value pair to the buffer.
-void syslog_write_key_value_int64(fuchsia_syslog_log_buffer_t* buffer, const char* key,
-                                  size_t key_length, int64_t value);
-
-// Writes a key/value pair to the buffer.
-void syslog_write_key_value_uint64(fuchsia_syslog_log_buffer_t* buffer, const char* key,
-                                   size_t key_length, uint64_t value);
-
-// Writes a key/value pair to the buffer.
-void syslog_write_key_value_double(fuchsia_syslog_log_buffer_t* buffer, const char* key,
-                                   size_t key_length, double value);
-
-// Writes a key/value pair to the buffer.
-void syslog_write_key_value_bool(fuchsia_syslog_log_buffer_t* buffer, const char* key,
-                                 size_t key_length, bool value);
-
-// Writes the LogBuffer to the socket.
-bool syslog_flush_record(fuchsia_syslog_log_buffer_t* buffer);
 
 __END_CDECLS
 

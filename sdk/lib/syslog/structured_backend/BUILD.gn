@@ -19,8 +19,8 @@ sdk_source_set("structured_backend") {
   ]
 
   sources = [
+    "cpp/fuchsia_syslog.cc",
     "cpp/fuchsia_syslog.h",
-    "fuchsia_syslog.cc",
     "fuchsia_syslog.h",
   ]
 
