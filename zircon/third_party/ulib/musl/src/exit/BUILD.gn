@@ -12,6 +12,7 @@ source_set("exit") {
     "quick_exit.c",
   ]
   deps = [
+    ":abort",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/third_party/ulib/musl:musl_internal",
@@ -21,6 +22,19 @@ source_set("exit") {
   # compile with default hidden visibility.  The functions aren't annotated for
   # export so that they can be compiled in non-libc contexts where their
   # definitions need to have hidden visibility for hermetic linking.
+  if (zircon_toolchain != false) {
+    configs -= [ "//build/config:symbol_visibility_hidden" ]
+  }
+}
+
+source_set("abort") {
+  sources = [ "abort.c" ]
+  deps = [
+    "//src/zircon/lib/zircon",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+
+  # See comment above.
   if (zircon_toolchain != false) {
     configs -= [ "//build/config:symbol_visibility_hidden" ]
   }

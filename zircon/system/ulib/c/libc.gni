@@ -96,10 +96,6 @@ libc_configs += [
 #     - Required: As for source_set(), but $dir is prefixed if set.
 #     - Type: list(file)
 #
-#   * local_sources
-#     - Optional: As for source_set(); the $dir prefix is not added.
-#     - Type: list(file)
-#
 #   * visibility
 #     - Optional: Additional label patterns that can use this target.
 #     All targets have visibility limited to libc code by default.
@@ -119,13 +115,12 @@ template("libc_source_set") {
                              "basic_abi",
                              "configs",
                              "dir",
-                             "local_sources",
                              "non_test_deps",
                              "non_test_vars",
-                             "public",
                              "remove_configs",
                              "sources",
                              "testonly_deps",
+                             "public",
                              "visibility",
                            ])
 
@@ -141,10 +136,6 @@ template("libc_source_set") {
       }
     } else {
       sources = invoker.sources
-    }
-
-    if (defined(invoker.local_sources)) {
-      sources += invoker.local_sources
     }
 
     if (defined(invoker.public)) {
@@ -332,32 +323,12 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     - Type: list(string)
 #     - Default: []
 #
-#   * os_functions
-#     - Optional: A subset of $functions that whose implementations come from
-#       the $llvm_libc/src/$dir/$current_os directory instead.
-#       When $current_os is "fuchsia", this uses "$function.cc" to get a local
-#       implementation source file in the Fuchsia tree rather than
-#       "$dir/$function.cpp" to get the llvm-libc implementation source file.
-#     - Type: list(string)
-#     - Default: []
-#
 #   * noncpu_dir
 #     - Optional: Subdir of $llvm_libc/src/$dir where implementations are found
 #       for $functions not found in $cpu_functions.
 #
 #   * no_test_functions
 #     - Optional: A subset of $functions that don't have tests.
-#
-#   * deps
-#     - Optional: Other llvm_libc_source_set() targets this one depends on.
-#     Unlike deps in plain source_set(), this will expand to different actual
-#     corresponding targets in the production, testonly, and unittests targets.
-#     - Type: list(label)
-#
-#   * local_deps
-#     - Optional: As for source_set().  Use this for deps on other things that
-#     the code requires but that aren't also llvm_libc_source_set() targets.
-#     - Type: list(label)
 #
 #   * basic_abi, configs, non_test_deps, testonly_deps
 #     - Optional: See libc_source_set().
@@ -389,13 +360,6 @@ template("llvm_libc_source_set") {
   assert(cpu_functions + invoker.functions - invoker.functions == [],
          "cpu_functions must be a subset of functions")
 
-  os_functions = []
-  if (defined(invoker.os_functions)) {
-    os_functions = invoker.os_functions
-  }
-  assert(os_functions + invoker.functions - invoker.functions == [],
-         "os_functions must be a subset of functions")
-
   no_test_functions = []
   if (defined(invoker.no_test_functions)) {
     no_test_functions = invoker.no_test_functions
@@ -425,36 +389,19 @@ template("llvm_libc_source_set") {
     if (!defined(invoker.sources)) {
       sources = []
     }
-    local_sources = []
 
     foreach(function, invoker.functions) {
       public += [ "$function.h" ]
-
-      prefix = ""
-
-      if (os_functions + [ function ] - [ function ] != os_functions) {
-        prefix += "$current_os/"
-      }
-
       if (cpu_functions + [ function ] - [ function ] != cpu_functions) {
-        prefix += "$clang_cpu/"
+        sources += [ "$clang_cpu/$function.cpp" ]
         not_needed(invoker, [ "noncpu_dir" ])
       } else if (defined(invoker.noncpu_dir)) {
-        prefix += "${invoker.noncpu_dir}/"
-      }
-
-      if (prefix == "fuchsia/") {
-        local_sources += [ "$function.cc" ]
-      } else if (prefix == "fuchsia/$clang_cpu/") {
-        local_sources += [ "$clang_cpu/$function.cc" ]
+        sources += [ "${invoker.noncpu_dir}/$function.cpp" ]
       } else {
-        sources += [ "$prefix$function.cpp" ]
+        sources += [ "$function.cpp" ]
       }
     }
 
-    if (defined(invoker.local_deps)) {
-      deps = invoker.local_deps
-    }
     if (defined(invoker.deps)) {
       if (!defined(non_test_deps)) {
         non_test_deps = []
