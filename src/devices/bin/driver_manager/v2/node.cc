@@ -578,6 +578,7 @@ void Node::CheckForRemoval() {
     // We'd better continue to close, since we can't talk to the driver.
   }
 
+  LOGF(INFO, "Node: %s Scheduling stop component", MakeComponentMoniker().c_str());
   ScheduleStopComponent();
 }
 
@@ -1144,7 +1145,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
          info.FormatDescription().data());
   }
   if (node_state_ == NodeState::kWaitingOnDriver) {
-    LOGF(DEBUG, "Node: %s: realm channel had expected shutdown.", name().c_str());
+    LOGF(INFO, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
     ScheduleStopComponent();
   } else if (node_state_ == NodeState::kWaitingOnDriverComponent) {
     LOGF(DEBUG, "Node: %s: driver channel had expected shutdown.", name().c_str());
