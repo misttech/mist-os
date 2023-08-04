@@ -1659,7 +1659,12 @@ fn select(
         if aggregated_events != 0 {
             let fd = FdNumber::from_raw(fd as i32);
             let file = current_task.files.get(fd)?;
-            waiter.add(current_task, fd, &file, FdEvents::from_bits_truncate(aggregated_events))?;
+            waiter.add(
+                current_task,
+                fd,
+                Some(&file),
+                FdEvents::from_bits_truncate(aggregated_events),
+            )?;
         }
     }
 
@@ -1929,20 +1934,24 @@ impl<Key: ReadItemKey> FileWaiter<Key> {
         &self,
         current_task: &CurrentTask,
         key: Key,
-        file: &FileHandle,
+        file: Option<&FileHandle>,
         requested_events: FdEvents,
     ) -> Result<(), Errno> {
-        let sought_events = requested_events | FdEvents::POLLERR | FdEvents::POLLHUP;
+        if let Some(file) = file {
+            let sought_events = requested_events | FdEvents::POLLERR | FdEvents::POLLHUP;
 
-        let ready_items = self.ready_items.clone();
-        let handler = Box::new(move |observed: FdEvents| {
-            ready_items.lock().push(ReadyItem::<Key> { key, events: observed });
-        });
+            let ready_items = self.ready_items.clone();
+            let handler = Box::new(move |observed: FdEvents| {
+                ready_items.lock().push(ReadyItem::<Key> { key, events: observed });
+            });
 
-        file.wait_async(current_task, &self.waiter, sought_events, handler);
-        let current_events = file.query_events(current_task)? & sought_events;
-        if !current_events.is_empty() {
-            self.ready_items.lock().push(ReadyItem::<Key> { key, events: current_events });
+            file.wait_async(current_task, &self.waiter, sought_events, handler);
+            let current_events = file.query_events(current_task)? & sought_events;
+            if !current_events.is_empty() {
+                self.ready_items.lock().push(ReadyItem::<Key> { key, events: current_events });
+            }
+        } else {
+            self.ready_items.lock().push(ReadyItem::<Key> { key, events: FdEvents::POLLNVAL });
         }
         Ok(())
     }
@@ -1986,11 +1995,11 @@ pub fn poll(
         if poll_descriptor.fd < 0 {
             continue;
         }
-        let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd))?;
+        let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd)).ok();
         waiter.add(
             current_task,
             index,
-            &file,
+            file.as_ref(),
             FdEvents::from_bits_truncate(poll_descriptor.events as u32),
         )?;
     }
@@ -2001,7 +2010,8 @@ pub fn poll(
     for ready_item in ready_items.iter() {
         let interested_events = FdEvents::from_bits_truncate(pollfds[ready_item.key].events as u32)
             | FdEvents::POLLERR
-            | FdEvents::POLLHUP;
+            | FdEvents::POLLHUP
+            | FdEvents::POLLNVAL;
         let return_events = (interested_events & ready_item.events).bits();
         pollfds[ready_item.key].revents = return_events as i16;
     }

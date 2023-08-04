@@ -20,7 +20,6 @@
                 "io.WriteFdExactly_string",
                 "io.WriteFdFmt",
                 "LocalSocketTest.read_from_closing_socket",
-                "sysdeps_poll.invalid_fd",
             ],
         },
         {
