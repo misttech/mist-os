@@ -25,7 +25,7 @@ mod tests {
     use crate::qemu_based::qemu::QemuEngine;
     use crate::FemuEngine;
     use emulator_instance::{get_instance_dir, EmulatorInstanceData, EngineState, EngineType};
-    use ffx_config::{query, ConfigLevel};
+    use ffx_config::ConfigLevel;
     use ffx_emulator_common::config::EMU_INSTANCE_ROOT_DIR;
     use serde_json::json;
     use std::{fs::File, io::Write};
@@ -33,14 +33,18 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_then_read() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
             .expect("Couldn't get a temporary directory for testing.")
             .path()
             .to_str()
             .expect("Couldn't convert Path to str")
             .to_string();
-        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
 
         // Create a test directory in TempFile::tempdir.
         let qemu_name = "qemu_test_write_then_read";
@@ -75,14 +79,18 @@ mod tests {
     #[fuchsia::test]
     async fn test_read_unknown_engine_type() -> Result<()> {
         let unknown_engine_type = include_str!("../test_data/unknown_engine_type_engine.json");
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
             .expect("Couldn't get a temporary directory for testing.")
             .path()
             .to_str()
             .expect("Couldn't convert Path to str")
             .to_string();
-        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
 
         let name = "unknown-type";
 

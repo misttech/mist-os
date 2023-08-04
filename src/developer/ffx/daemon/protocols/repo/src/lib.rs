@@ -2171,14 +2171,15 @@ mod tests {
         );
 
         fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
-            let _env = ffx_config::test_init().await.unwrap();
+            let env = ffx_config::test_init().await.unwrap();
 
             // Since ffx_config is global, it's possible to leave behind entries
             // across tests. Let's clean them up.
-            let _ = ffx_config::query("repository").remove().await;
+            let _ = env.context.query("repository").remove().await;
 
             // Most tests want the server to be running.
-            ffx_config::query("repository.server.mode")
+            env.context
+                .query("repository.server.mode")
                 .level(Some(ConfigLevel::User))
                 .set("ffx".into())
                 .await
@@ -2186,7 +2187,8 @@ mod tests {
 
             // Repo will automatically start a server, so make sure it picks a random local port.
             let addr: SocketAddr = (Ipv4Addr::LOCALHOST, 0).into();
-            ffx_config::query("repository.server.listen")
+            env.context
+                .query("repository.server.listen")
                 .level(Some(ConfigLevel::User))
                 .set(addr.to_string().into())
                 .await
@@ -2194,14 +2196,16 @@ mod tests {
 
             match mode {
                 TestRunMode::Fidl => {
-                    ffx_config::query("repository.registration-mode")
+                    env.context
+                        .query("repository.registration-mode")
                         .level(Some(ConfigLevel::User))
                         .set("fidl".to_string().into())
                         .await
                         .unwrap();
                 }
                 TestRunMode::Ssh => {
-                    ffx_config::query("repository.registration-mode")
+                    env.context
+                        .query("repository.registration-mode")
                         .level(Some(ConfigLevel::User))
                         .set("ssh".to_string().into())
                         .await

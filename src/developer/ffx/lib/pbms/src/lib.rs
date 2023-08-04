@@ -769,17 +769,20 @@ mod tests {
 
         let sdk_root_dir = create_test_intree_sdk();
         let sdk_root = sdk_root_dir.path().to_str().expect("path to str");
-        ffx_config::query("sdk.root")
+        env.context
+            .query("sdk.root")
             .level(Some(ConfigLevel::User))
             .set(sdk_root.into())
             .await
             .expect("set sdk root path");
-        ffx_config::query("sdk.type")
+        env.context
+            .query("sdk.type")
             .level(Some(ConfigLevel::User))
             .set("in-tree".into())
             .await
             .expect("set sdk type");
-        ffx_config::query(CONFIG_METADATA)
+        env.context
+            .query(CONFIG_METADATA)
             .level(Some(ConfigLevel::User))
             .set(serde_json::json!(["{sdk.root}/*.json"]))
             .await
@@ -823,17 +826,20 @@ mod tests {
 
         let sdk_root_dir = create_test_intree_sdk();
         let sdk_root = sdk_root_dir.path().to_str().expect("path to str");
-        ffx_config::query("sdk.root")
+        env.context
+            .query("sdk.root")
             .level(Some(ConfigLevel::User))
             .set(sdk_root.into())
             .await
             .expect("set sdk root path");
-        ffx_config::query("sdk.type")
+        env.context
+            .query("sdk.type")
             .level(Some(ConfigLevel::User))
             .set("in-tree".into())
             .await
             .expect("set sdk type");
-        ffx_config::query(CONFIG_METADATA)
+        env.context
+            .query(CONFIG_METADATA)
             .level(Some(ConfigLevel::User))
             .set(serde_json::json!(["{sdk.root}/*.json"]))
             .await
@@ -881,7 +887,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let pb_dir = make_pb_v2_in!(tmp, "fake.x64");
 
-        let _env = ffx_config::test_init().await.expect("create test config");
+        let env = ffx_config::test_init().await.expect("create test config");
         let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::InTree);
 
         // Load with passing a path directly
@@ -892,7 +898,8 @@ mod tests {
         assert_eq!(pb.loaded_from_path(), pb_dir);
 
         // Load with the config set with absolute path
-        ffx_config::query(PRODUCT_BUNDLE_PATH_KEY)
+        env.context
+            .query(PRODUCT_BUNDLE_PATH_KEY)
             .level(Some(ConfigLevel::User))
             .set(serde_json::Value::String(pb_dir.to_string()))
             .await

@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use ffx_target_forward_tcp_args::TcpCommand;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx as ffx;
@@ -15,6 +15,7 @@ pub struct ForwardTcpTool {
     cmd: TcpCommand,
     #[with(daemon_protocol())]
     forward_port: ffx::TunnelProxy,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(ForwardTcpTool);
@@ -23,21 +24,19 @@ fho::embedded_plugin!(ForwardTcpTool);
 impl FfxMain for ForwardTcpTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        forward_tcp(self.forward_port, self.cmd).await
+        let target: Option<String> = self
+            .context
+            .get(TARGET_DEFAULT_KEY)
+            .await
+            .user_message("Failed to get default target from config")?;
+        let target = if let Some(target) = target {
+            target
+        } else {
+            ffx_bail!("Specify a target or configure a default target")
+        };
+
+        forward_tcp_impl(&target, self.forward_port, self.cmd).await
     }
-}
-
-async fn forward_tcp(forward_port: ffx::TunnelProxy, cmd: TcpCommand) -> fho::Result<()> {
-    let target: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY)
-        .await
-        .user_message("Failed to get default target from config")?;
-    let target = if let Some(target) = target {
-        target
-    } else {
-        ffx_bail!("Specify a target or configure a default target")
-    };
-
-    forward_tcp_impl(&target, forward_port, cmd).await
 }
 
 async fn forward_tcp_impl(

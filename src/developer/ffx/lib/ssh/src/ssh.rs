@@ -80,6 +80,7 @@ pub async fn build_ssh_command(addr: SocketAddr, command: Vec<&str>) -> Result<C
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_config::ConfigLevel;
     use itertools::Itertools;
     use std::io::BufRead;
 
@@ -115,17 +116,15 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_apply_auth_sock() {
-        let _env = ffx_config::test_init().await.unwrap();
-        // XXX(82683): Setting config options in tests is modifying the user environment, so just
-        // grab the current value and assert against it.  This needs to get fixed, until it is, this
-        // test is of somewhat limited value.
-        let expect_path: String = match ffx_config::get("ssh.auth-sock").await {
-            Ok(s) => s,
-            Err(_) => {
-                eprintln!("WARNING: untested case, see fxbug.dev/82683");
-                return;
-            }
-        };
+        let env = ffx_config::test_init().await.unwrap();
+        let expect_path =
+            env.isolate_root.path().join("ssh-auth.sock").to_string_lossy().to_string();
+        env.context
+            .query("ssh.auth-sock")
+            .level(Some(ConfigLevel::User))
+            .set(expect_path.clone().into())
+            .await
+            .expect("setting auth sock config");
 
         let mut cmd = Command::new("env");
         apply_auth_sock(&mut cmd).await;

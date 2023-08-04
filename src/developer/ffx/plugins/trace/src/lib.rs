@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
-use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
 use fho::{daemon_protocol, deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
@@ -184,9 +184,10 @@ fn validate_category_name(category_name: &str) -> Result<()> {
     Ok(())
 }
 
-async fn get_category_group_names() -> Result<Vec<String>> {
-    let all_groups = ffx_config::query(ffx_config::build().select(ffx_config::SelectMode::All))
-        .name(Some("trace.category_groups"))
+async fn get_category_group_names(ctx: &EnvironmentContext) -> Result<Vec<String>> {
+    let all_groups = ctx
+        .query("trace.category_groups")
+        .select(ffx_config::SelectMode::All)
         .get::<Value>()
         .await
         .context("could not query `trace.category_groups` in config.")?;
@@ -202,18 +203,19 @@ async fn get_category_group_names() -> Result<Vec<String>> {
     Ok(group_names)
 }
 
-async fn get_category_group(category_group_name: &str) -> Result<Vec<String>> {
-    let category_group = ffx_config::get::<Vec<String>, _>(&format!(
-        "trace.category_groups.{}",
-        category_group_name
-    ))
-    .await
-    .context(format!(
-        "Error: no category group found for {0}, you can add this category locally by calling \
+async fn get_category_group(
+    ctx: &EnvironmentContext,
+    category_group_name: &str,
+) -> Result<Vec<String>> {
+    let category_group = ctx
+        .get::<Vec<String>, _>(&format!("trace.category_groups.{}", category_group_name))
+        .await
+        .context(format!(
+            "Error: no category group found for {0}, you can add this category locally by calling \
               `ffx config set trace.category_groups.{0} '[\"list\", \"of\", \"categories\"]'`\
               or globally by adding it to data/config.json in the ffx trace plugin.",
-        category_group_name
-    ))?;
+            category_group_name
+        ))?;
     for category in &category_group {
         validate_category_name(&category).context(format!(
             "Error: #{} contains an invalid category \"{}\"",
@@ -223,12 +225,15 @@ async fn get_category_group(category_group_name: &str) -> Result<Vec<String>> {
     Ok(category_group)
 }
 
-async fn expand_categories(categories: Vec<String>) -> Result<Vec<String>> {
+async fn expand_categories(
+    context: &EnvironmentContext,
+    categories: Vec<String>,
+) -> Result<Vec<String>> {
     let mut expanded_categories = BTreeSet::new();
     for category in categories {
         match category.strip_prefix('#') {
             Some(category_group_name) => {
-                let category_group = get_category_group(category_group_name).await?;
+                let category_group = get_category_group(context, category_group_name).await?;
                 expanded_categories.extend(category_group);
             }
             None => {
@@ -302,6 +307,7 @@ pub struct TraceTool {
     controller: fho::Deferred<ControllerProxy>,
     #[command]
     cmd: TraceCommand,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(TraceTool);
@@ -311,17 +317,18 @@ impl FfxMain for TraceTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        trace(self.proxy, self.controller, writer, self.cmd).await.map_err(Into::into)
+        trace(self.context, self.proxy, self.controller, writer, self.cmd).await.map_err(Into::into)
     }
 }
 
 pub async fn trace(
+    context: EnvironmentContext,
     proxy: TracingProxy,
     controller: fho::Deferred<ControllerProxy>,
     mut writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
-    let default_target: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
+    let default_target: Option<String> = context.get(TARGET_DEFAULT_KEY).await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
             let controller = controller.await?;
@@ -359,14 +366,14 @@ pub async fn trace(
             }
         }
         TraceSubCommand::ListCategoryGroups(_) => {
-            let group_names = get_category_group_names().await?;
+            let group_names = get_category_group_names(&context).await?;
             writer.line("Category groups:")?;
             for group_name in group_names {
                 writer.line(format!("  #{}", group_name))?;
             }
         }
         TraceSubCommand::Start(opts) => {
-            let string_matcher: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await.ok();
+            let string_matcher: Option<String> = context.get(TARGET_DEFAULT_KEY).await.ok();
             let default = ffx::TargetQuery { string_matcher, ..Default::default() };
             let triggers = if opts.trigger.is_empty() { None } else { Some(opts.trigger) };
             if triggers.is_some() && !opts.background {
@@ -382,7 +389,7 @@ pub async fn trace(
                     opts.buffer_size
                 );
             }
-            let expanded_categories = expand_categories(opts.categories).await?;
+            let expanded_categories = expand_categories(&context, opts.categories).await?;
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
                 categories: Some(expanded_categories.clone()),
@@ -398,7 +405,7 @@ pub async fn trace(
                     &trace_config,
                 )
                 .await?;
-            let target = handle_recording_result(res, &output).await?;
+            let target = handle_recording_result(&context, res, &output).await?;
             writer.print(format!(
                 "Tracing started successfully on \"{}\" for categories: [ {} ].\nWriting to {}",
                 target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
@@ -425,14 +432,14 @@ pub async fn trace(
                 waiter.wait().await;
             }
             writer.line(format!("Shutting down recording and writing to file."))?;
-            stop_tracing(&proxy, output, writer, opts.verbose).await?;
+            stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
         }
         TraceSubCommand::Stop(opts) => {
             let output = match opts.output {
                 Some(o) => canonical_path(o)?,
                 None => default_target.unwrap_or("".to_owned()),
             };
-            stop_tracing(&proxy, output, writer, opts.verbose).await?;
+            stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
     }
@@ -507,6 +514,7 @@ async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
 }
 
 async fn stop_tracing(
+    context: &EnvironmentContext,
     proxy: &TracingProxy,
     output: String,
     mut writer: Writer,
@@ -524,7 +532,7 @@ async fn stop_tracing(
         }
         Err(e) => Err(e),
     };
-    let target = handle_recording_result(result, &output).await?;
+    let target = handle_recording_result(context, result, &output).await?;
     // TODO(awdavies): Make a clickable link that auto-uploads the trace file if possible.
     writer.line(format!(
         "Tracing stopped successfully on \"{}\".\nResults written to {}",
@@ -536,10 +544,11 @@ async fn stop_tracing(
 }
 
 async fn handle_recording_result(
+    context: &EnvironmentContext,
     res: Result<ffx::TargetInfo, RecordingError>,
     output: &String,
 ) -> Result<ffx::TargetInfo> {
-    let default: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await.ok();
+    let default: Option<String> = context.get(TARGET_DEFAULT_KEY).await.ok();
     match res {
         Ok(t) => Ok(t),
         Err(e) => match e {
@@ -565,7 +574,7 @@ https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
                 ffx_bail!("Trace already running for file {}", output);
             }
             RecordingError::RecordingStart => {
-                let log_file: String = ffx_config::get("log.dir").await?;
+                let log_file: String = context.get("log.dir").await?;
                 ffx_bail!(
                     "Error starting Fuchsia trace. See {}/ffx.daemon.log\n
 Search for lines tagged with `ffx_daemon_service_tracing`. A common issue is a
@@ -576,7 +585,7 @@ package is missing from the device's system image.",
                 );
             }
             RecordingError::RecordingStop => {
-                let log_file: String = ffx_config::get("log.dir").await?;
+                let log_file: String = context.get("log.dir").await?;
                 ffx_bail!(
                     "Error stopping Fuchsia trace. See {}/ffx.daemon.log\n
 Search for lines tagged with `ffx_daemon_service_tracing`. A common issue is a
@@ -852,18 +861,19 @@ mod tests {
         })))
     }
 
-    async fn run_trace_test(cmd: TraceCommand, writer: Writer) {
+    async fn run_trace_test(ctx: EnvironmentContext, cmd: TraceCommand, writer: Writer) {
         let proxy = setup_fake_service();
         let controller = setup_fake_controller_proxy();
-        trace(proxy, controller, writer, cmd).await.unwrap();
+        trace(ctx, proxy, controller, writer, cmd).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) },
             writer,
         )
@@ -875,10 +885,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories_machine() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(Some(Format::Json), &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) },
             writer,
         )
@@ -896,13 +907,13 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories_peer_closed() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         let proxy = setup_fake_service();
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) };
-        let res = trace(proxy, controller, writer, cmd).await.unwrap_err();
+        let res = trace(env.context.clone(), proxy, controller, writer, cmd).await.unwrap_err();
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("This can happen if tracing is not"));
         assert!(test_buffers.into_stdout_str().is_empty());
@@ -910,10 +921,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_providers() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) },
             writer,
         )
@@ -927,13 +939,13 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_providers_peer_closed() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         let proxy = setup_fake_service();
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) };
-        let res = trace(proxy, controller, writer, cmd).await.unwrap_err();
+        let res = trace(env.context.clone(), proxy, controller, writer, cmd).await.unwrap_err();
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("This can happen if tracing is not"));
         assert!(test_buffers.into_stdout_str().is_empty());
@@ -941,10 +953,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_providers_machine() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(Some(Format::Json), &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) },
             writer,
         )
@@ -956,10 +969,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
@@ -999,10 +1013,15 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_status() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
-        run_trace_test(TraceCommand { sub_cmd: TraceSubCommand::Status(Status {}) }, writer).await;
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand { sub_cmd: TraceSubCommand::Status(Status {}) },
+            writer,
+        )
+        .await;
         let output = test_buffers.into_stdout_str();
         let want = "- foo:
   - Output file: /foo/bar.fxt
@@ -1021,10 +1040,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("foo.txt".to_string()),
@@ -1042,10 +1062,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_verbose() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
@@ -1085,10 +1106,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop_verbose() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Stop(Stop {
                     output: Some("foo.txt".to_string()),
@@ -1113,10 +1135,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_with_duration() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
@@ -1141,10 +1164,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_with_duration_foreground() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
@@ -1173,10 +1197,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_foreground() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
+            env.context.clone(),
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
@@ -1205,7 +1230,7 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_large_buffer() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
         let proxy = setup_fake_service();
@@ -1222,7 +1247,7 @@ Current tracing status:
                 trigger: vec![],
             }),
         };
-        let res = trace(proxy, controller, writer, cmd).await.unwrap_err();
+        let res = trace(env.context.clone(), proxy, controller, writer, cmd).await.unwrap_err();
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("Error: Requested buffer size of"));
         assert!(test_buffers.into_stdout_str().is_empty());
@@ -1230,45 +1255,55 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_category_group() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let birds = vec!["chickens", "bald_eagle", "blue-jay", "hawk*", "goose:gosling"];
-        ffx_config::query("trace.category_groups.birds")
+        env.context
+            .query("trace.category_groups.birds")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(json!(birds))
             .await
             .unwrap();
-        assert_eq!(birds, get_category_group("birds").await.unwrap());
+        assert_eq!(birds, get_category_group(&env.context, "birds").await.unwrap());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_category_group_names() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let birds = vec!["chickens", "ducks"];
         let bees = vec!["honey", "bumble"];
-        ffx_config::query("trace.category_groups.birds")
+        env.context
+            .query("trace.category_groups.birds")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(json!(birds))
             .await
             .unwrap();
-        ffx_config::query("trace.category_groups.bees")
+        env.context
+            .query("trace.category_groups.bees")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(json!(bees))
             .await
             .unwrap();
-        ffx_config::query("trace.category_groups.*invalid")
+        env.context
+            .query("trace.category_groups.*invalid")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(json!(bees))
             .await
             .unwrap();
-        assert!(get_category_group_names().await.unwrap().contains(&"birds".to_owned()));
-        assert!(get_category_group_names().await.unwrap().contains(&"bees".to_owned()));
-        assert!(get_category_group_names().await.unwrap().contains(&"*invalid".to_owned()));
+        assert!(get_category_group_names(&env.context)
+            .await
+            .unwrap()
+            .contains(&"birds".to_owned()));
+        assert!(get_category_group_names(&env.context).await.unwrap().contains(&"bees".to_owned()));
+        assert!(get_category_group_names(&env.context)
+            .await
+            .unwrap()
+            .contains(&"*invalid".to_owned()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_category_group_not_found() {
-        let _env = ffx_config::test_init().await.unwrap();
-        let err = get_category_group("not_found").await.unwrap_err();
+        let env = ffx_config::test_init().await.unwrap();
+        let err = get_category_group(&env.context, "not_found").await.unwrap_err();
         assert!(
             err.to_string().contains("Error: no category group found for not_found"),
             "the actual value was \"{}\"",
@@ -1281,14 +1316,15 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_category_group_invalid_category() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         for invalid_category in INVALID_CATEGORIES {
-            ffx_config::query("trace.category_groups.flawed")
+            env.context
+                .query("trace.category_groups.flawed")
                 .level(Some(ffx_config::ConfigLevel::User))
                 .set(json!(vec![invalid_category]))
                 .await
                 .unwrap();
-            let err = get_category_group("flawed").await.unwrap_err();
+            let err = get_category_group(&env.context, "flawed").await.unwrap_err();
             let expected_message = format!("invalid category \"{}\"", invalid_category);
             assert!(
                 err.to_string().contains(&expected_message),
@@ -1300,9 +1336,10 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_expand_categories() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let birds = vec!["chickens", "bald_eagle", "hawk*", "goose:gosling", "blue-jay"];
-        ffx_config::query("trace.category_groups.birds")
+        env.context
+            .query("trace.category_groups.birds")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(json!(birds))
             .await
@@ -1310,12 +1347,15 @@ Current tracing status:
         // The result should have all groups expanded, merge duplicate categories, and sort them.
         assert_eq!(
             vec!["*", "bald_eagle", "blue-jay", "chickens", "dove*", "goose:gosling", "hawk*"],
-            expand_categories(vec![
-                "dove*".to_string(),
-                "bald_eagle".to_string(),
-                "#birds".to_string(),
-                "*".to_string()
-            ])
+            expand_categories(
+                &env.context,
+                vec![
+                    "dove*".to_string(),
+                    "bald_eagle".to_string(),
+                    "#birds".to_string(),
+                    "*".to_string()
+                ]
+            )
             .await
             .unwrap()
         );
@@ -1323,9 +1363,11 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_expand_categories_invalid() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         for invalid_category in INVALID_CATEGORIES {
-            let err = expand_categories(vec![invalid_category.to_string()]).await.unwrap_err();
+            let err = expand_categories(&env.context, vec![invalid_category.to_string()])
+                .await
+                .unwrap_err();
             let expected_message = format!("category \"{}\" is invalid", invalid_category);
             assert!(
                 err.to_string().contains(&expected_message),
@@ -1337,14 +1379,15 @@ Current tracing status:
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_curated_category_groups_valid() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
 
         // Get all of the category groups found in config.json
         let category_groups_json: serde_json::Value =
-            ffx_config::get("trace.category_groups").await.unwrap();
+            env.context.get("trace.category_groups").await.unwrap();
 
         for category_group_name in category_groups_json.as_object().unwrap().keys() {
-            let category_group = get_category_group(category_group_name).await.unwrap();
+            let category_group =
+                get_category_group(&env.context, category_group_name).await.unwrap();
             assert_ne!(0, category_group.len());
         }
     }

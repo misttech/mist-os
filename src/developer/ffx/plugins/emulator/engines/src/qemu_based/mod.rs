@@ -814,7 +814,7 @@ mod tests {
         DataAmount, DataUnits, DiskImage, EmulatorInstanceData, EmulatorInstanceInfo, EngineType,
         PortMapping,
     };
-    use ffx_config::{query, ConfigLevel};
+    use ffx_config::{ConfigLevel, EnvironmentContext};
     use serde::{Deserialize, Serialize};
     use std::{io::Read, os::unix::net::UnixListener};
     use tempfile::{tempdir, TempDir};
@@ -865,10 +865,11 @@ mod tests {
 
     // Note that the caller MUST initialize the ffx_config environment before calling this function
     // since we override config values as part of the test. This looks like:
-    //     let _env = ffx_config::test_init().await?;
+    //     let env = ffx_config::test_init().await?;
     // The returned structure must remain in scope for the duration of the test to function
     // properly.
     async fn setup(
+        env: &EnvironmentContext,
         guest: &mut GuestConfig,
         temp: &TempDir,
         disk_image_format: DiskImageFormat,
@@ -895,7 +896,7 @@ mod tests {
             .open(&*disk_image_path)
             .context("cannot create test disk image file")?;
 
-        query(config::EMU_INSTANCE_ROOT_DIR)
+        env.query(config::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
             .set(json!(root.display().to_string()))
             .await?;
@@ -905,11 +906,11 @@ mod tests {
         guest.disk_image = Some(disk_image_path);
 
         // Set the paths to use for the SSH keys
-        query("ssh.pub")
+        env.query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!([root.join("test_authorized_keys")]))
             .await?;
-        query("ssh.priv")
+        env.query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!([root.join("test_ed25519_key")]))
             .await?;
@@ -930,13 +931,13 @@ mod tests {
     }
 
     async fn test_staging_no_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
-        let _env = ffx_config::test_init().await?;
+        let env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
-        let root = setup(&mut emu_config.guest, &temp, disk_image_format).await?;
+        let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -1024,13 +1025,13 @@ mod tests {
     }
 
     async fn test_staging_with_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
-        let _env = ffx_config::test_init().await?;
+        let env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
-        let root = setup(&mut emu_config.guest, &temp, disk_image_format).await?;
+        let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -1121,11 +1122,11 @@ mod tests {
     #[fuchsia::test]
 
     async fn test_staging_resize_fxfs() -> Result<()> {
-        let _env = ffx_config::test_init().await?;
+        let env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
-        let root = setup(&mut emu_config.guest, &temp, DiskImageFormat::Fxfs).await?;
+        let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fxfs).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -1164,11 +1165,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_embed_boot_data() -> Result<()> {
-        let _env = ffx_config::test_init().await?;
+        let env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let mut emu_config = EmulatorConfiguration::default();
 
-        let root = setup(&mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
+        let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -1230,13 +1231,17 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_port_mappings() -> Result<()> {
-        let _env = ffx_config::test_init().await?;
+        let env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let mut data: EmulatorInstanceData =
             EmulatorInstanceData::new_with_state("test-instance", EngineState::New);
-        let root =
-            setup(&mut data.get_emulator_configuration_mut().guest, &temp, DiskImageFormat::Fvm)
-                .await?;
+        let root = setup(
+            &env.context,
+            &mut data.get_emulator_configuration_mut().guest,
+            &temp,
+            DiskImageFormat::Fvm,
+        )
+        .await?;
         data.set_instance_directory(&root.join("test-instance").to_string_lossy());
         fs::create_dir_all(&data.get_emulator_configuration().runtime.instance_directory)?;
 

@@ -368,7 +368,7 @@ impl Daemon {
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
         self.start_signal_monitoring(quit_tx.clone());
-        let should_start_expiry = ffx_config::get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
+        let should_start_expiry = context.get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
         if should_start_expiry == true {
             self.start_target_expiry(Duration::from_secs(1));
         }

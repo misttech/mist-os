@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use crate::{EmulatorInstanceInfo, EngineType};
     use anyhow::Result;
-    use ffx_config::{query, ConfigLevel};
+    use ffx_config::ConfigLevel;
     use serde_json::json;
     use std::{
         fs::{create_dir_all, remove_file, File},
@@ -152,14 +152,18 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_instance_dir() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
             .expect("Couldn't get a temporary directory for testing.")
             .path()
             .to_str()
             .expect("Couldn't convert Path to str")
             .to_string();
-        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
 
         // Create a new directory.
         let path1 = get_instance_dir("create_me", true).await?;
@@ -191,14 +195,18 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_all_instances() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
             .expect("Couldn't get a temporary directory for testing.")
             .path()
             .to_str()
             .expect("Couldn't convert Path to str")
             .to_string();
-        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
 
         // Create three mock instance directories, and make sure they're all included.
         let path1 = PathBuf::from(&temp_dir).join("path1");
@@ -245,14 +253,18 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_clean_up_instance_dir() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
             .expect("Couldn't get a temporary directory for testing.")
             .path()
             .to_str()
             .expect("Couldn't convert Path to str")
             .to_string();
-        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
 
         let path1 = PathBuf::from(&temp_dir).join("path1");
         create_dir_all(path1.as_path())?;
@@ -284,14 +296,18 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_broken_reads() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let temp_dir = tempdir()
             .expect("Couldn't get a temporary directory for testing.")
             .path()
             .to_str()
             .expect("Couldn't convert Path to str")
             .to_string();
-        query(EMU_INSTANCE_ROOT_DIR).level(Some(ConfigLevel::User)).set(json!(temp_dir)).await?;
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
 
         // Create a test directory in TempFile::tempdir.
         let name = "test_write_then_read";

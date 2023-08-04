@@ -931,7 +931,7 @@ mod tests {
     // options, files, and URLs.
     #[fuchsia::test]
     async fn test_attach() -> Result<()> {
-        let _env = ffx_config::test_init().await.expect("Unable to initialize ffx_config.");
+        let env = ffx_config::test_init().await.expect("Unable to initialize ffx_config.");
         let mut test = Test::try_new()?;
         let mut script = ShellScript::try_new(&mut test)?;
 
@@ -950,7 +950,8 @@ mod tests {
         script = ShellScript::try_new(&mut test)?;
         let mut badpath = PathBuf::from(test.root_dir());
         badpath.push("invalid");
-        ffx_config::query(DEFAULT_FUZZING_OUTPUT_VARIABLE)
+        env.context
+            .query(DEFAULT_FUZZING_OUTPUT_VARIABLE)
             .level(Some(ffx_config::ConfigLevel::User))
             .set(serde_json::json!(&badpath))
             .await?;

@@ -420,25 +420,9 @@ pub async fn check_registration_alias_conflict(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, maplit::btreemap, pretty_assertions::assert_eq, serde_json::json,
-        std::future::Future,
-    };
+    use {super::*, maplit::btreemap, pretty_assertions::assert_eq, serde_json::json};
 
     const CONFIG_KEY_ROOT: &str = "repository";
-
-    // FIXME(http://fxbug.dev/80740): Unfortunately ffx_config is global, and so each of these tests
-    // could step on each others ffx_config entries if run in parallel. To avoid this, we will:
-    //
-    // * use the `serial_test` crate to make sure each test runs sequentially
-    // * clear out the config keys before we run each test to make sure state isn't leaked across
-    //   tests.
-    fn run_async_test<F: Future>(fut: F) -> F::Output {
-        fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
-            let _env = ffx_config::test_init().await.unwrap();
-            fut.await
-        })
-    }
 
     #[test]
     fn test_repository_query() {
@@ -482,691 +466,512 @@ mod tests {
         );
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_default_repository_with_only_one_configured() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_ROOT)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
+    #[fuchsia::test]
+    async fn test_get_default_repository_with_only_one_configured() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_ROOT)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
 
-            // Initially there's no default.
-            assert_eq!(get_default_repository().await.unwrap(), None);
+        // Initially there's no default.
+        assert_eq!(get_default_repository().await.unwrap(), None);
 
-            // Add the repository.
-            let repository =
-                RepositorySpec::Pm { path: "foo/bar/baz".into(), aliases: BTreeSet::new() };
-            set_repository("repo", &repository).await.unwrap();
+        // Add the repository.
+        let repository =
+            RepositorySpec::Pm { path: "foo/bar/baz".into(), aliases: BTreeSet::new() };
+        set_repository("repo", &repository).await.unwrap();
 
-            // The single configured repo should be returned as the default
-            assert_eq!(get_default_repository().await.unwrap(), Some(String::from("repo")));
+        // The single configured repo should be returned as the default
+        assert_eq!(get_default_repository().await.unwrap(), Some(String::from("repo")));
 
-            // Add a second repository.
-            let repository =
-                RepositorySpec::Pm { path: "foo/bar/baz2".into(), aliases: BTreeSet::new() };
-            set_repository("repo2", &repository).await.unwrap();
+        // Add a second repository.
+        let repository =
+            RepositorySpec::Pm { path: "foo/bar/baz2".into(), aliases: BTreeSet::new() };
+        set_repository("repo2", &repository).await.unwrap();
 
-            // The single configured repo should be returned as the default
-            assert_eq!(get_default_repository().await.unwrap(), None);
-        });
+        // The single configured repo should be returned as the default
+        assert_eq!(get_default_repository().await.unwrap(), None);
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_set_unset_default_repository() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_ROOT)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
+    #[fuchsia::test]
+    async fn test_get_set_unset_default_repository() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_ROOT)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
 
-            // Initially there's no default.
-            assert_eq!(get_default_repository().await.unwrap(), None);
+        // Initially there's no default.
+        assert_eq!(get_default_repository().await.unwrap(), None);
 
-            // Setting the default should write to the config.
-            set_default_repository("foo").await.unwrap();
-            assert_eq!(
-                ffx_config::get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
-                json!("foo"),
-            );
-            assert_eq!(get_default_repository().await.unwrap(), Some("foo".into()));
+        // Setting the default should write to the config.
+        set_default_repository("foo").await.unwrap();
+        assert_eq!(
+            env.context.get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
+            json!("foo"),
+        );
+        assert_eq!(get_default_repository().await.unwrap(), Some("foo".into()));
 
-            // We don't care if the repository has `.` in it.
-            set_default_repository("foo.bar").await.unwrap();
-            assert_eq!(
-                ffx_config::get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
-                json!("foo.bar"),
-            );
-            assert_eq!(get_default_repository().await.unwrap(), Some("foo.bar".into()));
+        // We don't care if the repository has `.` in it.
+        set_default_repository("foo.bar").await.unwrap();
+        assert_eq!(
+            env.context.get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
+            json!("foo.bar"),
+        );
+        assert_eq!(get_default_repository().await.unwrap(), Some("foo.bar".into()));
 
-            // Unset removes the default repository from the config.
-            unset_default_repository().await.unwrap();
-            assert_eq!(
-                ffx_config::get::<Option<Value>, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
-                None,
-            );
-            assert_eq!(get_default_repository().await.unwrap(), None);
+        // Unset removes the default repository from the config.
+        unset_default_repository().await.unwrap();
+        assert_eq!(
+            env.context.get::<Option<Value>, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
+            None,
+        );
+        assert_eq!(get_default_repository().await.unwrap(), None);
 
-            // Unsetting the repo again returns an error.
-            assert!(unset_default_repository().await.is_err());
-        });
+        // Unsetting the repo again returns an error.
+        assert!(unset_default_repository().await.is_err());
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_set_remove_repository() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REPOSITORIES)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
+    #[fuchsia::test]
+    async fn test_get_set_remove_repository() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REPOSITORIES)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
 
-            // Initially the repositoy does not exist.
-            assert_eq!(get_repository("repo").await.unwrap(), None);
+        // Initially the repositoy does not exist.
+        assert_eq!(get_repository("repo").await.unwrap(), None);
 
-            // Add the repository.
-            let repository = RepositorySpec::Pm {
+        // Add the repository.
+        let repository = RepositorySpec::Pm {
+            path: "foo/bar/baz".into(),
+            aliases: BTreeSet::from(["example.com".into(), "fuchsia.com".into()]),
+        };
+        set_repository("repo", &repository).await.unwrap();
+
+        // Make sure we wrote to the config.
+        assert_eq!(
+            env.context.get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
+            json!({
+                "repo": {
+                    "type": "pm",
+                    "path": "foo/bar/baz",
+                    "aliases": ["example.com", "fuchsia.com"],
+                }
+            }),
+        );
+
+        // Make sure we can get the repository.
+        assert_eq!(get_repository("repo").await.unwrap(), Some(repository));
+
+        // We can't get unknown repositories.
+        assert_eq!(get_repository("unknown").await.unwrap(), None);
+
+        // We can remove the repository.
+        remove_repository("repo").await.unwrap();
+        assert_eq!(
+            env.context.get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
+            None,
+        );
+        assert_eq!(get_repository("repo").await.unwrap(), None);
+    }
+
+    #[fuchsia::test]
+    async fn test_set_repository_encoding() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REPOSITORIES)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
+
+        set_repository(
+            "repo.name",
+            &RepositorySpec::Pm {
                 path: "foo/bar/baz".into(),
                 aliases: BTreeSet::from(["example.com".into(), "fuchsia.com".into()]),
-            };
-            set_repository("repo", &repository).await.unwrap();
+            },
+        )
+        .await
+        .unwrap();
 
-            // Make sure we wrote to the config.
-            assert_eq!(
-                ffx_config::get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
-                json!({
-                    "repo": {
-                        "type": "pm",
-                        "path": "foo/bar/baz",
-                        "aliases": ["example.com", "fuchsia.com"],
-                    }
-                }),
-            );
+        set_repository(
+            "repo%name",
+            &RepositorySpec::Pm { path: "foo/bar/baz".into(), aliases: BTreeSet::new() },
+        )
+        .await
+        .unwrap();
 
-            // Make sure we can get the repository.
-            assert_eq!(get_repository("repo").await.unwrap(), Some(repository));
-
-            // We can't get unknown repositories.
-            assert_eq!(get_repository("unknown").await.unwrap(), None);
-
-            // We can remove the repository.
-            remove_repository("repo").await.unwrap();
-            assert_eq!(
-                ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
-                None,
-            );
-            assert_eq!(get_repository("repo").await.unwrap(), None);
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_set_repository_encoding() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REPOSITORIES)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
-
-            set_repository(
-                "repo.name",
-                &RepositorySpec::Pm {
-                    path: "foo/bar/baz".into(),
-                    aliases: BTreeSet::from(["example.com".into(), "fuchsia.com".into()]),
+        assert_eq!(
+            env.context.get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
+            json!({
+                "repo%2Ename": {
+                    "type": "pm",
+                    "path": "foo/bar/baz",
+                    "aliases": ["example.com", "fuchsia.com"],
                 },
-            )
-            .await
-            .unwrap();
-
-            set_repository(
-                "repo%name",
-                &RepositorySpec::Pm { path: "foo/bar/baz".into(), aliases: BTreeSet::new() },
-            )
-            .await
-            .unwrap();
-
-            assert_eq!(
-                ffx_config::get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
-                json!({
-                    "repo%2Ename": {
-                        "type": "pm",
-                        "path": "foo/bar/baz",
-                        "aliases": ["example.com", "fuchsia.com"],
-                    },
-                    "repo%25name": {
-                        "type": "pm",
-                        "path": "foo/bar/baz",
-                    }
-                }),
-            );
-        });
+                "repo%25name": {
+                    "type": "pm",
+                    "path": "foo/bar/baz",
+                }
+            }),
+        );
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_set_remove_registration() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
+    #[fuchsia::test]
+    async fn test_get_set_remove_registration() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
 
-            // Initially the registration does not exist.
-            assert_eq!(get_registration("repo", "target").await.unwrap(), None);
+        // Initially the registration does not exist.
+        assert_eq!(get_registration("repo", "target").await.unwrap(), None);
 
-            // Add the registration.
-            let registration = RepositoryTarget {
-                repo_name: "repo".into(),
-                target_identifier: Some("target".into()),
+        // Add the registration.
+        let registration = RepositoryTarget {
+            repo_name: "repo".into(),
+            target_identifier: Some("target".into()),
+            aliases: None,
+            storage_type: None,
+        };
+        set_registration("target", &registration).await.unwrap();
+
+        // Make sure it was written to the config.
+        assert_eq!(
+            env.context.get::<Value, _>(CONFIG_KEY_REGISTRATIONS).await.unwrap(),
+            json!({
+                "repo": {
+                    "target": {
+                        "repo_name": "repo",
+                        "target_identifier": "target",
+                        "aliases": (),
+                        "storage_type": (),
+                    },
+                }
+            }),
+        );
+
+        // Make sure we can get the registration.
+        assert_eq!(get_registration("repo", "target").await.unwrap(), Some(registration));
+
+        // We can't get unknown registrations.
+        assert_eq!(get_registration("unkown", "target").await.unwrap(), None);
+        assert_eq!(get_registration("repo", "unknown").await.unwrap(), None);
+
+        // Remove the registration.
+        remove_registration("repo", "target").await.unwrap();
+        assert_eq!(get_registration("repo", "target").await.unwrap(), None);
+    }
+
+    #[fuchsia::test]
+    async fn test_registration_alias_conflict() {
+        let env = ffx_config::test_init().await.expect("test init");
+        let target_identifier = "target1";
+
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                "repo1": {
+                    target_identifier: {
+                        "repo_name": "repo1",
+                        "target_identifier": target_identifier,
+                        "aliases": ["fuchsia.com"],
+                        "storage_type": (),
+                    },
+                },
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(check_registration_alias_conflict("repo2", target_identifier, vec!["fuchsia.com".to_string()]).await.unwrap_err().to_string(), anyhow!("Alias conflict found while registering 'repo2' for target 'target1'. Alias 'fuchsia.com' is in use for existing registration: 'repo1'. To fix alias registration conflict, de-register older registration with: $ ffx target repository deregister -r repo1").to_string());
+    }
+
+    #[fuchsia::test]
+    async fn test_set_registration_encoding() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
+
+        set_registration(
+            "target.name",
+            &RepositoryTarget {
+                repo_name: "repo.name".into(),
+                target_identifier: Some("target.name".into()),
                 aliases: None,
                 storage_type: None,
-            };
-            set_registration("target", &registration).await.unwrap();
+            },
+        )
+        .await
+        .unwrap();
 
-            // Make sure it was written to the config.
-            assert_eq!(
-                ffx_config::get::<Value, _>(CONFIG_KEY_REGISTRATIONS).await.unwrap(),
-                json!({
-                    "repo": {
-                        "target": {
-                            "repo_name": "repo",
-                            "target_identifier": "target",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-                    }
-                }),
-            );
+        set_registration(
+            "target%name",
+            &RepositoryTarget {
+                repo_name: "repo%name".into(),
+                target_identifier: Some("target%name".into()),
+                aliases: None,
+                storage_type: None,
+            },
+        )
+        .await
+        .unwrap();
 
-            // Make sure we can get the registration.
-            assert_eq!(get_registration("repo", "target").await.unwrap(), Some(registration));
-
-            // We can't get unknown registrations.
-            assert_eq!(get_registration("unkown", "target").await.unwrap(), None);
-            assert_eq!(get_registration("repo", "unknown").await.unwrap(), None);
-
-            // Remove the registration.
-            remove_registration("repo", "target").await.unwrap();
-            assert_eq!(get_registration("repo", "target").await.unwrap(), None);
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_registration_alias_conflict() {
-        run_async_test(async {
-            let target_identifier = "target1";
-
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    "repo1": {
-                        target_identifier: {
-                            "repo_name": "repo1",
-                            "target_identifier": target_identifier,
-                            "aliases": ["fuchsia.com"],
-                            "storage_type": (),
-                        },
+        assert_eq!(
+            env.context.get::<Value, _>(CONFIG_KEY_REGISTRATIONS).await.unwrap(),
+            json!({
+                "repo%2Ename": {
+                    "target%2Ename": {
+                        "repo_name": "repo.name",
+                        "target_identifier": "target.name",
+                        "aliases": (),
+                        "storage_type": (),
                     },
-                }))
-                .await
-                .unwrap();
-
-            assert_eq!(check_registration_alias_conflict("repo2", target_identifier, vec!["fuchsia.com".to_string()]).await.unwrap_err().to_string(), anyhow!("Alias conflict found while registering 'repo2' for target 'target1'. Alias 'fuchsia.com' is in use for existing registration: 'repo1'. To fix alias registration conflict, de-register older registration with: $ ffx target repository deregister -r repo1").to_string());
-        });
+                },
+                "repo%25name": {
+                    "target%25name": {
+                        "repo_name": "repo%name",
+                        "target_identifier": "target%name",
+                        "aliases": (),
+                        "storage_type": (),
+                    },
+                }
+            }),
+        );
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_set_registration_encoding() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
+    #[fuchsia::test]
+    async fn test_get_repositories_empty() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REPOSITORIES)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
+        assert_eq!(get_repositories().await, btreemap! {});
+    }
 
-            set_registration(
-                "target.name",
-                &RepositoryTarget {
-                    repo_name: "repo.name".into(),
-                    target_identifier: Some("target.name".into()),
-                    aliases: None,
-                    storage_type: None,
+    #[fuchsia::test]
+    async fn test_get_repositories() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REPOSITORIES)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                // Parse a normal repository.
+                "repo-name": {
+                    "type": "pm",
+                    "path": "foo/bar/baz",
                 },
-            )
+
+                // Parse encoded `repo.name`.
+                "repo%2Ename": {
+                    "type": "pm",
+                    "path": "foo/bar/baz",
+                },
+
+                // Parse encoded `repo%name`.
+                "repo%25name": {
+                    "type": "pm",
+                    "path": "foo/bar/baz",
+                },
+            }))
             .await
             .unwrap();
 
-            set_registration(
-                "target%name",
-                &RepositoryTarget {
-                    repo_name: "repo%name".into(),
-                    target_identifier: Some("target%name".into()),
-                    aliases: None,
-                    storage_type: None,
+        assert_eq!(
+            get_repositories().await,
+            btreemap! {
+                "repo-name".into() => RepositorySpec::Pm {
+                    path: "foo/bar/baz".into(),
+                    aliases: BTreeSet::new(),
                 },
-            )
+                "repo.name".into() => RepositorySpec::Pm {
+                    path: "foo/bar/baz".into(),
+                    aliases: BTreeSet::new(),
+                },
+                "repo%name".into() => RepositorySpec::Pm {
+                    path: "foo/bar/baz".into(),
+                    aliases: BTreeSet::new(),
+                },
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_get_repositories_ignores_invalid_entries() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REPOSITORIES)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                // Ignores invalid repositories.
+                "invalid-entries": {},
+
+                // Ignores invalid encoded repository names.
+                "invalid%aaencoding": {
+                    "type": "pm",
+                    "path": "repo/bar/baz",
+                },
+            }))
             .await
             .unwrap();
 
-            assert_eq!(
-                ffx_config::get::<Value, _>(CONFIG_KEY_REGISTRATIONS).await.unwrap(),
-                json!({
-                    "repo%2Ename": {
-                        "target%2Ename": {
-                            "repo_name": "repo.name",
-                            "target_identifier": "target.name",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-                    },
-                    "repo%25name": {
-                        "target%25name": {
-                            "repo_name": "repo%name",
-                            "target_identifier": "target%name",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-                    }
-                }),
-            );
-        });
+        assert_eq!(get_repositories().await, btreemap! {});
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repositories_empty() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REPOSITORIES)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
-            assert_eq!(get_repositories().await, btreemap! {});
-        });
+    #[fuchsia::test]
+    async fn test_get_registrations_empty() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
+        assert_eq!(get_registrations().await, btreemap! {});
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repositories() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REPOSITORIES)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    // Parse a normal repository.
-                    "repo-name": {
-                        "type": "pm",
-                        "path": "foo/bar/baz",
+    #[fuchsia::test]
+    async fn test_get_registrations() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                "repo1": {
+                    "target1": {
+                        "repo_name": "repo1",
+                        "target_identifier": "target1",
+                        "storage_type": (),
+                    },
+                    "target2": {
+                        "repo_name": "repo1",
+                        "target_identifier": "target2",
+                        "aliases": ["fuchsia.com"],
+                        "storage_type": (),
                     },
 
-                    // Parse encoded `repo.name`.
-                    "repo%2Ename": {
-                        "type": "pm",
-                        "path": "foo/bar/baz",
+                    // Ignores invalid targets.
+                    "target3": {},
+                },
+
+                "repo2": {
+                    "target1": {
+                        "repo_name": "repo2",
+                        "target_identifier": "target1",
+                        "storage_type": (),
                     },
-
-                    // Parse encoded `repo%name`.
-                    "repo%25name": {
-                        "type": "pm",
-                        "path": "foo/bar/baz",
+                    "target2": {
+                        "repo_name": "repo2",
+                        "target_identifier": "target2",
+                        "storage_type": (),
                     },
-                }))
-                .await
-                .unwrap();
+                },
+            }))
+            .await
+            .unwrap();
 
-            assert_eq!(
-                get_repositories().await,
-                btreemap! {
-                    "repo-name".into() => RepositorySpec::Pm {
-                        path: "foo/bar/baz".into(),
-                        aliases: BTreeSet::new(),
-                    },
-                    "repo.name".into() => RepositorySpec::Pm {
-                        path: "foo/bar/baz".into(),
-                        aliases: BTreeSet::new(),
-                    },
-                    "repo%name".into() => RepositorySpec::Pm {
-                        path: "foo/bar/baz".into(),
-                        aliases: BTreeSet::new(),
-                    },
-                }
-            );
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repositories_ignores_invalid_entries() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REPOSITORIES)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    // Ignores invalid repositories.
-                    "invalid-entries": {},
-
-                    // Ignores invalid encoded repository names.
-                    "invalid%aaencoding": {
-                        "type": "pm",
-                        "path": "repo/bar/baz",
-                    },
-                }))
-                .await
-                .unwrap();
-
-            assert_eq!(get_repositories().await, btreemap! {});
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_registrations_empty() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
-            assert_eq!(get_registrations().await, btreemap! {});
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_registrations() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    "repo1": {
-                        "target1": {
-                            "repo_name": "repo1",
-                            "target_identifier": "target1",
-                            "storage_type": (),
-                        },
-                        "target2": {
-                            "repo_name": "repo1",
-                            "target_identifier": "target2",
-                            "aliases": ["fuchsia.com"],
-                            "storage_type": (),
-                        },
-
-                        // Ignores invalid targets.
-                        "target3": {},
-                    },
-
-                    "repo2": {
-                        "target1": {
-                            "repo_name": "repo2",
-                            "target_identifier": "target1",
-                            "storage_type": (),
-                        },
-                        "target2": {
-                            "repo_name": "repo2",
-                            "target_identifier": "target2",
-                            "storage_type": (),
-                        },
-                    },
-                }))
-                .await
-                .unwrap();
-
-            assert_eq!(
-                get_registrations().await,
-                btreemap! {
-                    "repo1".into() => btreemap! {
-                        "target1".into() => RepositoryTarget {
-                            repo_name: "repo1".into(),
-                            target_identifier: Some("target1".into()),
-                            aliases: None,
-                            storage_type: None,
-                        },
-                        "target2".into() => RepositoryTarget {
-                            repo_name: "repo1".into(),
-                            target_identifier: Some("target2".into()),
-                            aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
-                            storage_type: None,
-                        },
-                    },
-                    "repo2".into() => btreemap! {
-                        "target1".into() => RepositoryTarget {
-                            repo_name: "repo2".into(),
-                            target_identifier: Some("target1".into()),
-                            aliases: None,
-                            storage_type: None,
-                        },
-                        "target2".into() => RepositoryTarget {
-                            repo_name: "repo2".into(),
-                            target_identifier: Some("target2".into()),
-                            aliases: None,
-                            storage_type: None,
-                        },
-                    },
-                }
-            );
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_registrations_encoding() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    // Parse an encoded `repo.name`.
-                    "repo%2Ename": {
-                        // Parse an encoded `target.name`.
-                        "target%2Ename": {
-                            "repo_name": "repo.name",
-                            "target_identifier": "target.name",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-
-                        // Parse an encoded `target%name`.
-                        "target%25name": {
-                            "repo_name": "repo.name",
-                            "target_identifier": "target%name",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-                    },
-
-                    // Parse encoded `foo%name`.
-                    "repo%25name": {
-                        "target-name": {
-                            "repo_name": "repo%name",
-                            "target_identifier": "target-name",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-                    },
-                }))
-                .await
-                .unwrap();
-
-            assert_eq!(
-                get_registrations().await,
-                btreemap! {
-                    "repo.name".into() => btreemap! {
-                        "target.name".into() => RepositoryTarget {
-                            repo_name: "repo.name".into(),
-                            target_identifier: Some("target.name".into()),
-                            aliases: None,
-                            storage_type: None,
-                        },
-                        "target%name".into() => RepositoryTarget {
-                            repo_name: "repo.name".into(),
-                            target_identifier: Some("target%name".into()),
-                            aliases: None,
-                            storage_type: None,
-                        },
-                    },
-                    "repo%name".into() => btreemap! {
-                        "target-name".into() => RepositoryTarget {
-                            repo_name: "repo%name".into(),
-                            target_identifier: Some("target-name".into()),
-                            aliases: None,
-                            storage_type: None,
-                        },
-                    },
-                }
-            );
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_registrations_invalid_entries() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    // Ignores empty repositories.
-                    "empty-entries": {},
-
-                    "repo-name": {
-                        // Ignores invalid targets.
-                        "invalid-target": {},
-
-                        // Ignores invalid encoded target.
-                        "invalid%aaencoding": {
-                            "repo_name": "repo-name",
-                            "target_identifier": "target-name",
-                            "aliases": [],
-                            "storage_type": (),
-                        },
-                    },
-
-                    // Ignores invalid encoded repository names.
-                    "invalid%aarepo": {
-                        "target-name": {
-                            "repo_name": "repo-name",
-                            "target_identifier": "target-name",
-                            "aliases": [],
-                            "storage_type": (),
-                        },
-                    },
-                }))
-                .await
-                .unwrap();
-
-            assert_eq!(
-                get_registrations().await,
-                btreemap! {
-                    "repo-name".into() => btreemap! {},
-                }
-            );
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repository_registrations_empty() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({}))
-                .await
-                .unwrap();
-            assert_eq!(get_repository_registrations("repo").await, btreemap! {});
-        });
-    }
-
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repository_registrations() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    "repo": {
-                        "target1": {
-                            "repo_name": "repo1",
-                            "target_identifier": "target1",
-                            "aliases": ["fuchsia.com"],
-                            "storage_type": (),
-                        },
-                        "target2": {
-                            "repo_name": "repo1",
-                            "target_identifier": "target2",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
-
-                        // Ignores invalid targets.
-                        "target3": {},
-                    },
-                }))
-                .await
-                .unwrap();
-
-            assert_eq!(
-                get_repository_registrations("repo").await,
-                btreemap! {
+        assert_eq!(
+            get_registrations().await,
+            btreemap! {
+                "repo1".into() => btreemap! {
                     "target1".into() => RepositoryTarget {
                         repo_name: "repo1".into(),
                         target_identifier: Some("target1".into()),
-                        aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
+                        aliases: None,
                         storage_type: None,
                     },
                     "target2".into() => RepositoryTarget {
                         repo_name: "repo1".into(),
                         target_identifier: Some("target2".into()),
+                        aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
+                        storage_type: None,
+                    },
+                },
+                "repo2".into() => btreemap! {
+                    "target1".into() => RepositoryTarget {
+                        repo_name: "repo2".into(),
+                        target_identifier: Some("target1".into()),
+                        aliases: None,
+                        storage_type: None,
+                    },
+                    "target2".into() => RepositoryTarget {
+                        repo_name: "repo2".into(),
+                        target_identifier: Some("target2".into()),
                         aliases: None,
                         storage_type: None,
                     },
                 },
-            );
-
-            // Getting an unknown repository gets nothing.
-            assert_eq!(get_repository_registrations("unknown").await, btreemap! {});
-        });
+            }
+        );
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repository_registrations_encoding() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    // Parse an encoded `repo.name`.
-                    "repo%2Ename": {
-                        // Parse an encoded `target.name`.
-                        "target%2Ename": {
-                            "repo_name": "repo.name",
-                            "target_identifier": "target.name",
-                            "aliases": ["fuchsia.com"],
-                            "storage_type": (),
-                        },
-
-                        // Parse an encoded `target%name`.
-                        "target%25name": {
-                            "repo_name": "repo.name",
-                            "target_identifier": "target%name",
-                            "aliases": (),
-                            "storage_type": (),
-                        },
+    #[fuchsia::test]
+    async fn test_get_registrations_encoding() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                // Parse an encoded `repo.name`.
+                "repo%2Ename": {
+                    // Parse an encoded `target.name`.
+                    "target%2Ename": {
+                        "repo_name": "repo.name",
+                        "target_identifier": "target.name",
+                        "aliases": (),
+                        "storage_type": (),
                     },
-                }))
-                .await
-                .unwrap();
 
-            assert_eq!(
-                get_repository_registrations("repo.name").await,
-                btreemap! {
+                    // Parse an encoded `target%name`.
+                    "target%25name": {
+                        "repo_name": "repo.name",
+                        "target_identifier": "target%name",
+                        "aliases": (),
+                        "storage_type": (),
+                    },
+                },
+
+                // Parse encoded `foo%name`.
+                "repo%25name": {
+                    "target-name": {
+                        "repo_name": "repo%name",
+                        "target_identifier": "target-name",
+                        "aliases": (),
+                        "storage_type": (),
+                    },
+                },
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_registrations().await,
+            btreemap! {
+                "repo.name".into() => btreemap! {
                     "target.name".into() => RepositoryTarget {
                         repo_name: "repo.name".into(),
                         target_identifier: Some("target.name".into()),
-                        aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
+                        aliases: None,
                         storage_type: None,
                     },
                     "target%name".into() => RepositoryTarget {
@@ -1176,49 +981,210 @@ mod tests {
                         storage_type: None,
                     },
                 },
-            );
-        });
+                "repo%name".into() => btreemap! {
+                    "target-name".into() => RepositoryTarget {
+                        repo_name: "repo%name".into(),
+                        target_identifier: Some("target-name".into()),
+                        aliases: None,
+                        storage_type: None,
+                    },
+                },
+            }
+        );
     }
 
-    #[serial_test::serial]
-    #[test]
-    fn test_get_repository_registrations_invalid_entries() {
-        run_async_test(async {
-            ffx_config::query(CONFIG_KEY_REGISTRATIONS)
-                .level(Some(ConfigLevel::User))
-                .set(json!({
-                    // Ignores empty repositories.
-                    "empty-entries": {},
+    #[fuchsia::test]
+    async fn test_get_registrations_invalid_entries() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                // Ignores empty repositories.
+                "empty-entries": {},
 
-                    "repo-name": {
-                        // Ignores invalid targets.
-                        "invalid-target": {},
+                "repo-name": {
+                    // Ignores invalid targets.
+                    "invalid-target": {},
 
-                        // Ignores invalid encoded target.
-                        "invalid%aaencoding": {
-                            "repo_name": "repo-name",
-                            "target_identifier": "target-name",
-                            "aliases": [],
-                            "storage_type": (),
-                        },
+                    // Ignores invalid encoded target.
+                    "invalid%aaencoding": {
+                        "repo_name": "repo-name",
+                        "target_identifier": "target-name",
+                        "aliases": [],
+                        "storage_type": (),
+                    },
+                },
+
+                // Ignores invalid encoded repository names.
+                "invalid%aarepo": {
+                    "target-name": {
+                        "repo_name": "repo-name",
+                        "target_identifier": "target-name",
+                        "aliases": [],
+                        "storage_type": (),
+                    },
+                },
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_registrations().await,
+            btreemap! {
+                "repo-name".into() => btreemap! {},
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_get_repository_registrations_empty() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({}))
+            .await
+            .unwrap();
+        assert_eq!(get_repository_registrations("repo").await, btreemap! {});
+    }
+
+    #[fuchsia::test]
+    async fn test_get_repository_registrations() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                "repo": {
+                    "target1": {
+                        "repo_name": "repo1",
+                        "target_identifier": "target1",
+                        "aliases": ["fuchsia.com"],
+                        "storage_type": (),
+                    },
+                    "target2": {
+                        "repo_name": "repo1",
+                        "target_identifier": "target2",
+                        "aliases": (),
+                        "storage_type": (),
                     },
 
-                    // Ignores invalid encoded repository names.
-                    "invalid%aarepo": {
-                        "target-name": {
-                            "repo_name": "repo-name",
-                            "target_identifier": "target-name",
-                            "aliases": [],
-                            "storage_type": (),
-                        },
+                    // Ignores invalid targets.
+                    "target3": {},
+                },
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_repository_registrations("repo").await,
+            btreemap! {
+                "target1".into() => RepositoryTarget {
+                    repo_name: "repo1".into(),
+                    target_identifier: Some("target1".into()),
+                    aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
+                    storage_type: None,
+                },
+                "target2".into() => RepositoryTarget {
+                    repo_name: "repo1".into(),
+                    target_identifier: Some("target2".into()),
+                    aliases: None,
+                    storage_type: None,
+                },
+            },
+        );
+
+        // Getting an unknown repository gets nothing.
+        assert_eq!(get_repository_registrations("unknown").await, btreemap! {});
+    }
+
+    #[fuchsia::test]
+    async fn test_get_repository_registrations_encoding() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                // Parse an encoded `repo.name`.
+                "repo%2Ename": {
+                    // Parse an encoded `target.name`.
+                    "target%2Ename": {
+                        "repo_name": "repo.name",
+                        "target_identifier": "target.name",
+                        "aliases": ["fuchsia.com"],
+                        "storage_type": (),
                     },
-                }))
-                .await
-                .unwrap();
 
-            assert_eq!(get_repository_registrations("empty-entries").await, btreemap! {});
+                    // Parse an encoded `target%name`.
+                    "target%25name": {
+                        "repo_name": "repo.name",
+                        "target_identifier": "target%name",
+                        "aliases": (),
+                        "storage_type": (),
+                    },
+                },
+            }))
+            .await
+            .unwrap();
 
-            assert_eq!(get_repository_registrations("repo-name").await, btreemap! {});
-        });
+        assert_eq!(
+            get_repository_registrations("repo.name").await,
+            btreemap! {
+                "target.name".into() => RepositoryTarget {
+                    repo_name: "repo.name".into(),
+                    target_identifier: Some("target.name".into()),
+                    aliases: Some(BTreeSet::from(["fuchsia.com".into()])),
+                    storage_type: None,
+                },
+                "target%name".into() => RepositoryTarget {
+                    repo_name: "repo.name".into(),
+                    target_identifier: Some("target%name".into()),
+                    aliases: None,
+                    storage_type: None,
+                },
+            },
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_get_repository_registrations_invalid_entries() {
+        let env = ffx_config::test_init().await.expect("test init");
+        env.context
+            .query(CONFIG_KEY_REGISTRATIONS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({
+                // Ignores empty repositories.
+                "empty-entries": {},
+
+                "repo-name": {
+                    // Ignores invalid targets.
+                    "invalid-target": {},
+
+                    // Ignores invalid encoded target.
+                    "invalid%aaencoding": {
+                        "repo_name": "repo-name",
+                        "target_identifier": "target-name",
+                        "aliases": [],
+                        "storage_type": (),
+                    },
+                },
+
+                // Ignores invalid encoded repository names.
+                "invalid%aarepo": {
+                    "target-name": {
+                        "repo_name": "repo-name",
+                        "target_identifier": "target-name",
+                        "aliases": [],
+                        "storage_type": (),
+                    },
+                },
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(get_repository_registrations("empty-entries").await, btreemap! {});
+
+        assert_eq!(get_repository_registrations("repo-name").await, btreemap! {});
     }
 }

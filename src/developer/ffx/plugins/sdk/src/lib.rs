@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use ffx_config::{query, ConfigLevel};
+use ffx_config::{ConfigLevel, EnvironmentContext};
 use ffx_sdk_args::{SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use sdk::{in_tree_sdk_version, Sdk, SdkVersion};
@@ -11,6 +11,7 @@ use std::io::Write;
 
 #[derive(FfxTool)]
 pub struct SdkTool {
+    context: EnvironmentContext,
     sdk: fho::Result<Sdk>,
     #[command]
     cmd: SdkCommand,
@@ -23,18 +24,10 @@ impl FfxMain for SdkTool {
     type Writer = SimpleWriter;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        exec_sdk(self.cmd, self.sdk, writer).await
-    }
-}
-
-pub async fn exec_sdk(
-    command: SdkCommand,
-    sdk: fho::Result<Sdk>,
-    writer: SimpleWriter,
-) -> fho::Result<()> {
-    match &command.sub {
-        SubCommand::Version(_) => exec_version(sdk?, writer).await.map_err(Into::into),
-        SubCommand::Set(cmd) => exec_set(cmd).await.map_err(Into::into),
+        match &self.cmd.sub {
+            SubCommand::Version(_) => exec_version(self.sdk?, writer).await.map_err(Into::into),
+            SubCommand::Set(cmd) => exec_set(self.context, cmd).await.map_err(Into::into),
+        }
     }
 }
 
@@ -48,12 +41,13 @@ async fn exec_version<W: Write>(sdk: Sdk, mut writer: W) -> Result<()> {
     Ok(())
 }
 
-async fn exec_set(cmd: &SetCommand) -> Result<()> {
+async fn exec_set(context: EnvironmentContext, cmd: &SetCommand) -> Result<()> {
     match &cmd.sub {
         SetSubCommand::Root(SetRootCommand { path }) => {
             let abs_path =
                 path.canonicalize().context(format!("making path absolute: {:?}", path))?;
-            query("sdk.root")
+            context
+                .query("sdk.root")
                 .level(Some(ConfigLevel::User))
                 .set(abs_path.to_string_lossy().into())
                 .await?;

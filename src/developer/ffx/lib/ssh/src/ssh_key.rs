@@ -618,13 +618,15 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load() {
         // Set up the test environment and set the ssh key paths
-        let _env = test_init().await.expect("test env init");
-        query("ssh.pub")
+        let env = test_init().await.expect("test env init");
+        env.context
+            .query("ssh.pub")
             .level(Some(ConfigLevel::User))
             .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", "/expected/default", "someother"]))
             .await
             .expect("set ssh.pub");
-        query("ssh.priv")
+        env.context
+            .query("ssh.priv")
             .level(Some(ConfigLevel::User))
             .set(json!([
                 "$ENV_PATH_THAT_IS_NOT_SET_2",

@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use errors::{ffx_bail, ffx_error};
-use ffx_command::{Error, FfxContext, Result};
+use ffx_command::{return_user_error, user_error, Error, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_fidl::{DaemonError, VersionInfo};
 use fidl::endpoints::Proxy;
@@ -95,12 +94,12 @@ pub struct AvailabilityFlag<T>(pub T);
 
 #[async_trait(?Send)]
 impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
-    async fn check_env(self, _env: &FhoEnvironment) -> Result<()> {
+    async fn check_env(self, env: &FhoEnvironment) -> Result<()> {
         let flag = self.0.as_ref();
-        if ffx_config::get(flag).await.unwrap_or(false) {
+        if env.context.get(flag).await.unwrap_or(false) {
             Ok(())
         } else {
-            ffx_bail!(
+            return_user_error!(
                 "This is an experimental subcommand.  To enable this subcommand run 'ffx config set {} true'",
                 flag
             );
@@ -289,13 +288,13 @@ impl<P: Clone> std::ops::Deref for DaemonProtocol<P> {
 
 fn map_daemon_error(svc_name: &str, err: DaemonError) -> Error {
     match err {
-        DaemonError::ProtocolNotFound => ffx_error!(
+        DaemonError::ProtocolNotFound => user_error!(
             "The daemon protocol '{svc_name}' did not match any protocols on the daemon
 If you are not developing this plugin or the protocol it connects to, then this is a bug
 
 Please report it at http://fxbug.dev/new/ffx+User+Bug."
         ),
-        DaemonError::ProtocolOpenError => ffx_error!(
+        DaemonError::ProtocolOpenError => user_error!(
             "The daemon protocol '{svc_name}' failed to open on the daemon.
 
 If you are developing the protocol, there may be an internal failure when invoking the start
@@ -305,7 +304,7 @@ If you are NOT developing this plugin or the protocol it connects to, then this 
 
 Please report it at http://fxbug.dev/new/ffx+User+Bug."
         ),
-        unexpected => ffx_error!(
+        unexpected => user_error!(
 "While attempting to open the daemon protocol '{svc_name}', received an unexpected error:
 
 {unexpected:?}

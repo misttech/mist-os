@@ -247,7 +247,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     let mut log_root = None;
     let mut output_dir = None;
     let mut record = cmd.record;
-    match get("log.enabled").await {
+    match context.get("log.enabled").await {
         Ok(enabled) => {
             let enabled: bool = enabled;
             if !enabled && cmd.record {
@@ -264,7 +264,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
                 fuchsia_async::Timer::new(Duration::from_millis(10000)).await;
             }
 
-            log_root = Some(get("log.dir").await?);
+            log_root = Some(context.get("log.dir").await?);
             let final_output_dir =
                 cmd.output_dir.map(|s| PathBuf::from(s)).unwrap_or(std::env::current_dir()?);
 
@@ -319,7 +319,8 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
 
     let recorder = Arc::new(Mutex::new(DoctorRecorder::new()));
     let mut handler = DefaultDoctorStepHandler::new(recorder.clone(), Box::new(writer));
-    let default_target = get(TARGET_DEFAULT_KEY)
+    let default_target = context
+        .get(TARGET_DEFAULT_KEY)
         .await
         .map_err(|e: ffx_config::api::ConfigError| format!("{:?}", e).replace("\n", ""));
 
@@ -1279,7 +1280,7 @@ mod test {
     use super::*;
     use async_lock::Mutex;
     use async_trait::async_trait;
-    use ffx_config::{query, ConfigLevel, TestEnv};
+    use ffx_config::{ConfigLevel, TestEnv};
     use ffx_doctor_test_utils::MockWriter;
     use fidl::{
         endpoints::{
@@ -3371,8 +3372,20 @@ mod test {
         let pub_key = test_env.isolate_root.path().join("test_authorized_keys");
         let priv_key = test_env.isolate_root.path().join("test_ed25519_key");
         // Set the paths to use for the SSH keys
-        query("ssh.pub").level(Some(ConfigLevel::User)).set(json!([&pub_key])).await.unwrap();
-        query("ssh.priv").level(Some(ConfigLevel::User)).set(json!([&priv_key])).await.unwrap();
+        test_env
+            .context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!([&pub_key]))
+            .await
+            .unwrap();
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([&priv_key]))
+            .await
+            .unwrap();
 
         // Do not generate the keys - so they are missing.
 

@@ -247,7 +247,7 @@ impl Injector for Injection {
     }
 
     async fn is_experiment(&self, key: &str) -> bool {
-        ffx_config::get(key).await.unwrap_or(false)
+        self.env_context.get(key).await.unwrap_or(false)
     }
 
     async fn build_info(&self) -> Result<VersionInfo> {
