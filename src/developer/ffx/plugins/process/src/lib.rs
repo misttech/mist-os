@@ -8,7 +8,9 @@ mod fuchsia_map;
 mod processes_data;
 mod write_human_readable_output;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+
+use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::BuildInfo;
@@ -23,10 +25,13 @@ use fuchsia_zircon_types::zx_koid_t;
 use futures::AsyncReadExt;
 use processes_data::{processed, raw};
 use std::collections::HashSet;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Command, Stdio};
 use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
+
+const BARRIER: &str = "<ffx symbolizer>\n";
 
 pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 
@@ -213,7 +218,7 @@ async fn stack_trace_subcommand(
     };
     match explorer_proxy.get_stack_trace(&arg).await?.map_err(Status::from_raw) {
         Ok(stack_trace) => {
-            writeln!(w, "{}", stack_trace)?;
+            write_symbolized_stack_traces(w, stack_trace).await?;
             Ok(())
         }
         Err(Status::NOT_FOUND) => {
@@ -225,6 +230,50 @@ async fn stack_trace_subcommand(
             Err(e.into())
         }
     }
+}
+
+async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<()> {
+    let sdk = global_env_context().context("Loading global environment context")?.get_sdk().await?;
+    if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk).await {
+        tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+    }
+
+    let path = sdk.get_host_tool("symbolizer").context("getting symbolizer binary path")?;
+    let mut cmd = Command::new(path)
+        .args(vec![
+            "--symbol-server",
+            "gs://fuchsia-artifacts/debug",
+            "--symbol-server",
+            "gs://fuchsia-artifacts-internal/debug",
+            "--symbol-server",
+            "gs://fuchsia-artifacts-release/debug",
+        ])
+        .stdout(Stdio::piped())
+        .stdin(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .context("Spawning symbolizer")?;
+    let mut stdin = cmd.stdin.take().context("missing stdin")?;
+    let mut stdout = BufReader::new(cmd.stdout.take().context("missing stdout")?);
+    stdin.write_all(stack_trace.as_bytes())?;
+    stdin.write_all(BARRIER.as_bytes())?;
+
+    loop {
+        let mut stdout_buf = String::default();
+        match stdout.read_line(&mut stdout_buf) {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!("reading from symbolizer stdout failed: {}", e);
+                continue;
+            }
+        }
+
+        if stdout_buf.as_str() == BARRIER {
+            break;
+        }
+        write!(w, "{}", stdout_buf)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
