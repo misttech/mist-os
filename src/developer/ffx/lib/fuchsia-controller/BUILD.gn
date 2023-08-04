@@ -50,20 +50,20 @@ rustc_staticlib("lib") {
 
 python_c_extension("fidl_codec") {
   sources = [
-    "abi/convert.h",
-    "abi/macros.h",
-    "fidl_codec/decode.cc",
-    "fidl_codec/decode.h",
-    "fidl_codec/encode.cc",
-    "fidl_codec/encode.h",
-    "fidl_codec/fidl_codec.cc",
-    "fidl_codec/ir.cc",
-    "fidl_codec/ir.h",
-    "fidl_codec/mod.cc",
-    "fidl_codec/mod.h",
-    "fidl_codec/object_converter.cc",
-    "fidl_codec/object_converter.h",
-    "fidl_codec/python_dict_visitor.h",
+    "cpp/abi/convert.h",
+    "cpp/abi/macros.h",
+    "cpp/fidl_codec/decode.cc",
+    "cpp/fidl_codec/decode.h",
+    "cpp/fidl_codec/encode.cc",
+    "cpp/fidl_codec/encode.h",
+    "cpp/fidl_codec/fidl_codec.cc",
+    "cpp/fidl_codec/ir.cc",
+    "cpp/fidl_codec/ir.h",
+    "cpp/fidl_codec/mod.cc",
+    "cpp/fidl_codec/mod.h",
+    "cpp/fidl_codec/object_converter.cc",
+    "cpp/fidl_codec/object_converter.h",
+    "cpp/fidl_codec/python_dict_visitor.h",
   ]
 
   deps = [
@@ -76,20 +76,20 @@ python_c_extension("fidl_codec") {
 
 python_c_extension("fuchsia_controller_py") {
   sources = [
-    "abi/convert.h",
-    "abi/error.cc",
-    "abi/error.h",
-    "abi/fidl_channel.cc",
-    "abi/fidl_channel.h",
-    "abi/fidl_handle.cc",
-    "abi/fidl_handle.h",
-    "abi/fuchsia_controller.h",
-    "abi/fuchsia_controller_py.cc",
-    "abi/isolate_directory.cc",
-    "abi/isolate_directory.h",
-    "abi/macros.h",
-    "abi/mod.cc",
-    "abi/mod.h",
+    "cpp/abi/convert.h",
+    "cpp/abi/error.cc",
+    "cpp/abi/error.h",
+    "cpp/abi/fidl_channel.cc",
+    "cpp/abi/fidl_channel.h",
+    "cpp/abi/fidl_handle.cc",
+    "cpp/abi/fidl_handle.h",
+    "cpp/abi/fuchsia_controller.h",
+    "cpp/abi/fuchsia_controller_py.cc",
+    "cpp/abi/isolate_directory.cc",
+    "cpp/abi/isolate_directory.h",
+    "cpp/abi/macros.h",
+    "cpp/abi/mod.cc",
+    "cpp/abi/mod.h",
   ]
 
   deps = [

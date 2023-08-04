@@ -10,7 +10,7 @@
 
 #include "mod.h"
 #include "python_dict_visitor.h"
-#include "src/developer/ffx/lib/fuchsia-controller/abi/convert.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
 #include "src/lib/fidl_codec/wire_parser.h"
 
 namespace decode {

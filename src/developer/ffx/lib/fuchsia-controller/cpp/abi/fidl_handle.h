@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_ABI_FIDL_HANDLE_H_
-#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_ABI_FIDL_HANDLE_H_
+#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FIDL_HANDLE_H_
+#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FIDL_HANDLE_H_
 
 #include <Python.h>
 #include <zircon/types.h>
 
-#include "src/developer/ffx/lib/fuchsia-controller/abi/macros.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/macros.h"
 
 namespace fidl_handle {
 
@@ -22,4 +22,4 @@ using FidlHandle = struct {
 
 }  // namespace fidl_handle
 
-#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_ABI_FIDL_HANDLE_H_
+#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FIDL_HANDLE_H_

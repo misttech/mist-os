@@ -13,7 +13,7 @@
 #include "ir.h"
 #include "mod.h"
 #include "py_wrapper.h"
-#include "src/developer/ffx/lib/fuchsia-controller/abi/macros.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/macros.h"
 #include "src/lib/fidl_codec/library_loader.h"
 
 extern struct PyModuleDef fidl_codec_mod;

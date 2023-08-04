@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_ABI_FIDL_CHANNEL_H_
-#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_ABI_FIDL_CHANNEL_H_
+#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FIDL_CHANNEL_H_
+#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FIDL_CHANNEL_H_
 
 #include <Python.h>
 
@@ -21,4 +21,4 @@ using FidlChannel = struct {
 
 }  // namespace fidl_channel
 
-#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_ABI_FIDL_CHANNEL_H_
+#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FIDL_CHANNEL_H_

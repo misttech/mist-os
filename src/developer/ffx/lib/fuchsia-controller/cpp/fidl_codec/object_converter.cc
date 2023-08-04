@@ -10,7 +10,7 @@
 
 #include "object.h"
 #include "py_wrapper.h"
-#include "src/developer/ffx/lib/fuchsia-controller/abi/convert.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
 #include "src/lib/fidl_codec/wire_object.h"
 
 namespace converter {
