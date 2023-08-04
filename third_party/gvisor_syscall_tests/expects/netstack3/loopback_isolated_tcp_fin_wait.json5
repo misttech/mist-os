@@ -15,10 +15,10 @@
         {
             type: "skip",
             matchers: [
-                // NS3 does not support dual-stack TCP sockets yet, and these
-                // tests are known to occasionally timeout rather than fail
-                // (e.g. https://fxbug.dev/130377).
-                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4Any",
+                // TODO(https://fxbug.dev/130377): NS3 does not support dual
+                // stack TCP sockets yet, these tests are known to occasionally
+                // timeout rather than fail.
+                "All/*.*/ListenV6Any_ConnectV4Any",
             ],
         },
         {
