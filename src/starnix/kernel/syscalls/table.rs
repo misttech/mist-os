@@ -195,6 +195,7 @@ pub fn dispatch_syscall(
         prlimit64[4],
         process_vm_readv[6],
         pselect6[6],
+        ptrace[4],
         pwrite64[4],
         pwritev[4],
         pwritev2[6],

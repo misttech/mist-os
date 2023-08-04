@@ -885,6 +885,17 @@ pub fn sys_prctl(
     }
 }
 
+pub fn sys_ptrace(
+    _current_task: &mut CurrentTask,
+    request: u64,
+    pid: pid_t,
+    addr: UserAddress,
+    data: UserAddress,
+) -> Result<(), Errno> {
+    not_implemented!("ptrace({request}, {pid}, {addr}, {data})");
+    error!(ENOSYS)
+}
+
 pub fn sys_set_tid_address(
     current_task: &CurrentTask,
     user_tid: UserRef<pid_t>,
