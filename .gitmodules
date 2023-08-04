@@ -613,3 +613,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/dpranke/pyjson5
 	name = third_party/pyjson5
 	ignore = all
+[submodule "third_party/chre/src"]
+	path = third_party/chre/src
+	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/chre
+	name = third_party/chre
+	ignore = all
