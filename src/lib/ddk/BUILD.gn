@@ -474,6 +474,56 @@ library_headers("ddk-metadata-headers") {
     # #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire_types.h>.
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
   ]
+
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # New driver metadata should be defined in FIDL instead of C.
+  #
+  # To remove items from the allowlist, please send a change to one of the OWNERS of
+  # this file to remove an element from the visibility list below.
+  #
+  # Please allowlist entire directories rather than individual targets as it
+  # requires less allowlist churn over time.
+  visibility = [
+    "//sdk/lib/driver_test_realm:*",
+    "//src/camera/drivers/bus/aml_mipicsi:*",
+    "//src/camera/drivers/sensors/imx227:*",
+    "//src/devices/board/drivers/astro:*",
+    "//src/devices/board/drivers/integration-test:*",
+    "//src/devices/board/drivers/nelson:*",
+    "//src/devices/board/drivers/sherlock:*",
+    "//src/devices/board/drivers/vim3:*",
+    "//src/devices/bus/drivers/platform/test:*",
+    "//src/devices/clock/drivers/clock:*",
+    "//src/devices/gpio/drivers/gpio:*",
+    "//src/devices/i2c/drivers/i2c:*",
+    "//src/devices/i2c/drivers/intel-i2c:*",
+    "//src/devices/nand/drivers/nandpart:*",
+    "//src/devices/nand/drivers/ram-nand:*",
+    "//src/devices/power/drivers/power:*",
+    "//src/devices/pwm/drivers/aml-pwm:*",
+    "//src/devices/serial/drivers/ftdi:*",
+    "//src/devices/serial/drivers/ftdi/test:*",
+    "//src/devices/testing/driver-integration-test-shim:*",
+    "//src/devices/usb/drivers/usb-peripheral:*",
+    "//src/devices/usb/lib/usb:*",
+    "//src/graphics/display/drivers/amlogic-display:*",
+    "//src/graphics/display/drivers/dsi-dw:*",
+    "//src/ui/input/drivers/goodix:*",
+    "//src/ui/input/drivers/hid-buttons:*",
+    "//src/ui/input/drivers/hid-input-report:*",
+    "//src/ui/input/lib/hid-input-report:*",
+    "//src/ui/light/drivers/aml-light:*",
+    "//src/ui/light/drivers/lp50xx-light:*",
+    "//zircon/system/ulib/hid:*",
+  ]
 }
 
 library_headers("ddk-deprecated-binding-headers") {
