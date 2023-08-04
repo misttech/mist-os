@@ -141,7 +141,7 @@ impl ops::Not for FileMode {
 
 macro_rules! mode {
     ($type:ident, $mode:expr) => {
-        crate::types::FileMode::from_bits($mode) | crate::types::FileMode::$type
+        crate::types::FileMode::from_bits($mode | crate::types::FileMode::$type.bits())
     };
 }
 
