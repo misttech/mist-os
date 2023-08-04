@@ -46,9 +46,6 @@ pub fn construct_zbi(
         // Indicate the clock UTC backstop.
         zbi_builder.add_boot_arg(&format!("clock.backstop={}", product.kernel.clock_backstop));
 
-        // Instruct devmgr that a /system volume is required.
-        zbi_builder.add_boot_arg("devmgr.require-system=true");
-
         // Specify how to launch pkgfs: bin/pkgsvr <base-merkle>
         // This is still needed even though pkgfs has been removed because pkg-cache and
         // base-resolver use it to obtain the base_package hash.
