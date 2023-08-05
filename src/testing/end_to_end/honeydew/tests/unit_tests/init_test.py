@@ -473,11 +473,13 @@ class InitTests(unittest.TestCase):
             honeydew.device_classes.sl4f.fuchsia_device.FuchsiaDevice,
             honeydew.device_classes.sl4f.generic_fuchsia_device.
             GenericFuchsiaDevice,
+            honeydew.device_classes.sl4f.vim3.VIM3,
             honeydew.device_classes.sl4f.x64.X64,
             honeydew.device_classes.fuchsia_controller.fuchsia_device.
             FuchsiaDevice,
             honeydew.device_classes.fuchsia_controller.generic_fuchsia_device.
             GenericFuchsiaDevice,
+            honeydew.device_classes.fuchsia_controller.vim3.VIM3,
             honeydew.device_classes.fuchsia_controller.x64.X64,
         }
         self.assertEqual(

@@ -25,6 +25,11 @@ if (is_host) {
     public_deps = [ "device_class_tests:nuc_tests_fyi" ]
   }
 
+  group("vim3_tests_fyi") {
+    testonly = true
+    public_deps = [ "device_class_tests:vim3_tests_fyi" ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [

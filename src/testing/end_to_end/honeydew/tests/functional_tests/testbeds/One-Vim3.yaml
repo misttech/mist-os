@@ -1,0 +1,6 @@
+TestBeds:
+  - Name: Testbed-One-Vim3
+    Controllers:
+      FuchsiaDevice:
+        - name: fuchsia-c863-1470-5144
+          ssh_private_key: ~/.ssh/fuchsia_ed25519
