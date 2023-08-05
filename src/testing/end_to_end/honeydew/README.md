@@ -11,9 +11,11 @@ Supported host operating systems:
 Assumptions:
 * FFX CLI is present on the host and is included in `$PATH` environmental
   variable.
+* Fastboot CLI is present on the host and is included in `$PATH` environmental
+  variable, if you need to use [Fastboot transport].
 
 * This tool was built to be run locally. Remote workflows (i.e. where the Target
-  and Host are not colocated) are in limited support, and have the following
+  and Host are not collocated) are in limited support, and have the following
   assumptions:
     * You use a tool like `fssh tunnel` or `funnel` to forward the Target from
       your local machine to the remote machine over a SSH tunnel
@@ -238,7 +240,7 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 * [Tracing affordance](markdowns/tracing.md)
 
 ### Access the transports
-* [Fastboot transport](markdowns/fastboot.md)
+* [Fastboot transport]
 
 ### Device object destruction
 ```python
@@ -425,6 +427,8 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 [honeydew builders using try-jobs]: images/pye2e_builders.png
 
 [instructions on how to submit contributions to the Fuchsia project]: https://fuchsia.dev/fuchsia-src/development/source_code/contribute_changes
+
+[Fastboot transport]: markdowns/fastboot.md
 
 [//third_party]: https://fuchsia.googlesource.com/third_party/
 

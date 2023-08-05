@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/images/tools/fastboot.gni")
 import("//build/python/python_binary.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
@@ -172,6 +173,22 @@ template("python_mobly_test") {
   }
 
   #
+  # Define Fastboot binary host_test_data()
+  #
+
+  # This is currently required by Honeydew for Fuchsia device interactions when
+  # in fastboot mode. It's safe to assume that some of the python_mobly_test()
+  # will be performing some form of Fuchsia interactions when in fastboot mode
+  # so including Fastboot in this template would centralize this data deps for
+  # all users.
+
+  _fastboot_test_data_target = "${target_name}_fastboot_bin_test_data"
+  host_test_data(_fastboot_test_data_target) {
+    sources = [ "${prebuilt_fastboot}" ]
+    outputs = [ "${_test_dir}/fastboot" ]
+  }
+
+  #
   # Construct host test arguments.
   #
 
@@ -250,6 +267,7 @@ template("python_mobly_test") {
 
     deps =
         [
+          ":${_fastboot_test_data_target}",
           ":${_ffx_test_data_target}",
           ":${_mobly_test_data_target}",
           "//build/python:interpreter",
