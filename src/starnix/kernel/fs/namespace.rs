@@ -7,8 +7,8 @@ use crate::{
     device::BinderFs,
     fs::{
         buffers::InputBuffer, devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem,
-        fuse::new_fuse_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
-        FileSystemOptions, FsStr,
+        fuse::new_fuse_fs, overlayfs::OverlayFs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs,
+        tracefs::trace_fs, FileSystemOptions, FsStr,
     },
     lock::{Mutex, RwLock},
     mutable_state::*,
@@ -560,9 +560,11 @@ impl CurrentTask {
             flags: flags & MountFlags::STORED_ON_FILESYSTEM,
             params: data.to_vec(),
         };
+
         match fs_type {
             b"fuse" => new_fuse_fs(self, options),
             b"ext4" => ExtFilesystem::new_fs(kernel, self, options),
+            b"overlay" => OverlayFs::new_fs(self, options),
             _ => self.kernel().create_filesystem(fs_type, options),
         }
     }

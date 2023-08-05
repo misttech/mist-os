@@ -106,6 +106,7 @@ test("syscalls_test_bin") {
     "memfd_test.cc",
     "mmap_test.cc",
     "mount_test.cc",
+    "overlayfs_test.cc",
     "pipe_test.cc",
     "poll_test.cc",
     "prctl_test.cc",

@@ -27,34 +27,6 @@ namespace {
 using ::testing::IsSupersetOf;
 using ::testing::UnorderedElementsAreArray;
 
-/// Unmount anything mounted at or under path.
-void RecursiveUnmount(const char *path) {
-  int dir_fd = open(path, O_DIRECTORY | O_NOFOLLOW);
-  if (dir_fd >= 0) {
-    // Grab the entries first because having the directory open to enumerate it may cause a umount
-    // to fail with EBUSY
-    DIR *dir = fdopendir(dir_fd);
-    std::vector<std::string> entries;
-    while (struct dirent *entry = readdir(dir)) {
-      entries.push_back(entry->d_name);
-    }
-    closedir(dir);
-    for (auto &entry : entries) {
-      if (entry == "." || entry == "..")
-        continue;
-      std::string subpath = path;
-      subpath.append("/");
-      subpath.append(entry);
-      RecursiveUnmount(subpath.c_str());
-    }
-  }
-  // Repeatedly call umount to handle shadowed mounts properly.
-  do {
-    errno = 0;
-    ASSERT_THAT(umount(path), AnyOf(SyscallSucceeds(), SyscallFailsWithErrno(EINVAL))) << path;
-  } while (errno != EINVAL);
-}
-
 // Reads and splits the "/proc/self/mountinfo" file.
 void ReadMountInfo(std::vector<std::vector<std::string>> *out_data) {
   std::string mountinfo;
@@ -99,10 +71,9 @@ class MountTest : public ::testing::Test {
     if (skip_mount_tests) {
       GTEST_SKIP() << "Permission denied for unshare(CLONE_NEWNS), skipping suite.";
     }
-    tmp_ = test_helper::get_tmp_path() + "/mounttest";
-    mkdir(tmp_.c_str(), 0777);
-    RecursiveUnmount(tmp_.c_str());
-    ASSERT_THAT(mount(nullptr, tmp_.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+
+    ASSERT_FALSE(temp_dir_.path().empty());
+    ASSERT_THAT(mount(nullptr, temp_dir_.path().c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
 
     MakeOwnMount("1");
     MakeDir("1/1");
@@ -113,17 +84,9 @@ class MountTest : public ::testing::Test {
     ASSERT_TRUE(FileExists("2/2"));
   }
 
-  void TearDown() override {
-    // Clean up after the tests so that other tests that care about mount state
-    // don't fail.
-    if (!skip_mount_tests) {
-      RecursiveUnmount(tmp_.c_str());
-    }
-  }
-
   /// All paths used in test functions are relative to the temp directory. This function makes the
   /// path absolute.
-  std::string TestPath(const char *path) const { return tmp_ + "/" + path; }
+  std::string TestPath(const char *path) const { return temp_dir_.path() + "/" + path; }
 
   // Create a directory.
   int MakeDir(const char *name) const {
@@ -153,7 +116,7 @@ class MountTest : public ::testing::Test {
   }
 
  private:
-  std::string tmp_;
+  test_helper::ScopedTempDir temp_dir_;
 };
 
 [[maybe_unused]] void DumpMountinfo() {
@@ -349,9 +312,6 @@ class ProcMountsTest : public ProcTestBase {
     }
     return ret;
   }
-
- protected:
-  const std::string tmp_ = test_helper::get_tmp_path();
 };
 
 TEST_F(ProcMountsTest, Basic) {
@@ -373,22 +333,19 @@ TEST_F(ProcMountsTest, MountAdded) {
 
   auto before_mounts = read_mounts();
 
-  const char dir_template[] = "/foo.XXXXXX";
-  size_t len = tmp_.length() + strlen(dir_template) + 1;
-  auto mp = std::unique_ptr<char[]>(new char[len]);
-  snprintf(mp.get(), len, "%s%s", tmp_.c_str(), dir_template);
-  ASSERT_NE(mkdtemp(mp.get()), nullptr);
-  ASSERT_THAT(chmod(mp.get(), 0777), SyscallSucceeds());
-  ASSERT_THAT(mount("testtmp", mp.get(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  std::optional<test_helper::ScopedTempDir> temp_dir;
+  temp_dir.emplace();
+
+  ASSERT_THAT(chmod(temp_dir->path().c_str(), 0777), SyscallSucceeds());
+  ASSERT_THAT(mount("testtmp", temp_dir->path().c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
 
   auto expected_mounts = before_mounts;
-  std::string mount = "testtmp " + std::string(mp.get()) + " tmpfs rw 0 0";
+  std::string mount = "testtmp " + temp_dir->path() + " tmpfs rw 0 0";
   expected_mounts.push_back(mount);
   EXPECT_THAT(read_mounts(), UnorderedElementsAreArray(expected_mounts));
 
   // Clean-up.
-  ASSERT_THAT(umount(mp.get()), SyscallSucceeds());
-  ASSERT_THAT(rmdir(mp.get()), SyscallSucceeds());
+  temp_dir.reset();
 
   EXPECT_THAT(read_mounts(), UnorderedElementsAreArray(before_mounts));
 }

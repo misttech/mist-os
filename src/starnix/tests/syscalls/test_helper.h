@@ -167,6 +167,17 @@ class ScopedTempFD {
   ScopedFD fd_;
 };
 
+class ScopedTempDir {
+ public:
+  ScopedTempDir();
+  ~ScopedTempDir();
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+};
+
 #define HANDLE_EINTR(x)                                     \
   ({                                                        \
     decltype(x) eintr_wrapper_result;                       \
@@ -204,6 +215,9 @@ bool HasCapability(uint32_t cap);
 
 // Returns true if running on Starnix.  This is likely only necessary when there are known bugs.
 bool IsStarnix();
+
+/// Unmount anything mounted at or under `path` and remove it.
+void RecursiveUnmountAndRemove(const std::string &path);
 
 }  // namespace test_helper
 

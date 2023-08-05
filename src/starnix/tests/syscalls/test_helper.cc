@@ -4,17 +4,22 @@
 
 #include "src/starnix/tests/syscalls/test_helper.h"
 
+#include <dirent.h>
+#include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 #include <linux/capability.h>
@@ -148,6 +153,19 @@ ScopedTempFD::ScopedTempFD() : name_("/tmp/proc_test_file_XXXXXX") {
   fd_ = ScopedFD(mkstemp(mut_name));
 }
 
+ScopedTempDir::ScopedTempDir() {
+  path_ = get_tmp_path() + "/testdirXXXXXX";
+  if (!mkdtemp(path_.data())) {
+    path_.clear();
+  }
+}
+
+ScopedTempDir::~ScopedTempDir() {
+  if (!path_.empty()) {
+    RecursiveUnmountAndRemove(path_);
+  }
+}
+
 void waitForChildSucceeds(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
                           int (*parentRunFunction)(void *)) {
   CloneHelper cloneHelper;
@@ -250,6 +268,35 @@ bool HasSysAdmin() { return HasCapability(CAP_SYS_ADMIN); }
 bool IsStarnix() {
   struct utsname buf;
   return uname(&buf) == 0 && strstr(buf.release, "starnix") != nullptr;
+}
+
+void RecursiveUnmountAndRemove(const std::string &path) {
+  if (HasSysAdmin()) {
+    // Repeatedly call umount to handle shadowed mounts properly.
+    do {
+      errno = 0;
+      ASSERT_THAT(umount(path.c_str()), AnyOf(SyscallSucceeds(), SyscallFailsWithErrno(EINVAL)))
+          << path;
+    } while (errno != EINVAL);
+  }
+
+  int dir_fd = open(path.c_str(), O_DIRECTORY | O_NOFOLLOW);
+  if (dir_fd >= 0) {
+    DIR *dir = fdopendir(dir_fd);
+    while (struct dirent *entry = readdir(dir)) {
+      std::string name(entry->d_name);
+      if (name == "." || name == "..")
+        continue;
+      std::string subpath = std::string(path) + "/" + name;
+      if (entry->d_type == DT_DIR) {
+        RecursiveUnmountAndRemove(subpath);
+      } else {
+        EXPECT_THAT(unlink(subpath.c_str()), SyscallSucceeds()) << subpath;
+      }
+    }
+  }
+
+  EXPECT_THAT(rmdir(path.c_str()), SyscallSucceeds());
 }
 
 }  // namespace test_helper

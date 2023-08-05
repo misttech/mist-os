@@ -245,6 +245,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/layeredfs.rs",
     "fs/mod.rs",
     "fs/namespace.rs",
+    "fs/overlayfs.rs",
     "fs/path.rs",
     "fs/pidfd.rs",
     "fs/pipe.rs",
