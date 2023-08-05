@@ -435,8 +435,8 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
       .WriteTo(&(*vpu_mmio_));
   VdinLFifoCtrlReg::Get().FromValue(0).set_fifo_buf_size(0x780).WriteTo(&(*vpu_mmio_));
 
-  // Setup Async Fifo
-  VideoInputAsyncFifoControl3::Get(kVideoInputModuleId)
+  // Setup input channel FIFO.src/graphics/display/drivers/amlogic-display/video-input-regs.h
+  VideoInputChannelFifoControl3::Get(kVideoInputModuleId)
       .ReadFrom(&(*vpu_mmio_))
       .set_channel6_data_enabled(true)
       .set_channel6_go_field_signal_enabled(true)
@@ -444,7 +444,7 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
       .set_channel6_input_vsync_is_negative(false)
       .set_channel6_input_hsync_is_negative(false)
       .set_channel6_async_fifo_software_reset_on_vsync(true)
-      .set_channel6_clear_overflow_bit(false)
+      .set_channel6_clear_fifo_overflow_bit(false)
       .set_channel6_async_fifo_software_reset(false)
       .WriteTo(&(*vpu_mmio_));
 
@@ -640,7 +640,7 @@ void Vpu::CapturePrintRegisters() {
             VdInWrVStartEndReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO(
       "VdInAFifoCtrl3Reg = 0x%x\n",
-      VideoInputAsyncFifoControl3::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
+      VideoInputChannelFifoControl3::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInMiscCtrlReg = 0x%x\n", VdInMiscCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInIfMuxCtrlReg = 0x%x\n",
             VdInIfMuxCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());

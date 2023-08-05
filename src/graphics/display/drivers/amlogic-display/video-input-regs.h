@@ -217,34 +217,107 @@ class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandSta
   }
 };
 
-// There are four control registers (ASFIFO_CTRL0/1/2/3) for video input
-// channels (VDI) channel 1 to channel 9. Layout of async FIFO configuration
-// fields are the same for each async FIFO.
+// There are multiple video input channels (VDIs, possibly shorthand for Video
+// Data Input) available for video input modules (VDINs), numbered from VDI1 to
+// VDI9. Each VDIN has one asynchronous FIFO (ASFIFO) for each VDI to receive
+// pixels from.
 //
-// Currently this driver only uses VDI channel 6; control fields / registers
-// for all the other VDI channels are left reserved.
-
-// VDIN0_ASFIFO_CTRL3, VDIN1_ASFIFO_CTRL3
+// For each VDIN, there are four control registers (ASFIFO_CTRL0/1/2/3) to
+// configure the way the VDIN reads pixels from a channel by setting the
+// corresponding FIFO behaviors. The layout of the ASFIFO configuration fields
+// is the same across all channels.
 //
-// Each video input module has multiple video input channels (VDIs) and async
-// FIFOs (ASFIFO). They are hard-wired for each type of video input.
-// For example, VIU loopback output always use video input channel VDI6.
+// Currently this driver only uses VDI 6 and VDI 8; control fields / registers
+// for all the other VDI channels are not defined here.
 //
 // A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1088-1090, 1106, 1110-1112,
 // 1128.
 // S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 779-781, 798-799, 802-805,
 // 822.
 // S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 715-717, 733, 738-740, 755.
-class VideoInputAsyncFifoControl3
-    : public hwreg::RegisterBase<VideoInputAsyncFifoControl3, uint32_t> {
- public:
-  // VDIN0_ASFIFO_CTRL3 has bits 31-24 used for control fields for VDI channel
-  // 9 / async FIFO 9, which is for VIU writeback channel 2. Currently this
-  // driver doesn't use this writeback channel, so we leave these bits reserved.
 
-  // Bits 15-9 are control fields for VDI channel 7 / async FIFO 7.
-  // Current this driver only doesn't use this VDI channel, so we leave these
-  // bits reserved.
+// VDIN0_ASFIFO_CTRL2, VDIN1_ASFIFO_CTRL2
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1090, 1112.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 781, 805.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 717, 740.
+class VideoInputChannelFifoControl2
+    : public hwreg::RegisterBase<VideoInputChannelFifoControl2, uint32_t> {
+ public:
+  // Bits 25 and 23-20 further configure decimation. This driver does not
+  // support decimation, so we do not define the bits.
+
+  // True iff input decimation subsampling is enabled.
+  DEF_BIT(24, decimation_data_enabled);
+
+  // Only 1 / (decimation_ratio_minus_1 + 1) of the pixels will be sampled.
+  // Setting this field to zero effectively disables decimation.
+  DEF_FIELD(19, 16, decimation_ratio_minus_1);
+
+  // Bits 7-0 configure VDI 5.
+  // Currently this driver doesn't use VDI channel 5, so we don't define these
+  // bits.
+
+  static auto Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        static constexpr uint32_t kVideoInput0RegAddr = 0x120f * sizeof(uint32_t);
+        return hwreg::RegisterAddr<VideoInputChannelFifoControl2>(kVideoInput0RegAddr);
+      case VideoInputModuleId::kVideoInputModule1:
+        static constexpr uint32_t kVideoInput1RegAddr = 0x130f * sizeof(uint32_t);
+        return hwreg::RegisterAddr<VideoInputChannelFifoControl2>(kVideoInput1RegAddr);
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+};
+
+// VDIN0_ASFIFO_CTRL3, VDIN1_ASFIFO_CTRL3
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1106, 1128.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 798-799, 822.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 733, 755.
+class VideoInputChannelFifoControl3
+    : public hwreg::RegisterBase<VideoInputChannelFifoControl3, uint32_t> {
+ public:
+  // Bits 31-24 configure VDI 9.
+  // Currently this driver doesn't use VDI channel 9, so we don't define these
+  // bits.
+
+  // Bits 23-16 configure VDI 8. These bits are not documented in any
+  // datasheet. Experiments on a VIM3 (using Amlogic A311D) show that these
+  // bits correspond to VDI 8 / ASFIFO 8.
+
+  // Enable data transmission on channel 8.
+  DEF_BIT(23, channel8_data_enabled);
+
+  // Enable go_field (Vsync) signals on channel 8.
+  DEF_BIT(22, channel8_go_field_signal_enabled);
+
+  // Enable go_line (Hsync) signals for channel 8.
+  DEF_BIT(21, channel8_go_line_signal_enabled);
+
+  // True iff the input video on channel 8 has negative polarity Vsync signals.
+  DEF_BIT(20, channel8_input_vsync_is_negative);
+
+  // True iff the input video on channel 6 has negative polarity Hsync signals.
+  DEF_BIT(19, channel8_input_hsync_is_negative);
+
+  // If true, the ASFIFO will be reset on each Vsync signal.
+  DEF_BIT(18, channel8_async_fifo_software_reset_on_vsync);
+
+  // Clears (and acknowledges) the `vdi8_fifo_overflow` bit in the
+  // `VDIN0/1_COM_STATUS2` register.
+  DEF_BIT(17, channel8_clear_fifo_overflow_bit);
+
+  // Resets the async FIFO.
+  //
+  // This bit is a "level signal" bit. Drivers reset the FIFO by first setting
+  // it to 1, and then to 0.
+  DEF_BIT(16, channel8_async_fifo_software_reset);
+
+  // Bits 15-9 configure VDI 7.
+  // Currently this driver doesn't use VDI channel 7, so we don't define these
+  // bits.
 
   // Enable data transmission on channel 6.
   DEF_BIT(7, channel6_data_enabled);
@@ -261,28 +334,27 @@ class VideoInputAsyncFifoControl3
   // True iff the input video on channel 6 has negative polarity Hsync signals.
   DEF_BIT(3, channel6_input_hsync_is_negative);
 
-  // If set to true, the channel asynchronous FIFO will be reset on each Vsync
-  // signal.
+  // If true, the channel ASFIFO will be reset on each Vsync signal.
   DEF_BIT(2, channel6_async_fifo_software_reset_on_vsync);
 
-  // Clears (and acknowledges) the `vdi6_fifo_overflow` bit in
+  // Clears (and acknowledges) the `vdi6_fifo_overflow` bit in the
   // `VDIN0/1_COM_STATUS2` register.
-  DEF_BIT(1, channel6_clear_overflow_bit);
+  DEF_BIT(1, channel6_clear_fifo_overflow_bit);
 
   // Resets the async FIFO.
   //
-  // This bit is a "level signal", in order to reset the FIFO, drivers should
-  // first write 1, and then write 0.
+  // This bit is a "level signal" bit. Drivers reset the FIFO by first setting
+  // it to 1, and then to 0.
   DEF_BIT(0, channel6_async_fifo_software_reset);
 
   static auto Get(VideoInputModuleId video_input) {
     switch (video_input) {
       case VideoInputModuleId::kVideoInputModule0:
         static constexpr uint32_t kVideoInput0RegAddr = 0x126f * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputAsyncFifoControl3>(kVideoInput0RegAddr);
+        return hwreg::RegisterAddr<VideoInputChannelFifoControl3>(kVideoInput0RegAddr);
       case VideoInputModuleId::kVideoInputModule1:
         static constexpr uint32_t kVideoInput1RegAddr = 0x136f * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputAsyncFifoControl3>(kVideoInput1RegAddr);
+        return hwreg::RegisterAddr<VideoInputChannelFifoControl3>(kVideoInput1RegAddr);
       default:
         ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d",
                             static_cast<int>(video_input));
