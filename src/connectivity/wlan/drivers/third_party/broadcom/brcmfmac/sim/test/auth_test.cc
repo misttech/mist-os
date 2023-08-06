@@ -129,6 +129,8 @@ class AuthTest : public SimTest {
     SEC_TYPE_WPA3
   };
 
+  void TearDown() override { EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK); }
+
   enum SaeAuthState { COMMIT, CONFIRM, DONE };
 
   struct AuthFrameContent {
@@ -144,6 +146,7 @@ class AuthTest : public SimTest {
 
   // Start the process of authentication
   void StartConnect();
+  void SendSaeFrame(wlan_fullmac::WlanFullmacSaeFrame frame);
 
   void VerifyAuthFrames();
   void SecErrorInject();
@@ -406,6 +409,11 @@ void AuthTest::StartConnect() {
   EXPECT_TRUE(result.ok());
 }
 
+void AuthTest::SendSaeFrame(wlan_fullmac::WlanFullmacSaeFrame frame) {
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SaeFrameTx(frame);
+  EXPECT_TRUE(result.ok());
+}
+
 void AuthTest::OnScanResult(const wlan_fullmac::WlanFullmacScanResult* result) {
   EXPECT_EQ(result->bss.capability_info, (uint16_t)32);
 }
@@ -490,9 +498,8 @@ void AuthTest::OnSaeHandshakeInd(const wlan_fullmac::WlanFullmacSaeHandshakeInd*
 
   // Send the error injected commit frame instead if it exists.
   if (sae_commit_frame != nullptr) {
-    auto result =
-        client_ifc_.client_.buffer(client_ifc_.test_arena_)->SaeFrameTx(*sae_commit_frame);
-    EXPECT_TRUE(result.ok());
+    env_->ScheduleNotification(std::bind(&AuthTest::SendSaeFrame, this, *sae_commit_frame),
+                               zx::msec(1));
     return;
   }
 
@@ -504,8 +511,7 @@ void AuthTest::OnSaeHandshakeInd(const wlan_fullmac::WlanFullmacSaeHandshakeInd*
   };
 
   kDefaultBssid.CopyTo(frame.peer_sta_address.data());
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SaeFrameTx(frame);
-  EXPECT_TRUE(result.ok());
+  env_->ScheduleNotification(std::bind(&AuthTest::SendSaeFrame, this, frame), zx::msec(1));
 }
 
 void AuthTest::OnSaeFrameRx(const wlan_fullmac::WlanFullmacSaeFrame* frame) {
@@ -526,8 +532,8 @@ void AuthTest::OnSaeFrameRx(const wlan_fullmac::WlanFullmacSaeFrame* frame) {
 
     kDefaultBssid.CopyTo(next_frame.peer_sta_address.data());
 
-    auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SaeFrameTx(next_frame);
-    EXPECT_TRUE(result.ok());
+    env_->ScheduleNotification(std::bind(&AuthTest::SendSaeFrame, this, next_frame), zx::msec(1));
+
     sae_auth_state_ = CONFIRM;
   } else if (sae_auth_state_ == CONFIRM) {
     ASSERT_EQ(frame->seq_num, 2);
@@ -866,6 +872,33 @@ TEST_F(AuthTest, WPA3FailStatusCode) {
   EXPECT_EQ(sae_auth_state_, COMMIT);
 }
 
-// TODO(fxbug.dev/131015): Add WPA3WrongBssid test case back.
+// Verify that the firmware will timeout if the bssid in SAE auth frame is wrong, because SAE status
+// will not be updated.
+TEST_F(AuthTest, WPA3WrongBssid) {
+  Init();
+  sec_type_ = SEC_TYPE_WPA3;
+  ap_.SetSecurity({.auth_handling_mode = simulation::AUTH_TYPE_SAE,
+                   .sec_type = simulation::SEC_PROTO_TYPE_WPA3});
+  // ap_.SetAssocHandling(simulation::FakeAp::ASSOC_IGNORED);
+
+  wlan_fullmac::WlanFullmacSaeFrame frame = {
+      .status_code = wlan_ieee80211::StatusCode::kSuccess,
+      .seq_num = 1,
+      .sae_fields = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kCommitSaeFields),
+                                                            kCommitSaeFieldsLen),
+  };
+
+  // Use wrong bssid.
+  kWrongBssid.CopyTo(frame.peer_sta_address.data());
+  sae_commit_frame = &frame;
+
+  env_->ScheduleNotification(std::bind(&AuthTest::StartConnect, this), zx::msec(10));
+  env_->Run(kTestDuration);
+
+  // No auth frame will be sent out.
+  VerifyAuthFrames();
+  EXPECT_EQ(connect_status_, wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
+  EXPECT_EQ(sae_auth_state_, COMMIT);
+}
 
 }  // namespace wlan::brcmfmac

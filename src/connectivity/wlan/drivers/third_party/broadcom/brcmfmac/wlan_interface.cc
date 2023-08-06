@@ -509,11 +509,8 @@ void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request, fdf::A
 void WlanInterface::SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
                                SaeFrameTxCompleter::Sync& completer) {
   const fuchsia_wlan_fullmac::wire::WlanFullmacSaeFrame frame = request->frame;
-  zx_status_t status = brcmf_if_sae_frame_tx(wdev_->netdev, &frame);
+  brcmf_if_sae_frame_tx(wdev_->netdev, &frame);
   completer.buffer(arena).Reply();
-  if (status != ZX_OK) {
-    brcmf_return_assoc_result(wdev_->netdev, STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
-  }
 }
 
 void WlanInterface::WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) {

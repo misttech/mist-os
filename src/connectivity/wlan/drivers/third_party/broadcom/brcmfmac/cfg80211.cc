@@ -4881,7 +4881,7 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
   if (err != ZX_OK) {
     BRCMF_ERR("Error sending SAE auth frame. err: %s, fw_err: %s", zx_status_get_string(err),
               brcmf_fil_get_errstr(fw_err));
-    // brcmf_return_assoc_result(ndev, STATUS_CODE_REFUSED_UNAUTHENTICATED_ACCESS_NOT_SUPPORTED);
+    brcmf_return_assoc_result(ndev, STATUS_CODE_REFUSED_UNAUTHENTICATED_ACCESS_NOT_SUPPORTED);
   }
 
   return err;
