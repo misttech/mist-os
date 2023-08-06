@@ -81,6 +81,7 @@ rustc_library("vfs") {
     "src/service/tests/direct_connection.rs",
     "src/service/tests/node_reference.rs",
     "src/symlink.rs",
+    "src/temp_clone.rs",
     "src/test_utils.rs",
     "src/test_utils/assertions.rs",
     "src/test_utils/node.rs",

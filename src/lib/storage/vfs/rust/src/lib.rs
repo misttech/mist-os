@@ -26,6 +26,7 @@ pub mod protocols;
 pub mod remote;
 pub mod service;
 pub mod symlink;
+pub mod temp_clone;
 pub mod token_registry;
 pub mod tree_builder;
 

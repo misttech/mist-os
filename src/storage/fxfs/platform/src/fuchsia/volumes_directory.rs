@@ -368,7 +368,7 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         let MountOptions { crypt, as_blob } = mount_options;
         let crypt = if let Some(crypt) = crypt {
-            Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
+            Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {
             None
         };
@@ -487,7 +487,7 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         let fs = self.root_volume.volume_directory().store().filesystem();
         let crypt = if let Some(crypt) = options.crypt {
-            Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
+            Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {
             None
         };
@@ -516,7 +516,7 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         tracing::info!(%name, %store_id, ?options, "Received mount request");
         let crypt = if let Some(crypt) = options.crypt {
-            Some(Arc::new(RemoteCrypt::new(crypt).await) as Arc<dyn Crypt>)
+            Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {
             None
         };

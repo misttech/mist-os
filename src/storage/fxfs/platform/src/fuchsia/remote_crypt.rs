@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::fuchsia::pager::PagerExecutor,
     anyhow::{anyhow, bail, Error},
     async_trait::async_trait,
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose},
-    fuchsia_async as fasync,
     fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE},
     std::convert::TryInto,
 };
@@ -18,15 +16,8 @@ pub struct RemoteCrypt {
 }
 
 impl RemoteCrypt {
-    pub async fn new(client: ClientEnd<CryptMarker>) -> Self {
-        // The channel must be registered on the pager executor.
-        Self {
-            client: fasync::Task::spawn_on(
-                PagerExecutor::global_instance().executor_handle(),
-                async move { client.into_proxy().unwrap() },
-            )
-            .await,
-        }
+    pub fn new(client: ClientEnd<CryptMarker>) -> Self {
+        Self { client: client.into_proxy().unwrap() }
     }
 }
 
