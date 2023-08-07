@@ -77,8 +77,8 @@ struct SymbolFuzzer {
     FuzzedDataProvider blob_provider(blob.data(), blob.size());
     while (blob_provider.remaining_bytes() > 0) {
       const std::string name = blob_provider.ConsumeRandomLengthString();
-      if (const auto* sym = elfldltl::SymbolName(name).Lookup(info)) {
-        ZX_ASSERT(info.string(sym->name) == name);
+      if (const auto* sym = elfldltl::SymbolName(name.c_str()).Lookup(info)) {
+        ZX_ASSERT(info.string(sym->name) == name.c_str());
       }
     }
 
