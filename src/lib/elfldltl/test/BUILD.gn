@@ -45,8 +45,8 @@ test("elfldltl-unittests") {
   }
 
   deps = [
-    ":test-utils",
     "..",
+    "../testing",
     "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/symbolizer-markup",
@@ -58,13 +58,6 @@ test("elfldltl-unittests") {
   }
 
   data_deps = [ ":resolve_test_dsos" ]
-}
-
-source_set("test-utils") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  public_deps = [ "..:elfldltl-testutils" ]
 }
 
 resolve_dsos = [
@@ -336,8 +329,8 @@ source_set("loader-tests") {
 
   deps = [
     ":test-data",
-    ":test-utils",
     "..",
+    "../testing",
     "//sdk/lib/stdcompat",
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fbl",

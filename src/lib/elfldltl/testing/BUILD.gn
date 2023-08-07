@@ -1,0 +1,45 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/library_headers.gni")
+
+group("testing") {
+  testonly = true
+  public_deps = [ ":elfldltl-testing" ]
+}
+
+library_headers("headers") {
+  testonly = true
+
+  headers = [
+    "lib/elfldltl/testing/diagnostics.h",
+    "lib/elfldltl/testing/get-test-data.h",
+    "lib/elfldltl/testing/loader.h",
+    "lib/elfldltl/testing/typed-test.h",
+  ]
+
+  public_deps = [
+    "..",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+static_library("elfldltl-testing") {
+  testonly = true
+
+  public_deps = [ ":headers" ]
+
+  sources = [ "get-test-data-path.cc" ]
+  deps = [ "//third_party/googletest:gtest" ]
+  if (is_fuchsia) {
+    sources += [ "get-test-lib.cc" ]
+    deps += [
+      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
+      "//sdk/lib/fdio",
+      "//zircon/system/ulib/zx",
+    ]
+  }
+}

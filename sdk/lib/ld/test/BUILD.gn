@@ -58,7 +58,7 @@ source_set("load-tests") {
     "..:abi-headers",
     "..:posix-header",
     "//src/lib/elfldltl",
-    "//src/lib/elfldltl:elfldltl-testutils",
+    "//src/lib/elfldltl/testing",
     "//third_party/googletest:gtest",
   ]
   if (is_fuchsia) {

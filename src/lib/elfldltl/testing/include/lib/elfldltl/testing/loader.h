@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TESTING_LOADER_H_
-#define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TESTING_LOADER_H_
+#ifndef SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_LOADER_H_
+#define SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_LOADER_H_
 
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/fd.h>
@@ -158,4 +158,4 @@ class LoadTests : public ::testing::Test {
 
 }  // namespace elfldltl::testing
 
-#endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TESTING_LOADER_H_
+#endif  // SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_LOADER_H_

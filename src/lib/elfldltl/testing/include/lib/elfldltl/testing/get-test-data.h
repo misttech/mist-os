@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TESTING_GET_TEST_DATA_H_
-#define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TESTING_GET_TEST_DATA_H_
+#ifndef SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_GET_TEST_DATA_H_
+#define SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_GET_TEST_DATA_H_
 
 #include <filesystem>
 #include <string_view>
@@ -29,4 +29,4 @@ zx::vmo GetTestLibVmo(std::string_view libname);
 
 }  // namespace elfldltl::testing
 
-#endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TESTING_GET_TEST_DATA_H_
+#endif  // SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_GET_TEST_DATA_H_

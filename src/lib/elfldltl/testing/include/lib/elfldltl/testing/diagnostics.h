@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TEST_DIAGNOSTICS_H_
-#define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TEST_DIAGNOSTICS_H_
+#ifndef SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_DIAGNOSTICS_H_
+#define SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_DIAGNOSTICS_H_
 
 #include <lib/elfldltl/diagnostics.h>
 
@@ -102,4 +102,4 @@ constexpr auto ExpectOkDiagnostics() {
 
 }  // namespace elfldltl::testing
 
-#endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_TEST_DIAGNOSTICS_H_
+#endif  // SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_DIAGNOSTICS_H_
