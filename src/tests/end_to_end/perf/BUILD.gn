@@ -19,7 +19,6 @@ test_list = [
   "archivist_benchmarks_test",
   "audio_mixer_profiler_test",
   "diagnostics_benchmarks_test",
-  "diagnostics_log_rust_benchmarks_test",
   "extended_pstate_benchmarks_test",
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
@@ -36,6 +35,13 @@ test_list = [
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
 ]
+
+# TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
+# currently fails to build for ARM64/VIM3 due to a toolchain bug.
+# Re-enable it for ARM64 when the bug is fixed.
+if (target_cpu != "arm64") {
+  test_list += [ "diagnostics_log_rust_benchmarks_test" ]
+}
 
 if (target_cpu == "x64" && !is_asan) {
   if (host_os == "linux") {

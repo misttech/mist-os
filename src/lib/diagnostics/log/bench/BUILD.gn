@@ -5,71 +5,80 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_binary("encoding-bin") {
-  name = "diagnostics_log_encoding_bench"
-  edition = "2018"
-  with_unit_tests = true
+# TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
+# currently fails to build for ARM64/VIM3 due to a toolchain bug.
+# Re-enable it for ARM64 when the bug is fixed.
+if (target_cpu != "arm64") {
+  rustc_binary("encoding-bin") {
+    name = "diagnostics_log_encoding_bench"
+    edition = "2018"
+    with_unit_tests = true
 
-  source_root = "src/encoding.rs"
+    source_root = "src/encoding.rs"
 
-  deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//src/developer/fuchsia-criterion",
-    "//src/lib/diagnostics/log/encoding/rust",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:paste",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-core",
-    "//third_party/rust_crates:tracing-subscriber",
-  ]
+    deps = [
+      "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+      "//src/developer/fuchsia-criterion",
+      "//src/lib/diagnostics/log/encoding/rust",
+      "//src/lib/fuchsia-runtime",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//third_party/rust_crates:once_cell",
+      "//third_party/rust_crates:paste",
+      "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:tracing-core",
+      "//third_party/rust_crates:tracing-subscriber",
+    ]
 
-  sources = [ "src/encoding.rs" ]
-}
+    sources = [ "src/encoding.rs" ]
+  }
 
-rustc_binary("core-bin") {
-  name = "diagnostics_log_bench"
-  edition = "2018"
+  rustc_binary("core-bin") {
+    name = "diagnostics_log_bench"
+    edition = "2018"
 
-  source_root = "src/core.rs"
+    source_root = "src/core.rs"
 
-  deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//src/developer/fuchsia-criterion",
-    "//src/lib/diagnostics/log/rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:log",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-log",
-  ]
+    deps = [
+      "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+      "//src/developer/fuchsia-criterion",
+      "//src/lib/diagnostics/log/rust",
+      "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-async",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:log",
+      "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:tracing-log",
+    ]
 
-  sources = [ "src/core.rs" ]
-}
+    sources = [ "src/core.rs" ]
+  }
 
-fuchsia_component("encoding-component") {
-  component_name = "encoding"
-  manifest = "meta/encoding.cml"
-  deps = [ ":encoding-bin" ]
-}
+  fuchsia_component("encoding-component") {
+    component_name = "encoding"
+    manifest = "meta/encoding.cml"
+    deps = [ ":encoding-bin" ]
+  }
 
-fuchsia_component("core-component") {
-  component_name = "core"
-  manifest = "meta/core.cml"
-  deps = [ ":core-bin" ]
-}
+  fuchsia_component("core-component") {
+    component_name = "core"
+    manifest = "meta/core.cml"
+    deps = [ ":core-bin" ]
+  }
 
-fuchsia_package("diagnostics-log-rust-benchmarks") {
-  deps = [
-    ":core-component",
-    ":encoding-component",
-  ]
-}
+  fuchsia_package("diagnostics-log-rust-benchmarks") {
+    deps = [
+      ":core-component",
+      ":encoding-component",
+    ]
+  }
 
-group("bench") {
-  testonly = true
-  deps = [ ":diagnostics-log-rust-benchmarks" ]
+  group("bench") {
+    testonly = true
+    deps = [ ":diagnostics-log-rust-benchmarks" ]
+  }
+} else {
+  group("bench") {
+    testonly = true
+  }
 }
