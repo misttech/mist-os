@@ -363,7 +363,7 @@ class InProcessTestLaunch {
 #endif  // __Fuchsia__
 
 template <class LoaderTraits>
-class LdStartupTests : public elfldltl::testing::LoadTests<LoaderTraits> {
+class LdLoadTests : public elfldltl::testing::LoadTests<LoaderTraits> {
  public:
   using Base = elfldltl::testing::LoadTests<LoaderTraits>;
   using typename Base::Loader;
@@ -409,9 +409,9 @@ using LoaderTypes = ::testing::Types<elfldltl::testing::LocalVmarLoaderTraits,
 using LoaderTypes = elfldltl::testing::LoaderTypes;
 #endif
 
-TYPED_TEST_SUITE(LdStartupTests, LoaderTypes);
+TYPED_TEST_SUITE(LdLoadTests, LoaderTypes);
 
-TYPED_TEST(LdStartupTests, Basic) {
+TYPED_TEST(LdLoadTests, Basic) {
   constexpr int kReturnValue = 17;
 
   InProcessTestLaunch launch;

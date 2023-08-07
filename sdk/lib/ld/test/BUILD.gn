@@ -53,7 +53,7 @@ source_set("load-tests") {
   visibility = [ ":*" ]
   testonly = true
 
-  sources = [ "ld-startup-tests.cc" ]
+  sources = [ "load-tests.cc" ]
   deps = [
     "..:abi-headers",
     "..:posix-header",
