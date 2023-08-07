@@ -1794,12 +1794,10 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
   const std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
-  struct wireless_dev* wdev = ndev_to_wdev(ndev);
-  struct brcmf_cfg80211_vif* vif = containerof(wdev, struct brcmf_cfg80211_vif, wdev);
   struct brcmf_cfg80211_profile prof = ifp->vif->profile;
 
   cfg->roam_timer->Stop();
-  brcmf_clear_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
+  brcmf_clear_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state);
   if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping roam result callback");
     return;
@@ -5284,13 +5282,13 @@ static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
 }
 
 static zx_status_t brcmf_bss_connect_done(brcmf_if* ifp, brcmf_connect_status_t connect_status,
-                                          status_code_t assoc_result, bool pending_assoc) {
+                                          status_code_t assoc_result) {
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct net_device* ndev = ifp->ndev;
   BRCMF_DBG(TRACE, "Enter");
 
   if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state)) {
-    // Stop connect timer no matter connect success or not, this timer only timeout when nothing
+    // Stop connect timer no matter connect success or not, this timer only times out when nothing
     // is heard from firmware.
     cfg->connect_timer->Stop();
     brcmf_log_conn_status(ifp, connect_status);
@@ -5306,23 +5304,11 @@ static zx_status_t brcmf_bss_connect_done(brcmf_if* ifp, brcmf_connect_status_t 
           // Indicate the rssi soon after connection
           cfg80211_signal_ind(ndev);
         }
-        if (pending_assoc) {
-          brcmf_return_assoc_result(ndev, STATUS_CODE_SUCCESS);
-        }
+        assoc_result = STATUS_CODE_SUCCESS;
         break;
       }
       case brcmf_connect_status_t::ASSOC_REQ_FAILED: {
         BRCMF_INFO("Association is rejected, need to reset firmware state.");
-        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
-        if (err != ZX_OK) {
-          BRCMF_ERR("Failed to clear firmware connection state.");
-        }
-        // pending_assoc is implied because of the connect status.
-        brcmf_return_assoc_result(ndev, assoc_result);
-        break;
-      }
-      case brcmf_connect_status_t::REASSOC_REQ_FAILED: {
-        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
         const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
         if (err != ZX_OK) {
           BRCMF_ERR("Failed to clear firmware connection state.");
@@ -5336,8 +5322,52 @@ static zx_status_t brcmf_bss_connect_done(brcmf_if* ifp, brcmf_connect_status_t 
         if (err != ZX_OK) {
           BRCMF_ERR("Failed to clear firmware connection state.");
         }
-        if (pending_assoc) {
-          brcmf_return_assoc_result(ndev, assoc_result);
+        break;
+      }
+    }
+    brcmf_return_assoc_result(ndev, assoc_result);
+  }
+
+  BRCMF_DBG(TRACE, "Exit");
+  return ZX_OK;
+}
+
+static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t connect_status,
+                                       status_code_t reassoc_result) {
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  struct net_device* ndev = ifp->ndev;
+  BRCMF_DBG(TRACE, "Enter");
+
+  if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    cfg->roam_timer->Stop();
+    brcmf_log_conn_status(ifp, connect_status);
+    switch (connect_status) {
+      case brcmf_connect_status_t::CONNECTED: {
+        brcmf_get_assoc_ies(cfg, ifp);
+        brcmf_set_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
+        if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
+          // Start the signal report timer
+          cfg->connect_log_cnt = 0;
+          cfg->signal_report_timer->Start(BRCMF_SIGNAL_REPORT_TIMER_DUR_MS);
+          // Indicate the rssi soon after connection
+          cfg80211_signal_ind(ndev);
+        }
+        break;
+      }
+      case brcmf_connect_status_t::REASSOC_REQ_FAILED: {
+        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
+        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
+      default: {
+        BRCMF_WARN("Unsuccessful roam: connect_status %s, reassoc_result %d",
+                   brcmf_get_connect_status_str(connect_status), static_cast<int>(reassoc_result));
+        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
         }
         break;
       }
@@ -5362,7 +5392,7 @@ static void brcmf_connect_timeout_worker(WorkItem* work) {
   // In case the timeout happens in SAE process.
   brcmf_clear_bit(brcmf_vif_status_bit_t::SAE_AUTHENTICATING, &ifp->vif->sme_state);
   brcmf_bss_connect_done(ifp, brcmf_connect_status_t::CONNECTING_TIMEOUT,
-                         STATUS_CODE_REFUSED_REASON_UNSPECIFIED, true);
+                         STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
 }
 
 static zx_status_t brcmf_indicate_client_connect(struct brcmf_if* ifp,
@@ -5375,7 +5405,7 @@ static zx_status_t brcmf_indicate_client_connect(struct brcmf_if* ifp,
             brcmf_fweh_get_auth_type_str(e->auth_type), e->flags);
   BRCMF_DBG(CONN, "Linkup\n");
 
-  brcmf_bss_connect_done(ifp, brcmf_connect_status_t::CONNECTED, STATUS_CODE_SUCCESS, true);
+  brcmf_bss_connect_done(ifp, brcmf_connect_status_t::CONNECTED, STATUS_CODE_SUCCESS);
   brcmf_net_setcarrier(ifp, true);
 
   BRCMF_DBG(TRACE, "Exit\n");
@@ -5406,7 +5436,7 @@ static zx_status_t brcmf_handle_assoc_event(struct brcmf_if* ifp, const struct b
                                 (e->status == BRCMF_E_STATUS_SUCCESS)
                                     ? brcmf_connect_status_t::CONNECTED
                                     : brcmf_connect_status_t::ASSOC_REQ_FAILED,
-                                reason_code, true);
+                                reason_code);
 }
 
 // Handler to ASSOC_IND and REASSOC_IND events. These are explicitly meant for SoftAP
@@ -5499,8 +5529,8 @@ static void brcmf_roam_timeout_worker(WorkItem* work) {
   if (err != ZX_OK) {
     BRCMF_ERR("Failed to clear firmware connection state.");
   }
-  brcmf_bss_connect_done(ifp, brcmf_connect_status_t::CONNECTING_TIMEOUT,
-                         STATUS_CODE_REFUSED_REASON_UNSPECIFIED, false);
+  brcmf_bss_roam_done(ifp, brcmf_connect_status_t::CONNECTING_TIMEOUT,
+                      STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
 }
 
 // Sync driver channel to match firmware channel.
@@ -5564,8 +5594,7 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
     // events. For this event, e->reason is in the StatusCode enum space.
     const status_code_t reason_code = e->reason;
     brcmf_return_roam_result(ndev, e->addr, reason_code);
-    return brcmf_bss_connect_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, reason_code,
-                                  false);
+    return brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, reason_code);
   }
   return ZX_OK;
 }
@@ -5650,7 +5679,7 @@ static zx_status_t brcmf_process_auth_event(struct brcmf_if* ifp, const struct b
       brcmf_clear_bit(brcmf_vif_status_bit_t::SAE_AUTHENTICATING, &ifp->vif->sme_state);
     }
     brcmf_bss_connect_done(ifp, brcmf_connect_status_t::AUTHENTICATION_FAILED,
-                           STATUS_CODE_REFUSED_UNAUTHENTICATED_ACCESS_NOT_SUPPORTED, true);
+                           STATUS_CODE_REFUSED_UNAUTHENTICATED_ACCESS_NOT_SUPPORTED);
   }
 
   // Only care about the authentication frames during SAE process.
@@ -5715,7 +5744,7 @@ static void brcmf_indicate_no_network(struct brcmf_if* ifp) {
 
   BRCMF_DBG(CONN, "No network\n");
   brcmf_bss_connect_done(ifp, brcmf_connect_status_t::NO_NETWORK,
-                         STATUS_CODE_REFUSED_EXTERNAL_REASON, true);
+                         STATUS_CODE_REFUSED_EXTERNAL_REASON);
   brcmf_disconnect_done(cfg);
 }
 
@@ -5744,8 +5773,7 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
   brcmf_bss_connect_done(ifp, connect_status,
                          (connect_status == brcmf_connect_status_t::CONNECTED)
                              ? STATUS_CODE_SUCCESS
-                             : STATUS_CODE_REFUSED_REASON_UNSPECIFIED,
-                         true);
+                             : STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
 
   wlan_ieee80211::ReasonCode reason_code = (connect_status == brcmf_connect_status_t::LINK_FAILED)
                                                ? wlan_ieee80211::ReasonCode::MLME_LINK_FAILED
@@ -5883,7 +5911,7 @@ static zx_status_t brcmf_notify_roam_prep_status(struct brcmf_if* ifp,
     BRCMF_WARN("Roam attempt failed");
     const status_code_t status = STATUS_CODE_REFUSED_REASON_UNSPECIFIED;
     brcmf_return_roam_result(ndev, e->addr, status);
-    return brcmf_bss_connect_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, status, false);
+    return brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, status);
   }
 
   return ZX_OK;
@@ -5941,7 +5969,7 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
       const auto update_bss_info_status = brcmf_update_bss_info(ifp);
       if (sync_channel_status == ZX_OK && update_bss_info_status == ZX_OK) {
         brcmf_return_roam_result(ifp->ndev, e->addr, STATUS_CODE_SUCCESS);
-        brcmf_bss_connect_done(ifp, brcmf_connect_status_t::CONNECTED, STATUS_CODE_SUCCESS, false);
+        brcmf_bss_roam_done(ifp, brcmf_connect_status_t::CONNECTED, STATUS_CODE_SUCCESS);
         return ZX_OK;
       }
     }
@@ -5953,7 +5981,7 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
   BRCMF_WARN("Roam attempt failed");
   const status_code_t result_code = STATUS_CODE_REFUSED_REASON_UNSPECIFIED;
   brcmf_return_roam_result(ifp->ndev, e->addr, result_code);
-  brcmf_bss_connect_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, result_code, false);
+  brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, result_code);
   return ZX_OK;
 }
 
