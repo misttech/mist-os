@@ -3184,10 +3184,14 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
   bool clm_needed = false;
 
   zx_status_t ret = brcmf_get_wifi_metadata(bus_if, &config, sizeof(config), &actual);
-  if (ret == ZX_OK && actual == sizeof(config)) {
+  if (ret != ZX_OK) {
+    BRCMF_ERR("Failed to get wifi metadata: %s", zx_status_get_string(ret));
+    clm_needed = false;
+  } else if (actual == sizeof(config)) {
     clm_needed = config.clm_needed;
   } else {
-    BRCMF_ERR("device_get_metadata failed");
+    BRCMF_ERR("Incorrect wifi metadata size: Expected %lu bytes but actual is %lu", sizeof(config),
+              actual);
     clm_needed = false;
   }
 

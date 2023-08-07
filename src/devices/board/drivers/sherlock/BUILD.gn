@@ -212,7 +212,9 @@ driver_bind_rules("sherlock-wifi-bind") {
   tests = "bind-tests/sherlock-wifi-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.t931",
+    "//src/devices/bind/fuchsia.broadcom.platform",
     "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sdio",
   ]
 }

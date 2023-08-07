@@ -172,7 +172,9 @@ driver_bind_rules("astro-wifi-bind") {
   tests = "bind-tests/astro-wifi-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
+    "//src/devices/bind/fuchsia.broadcom.platform",
     "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sdmmc",
   ]
 }

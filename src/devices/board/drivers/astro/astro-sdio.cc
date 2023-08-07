@@ -104,6 +104,9 @@ static const std::vector<fpbus::Metadata> sd_emmc_metadata{
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
                                      reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
     }},
+};
+
+static const std::vector<fpbus::Metadata> wifi_metadata{
     {{
         .type = DEVICE_METADATA_WIFI_CONFIG,
         .data = std::vector<uint8_t>(
@@ -210,17 +213,16 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
 }
 
 zx_status_t Astro::SdioInit() {
-  zx_status_t status;
-
   SdEmmcConfigurePortB();
 
   fidl::Arena<> fidl_arena;
-  fdf::Arena arena('SDIO');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, sd_emmc_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_sdio_fragments,
-                                               std::size(aml_sdio_fragments)),
-      "pdev");
+  fdf::Arena sdio_arena('SDIO');
+  auto result =
+      pbus_.buffer(sdio_arena)
+          ->AddComposite(fidl::ToWire(fidl_arena, sd_emmc_dev),
+                         platform_bus_composite::MakeFidlFragment(fidl_arena, aml_sdio_fragments,
+                                                                  std::size(aml_sdio_fragments)),
+                         "pdev");
   if (!result.ok()) {
     zxlogf(ERROR, "%s: AddComposite Sdio(sd_emmc_dev) request failed: %s", __func__,
            result.FormatDescription().data());
@@ -233,27 +235,29 @@ zx_status_t Astro::SdioInit() {
   }
 
   // Add a composite device for wifi driver.
-  const zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_BROADCOM},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_BCM43458},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_BCM_WIFI},
-  };
+  fpbus::Node wifi_dev;
+  wifi_dev.name() = "wifi";
+  wifi_dev.vid() = PDEV_VID_BROADCOM;
+  wifi_dev.pid() = PDEV_PID_BCM43458;
+  wifi_dev.did() = PDEV_DID_BCM_WIFI;
+  wifi_dev.metadata() = wifi_metadata;
 
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = wifi_fragments,
-      .fragments_count = std::size(wifi_fragments),
-      .primary_fragment = "sdio-function-1",  // ???
-      .spawn_colocated = true,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
-  };
-
-  status = DdkAddComposite("wifi", &comp_desc);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite failed: %d", __func__, status);
-    return status;
+  fdf::Arena wifi_arena('WIFI');
+  fdf::WireUnownedResult wifi_result =
+      pbus_.buffer(wifi_arena)
+          ->AddComposite(fidl::ToWire(fidl_arena, wifi_dev),
+                         platform_bus_composite::MakeFidlFragment(fidl_arena, wifi_fragments,
+                                                                  std::size(wifi_fragments)),
+                         "sdio-function-1");
+  if (!wifi_result.ok()) {
+    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
+           wifi_result.status_string());
+    return wifi_result.status();
+  }
+  if (wifi_result->is_error()) {
+    zxlogf(ERROR, "Failed to add wifi composite to platform device: %s",
+           zx_status_get_string(wifi_result->error_value()));
+    return wifi_result->error_value();
   }
 
   return ZX_OK;

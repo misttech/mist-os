@@ -8,6 +8,8 @@ using fuchsia.sdmmc;
 using fuchsia.broadcom.sdio;
 using fuchsia.hardware.gpio;
 using fuchsia.amlogic.platform.s905d3;
+using fuchsia.broadcom.platform;
+using fuchsia.platform;
 
 primary node "sdio-function-1" {
   fuchsia.BIND_PROTOCOL == fuchsia.sdmmc.BIND_PROTOCOL.SDIO;
@@ -30,4 +32,12 @@ node "sdio-function-2" {
 node "gpio-oob" {
   fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOX_PIN_ID.PIN_7;  // S905D3_WIFI_SDIO_WAKE_HOST
+}
+
+node "pdev" {
+    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_VID.BROADCOM;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM43458;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_DID.WIFI;
+    fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }

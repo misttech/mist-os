@@ -64,8 +64,10 @@ driver_bind_rules("vim3-wifi-bind") {
   bind_output = "vim3-wifi-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
+    "//src/devices/bind/fuchsia.broadcom.platform",
     "//src/devices/bind/fuchsia.broadcom.sdio",
     "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sdio",
   ]
 }

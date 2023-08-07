@@ -129,10 +129,14 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloa
   // Get Broadcom WiFi Metadata by calling the bus specific function
   if (sdiodev && sdiodev->bus_if && sdiodev->bus_if->ops) {
     ret = brcmf_bus_get_wifi_metadata(sdiodev->bus_if, &config, sizeof(wifi_config_t), &actual);
-    if ((ret != ZX_OK && ret != ZX_ERR_NOT_FOUND) ||
-        (ret == ZX_OK && actual != sizeof(wifi_config_t))) {
-      BRCMF_ERR("brcmf_sdiod_intr_register: device_get_metadata failed");
+    if (ret != ZX_OK && ret != ZX_ERR_NOT_FOUND) {
+      BRCMF_ERR("Failed to get wifi metadata: %s", zx_status_get_string(ret));
       return ret;
+    }
+    if (ret == ZX_OK && actual != sizeof(wifi_config_t)) {
+      BRCMF_ERR("Incorrect wifi metadata size: Expected %lu bytes but actual is %lu bytes",
+                sizeof(wifi_config_t), actual);
+      return ZX_ERR_INTERNAL;
     }
   } else {
     return ZX_ERR_NOT_SUPPORTED;
