@@ -204,7 +204,7 @@ llvm_libc_source_set("strsignalerror") {
     "strsignal",
   ]
 
-  deps = [ ":StringUtil" ]
+  local_deps = [ ":StringUtil" ]
 }
 
 libc_source_set("StringUtil") {
@@ -230,12 +230,6 @@ libc_source_set("StringUtil") {
     "tables/stdc_errors.h",
     "tables/stdc_signals.h",
   ]
-}
-
-# llvm_libc_source_set() deps wants this too.
-group("StringUtil.unittests") {
-  visibility = [ ":*" ]
-  testonly = true
 }
 
 llvm_libc_source_set("compat") {

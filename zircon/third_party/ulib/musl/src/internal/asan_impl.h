@@ -7,6 +7,8 @@
 #include <zircon/compiler.h>
 #include <zircon/sanitizer.h>
 
+#include "libc.h"
+
 // NOTE: userboot includes memcpy, memmove, and memset source files
 // directly, so it needs to be able to handle their #include's of this
 // header.
@@ -59,9 +61,10 @@ void __hwasan_init(void);
 // Allow this to be an empty inline for non-sanitized cases so we don't need to
 // stick `!__has_feature(address_sanitizer) && !__has_feature(hwaddress_sanitizer)`
 // in a bunch of places.
-static inline void __asan_early_init(void) {}
+LIBC_NO_SAFESTACK static inline void __asan_early_init(void) {}
+
 #define ADDR_MASK UINTPTR_MAX
 
-static inline void __hwasan_init(void) {}
+LIBC_NO_SAFESTACK static inline void __hwasan_init(void) {}
 
 #endif  // __has_feature(address_sanitizer)
