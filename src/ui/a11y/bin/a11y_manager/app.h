@@ -131,6 +131,10 @@ class App {
 
   static constexpr char kIntlPropertyProviderDisconnectedInspectName[] =
       "intl_property_provider_disconnected";
+  static constexpr char kScreenReaderEnabledInspectName[] = "screen_reader_enabled";
+  static constexpr char kMagnifierEnabledInspectName[] = "magnifier_enabled";
+  static constexpr char kColorInversionEnabledInspectName[] = "color_inversion_enabled";
+  static constexpr char kColorCorrectionModeInspectName[] = "color_correction_mode";
 
  private:
   // If gesture manager/handler/arena ever get idempotent operations, we can remove this.
@@ -161,6 +165,7 @@ class App {
   void UpdateMagnifierState();
   void UpdateColorTransformState();
   void UpdateGestureManagerState();
+  void UpdateInspectState();
 
   // Initializes the Screen Reader, instantiating its context and related services.
   std::unique_ptr<a11y::ScreenReader> InitializeScreenReader();
@@ -222,6 +227,12 @@ class App {
   // If false, the a11y manager could not connect to the PropertyProvider, and
   // defaulted to the locale "en-US".
   inspect::BoolProperty inspect_property_intl_property_provider_disconnected_;
+
+  // Inspect properties for each of the user configurable features.
+  inspect::BoolProperty screen_reader_enabled_;
+  inspect::BoolProperty magnifier_enabled_;
+  inspect::BoolProperty color_inversion_enabled_;
+  inspect::UintProperty color_correction_mode_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(App);
 };

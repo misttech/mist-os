@@ -19,9 +19,11 @@ executable("a11y_manager_apptests") {
   deps = [
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/fostr/fidl/fuchsia.accessibility",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/json_parser",
@@ -38,6 +40,7 @@ executable("a11y_manager_apptests") {
     "//src/ui/a11y/lib/util/tests/mocks",
     "//src/ui/a11y/lib/view/tests/mocks",
     "//third_party/glm",
+    "//third_party/googletest:gmock",
     "//third_party/rapidjson",
   ]
 

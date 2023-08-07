@@ -13,6 +13,15 @@
 #include "src/ui/a11y/lib/util/util.h"
 #include "src/ui/a11y/lib/view/view_coordinate_converter.h"
 
+namespace {
+
+template <typename T>
+auto to_underlying(T value) {
+  return static_cast<std::underlying_type_t<T>>(value);
+}
+
+}  // namespace
+
 namespace a11y_manager {
 
 const float kDefaultMagnificationZoomFactor = 1.0;
@@ -46,7 +55,15 @@ App::App(sys::ComponentContext* context, a11y::ViewManager* view_manager,
       screen_reader_context_factory_(screen_reader_context_factory),
       inspect_node_(std::move(inspect_node)),
       inspect_property_intl_property_provider_disconnected_(
-          inspect_node_.CreateBool(kIntlPropertyProviderDisconnectedInspectName, false)) {
+          inspect_node_.CreateBool(kIntlPropertyProviderDisconnectedInspectName, false)),
+      screen_reader_enabled_(inspect_node_.CreateBool(kScreenReaderEnabledInspectName,
+                                                      state_.screen_reader_enabled())),
+      magnifier_enabled_(
+          inspect_node_.CreateBool(kMagnifierEnabledInspectName, state_.magnifier_enabled())),
+      color_inversion_enabled_(inspect_node_.CreateBool(kColorInversionEnabledInspectName,
+                                                        state_.color_inversion_enabled())),
+      color_correction_mode_(inspect_node_.CreateUint(
+          kColorCorrectionModeInspectName, to_underlying(state_.color_correction_mode()))) {
   FX_DCHECK(context);
   FX_DCHECK(view_manager);
   FX_DCHECK(tts_manager);
@@ -173,6 +190,7 @@ void App::SetState(A11yManagerState state) {
   UpdateColorTransformState();
   // May rely on screen reader existence.
   UpdateGestureManagerState();
+  UpdateInspectState();
 
   // The first call to SetState() will set the screen reader enabled setting to its
   // value at boot time. This first call to SetState() should result in screen
@@ -233,6 +251,13 @@ void App::UpdateGestureManagerState() {
     screen_reader_->BindGestures(gesture_manager_->gesture_handler());
     gesture_manager_->gesture_handler()->ConsumeAll();
   }
+}
+
+void App::UpdateInspectState() {
+  screen_reader_enabled_.Set(state_.screen_reader_enabled());
+  magnifier_enabled_.Set(state_.magnifier_enabled());
+  color_inversion_enabled_.Set(state_.color_inversion_enabled());
+  color_correction_mode_.Set(to_underlying(state_.color_correction_mode()));
 }
 
 bool App::GestureState::operator==(GestureState o) const {
