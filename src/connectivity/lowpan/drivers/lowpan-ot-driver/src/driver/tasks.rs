@@ -271,9 +271,8 @@ where
         // Enable SRP Server
         driver_state.ot_instance.srp_server_set_enabled(true);
 
-        // Disable TREL by default. TREL will be enabled dynamically
-        // by the feature experiment API.
-        driver_state.ot_instance.trel_set_enabled(false);
+        // <b/293936909>: Make sure the TREL state matches what is expected.
+        driver_state.check_trel();
     }
 
     /// A single iteration of the main task loop
@@ -346,6 +345,9 @@ where
 
             // Bring up the mesh stack.
             driver_state.ot_instance.thread_set_enabled(true).context("thread_set_enabled")?;
+
+            // <b/293936909>: Make sure the TREL state matches what is expected.
+            driver_state.check_trel();
         }
 
         info!(tag = "main_task", "online_loop: Waiting for us to become online. . .");
@@ -426,6 +428,9 @@ where
 
             // Mark the network interface as offline.
             driver_state.ot_instance.ip6_set_enabled(false).context("ip6_set_enabled")?;
+
+            // <b/293936909>: Make sure the TREL state matches what is expected.
+            driver_state.check_trel();
         } // Driver state lock goes out of scope here
 
         info!(tag = "main_task", "offline_loop: Waiting");

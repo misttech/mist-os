@@ -966,12 +966,11 @@ where
     #[tracing::instrument(skip_all)]
     async fn get_feature_config(&self) -> ZxResult<FeatureConfig> {
         let driver_state = self.driver_state.lock();
-        let ot = &driver_state.ot_instance;
 
         let (detailed_logging_enabled, detailed_logging_level) =
             driver_state.detailed_logging.process_detailed_logging_get();
         Ok(FeatureConfig {
-            trel_enabled: Some(ot.trel_is_enabled()),
+            trel_enabled: Some(driver_state.is_trel_enabled()),
             detailed_logging_enabled: Some(detailed_logging_enabled),
             detailed_logging_level: Some(detailed_logging_level.into()),
             ..Default::default()
@@ -981,17 +980,14 @@ where
     #[tracing::instrument(skip_all)]
     async fn update_feature_config(&self, config: FeatureConfig) -> ZxResult<()> {
         info!(tag = "api", "Got \"update feature config\" request");
-        let driver_state = self.driver_state.lock();
-        let ot = &driver_state.ot_instance;
+        let mut driver_state = self.driver_state.lock();
 
         if let Some(trel_enabled) = config.trel_enabled {
-            if trel_enabled != ot.trel_is_enabled() {
-                ot.trel_set_enabled(trel_enabled);
-            }
+            driver_state.set_trel_enabled(trel_enabled);
         }
 
         if let Some(nat64_enabled) = config.nat64_enabled {
-            ot.nat64_set_enabled(nat64_enabled);
+            driver_state.ot_instance.nat64_set_enabled(nat64_enabled);
         }
 
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(
