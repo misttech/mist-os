@@ -9,7 +9,7 @@
         "kind": "table/member",
         "name": "fuchsia.test/Case.name",
         "ordinal": "1",
-        "type": "string:512"
+        "type": "string:2048"
     },
     {
         "kind": "table",
@@ -67,13 +67,13 @@
         "kind": "table/member",
         "name": "fuchsia.test/Invocation.name",
         "ordinal": "1",
-        "type": "string:512"
+        "type": "string:2048"
     },
     {
         "kind": "table/member",
         "name": "fuchsia.test/Invocation.tag",
         "ordinal": "2",
-        "type": "string:512"
+        "type": "string:2048"
     },
     {
         "kind": "table",
