@@ -1045,7 +1045,7 @@ impl FsNode {
         // Check that the the filesystem UID of the calling process (`current_task`) is the same as
         // the UID of the existing file. The check can be bypassed if the calling process has
         // `CAP_FOWNER` capability.
-        if !creds.has_capability(CAP_FOWNER) && child_uid != creds.euid {
+        if !creds.has_capability(CAP_FOWNER) && child_uid != creds.fsuid {
             // If current_task is not the user of the existing file, it needs to have read and write
             // access to the existing file.
             child.check_access(current_task, Access::READ | Access::WRITE).map_err(|e| {
@@ -1164,7 +1164,7 @@ impl FsNode {
                 // At least one of the EXEC bits must be set to execute files.
                 0o6 | (mode & 0o100) >> 6 | (mode & 0o010) >> 3 | mode & 0o001
             }
-        } else if creds.euid == node_uid {
+        } else if creds.fsuid == node_uid {
             (mode & 0o700) >> 6
         } else if creds.is_in_group(node_gid) {
             (mode & 0o070) >> 3
@@ -1176,7 +1176,7 @@ impl FsNode {
         }
 
         if access.contains(Access::NOATIME)
-            && node_uid != creds.euid
+            && node_uid != creds.fsuid
             && !creds.has_capability(CAP_FOWNER)
         {
             return error!(EPERM);
@@ -1186,7 +1186,7 @@ impl FsNode {
     }
 
     /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
-    /// `child`. If this node has `S_ISVTX`, then either the child must be owned by the `euid` of
+    /// `child`. If this node has `S_ISVTX`, then either the child must be owned by the `fsuid` of
     /// `current_task` or `current_task` must have `CAP_FOWNER`.
     pub fn check_sticky_bit(
         &self,
@@ -1196,7 +1196,7 @@ impl FsNode {
         let creds = current_task.creds();
         if !creds.has_capability(CAP_FOWNER)
             && self.info().mode.contains(FileMode::ISVTX)
-            && child.info().uid != creds.euid
+            && child.info().uid != creds.fsuid
         {
             return error!(EPERM);
         }
@@ -1526,7 +1526,7 @@ impl FsNode {
         // the CAP_FOWNER capability.
         let creds = current_task.creds();
         let has_owner_priviledge =
-            creds.euid == self.info().uid || creds.has_capability(CAP_FOWNER);
+            creds.fsuid == self.info().uid || creds.has_capability(CAP_FOWNER);
         let set_current_time = matches!((atime, mtime), (TimeUpdateType::Now, TimeUpdateType::Now));
         if !has_owner_priviledge {
             if set_current_time {

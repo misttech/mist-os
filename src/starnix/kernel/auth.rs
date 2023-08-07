@@ -4,7 +4,7 @@
 
 use bitflags::bitflags;
 
-use crate::types::{gid_t, uapi, uid_t, Capabilities};
+use crate::types::*;
 
 #[derive(Debug, Clone)]
 pub struct Credentials {
@@ -15,6 +15,12 @@ pub struct Credentials {
     pub saved_uid: uid_t,
     pub saved_gid: gid_t,
     pub groups: Vec<gid_t>,
+
+    /// See https://man7.org/linux/man-pages/man2/setfsuid.2.html
+    pub fsuid: uid_t,
+
+    /// See https://man7.org/linux/man-pages/man2/setfsgid.2.html
+    pub fsgid: gid_t,
 
     /// From https://man7.org/linux/man-pages/man7/capabilities.7.html
     ///
@@ -107,6 +113,8 @@ impl Credentials {
             saved_uid: uid,
             saved_gid: gid,
             groups: vec![],
+            fsuid: uid,
+            fsgid: gid,
             cap_permitted: caps,
             cap_effective: caps,
             cap_inheritable: caps,
@@ -175,13 +183,14 @@ impl Credentials {
     }
 
     pub fn as_fscred(&self) -> FsCred {
-        FsCred { uid: self.euid, gid: self.egid }
+        FsCred { uid: self.fsuid, gid: self.fsgid }
     }
 
     pub fn update_capabilities(
         &mut self,
         prev_uid: uid_t,
         prev_euid: uid_t,
+        prev_fsuid: uid_t,
         prev_saved_uid: uid_t,
     ) {
         // https://man7.org/linux/man-pages/man7/capabilities.7.html
@@ -214,6 +223,29 @@ impl Credentials {
             // If the effective user ID is changed from nonzero to 0, then
             // the permitted set is copied to the effective set.
             self.cap_effective = self.cap_permitted;
+        }
+
+        // If the filesystem user ID is changed from 0 to nonzero (see
+        // setfsuid(2)), then the following capabilities are cleared from
+        // the effective set: CAP_CHOWN, CAP_DAC_OVERRIDE,
+        // CAP_DAC_READ_SEARCH, CAP_FOWNER, CAP_FSETID,
+        // CAP_LINUX_IMMUTABLE (since Linux 2.6.30), CAP_MAC_OVERRIDE,
+        // and CAP_MKNOD (since Linux 2.6.30).
+        let fs_capabilities = CAP_CHOWN
+            | CAP_DAC_OVERRIDE
+            | CAP_DAC_READ_SEARCH
+            | CAP_FOWNER
+            | CAP_FSETID
+            | CAP_LINUX_IMMUTABLE
+            | CAP_MAC_OVERRIDE
+            | CAP_MKNOD;
+        if prev_fsuid == 0 && self.fsuid != 0 {
+            self.cap_effective &= !fs_capabilities;
+        } else if prev_fsuid != 0 && self.fsuid == 0 {
+            // If the filesystem UID is changed from nonzero to 0, then any
+            // of these capabilities that are enabled in the permitted set
+            // are enabled in the effective set.
+            self.cap_effective |= self.cap_permitted & fs_capabilities;
         }
     }
 }

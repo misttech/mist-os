@@ -401,7 +401,7 @@ impl DirEntry {
             // See a similar check in `FsNode::chmod`.
             let creds = current_task.creds();
             if !creds.has_capability(CAP_FOWNER)
-                && owner.gid != creds.egid
+                && owner.gid != creds.fsgid
                 && !creds.is_in_group(owner.gid)
             {
                 *mode &= !FileMode::ISGID;

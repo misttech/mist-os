@@ -340,15 +340,17 @@ pub fn sys_setuid(current_task: &CurrentTask, uid: uid_t) -> Result<(), Errno> {
 
     let prev_uid = creds.uid;
     let prev_euid = creds.euid;
+    let prev_fsuid = creds.fsuid;
     let prev_saved_uid = creds.saved_uid;
     let has_cap_setuid = creds.has_capability(CAP_SETUID);
     creds.euid = uid;
+    creds.fsuid = uid;
     if has_cap_setuid {
         creds.uid = uid;
         creds.saved_uid = uid;
     }
 
-    creds.update_capabilities(prev_uid, prev_euid, prev_saved_uid);
+    creds.update_capabilities(prev_uid, prev_euid, prev_fsuid, prev_saved_uid);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -362,6 +364,7 @@ pub fn sys_setgid(current_task: &CurrentTask, gid: gid_t) -> Result<(), Errno> {
         return error!(EPERM);
     }
     creds.egid = gid;
+    creds.fsgid = gid;
     if creds.has_capability(CAP_SETGID) {
         creds.gid = gid;
         creds.saved_gid = gid;
@@ -376,6 +379,40 @@ pub fn sys_geteuid(current_task: &CurrentTask) -> Result<uid_t, Errno> {
 
 pub fn sys_getegid(current_task: &CurrentTask) -> Result<gid_t, Errno> {
     Ok(current_task.creds().egid)
+}
+
+pub fn sys_setfsuid(current_task: &CurrentTask, fsuid: uid_t) -> Result<uid_t, Errno> {
+    let mut creds = current_task.creds();
+    let prev_uid = creds.uid;
+    let prev_euid = creds.euid;
+    let prev_fsuid = creds.fsuid;
+    let prev_saved_uid = creds.saved_uid;
+
+    if fsuid != u32::MAX && new_uid_allowed(&creds, fsuid) {
+        creds.fsuid = fsuid;
+        creds.update_capabilities(prev_uid, prev_euid, prev_fsuid, prev_saved_uid);
+        current_task.set_creds(creds);
+    }
+
+    Ok(prev_fsuid)
+}
+
+pub fn sys_setfsgid(current_task: &CurrentTask, fsgid: gid_t) -> Result<gid_t, Errno> {
+    let mut creds = current_task.creds();
+    let prev_uid = creds.uid;
+    let prev_euid = creds.euid;
+    let prev_fsuid = creds.fsuid;
+    let prev_saved_uid = creds.saved_uid;
+
+    let prev_fsgid = creds.fsgid;
+
+    if fsgid != u32::MAX && new_gid_allowed(&creds, fsgid) {
+        creds.fsgid = fsgid;
+        creds.update_capabilities(prev_uid, prev_euid, prev_fsuid, prev_saved_uid);
+        current_task.set_creds(creds);
+    }
+
+    Ok(prev_fsgid)
 }
 
 pub fn sys_getresuid(
@@ -413,6 +450,7 @@ pub fn sys_setreuid(current_task: &CurrentTask, ruid: uid_t, euid: uid_t) -> Res
 
     let prev_ruid = creds.uid;
     let prev_euid = creds.euid;
+    let prev_fsuid = creds.fsuid;
     let prev_saved_uid = creds.saved_uid;
     let mut is_ruid_set = false;
     if ruid != u32::MAX {
@@ -421,13 +459,14 @@ pub fn sys_setreuid(current_task: &CurrentTask, ruid: uid_t, euid: uid_t) -> Res
     }
     if euid != u32::MAX {
         creds.euid = euid;
+        creds.fsuid = euid;
     }
 
     if is_ruid_set || prev_ruid != euid {
         creds.saved_uid = creds.euid;
     }
 
-    creds.update_capabilities(prev_ruid, prev_euid, prev_saved_uid);
+    creds.update_capabilities(prev_ruid, prev_euid, prev_fsuid, prev_saved_uid);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -446,6 +485,7 @@ pub fn sys_setregid(current_task: &CurrentTask, rgid: gid_t, egid: gid_t) -> Res
     }
     if egid != u32::MAX {
         creds.egid = egid;
+        creds.fsgid = egid;
     }
 
     if is_rgid_set || previous_rgid != egid {
@@ -470,17 +510,19 @@ pub fn sys_setresuid(
 
     let prev_ruid = creds.uid;
     let prev_euid = creds.euid;
+    let prev_fsuid = creds.fsuid;
     let prev_saved_uid = creds.saved_uid;
     if ruid != u32::MAX {
         creds.uid = ruid;
     }
     if euid != u32::MAX {
         creds.euid = euid;
+        creds.fsuid = euid;
     }
     if suid != u32::MAX {
         creds.saved_uid = suid;
     }
-    creds.update_capabilities(prev_ruid, prev_euid, prev_saved_uid);
+    creds.update_capabilities(prev_ruid, prev_euid, prev_fsuid, prev_saved_uid);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -501,6 +543,7 @@ pub fn sys_setresgid(
     }
     if egid != u32::MAX {
         creds.egid = egid;
+        creds.fsgid = egid;
     }
     if sgid != u32::MAX {
         creds.saved_gid = sgid;

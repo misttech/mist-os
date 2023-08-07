@@ -1415,7 +1415,13 @@ mod test {
         const BLK_MODE: FileMode = mode!(IFBLK, 0o746);
 
         let (kernel, current_task) = create_kernel_and_task();
-        current_task.set_creds(Credentials { euid: 1, egid: 2, ..current_task.creds() });
+        current_task.set_creds(Credentials {
+            euid: 1,
+            fsuid: 1,
+            egid: 2,
+            fsgid: 2,
+            ..current_task.creds()
+        });
         fasync::unblock(move || {
             let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
             let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
