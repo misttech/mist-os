@@ -6,13 +6,10 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_NODE_H_
 
 #include <fidl/fuchsia.component.runner/cpp/wire.h>
-#include <fidl/fuchsia.driver.development/cpp/natural_types.h>
-#include <fidl/fuchsia.driver.development/cpp/wire.h>
+#include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
-#include <lib/zircon-internal/thread_annotations.h>
 
 #include <list>
 #include <memory>
@@ -21,6 +18,7 @@
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/inspect.h"
+#include "src/devices/bin/driver_manager/v2/bind_result_tracker.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 
 namespace dfv2 {
@@ -34,39 +32,11 @@ class Node;
 class NodeRemovalTracker;
 using NodeId = uint32_t;
 
-using NodeBindingInfoResultCallback =
-    fit::callback<void(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>)>;
-
 using AddNodeResultCallback = fit::callback<void(
     fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>>)>;
 
 using DestroyDriverComponentCallback =
     fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>;
-
-// Used to track binding results. Once the tracker reaches the expected result count, it invokes the
-// callback. The expected result count must be greater than 0.
-class BindResultTracker {
- public:
-  explicit BindResultTracker(size_t expected_result_count,
-                             NodeBindingInfoResultCallback result_callback);
-
-  void ReportSuccessfulBind(const std::string_view& node_name, const std::string_view& driver);
-  void ReportSuccessfulBind(
-      const std::string_view& node_name,
-      const std::vector<fuchsia_driver_development::CompositeInfo>& legacy_composite_infos,
-      const std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo>&
-          composite_spec_infos);
-  void ReportNoBind();
-
- private:
-  void Complete(size_t current);
-  fidl::Arena<> arena_;
-  size_t expected_result_count_;
-  size_t currently_reported_ TA_GUARDED(lock_);
-  std::mutex lock_;
-  NodeBindingInfoResultCallback result_callback_;
-  std::vector<fuchsia_driver_development::wire::NodeBindingInfo> results_;
-};
 
 class NodeManager {
  public:

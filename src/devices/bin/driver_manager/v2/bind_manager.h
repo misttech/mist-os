@@ -12,6 +12,7 @@
 #include <unordered_map>
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
+#include "src/devices/bin/driver_manager/v2/bind_result_tracker.h"
 #include "src/devices/bin/driver_manager/v2/composite_assembler.h"
 
 namespace dfv2 {

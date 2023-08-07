@@ -9,6 +9,8 @@ source_set("driver_runner") {
   sources = [
     "bind_manager.cc",
     "bind_manager.h",
+    "bind_result_tracker.cc",
+    "bind_result_tracker.h",
     "composite_assembler.cc",
     "composite_assembler.h",
     "composite_node_spec_v2.cc",
