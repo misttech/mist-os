@@ -42,6 +42,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   POWER_CORE = 0x31,
   DEVICETREE = 0x32,
   FAKE_BATTERY = 0x33,
+  TCS3400_LIGHT = 0x34,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {

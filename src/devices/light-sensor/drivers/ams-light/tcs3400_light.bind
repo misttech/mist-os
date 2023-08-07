@@ -6,6 +6,7 @@ composite tcs3400_light;
 
 using fuchsia.hardware.gpio;
 using fuchsia.i2c;
+using fuchsia.platform;
 
 primary node "i2c" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
@@ -14,4 +15,12 @@ primary node "i2c" {
 node "gpio" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.LIGHT_INTERRUPT;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.TCS3400_LIGHT;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }

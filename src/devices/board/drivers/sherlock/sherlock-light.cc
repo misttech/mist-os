@@ -36,48 +36,74 @@ zx_status_t Sherlock::LightInit() {
   params.integration_time_us = 711'680;
   params.gain = 64;
   params.polling_time_us = 700'000;
-  device_metadata_t metadata[] = {
-      {
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = reinterpret_cast<uint8_t*>(&params),
-          .length = sizeof(params),
-      },
+  const std::vector<fpbus::Metadata> kTcs3400Metadata{
+      {{.type = DEVICE_METADATA_PRIVATE,
+        .data = std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&params),
+                                     reinterpret_cast<uint8_t*>(&params) + sizeof(params))}},
   };
 
-  const ddk::BindRule kI2cRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+  fpbus::Node tcs3400_light_dev;
+  tcs3400_light_dev.name() = "tcs3400_light";
+  tcs3400_light_dev.vid() = PDEV_VID_GENERIC;
+  tcs3400_light_dev.pid() = PDEV_PID_GENERIC;
+  tcs3400_light_dev.did() = PDEV_DID_TCS3400_LIGHT;
+  tcs3400_light_dev.metadata() = kTcs3400Metadata;
+
+  const auto kI2cBindRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-      ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
-      ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                               bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
   };
-  const device_bind_prop_t kI2cProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-      ddk::MakeProperty(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
-      ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
+  const auto kI2cProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+      fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
   };
 
-  const ddk::BindRule kGpioLightInterruptRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+  const auto kGpioLightInterruptRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOAO_PIN_ID_PIN_5),
   };
-  const device_bind_prop_t kGpioLightInterruptProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+  const auto kGpioLightInterruptProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_LIGHT_INTERRUPT),
   };
 
-  zx_status_t status = DdkAddCompositeNodeSpec(
-      "tcs3400_light", ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
-                           .AddParentSpec(kGpioLightInterruptRules, kGpioLightInterruptProperties)
-                           .set_metadata(metadata));
+  auto kTcs3400LightParents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kI2cBindRules,
+          .properties = kI2cProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kGpioLightInterruptRules,
+          .properties = kGpioLightInterruptProperties,
+      }},
+  };
 
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite failed: %d", __func__, status);
-    return status;
+  fidl::Arena<> fidl_arena;
+  fdf::Arena tcs3400_light_arena('TCS3');
+
+  auto tcs3400_light_spec = fuchsia_driver_framework::CompositeNodeSpec{
+      {.name = "tcs3400_light", .parents = kTcs3400LightParents}};
+  fdf::WireUnownedResult tsc3400_light_result =
+      pbus_.buffer(tcs3400_light_arena)
+          ->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tcs3400_light_dev),
+                                 fidl::ToWire(fidl_arena, tcs3400_light_spec));
+  if (!tsc3400_light_result.ok()) {
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request to platform bus: %s",
+           tsc3400_light_result.status_string());
+    return tsc3400_light_result.status();
+  }
+  if (tsc3400_light_result->is_error()) {
+    zxlogf(ERROR, "Failed to add tcs3400_light composite node spec to platform device: %s",
+           zx_status_get_string(tsc3400_light_result->error_value()));
+    return tsc3400_light_result->error_value();
   }
 
   // Lights
@@ -115,7 +141,7 @@ zx_status_t Sherlock::LightInit() {
   light_dev.metadata() = light_metadata;
 
   // Enable the Amber LED so it will be controlled by PWM.
-  status = gpio_impl_.SetAltFunction(GPIO_AMBER_LED, 3);  // Set as GPIO.
+  zx_status_t status = gpio_impl_.SetAltFunction(GPIO_AMBER_LED, 3);  // Set as GPIO.
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Configure mute LED GPIO failed %d", __func__, status);
   }
@@ -208,7 +234,6 @@ zx_status_t Sherlock::LightInit() {
       }},
   };
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena arena('LIGH');
   auto aml_light_spec =
       fuchsia_driver_framework::CompositeNodeSpec{{.name = "aml_light", .parents = parents}};

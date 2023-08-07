@@ -61,6 +61,7 @@ __BEGIN_CDECLS
 #define PDEV_DID_POWER_CORE             0x31  // Power core
 #define PDEV_DID_DEVICETREE_NODE        0x32  // Node published by devicetree driver
 #define PDEV_DID_FAKE_BATTERY           0x33  // Fake battery for test
+#define PDEV_DID_TCS3400_LIGHT          0x34  // TCS3400 light
 
 // QEMU emulator
 #define PDEV_VID_QEMU               0x01

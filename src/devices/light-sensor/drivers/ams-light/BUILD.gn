@@ -18,6 +18,7 @@ driver_bind_rules("tcs3400_light_bind") {
   deps = [
     "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

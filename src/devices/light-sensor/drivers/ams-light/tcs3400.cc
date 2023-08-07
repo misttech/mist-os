@@ -620,7 +620,7 @@ zx_status_t Tcs3400Device::InitMetadata() {
   auto status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &parameters,
                                     sizeof(metadata::LightSensorParams), &actual);
   if (status != ZX_OK || sizeof(metadata::LightSensorParams) != actual) {
-    zxlogf(ERROR, "Getting metadata failed %d", status);
+    zxlogf(ERROR, "Failed to get metadata: %s", zx_status_get_string(status));
     return status;
   }
 
