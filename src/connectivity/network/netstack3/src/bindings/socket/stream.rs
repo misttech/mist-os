@@ -38,12 +38,11 @@ use netstack3_core::{
         },
         segment::Payload,
         socket::{
-            accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
-            get_handshake_status, get_info, get_socket_error, listen, receive_buffer_size,
-            remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_device,
-            set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown_conn,
-            shutdown_listener, with_socket_options, with_socket_options_mut, AcceptError,
-            BoundInfo, ConnectError, ConnectionId, ConnectionInfo, HandshakeStatus, ListenError,
+            accept, bind, close_conn, connect, create_socket, get_info, get_socket_error, listen,
+            receive_buffer_size, remove_bound, remove_unbound, reuseaddr, send_buffer_size,
+            set_device, set_receive_buffer_size, set_reuseaddr, set_send_buffer_size,
+            shutdown_conn, shutdown_listener, with_socket_options, with_socket_options_mut,
+            AcceptError, BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenError,
             ListenerNotifier, NoConnection, SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
@@ -553,6 +552,10 @@ impl IntoErrno for ConnectError {
             ConnectError::NoRoute => fposix::Errno::Enetunreach,
             ConnectError::NoPort | ConnectError::ConnectionExists => fposix::Errno::Eaddrnotavail,
             ConnectError::Zone(z) => z.into_errno(),
+            ConnectError::Listener => fposix::Errno::Einval,
+            ConnectError::Pending => fposix::Errno::Ealready,
+            ConnectError::Completed => fposix::Errno::Eisconn,
+            ConnectError::Aborted => fposix::Errno::Econnrefused,
         }
     }
 }
@@ -677,39 +680,15 @@ where
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
         let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
-        let connection = match *id {
-            SocketId::Bound(bound) => {
-                let connection =
-                    connect_bound::<I, _>(sync_ctx, non_sync_ctx, bound, SocketAddr { ip, port })
-                        .map_err(IntoErrno::into_errno)?;
-                Ok(connection)
-            }
-            SocketId::Unbound(unbound) => {
-                let connected: ConnectionId<I> =
-                    connect_unbound::<I, _>(sync_ctx, non_sync_ctx, unbound, ip, port)
-                        .map_err(IntoErrno::into_errno)?;
-                Ok(connected)
-            }
-            SocketId::Listener(_) => Err(fposix::Errno::Einval),
-            SocketId::Connection(id) => {
-                return match get_handshake_status::<I, _>(sync_ctx, id) {
-                    HandshakeStatus::Pending => Err(fposix::Errno::Ealready),
-                    HandshakeStatus::Aborted => Err(fposix::Errno::Econnrefused),
-                    HandshakeStatus::Completed { reported } => {
-                        if reported {
-                            Err(fposix::Errno::Eisconn)
-                        } else {
-                            Ok(())
-                        }
-                    }
-                }
-            }
-        }?;
-        let (local, watcher) =
-            self.data.local_socket_and_watcher.take().expect("send task should not be spawned");
-        spawn_send_task::<I>(ns_ctx.clone(), local, watcher, connection);
-        *id = SocketId::Connection(connection);
-        Err(fposix::Errno::Einprogress)
+        let connection = connect::<I, _>(sync_ctx, non_sync_ctx, *id, SocketAddr { ip, port })
+            .map_err(IntoErrno::into_errno)?;
+        if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
+            spawn_send_task::<I>(ns_ctx.clone(), local, watcher, connection);
+            *id = SocketId::Connection(connection);
+            Err(fposix::Errno::Einprogress)
+        } else {
+            Ok(())
+        }
     }
 
     fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
