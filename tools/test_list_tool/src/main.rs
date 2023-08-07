@@ -47,6 +47,7 @@ struct TestEntry {
     os: String,
     package_url: Option<String>,
     component_label: Option<String>,
+    package_label: Option<String>,
     package_manifests: Option<Vec<String>>,
     log_settings: Option<LogSettings>,
     build_rule: Option<String>,
@@ -101,6 +102,7 @@ struct FuchsiaTestTags {
     realm: Option<String>,
     hermetic: Option<bool>,
     legacy_test: Option<bool>,
+    package_label: Option<String>,
 }
 
 impl FuchsiaTestTags {
@@ -122,6 +124,7 @@ impl FuchsiaTestTags {
             TestTag { key: "realm".to_string(), value: string_to_val(self.realm) },
             TestTag { key: "hermetic".to_string(), value: bool_to_val(self.hermetic) },
             TestTag { key: "legacy_test".to_string(), value: bool_to_val(self.legacy_test) },
+            TestTag { key: "package_label".to_string(), value: string_to_val(self.package_label) }
         ]
         .into_iter()
         .collect()
@@ -277,6 +280,7 @@ fn update_tags_with_test_entry(tags: &mut FuchsiaTestTags, test_entry: &TestEntr
     tags.os = Some(test_entry.os.clone());
     tags.cpu = Some(test_entry.cpu.clone());
     tags.scope = Some(test_type.to_string());
+    tags.package_label = test_entry.package_label.clone();
 }
 
 fn main() -> Result<(), Error> {
@@ -733,6 +737,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "unknown".to_string() },
                 ],
@@ -743,6 +748,7 @@ mod tests {
                     os: "fuchsia".to_string(),
                     build_rule: Some("fuchsia_unittest_package".to_string()),
                     has_generated_manifest: Some(true),
+                    package_label: Some("//examples/test/echo-integration-test".to_string()),
                     ..TestEntry::default()
                 },
                 FuchsiaTestTags { ..FuchsiaTestTags::default() },
@@ -751,6 +757,10 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag {
+                        key: "package_label".to_string(),
+                        value: "//examples/test/echo-integration-test".to_string(),
+                    },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "unit".to_string() },
                 ],
@@ -769,6 +779,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "integration".to_string() },
                 ],
@@ -787,6 +798,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "unit".to_string() },
                 ],
@@ -805,6 +817,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "integration".to_string() },
                 ],
@@ -823,6 +836,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "vulkan".to_string() },
                     TestTag { key: "scope".to_string(), value: "system".to_string() },
                 ],
@@ -844,6 +858,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "hermetic".to_string() },
                     TestTag { key: "scope".to_string(), value: "unit".to_string() },
                 ],
@@ -865,6 +880,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "hermetic".to_string() },
                     TestTag { key: "scope".to_string(), value: "fuzzer".to_string() },
                 ],
@@ -886,6 +902,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "hermetic".to_string() },
                     TestTag { key: "scope".to_string(), value: "fuzzer".to_string() },
                 ],
@@ -907,6 +924,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "hermetic".to_string() },
                     TestTag { key: "scope".to_string(), value: "prebuilt".to_string() },
                 ],
@@ -925,6 +943,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "bootfs".to_string() },
                 ],
@@ -942,6 +961,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "linux".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "host_shell".to_string() },
                 ],
@@ -959,6 +979,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "linux".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "host".to_string() },
                 ],
@@ -976,6 +997,7 @@ mod tests {
                     TestTag { key: "hermetic".to_string(), value: "".to_string() },
                     TestTag { key: "legacy_test".to_string(), value: "".to_string() },
                     TestTag { key: "os".to_string(), value: "linux".to_string() },
+                    TestTag { key: "package_label".to_string(), value: "".to_string() },
                     TestTag { key: "realm".to_string(), value: "".to_string() },
                     TestTag { key: "scope".to_string(), value: "host".to_string() },
                 ],
@@ -1028,6 +1050,7 @@ mod tests {
                         package_manifests: Some(vec![
                             "obj/build/components/tests/echo-integration-test/package_manifest.json".to_string(),
                         ]),
+                        package_label: Some("//build/components/tests:echo-integration-test(//build/toolchain/fuchsia:x64)".into()),
                         log_settings: Some(LogSettings {
                             max_severity: Some(diagnostics_data::Severity::Warn),
                             min_severity: Some(diagnostics_data::Severity::Debug),
