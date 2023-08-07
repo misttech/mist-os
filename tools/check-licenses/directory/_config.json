@@ -36,14 +36,6 @@
             },
             {
                 "paths": [
-                    "third_party/chre"
-                ],
-                "notes": [
-                    "Temporarily skip this 3P directory, allowing it to land."
-                ]
-            },
-            {
-                "paths": [
                     "prebuilt/third_party/sysroot/linux"
                 ],
                 "notes": [
