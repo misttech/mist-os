@@ -7009,7 +7009,7 @@ rust_library("parking_lot_core-v0_6_2") {
 
   deps = []
   deps += [ ":cfg-if-v0_1_10" ]
-  deps += [ ":smallvec-v0_6_13" ]
+  deps += [ ":smallvec-v0_6_14" ]
   if (false) {
     deps += [ ":cloudabi-v0_0_3" ]
   }
@@ -10368,10 +10368,10 @@ rust_library("slab-v0_4_7") {
   visibility = [ ":*" ]
 }
 
-rust_library("smallvec-v0_6_13") {
+rust_library("smallvec-v0_6_14") {
   crate_name = "smallvec"
-  crate_root = "//third_party/rust_crates/vendor/smallvec-0.6.13/lib.rs"
-  output_name = "smallvec-15257cc85e7a16b9"
+  crate_root = "//third_party/rust_crates/vendor/smallvec-0.6.14/lib.rs"
+  output_name = "smallvec-17cff5ddbac2d3b4"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10382,8 +10382,8 @@ rust_library("smallvec-v0_6_13") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=15257cc85e7a16b9",
-    "-Cextra-filename=-15257cc85e7a16b9",
+    "-Cmetadata=17cff5ddbac2d3b4",
+    "-Cextra-filename=-17cff5ddbac2d3b4",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
