@@ -575,7 +575,7 @@ mod tests {
         camino::{Utf8Path, Utf8PathBuf},
         fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
         pretty_assertions::assert_eq,
-        std::fs::create_dir_all,
+        std::fs::{self, create_dir_all},
         tuf::{
             database::Database, repo_builder::RepoBuilder as TufRepoBuilder,
             repository::FileSystemRepositoryBuilder,
@@ -610,7 +610,7 @@ mod tests {
             .unwrap();
 
         // Make sure we can update a client with 2.root.json metadata.
-        let buf = async_fs::read(dir.join("repository").join("2.root.json")).await.unwrap();
+        let buf = fs::read(dir.join("repository").join("2.root.json")).unwrap();
         let trusted_root = RawSignedMetadata::new(buf);
 
         let mut repo_client = RepoClient::from_trusted_root(&trusted_root, repo).await.unwrap();

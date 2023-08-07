@@ -18,8 +18,6 @@ use {
 };
 
 mod file_system;
-mod gcs_repository;
-mod http_repository;
 mod pm;
 
 #[cfg(test)]
@@ -27,10 +25,18 @@ pub(crate) mod repo_tests;
 
 pub use {
     file_system::{CopyMode, FileSystemRepository, FileSystemRepositoryBuilder},
-    gcs_repository::GcsRepository,
-    http_repository::HttpRepository,
     pm::PmRepository,
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+mod gcs_repository;
+#[cfg(not(target_os = "fuchsia"))]
+pub use gcs_repository::GcsRepository;
+
+#[cfg(not(target_os = "fuchsia"))]
+mod http_repository;
+#[cfg(not(target_os = "fuchsia"))]
+pub use http_repository::HttpRepository;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

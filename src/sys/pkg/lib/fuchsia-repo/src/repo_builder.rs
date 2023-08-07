@@ -5,7 +5,6 @@
 use {
     crate::{repo_client::RepoClient, repo_keys::RepoKeys, repository::RepoStorageProvider},
     anyhow::{anyhow, Context, Result},
-    async_fs::{unix::MetadataExt, File},
     camino::{Utf8Path, Utf8PathBuf},
     chrono::{DateTime, Duration, Utc},
     fuchsia_merkle::Hash,
@@ -13,7 +12,9 @@ use {
     futures::stream::{StreamExt as _, TryStreamExt as _},
     std::{
         collections::{hash_map, BTreeMap, HashMap, HashSet},
+        fs::{self, File},
         future::Future,
+        os::unix::fs::MetadataExt,
         pin::Pin,
     },
     tempfile::TempDir,
@@ -190,7 +191,7 @@ where
 
     /// Stage a package manifest from the `path` to be published.
     pub async fn add_package(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
-        match async_fs::read(path.as_std_path()).await {
+        match fs::read(path.as_std_path()) {
             Ok(contents) => {
                 let package = PackageManifest::from_reader(&path, &contents[..])
                     .with_context(|| format!("reading package manifest {path}"))?;
@@ -387,7 +388,7 @@ where
                         None
                     } else {
                         Some(async move {
-                            let result = async_fs::metadata(&blob.source_path).await;
+                            let result = fs::metadata(&blob.source_path);
                             (blob, result)
                         })
                     }
@@ -494,7 +495,7 @@ where
         to_be_staged_blobs: &mut HashMap<Hash, BlobInfo>,
         deps: &mut HashSet<Utf8PathBuf>,
     ) -> Result<bool> {
-        let contents = match async_fs::read(path.as_std_path()).await {
+        let contents = match fs::read(path.as_std_path()) {
             Ok(contents) => contents,
             Err(err) => {
                 if self.ignore_missing_packages && err.kind() == std::io::ErrorKind::NotFound {
@@ -526,8 +527,7 @@ where
     /// Stage all the packages pointed to by the package list to be published.
     /// Paths in the package list file are relative to the directory that contains the package list.
     pub async fn add_package_list(mut self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
-        let contents = async_fs::read(path.as_std_path())
-            .await
+        let contents = fs::read(path.as_std_path())
             .with_context(|| format!("reading package manifest list {path}"))?;
 
         let package_list_manifest = PackageManifestList::from_reader(&path, &contents[..])
@@ -631,9 +631,11 @@ where
             custom.insert("merkle".into(), serde_json::to_value(meta_far_blob.merkle)?);
             custom.insert("size".into(), serde_json::to_value(meta_far_blob.size)?);
 
-            let f = File::open(&meta_far_blob.source_path).await?;
+            let f = File::open(&meta_far_blob.source_path)?;
 
-            repo_builder = repo_builder.add_target_with_custom(target_path, f, custom).await?;
+            repo_builder = repo_builder
+                .add_target_with_custom(target_path, futures::io::AllowStdIo::new(f), custom)
+                .await?;
         }
 
         // Stage the targets metadata. If we're forcing a metadata refresh, force a new targets,
@@ -805,8 +807,6 @@ fn check_manifests_are_equivalent(
 
 #[cfg(test)]
 mod tests {
-    use async_fs::unix::PermissionsExt;
-
     use {
         super::*,
         crate::{
@@ -822,6 +822,7 @@ mod tests {
             collections::{BTreeMap, BTreeSet, HashMap},
             fs,
             io::Write as _,
+            os::unix::fs::PermissionsExt as _,
         },
         tuf::{
             crypto::Ed25519PrivateKey,

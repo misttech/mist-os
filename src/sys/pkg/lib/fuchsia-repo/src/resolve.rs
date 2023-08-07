@@ -17,13 +17,13 @@ use {
         future::{BoxFuture, Shared},
         io::Cursor,
         stream::{self, FuturesUnordered},
-        AsyncRead, AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt as _,
-        TryStreamExt as _,
+        AsyncRead, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _,
     },
     serde_json::Value,
     std::{
         collections::HashMap,
-        fs::File,
+        fs::{self, File},
+        io::Write,
         path::{Path, PathBuf},
         sync::Arc,
     },
@@ -264,7 +264,7 @@ where
         concurrency: usize,
     ) -> Result<PackageFetcher<'a, R>> {
         if !blobs_dir.exists() {
-            async_fs::create_dir_all(blobs_dir).await?;
+            fs::create_dir_all(blobs_dir)?;
         }
 
         if blobs_dir.is_file() {
@@ -340,10 +340,10 @@ where
     let path = dir.join(&blob_str);
 
     // If the local path already exists, check if has the correct merkle. If so, exit early.
-    match async_fs::File::open(&path).await {
+    match fs::File::open(&path) {
         Ok(mut file) => {
-            let hash = fuchsia_merkle::from_async_read(&mut file).await?.root();
-            let () = file.close().await?;
+            let hash = fuchsia_merkle::from_read(&mut file)?.root();
+            drop(file);
             if blob == &hash {
                 return Ok(path);
             }
@@ -361,13 +361,13 @@ where
         repo.fetch_blob(&blob_str).await.with_context(|| format!("fetching {blob}"))?;
 
     let (file, temp_path) = NamedTempFile::new_in(dir)?.into_parts();
-    let mut file = async_fs::File::from(file);
+    let mut file = File::from(file);
 
     let mut merkle_builder = MerkleTreeBuilder::new();
 
     while let Some(chunk) = resource.stream.try_next().await? {
         merkle_builder.write(&chunk);
-        file.write_all(&chunk).await?;
+        file.write_all(&chunk)?;
     }
 
     // Close the file as soon as it's not needed.
@@ -378,8 +378,8 @@ where
     // Error out if the merkle doesn't match what we expected.
     if blob == &hash {
         // Flush the file to make sure all the bytes got written to disk.
-        file.flush().await?;
-        let () = file.close().await?;
+        file.flush()?;
+        drop(file);
 
         temp_path.persist(&path)?;
 

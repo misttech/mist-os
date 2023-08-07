@@ -9,23 +9,17 @@ use {
         util::file_stream,
     },
     anyhow::{anyhow, Context as _, Result},
-    async_fs::DirBuilder,
     camino::{Utf8Component, Utf8Path, Utf8PathBuf},
     delivery_blob::DeliveryBlobType,
     fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fuchsia_async as fasync,
     fuchsia_merkle::Hash,
-    futures::{
-        future::BoxFuture, stream::BoxStream, AsyncRead, FutureExt as _, Stream, StreamExt as _,
-    },
-    notify::{recommended_watcher, RecursiveMode, Watcher as _},
+    futures::{future::BoxFuture, AsyncRead, FutureExt as _},
     std::{
         collections::BTreeSet,
-        ffi::OsStr,
+        fs::{self, DirBuilder},
         io::{Seek as _, SeekFrom},
         os::unix::fs::MetadataExt,
-        pin::Pin,
-        task::{Context, Poll},
         time::SystemTime,
     },
     tempfile::{NamedTempFile, TempPath},
@@ -38,6 +32,17 @@ use {
             FileSystemRepositoryBuilder as TufFileSystemRepositoryBuilder,
             RepositoryProvider as TufRepositoryProvider, RepositoryStorage as TufRepositoryStorage,
         },
+    },
+};
+
+#[cfg(not(target_os = "fuchsia"))]
+use {
+    futures::{stream::BoxStream, Stream, StreamExt as _},
+    notify::{recommended_watcher, RecursiveMode, Watcher as _},
+    std::{
+        ffi::OsStr,
+        pin::Pin,
+        task::{Context, Poll},
     },
 };
 
@@ -260,10 +265,12 @@ impl RepoProvider for FileSystemRepository {
         self.fetch(&self.blob_repo_path, resource_path, range)
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
     fn supports_watch(&self) -> bool {
         true
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
     fn watch(&self) -> Result<BoxStream<'static, ()>> {
         // Since all we are doing is signaling that the timestamp file is changed, it's it's fine
         // if the channel is full, since that just means we haven't consumed our notice yet.
@@ -304,7 +311,7 @@ impl RepoProvider for FileSystemRepository {
         let file_path = sanitize_path(&self.blob_repo_path, path);
         async move {
             let file_path = file_path?;
-            Ok(async_fs::metadata(&file_path).await?.len())
+            Ok(fs::metadata(&file_path)?.len())
         }
         .boxed()
     }
@@ -316,7 +323,7 @@ impl RepoProvider for FileSystemRepository {
         let file_path = sanitize_path(&self.blob_repo_path, path);
         async move {
             let file_path = file_path?;
-            Ok(Some(async_fs::metadata(&file_path).await?.modified()?))
+            Ok(Some(fs::metadata(&file_path)?.modified()?))
         }
         .boxed()
     }
@@ -372,8 +379,8 @@ impl RepoStorage for FileSystemRepository {
         async move {
             let dst = sanitize_path(&self.blob_repo_path, &hash_str)?;
 
-            let src_metadata = async_fs::metadata(&src).await?;
-            let dst_metadata = match async_fs::metadata(&dst).await {
+            let src_metadata = fs::metadata(&src)?;
+            let dst_metadata = match fs::metadata(&dst) {
                 Ok(metadata) => Some(metadata),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
                 Err(e) => return Err(anyhow!(e)),
@@ -416,14 +423,14 @@ impl RepoStorage for FileSystemRepository {
                     if is_hardlink {
                         // No work to do if src and dest are already hardlinks.
                     } else {
-                        match async_fs::hard_link(&src, &dst).await {
+                        match fs::hard_link(&src, &dst) {
                             Ok(()) => {
                                 // FIXME(b/271694204): Workaround an unknown issue where hardlinks
                                 // aren't readable immediately after creation in some environments.
-                                if async_fs::metadata(&dst).await.is_err() {
+                                if fs::metadata(&dst).is_err() {
                                     warn!("Hardlink at {dst:?} not yet readable");
                                     fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
-                                    if async_fs::metadata(&dst).await.is_err() {
+                                    if fs::metadata(&dst).is_err() {
                                         warn!("Hardlink at {dst:?} still not readable, falling back to copy");
                                         copy_blob(&src, &dst).await?
                                     }
@@ -456,7 +463,7 @@ impl RepoStorage for FileSystemRepository {
 }
 
 async fn path_exists(path: &Utf8Path) -> std::io::Result<bool> {
-    match async_fs::File::open(&path).await {
+    match fs::File::open(&path) {
         Ok(_) => Ok(true),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(err) => Err(err),
@@ -465,7 +472,7 @@ async fn path_exists(path: &Utf8Path) -> std::io::Result<bool> {
 
 async fn create_temp_file(path: &Utf8Path) -> Result<TempPath> {
     let temp_file = if let Some(parent) = path.parent() {
-        DirBuilder::new().recursive(true).create(parent).await?;
+        DirBuilder::new().recursive(true).create(parent)?;
 
         NamedTempFile::new_in(parent)?
     } else {
@@ -477,10 +484,10 @@ async fn create_temp_file(path: &Utf8Path) -> Result<TempPath> {
 
 // Set the blob at `path` to be read-only.
 async fn set_blob_read_only(path: &Utf8Path) -> Result<()> {
-    let file = async_fs::File::open(path).await?;
-    let mut permissions = file.metadata().await?.permissions();
+    let file = fs::File::open(path)?;
+    let mut permissions = file.metadata()?.permissions();
     permissions.set_readonly(true);
-    file.set_permissions(permissions).await?;
+    file.set_permissions(permissions)?;
 
     Ok(())
 }
@@ -490,8 +497,8 @@ async fn set_blob_read_only(path: &Utf8Path) -> Result<()> {
 async fn reflink(src_path: &Utf8Path, dst_path: &Utf8Path) -> Result<(), std::io::Error> {
     use std::os::fd::AsRawFd;
 
-    let src = async_fs::File::open(src_path).await?;
-    let dst = async_fs::File::create(dst_path).await?;
+    let src = fs::File::open(src_path)?;
+    let dst = fs::File::create(dst_path)?;
 
     // Safe because this is a synchronous syscall and the raw fds don't outlive the call.
     let res = unsafe { libc::ioctl(dst.as_raw_fd(), libc::FICLONE, src.as_raw_fd()) };
@@ -501,7 +508,7 @@ async fn reflink(src_path: &Utf8Path, dst_path: &Utf8Path) -> Result<(), std::io
             let err = std::io::Error::last_os_error();
 
             drop(dst);
-            let _ = async_fs::remove_file(dst_path).await;
+            let _ = fs::remove_file(dst_path);
 
             match err.raw_os_error().unwrap() {
                 // The filesystem does not support reflinks.
@@ -528,7 +535,9 @@ async fn copy_blob(src: &Utf8Path, dst: &Utf8Path) -> Result<()> {
     match reflink(src, (*temp_path).try_into()?).await {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::Unsupported => {
-            async_fs::copy(src, &temp_path).await?;
+            let src = src.to_owned();
+            let temp_path = temp_path.to_path_buf();
+            fasync::unblock(move || fs::copy(src, &temp_path)).await?;
         }
         Err(e) => return Err(anyhow!(e)),
     }
@@ -542,7 +551,7 @@ async fn generate_delivery_blob(
     dst: &Utf8Path,
     blob_type: DeliveryBlobType,
 ) -> Result<()> {
-    let src_blob = async_fs::read(src).await.with_context(|| format!("reading {src}"))?;
+    let src_blob = fs::read(src).with_context(|| format!("reading {src}"))?;
 
     let temp_path = create_temp_file(dst).await?;
     let file = std::fs::File::create(&temp_path)?;
@@ -557,6 +566,7 @@ async fn generate_delivery_blob(
     set_blob_read_only(dst).await
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 #[pin_project::pin_project]
 struct WatchStream {
     _watcher: notify::RecommendedWatcher,
@@ -564,6 +574,7 @@ struct WatchStream {
     receiver: futures::channel::mpsc::Receiver<()>,
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 impl Stream for WatchStream {
     type Item = ();
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
