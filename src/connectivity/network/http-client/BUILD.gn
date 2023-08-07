@@ -38,3 +38,9 @@ fuchsia_component("component") {
   manifest = "meta/http_client.cml"
   deps = [ ":http_client" ]
 }
+
+fuchsia_package("package") {
+  package_name = "http-client"
+  deps = [ ":component" ]
+  visibility = [ "//bundles/assembly/*" ]
+}

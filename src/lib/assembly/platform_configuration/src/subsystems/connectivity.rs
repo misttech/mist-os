@@ -63,9 +63,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             (_, _, None) => Some(&NetworkingConfig::Standard),
         };
         if let Some(networking) = networking {
-            // The 'core_realm_networking' bundle is required if networking is
-            // enabled.
+            // The 'core_realm_networking' and 'network_realm' bundles are
+            // required if networking is enabled.
             builder.platform_bundle("core_realm_networking");
+            builder.platform_bundle("network_realm");
 
             // Which specific network package is selectable by the product.
             match networking {

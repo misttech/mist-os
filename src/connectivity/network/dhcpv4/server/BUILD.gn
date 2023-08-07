@@ -59,6 +59,12 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_package("package") {
+  package_name = "dhcpv4-server"
+  deps = [ ":component" ]
+  visibility = [ "//bundles/assembly/*" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":dhcpv4-server-tests" ]

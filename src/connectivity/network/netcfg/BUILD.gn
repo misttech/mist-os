@@ -116,10 +116,22 @@ fuchsia_component("component-basic") {
   deps = [ ":bin-basic" ]
 }
 
+fuchsia_package("package-basic") {
+  package_name = "netcfg-basic"
+  deps = [ ":component-basic" ]
+  visibility = [ "//bundles/assembly/*" ]
+}
+
 fuchsia_component("component-advanced") {
   component_name = "netcfg-advanced"
   manifest = "meta/netcfg-advanced.cml"
   deps = [ ":bin-advanced" ]
+}
+
+fuchsia_package("package-advanced") {
+  package_name = "netcfg-advanced"
+  deps = [ ":component-advanced" ]
+  visibility = [ "//bundles/assembly/*" ]
 }
 
 config_data("config-default") {

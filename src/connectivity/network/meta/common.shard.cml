@@ -6,39 +6,38 @@
     // in non-prod builds.
     include: [
         "//src/connectivity/network/meta/test-collection.shard.cml",
-        "trace/client.shard.cml",
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+        "trace/offer.shard.cml",
     ],
     children: [
         {
             name: "dhcpd",
-            url: "#meta/dhcpv4_server.cm",
+            url: "fuchsia-pkg://fuchsia.com/dhcpv4-server#meta/dhcpv4_server.cm",
         },
         {
             name: "dhcpv6-client",
-            url: "#meta/dhcpv6-client.cm",
+            url: "fuchsia-pkg://fuchsia.com/dhcpv6-client#meta/dhcpv6-client.cm",
         },
         {
             name: "dns-resolver",
-            url: "#meta/dns_resolver.cm",
+            url: "fuchsia-pkg://fuchsia.com/dns-resolver#meta/dns_resolver.cm",
         },
         {
             name: "http-client",
-            url: "#meta/http-client.cm",
+            url: "fuchsia-pkg://fuchsia.com/http-client#meta/http-client.cm",
         },
         {
             name: "netstack",
 
-            // Pull the netstack from an external package. This allows its
-            // contents to be determined at product assembly time, which makes
-            // it easy to swap out the netstack. We can't use subpackages for
-            // this because they are only used to assemble packages, not to
-            // assemble packages into a product, which occurs later.
+            // TODO(https://fxbug.dev/131601): Move netstack package selection
+            // to assembly.
             url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm",
             on_terminate: "reboot",
         },
         {
             name: "reachability",
-            url: "#meta/reachability.cm",
+            url: "fuchsia-pkg://fuchsia.com/reachability#meta/reachability.cm",
             startup: "eager",
         },
     ],

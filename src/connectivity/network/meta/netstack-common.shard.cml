@@ -7,6 +7,7 @@
 {
     include: [
         "inspect/client.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     capabilities: [

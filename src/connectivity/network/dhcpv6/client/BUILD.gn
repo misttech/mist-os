@@ -56,6 +56,12 @@ fuchsia_component("component") {
   deps = [ ":dhcpv6_client" ]
 }
 
+fuchsia_package("package") {
+  package_name = "dhcpv6-client"
+  deps = [ ":component" ]
+  visibility = [ "//bundles/assembly/*" ]
+}
+
 fuchsia_test_component("dhcpv6-client-test") {
   manifest = "meta/dhcpv6-client-test.cml"
   deps = [ ":dhcpv6_client_test" ]

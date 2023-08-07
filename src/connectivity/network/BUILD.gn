@@ -10,13 +10,9 @@ declare_args() {
   enable_netstack2_tracing = false
 }
 
-_netstack_package = ":netstack2"
 _netstack2_component = "netstack:component"
 assert(!(enable_netstack2_tracing && use_netstack3),
        "cannot enable both Netstack3 and tracing in Netstack2")
-if (use_netstack3) {
-  _netstack_package = ":netstack3"
-}
 if (enable_netstack2_tracing) {
   _netstack2_component = "netstack:component-with-tracing-dropin"
 }
@@ -35,56 +31,14 @@ fuchsia_component("component-basic") {
   manifest = "meta/network-basic.cml"
 }
 
-# Defines a Fuchsia package with networking components.
-#
-# Parameters
-#
-#   basic:
-#     Required: Use only the basic versions of components.
-#
-#   visibility:
-#     Optional: Has the standard GN meaning.
-template("network_package") {
-  fuchsia_package(target_name) {
-    forward_variables_from(invoker, [ "visibility" ])
-    package_name = "network"
-    deps = [
-      "dhcpv4/server:component",
-      "dhcpv6/client:component",
-      "dns:component",
-      "http-client:component",
-      "reachability:component",
-    ]
-    if (invoker.basic) {
-      deps += [
-        ":component-basic",
-        "netcfg:component-basic",
-      ]
-    } else {
-      deps += [
-        ":component",
-        "netcfg:component-advanced",
-      ]
-    }
-  }
-}
-
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
 }
 
-network_package("network") {
-  basic = false
-}
-
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("basic-for_transition") {
-}
-
-network_package("network-basic") {
-  basic = true
 }
 
 fuchsia_package("netstack2") {

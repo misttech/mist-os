@@ -81,6 +81,7 @@ user_platform_aib_names =
 
       # The additional children of core we add when we have networking enabled
       "core_realm_networking",
+      "network_realm",
       "networking_with_virtualization",
       "networking_basic",
 

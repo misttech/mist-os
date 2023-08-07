@@ -120,6 +120,12 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_package("package") {
+  package_name = "dns-resolver"
+  deps = [ ":component" ]
+  visibility = [ "//bundles/assembly/*" ]
+}
+
 fuchsia_component("component_with_fake_time") {
   component_name = "dns_resolver_with_fake_time"
   manifest = "meta/dns_resolver_with_fake_time.cml"

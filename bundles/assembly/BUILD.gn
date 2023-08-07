@@ -502,13 +502,78 @@ assembly_input_bundle("core_realm_networking") {
   ]
 }
 
+# network_realm
+#
+# This AIB is the base on which to build up networking support. It includes all
+# the packages that are common across all products that require networking.
+assembly_input_bundle("network_realm") {
+  base_packages = [
+    "//src/connectivity/network/dhcpv4/server:package",
+    "//src/connectivity/network/dhcpv6/client:package",
+    "//src/connectivity/network/dns:package",
+    "//src/connectivity/network/http-client:package",
+    "//src/connectivity/network/reachability:package",
+  ]
+
+  compiled_packages = [
+    {
+      name = "network"
+      components = [
+        {
+          component_name = "network"
+          shards =
+              rebase_path("//src/connectivity/network/meta/common.shard.cml",
+                          root_build_dir)
+        },
+      ]
+      component_includes = [
+        {
+          source =
+              rebase_path("//sdk/lib/inspect/offer.shard.cml", root_build_dir)
+          destination = "inspect/offer.shard.cml"
+        },
+        {
+          source =
+              rebase_path("//sdk/lib/trace/offer.shard.cml", root_build_dir)
+          destination = "trace/offer.shard.cml"
+        },
+        {
+          source =
+              rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
+          destination = "syslog/offer.shard.cml"
+        },
+        {
+          source = rebase_path(
+                  "//src/connectivity/network/meta/test-collection.shard.cml",
+                  root_build_dir)
+          destination =
+              "src/connectivity/network/meta/test-collection.shard.cml"
+        },
+      ]
+    },
+  ]
+}
+
 # networking_with_virtualization
 #
 # This AIB adds the networking capabilities that include virtualization support.
 # It is mutually-exclusive with networking_basic.
 #
 assembly_input_bundle("networking_with_virtualization") {
-  base_packages = [ "//src/connectivity/network" ]
+  base_packages = [ "//src/connectivity/network/netcfg:package-advanced" ]
+  compiled_packages = [
+    {
+      name = "network"
+      component_shards = [
+        {
+          component_name = "network"
+          shards = rebase_path(
+                  [ "//src/connectivity/network/meta/network-with-virtualization.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # networking_basic
@@ -517,7 +582,20 @@ assembly_input_bundle("networking_with_virtualization") {
 # It is mutually-exclusive with networking_with_virtualization.
 #
 assembly_input_bundle("networking_basic") {
-  base_packages = [ "//src/connectivity/network:network-basic" ]
+  base_packages = [ "//src/connectivity/network/netcfg:package-basic" ]
+  compiled_packages = [
+    {
+      name = "network"
+      component_shards = [
+        {
+          component_name = "network"
+          shards = rebase_path(
+                  [ "//src/connectivity/network/meta/network-basic.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # This is common across all eng-mode products that include the core realm.

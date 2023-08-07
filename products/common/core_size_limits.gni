@@ -94,9 +94,16 @@ size_checker_input = {
     {
       component = "Connectivity/Network"
       src = [
+        "packages/base/dhcpv4-server",
+        "packages/base/dhcpv6-client",
+        "packages/base/dns-resolver",
+        "packages/base/http-client",
         "packages/base/mdns",
+        "packages/base/netcfg-advanced",
+        "packages/base/netcfg-basic",
         "packages/base/netstack",
         "packages/base/network",
+        "packages/base/reachability",
       ]
       limit = 8965179  # 8.550 MiB
       creep_limit = 81920  # 80.0 KiB

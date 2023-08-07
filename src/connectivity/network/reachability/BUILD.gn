@@ -113,6 +113,12 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_package("package") {
+  package_name = "reachability"
+  deps = [ ":component" ]
+  visibility = [ "//bundles/assembly/*" ]
+}
+
 fuchsia_component("component_with_fake_time") {
   component_name = "reachability_with_fake_time"
   manifest = "meta/reachability_with_fake_time.cml"
