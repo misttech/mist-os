@@ -1302,8 +1302,6 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         remote: SocketAddr<I::Addr, Self::DeviceId>,
     ) -> Result<ConnectionId<I>, ConnectError>;
 
-    fn get_handshake_status(&mut self, id: ConnectionId<I>) -> HandshakeStatus;
-
     fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection>;
     fn close_conn(&mut self, ctx: &mut C, id: ConnectionId<I>);
     fn remove_unbound(&mut self, id: UnboundId<I>);
@@ -1700,18 +1698,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 Ok(conn_id)
             },
         )
-    }
-
-    fn get_handshake_status(&mut self, id: ConnectionId<I>) -> HandshakeStatus {
-        self.with_tcp_sockets_mut(|sockets| {
-            let (conn, _sharing, _addr) =
-                id.get_from_socket_state_mut(&mut sockets.socket_state).expect("invalid conn ID");
-            let status = conn.handshake_status;
-            if let HandshakeStatus::Completed { reported } = &mut conn.handshake_status {
-                *reported = true;
-            }
-            status
-        })
     }
 
     fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection> {
@@ -2749,25 +2735,6 @@ where
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close_conn(sync_ctx, ctx, id),
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close_conn(sync_ctx, ctx, id),
     )
-}
-
-/// Gets the handshake status for the connection.
-pub fn get_handshake_status<I, C>(sync_ctx: &SyncCtx<C>, id: ConnectionId<I>) -> HandshakeStatus
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    let IpInvariant(status) = I::map_ip(
-        (IpInvariant(&mut sync_ctx), id),
-        |(IpInvariant(sync_ctx), id)| {
-            IpInvariant(SocketHandler::get_handshake_status(sync_ctx, id))
-        },
-        |(IpInvariant(sync_ctx), id)| {
-            IpInvariant(SocketHandler::get_handshake_status(sync_ctx, id))
-        },
-    );
-    status
 }
 
 /// Shuts down the write-half of the connection. Calling this function signals
@@ -4015,10 +3982,18 @@ mod tests {
             assert_eq!(addr.ip, ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip));
         }
 
-        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, client),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    client.into(),
+                    SocketAddr {
+                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
+                        port: server_port,
+                    }
+                ),
+                Ok(client)
             );
         });
 
@@ -4323,8 +4298,13 @@ mod tests {
 
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, client_connection),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    client_connection.into(),
+                    SocketAddr { ip: ZonedAddr::Unzoned(server_ip), port: PORT }
+                ),
+                Ok(client_connection)
             );
 
             let info = assert_matches!(
@@ -4433,10 +4413,18 @@ mod tests {
                 Err(SetDeviceError::ZoneChange)
             );
         });
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, client_connection),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    client_connection.into(),
+                    SocketAddr {
+                        ip: AddrAndZone::new(server_ip.get(), FakeDeviceId).unwrap().into(),
+                        port: PORT,
+                    }
+                ),
+                Ok(client_connection)
             );
         });
     }
@@ -4502,10 +4490,15 @@ mod tests {
                 handshake_status: HandshakeStatus::Aborted,
             }
         );
-        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
-            assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, client),
-                HandshakeStatus::Aborted,
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            assert_matches!(
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    client.into(),
+                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 }
+                ),
+                Err(ConnectError::Aborted)
             );
         });
     }
@@ -5079,10 +5072,15 @@ mod tests {
 
         // The incoming connection was signaled, and the remote end was notified
         // of connection establishment.
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, remote_connection),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    remote_connection.into(),
+                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 },
+                ),
+                Ok(remote_connection)
             );
         });
 
@@ -5170,15 +5168,20 @@ mod tests {
 
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             sync_ctx.with_tcp_sockets(|sockets| {
                 let (conn, _, _addr) =
                     new_remote_connection.get_from_socket_state(&sockets.socket_state).unwrap();
                 assert_matches!(conn.state, State::Established(_));
             });
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, new_remote_connection),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    new_remote_connection.into(),
+                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 },
+                ),
+                Ok(new_remote_connection)
             );
         });
     }
@@ -5521,10 +5524,15 @@ mod tests {
         });
         // Finish the connection establishment.
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, client),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    client.into(),
+                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 },
+                ),
+                Ok(client)
             );
         });
 
@@ -5751,8 +5759,13 @@ mod tests {
         );
         // The TCP handshake should be aborted.
         assert_eq!(
-            SocketHandler::get_handshake_status(&mut sync_ctx, connection),
-            HandshakeStatus::Aborted,
+            SocketHandler::connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                connection.into(),
+                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
+            ),
+            Err(ConnectError::Aborted)
         );
         SocketHandler::get_socket_error(&mut sync_ctx, connection.into()).unwrap()
     }
@@ -5943,10 +5956,18 @@ mod tests {
         });
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, extra_conn),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    extra_conn.into(),
+                    SocketAddr {
+                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                        port: CLIENT_PORT
+                    },
+                ),
+                Ok(extra_conn)
             );
         });
 
@@ -6040,10 +6061,18 @@ mod tests {
         });
         // The TIME-WAIT socket should be reused to establish the connection.
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(
-                SocketHandler::get_handshake_status(sync_ctx, conn),
-                HandshakeStatus::Completed { reported: false },
+                SocketHandler::connect(
+                    sync_ctx,
+                    non_sync_ctx,
+                    conn.into(),
+                    SocketAddr {
+                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                        port: CLIENT_PORT
+                    },
+                ),
+                Ok(conn)
             );
         });
     }
