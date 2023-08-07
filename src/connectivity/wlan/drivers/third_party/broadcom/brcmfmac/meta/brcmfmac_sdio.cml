@@ -16,6 +16,7 @@
     },
     capabilities: [
         { service: "fuchsia.wlan.phyimpl.Service" },
+        { service: "fuchsia.wlan.fullmac.Service" },
     ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
@@ -23,6 +24,10 @@
     expose: [
         {
             service: "fuchsia.wlan.phyimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.wlan.fullmac.Service",
             from: "self",
         },
     ],
