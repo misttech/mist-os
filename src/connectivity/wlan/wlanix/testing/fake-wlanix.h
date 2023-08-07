@@ -16,6 +16,7 @@ namespace wlanix_test {
 
 enum class CommandTag {
   kWlanixGetWifi,
+  kWlanixGetNl80211,
   kWlanixUnknownMethod,
   kWifiRegisterEventCallback,
   kWifiStart,
@@ -53,6 +54,8 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   // Wlanix methods
   void GetWifi(fuchsia_wlan_wlanix::wire::WlanixGetWifiRequest* request,
                GetWifiCompleter::Sync& completer) override;
+  void GetNl80211(fuchsia_wlan_wlanix::wire::WlanixGetNl80211Request* request,
+                  GetNl80211Completer::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Wlanix> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 

@@ -12,6 +12,9 @@ open protocol Wlanix {
     flexible GetWifi(resource table {
         1: wifi server_end:Wifi;
     });
+    flexible GetNl80211(resource table {
+        1: nl80211 server_end:Nl80211;
+    });
 };
 
 open protocol Wifi {
@@ -96,5 +99,38 @@ open protocol WifiStaIface {
     /// Get the name of this iface.
     flexible GetName() -> (table {
         1: iface_name string:16;
+    });
+};
+
+type Nl80211MessageType = flexible enum {
+    DONE = 1;
+    ERROR = 2;
+    ACK = 3;
+    NO_OP = 4;
+    OVERRUN = 5;
+    MESSAGE = 6;
+};
+
+type Nl80211Message = table {
+    1: message_type Nl80211MessageType;
+    2: payload vector<uint8>:MAX;
+};
+
+open protocol Nl80211 {
+    flexible GetMulticast(resource table {
+        1: group string:32;
+        2: multicast client_end:Nl80211Multicast;
+    });
+
+    flexible Message(resource table {
+        1: message Nl80211Message;
+    }) -> (resource table {
+        1: responses vector<Nl80211Message>:MAX;
+    }) error zx.Status;
+};
+
+open protocol Nl80211Multicast {
+    flexible Message(resource table {
+        1: message Nl80211Message;
     });
 };

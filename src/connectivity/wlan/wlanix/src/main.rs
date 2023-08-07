@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Error},
+    anyhow::{bail, Context, Error},
     fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon as zx,
-    futures::StreamExt,
+    futures::{select, StreamExt},
+    netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
+    netlink_packet_generic::GenlMessage,
     parking_lot::Mutex,
     std::sync::Arc,
     tracing::{error, info, warn},
@@ -16,14 +18,17 @@ use {
 #[allow(unused)]
 mod nl80211;
 
+use nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr};
+
 const FAKE_CHIP_ID: u32 = 1;
+const IFACE_NAME: &str = "sta-iface-name";
 
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiStaIfaceRequest::GetName { responder } => {
             info!("fidl_wlanix::WifiStaIfaceRequest::GetName");
             let response = fidl_wlanix::WifiStaIfaceGetNameResponse {
-                iface_name: Some("sta-iface-name".to_string()),
+                iface_name: Some(IFACE_NAME.to_string()),
                 ..Default::default()
             };
             responder.send(&response).context("send GetName response")?;
@@ -224,6 +229,169 @@ async fn serve_wifi(reqs: fidl_wlanix::WifiRequestStream, state: Arc<Mutex<WifiS
     .await;
 }
 
+fn nl80211_message_resp(
+    responses: Vec<fidl_wlanix::Nl80211Message>,
+) -> fidl_wlanix::Nl80211MessageResponse {
+    fidl_wlanix::Nl80211MessageResponse { responses: Some(responses), ..Default::default() }
+}
+
+fn build_nl80211_message(cmd: Nl80211Cmd, attrs: Vec<Nl80211Attr>) -> fidl_wlanix::Nl80211Message {
+    let resp = GenlMessage::from_payload(Nl80211 { cmd, attrs });
+    let mut buffer = vec![0u8; resp.buffer_len()];
+    resp.serialize(&mut buffer);
+    fidl_wlanix::Nl80211Message {
+        message_type: Some(fidl_wlanix::Nl80211MessageType::Message),
+        payload: Some(buffer),
+        ..Default::default()
+    }
+}
+
+fn build_nl80211_ack() -> fidl_wlanix::Nl80211Message {
+    fidl_wlanix::Nl80211Message {
+        message_type: Some(fidl_wlanix::Nl80211MessageType::Ack),
+        payload: None,
+        ..Default::default()
+    }
+}
+
+fn build_nl80211_done() -> fidl_wlanix::Nl80211Message {
+    fidl_wlanix::Nl80211Message {
+        message_type: Some(fidl_wlanix::Nl80211MessageType::Done),
+        payload: None,
+        ..Default::default()
+    }
+}
+
+fn handle_nl80211_message(
+    netlink_message: fidl_wlanix::Nl80211Message,
+    responder: fidl_wlanix::Nl80211MessageResponder,
+    scan_sender: Option<&fidl_wlanix::Nl80211MulticastProxy>,
+) -> Result<(), Error> {
+    let payload = match netlink_message {
+        fidl_wlanix::Nl80211Message {
+            message_type: Some(fidl_wlanix::Nl80211MessageType::Message),
+            payload: Some(p),
+            ..
+        } => p,
+        _ => return Ok(()),
+    };
+    let deserialized = GenlMessage::<Nl80211>::deserialize(&NetlinkHeader::default(), &payload[..]);
+    let Ok(message) = deserialized else {
+        bail!("Failed to parse nl80211 message: {}", deserialized.unwrap_err())
+    };
+    match message.payload.cmd {
+        Nl80211Cmd::GetWiphy => {
+            info!("Nl80211Cmd::GetWiphy");
+            responder
+                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                    Nl80211Cmd::NewWiphy,
+                    vec![
+                        // Phy ID
+                        Nl80211Attr::Wiphy(0),
+                        // Supported bands
+                        Nl80211Attr::WiphyBands(vec![vec![Nl80211BandAttr::Frequencies(vec![
+                            vec![Nl80211FrequencyAttr::Frequency(2412)],
+                            vec![Nl80211FrequencyAttr::Frequency(2417)],
+                        ])]]),
+                        // Scan capabilities
+                        Nl80211Attr::MaxScanSsids(32),
+                        Nl80211Attr::MaxScheduledScanSsids(32),
+                        Nl80211Attr::MaxMatchSets(32),
+                        // Feature flags
+                        Nl80211Attr::FeatureFlags(0),
+                        Nl80211Attr::ExtendedFeatures(vec![]),
+                    ],
+                )])))
+                .context("Failed to send NewWiphy")?;
+        }
+        Nl80211Cmd::GetInterface => {
+            info!("Nl80211Cmd::GetInterface");
+            responder
+                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                    Nl80211Cmd::NewInterface,
+                    vec![
+                        Nl80211Attr::IfaceIndex(0),
+                        Nl80211Attr::IfaceName(IFACE_NAME.to_string()),
+                        Nl80211Attr::Mac([1, 2, 3, 4, 5, 6]),
+                    ],
+                )])))
+                .context("Failed to send NewInterface")?;
+        }
+        Nl80211Cmd::GetProtocolFeatures => {
+            info!("Nl80211Cmd::GetProtocolFeatures");
+            responder
+                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                    Nl80211Cmd::GetProtocolFeatures,
+                    vec![Nl80211Attr::ProtocolFeatures(0)],
+                )])))
+                .context("Failed to send GetProtocolFeatures")?;
+        }
+        Nl80211Cmd::TriggerScan => {
+            info!("Nl80211Cmd::TriggerScan");
+            responder
+                .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                .context("Failed to ack TriggerScan")?;
+            if let Some(proxy) = scan_sender {
+                proxy
+                    .message(fidl_wlanix::Nl80211MulticastMessageRequest {
+                        message: Some(build_nl80211_message(
+                            Nl80211Cmd::NewScanResults,
+                            vec![Nl80211Attr::IfaceIndex(0)],
+                        )),
+                        ..Default::default()
+                    })
+                    .context("Failed to send NewScanResults")?;
+            }
+        }
+        Nl80211Cmd::GetScan => {
+            info!("Nl80211Cmd::GetScan");
+            responder
+                .send(Ok(nl80211_message_resp(vec![build_nl80211_done()])))
+                .context("Failed to send scan results")?;
+        }
+        _ => {
+            warn!("Dropping nl80211 message: {:?}", message);
+            responder
+                .send(Ok(nl80211_message_resp(vec![])))
+                .context("Failed to respond to unhandled message")?;
+        }
+    }
+    Ok(())
+}
+
+async fn serve_nl80211(mut reqs: fidl_wlanix::Nl80211RequestStream) {
+    let mut scan_multicast_sender = None;
+    loop {
+        select! {
+            req = reqs.select_next_some() => match req {
+                Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, ..}) => {
+                    if let Some(message) = payload.message {
+                        if let Err(e) = handle_nl80211_message(message, responder, scan_multicast_sender.as_ref()) {
+                            error!("Failed to handle Nl80211 message: {}", e);
+                        }
+                    }
+                }
+                Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
+                    if let Some(multicast) = payload.multicast {
+                        if payload.group == Some("scan".to_string())  {
+                            scan_multicast_sender.replace(multicast.into_proxy().expect("Failed to create multicast proxy"));
+                        } else {
+                            warn!("Dropping channel for unsupported multicast group {:?}", payload.group);
+                        }
+                    }
+                }
+                Ok(fidl_wlanix::Nl80211Request::_UnknownMethod { ordinal, .. }) => {
+                    warn!("Unknown Nl80211Request ordinal: {}", ordinal);
+                }
+                Err(e) => {
+                    error!("Nl80211 request stream failed: {}", e);
+                    return;
+                }
+            }
+        }
+    }
+}
+
 async fn handle_wlanix_request(
     req: fidl_wlanix::WlanixRequest,
     state: Arc<Mutex<WifiState>>,
@@ -234,6 +402,13 @@ async fn handle_wlanix_request(
             if let Some(wifi) = payload.wifi {
                 let wifi_stream = wifi.into_stream().context("create Wifi stream")?;
                 serve_wifi(wifi_stream, Arc::clone(&state)).await;
+            }
+        }
+        fidl_wlanix::WlanixRequest::GetNl80211 { payload, .. } => {
+            info!("fidl_wlanix::WlanixRequest::GetNl80211");
+            if let Some(nl80211) = payload.nl80211 {
+                let nl80211_stream = nl80211.into_stream().context("create Nl80211 stream")?;
+                serve_nl80211(nl80211_stream).await;
             }
         }
         fidl_wlanix::WlanixRequest::_UnknownMethod { ordinal, .. } => {
@@ -287,7 +462,7 @@ async fn main() {
 mod tests {
     use {
         super::*,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream},
+        fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
         futures::{pin_mut, task::Poll, Future},
         std::pin::Pin,
         wlan_common::assert_variant,
@@ -504,5 +679,102 @@ mod tests {
             exec,
         };
         (test_helper, test_fut)
+    }
+
+    #[test]
+    fn get_nl80211() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
+            .expect("Failed to get proxy and req stream");
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let wlanix_fut = serve_wlanix(stream, state);
+        pin_mut!(wlanix_fut);
+        let (nl_proxy, nl_server) =
+            create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+        proxy
+            .get_nl80211(fidl_wlanix::WlanixGetNl80211Request {
+                nl80211: Some(nl_server),
+                ..Default::default()
+            })
+            .expect("Failed to get Nl80211");
+        assert_variant!(exec.run_until_stalled(&mut wlanix_fut), Poll::Pending);
+        assert!(!nl_proxy.is_closed());
+    }
+
+    #[test]
+    fn unsupported_mcast_group() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let nl80211_fut = serve_nl80211(stream);
+        pin_mut!(nl80211_fut);
+
+        let (mcast_client, mut mcast_stream) =
+            create_request_stream::<fidl_wlanix::Nl80211MulticastMarker>()
+                .expect("Failed to create mcast request stream");
+        proxy
+            .get_multicast(fidl_wlanix::Nl80211GetMulticastRequest {
+                group: Some("doesnt_exist".to_string()),
+                multicast: Some(mcast_client),
+                ..Default::default()
+            })
+            .expect("Failed to get multicast");
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+
+        // The stream should immediately terminate.
+        let next_mcast = mcast_stream.next();
+        pin_mut!(next_mcast);
+        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(None));
+    }
+
+    #[test]
+    fn trigger_scan() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let nl80211_fut = serve_nl80211(stream);
+        pin_mut!(nl80211_fut);
+
+        let (mcast_client, mut mcast_stream) =
+            create_request_stream::<fidl_wlanix::Nl80211MulticastMarker>()
+                .expect("Failed to create mcast request stream");
+        proxy
+            .get_multicast(fidl_wlanix::Nl80211GetMulticastRequest {
+                group: Some("scan".to_string()),
+                multicast: Some(mcast_client),
+                ..Default::default()
+            })
+            .expect("Failed to get multicast");
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+
+        let next_mcast = mcast_stream.next();
+        pin_mut!(next_mcast);
+        assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
+        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(trigger_scan_message),
+            ..Default::default()
+        });
+        pin_mut!(trigger_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = assert_variant!(
+            exec.run_until_stalled(&mut trigger_scan_fut),
+            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
+        );
+        assert_eq!(responses.len(), 1);
+        assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Ack));
+
+        // With our faked scan results we expect an immediate multicast notification.
+        let mcast_req = assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(Some(Ok(msg))) => msg);
+        let mcast_msg = assert_variant!(mcast_req, fidl_wlanix::Nl80211MulticastRequest::Message {
+            payload: fidl_wlanix::Nl80211MulticastMessageRequest {message: Some(m), .. }, ..} => m);
+        let payload = assert_variant!(mcast_msg.payload, Some(p) => p);
+        let deser_msg =
+            GenlMessage::<Nl80211>::deserialize(&NetlinkHeader::default(), &payload[..])
+                .expect("Failed to deserialize payload");
+        assert_eq!(deser_msg.payload.cmd, Nl80211Cmd::NewScanResults);
     }
 }

@@ -24,6 +24,12 @@ void FakeWlanix::GetWifi(fuchsia_wlan_wlanix::wire::WlanixGetWifiRequest* reques
   fidl::BindServer(dispatcher_, std::move(request->wifi()), this);
 }
 
+void FakeWlanix::GetNl80211(fuchsia_wlan_wlanix::wire::WlanixGetNl80211Request* request,
+                            GetNl80211Completer::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWlanixGetNl80211});
+  ZX_ASSERT_MSG(false, "GetNl80211 is not supported by fake-wlanix");
+}
+
 void FakeWlanix::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Wlanix> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
