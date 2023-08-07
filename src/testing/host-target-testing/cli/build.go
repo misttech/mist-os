@@ -13,6 +13,8 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 )
 
+// If the useLatestFfx flag is set to true then use the latest ffx tool,
+// else the ffx tool from the build will be used.
 type BuildConfig struct {
 	archiveConfig    *ArchiveConfig
 	deviceConfig     *DeviceConfig
@@ -21,6 +23,7 @@ type BuildConfig struct {
 	buildID          string
 	fuchsiaBuildDir  string
 	productBundleDir string
+	useLatestFfx     bool
 }
 
 func NewBuildConfig(
@@ -29,7 +32,7 @@ func NewBuildConfig(
 	deviceConfig *DeviceConfig,
 	defaultBuildID string,
 ) *BuildConfig {
-	return NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, defaultBuildID, "")
+	return NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, defaultBuildID, "", false)
 }
 
 func NewBuildConfigWithPrefix(
@@ -38,11 +41,13 @@ func NewBuildConfigWithPrefix(
 	deviceConfig *DeviceConfig,
 	defaultBuildID string,
 	prefix string,
+	useLatestFfx bool,
 ) *BuildConfig {
 	c := &BuildConfig{
 		prefix:        prefix,
 		archiveConfig: archiveConfig,
 		deviceConfig:  deviceConfig,
+		useLatestFfx:  useLatestFfx,
 	}
 
 	fs.StringVar(&c.builderName, fmt.Sprintf("%sbuilder-name", prefix), "", "Pave to the latest version of this builder")
@@ -114,7 +119,11 @@ func (c *BuildConfig) GetBuild(ctx context.Context, deviceClient *device.Client,
 
 	var build artifacts.Build
 	if buildID != "" {
-		build, err = c.archiveConfig.BuildArchive().GetBuildByID(ctx, buildID, dir, sshPrivateKey.PublicKey())
+		ffxPath := ""
+		if c.useLatestFfx {
+			ffxPath = c.deviceConfig.ffxPath
+		}
+		build, err = c.archiveConfig.BuildArchive().GetBuildByID(ctx, buildID, dir, sshPrivateKey.PublicKey(), ffxPath)
 	} else if c.fuchsiaBuildDir != "" {
 		build, err = artifacts.NewFuchsiaDirBuild(c.fuchsiaBuildDir, sshPrivateKey.PublicKey()), nil
 	} else if c.productBundleDir != "" {

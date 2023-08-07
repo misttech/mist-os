@@ -44,14 +44,13 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
-
 	c := &config{
 		archiveConfig:        archiveConfig,
 		deviceConfig:         deviceConfig,
 		installerConfig:      installerConfig,
 		chainedBuildConfig:   cli.NewRepeatableBuildConfig(fs, archiveConfig, deviceConfig),
-		downgradeBuildConfig: cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, "", "downgrade-"),
-		upgradeBuildConfig:   cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), "upgrade-"),
+		downgradeBuildConfig: cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, "", "downgrade-", true),
+		upgradeBuildConfig:   cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), "upgrade-", false),
 	}
 
 	fs.DurationVar(&c.paveTimeout, "pave-timeout", 5*time.Minute, "Err if a pave takes longer than this time (default is 5 minutes)")

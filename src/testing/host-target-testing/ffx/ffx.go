@@ -155,7 +155,7 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 	}
 	// prepend a config flag for finding subtools that are compiled separately
 	// in the same directory as ffx itself.
-	args = append([]string{"--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path))}, args...)
+	args = append([]string{"--isolate-dir", f.isolateDir, "--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path))}, args...)
 	logger.Infof(ctx, "running: %s %q", path, args)
 	cmd := exec.CommandContext(ctx, path, args...)
 	if f.stdout != nil {
@@ -164,8 +164,6 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 		cmd.Stdout = os.Stdout
 	}
 	cmd.Stderr = os.Stderr
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("FFX_ISOLATE_DIR=%s", f.isolateDir))
 
 	cmdRet := cmd.Run()
 	logger.Infof(ctx, "finished running %s %q: %q", path, args, cmdRet)

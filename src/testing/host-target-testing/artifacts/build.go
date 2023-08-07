@@ -78,6 +78,7 @@ type ArtifactsBuild struct {
 	buildImageDir string
 	sshPublicKey  ssh.PublicKey
 	srcs          map[string]struct{}
+	ffxPath       string
 }
 
 func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
@@ -327,6 +328,10 @@ func (b *ArtifactsBuild) getFfxFlasher(ctx context.Context) (*flasher.FfxFlasher
 	}
 	// Use the latest ffx
 	ffxPath := filepath.Join(buildImageDir, "ffx")
+	if b.ffxPath != "" {
+		ffxPath = b.ffxPath
+	}
+
 	flashManifest := filepath.Join(buildImageDir, "flash.json")
 	if err := b.archive.download(ctx, currentBuildId, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
 		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
