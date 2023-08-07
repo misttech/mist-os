@@ -668,6 +668,9 @@ pub fn sys_readlinkat(
         SymlinkTarget::Node(node) => node.path(current_task),
     };
 
+    if buffer_size == 0 {
+        return error!(EINVAL);
+    }
     // Cap the returned length at buffer_size.
     let length = std::cmp::min(buffer_size, target.len());
     current_task.write_memory(buffer, &target[..length])?;

@@ -231,8 +231,6 @@
                 "readahead01",
                 "readahead02",
                 "readdir21",
-                "readlink03",
-                "readlinkat02",
                 "recv01",
                 "recvfrom01",
                 "recvmsg01",
