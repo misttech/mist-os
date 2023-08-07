@@ -9,18 +9,13 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
-if (is_host) {
+if (is_host && target_cpu == "x64") {
   ffx = "${ffx_test_host_tools_out_dir}/ffx"
-
-  supports_emu = is_linux
-
-  if (supports_emu) {
-    emu_dir = "//prebuilt/third_party/qemu/${host_platform}"
-    product_bundle =
-        get_label_info(labels.images, "target_out_dir") + "/product_bundle"
-    bootloader = "${product_bundle}/partitions/fuchsia.esp.blk"
-    run_zircon = "//zircon/scripts/run-zircon"
-  }
+  emu_dir = "//prebuilt/third_party/qemu/${host_platform}"
+  product_bundle =
+      get_label_info(labels.images, "target_out_dir") + "/product_bundle"
+  bootloader = "${product_bundle}/partitions/fuchsia.esp.blk"
+  run_zircon = "//zircon/scripts/run-zircon"
 
   rustc_library("ffx_testing") {
     edition = "2021"
@@ -34,59 +29,48 @@ if (is_host) {
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-io",
       "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:gpt",
       "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:tempfile",
     ]
 
-    if (supports_emu) {
-      deps += [ "//third_party/rust_crates:gpt" ]
-    }
-
-    non_rust_deps = [ "//src/developer/ffx:test_data" ]
-
-    if (supports_emu) {
-      non_rust_deps += [
-        ":emu_test_data",
-        ":prebuilt_qemu",
-      ]
-    }
+    non_rust_deps = [
+      ":prebuilt_qemu",
+      ":test_data",
+      "//src/developer/ffx:test_data",
+    ]
 
     sources = [
       "src/emu.rs",
       "src/lib.rs",
     ]
 
-    rustenv = [ "FFX=" + rebase_path(ffx, root_build_dir) ]
-
-    if (supports_emu) {
-      rustenv += [
-        "QEMU_PATH=" + rebase_path(emu_dir, root_build_dir),
-        "PRODUCT_BUNDLE=" + rebase_path(product_bundle, root_build_dir),
-        "BOOTLOADER=" + rebase_path(bootloader, root_build_dir),
-        "RUN_ZIRCON=" + rebase_path(run_zircon, root_build_dir),
-      ]
-    }
+    rustenv = [
+      "FFX=" + rebase_path(ffx, root_build_dir),
+      "QEMU_PATH=" + rebase_path(emu_dir, root_build_dir),
+      "PRODUCT_BUNDLE=" + rebase_path(product_bundle, root_build_dir),
+      "BOOTLOADER=" + rebase_path(bootloader, root_build_dir),
+      "RUN_ZIRCON=" + rebase_path(run_zircon, root_build_dir),
+    ]
   }
 
-  if (supports_emu) {
-    host_test_data("prebuilt_qemu") {
-      sources = [ emu_dir ]
-    }
+  host_test_data("prebuilt_qemu") {
+    sources = [ emu_dir ]
+  }
 
-    host_test_data("emu_test_data") {
-      deps = [
-        # This dep currently does nothing, but if the circular dependency issue
-        # is solved then it'll add a proper dep on the built image.
-        "//build/images/fuchsia:fuchsia_zbi_for_host_tests",
-        "//src/firmware/gigaboot/cpp:fuchsia",
-      ]
-      sources = [
-        "//prebuilt/third_party/edk2/qemu-x64/OVMF_CODE.fd",
-        "//prebuilt/third_party/edk2/qemu-x64/OVMF_VARS.fd",
-        bootloader,
-        product_bundle,
-        run_zircon,
-      ]
-    }
+  host_test_data("test_data") {
+    deps = [
+      # This dep currently does nothing, but if the circular dependency issue
+      # is solved then it'll add a proper dep on the built image.
+      "//build/images/fuchsia:fuchsia_zbi_for_host_tests",
+      "//src/firmware/gigaboot/cpp:fuchsia",
+    ]
+    sources = [
+      "//prebuilt/third_party/edk2/qemu-x64/OVMF_CODE.fd",
+      "//prebuilt/third_party/edk2/qemu-x64/OVMF_VARS.fd",
+      bootloader,
+      product_bundle,
+      run_zircon,
+    ]
   }
 }
