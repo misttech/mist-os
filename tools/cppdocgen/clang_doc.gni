@@ -69,6 +69,7 @@ template("clang_doc_invoke") {
                            [
                              "deps",
                              "visibility",
+                             "hermetic_action_ignored_prefixes",
                            ])
   }
 }
@@ -156,6 +157,7 @@ template("clang_doc_headers") {
                            [
                              "out_zip",
                              "visibility",
+                             "hermetic_action_ignored_prefixes",
                            ])
     deps = [ ":$compile_source_target_name" ]
   }
