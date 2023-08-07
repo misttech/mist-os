@@ -7,6 +7,7 @@
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/update/channelcontrol/cpp/fidl.h>
 #include <lib/zx/time.h>
+#include <zircon/errors.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -165,6 +166,100 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, Reconnects) {
 
   RunLoopUntilIdle();
   EXPECT_EQ(channel_server->NumConnections(), 0u);
+}
+
+TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, ReconnectsAfterErrorOnInitialConnection) {
+  DynamicCurrentChannelProvider provider(dispatcher(), services(),
+                                         std::make_unique<MonotonicBackoff>());
+
+  RunLoopUntilIdle();
+
+  Annotations annotations;
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, Error::kConnectionError)}));
+
+  auto channel_server = std::make_unique<stubs::ChannelControl>(stubs::ChannelControlBase::Params{
+      .current = kChannelValue,
+  });
+  InjectServiceProvider(channel_server.get());
+
+  RunLoopFor(zx::sec(1));
+  ASSERT_EQ(channel_server->NumConnections(), 1u);
+
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, kChannelValue)}));
+}
+
+TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfUnavailable) {
+  DynamicCurrentChannelProvider provider(dispatcher(), services(),
+                                         std::make_unique<MonotonicBackoff>());
+
+  auto channel_server = std::make_unique<stubs::ChannelControl>(stubs::ChannelControlBase::Params{
+      .current = kChannelValue,
+  });
+  InjectServiceProvider(channel_server.get());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(channel_server->NumConnections(), 1u);
+
+  channel_server->CloseAllConnections(ZX_ERR_UNAVAILABLE);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(channel_server->NumConnections(), 0u);
+
+  Annotations annotations;
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+
+  RunLoopFor(zx::sec(1));
+  EXPECT_EQ(channel_server->NumConnections(), 0u);
+
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+}
+
+TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfNotFound) {
+  DynamicCurrentChannelProvider provider(dispatcher(), services(),
+                                         std::make_unique<MonotonicBackoff>());
+
+  auto channel_server = std::make_unique<stubs::ChannelControl>(stubs::ChannelControlBase::Params{
+      .current = kChannelValue,
+  });
+  InjectServiceProvider(channel_server.get());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(channel_server->NumConnections(), 1u);
+
+  channel_server->CloseAllConnections(ZX_ERR_NOT_FOUND);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(channel_server->NumConnections(), 0u);
+
+  Annotations annotations;
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+
+  RunLoopFor(zx::sec(1));
+  EXPECT_EQ(channel_server->NumConnections(), 0u);
+
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
 }
 
 constexpr char kDeviceIdKey[] = "current_device_id";

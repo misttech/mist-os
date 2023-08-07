@@ -67,7 +67,9 @@ class MultiBindingFidlServer : public TestBase {
     };
   }
 
-  void CloseAllConnections() { bindings_.CloseAll(); }
+  void CloseAllConnections(const zx_status_t status = ZX_ERR_PEER_CLOSED) {
+    bindings_.CloseAll(status);
+  }
 
   size_t NumConnections() { return bindings_.size(); }
 

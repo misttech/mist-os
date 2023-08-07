@@ -11,15 +11,49 @@
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/errors.h>
 
 #include <memory>
+#include <optional>
 
 #include "src/developer/forensics/feedback/annotations/provider.h"
 #include "src/developer/forensics/feedback/annotations/types.h"
+#include "src/developer/forensics/utils/errors.h"
 #include "src/lib/backoff/backoff.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
+#include "src/lib/fxl/strings/substitute.h"
 
 namespace forensics::feedback {
+
+namespace internal {
+
+// Defines how a provider should behave in the event of a connection error with the server.
+struct DisconnectResponse {
+  static DisconnectResponse BuildFrom(const zx_status_t status,
+                                      const std::string_view interface_name) {
+    DisconnectResponse response;
+
+    if (status == ZX_ERR_UNAVAILABLE || status == ZX_ERR_NOT_FOUND) {
+      return DisconnectResponse{
+          .log_message = fxl::Substitute("$0 unavailable, will not retry", interface_name),
+          .error = Error::kNotAvailableInProduct,
+          .should_reconnect = false,
+      };
+    }
+
+    return DisconnectResponse{
+        .log_message = fxl::Substitute("Lost connection to $0", interface_name),
+        .error = Error::kConnectionError,
+        .should_reconnect = true,
+    };
+  }
+
+  std::string log_message;
+  Error error;
+  bool should_reconnect;
+};
+
+}  // namespace internal
 
 // Static async annotation provider that handles calling a single FIDL method and
 // returning the result of the call as Annotations when the method completes.
@@ -71,6 +105,7 @@ class DynamicSingleFidlMethodAnnotationProvider : public DynamicAsyncAnnotationP
   std::shared_ptr<sys::ServiceDirectory> services_;
   std::unique_ptr<backoff::Backoff> backoff_;
   Convert convert_;
+  std::optional<Error> connection_error_;
 
   ::fidl::InterfacePtr<Interface> ptr_;
   std::vector<::fit::callback<void(Annotations)>> callbacks_;
@@ -143,38 +178,48 @@ DynamicSingleFidlMethodAnnotationProvider<Interface, method, Convert>::
     DynamicSingleFidlMethodAnnotationProvider(async_dispatcher_t* dispatcher,
                                               std::shared_ptr<sys::ServiceDirectory> services,
                                               std::unique_ptr<backoff::Backoff> backoff)
-    : dispatcher_(dispatcher), services_(std::move(services)), backoff_(std::move(backoff)) {
+    : dispatcher_(dispatcher),
+      services_(std::move(services)),
+      backoff_(std::move(backoff)),
+      connection_error_(std::nullopt) {
   services_->Connect(ptr_.NewRequest(dispatcher_));
 
   ptr_.set_error_handler([this](const zx_status_t status) {
-    FX_PLOGS(WARNING, status) << "Lost connection to " << Interface::Name_;
+    const internal::DisconnectResponse disconnect =
+        internal::DisconnectResponse::BuildFrom(status, Interface::Name_);
 
-    // Complete any outstanding callbacks with a connection error.
+    FX_PLOGS(WARNING, status) << disconnect.log_message;
+    connection_error_ = disconnect.error;
+
+    // Complete any outstanding callbacks with |error|.
     for (auto& callback : callbacks_) {
       if (callback != nullptr) {
-        callback(convert_(Error::kConnectionError));
+        callback(convert_(*connection_error_));
       }
     }
 
     CleanupCompleted();
 
-    async::PostDelayedTask(
-        dispatcher_,
-        [self = ptr_factory_.GetWeakPtr()] {
-          if (self) {
-            self->services_->Connect(self->ptr_.NewRequest(self->dispatcher_));
-          }
-        },
-        backoff_->GetNext());
+    if (disconnect.should_reconnect) {
+      async::PostDelayedTask(
+          dispatcher_,
+          [self = ptr_factory_.GetWeakPtr()] {
+            if (self) {
+              self->services_->Connect(self->ptr_.NewRequest(self->dispatcher_));
+            }
+          },
+          backoff_->GetNext());
+    }
   });
 }
 
 template <typename Interface, auto method, typename Convert>
 void DynamicSingleFidlMethodAnnotationProvider<Interface, method, Convert>::Get(
     ::fit::callback<void(Annotations)> callback) {
-  // A reconnection is in progress.
+  // A reconnection is possibly in progress or the server was unavailable on the product.
   if (!ptr_.is_bound()) {
-    callback(convert_(Error::kConnectionError));
+    FX_CHECK(connection_error_.has_value());
+    callback(convert_(*connection_error_));
     return;
   }
 
