@@ -89,7 +89,8 @@ ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {
       static_cast<uint32_t>(BIND_PCI_TOPO_PACK(info.bus_id, info.dev_id, info.func_id));
 
   const ddk::BindRule kSysmemRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
   };
 
   const device_bind_prop_t kSysmemProperties[] = {

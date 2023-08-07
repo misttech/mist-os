@@ -11,8 +11,10 @@ driver_bind_rules("virtio_block_bind") {
   rules = "virtio_block.bind"
   tests = "block_bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.driver.framework",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.hardware.sysmem",
     "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

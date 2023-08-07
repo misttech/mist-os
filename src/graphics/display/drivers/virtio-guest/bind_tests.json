@@ -1,39 +1,40 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_GPU",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "All Match"
+        "node": "pci",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
+                    "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_GPU"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_GPU",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "abort",
-        "name": "Mismatch Protocol"
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_GPU",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "abort",
-        "name": "Mismatch VID"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "abort",
-        "name": "Mismatch DID"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]
