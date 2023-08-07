@@ -7,7 +7,7 @@ import os
 import tempfile
 import os.path
 import asyncio
-from fuchsia_controller_py import Context, IsolateDir
+from fuchsia_controller_py import Context, IsolateDir, FidlChannel
 
 
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
@@ -83,3 +83,17 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.response, "foo")
         res = asyncio.run(e.echo_string(value="barzzz"))
         self.assertEqual(res.response, "barzzz")
+
+    async def test_sending_fidl_protocol(self):
+        tc_server, tc_client = FidlChannel.create()
+        list_server, list_client = FidlChannel.create()
+        tc_proxy = ffx_fidl.TargetCollection.Client(tc_client)
+        query = ffx_fidl.TargetQuery(string_matcher="foobar")
+        tc_proxy.list_targets(query=query, reader=list_client.take())
+        buf, hdls = tc_server.read()
+        self.assertEqual(len(hdls), 1)
+        new_list_client = hdls[0]
+        new_list_client.write((bytearray([5, 6, 7]), []))
+        list_buf, list_hdls = list_server.read()
+        self.assertEqual(len(list_hdls), 0)
+        self.assertEqual(list_buf, bytearray([5, 6, 7]))

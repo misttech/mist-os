@@ -62,6 +62,9 @@ pub(crate) enum LibraryCommand {
         out_handles: ExtBuffer<MaybeUninit<fidl::Handle>>,
         responder: Responder<ReadResponse>,
     },
+    ChannelCreate {
+        responder: Responder<(fidl::Channel, fidl::Channel)>,
+    },
     ChannelWrite {
         channel: fidl::Channel,
         buf: ExtBuffer<u8>,
@@ -224,6 +227,9 @@ impl LibraryCommand {
                             .unwrap();
                     }
                 }
+            }
+            Self::ChannelCreate { responder } => {
+                responder.send(fidl::Channel::create()).unwrap();
             }
             Self::ChannelWrite { channel, buf, mut handles, responder } => {
                 let channel = ManuallyDrop::new(channel);

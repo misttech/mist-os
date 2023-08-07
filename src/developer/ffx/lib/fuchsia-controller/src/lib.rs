@@ -330,7 +330,22 @@ pub unsafe extern "C" fn ffx_connect_handle_notifier(ctx: *const LibContext) -> 
     rx.recv().unwrap()
 }
 
-// LINT.ThenChange(../abi/fuchsia_controller.h)
+#[no_mangle]
+pub unsafe extern "C" fn ffx_channel_create(
+    ctx: *const LibContext,
+    _options: u32,
+    out0: *mut zx_types::zx_handle_t,
+    out1: *mut zx_types::zx_handle_t,
+) {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    ctx.run(LibraryCommand::ChannelCreate { responder: tx });
+    let (ch0, ch1) = rx.recv().unwrap();
+    unsafe { *out0 = ch0.into_raw() };
+    unsafe { *out1 = ch1.into_raw() };
+}
+
+// LINT.ThenChange(../cpp/abi/fuchsia_controller.h)
 
 #[cfg(test)]
 mod test {
