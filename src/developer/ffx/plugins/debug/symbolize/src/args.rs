@@ -14,6 +14,10 @@ pub struct SymbolizeCommand {
     #[argh(switch)]
     pub auth: bool,
 
+    /// do not prettify the backtraces.
+    #[argh(switch)]
+    pub no_prettify: bool,
+
     /// extra arguments passed to the symbolizer. Any arguments starting with "-" must be after a "--" separator.
     #[argh(positional)]
     pub symbolizer_args: Vec<String>,

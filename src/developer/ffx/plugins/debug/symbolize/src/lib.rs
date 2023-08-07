@@ -35,6 +35,10 @@ impl FfxMain for SymbolizeTool {
         if self.cmd.auth {
             args.push("--auth".to_owned());
         }
+        if !self.cmd.no_prettify {
+            args.push("--prettify-backtrace".to_owned());
+            args.push("--omit-module-lines".to_owned());
+        }
 
         let mut cmd = Command::new(symbolizer_path)
             .args(args)

@@ -63,6 +63,9 @@ while [[ $# -ne 0 ]]; do
     fx-error "--remote-symbols|-r is deprecated. Remote symbolization will be tried automatically."
     exit 1
     ;;
+  --no-prettify)
+    symbolizer+=("--no-prettify")
+    ;;
   *)
     break
   esac
