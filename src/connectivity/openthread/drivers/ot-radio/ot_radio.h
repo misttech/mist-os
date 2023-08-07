@@ -8,8 +8,8 @@
 #ifndef _ALL_SOURCE
 #define _ALL_SOURCE  // Enables thrd_create_with_name in <threads.h>.
 #endif
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.lowpan.spinel/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
@@ -104,7 +104,7 @@ class OtRadioDevice : public DeviceType {
 
   uint8_t spi_rx_buffer_[kMaxFrameSize];
 
-  std::array<ddk::GpioProtocolClient, OT_RADIO_PIN_COUNT> gpio_;
+  std::array<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>, OT_RADIO_PIN_COUNT> gpio_;
 
  private:
   zx_status_t RadioThread();
@@ -115,7 +115,7 @@ class OtRadioDevice : public DeviceType {
   zx_status_t HandleRadioRxFrame(uint8_t* frameBuffer, uint16_t length);
   zx_status_t RadioPacketTx(uint8_t* frameBuffer, uint16_t length);
   zx_status_t InvokeInterruptHandler();
-  bool IsInterruptAsserted();
+  zx::result<bool> IsInterruptAsserted();
   void InspectOutboundFrame(uint8_t* frame_buffer, uint16_t length);
   void InspectInboundFrame(uint8_t* frame_buffer, uint16_t length);
   void ResetFrameInspectData();

@@ -187,24 +187,45 @@ zx_status_t OtRadioDeviceBootloader::PutRcpInBootloader() {
 
   zxlogf(DEBUG, "ot-radio : putting rcp in bootloader");
 
-  status = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN].Write(0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio: gpio write failed");
-    return status;
+  {
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN]->Write(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to bootloader gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to bootloader gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
   zx::nanosleep(zx::deadline_after(zx::msec(50)));
 
-  status = dev_handle_->gpio_[OT_RADIO_RESET_PIN].Write(0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio: gpio write failed");
-    return status;
+  {
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_RESET_PIN]->Write(0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
   zx::nanosleep(zx::deadline_after(zx::msec(50)));
 
-  status = dev_handle_->gpio_[OT_RADIO_RESET_PIN].Write(1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio: gpio write failed");
-    return status;
+  {
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_RESET_PIN]->Write(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to reset gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   // Note - give some time before releasing bootloader pin otherwise RCP
@@ -215,10 +236,17 @@ zx_status_t OtRadioDeviceBootloader::PutRcpInBootloader() {
   // This also gives time for the bootloader to be up and ready to respond
   zx::nanosleep(zx::deadline_after(zx::msec(400)));
 
-  status = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN].Write(1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio: gpio write failed");
-    return status;
+  {
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN]->Write(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send Write request to bootloader gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to write to bootloader gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   zxlogf(DEBUG, "ot-radio : device has been put in bootloader mode");

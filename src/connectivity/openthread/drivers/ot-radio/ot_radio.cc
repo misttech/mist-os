@@ -203,57 +203,97 @@ zx_status_t OtRadioDevice::Init() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  gpio_[OT_RADIO_INT_PIN] = ddk::GpioProtocolClient(parent(), "gpio-int");
-  if (!gpio_[OT_RADIO_INT_PIN].is_valid()) {
-    zxlogf(ERROR, "ot-radio %s: failed to acquire interrupt gpio", __func__);
+  const char* kInterruptGpioFragmentName = "gpio-int";
+  zx::result gpio_int = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent(), kInterruptGpioFragmentName);
+  if (gpio_int.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kInterruptGpioFragmentName,
+           gpio_int.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  gpio_[OT_RADIO_INT_PIN].Bind(std::move(gpio_int.value()));
 
-  zx_status_t status = gpio_[OT_RADIO_INT_PIN].ConfigIn(GPIO_NO_PULL);
-
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio %s: failed to configure interrupt gpio", __func__);
-    return status;
+  {
+    fidl::WireResult result =
+        gpio_[OT_RADIO_INT_PIN]->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request to interrupt gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure interrupt gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  status = gpio_[OT_RADIO_INT_PIN].GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW, &interrupt_);
-
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio %s: failed to get interrupt", __func__);
-    return status;
+  fidl::WireResult interrupt_result =
+      gpio_[OT_RADIO_INT_PIN]->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW);
+  if (!interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
+           interrupt_result.status_string());
+    return interrupt_result.status();
   }
+  if (interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from interrupt gpio: %s",
+           zx_status_get_string(interrupt_result->error_value()));
+    return interrupt_result->error_value();
+  }
+  interrupt_ = std::move(interrupt_result.value()->irq);
 
-  gpio_[OT_RADIO_RESET_PIN] = ddk::GpioProtocolClient(parent(), "gpio-reset");
-  if (!gpio_[OT_RADIO_RESET_PIN].is_valid()) {
-    zxlogf(ERROR, "ot-radio %s: failed to acquire reset gpio", __func__);
+  const char* kResetGpioFragmentName = "gpio-reset";
+  zx::result gpio_reset = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      parent(), kResetGpioFragmentName);
+  if (gpio_reset.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kResetGpioFragmentName,
+           gpio_reset.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  gpio_[OT_RADIO_RESET_PIN].Bind(std::move(gpio_reset.value()));
 
-  status = gpio_[OT_RADIO_RESET_PIN].ConfigOut(1);
-
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio %s: failed to configure rst gpio, status = %d", __func__, status);
-    return status;
+  {
+    fidl::WireResult result = gpio_[OT_RADIO_RESET_PIN]->ConfigOut(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure reset gpio to output: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
-  gpio_[OT_RADIO_BOOTLOADER_PIN] = ddk::GpioProtocolClient(parent(), "gpio-bootloader");
-  if (!gpio_[OT_RADIO_BOOTLOADER_PIN].is_valid()) {
-    zxlogf(ERROR, "ot-radio %s: failed to acquire radio bootloader pin", __func__);
+  const char* kBootloaderGpioFragmentName = "gpio-bootloader";
+  zx::result gpio_bootloader =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent(), kBootloaderGpioFragmentName);
+  if (gpio_bootloader.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kBootloaderGpioFragmentName,
+           gpio_bootloader.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  gpio_[OT_RADIO_BOOTLOADER_PIN].Bind(std::move(gpio_bootloader.value()));
 
-  status = gpio_[OT_RADIO_BOOTLOADER_PIN].ConfigOut(1);
-
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio %s: failed to configure bootloader gpio, status = %d", __func__,
-           status);
-    return status;
+  {
+    fidl::WireResult result = gpio_[OT_RADIO_BOOTLOADER_PIN]->ConfigOut(1);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigOut request to bootloader gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure bootloader gpio to output: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   size_t actual;
   uint32_t device_id;
-  status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE, &device_id,
-                                        sizeof(device_id), &actual);
+  zx_status_t status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE,
+                                                    &device_id, sizeof(device_id), &actual);
   if (status != ZX_OK || sizeof(device_id) != actual) {
     status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_id, sizeof(device_id),
                                  &actual);
@@ -363,11 +403,18 @@ zx_status_t OtRadioDevice::InvokeInterruptHandler() {
   return port_.queue(&packet);
 }
 
-bool OtRadioDevice::IsInterruptAsserted() {
+zx::result<bool> OtRadioDevice::IsInterruptAsserted() {
   TRACE_DURATION(kOtRadioTraceCategory, __func__);
-  uint8_t pin_level = 0;
-  gpio_[OT_RADIO_INT_PIN].Read(&pin_level);
-  return pin_level == 0;
+  fidl::WireResult result = gpio_[OT_RADIO_INT_PIN]->Read();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to interrupt gpio: %s", result.status_string());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to read interrupt gpio: %s", zx_status_get_string(result->error_value()));
+    return zx::error(result->error_value());
+  }
+  return zx::ok(result.value()->value == 0);
 }
 
 zx_status_t OtRadioDevice::DriverUnitTestGetNCPVersion() { return GetNCPVersion(); }
@@ -395,10 +442,14 @@ zx_status_t OtRadioDevice::AssertResetPin() {
   zx_status_t status = ZX_OK;
   zxlogf(DEBUG, "ot-radio: assert reset pin");
 
-  status = gpio_[OT_RADIO_RESET_PIN].Write(0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio: gpio write failed");
-    return status;
+  fidl::WireResult result = gpio_[OT_RADIO_RESET_PIN]->Write(0);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to write to reset gpio: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
   zx::nanosleep(zx::deadline_after(zx::msec(kRcpHardResetPinAssertTimeMs)));
   return status;
@@ -415,11 +466,17 @@ zx_status_t OtRadioDevice::Reset() {
     return status;
   }
 
-  status = gpio_[OT_RADIO_RESET_PIN].Write(1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ot-radio: gpio write failed");
+  fidl::WireResult result = gpio_[OT_RADIO_RESET_PIN]->Write(1);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+    return result.status();
   }
-  return status;
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to write to reset gpio: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
 }
 
 uint32_t OtRadioDevice::GetTimeoutMs() {
@@ -764,7 +821,18 @@ void OtRadioDevice::StopLoopThread() {
 zx_status_t OtRadioDevice::ShutDown() {
   StopRadioThread();
 
-  gpio_[OT_RADIO_INT_PIN].ReleaseInterrupt();
+  fidl::WireResult result = gpio_[OT_RADIO_INT_PIN]->ReleaseInterrupt();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send ReleaseInterrupt request to interrupt gpio: %s",
+           result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to release interrupt for interrupt gpio: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
   interrupt_.destroy();
 
   StopLoopThread();

@@ -41,8 +41,8 @@ template("ot_radio_driver") {
     ]
 
     deps = [
-      "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
+      "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
       "//sdk/fidl/fuchsia.lowpan.spinel:fuchsia.lowpan.spinel_cpp_wire",
       "//src/connectivity/openthread/drivers/ot-radio:ot_radio_bind",
       "//src/connectivity/openthread/third_party/openthread:spinel-framer",
@@ -82,7 +82,7 @@ template("ot_radio_driver") {
   fuchsia_driver_component("ot-radio-${driver_suffix}") {
     deps = [ ":ot-radio-${driver_suffix}_driver" ]
     info = "ot-radio-${driver_suffix}-info.json"
-    colocate = true
+    manifest = "meta/ot-radio-${driver_suffix}.cml"
   }
 
   if (internal_access) {

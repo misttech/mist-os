@@ -19,16 +19,16 @@ primary node "spi" {
 }
 
 node "gpio-int" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOC_PIN_ID.PIN_5; // TH_SOC_INT
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOA_PIN_ID.PIN_13; // SOC_TH_RST_L
 }
 
 node "gpio-bootloader" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOZ_PIN_ID.PIN_1; // SOC_TH_BOOT_MODE_L
 }
