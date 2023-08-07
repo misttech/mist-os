@@ -9,6 +9,7 @@
 #include <lib/stdcompat/span.h>
 
 #include <optional>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -23,8 +24,9 @@ inline auto DefaultMakeInvalidHandle() {
 
 // elfldltl::File<Handle, Offset, Read, MakeInvalidHandle> implements the File
 // API (see memory.h) by holding a Handle object and calling Read as a function
-// bool(Handle&, Offset, cpp20::span<byte>) that returns true for success.
-// MakeInvalidHandle can be supplied if default-construction isn't the way.
+// fit::result<...>(Handle&, Offset, cpp20::span<byte>) that returns some error
+// value that Diagnostics::SystemError can handle.  MakeInvalidHandle can be
+// supplied if default-construction isn't the way.
 template <class Diagnostics, typename Handle, typename Offset, auto Read,
           auto MakeInvalidHandle = &DefaultMakeInvalidHandle<Handle>>
 class File {
@@ -32,14 +34,18 @@ class File {
   static_assert(std::is_invocable_v<decltype(Read), Handle&, Offset, cpp20::span<std::byte>>);
   static_assert(std::is_convertible_v<decltype(MakeInvalidHandle()), Handle>);
 
-  explicit File(Diagnostics diag) : diag_(diag) {}
-  File(const File&) noexcept(std::is_nothrow_copy_constructible_v<Handle>) = default;
-  File(File&&) noexcept(std::is_nothrow_move_constructible_v<Handle>) = default;
+  using offset_type = Offset;
 
-  File(Handle handle, Diagnostics diag) noexcept(std::is_nothrow_move_constructible_v<Handle>)
+  File(const File&) noexcept(std::is_nothrow_copy_constructible_v<Handle>) = default;
+
+  File(File&&) noexcept(std::is_nothrow_move_constructible_v<Handle>) = default;
+  explicit File(Diagnostics& diag) : diag_(diag) {}
+
+  File(Handle handle, Diagnostics& diag) noexcept(std::is_nothrow_move_constructible_v<Handle>)
       : handle_(std::move(handle)), diag_(diag) {}
 
   File& operator=(const File&) noexcept(std::is_nothrow_copy_assignable_v<Handle>) = default;
+
   File& operator=(File&&) noexcept(std::is_nothrow_move_assignable_v<Handle>) = default;
 
   const Handle& get() const { return handle_; }
@@ -71,16 +77,29 @@ class File {
  private:
   template <typename T, typename Result>
   void FinishReadFromFile(Offset offset, cpp20::span<T> data, Result& result) {
-    if (!Read(handle_, offset, cpp20::as_writable_bytes(data))) {
-      DiagnoseError(offset);
+    using namespace std::string_view_literals;
+    auto read = Read(handle_, offset, cpp20::as_writable_bytes(data));
+    if (read.is_error()) {
+      // FileOffset takes an unsigned type, but off_t is signed.
+      // No value passed to Read should be negative.
+      auto diagnose = [offset = static_cast<std::make_unsigned_t<Offset>>(offset),
+                       bytes = data.size_bytes(), this](auto&& error) {
+        diag_.SystemError("cannot read "sv, bytes, " bytes"sv, FileOffset{offset}, ": "sv,
+                          std::move(error));
+      };
+      auto error = std::move(read).error_value();
+      if (error == decltype(error){}) {
+        // The default-initialized error type is used to mean EOF.
+        diagnose("reached end of file"sv);
+      } else {
+        diagnose(std::move(error));
+      }
       result = Result();
     }
   }
 
-  void DiagnoseError(Offset offset) { diag_.FormatError("couldn't read file at offset: ", offset); }
-
   Handle handle_ = MakeInvalidHandle();
-  [[no_unique_address]] Diagnostics diag_;
+  Diagnostics& diag_;
 };
 
 }  // namespace elfldltl

@@ -5,12 +5,16 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FD_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FD_H_
 
+#include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <unistd.h>
+
+#include <cerrno>
 
 #include <fbl/unique_fd.h>
 
 #include "file.h"
+#include "posix.h"
 
 namespace elfldltl {
 
@@ -20,13 +24,25 @@ namespace elfldltl {
 
 namespace internal {
 
-inline bool ReadFd(int fd, off_t offset, cpp20::span<std::byte> buffer) {
-  return static_cast<size_t>(pread(fd, buffer.data(), buffer.size(), offset)) == buffer.size();
+inline fit::result<PosixError> ReadFd(int fd, off_t offset, cpp20::span<std::byte> buffer) {
+  do {
+    ssize_t n = pread(fd, buffer.data(), buffer.size(), offset);
+    if (n < 0) {
+      return fit::error{PosixError{errno}};
+    }
+    if (n == 0) {
+      return fit::error{PosixError{}};  // This signifies EOF.
+    }
+    buffer = buffer.subspan(static_cast<size_t>(n));
+    offset += n;
+  } while (!buffer.empty());
+  return fit::ok();
 }
 
 inline int MakeInvalidFd() { return -1; }
 
-inline bool ReadUniqueFd(const fbl::unique_fd& fd, off_t offset, cpp20::span<std::byte> buffer) {
+inline fit::result<PosixError> ReadUniqueFd(const fbl::unique_fd& fd, off_t offset,
+                                            cpp20::span<std::byte> buffer) {
   return ReadFd(fd.get(), offset, buffer);
 }
 
@@ -56,10 +72,10 @@ class FdFile : public FdFileBase<Diagnostics> {
 
 // Deduction guide.
 template <class Diagnostics>
-FdFile(int fd, Diagnostics&& diagnostics) -> FdFile<Diagnostics>;
+FdFile(int fd, Diagnostics& diagnostics) -> FdFile<Diagnostics>;
 
 template <class Diagnostics>
-FdFile(Diagnostics&& diagnostics) -> FdFile<Diagnostics>;
+FdFile(Diagnostics& diagnostics) -> FdFile<Diagnostics>;
 
 template <class Diagnostics>
 class UniqueFdFile : public UniqueFdFileBase<Diagnostics> {
@@ -79,10 +95,10 @@ class UniqueFdFile : public UniqueFdFileBase<Diagnostics> {
 
 // Deduction guide.
 template <class Diagnostics>
-UniqueFdFile(fbl::unique_fd fd, Diagnostics&& diagnostics) -> UniqueFdFile<Diagnostics>;
+UniqueFdFile(fbl::unique_fd fd, Diagnostics& diagnostics) -> UniqueFdFile<Diagnostics>;
 
 template <class Diagnostics>
-UniqueFdFile(Diagnostics&& diagnostics) -> UniqueFdFile<Diagnostics>;
+UniqueFdFile(Diagnostics& diagnostics) -> UniqueFdFile<Diagnostics>;
 
 }  // namespace elfldltl
 

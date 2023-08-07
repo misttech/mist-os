@@ -18,14 +18,15 @@
 
 namespace {
 
-using elfldltl::testing::ExpectedSingleError;
-using elfldltl::testing::ExpectOkDiagnostics;
-
-using ::testing::Optional, ::testing::Eq;
+using ::testing::ElementsAreArray;
+using ::testing::Eq;
+using ::testing::Optional;
 
 class TestFdFile : public ::testing::Test {
  protected:
   static constexpr bool kDestroysHandle = false;
+
+  static constexpr elfldltl::PosixError kInvalidFdError{EBADF};
 
   template <typename Diagnostics>
   using FileT = elfldltl::FdFile<Diagnostics>;
@@ -68,10 +69,17 @@ class TestVmoFile : public ::testing::Test {
  protected:
   static constexpr bool kDestroysHandle = true;
 
+  static constexpr elfldltl::ZirconError kInvalidFdError{ZX_ERR_BAD_HANDLE};
+
   template <typename Diagnostics>
   using FileT = elfldltl::VmoFile<Diagnostics>;
 
+  // The fixture starts with an empty VMO so that reads on GetHandle() will
+  // fail with ZX_ERR_OUT_OF_RANGE rather than ZX_ERR_BAD_HANDLE.
+  TestVmoFile() { EXPECT_EQ(zx::vmo::create(0, 0, &vmo_), ZX_OK); }
+
   void Write(const void* p, size_t size) {
+    // This replaces the empty VMO.
     ASSERT_EQ(zx::vmo::create(size, 0, &vmo_), ZX_OK);
     ASSERT_EQ(vmo_.write(p, 0, size), ZX_OK);
   }
@@ -102,88 +110,112 @@ using FileTypes = ::testing::Types<
 #endif
     TestFdFile, TestUniqueFdFile>;
 
+using ExpectOkDiagnosticsType = decltype(elfldltl::testing::ExpectOkDiagnostics());
+
 template <class TestFile>
-using ElfldltlFileTests = TestFile;
+class ElfldltlFileTests : public TestFile {
+ public:
+  using OkFileT = typename TestFile::template FileT<ExpectOkDiagnosticsType>;
+  using offset_type = typename OkFileT::offset_type;
+  using unsigned_offset_type = std::make_unsigned_t<offset_type>;
+
+  static constexpr unsigned_offset_type kZeroOffset = 0;
+  static constexpr elfldltl::FileOffset kZeroFileOffset{kZeroOffset};
+
+  static constexpr auto MakeExpectedInvalidFd() {
+    return elfldltl::testing::ExpectedSingleError{
+        "cannot read ", sizeof(int), " bytes", kZeroFileOffset, ": ", TestFile::kInvalidFdError,
+    };
+  }
+
+  static constexpr auto MakeExpectedEof() {
+    return elfldltl::testing::ExpectedSingleError{
+        "cannot read ", sizeof(int), " bytes", kZeroFileOffset, ": ", "reached end of file",
+    };
+  }
+
+  using InvalidFdDiagnostics = std::decay_t<decltype(MakeExpectedInvalidFd().diag())>;
+  using InvalidFdFileT = typename TestFile::template FileT<InvalidFdDiagnostics>;
+
+  using EofDiagnostics = std::decay_t<decltype(MakeExpectedEof().diag())>;
+  using EofFileT = typename TestFile::template FileT<EofDiagnostics>;
+};
 
 TYPED_TEST_SUITE(ElfldltlFileTests, FileTypes);
 
 TYPED_TEST(ElfldltlFileTests, InvalidFd) {
-  ExpectedSingleError expected{"couldn't read file at offset: ", 0};
-  using FileT = typename TestFixture::template FileT<decltype(expected.diag())>;
-  {
-    FileT file{expected.diag()};
+  auto expected = TestFixture::MakeExpectedInvalidFd();
+  typename TestFixture::InvalidFdFileT file{expected.diag()};
 
-    std::optional<int> got = file.template ReadFromFile<int>(0);
-    EXPECT_FALSE(got);
-  }
-  {
-    FileT file(this->GetHandle(), expected.diag());
+  std::optional<int> got = file.template ReadFromFile<int>(0);
+  EXPECT_FALSE(got);
+}
 
-    std::optional<int> got = file.template ReadFromFile<int>(0);
-    EXPECT_FALSE(got);
-  }
+TYPED_TEST(ElfldltlFileTests, Eof) {
+  auto expected = TestFixture::MakeExpectedEof();
+  typename TestFixture::EofFileT file{this->GetHandle(), expected.diag()};
+
+  std::optional<int> got = file.template ReadFromFile<int>(0);
+  EXPECT_EQ(got, std::nullopt);
 }
 
 TYPED_TEST(ElfldltlFileTests, ReadFromFile) {
-  auto diag = ExpectOkDiagnostics();
-  using FileT = typename TestFixture::template FileT<decltype(diag)>;
-
   int i = 123;
 
   this->Write(&i, sizeof(i));
 
-  FileT file{this->GetHandle(), diag};
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  typename TestFixture::OkFileT file{this->GetHandle(), diag};
+
   std::optional<int> got = file.template ReadFromFile<int>(0);
-  EXPECT_EQ(*got, i);
+  EXPECT_THAT(got, Optional(Eq(i)));
 }
 
 TYPED_TEST(ElfldltlFileTests, ReadArrayFromFile) {
-  auto diag = ExpectOkDiagnostics();
-  using FileT = typename TestFixture::template FileT<decltype(diag)>;
+  constexpr int kData[] = {123, 456, 789};
 
-  const std::array<int, 3> data{123, 456, 789};
+  this->Write(kData, sizeof(kData));
 
-  this->Write(data.data(), sizeof(data));
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  typename TestFixture::OkFileT file{this->GetHandle(), diag};
 
   elfldltl::FixedArrayFromFile<int, 3> allocator;
-  FileT file{this->GetHandle(), diag};
   auto got = file.template ReadArrayFromFile<int>(0, allocator, 3);
 
   ASSERT_TRUE(got);
-  cpp20::span<int> span = *got;
-  ASSERT_EQ(span.size(), data.size());
-  for (size_t i = 0; i < data.size(); i++) {
-    EXPECT_EQ(span[i], data[i]);
-  }
+  cpp20::span<const int> data = *got;
+  EXPECT_THAT(data, ElementsAreArray(kData));
 }
 
 TYPED_TEST(ElfldltlFileTests, Assignment) {
-  ExpectedSingleError expected("couldn't read file at offset: ", 0);
-  auto diag = [&] {
-    if constexpr (TestFixture::kDestroysHandle) {
-      return expected.diag();
-    } else {
-      return ExpectOkDiagnostics();
+  auto test_assignment = [this](auto&& diag) {
+    using Diagnostics = std::decay_t<decltype(diag)>;
+    using FileT = typename TestFixture::template FileT<Diagnostics>;
+
+    int i = 123;
+
+    this->Write(&i, sizeof(i));
+
+    FileT file{this->GetHandle(), diag};
+    EXPECT_THAT(file.template ReadFromFile<int>(0), Optional(Eq(i)));
+    if constexpr (std::is_copy_assignable_v<decltype(file)>) {
+      auto other = file;
+      EXPECT_THAT(other.template ReadFromFile<int>(0), Optional(Eq(i)));
     }
-  }();
-  using FileT = typename TestFixture::template FileT<decltype(diag)>;
-  int i = 123;
+    EXPECT_THAT(file.template ReadFromFile<int>(0), Optional(Eq(i)));
+    {
+      auto other = std::move(file);
+      EXPECT_THAT(other.template ReadFromFile<int>(0), Optional(Eq(i)));
+    }
+    if constexpr (TestFixture::kDestroysHandle) {
+      EXPECT_FALSE(file.template ReadFromFile<int>(0).has_value());
+    }
+  };
 
-  this->Write(&i, sizeof(i));
-
-  FileT file{this->GetHandle(), diag};
-  EXPECT_THAT(file.template ReadFromFile<int>(0), Optional(Eq(i)));
-  if constexpr (std::is_copy_assignable_v<FileT>) {
-    FileT other = file;
-    EXPECT_THAT(other.template ReadFromFile<int>(0), Optional(Eq(i)));
-  }
-  EXPECT_THAT(file.template ReadFromFile<int>(0), Optional(Eq(i)));
-  {
-    FileT other = std::move(file);
-    EXPECT_THAT(other.template ReadFromFile<int>(0), Optional(Eq(i)));
-  }
   if constexpr (TestFixture::kDestroysHandle) {
-    EXPECT_FALSE(file.template ReadFromFile<int>(0).has_value());
+    test_assignment(TestFixture::MakeExpectedInvalidFd().diag());
+  } else {
+    test_assignment(elfldltl::testing::ExpectOkDiagnostics());
   }
 }
 

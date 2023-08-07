@@ -45,19 +45,19 @@ class ExpectedSingleError {
   template <typename T>
   using expected_t = typename ExpectedType<T>::type;
 
-  explicit ExpectedSingleError(Args&&... args) : expected_(args...) {}
+  explicit ExpectedSingleError(Args... args) : expected_(std::move(args)...) {}
 
   auto& diag() { return diag_; }
 
   template <typename... Ts>
-  bool operator()(Ts&&... args) {
+  bool operator()(Ts&&... args) const {
     constexpr size_t expected_argument_count = sizeof...(Args);
     constexpr size_t called_argument_count = sizeof...(Ts);
     if constexpr (called_argument_count != expected_argument_count) {
       EXPECT_EQ(called_argument_count, expected_argument_count);
       Diagnose(std::forward<Ts>(args)...);
-    } else {
-      Check(std::make_tuple(args...), std::make_index_sequence<sizeof...(Args)>());
+    } else if (!Check(std::make_tuple(args...), std::make_index_sequence<sizeof...(Args)>())) {
+      Diagnose(std::forward<Ts>(args)...);
     }
     return true;
   }
@@ -71,17 +71,25 @@ class ExpectedSingleError {
   };
 
   template <typename Tuple, size_t... I>
-  void Check(Tuple&& args, std::index_sequence<I...> seq) {
-    (
-        [&]() {
-          using T = typename ExpectedType<decltype(std::get<I>(args))>::type;
-          EXPECT_EQ(std::get<I>(args), T(std::get<I>(expected_))) << "argument " << I;
-        }(),
-        ...);
+  [[nodiscard]] bool Check(Tuple&& args, std::index_sequence<I...> seq) const {
+    return ([&]() -> int {  // Fold uses & instead of && so no short-circuit.
+      const auto& raw_arg = std::get<I>(args);
+      const auto& raw_expected = std::get<I>(expected_);
+      using T = expected_t<std::decay_t<decltype(raw_expected)>>;
+      if constexpr (std::is_convertible_v<decltype(raw_arg), T>) {
+        const T arg = static_cast<T>(raw_arg);
+        const T expected = raw_expected;
+        EXPECT_EQ(arg, expected) << "argument " << I;
+        return arg == expected;
+      } else {
+        ADD_FAILURE() << "incompatible types for argument " << I;
+        return false;
+      }
+    }() & ...);
   }
 
   template <typename... Ts>
-  void Diagnose(Ts&&... args) {
+  void Diagnose(Ts&&... args) const {
     constexpr auto format = [](auto&&... args) -> std::string {
       std::stringstream os;
       auto report = OstreamDiagnosticsReport(os);

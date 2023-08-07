@@ -5,11 +5,13 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMO_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMO_H_
 
+#include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 
 #include "file.h"
+#include "zircon.h"
 
 namespace elfldltl {
 
@@ -19,12 +21,20 @@ namespace elfldltl {
 
 namespace internal {
 
-inline bool ReadVmo(const zx::vmo& vmo, uint64_t offset, cpp20::span<std::byte> buffer) {
-  return vmo.read(buffer.data(), offset, buffer.size()) == ZX_OK;
+inline fit::result<ZirconError> ReadVmo(const zx::vmo& vmo, uint64_t offset,
+                                        cpp20::span<std::byte> buffer) {
+  zx_status_t status = vmo.read(buffer.data(), offset, buffer.size());
+  if (status == ZX_ERR_OUT_OF_RANGE) {
+    return fit::error{ZirconError{}};  // This indicates EOF.
+  }
+  if (status != ZX_OK) {
+    return fit::error{ZirconError{status}};
+  }
+  return fit::ok();
 }
 
-inline bool ReadUnownedVmo(const zx::unowned_vmo& vmo, uint64_t offset,
-                           cpp20::span<std::byte> buffer) {
+inline fit::result<ZirconError> ReadUnownedVmo(const zx::unowned_vmo& vmo, uint64_t offset,
+                                               cpp20::span<std::byte> buffer) {
   return ReadVmo(*vmo, offset, buffer);
 }
 

@@ -126,6 +126,9 @@ struct FileOffset {
 
   constexpr value_type operator*() const { return offset; }
 
+  constexpr bool operator==(const FileOffset& other) const { return offset == other.offset; }
+  constexpr bool operator!=(const FileOffset& other) const { return offset != other.offset; }
+
   static constexpr std::string_view kDescription = "file offset";
 
   value_type offset;
@@ -157,6 +160,9 @@ struct FileAddress {
   using value_type = size_type;
 
   constexpr value_type operator*() const { return address; }
+
+  constexpr bool operator==(const FileAddress& other) const { return address == other.address; }
+  constexpr bool operator!=(const FileAddress& other) const { return address != other.address; }
 
   static constexpr std::string_view kDescription = "file-relative address";
 
@@ -414,7 +420,7 @@ constexpr auto CollectStringsDiagnostics(T& container, Flags&&... flags) {
 }
 
 template <typename S, size_t N>
-constexpr decltype(auto) operator<<(S && ostream, internal::ConstString<N> string) {
+constexpr decltype(auto) operator<<(S&& ostream, internal::ConstString<N> string) {
   return std::forward<S>(ostream) << static_cast<std::string_view>(string);
 }
 
@@ -442,17 +448,17 @@ constexpr auto OstreamDiagnostics(Ostream& ostream, Flags&& flags = {}, Args&&..
 // special argument types.
 
 template <typename S, typename T>
-constexpr decltype(auto) operator<<(S && ostream, FileOffset<T> offset) {
+constexpr decltype(auto) operator<<(S&& ostream, FileOffset<T> offset) {
   return std::forward<S>(ostream) << " at file offset " << *offset;
 }
 
 template <typename S, typename T>
-constexpr decltype(auto) operator<<(S && ostream, FileAddress<T> address) {
+constexpr decltype(auto) operator<<(S&& ostream, FileAddress<T> address) {
   return std::forward<S>(ostream) << " at relative address " << *address;
 }
 
 template <typename S, typename T, typename = decltype(std::declval<T>().str())>
-constexpr decltype(auto) operator<<(S && ostream, T && t) {
+constexpr decltype(auto) operator<<(S&& ostream, T&& t) {
   return std::forward<S>(ostream) << t.str();
 }
 
