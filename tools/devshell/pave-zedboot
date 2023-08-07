@@ -13,6 +13,9 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 
+fx-warn "DEPRECATION WARNING"
+fx-warn "\`fx pave-zedboot\` is deprecated and will be removed soon, if you need this command, please report to https://fxbug.dev/131143.\n"
+
 name_args=()
 name="$(get-device-name)"
 if [[ -n "$name" ]]; then
