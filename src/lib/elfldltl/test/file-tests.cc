@@ -8,6 +8,7 @@
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <stdio.h>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #ifdef __Fuchsia__
@@ -20,7 +21,12 @@ namespace {
 using elfldltl::testing::ExpectedSingleError;
 using elfldltl::testing::ExpectOkDiagnostics;
 
-struct TestFdFile {
+using ::testing::Optional, ::testing::Eq;
+
+class TestFdFile : public ::testing::Test {
+ protected:
+  static constexpr bool kDestroysHandle = false;
+
   template <typename Diagnostics>
   using FileT = elfldltl::FdFile<Diagnostics>;
 
@@ -46,7 +52,10 @@ struct TestFdFile {
   FILE* f_;
 };
 
-struct TestUniqueFdFile : public TestFdFile {
+class TestUniqueFdFile : public TestFdFile {
+ protected:
+  static constexpr bool kDestroysHandle = true;
+
   template <typename Diagnostics>
   using FileT = elfldltl::UniqueFdFile<Diagnostics>;
 
@@ -55,7 +64,10 @@ struct TestUniqueFdFile : public TestFdFile {
 
 #ifdef __Fuchsia__
 
-struct TestVmoFile {
+class TestVmoFile : public ::testing::Test {
+ protected:
+  static constexpr bool kDestroysHandle = true;
+
   template <typename Diagnostics>
   using FileT = elfldltl::VmoFile<Diagnostics>;
 
@@ -72,34 +84,32 @@ struct TestVmoFile {
   zx::vmo vmo_;
 };
 
-struct TestUnownedVmoFile : public TestVmoFile {
+class TestUnownedVmoFile : public TestVmoFile {
+ protected:
+  static constexpr bool kDestroysHandle = false;
+
   template <typename Diagnostics>
   using FileT = elfldltl::UnownedVmoFile<Diagnostics>;
 
   zx::unowned_vmo GetHandle() { return Borrow(); }
 };
 
-#else  // __Fuchsia__
-
-using TestUnownedVmoFile = struct {};
-
 #endif  // __Fuchsia__
 
-template <typename Test>
-void TestPlatforms(Test&& test) {
-  test(TestFdFile{});
-  test(TestUniqueFdFile{});
+using FileTypes = ::testing::Types<
 #ifdef __Fuchsia__
-  test(TestVmoFile{});
-  test(TestUnownedVmoFile{});
+    TestVmoFile, TestUnownedVmoFile,
 #endif
-}
+    TestFdFile, TestUniqueFdFile>;
 
-auto InvalidFd = [](auto&& test_file) {
-  ExpectedSingleError expected("couldn't read file at offset: ", 0);
-  using FileT =
-      typename std::decay_t<decltype(test_file)>::template FileT<decltype(expected.diag())>;
+template <class TestFile>
+using ElfldltlFileTests = TestFile;
 
+TYPED_TEST_SUITE(ElfldltlFileTests, FileTypes);
+
+TYPED_TEST(ElfldltlFileTests, InvalidFd) {
+  ExpectedSingleError expected{"couldn't read file at offset: ", 0};
+  using FileT = typename TestFixture::template FileT<decltype(expected.diag())>;
   {
     FileT file{expected.diag()};
 
@@ -107,38 +117,36 @@ auto InvalidFd = [](auto&& test_file) {
     EXPECT_FALSE(got);
   }
   {
-    FileT file(test_file.GetHandle(), expected.diag());
+    FileT file(this->GetHandle(), expected.diag());
 
     std::optional<int> got = file.template ReadFromFile<int>(0);
     EXPECT_FALSE(got);
   }
-};
+}
 
-TEST(ElfldltlFileTests, InvalidFd) { TestPlatforms(InvalidFd); }
-
-auto ReadFromFile = [](auto&& test_file) {
+TYPED_TEST(ElfldltlFileTests, ReadFromFile) {
   auto diag = ExpectOkDiagnostics();
-  using FileT = typename std::decay_t<decltype(test_file)>::template FileT<decltype(diag)>;
+  using FileT = typename TestFixture::template FileT<decltype(diag)>;
+
   int i = 123;
 
-  test_file.Write(&i, sizeof(i));
+  this->Write(&i, sizeof(i));
 
-  FileT file{test_file.GetHandle(), diag};
+  FileT file{this->GetHandle(), diag};
   std::optional<int> got = file.template ReadFromFile<int>(0);
   EXPECT_EQ(*got, i);
-};
+}
 
-TEST(ElfldltlFileTests, ReadFromFile) { TestPlatforms(ReadFromFile); }
-
-auto ReadArrayFromFile = [](auto&& test_file) {
+TYPED_TEST(ElfldltlFileTests, ReadArrayFromFile) {
   auto diag = ExpectOkDiagnostics();
-  using FileT = typename std::decay_t<decltype(test_file)>::template FileT<decltype(diag)>;
+  using FileT = typename TestFixture::template FileT<decltype(diag)>;
+
   const std::array<int, 3> data{123, 456, 789};
 
-  test_file.Write(data.data(), sizeof(data));
+  this->Write(data.data(), sizeof(data));
 
   elfldltl::FixedArrayFromFile<int, 3> allocator;
-  FileT file{test_file.GetHandle(), diag};
+  FileT file{this->GetHandle(), diag};
   auto got = file.template ReadArrayFromFile<int>(0, allocator, 3);
 
   ASSERT_TRUE(got);
@@ -147,50 +155,36 @@ auto ReadArrayFromFile = [](auto&& test_file) {
   for (size_t i = 0; i < data.size(); i++) {
     EXPECT_EQ(span[i], data[i]);
   }
-};
+}
 
-TEST(ElfldltlFileTests, ReadArrayFromFile) { TestPlatforms(ReadArrayFromFile); }
-
-auto Assignment = [](auto&& test_file) {
-  using TestFileT = std::decay_t<std::decay_t<decltype(test_file)>>;
-  constexpr bool DestroysHandle =
-      std::is_same_v<TestFileT, TestUniqueFdFile> || std::is_same_v<TestFileT, TestUnownedVmoFile>;
-
+TYPED_TEST(ElfldltlFileTests, Assignment) {
   ExpectedSingleError expected("couldn't read file at offset: ", 0);
   auto diag = [&] {
-    if constexpr (DestroysHandle) {
+    if constexpr (TestFixture::kDestroysHandle) {
       return expected.diag();
     } else {
       return ExpectOkDiagnostics();
     }
   }();
-  using FileT = typename TestFileT::template FileT<decltype(diag)>;
+  using FileT = typename TestFixture::template FileT<decltype(diag)>;
   int i = 123;
 
-  test_file.Write(&i, sizeof(i));
+  this->Write(&i, sizeof(i));
 
-  // If we ever switch to gtest, use EXPECT_THAT(..., Optional(...));
-  auto expect_optional = [](const auto& optional, const auto& expected) {
-    ASSERT_TRUE(optional);
-    EXPECT_EQ(*optional, expected);
-  };
-
-  FileT file{test_file.GetHandle(), diag};
-  expect_optional(file.template ReadFromFile<int>(0), i);
+  FileT file{this->GetHandle(), diag};
+  EXPECT_THAT(file.template ReadFromFile<int>(0), Optional(Eq(i)));
   if constexpr (std::is_copy_assignable_v<FileT>) {
     FileT other = file;
-    expect_optional(other.template ReadFromFile<int>(0), i);
+    EXPECT_THAT(other.template ReadFromFile<int>(0), Optional(Eq(i)));
   }
-  expect_optional(file.template ReadFromFile<int>(0), i);
+  EXPECT_THAT(file.template ReadFromFile<int>(0), Optional(Eq(i)));
   {
     FileT other = std::move(file);
-    expect_optional(other.template ReadFromFile<int>(0), i);
+    EXPECT_THAT(other.template ReadFromFile<int>(0), Optional(Eq(i)));
   }
-  if (DestroysHandle) {
+  if constexpr (TestFixture::kDestroysHandle) {
     EXPECT_FALSE(file.template ReadFromFile<int>(0).has_value());
   }
-};
-
-TEST(ElfldltlFileTests, Assignment) { TestPlatforms(Assignment); }
+}
 
 }  // anonymous namespace
