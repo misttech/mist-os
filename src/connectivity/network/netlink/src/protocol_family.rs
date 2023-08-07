@@ -1428,7 +1428,7 @@ mod test {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
-            rules_request_handler: RuleTable::default(),
+            rules_request_handler: RuleTable::new(),
         };
 
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
@@ -1495,7 +1495,7 @@ mod test {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
-            rules_request_handler: RuleTable::default(),
+            rules_request_handler: RuleTable::new(),
         };
 
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
@@ -2801,7 +2801,7 @@ mod test {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
-            rules_request_handler: RuleTable::default(),
+            rules_request_handler: RuleTable::new(),
         };
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
             if family == AF_UNSPEC || family == AF_INET {
@@ -3579,7 +3579,7 @@ mod test {
             interfaces_request_sink,
             v4_routes_request_sink,
             v6_routes_request_sink,
-            rules_request_handler: RuleTable::default(),
+            rules_request_handler: RuleTable::new(),
         };
 
         match req_and_resp {

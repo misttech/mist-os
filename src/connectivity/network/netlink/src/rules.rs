@@ -12,10 +12,17 @@ use std::{
 };
 
 use either::Either;
-use net_types::ip::IpVersion;
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
-    rtnl::{constants::FR_ACT_UNSPEC, rule::nlas::Nla, RuleMessage},
+    rtnl::{
+        constants::{
+            AF_INET, AF_INET6, FR_ACT_TO_TBL, FR_ACT_UNSPEC, RT_TABLE_DEFAULT, RT_TABLE_LOCAL,
+            RT_TABLE_MAIN,
+        },
+        rule::nlas::Nla,
+        RuleMessage,
+    },
     RtnlMessage,
 };
 
@@ -25,6 +32,11 @@ use crate::{
     netlink_packet::errno::Errno,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
 };
+
+// The priorities of the default rules installed on Linux.
+const LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY: u32 = 0;
+const LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY: u32 = 32766;
+const LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY: u32 = 32767;
 
 type RulePriority = u32;
 
@@ -237,10 +249,70 @@ impl DelRuleError {
 ///
 /// The inner rule tables are wrapped with `Arc<Mutex>` to support concurrent
 /// access from multiple NETLINK_ROUTE clients.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub(crate) struct RuleTable {
     v4_rules: Arc<Mutex<RuleTableInner>>,
     v6_rules: Arc<Mutex<RuleTableInner>>,
+}
+
+impl RuleTable {
+    /// Constructs an empty RuleTable.
+    pub(crate) fn new() -> RuleTable {
+        RuleTable {
+            v4_rules: Arc::new(Mutex::new(RuleTableInner::default())),
+            v6_rules: Arc::new(Mutex::new(RuleTableInner::default())),
+        }
+    }
+
+    /// Constructs a RuleTable prepopulated with the default rules present on
+    /// Linux.
+    /// * [V4] 0:        from all lookup local
+    /// * [V4] 32766:    from all lookup main
+    /// * [V4] 32767:    from all lookup default
+    /// * [V6] 0:        from all lookup local
+    /// * [V6] 32766:    from all lookup main
+    pub(crate) fn new_with_defaults() -> RuleTable {
+        fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
+            let mut rule = RuleMessage::default();
+            rule.header.family = match I::VERSION {
+                IpVersion::V4 => AF_INET.try_into().expect("AF_INET (2) should fit in an u8"),
+                IpVersion::V6 => AF_INET6.try_into().expect("AF_INET6 (10) should fit in an u8"),
+            };
+            rule.header.table = table;
+            rule.header.action = FR_ACT_TO_TBL;
+            rule.nlas.push(Nla::Priority(priority));
+            rule
+        }
+
+        let table = RuleTable::new();
+
+        for rule in [
+            build_lookup_rule::<Ipv4>(LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY, RT_TABLE_LOCAL),
+            build_lookup_rule::<Ipv4>(LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY, RT_TABLE_MAIN),
+            build_lookup_rule::<Ipv4>(LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY, RT_TABLE_DEFAULT),
+        ] {
+            table
+                .v4_rules
+                .lock()
+                .unwrap()
+                .add_rule(rule)
+                .expect("should not fail to add a default ipv4 rule");
+        }
+
+        for rule in [
+            build_lookup_rule::<Ipv6>(LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY, RT_TABLE_LOCAL),
+            build_lookup_rule::<Ipv6>(LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY, RT_TABLE_MAIN),
+        ] {
+            table
+                .v6_rules
+                .lock()
+                .unwrap()
+                .add_rule(rule)
+                .expect("should not fail to add a default ipv6 rule");
+        }
+
+        table
+    }
 }
 
 /// The set of possible requests related to PBR rules.
@@ -468,7 +540,7 @@ mod tests {
     fn test_rule_table(ip_version: IpVersion) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::default();
+        let mut table = RuleTable::new();
 
         // Verify that the table is empty.
         assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..], &[],);
@@ -587,7 +659,7 @@ mod tests {
     fn test_rule_table_new_rule_already_exists(ip_version: IpVersion) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::default();
+        let mut table = RuleTable::new();
 
         const PRIORITY_NLA: Nla = Nla::Priority(0);
         let oif_nla = Nla::OifName(String::from("lo"));
@@ -650,7 +722,7 @@ mod tests {
     fn test_rule_table_del_rule_fails(pattern: RuleMessage, error: Errno, ip_version: IpVersion) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::default();
+        let mut table = RuleTable::new();
         assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..], &[]);
 
         let result = table.handle_request(RuleRequest {
@@ -667,7 +739,7 @@ mod tests {
     fn test_v4_and_v6_rule_tables_are_independent(version: IpVersion, opposite_version: IpVersion) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::default();
+        let mut table = RuleTable::new();
         // Add a new rule to the table and expect success.
         let rule = build_rule(FR_ACT_UNSPEC, vec![Nla::Priority(1)]);
         table
@@ -706,5 +778,38 @@ mod tests {
                 client: client.clone(),
             })
             .expect("new rule should succeed");
+    }
+
+    #[test]
+    fn test_default_rules() {
+        let (mut sink, client) =
+            crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let mut table = RuleTable::new_with_defaults();
+
+        let new_rule = |table: u8, priority: RulePriority, family: u16| {
+            let mut rule = RuleMessage::default();
+            rule.header.action = FR_ACT_TO_TBL;
+            rule.header.table = table;
+            rule.header.family = family.try_into().expect("address family should fit in a u8");
+            rule.nlas = vec![Nla::Priority(priority)];
+            to_nlm_new_rule(rule, DUMP_SEQUENCE_NUM, true)
+        };
+
+        assert_eq!(
+            &dump_rules(&mut sink, client.clone(), &mut table, IpVersion::V4)[..],
+            &[
+                new_rule(RT_TABLE_LOCAL, LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY, AF_INET),
+                new_rule(RT_TABLE_MAIN, LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY, AF_INET),
+                new_rule(RT_TABLE_DEFAULT, LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY, AF_INET),
+            ]
+        );
+
+        assert_eq!(
+            &dump_rules(&mut sink, client.clone(), &mut table, IpVersion::V6)[..],
+            &[
+                new_rule(RT_TABLE_LOCAL, LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY, AF_INET6),
+                new_rule(RT_TABLE_MAIN, LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY, AF_INET6),
+            ]
+        );
     }
 }

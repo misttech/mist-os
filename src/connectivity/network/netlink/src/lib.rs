@@ -159,7 +159,7 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                         interfaces_request_sink,
                         v4_routes_request_sink,
                         v6_routes_request_sink,
-                        rules_request_handler: RuleTable::default(),
+                        rules_request_handler: RuleTable::new_with_defaults(),
                     },
                 )
                 .await;
