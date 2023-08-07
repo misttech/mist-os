@@ -118,11 +118,27 @@ zx::result<Elf64_Shdr> FindSectionHeader(zx::vmo& driver_vmo, const Elf64_Ehdr& 
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
+zx::result<std::string> GetRelativeUrl(std::string_view url) {
+  constexpr std::string_view kPrefix = "#meta/";
+
+  size_t prefix_start_idx = url.find(kPrefix);
+  if (prefix_start_idx == std::string::npos) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  return zx::ok(url.substr(prefix_start_idx));
+}
+
 }  // namespace
 
 namespace driver_symbols {
 
-zx::result<std::vector<std::string>> FindRestrictedSymbols(zx::vmo& driver_vmo) {
+zx::result<std::vector<std::string>> FindRestrictedSymbols(zx::vmo& driver_vmo,
+                                                           std::string_view driver_url) {
+  auto relative_url = GetRelativeUrl(driver_url);
+  if (relative_url.is_error()) {
+    return relative_url.take_error();
+  }
+
   zx::result<Elf64_Ehdr> elf_header = GetElfHeader(driver_vmo);
   if (elf_header.is_error()) {
     return elf_header.take_error();
@@ -168,6 +184,11 @@ zx::result<std::vector<std::string>> FindRestrictedSymbols(zx::vmo& driver_vmo) 
     const char* name = dynsym_strings_table->ptr() + symbol.st_name;
     if (kRestrictedLibcSymbols.find(name) != kRestrictedLibcSymbols.end()) {
       matches.push_back(name);
+    } else if (kCreateThreadSymbols.find(name) != kCreateThreadSymbols.end()) {
+      if (kCreateThreadSymbolsDriversAllowlist.find(*relative_url) ==
+          kCreateThreadSymbolsDriversAllowlist.end()) {
+        matches.push_back(name);
+      }
     }
   }
   return zx::ok(matches);

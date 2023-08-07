@@ -76,9 +76,10 @@ void CreateFakeElf(const std::vector<std::string>& symbols, zx::vmo* out_vmo) {
 }
 
 TEST(SymbolsTest, InvalidFormat) {
+  constexpr std::string_view kDriverUrl = "fuchsia-boot:///#meta/driver.cm";
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(4096, 0, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo);
+  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
   ASSERT_TRUE(result.is_error());
 }
 
@@ -87,10 +88,11 @@ TEST(SymbolsTest, NoRestrictedSymbols) {
       "memcmp",
       "printf",
   };
+  constexpr std::string_view kDriverUrl = "fuchsia-boot:///#meta/driver.cm";
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo);
+  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
   ASSERT_TRUE(result.is_ok());
 
   ASSERT_EQ(result->size(), 0);
@@ -106,10 +108,44 @@ TEST(SymbolsTest, RestrictedSymbols) {
       "dlopen",
       "setenv",
   };
+  constexpr std::string_view kDriverUrl = "fuchsia-boot:///#meta/driver.cm";
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo);
+  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  ASSERT_TRUE(result.is_ok());
+
+  std::sort(want_symbols.begin(), want_symbols.end());
+  std::sort(result->begin(), result->end());
+  ASSERT_EQ(*result, want_symbols);
+}
+
+TEST(SymbolsTest, ThreadSymbolsAllowedDriver) {
+  const std::vector<std::string> kSymbols = {
+      "thrd_create",
+  };
+  constexpr std::string_view kDriverUrl = "fuchsia-boot:///#meta/platform-bus-x86.cm";
+
+  zx::vmo vmo;
+  ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
+  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  ASSERT_TRUE(result.is_ok());
+
+  ASSERT_EQ(result->size(), 0);
+}
+
+TEST(SymbolsTest, ThreadSymbolsRestrictedDriver) {
+  const std::vector<std::string> kSymbols = {
+      "thrd_create",
+  };
+  std::vector<std::string> want_symbols = {
+      "thrd_create",
+  };
+  constexpr std::string_view kDriverUrl = "fuchsia-boot:///#meta/not-on-thread-allowlist.cm";
+
+  zx::vmo vmo;
+  ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
+  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
   ASSERT_TRUE(result.is_ok());
 
   std::sort(want_symbols.begin(), want_symbols.end());

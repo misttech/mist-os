@@ -489,7 +489,7 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
 
   const char* c_libname = new_driver->libname().c_str();
 
-  auto result = driver_symbols::FindRestrictedSymbols(vmo);
+  auto result = driver_symbols::FindRestrictedSymbols(vmo, new_driver->libname());
   if (result.is_error()) {
     LOGF(WARNING, "Driver '%s' failed to validate as ELF: %s", c_libname, result.status_value());
   } else if (result->size() > 0) {

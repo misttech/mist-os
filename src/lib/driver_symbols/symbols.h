@@ -15,7 +15,8 @@ namespace driver_symbols {
 
 // Checks the |driver_vmo| for usage of restricted symbols.
 // Returns a vector of any restricted symbols, or an error if the vmo is not an ELF file.
-zx::result<std::vector<std::string>> FindRestrictedSymbols(zx::vmo& driver_vmo);
+zx::result<std::vector<std::string>> FindRestrictedSymbols(zx::vmo& driver_vmo,
+                                                           std::string_view driver_url);
 
 }  // namespace driver_symbols
 
