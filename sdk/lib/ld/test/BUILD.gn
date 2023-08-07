@@ -62,9 +62,18 @@ source_set("load-tests") {
     "//third_party/googletest:gtest",
   ]
   if (is_fuchsia) {
+    sources += [
+      "ld-startup-in-process-tests-zircon.cc",
+      "ld-startup-in-process-tests-zircon.h",
+    ]
     deps += [
       "../testing",
       "//zircon/system/ulib/zx",
+    ]
+  } else {
+    sources += [
+      "ld-startup-in-process-tests-posix.cc",
+      "ld-startup-in-process-tests-posix.h",
     ]
   }
 
