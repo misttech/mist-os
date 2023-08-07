@@ -5,21 +5,15 @@
 #ifndef LIB_LD_TEST_LD_STARTUP_IN_PROCESS_TESTS_ZIRCON_H_
 #define LIB_LD_TEST_LD_STARTUP_IN_PROCESS_TESTS_ZIRCON_H_
 
+#include <lib/elfldltl/testing/loader.h>
 #include <lib/elfldltl/testing/test-pipe-reader.h>
 #include <lib/ld/testing/test-processargs.h>
 #include <lib/zx/vmar.h>
-#include <zircon/processargs.h>
-#include <zircon/syscalls.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
-#include <string>
 #include <string_view>
-#include <tuple>
-
-#include <gtest/gtest.h>
 
 // The in-process here work by doing ELF loading approximately as the system
 // program loader would, but into this process that's running the test.  Once
@@ -34,57 +28,25 @@ namespace ld::testing {
 // On Fuchsia this means packing a message on the bootstrap channel.  The entry
 // point receives the bootstrap channel (zx_handle_t) and the base address of
 // the vDSO.
-class InProcessTestLaunch {
+class LdStartupInProcessTests
+    : public elfldltl::testing::LoadTests<elfldltl::testing::LocalVmarLoaderTraits> {
  public:
-  static constexpr bool kHasLog = true;
-
-  // The dynamic linker gets loaded into this same test process, but it's given
-  // a sub-VMAR to consider its "root" or allocation range so hopefully it will
-  // confine its pointer references to that part of the address space.  The
-  // dynamic linker doesn't necessarily clean up all its mappings--on success,
-  // it leaves many mappings in place.  Test VMAR is always destroyed when the
-  // InProcessTestLaunch object goes out of scope.
-  static constexpr size_t kVmarSize = 1 << 30;
-
   void Init(std::initializer_list<std::string_view> args = {});
 
-  // Arguments for calling MakeLoader(const zx::vmar&).
-  auto LoaderArgs() const { return std::forward_as_tuple(test_vmar_); }
+  void Load(std::string_view executable_name);
 
-  // This is called after the dynamic linker is loaded.
-  template <class Loader>
-  void AfterLoad(Loader&& loader) {
-    // The ends the useful lifetime of the loader object by extracting the VMAR
-    // where it loaded the test image.  This VMAR handle doesn't need to be
-    // saved here, since it's a sub-VMAR of the test_vmar_ that will be
-    // destroyed when this InProcessTestLaunch object dies.
-    zx::vmar load_image_vmar = std::move(loader).Commit();
+  int64_t Run();
 
-    // Pass along that handle in the bootstrap message.
-    procargs_.AddHandle(PA_VMAR_LOADED, std::move(load_image_vmar));
-  }
+  void ExpectLog(std::string_view expected_log);
 
-  template <class Test>
-  void SendExecutable(std::string_view name, Test& test) {
-    SendExecutable(name);
-  }
-
-  ld::testing::TestProcessArgs& procargs() { return procargs_; }
-
-  std::string CollectLog() { return std::move(*std::exchange(log_, {})).Finish(); }
-
-  int Call(uintptr_t entry);
-
-  ~InProcessTestLaunch();
+  ~LdStartupInProcessTests();
 
  private:
-  using EntryFunction = int(zx_handle_t, void*);
+  using Base = elfldltl::testing::LoadTests<elfldltl::testing::LocalVmarLoaderTraits>;
+  using Base::Load;
 
-  void SendExecutable(std::string_view name);
-
-  static void* GetVdso();
-
-  ld::testing::TestProcessArgs procargs_;
+  uintptr_t entry_ = 0;
+  TestProcessArgs procargs_;
   std::unique_ptr<elfldltl::testing::TestPipeReader> log_;
   zx::vmar test_vmar_;
 };

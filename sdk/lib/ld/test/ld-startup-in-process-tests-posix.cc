@@ -5,10 +5,14 @@
 #include "ld-startup-in-process-tests-posix.h"
 
 #include <lib/elfldltl/layout.h>
+#include <lib/ld/abi.h>
+#include <lib/stdcompat/span.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
 
 #include <numeric>
+
+#include <gtest/gtest.h>
 
 #include "../posix.h"
 
@@ -20,7 +24,7 @@ constexpr size_t kStackSize = 64 << 10;
 // This is actually defined in assembly code with internal linkage.
 // It simply switches to the new SP and then calls the entry point.
 // When that code returns, this just restores the old SP and also returns.
-extern "C" int CallOnStack(uintptr_t entry, void* sp);
+extern "C" int64_t CallOnStack(uintptr_t entry, void* sp);
 __asm__(
     R"""(
     .pushsection .text.CallOnStack, "ax", %progbits
@@ -80,7 +84,9 @@ __asm__(
 
 }  // namespace
 
-struct InProcessTestLaunch::AuxvBlock {
+const std::string kLdStartupName{ld::abi::kInterp};
+
+struct LdStartupInProcessTests::AuxvBlock {
   ld::Auxv vdso = {
       static_cast<uintptr_t>(ld::AuxvTag::kSysinfoEhdr),
       getauxval(static_cast<uintptr_t>(ld::AuxvTag::kSysinfoEhdr)),
@@ -99,30 +105,70 @@ struct InProcessTestLaunch::AuxvBlock {
   const ld::Auxv null = {static_cast<uintptr_t>(ld::AuxvTag::kNull)};
 };
 
-void InProcessTestLaunch::Init(std::initializer_list<std::string_view> args) {
+void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args) {
   ASSERT_NO_FATAL_FAILURE(AllocateStack());
   ASSERT_NO_FATAL_FAILURE(PopulateStack(args, {}));
 }
 
-bool InProcessTestLaunch::OnExecutableSegment(uintptr_t load_bias, uintptr_t phoff,
-                                              size_t phdrs_size_bytes, uintptr_t vaddr,
-                                              uintptr_t offset, size_t filesz) {
-  if (offset <= phoff && phoff - offset < filesz && filesz - (phoff - offset) >= phdrs_size_bytes) {
-    auxv_->phdr.back() = phoff - offset + vaddr + load_bias;
-    return false;
-  }
-  return true;
+void LdStartupInProcessTests::Load(std::string_view executable_name) {
+  ASSERT_TRUE(auxv_);  // Init must have been called already.
+
+  // First load the dynamic linker.
+  std::optional<LoadResult> result;
+  ASSERT_NO_FATAL_FAILURE(Load(kLdStartupName, result));
+
+  // Stash the dynamic linker's entry point.
+  entry_ = result->entry + result->loader.load_bias();
+
+  // Save the loader object so it gets destroyed when the test fixture is
+  // destroyed destroyed.  That will clean up the mappings it made.  (This
+  // doesn't do anything about any mappings that were made by the loaded code
+  // at Run(), but so it goes.)
+  loader_ = std::move(result->loader);
+
+  // Now load the executable.
+  result.reset();
+  ASSERT_NO_FATAL_FAILURE(Load(executable_name, result));
+
+  // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
+  cpp20::span phdrs = result->phdrs.get();
+
+  // This non-template lambda gets called with the vaddr, offset, and filesz of
+  // each segment.  It's called by the generic lambda passed to VisitSegments.
+  auto on_segment = [load_bias = result->loader.load_bias(), phoff = result->phoff(),
+                     phdrs_size_bytes = phdrs.size_bytes(),
+                     this](uintptr_t vaddr, uintptr_t offset, size_t filesz) {
+    if (offset <= phoff && phoff - offset < filesz &&
+        filesz - (phoff - offset) >= phdrs_size_bytes) {
+      auxv_->phdr.back() = phoff - offset + vaddr + load_bias;
+      return false;
+    }
+    return true;
+  };
+  result->info.VisitSegments([on_segment](const auto& segment) {
+    return on_segment(segment.vaddr(), segment.offset(), segment.filesz());
+  });
+
+  ASSERT_NE(auxv_->phdr.back(), 0u);
+
+  auxv_->phnum.back() = phdrs.size();
+
+  // Set AT_ENTRY to the executable's entry point.
+  auxv_->entry.back() = result->entry + result->loader.load_bias();
+
+  // Save the second Loader object to keep the mappings alive.
+  exec_loader_ = std::move(result->loader);
 }
 
-int InProcessTestLaunch::Call(uintptr_t entry) { return CallOnStack(entry, sp_); }
+int64_t LdStartupInProcessTests::Run() { return CallOnStack(entry_, sp_); }
 
-InProcessTestLaunch::~InProcessTestLaunch() {
+LdStartupInProcessTests::~LdStartupInProcessTests() {
   if (stack_) {
     munmap(stack_, kStackSize * 2);
   }
 }
 
-void InProcessTestLaunch::AllocateStack() {
+void LdStartupInProcessTests::AllocateStack() {
   // Allocate a stack and a guard region below it.
   void* ptr = mmap(nullptr, kStackSize * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
   ASSERT_TRUE(ptr) << "mmap: " << strerror(errno);
@@ -131,8 +177,8 @@ void InProcessTestLaunch::AllocateStack() {
   EXPECT_EQ(mprotect(stack_, kStackSize, PROT_NONE), 0) << strerror(errno);
 }
 
-void InProcessTestLaunch::PopulateStack(std::initializer_list<std::string_view> argv,
-                                        std::initializer_list<std::string_view> envp) {
+void LdStartupInProcessTests::PopulateStack(std::initializer_list<std::string_view> argv,
+                                            std::initializer_list<std::string_view> envp) {
   // Figure out the total size of string data to write.
   constexpr auto string_size = [](size_t total, std::string_view str) {
     return total + str.size() + 1;
@@ -185,17 +231,17 @@ void InProcessTestLaunch::PopulateStack(std::initializer_list<std::string_view> 
   sp_ = sp;
 }
 
-void InProcessTestLaunch::FinishSendExecutable(size_t phnum, uintptr_t entry,
-                                               elfldltl::MmapLoader loader) {
-  ASSERT_NE(auxv_->phdr.back(), 0u);
-
-  auxv_->phnum.back() = phnum;
-
-  // Set AT_ENTRY to the executable's entry point.
-  auxv_->entry.back() = entry + loader.load_bias();
-
-  // Save the second Loader object to keep the mappings alive.
-  exec_loader_ = std::move(loader);
+// The loaded code is just writing to STDERR_FILENO in the same process.
+// There's no way to install e.g. a pipe end as STDERR_FILENO for the loaded
+// code without also hijacking stderr for the test harness itself, which seems
+// a bit dodgy even if the original file descriptor were saved and dup2'd back
+// after the test succeeds.  In the long run, most cases where the real dynamic
+// linker would emit any diagnostics are when it would then crash the process,
+// so those cases will only get tested via spawning a new process, not
+// in-process tests.
+void LdStartupInProcessTests::ExpectLog(std::string_view expected_log) {
+  // No log capture, so this must be used only in tests that expect no output.
+  EXPECT_EQ(expected_log, "");
 }
 
 }  // namespace ld::testing
