@@ -263,7 +263,7 @@ TEST_F(MountTest, ProcMountInfoRoot) {
 
 TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
   std::string expected_contents;
-  EXPECT_TRUE(files::ReadFileToString("/data/hello_world.txt", &expected_contents));
+  EXPECT_TRUE(files::ReadFileToString("data/hello_world.txt", &expected_contents));
 
   // TODO(https://fxbug.dev/130532) remove explicit loopback discovery and binding once unneeded
   test_helper::ScopedFD loop_control(open("/dev/loop-control", O_RDWR, 0777));
@@ -276,7 +276,7 @@ TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
   test_helper::ScopedFD free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
   ASSERT_TRUE(free_loop_device.is_valid());
 
-  test_helper::ScopedFD ext_image(open("/data/simple_ext4.img", O_RDONLY, 0644));
+  test_helper::ScopedFD ext_image(open("data/simple_ext4.img", O_RDONLY, 0644));
   ASSERT_TRUE(ext_image.is_valid());
 
   ASSERT_SUCCESS(ioctl(free_loop_device.get(), LOOP_SET_FD, ext_image.get()));

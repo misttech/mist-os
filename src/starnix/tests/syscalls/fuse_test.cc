@@ -55,7 +55,7 @@ class FuseTest : public ::testing::Test {
     if (getenv(kOverlayFsPath)) {
       return getenv(kOverlayFsPath);
     } else {
-      return "/data/fuse-overlayfs";
+      return "data/fuse-overlayfs";
     }
   }
 

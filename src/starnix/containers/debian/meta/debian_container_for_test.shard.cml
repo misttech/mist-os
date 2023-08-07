@@ -1,0 +1,22 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    // TODO(https://fxbug.dev/131564): Remove external_container.
+    program: {
+        external_container: "true",
+    },
+    children: [
+        {
+            name: "test_container",
+            url: "debian#meta/debian_container.cm",
+            environment: "#starnix_runner_env",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.runner.ComponentRunner",
+            from: "#test_container",
+        },
+    ],
+}

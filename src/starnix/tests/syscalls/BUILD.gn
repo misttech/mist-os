@@ -215,7 +215,6 @@ starnix_linux_test_component("syscalls_test") {
     ":fuse_overlayfs",
     ":simple_ext4_image",
     ":syscall_test_exec_child_resource($target_linux_toolchain)",
-    "//src/starnix/containers/debian:debian_container",
   ]
   uses_expectations = true
   test_type = "starnix"
@@ -227,14 +226,6 @@ starnix_linux_test_component("crash_test") {
   test_type = "starnix"
 }
 
-group("container_resources") {
-  deps = [
-    "//src/starnix/containers:data_tmp_target",
-    "//src/starnix/containers:default_init",
-    "//src/starnix/containers/debian:system_image",
-  ]
-}
-
 fuchsia_test_package("starnix_syscall_tests") {
   test_components = [
     ":syscalls_test",
@@ -242,9 +233,9 @@ fuchsia_test_package("starnix_syscall_tests") {
   ]
 
   subpackages = starnix_test_subpackages
+  subpackages += [ "//src/starnix/containers/debian:debian_package" ]
 
   deps = [
-    ":container_resources",
     ":extended_pstate_initial_state_child_resource",
     "//src/lib/testing/expectation:expectation_comparer",
   ]

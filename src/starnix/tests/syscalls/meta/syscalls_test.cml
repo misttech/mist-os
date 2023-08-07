@@ -2,25 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/starnix/tests/starnix_test_with_expectations.shard.cml" ],
+    include: [
+        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
+        "//src/starnix/tests/starnix_test_with_expectations.shard.cml",
+    ],
     program: {
         binary: "data/tests/syscalls_test_bin",
-        external_container: "true",
         uid: "0",
         test_type: "gtest",
     },
-    children: [
-        {
-            name: "test_container",
-            url: "#meta/debian_container.cm",
-            environment: "#starnix_runner_env",
-        },
-    ],
     use: [
-        {
-            protocol: "fuchsia.component.runner.ComponentRunner",
-            from: "#test_container",
-        },
         {
             storage: "custom_artifacts",
             rights: [ "rw*" ],

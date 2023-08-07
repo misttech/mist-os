@@ -63,7 +63,7 @@ TEST_F(LoopTest, ReopeningDevicePreservesOffset) {
   test_helper::ScopedFD free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
   ASSERT_TRUE(free_loop_device.is_valid());
 
-  test_helper::ScopedFD backing_file(open("/data/hello_world.txt", O_RDONLY, 0644));
+  test_helper::ScopedFD backing_file(open("data/hello_world.txt", O_RDONLY, 0644));
   ASSERT_TRUE(backing_file.is_valid());
 
   // Configure an offset that we'll check for after re-opening the device.
