@@ -20,7 +20,7 @@
         },
         {
             name: "netstack",
-            url: "#meta/netstack.cm",
+            url: "netstack#meta/netstack.cm",
         },
     ],
     collections: [

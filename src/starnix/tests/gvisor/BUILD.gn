@@ -317,7 +317,6 @@ group("gvisor_runfiles") {
 group("container_resources") {
   deps = [
     ":gvisor_runfiles",
-    "//src/connectivity/network/netstack:component",
     "//src/starnix/containers:data_tmp_target",
     "//src/starnix/containers:default_init",
     "//src/starnix/containers/debian:system_image",

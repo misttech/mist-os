@@ -18,10 +18,7 @@ group("tests") {
 fuchsia_test_component_with_expectations("adbd_test") {
   manifest = "meta/adbd_test.cml"
   expectations = "expectations/adbd_test.json5"
-  deps = [
-    "//src/connectivity/network/netstack:component",
-    "//src/starnix/tests:starnix_test_with_expectations",
-  ]
+  deps = [ "//src/starnix/tests:starnix_test_with_expectations" ]
   test_type = "starnix"
 }
 
