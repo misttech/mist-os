@@ -1,7 +1,7 @@
 Name: CHRE
 URL: https://android.googlesource.com/platform/system/chre/+/refs/heads/main
 License: Apache 2.0
-License File: NOTICE
+License File: src/NOTICE
 Description:
 
 Android’s platform for developing always-on applications, called nanoapps.
