@@ -193,7 +193,7 @@ else
   # that our tar file is just a archive of individual files with no paths.
   SYMLINK_PATH="$(mktemp -d)"
   CLEANUP_LIST+=("${SYMLINK_PATH}")
-  for i in "${kernelzbi}" "${img_raw}" "${FUCHSIA_BUILD_DIR}/${KERNEL_IMAGE}"; do
+  for i in "${kernelzbi}" "${img_raw}" "${KERNEL_IMAGE}"; do
     if [[ ! $i ]]; then
       continue
     fi
