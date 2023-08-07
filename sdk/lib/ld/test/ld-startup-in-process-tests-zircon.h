@@ -5,7 +5,7 @@
 #ifndef LIB_LD_TEST_LD_STARTUP_IN_PROCESS_TESTS_ZIRCON_H_
 #define LIB_LD_TEST_LD_STARTUP_IN_PROCESS_TESTS_ZIRCON_H_
 
-#include <lib/ld/testing/test-log-socket.h>
+#include <lib/elfldltl/testing/test-pipe-reader.h>
 #include <lib/ld/testing/test-processargs.h>
 #include <lib/zx/vmar.h>
 #include <zircon/processargs.h>
@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -70,7 +71,7 @@ class InProcessTestLaunch {
 
   ld::testing::TestProcessArgs& procargs() { return procargs_; }
 
-  std::string CollectLog() { return std::move(log_).Read(); }
+  std::string CollectLog() { return std::move(*std::exchange(log_, {})).Finish(); }
 
   int Call(uintptr_t entry);
 
@@ -84,7 +85,7 @@ class InProcessTestLaunch {
   static void* GetVdso();
 
   ld::testing::TestProcessArgs procargs_;
-  ld::testing::TestLogSocket log_;
+  std::unique_ptr<elfldltl::testing::TestPipeReader> log_;
   zx::vmar test_vmar_;
 };
 

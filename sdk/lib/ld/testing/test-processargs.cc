@@ -4,6 +4,7 @@
 
 #include "lib/ld/testing/test-processargs.h"
 
+#include <lib/fdio/fd.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/process.h>
@@ -34,6 +35,12 @@ TestProcessArgs& TestProcessArgs::AddDuplicateHandle(uint32_t info, zx::unowned_
 
 TestProcessArgs& TestProcessArgs::AddFd(int fd, zx::handle handle) {
   return AddHandle(PA_HND(PA_FD, fd), std::move(handle));
+}
+
+TestProcessArgs& TestProcessArgs::AddFd(int test_fd, fbl::unique_fd local_fd) {
+  zx_handle_t handle = ZX_HANDLE_INVALID;
+  EXPECT_EQ(fdio_fd_transfer(local_fd.release(), &handle), ZX_OK);
+  return AddFd(test_fd, zx::handle{handle});
 }
 
 TestProcessArgs& TestProcessArgs::AddName(std::string_view name, uint32_t info,

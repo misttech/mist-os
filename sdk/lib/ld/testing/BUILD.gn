@@ -12,13 +12,14 @@ group("testing") {
 library_headers("headers") {
   testonly = true
 
-  headers = [
-    "lib/ld/testing/test-log-socket.h",
-    "lib/ld/testing/test-processargs.h",
-  ]
+  headers = []
   public_deps = []
   if (is_fuchsia) {
-    public_deps += [ "//zircon/system/ulib/zx" ]
+    headers += [ "lib/ld/testing/test-processargs.h" ]
+    public_deps += [
+      "//zircon/system/ulib/fbl",
+      "//zircon/system/ulib/zx",
+    ]
   }
 }
 
@@ -27,13 +28,15 @@ static_library("ld-testing") {
 
   public_deps = [ ":headers" ]
 
-  sources = [
-    "test-log-socket.cc",
-    "test-processargs.cc",
-  ]
-  deps = [
-    "//sdk/lib/stdcompat",
-    "//src/zircon/lib/zircon",
-    "//third_party/googletest:gtest",
-  ]
+  sources = []
+  deps = []
+  if (is_fuchsia) {
+    sources += [ "test-processargs.cc" ]
+    deps += [
+      "//sdk/lib/fdio",
+      "//sdk/lib/stdcompat",
+      "//third_party/googletest:gtest",
+      "//zircon/system/ulib/zx",
+    ]
+  }
 }

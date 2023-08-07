@@ -19,11 +19,14 @@ void InProcessTestLaunch::Init(std::initializer_list<std::string_view> args) {
                 &test_vmar_, &test_base),
             ZX_OK);
 
-  ASSERT_NO_FATAL_FAILURE(log_.Init());
+  log_ = std::make_unique<elfldltl::testing::TestPipeReader>();
+  fbl::unique_fd log_fd;
+  ASSERT_NO_FATAL_FAILURE(log_->Init(log_fd));
+
   procargs()  //
       .AddInProcessTestHandles()
       .AddDuplicateHandle(PA_VMAR_ROOT, test_vmar_.borrow())
-      .AddFd(STDERR_FILENO, log_.TakeSocket())
+      .AddFd(STDERR_FILENO, std::move(log_fd))
       .SetArgs(args);
 }
 

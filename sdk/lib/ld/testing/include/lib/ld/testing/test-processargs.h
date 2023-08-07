@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include <fbl/unique_fd.h>
+
 namespace ld::testing {
 
 // This is a "builder"-style object that collects information to be packed into
@@ -40,6 +42,8 @@ class TestProcessArgs {
   TestProcessArgs& AddFd(int fd, T&& handle) {
     return AddFd(fd, zx::handle{handle.release()});
   }
+
+  TestProcessArgs& AddFd(int test_fd, fbl::unique_fd local_fd);
 
   // This returns the index of the entry the next AddName call will append.
   size_t next_name() const { return names_.size(); }

@@ -21,6 +21,7 @@ void TestPipeReader::Init(fbl::unique_fd& write_pipe) {
   ASSERT_EQ(fcntl(read_pipe_.get(), F_SETFD, FD_CLOEXEC), 0) << strerror(errno);
   ASSERT_EQ(fcntl(write_pipe.get(), F_SETFD, FD_CLOEXEC), 0) << strerror(errno);
   pipe_buf_size_ = fpathconf(read_pipe_.get(), _PC_PIPE_BUF);
+  ASSERT_GT(pipe_buf_size_, 0u);
   thread_ = std::thread(&TestPipeReader::ReaderThread, this);
 }
 
@@ -33,8 +34,8 @@ void TestPipeReader::ReaderThread() {
     size_t contents_size = contents_.size();
     contents_.append(pipe_buf_size_, kFillByte);
     n = read(read_pipe_.get(), &contents_[contents_size], pipe_buf_size_);
+    contents_.resize(contents_size + std::max<ssize_t>(n, 0));
     ASSERT_GE(n, 0) << "read: " << strerror(errno);
-    contents_.resize(contents_size + n);
   } while (n > 0);
 }
 
