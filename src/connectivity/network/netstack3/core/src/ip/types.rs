@@ -28,6 +28,12 @@ impl From<RawMetric> for u32 {
     }
 }
 
+impl From<RawMetric> for u64 {
+    fn from(RawMetric(metric): RawMetric) -> u64 {
+        u64::from(metric)
+    }
+}
+
 /// The default interface routing metric.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 

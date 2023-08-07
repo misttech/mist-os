@@ -83,6 +83,7 @@ use netstack3_core::{
     error::NetstackError,
     handle_timer,
     ip::{
+        self,
         device::{
             slaac::SlaacConfiguration,
             state::{Ipv6DeviceConfiguration, Lifetime},
@@ -993,6 +994,71 @@ impl Netstack {
             })
         }
     }
+
+    fn routes_info_getter(
+        &self,
+    ) -> impl Fn() -> BoxFuture<'static, Result<fuchsia_inspect::Inspector, anyhow::Error>>
+           + Clone
+           + Sync
+           + Send
+           + 'static {
+        struct Visitor(fuchsia_inspect::Inspector);
+        impl ip::forwarding::RoutesVisitor for &'_ mut Visitor {
+            type VisitResult = ();
+            fn visit<'a, I: Ip, D: 'a + std::fmt::Display>(
+                self,
+                per_route: impl Iterator<Item = &'a ip::types::Entry<I::Addr, D>>,
+            ) -> Self::VisitResult {
+                let Visitor(inspector) = self;
+                for (i, route) in per_route.enumerate() {
+                    inspector.root().record_child(format!("{}", i), |node| {
+                        let ip::types::Entry { subnet, device, gateway, metric } = route;
+                        node.record_string("Destination", format!("{}", subnet));
+                        node.record_string("NIC", format!("{}", device));
+                        match gateway {
+                            Some(gateway) => {
+                                node.record_string("Gateway", format!("{}", gateway));
+                            }
+                            None => {
+                                node.record_string("Gateway", "[NONE]");
+                            }
+                        }
+                        match metric {
+                            ip::types::Metric::MetricTracksInterface(metric) => {
+                                node.record_uint("Metric", (*metric).into());
+                                node.record_bool("MetricTracksInterface", true);
+                            }
+                            ip::types::Metric::ExplicitMetric(metric) => {
+                                node.record_uint("Metric", (*metric).into());
+                                node.record_bool("MetricTracksInterface", false);
+                            }
+                        }
+                    })
+                }
+            }
+        }
+        let ctx = self.ctx.clone();
+        move || {
+            let mut ctx = ctx.clone();
+            Box::pin(async move {
+                let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+
+                let mut visitor = Visitor(fuchsia_inspect::Inspector::new(
+                    fuchsia_inspect::InspectorConfig::default(),
+                ));
+                ip::forwarding::with_routes::<Ipv4, _, DeviceId<BindingsNonSyncCtxImpl>, _>(
+                    sync_ctx,
+                    &mut visitor,
+                );
+                ip::forwarding::with_routes::<Ipv6, _, DeviceId<BindingsNonSyncCtxImpl>, _>(
+                    sync_ctx,
+                    &mut visitor,
+                );
+                let Visitor(inspector) = visitor;
+                Ok(inspector)
+            })
+        }
+    }
 }
 
 enum Service {
@@ -1084,6 +1150,8 @@ impl NetstackSeed {
         inspect_runtime::serve(inspector, &mut fs).expect("failed to serve inspect");
         let _socket_info =
             inspector.root().create_lazy_child("Socket Info", netstack.socket_info_getter());
+        let _route_info =
+            inspector.root().create_lazy_child("Routes Info", netstack.routes_info_getter());
 
         let services = fs.take_and_serve_directory_handle().context("directory handle")?;
 

@@ -7,8 +7,9 @@
 use alloc::vec::Vec;
 use core::{fmt::Debug, slice::Iter};
 
+use lock_order::Locked;
 use net_types::{
-    ip::{GenericOverIp, Ip, Subnet},
+    ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet},
     SpecifiedAddr,
 };
 use thiserror::Error;
@@ -21,9 +22,10 @@ use crate::{
             AddableEntry, AddableMetric, DecomposedAddableEntry, Destination, Entry, Metric,
             NextHop, RawMetric,
         },
-        AnyDevice, DeviceIdContext, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
+        AnyDevice, DeviceIdContext, IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
         IpStateContext,
     },
+    NonSyncContext, SyncCtx,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -192,6 +194,46 @@ fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
             Metric::MetricTracksInterface(sync_ctx.get_routing_metric(device))
         }
     }
+}
+
+/// Visitor for route table state.
+pub trait RoutesVisitor {
+    /// The result of [`RoutesVisitor::visit`].
+    type VisitResult;
+
+    /// Consumes `self` and an Entry iterator to produce a `VisitResult`.
+    fn visit<'a, I: Ip, D: 'a + std::fmt::Display>(
+        self,
+        stats: impl Iterator<Item = &'a Entry<I::Addr, D>>,
+    ) -> Self::VisitResult;
+}
+
+/// Provides access to the state of the route table via a visitor.
+pub fn with_routes<I, C, D, V>(sync_ctx: &SyncCtx<C>, cb: V) -> V::VisitResult
+where
+    I: IpExt,
+    C: NonSyncContext,
+    V: RoutesVisitor,
+{
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let IpInvariant(r) = I::map_ip(
+        IpInvariant((&mut sync_ctx, cb)),
+        |IpInvariant((sync_ctx, cb))| {
+            IpInvariant(sync_ctx.with_ip_routing_table(
+                |_sync_ctx, table: &ForwardingTable<Ipv4, _>| {
+                    cb.visit::<Ipv4, _>(table.iter_table())
+                },
+            ))
+        },
+        |IpInvariant((sync_ctx, cb))| {
+            IpInvariant(sync_ctx.with_ip_routing_table(
+                |_sync_ctx, table: &ForwardingTable<Ipv6, _>| {
+                    cb.visit::<Ipv6, _>(table.iter_table())
+                },
+            ))
+        },
+    );
+    r
 }
 
 /// An IP forwarding table.
