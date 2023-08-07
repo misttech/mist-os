@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/test.gni")
 
 driver_bind_rules("fake_battery_bind") {
   rules = "fake-battery-driver.bind"
@@ -68,7 +69,39 @@ fuchsia_unittest_package("fake-battery-driver-tests") {
   deps = [ ":cpp_test" ]
 }
 
+test("driver_integration_test") {
+  sources = [ "integration_test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
+    "//sdk/fidl/fuchsia.hardware.powersource.test:fuchsia.hardware.powersource.test_cpp",
+    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+  ]
+}
+
+fuchsia_unittest_package("integration_tests") {
+  package_name = "fake_battery_ingration_test"
+  deps = [
+    # Test component.
+    ":driver_integration_test",
+
+    # Driver(s) to be tested.
+    ":fake_battery_component",
+
+    # Include the platform bus (if driver binds to it)
+    "//src/devices/bus/drivers/platform:platform-bus",
+  ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":fake-battery-driver-tests" ]
+  deps = [
+    ":fake-battery-driver-tests",
+    ":integration_tests",
+  ]
 }
