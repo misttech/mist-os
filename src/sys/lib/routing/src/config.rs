@@ -23,7 +23,7 @@ use {
     },
     thiserror::Error,
     tracing::warn,
-    version_history::AbiRevision,
+    version_history::{version_from_abi_revision, AbiRevision, SUPPORTED_API_LEVELS},
 };
 
 /// Runtime configuration options.
@@ -281,10 +281,78 @@ pub enum CapabilityAllowlistSource {
 
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum AbiRevisionError {
-    #[error("Missing a component target ABI revision.")]
+    /// A component tried to run, but it presented no ABI revision.
     Absent,
-    #[error("Unsupported component target ABI revision: {0}. The following revisions are supported: {1}")]
-    Unsupported(AbiRevision, String),
+
+    /// A component tried to run, but its ABI revision was not recognized.
+    Unknown { abi_revision: AbiRevision, supported_versions: Vec<version_history::Version> },
+
+    /// A component tried to run, but the ABI revision it presented is not
+    /// supported by this system.
+    Unsupported {
+        version: version_history::Version,
+        supported_versions: Vec<version_history::Version>,
+    },
+}
+
+impl AbiRevisionError {
+    fn check_abi_revision(abi_revision: Option<AbiRevision>) -> Result<(), Self> {
+        let abi_revision = abi_revision.ok_or(AbiRevisionError::Absent)?;
+
+        if let Some(version) = version_from_abi_revision(abi_revision) {
+            if version.is_supported() {
+                Ok(())
+            } else {
+                Err(AbiRevisionError::Unsupported {
+                    version,
+                    supported_versions: SUPPORTED_API_LEVELS.to_vec(),
+                })
+            }
+        } else {
+            Err(AbiRevisionError::Unknown {
+                abi_revision,
+                supported_versions: SUPPORTED_API_LEVELS.to_vec(),
+            })
+        }
+    }
+}
+
+impl std::fmt::Display for AbiRevisionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let write_supported_versions = |f: &mut std::fmt::Formatter<'_>,
+                                        supported_versions: &[version_history::Version]|
+         -> std::fmt::Result {
+            write!(f, "The following API levels are supported: ")?;
+
+            for (idx, version) in supported_versions.iter().enumerate() {
+                write!(f, "{} ({})", version.api_level, version.abi_revision)?;
+                if idx != supported_versions.len() - 1 {
+                    write!(f, ", ")?;
+                }
+            }
+            Ok(())
+        };
+
+        match self {
+            AbiRevisionError::Absent => write!(f, "Missing a component target ABI revision."),
+            AbiRevisionError::Unknown { abi_revision, supported_versions } => {
+                write!(
+                    f,
+                    "Unknown component target ABI revision: {}. The OS may be too old to run it? ",
+                    abi_revision
+                )?;
+                write_supported_versions(f, supported_versions)
+            }
+            AbiRevisionError::Unsupported { version, supported_versions } => {
+                write!(
+                    f,
+                    "Component targets API {} ({}), which is no longer supported. ",
+                    version.api_level, version.abi_revision
+                )?;
+                write_supported_versions(f, supported_versions)
+            }
+        }
+    }
 }
 
 /// The enforcement and validation policy to apply to component target ABI revisions.
@@ -311,21 +379,6 @@ impl Default for AbiRevisionPolicy {
 }
 
 impl AbiRevisionPolicy {
-    fn is_supported(moniker: &Moniker, abi_revision: Option<AbiRevision>) -> bool {
-        match abi_revision {
-            Some(abi) => {
-                let is_supported = version_history::is_supported_abi_revision(abi);
-                if !is_supported {
-                    warn!("Component {} targets an invalid ABI revision {}.", moniker, abi)
-                }
-                is_supported
-            }
-            None => {
-                warn!("Component {} does not have a target ABI revision.", moniker);
-                false
-            }
-        }
-    }
     /// Check if the abi_revision, if present, is supported by the platform and compatible with the
     /// `AbiRevisionPolicy`. Regardless of the enforcement policy, log a warning if the
     /// ABI revision is missing or not supported by the platform.
@@ -334,22 +387,27 @@ impl AbiRevisionPolicy {
         moniker: &Moniker,
         abi_revision: Option<AbiRevision>,
     ) -> Result<(), AbiRevisionError> {
-        let is_supported_abi = Self::is_supported(moniker, abi_revision);
-        match (self, abi_revision) {
-            (AbiRevisionPolicy::AllowAll, _) => Ok(()),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(_)) => Ok(()),
-            (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(abi)) => {
-                if is_supported_abi {
-                    Ok(())
-                } else {
-                    let supported_abis: Vec<_> = version_history::get_supported_abi_revisions()
-                        .into_iter()
-                        .map(|v| format!("{}", version_history::AbiRevision(v)))
-                        .collect();
-                    Err(AbiRevisionError::Unsupported(abi, supported_abis.join(",")))
-                }
+        let Err(abi_error) = AbiRevisionError::check_abi_revision(abi_revision) else { return Ok(()) };
+
+        match self {
+            AbiRevisionPolicy::AllowAll => {
+                warn!(
+                    "Ignoring AbiRevisionError in {} due to AllowAll policy: {}",
+                    moniker, abi_error
+                );
+                Ok(())
             }
-            _ => Err(AbiRevisionError::Absent),
+            AbiRevisionPolicy::EnforcePresenceOnly => match abi_error {
+                AbiRevisionError::Absent => Err(AbiRevisionError::Absent),
+                _ => {
+                    warn!(
+                        "Ignoring AbiRevisionError in {} due to EnforcePresenceOnly policy: {}",
+                        moniker, abi_error
+                    );
+                    Ok(())
+                }
+            },
+            AbiRevisionPolicy::EnforcePresenceAndCompatibility => Err(abi_error),
         }
     }
 }
@@ -1275,20 +1333,30 @@ mod tests {
 
     #[test]
     fn abi_revision_policy_check_compatibility() -> Result<(), Error> {
-        // This test assumes the platform does not support a u64::MAX ABI value.
-        let invalid_abi = AbiRevision(u64::MAX);
-        let valid_abi = version_history::LATEST_VERSION.abi_revision;
-        let supported_abis: Vec<_> = version_history::get_supported_abi_revisions()
-            .into_iter()
-            .map(|v| format!("{}", version_history::AbiRevision(v)))
-            .collect();
+        // This test assumes the platform does not support a u64::MAX ABI value
+        // and the first entry in VERSION_HISTORY is unsupported.
+        let unknown_abi = AbiRevision(u64::MAX);
+        assert!(version_history::version_from_abi_revision(unknown_abi).is_none());
+
+        let unsupported_version = version_history::VERSION_HISTORY[0].clone();
+        assert!(!unsupported_version.is_supported());
+
+        let supported_version = version_history::LATEST_VERSION.clone();
+        assert!(supported_version.is_supported());
+
         let test_scenarios = vec![
             (AbiRevisionPolicy::AllowAll, None, Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(invalid_abi), Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(valid_abi), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(unknown_abi), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(unsupported_version.abi_revision), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(supported_version.abi_revision), Ok(())),
             (AbiRevisionPolicy::EnforcePresenceOnly, None, Err(AbiRevisionError::Absent)),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(invalid_abi), Ok(())),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(valid_abi), Ok(())),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(unknown_abi), Ok(())),
+            (
+                AbiRevisionPolicy::EnforcePresenceOnly,
+                Some(unsupported_version.abi_revision),
+                Ok(()),
+            ),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(supported_version.abi_revision), Ok(())),
             (
                 AbiRevisionPolicy::EnforcePresenceAndCompatibility,
                 None,
@@ -1296,10 +1364,25 @@ mod tests {
             ),
             (
                 AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                Some(invalid_abi),
-                Err(AbiRevisionError::Unsupported(invalid_abi, supported_abis.join(","))),
+                Some(unknown_abi),
+                Err(AbiRevisionError::Unknown {
+                    abi_revision: unknown_abi,
+                    supported_versions: version_history::SUPPORTED_API_LEVELS.to_vec(),
+                }),
             ),
-            (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(valid_abi), Ok(())),
+            (
+                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
+                Some(unsupported_version.abi_revision),
+                Err(AbiRevisionError::Unsupported {
+                    version: unsupported_version,
+                    supported_versions: version_history::SUPPORTED_API_LEVELS.to_vec(),
+                }),
+            ),
+            (
+                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
+                Some(supported_version.abi_revision),
+                Ok(()),
+            ),
         ];
         for (policy, abi, expected_res) in test_scenarios {
             println!(

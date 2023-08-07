@@ -108,16 +108,35 @@ pub struct Version {
     pub status: Status,
 }
 
+impl Version {
+    /// Returns true if this version is supported - that is, whether components
+    /// targeting this version will be able to run on this device.
+    pub fn is_supported(&self) -> bool {
+        match self.status {
+            Status::InDevelopment | Status::Supported => true,
+            Status::Unsupported => false,
+        }
+    }
+}
+
+pub fn version_from_abi_revision(abi_revision: AbiRevision) -> Option<Version> {
+    // TODO(fxbug.dev/117262): Store APIs and ABIs in a map instead of a list.
+    VERSION_HISTORY.iter().find(|v| v.abi_revision == abi_revision).cloned()
+}
+
 /// Returns true if the given abi_revision is listed in the VERSION_HISTORY of
 /// known SDK versions.
 pub fn is_valid_abi_revision(abi_revision: AbiRevision) -> bool {
-    VERSION_HISTORY.iter().any(|v| v.abi_revision == abi_revision)
+    version_from_abi_revision(abi_revision).is_some()
 }
 
 /// Returns true if the given abi_revision is listed in SUPPORTED_API_LEVELS.
 pub fn is_supported_abi_revision(abi_revision: AbiRevision) -> bool {
-    // TODO(fxbug.dev/117262): Store APIs and ABIs in a map instead of a list.
-    SUPPORTED_API_LEVELS.iter().any(|v| v.abi_revision == abi_revision)
+    if let Some(version) = version_from_abi_revision(abi_revision) {
+        version.is_supported()
+    } else {
+        false
+    }
 }
 
 /// Returns a vector of the API levels in SUPPORTED_API_LEVELS.
