@@ -25,21 +25,6 @@ namespace elfldltl::testing {
 // error logged.
 template <typename... Args>
 class ExpectedSingleError {
- public:
-  explicit ExpectedSingleError(Args&&... args) : expected_(args...) {}
-
-  auto& diag() { return diag_; }
-
-  template <typename... Ts>
-  bool operator()(Ts&&... args) {
-    if constexpr (sizeof...(Args) != sizeof...(Ts)) {
-      ADD_FAILURE() << "Expected " << sizeof...(Args) << " args, got " << sizeof...(Ts);
-    } else {
-      Check(std::make_tuple(args...), std::make_index_sequence<sizeof...(Args)>());
-    }
-    return true;
-  }
-
  private:
   template <typename T, typename T2 = void>
   struct ExpectedType {
@@ -56,6 +41,35 @@ class ExpectedSingleError {
     using type = uint64_t;
   };
 
+ public:
+  template <typename T>
+  using expected_t = typename ExpectedType<T>::type;
+
+  explicit ExpectedSingleError(Args&&... args) : expected_(args...) {}
+
+  auto& diag() { return diag_; }
+
+  template <typename... Ts>
+  bool operator()(Ts&&... args) {
+    constexpr size_t expected_argument_count = sizeof...(Args);
+    constexpr size_t called_argument_count = sizeof...(Ts);
+    if constexpr (called_argument_count != expected_argument_count) {
+      EXPECT_EQ(called_argument_count, expected_argument_count);
+      Diagnose(std::forward<Ts>(args)...);
+    } else {
+      Check(std::make_tuple(args...), std::make_index_sequence<sizeof...(Args)>());
+    }
+    return true;
+  }
+
+ private:
+  // Diagnostic flags for signaling as much information as possible.
+  static constexpr elfldltl::DiagnosticsFlags kFlags = {
+      .multiple_errors = true,
+      .warnings_are_errors = false,
+      .extra_checking = true,
+  };
+
   template <typename Tuple, size_t... I>
   void Check(Tuple&& args, std::index_sequence<I...> seq) {
     (
@@ -66,17 +80,22 @@ class ExpectedSingleError {
         ...);
   }
 
- public:
-  template <typename T>
-  using expected_t = typename ExpectedType<T>::type;
-
- private:
-  // Diagnostic flags for signaling as much information as possible.
-  static constexpr elfldltl::DiagnosticsFlags kFlags = {
-      .multiple_errors = true,
-      .warnings_are_errors = false,
-      .extra_checking = true,
-  };
+  template <typename... Ts>
+  void Diagnose(Ts&&... args) {
+    constexpr auto format = [](auto&&... args) -> std::string {
+      std::stringstream os;
+      auto report = OstreamDiagnosticsReport(os);
+      report(std::forward<decltype(args)>(args)...);
+      return std::move(os).str();
+    };
+    std::string formatted_arguments = format(std::forward<Ts>(args)...);
+    if constexpr (sizeof...(Args) == 0) {
+      EXPECT_EQ(formatted_arguments, "");
+    } else {
+      std::string formatted_expected_arguments = std::apply(format, expected_);
+      EXPECT_EQ(formatted_arguments, formatted_expected_arguments);
+    }
+  }
 
   std::tuple<Args...> expected_;
   elfldltl::Diagnostics<std::reference_wrapper<ExpectedSingleError>> diag_{*this, kFlags};
