@@ -159,7 +159,7 @@ class GnuHash {
 
       uint32_t offset = BucketChainStart(max_symndx);
 
-      if ((offset >> 1) > words.size()) [[unlikely]] {
+      if ((offset >> 1) >= words.size()) [[unlikely]] {
         return 0;
       }
 
