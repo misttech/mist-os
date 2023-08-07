@@ -8260,7 +8260,7 @@ rust_library("rand-v0_6_5") {
 
   deps = []
   deps += [ ":rand_chacha-v0_1_1" ]
-  deps += [ ":rand_core-v0_4_0" ]
+  deps += [ ":rand_core-v0_4_2" ]
   deps += [ ":rand_hc-v0_1_0" ]
   deps += [ ":rand_isaac-v0_1_1" ]
   deps += [ ":rand_jitter-v0_1_3" ]
@@ -8384,7 +8384,7 @@ rust_library("rand_core-v0_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_4_0" ]
+  deps += [ ":rand_core-v0_4_2" ]
 
   rustenv = []
 
@@ -8398,10 +8398,10 @@ rust_library("rand_core-v0_3_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("rand_core-v0_4_0") {
+rust_library("rand_core-v0_4_2") {
   crate_name = "rand_core"
-  crate_root = "//third_party/rust_crates/vendor/rand_core-0.4.0/src/lib.rs"
-  output_name = "rand_core-b977c15482d5a8aa"
+  crate_root = "//third_party/rust_crates/vendor/rand_core-0.4.2/src/lib.rs"
+  output_name = "rand_core-a1ab8a2dace5ada0"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8411,8 +8411,8 @@ rust_library("rand_core-v0_4_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=b977c15482d5a8aa",
-    "-Cextra-filename=-b977c15482d5a8aa",
+    "-Cmetadata=a1ab8a2dace5ada0",
+    "-Cextra-filename=-a1ab8a2dace5ada0",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"std\"",
   ]
@@ -8514,7 +8514,7 @@ rust_library("rand_jitter-v0_1_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_4_0" ]
+  deps += [ ":rand_core-v0_4_2" ]
   if (current_os == "mac" || false) {
     deps += [ ":libc-v0_2_142" ]
   }
@@ -8542,7 +8542,7 @@ rust_library("rand_os-v0_1_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_4_0" ]
+  deps += [ ":rand_core-v0_4_2" ]
   if (false) {
     deps += [ ":rdrand-v0_4_0" ]
   }
