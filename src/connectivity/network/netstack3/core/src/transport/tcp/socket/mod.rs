@@ -3913,37 +3913,26 @@ mod tests {
             if client_reuse_addr {
                 SocketHandler::set_reuseaddr(sync_ctx, conn.into(), true).expect("can set");
             }
-            if let Some(port) = client_port {
-                let conn = SocketHandler::bind(
+            let socket = if let Some(port) = client_port {
+                SocketHandler::bind(
                     sync_ctx,
                     non_sync_ctx,
                     conn,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
                     Some(port),
                 )
-                .expect("failed to bind the client socket");
-                SocketHandler::connect(
-                    sync_ctx,
-                    non_sync_ctx,
-                    conn.into(),
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
-                        port: server_port,
-                    },
-                )
-                .expect("failed to connect")
+                .expect("failed to bind the client socket")
+                .into()
             } else {
-                SocketHandler::connect(
-                    sync_ctx,
-                    non_sync_ctx,
-                    conn.into(),
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
-                        port: server_port,
-                    },
-                )
-                .expect("failed to connect")
-            }
+                SocketId::Unbound(conn)
+            };
+            SocketHandler::connect(
+                sync_ctx,
+                non_sync_ctx,
+                socket,
+                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: server_port },
+            )
+            .expect("failed to connect")
         });
         // If drop rate is 0, the SYN is guaranteed to be delivered, so we can
         // look at the SYN queue deterministically.
