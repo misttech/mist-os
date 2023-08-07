@@ -55,6 +55,11 @@ pub struct Opt {
     /// them interact. (Normally set to false iff run as ffx daemon.)
     pub client_routing: bool,
 
+    #[argh(option)]
+    /// paths to other ascendds which we will connect this ascendd to, causing
+    /// both to be part of the same network.
+    pub link: Vec<PathBuf>,
+
     #[argh(option, default = "false")]
     /// allow ascendd to scan for USB devices and connect to them automatically.
     pub usb: bool,
@@ -67,11 +72,12 @@ pub struct Ascendd {
 
 impl Ascendd {
     pub async fn new(
-        opt: Opt,
+        mut opt: Opt,
         hoist: &Hoist,
         stdout: impl AsyncWrite + Unpin + Send + 'static,
     ) -> Result<Self, Error> {
         let usb = opt.usb;
+        let link = std::mem::replace(&mut opt.link, vec![]);
         let (sockpath, serial, client_routing, incoming) = bind_listener(opt, hoist).await?;
         Ok(Self {
             task: Task::spawn(run_ascendd(
@@ -82,6 +88,7 @@ impl Ascendd {
                 client_routing,
                 usb,
                 stdout,
+                link,
             )),
         })
     }
@@ -162,11 +169,46 @@ pub async fn run_stream<'a>(
     }
 }
 
+/// Run a connection to another ascendd server.
+/// and paths, to completion.
+pub async fn run_linked_ascendd<'a>(
+    node: Arc<overnet_core::Router>,
+    rx: &'a mut (dyn AsyncRead + Unpin + Send),
+    tx: &'a mut (dyn AsyncWrite + Unpin + Send),
+) {
+    let (errors_sender, errors) = unbounded();
+    if let Err(e) = futures::future::join(
+        async move {
+            tx.write_all(&CIRCUIT_ID).await?;
+            circuit::multi_stream::multi_stream_node_connection_to_async(
+                node.circuit_node(),
+                rx,
+                tx,
+                false,
+                circuit::Quality::LOCAL_SOCKET,
+                errors_sender,
+                "ascendd client".to_owned(),
+            )
+            .await
+        },
+        errors
+            .map(|e| {
+                tracing::warn!("An ascendd linking circuit stream failed: {e:?}");
+            })
+            .collect::<()>(),
+    )
+    .map(|(result, ())| result)
+    .await
+    {
+        tracing::debug!(err = ?e, "Link to other ascendd closed");
+    }
+}
+
 async fn bind_listener(
     opt: Opt,
     hoist: &Hoist,
 ) -> Result<(PathBuf, String, AscenddClientRouting, UnixListener), Error> {
-    let Opt { sockpath, serial, client_routing, usb: _ } = opt;
+    let Opt { sockpath, serial, client_routing, usb: _, link: _ } = opt;
     let sockpath = sockpath.unwrap_or(default_ascendd_path());
     let serial = serial.unwrap_or("none".to_string());
 
@@ -240,6 +282,7 @@ async fn run_ascendd(
     client_routing: AscenddClientRouting,
     usb: bool,
     stdout: impl AsyncWrite + Unpin + Send,
+    link: Vec<PathBuf>,
 ) -> Result<(), Error> {
     let node = hoist.node();
     node.set_implementation(fidl_fuchsia_overnet_protocol::Implementation::Ascendd);
@@ -250,7 +293,16 @@ async fn run_ascendd(
     let sockpath = &sockpath.to_str().context("Non-unicode in socket path")?.to_owned();
     let hoist = &hoist;
 
-    futures::future::try_join3(
+    futures::future::try_join4(
+        futures::stream::iter(link.into_iter().map(Ok)).try_for_each_concurrent(None, |path| {
+            let node = Arc::clone(&node);
+            async move {
+                let sock = UnixStream::connect(path).await?;
+                let (mut rx, mut tx) = sock.split();
+                run_linked_ascendd(node, &mut rx, &mut tx).await;
+                Ok(())
+            }
+        }),
         run_serial_link_handlers(Arc::downgrade(&hoist.node()), &serial, stdout),
         async move {
             if usb {

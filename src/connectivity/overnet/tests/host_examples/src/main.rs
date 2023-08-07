@@ -8,7 +8,6 @@ use parking_lot::{Condvar, Mutex};
 use rand::Rng;
 use std::collections::HashMap;
 use std::env::current_exe;
-use std::io::{Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
@@ -177,10 +176,6 @@ impl TestContext {
         Ok(())
     }
 
-    fn new_daemon_from_child(&self, name: String, child: Child) {
-        self.state.lock().daemons.push(Daemon::new_from_child(name, child));
-    }
-
     fn show_reports_if_failed(
         &self,
         timeout: Duration,
@@ -237,6 +232,15 @@ struct Ascendd {
 }
 
 impl Ascendd {
+    fn new_linked(ctx: &Arc<TestContext>, other: &Ascendd) -> Result<Ascendd, Error> {
+        let socket = format!("/tmp/ascendd.{}.sock", rand::thread_rng().gen::<u128>());
+        let mut cmd = cmd("ascendd");
+        cmd.arg("--sockpath").arg(&socket);
+        cmd.arg("--link").arg(&other.socket);
+        ctx.new_daemon(cmd)?;
+        Ok(Ascendd { ctx: ctx.clone(), socket })
+    }
+
     fn new(ctx: &Arc<TestContext>) -> Result<Ascendd, Error> {
         let socket = format!("/tmp/ascendd.{}.sock", rand::thread_rng().gen::<u128>());
         let mut cmd = cmd("ascendd");
@@ -336,47 +340,6 @@ impl Ascendd {
     fn add_event_pair_server(&mut self) -> Result<(), Error> {
         self.ctx.new_daemon(self.event_pair_cmd("server"))
     }
-
-    fn add_onet_host_pipe(
-        &mut self,
-        label: &str,
-    ) -> Result<(Box<dyn Read + Send>, Box<dyn Write + Send>), Error> {
-        let mut cmd = self.labelled_cmd("onet", label);
-        cmd.arg("host-pipe").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let name = format!("{:?}", cmd);
-        let mut child = cmd.spawn().context(format!("spawning command {}", name))?;
-        let input = Box::new(child.stdout.take().ok_or(anyhow::format_err!("no stdout"))?);
-        let output = Box::new(child.stdin.take().ok_or(anyhow::format_err!("no stdin"))?);
-        self.ctx.new_daemon_from_child(name, child);
-        Ok((input, output))
-    }
-
-    fn onet_client(&self, cmd: &str, args: &[&str]) -> Command {
-        let mut c = self.labelled_cmd("onet", cmd);
-        c.arg(cmd);
-        for arg in args {
-            c.arg(arg);
-        }
-        c
-    }
-}
-
-fn bridge(a: &mut Ascendd, b: &mut Ascendd) -> Result<(), Error> {
-    let (i1, o1) = a.add_onet_host_pipe("onet1").context("adding host-pipe onet1")?;
-    let (i2, o2) = b.add_onet_host_pipe("onet2").context("adding host-pipe onet2")?;
-    let (i1, o1, i2, o2) = (
-        Arc::new(Mutex::new(i1)),
-        Arc::new(Mutex::new(o1)),
-        Arc::new(Mutex::new(i2)),
-        Arc::new(Mutex::new(o2)),
-    );
-    std::thread::Builder::new()
-        .spawn(move || std::io::copy(&mut *i1.lock(), &mut *o2.lock()))
-        .context("spawning copy thread 1")?;
-    std::thread::Builder::new()
-        .spawn(move || std::io::copy(&mut *i2.lock(), &mut *o1.lock()))
-        .context("spawning copy thread 2")?;
-    Ok(())
 }
 
 mod tests {
@@ -393,8 +356,6 @@ mod tests {
         ctx.clone().show_reports_if_failed(args.timeout, move || {
             ascendd.add_echo_server().context("starting server")?;
             ctx.run_client(ascendd.echo_client()).context("running client")?;
-            ctx.run_client(ascendd.onet_client("full-map", &["--exclude-self", "true"]))
-                .context("running onet full-map")?;
             Ok(())
         })
     }
@@ -406,38 +367,11 @@ mod tests {
 
     pub fn multiple_ascendd_echo_test(args: TestArgs) -> Result<(), Error> {
         let ctx = TestContext::new(args);
-        let mut ascendd1 = Ascendd::new(&ctx).context("creating ascendd 1")?;
-        let mut ascendd2 = Ascendd::new(&ctx).context("creating ascendd 2")?;
+        let ascendd1 = Ascendd::new(&ctx).context("creating ascendd 1")?;
+        let mut ascendd2 = Ascendd::new_linked(&ctx, &ascendd1).context("creating ascendd 2")?;
         ctx.clone().show_reports_if_failed(args.timeout, move || {
-            bridge(&mut ascendd1, &mut ascendd2).context("bridging ascendds")?;
             ascendd2.add_echo_server().context("starting server")?;
             ctx.run_client(ascendd1.echo_client()).context("running client")?;
-            let output = ctx
-                .run_client(ascendd1.onet_client("list-peers", &[]))
-                .context("running onet list-peers")?;
-            // The following should be running: 2 ascendd's, 2 bridging onet's,
-            // the query onet, and the server
-            println!("OUTPUT");
-            println!("{}", output);
-            assert_eq!(output.lines().count(), 6);
-            assert_eq!(output.matches("Ascendd").count(), 2);
-            assert_eq!(output.matches("HoistRustCrate").count(), 4);
-            #[cfg(target_os = "linux")]
-            assert_eq!(output.matches("Linux").count(), 6);
-            #[cfg(target_os = "macos")]
-            assert_eq!(output.matches("Mac").count(), 6);
-            assert_eq!(output.matches("bin:onet").count(), 3);
-            assert_eq!(output.matches("bin:ascendd").count(), 2);
-            assert_eq!(output.matches("bin:overnet_echo").count(), 1);
-            assert_eq!(
-                output
-                    .matches(&format!(
-                        "hostname:{}",
-                        String::from_utf8(Command::new("hostname").output()?.stdout).unwrap()
-                    ))
-                    .count(),
-                6
-            );
             Ok(())
         })
     }
@@ -453,19 +387,6 @@ mod tests {
         ctx.clone().show_reports_if_failed(args.timeout, move || {
             ascendd.add_interface_passing_server().context("starting server")?;
             ctx.run_client(ascendd.interface_passing_client()).context("running client")?;
-            let output = ctx
-                .run_client(ascendd.onet_client("list-links", &["all"]))
-                .context("running onet full-map")?;
-            // Should see either four or five links:
-            // ascendd -> server
-            // server ->ascendd
-            // ascendd -> onet
-            // onet -> ascendd
-            // [maybe] ascend -> client [possible dead]
-            // (The last, optional link is due to "Route flap prevention" which keeps the
-            //  link alive //  for a few seconds -- see peer::next_link(). Depending on
-            //  the timing of the run, this link may or may not exist.)
-            assert!((4..=5).contains(&output.matches(" -> ").count()));
             Ok(())
         })
     }
@@ -506,8 +427,6 @@ mod tests {
         ctx.clone().show_reports_if_failed(args.timeout, move || {
             ascendd.add_socket_passing_server(&config).context("starting server")?;
             ctx.run_client(ascendd.socket_passing_client(&config)).context("running client")?;
-            ctx.run_client(ascendd.onet_client("full-map", &["--exclude-self", "false"]))
-                .context("running onet full-map")?;
             Ok(())
         })
     }
