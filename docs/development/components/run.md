@@ -84,8 +84,8 @@ component is being served. For example, the following command creates a new
 component instance named `hello-world` inside the `ffx-laboratory` collection:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx component create /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
-URL: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
+$ ffx component create /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
+URL: fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
 Moniker: /core/ffx-laboratory:hello-world
 Creating component instance...
 ```
@@ -162,11 +162,12 @@ ffx component run {{ '<var label="moniker">TARGET_MONIKER</var>' }} {{ '<var lab
 Replace `TARGET_MONIKER` with the destination moniker of the new component
 inside an existing collection and `COMPONENT_URL` with the location where the
 component is being served. For example, the following command creates a new
-component instance named `hello-world` inside the `ffx-laboratory` collection:
+component instance named `hello-world-rust` inside the `ffx-laboratory`
+collection:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx component run /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
-URL: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
+$ ffx component run /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
+URL: fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
 Moniker: /core/ffx-laboratory:hello-world-rust
 Creating component instance...
 Starting component instance...
@@ -176,7 +177,7 @@ The example above is equivalent to running the following individual `ffx`
 commands:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx component create /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
+$ ffx component create /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
 $ ffx component start /core/ffx-laboratory:hello-world-rust
 ```
 

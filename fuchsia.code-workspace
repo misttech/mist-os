@@ -376,7 +376,7 @@
       {
         "id": "COMPONENT_URL",
         "type": "promptString",
-        "description": "COMPONENT_URL: The resource location of a component. E.g. 'fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm'"
+        "description": "COMPONENT_URL: The resource location of a component. E.g. 'fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm'"
       },
       {
         "id": "COMPONENT_FILTER",

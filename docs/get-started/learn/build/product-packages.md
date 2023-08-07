@@ -229,7 +229,7 @@ fx build
 Use the `ffx component` command to run a Hello World component example:
 
 ```posix-terminal
-ffx component run /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
+ffx component run /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
 ```
 
 Open a new terminal window and filter the device logs for messages from the

@@ -53,8 +53,8 @@ To start a new dynamic component instance on a device, do the following:
    `/core/ffx-laboratory:hello-world`:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx component create /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
-   URL: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
+   $ ffx component create /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
+   URL: fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
    Moniker: /core/ffx-laboratory:hello-world
    Creating component instance...
    ```
@@ -104,8 +104,8 @@ collection.
 The example below starts the `hello-world-cpp.cm` component on the device:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx component run /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
-URL: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
+$ ffx component run /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
+URL: fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
 Moniker: /core/ffx-laboratory:hello-world-cpp
 Creating component instance...
 Starting component instance...
@@ -117,11 +117,11 @@ In essence, the `ffx component run` command performs the following steps:
    `ffx-laboratory` collection using the component name as the target moniker.
 2. Run `ffx component start` to start the component instance on the device.
 
-For instance, running `ffx component run /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm`
+For instance, running `ffx component run /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm`
 in the example above is equivalent to running the following commands:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx component create /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-cpp.cm
+$ ffx component create /core/ffx-laboratory:hello-world-cpp fuchsia-pkg://fuchsia.com/hello-world-cpp#meta/hello-world-cpp.cm
 $ ffx component start /core/ffx-laboratory:hello-world-cpp
 ```
 

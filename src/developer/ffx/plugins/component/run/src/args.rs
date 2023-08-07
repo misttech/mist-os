@@ -17,7 +17,7 @@ use moniker::Moniker;
 within the component topology.",
     example = "To create a component instance from the `hello-world-rust` component URL:
 
-    $ ffx component run /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm",
+    $ ffx component run /core/ffx-laboratory:hello-world fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm",
     note = "This command is a shorthand for the following:
 
     $ ffx component create <moniker> <component-url>

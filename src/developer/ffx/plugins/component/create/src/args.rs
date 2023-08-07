@@ -16,7 +16,7 @@ use moniker::Moniker;
     description = "Creates a dynamic component instance, adding it to the collection designated by <moniker>",
     example = "To create a component instance designated by the moniker `/core/ffx-laboratory:foo`:
 
-    $ ffx component create /core/ffx-laboratory:foo fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm",
+    $ ffx component create /core/ffx-laboratory:foo fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm",
     note = "To learn more about running components, see https://fuchsia.dev/go/components/run"
 )]
 

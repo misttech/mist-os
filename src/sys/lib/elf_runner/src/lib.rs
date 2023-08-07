@@ -1214,7 +1214,7 @@ mod tests {
         });
 
         cm_runner::StartInfo {
-            resolved_url: "fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm"
+            resolved_url: "fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm"
                 .to_string(),
             program: fdata::Dictionary {
                 entries: Some(vec![

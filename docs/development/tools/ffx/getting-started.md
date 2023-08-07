@@ -324,18 +324,18 @@ $ fx set <product>.<board> --with //examples/hello_world/rust:hello-world-rust &
 ```
 
 Then use the `component run` command to create and launch a component instance from the URL
-`fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm` with the moniker
+`fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm` with the moniker
 `/core/ffx-laboratory:hello-world-rust`:
 
 ```none
-$ fx ffx component run /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
-URL: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
+$ fx ffx component run /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
+URL: fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
 Moniker: /core/ffx-laboratory:hello-world-rust
 Creating component instance...
 ...
 $ fx ffx component show hello-world-rust
                Moniker: /core/ffx-laboratory:hello-world-rust
-                   URL: fuchsia-pkg://fuchsia.com/hello-world#meta/hello-world-rust.cm
+                   URL: fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
                   Type: v2 dynamic component
        Execution State: Running
                 Job ID: 50775
