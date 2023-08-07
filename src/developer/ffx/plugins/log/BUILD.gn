@@ -9,16 +9,9 @@ ffx_plugin("ffx_log") {
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
-  args_with_unit_tests = true
+  args_with_unit_tests = false
 
-  args_deps = [
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//src/lib/diagnostics/data/rust",
-    "//src/lib/diagnostics/selectors",
-    "//third_party/rust_crates:chrono",
-    "//third_party/rust_crates:chrono-english",
-  ]
+  args_deps = [ "//src/diagnostics/lib/log-command" ]
 
   config_data = [ "data/config.json" ]
 
@@ -26,20 +19,18 @@ ffx_plugin("ffx_log") {
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/logger/data:lib",
-    "//src/developer/ffx/logger/frontend:lib",
-    "//src/developer/ffx/tools/log_ng:lib",
+    "//src/developer/ffx/lib/rcs:lib",
+    "//src/diagnostics/lib/log-command",
+    "//src/diagnostics/lib/log_symbolizer",
     "//src/lib/diagnostics/data/rust",
-    "//src/sys/lib/moniker",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:blocking",
-    "//third_party/rust_crates:chrono",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
@@ -49,14 +40,19 @@ ffx_plugin("ffx_log") {
   sources = [
     "src/error.rs",
     "src/lib.rs",
+    "src/symbolizer.rs",
+    "src/testing_utils.rs",
   ]
 
   test_deps = [
-    "//src/developer/ffx/logger/test_utils:lib",
+    "//src/developer/ffx/lib/writer:lib",
+    "//src/diagnostics/lib/log-command",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:chrono",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:serde_json",
   ]
 }
 
