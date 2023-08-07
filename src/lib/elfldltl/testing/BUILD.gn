@@ -16,6 +16,7 @@ library_headers("headers") {
     "lib/elfldltl/testing/diagnostics.h",
     "lib/elfldltl/testing/get-test-data.h",
     "lib/elfldltl/testing/loader.h",
+    "lib/elfldltl/testing/test-pipe-reader.h",
     "lib/elfldltl/testing/typed-test.h",
   ]
 
@@ -32,7 +33,10 @@ static_library("elfldltl-testing") {
 
   public_deps = [ ":headers" ]
 
-  sources = [ "get-test-data-path.cc" ]
+  sources = [
+    "get-test-data-path.cc",
+    "test-pipe-reader.cc",
+  ]
   deps = [ "//third_party/googletest:gtest" ]
   if (is_fuchsia) {
     sources += [ "get-test-lib.cc" ]

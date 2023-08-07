@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/testing/test-pipe-reader.h>
 #include <lib/fit/defer.h>
 #include <lib/zxdump/fd-writer.h>
 #include <stdio.h>
@@ -11,7 +12,6 @@
 
 #include <fbl/unique_fd.h>
 
-#include "test-pipe-reader.h"
 #include "writer-tests.h"
 
 namespace {
@@ -42,7 +42,7 @@ TEST(ZxdumpTests, FdWriterToFile) {
 }
 
 TEST(ZxdumpTests, FdWriterToPipe) {
-  zxdump::testing::TestPipeReader reader;
+  elfldltl::testing::TestPipeReader reader;
   fbl::unique_fd write_pipe;
   ASSERT_NO_FATAL_FAILURE(reader.Init(write_pipe));
 

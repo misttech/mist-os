@@ -127,17 +127,6 @@ source_set("piped-command") {
   }
 }
 
-source_set("test-pipe-reader") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  public = [ "test-pipe-reader.h" ]
-  public_deps = [ "//zircon/system/ulib/fbl" ]
-
-  sources = [ "test-pipe-reader.cc" ]
-  deps = [ "//third_party/googletest:gtest" ]
-}
-
 source_set("test-data-holder") {
   visibility = [ ":*" ]
   testonly = true
@@ -236,11 +225,11 @@ test("zxdump-unittests") {
   deps = [
     ":piped-command",
     ":test-data-holder",
-    ":test-pipe-reader",
     ":test-tool-process",
     ":zxdump",
     "//sdk/lib/fit",
     "//src/lib/elfldltl",
+    "//src/lib/elfldltl/testing",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fbl",

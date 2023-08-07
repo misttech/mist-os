@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/testing/test-pipe-reader.h>
 #include <lib/fit/defer.h>
 #include <lib/zxdump/zstd-writer.h>
 #include <stdio.h>
@@ -10,7 +11,6 @@
 
 #include <fbl/unique_fd.h>
 
-#include "test-pipe-reader.h"
 #include "test-tool-process.h"
 #include "writer-tests.h"
 
@@ -58,7 +58,7 @@ TEST(ZxdumpTests, ZstdWriterToPipe) {
   ASSERT_NO_FATAL_FAILURE(zstd.Init());
 
   // Use the write side of the reader's pipe as the tool's stdout.
-  zxdump::testing::TestPipeReader reader;
+  elfldltl::testing::TestPipeReader reader;
   ASSERT_NO_FATAL_FAILURE(reader.Init(zstd.tool_stdout()));
 
   // Now start the decompressor running as a filter.

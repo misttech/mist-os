@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_ZXDUMP_TEST_PIPE_READER_H_
-#define SRC_LIB_ZXDUMP_TEST_PIPE_READER_H_
-
-#include <unistd.h>
+#ifndef SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_TEST_PIPE_READER_H_
+#define SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_TEST_PIPE_READER_H_
 
 #include <string>
 #include <thread>
 
 #include <fbl/unique_fd.h>
 
-namespace zxdump::testing {
+namespace elfldltl::testing {
 
 class TestPipeReader {
  public:
@@ -36,6 +34,6 @@ class TestPipeReader {
   std::thread thread_;
 };
 
-}  // namespace zxdump::testing
+}  // namespace elfldltl::testing
 
-#endif  // SRC_LIB_ZXDUMP_TEST_PIPE_READER_H_
+#endif  // SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_TEST_PIPE_READER_H_

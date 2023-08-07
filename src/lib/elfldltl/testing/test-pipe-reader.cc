@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "test-pipe-reader.h"
+#include "lib/elfldltl/testing/test-pipe-reader.h"
+
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
-namespace zxdump::testing {
+namespace elfldltl::testing {
 
 constexpr char kFillByte = 0x55;
 
@@ -15,6 +18,8 @@ void TestPipeReader::Init(fbl::unique_fd& write_pipe) {
   ASSERT_EQ(0, pipe(fds)) << "pipe: " << strerror(errno);
   read_pipe_.reset(fds[0]);
   write_pipe.reset(fds[1]);
+  ASSERT_EQ(fcntl(read_pipe_.get(), F_SETFD, FD_CLOEXEC), 0) << strerror(errno);
+  ASSERT_EQ(fcntl(write_pipe.get(), F_SETFD, FD_CLOEXEC), 0) << strerror(errno);
   pipe_buf_size_ = fpathconf(read_pipe_.get(), _PC_PIPE_BUF);
   thread_ = std::thread(&TestPipeReader::ReaderThread, this);
 }
@@ -33,4 +38,4 @@ void TestPipeReader::ReaderThread() {
   } while (n > 0);
 }
 
-}  // namespace zxdump::testing
+}  // namespace elfldltl::testing
