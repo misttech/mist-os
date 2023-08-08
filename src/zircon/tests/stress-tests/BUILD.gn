@@ -21,6 +21,12 @@ fuchsia_test_package("kernel-stress-tests") {
         }
         tags = [ "stress-tests" ]
       },
+      {
+        dimensions = {
+          device_type = "Vim3"
+        }
+        tags = [ "stress-tests" ]
+      },
     ]
   }
 }
