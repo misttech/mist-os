@@ -1164,6 +1164,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 4,
         "alignment": 4,
@@ -1443,6 +1444,7 @@
       ],
       "strict": false,
       "resource": false,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -1580,6 +1582,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,

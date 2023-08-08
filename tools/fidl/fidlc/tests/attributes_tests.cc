@@ -2066,4 +2066,18 @@ TEST(AttributesTests, BadDiscoverableInvalidNameErrcat) {
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidDiscoverableName);
 }
 
+// The @result attribute was originally used to implement method error results.
+// It no longer does anything. This test just makes sure it doesn't cause a crash.
+TEST(AttributesTests, GoodResultAttribute) {
+  TestLibrary library(R"FIDL(
+library example;
+
+@result
+type Foo = union {
+    1: s string;
+};
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
 }  // namespace

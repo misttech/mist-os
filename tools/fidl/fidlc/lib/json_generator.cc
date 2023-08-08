@@ -600,11 +600,14 @@ void JSONGenerator::Generate(const flat::Struct& value) {
   GenerateObject([&]() {
     GenerateDeclName(value.name);
     GenerateObjectMember("location", NameSpan(value.name));
-
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
     GenerateObjectMember("resource", value.resourceness == types::Resourceness::kResource);
+    auto anon = value.name.as_anonymous();
+    bool is_empty_success_struct =
+        anon && anon->provenance == flat::Name::Provenance::kGeneratedEmptySuccessStruct;
+    GenerateObjectMember("is_empty_success_struct", is_empty_success_struct);
     GenerateTypeShapes(value);
   });
 }
@@ -685,6 +688,9 @@ void JSONGenerator::Generate(const flat::Union& value) {
     GenerateObjectMember("members", value.members);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("resource", value.resourceness == types::Resourceness::kResource);
+    auto anon = value.name.as_anonymous();
+    bool is_result = anon && anon->provenance == flat::Name::Provenance::kGeneratedResultUnion;
+    GenerateObjectMember("is_result", is_result);
     GenerateTypeShapes(value);
   });
 }

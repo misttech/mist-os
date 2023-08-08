@@ -182,6 +182,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 32,
         "alignment": 8,

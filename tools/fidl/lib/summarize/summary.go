@@ -126,13 +126,11 @@ func serialize(e []element) []ElementStr {
 }
 
 // filterStructs filters out structs that should not be included in API summaries.
-func filterStructs(structs []fidlgen.Struct, mtum fidlgen.MethodTypeUsageMap) []fidlgen.Struct {
+func filterStructs(structs []fidlgen.Struct) []fidlgen.Struct {
 	var out []fidlgen.Struct
 	for _, s := range structs {
-		if k, ok := mtum[s.Name]; ok {
-			if k == fidlgen.UsedOnlyAsPayload && len(s.Members) == 0 {
-				continue
-			}
+		if s.IsEmptySuccessStruct {
+			continue
 		}
 		out = append(out, s)
 	}
@@ -143,7 +141,7 @@ func filterStructs(structs []fidlgen.Struct, mtum fidlgen.MethodTypeUsageMap) []
 func filterUnions(unions []fidlgen.Union) []fidlgen.Union {
 	var out []fidlgen.Union
 	for _, u := range unions {
-		if u.HasAttribute("result") {
+		if u.IsResult {
 			continue
 		}
 		out = append(out, u)
@@ -155,11 +153,6 @@ func filterUnions(unions []fidlgen.Union) []fidlgen.Union {
 func Summarize(root fidlgen.Root) summary {
 	var s summarizer
 
-	// Do a first pass of the protocols, creating a map of all names of types that
-	// are used as a transactional message bodies or payloads to the kind of
-	// usage (message body, payload, or both).
-	mtum := root.MethodTypeUsageMap()
-
 	s.registerStructs(root.Structs)
 	s.registerStructs(root.ExternalStructs)
 	s.registerProtocolNames(root.Protocols)
@@ -167,7 +160,7 @@ func Summarize(root fidlgen.Root) summary {
 	s.addConsts(root.Consts)
 	s.addBits(root.Bits)
 	s.addEnums(root.Enums)
-	s.addStructs(filterStructs(root.Structs, mtum))
+	s.addStructs(filterStructs(root.Structs))
 	s.addTables(root.Tables)
 	s.addUnions(filterUnions(root.Unions))
 	s.addProtocols(root.Protocols)

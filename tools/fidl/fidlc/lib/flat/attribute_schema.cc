@@ -395,39 +395,6 @@ static bool DiscoverableConstraint(Reporter* reporter, const ExperimentalFlags f
   return true;
 }
 
-static bool ResultShapeConstraint(Reporter* reporter, const ExperimentalFlags flags,
-                                  const Attribute* attribute, const Element* element) {
-  ZX_ASSERT(element);
-  ZX_ASSERT(element->kind == Element::Kind::kUnion);
-  auto union_decl = static_cast<const Union*>(element);
-  ZX_ASSERT(union_decl->members.size() == 2 || union_decl->members.size() == 3);
-  auto& error_member = union_decl->members.at(1);
-  ZX_ASSERT_MSG(union_decl->members.size() == 3 || error_member.maybe_used != nullptr,
-                "must have an error variant if transport error not used");
-
-  if (error_member.maybe_used != nullptr) {
-    auto error_type = error_member.maybe_used->type_ctor->type;
-    const PrimitiveType* error_primitive = nullptr;
-    if (error_type->kind == Type::Kind::kPrimitive) {
-      error_primitive = static_cast<const PrimitiveType*>(error_type);
-    } else if (error_type->kind == Type::Kind::kIdentifier) {
-      auto identifier_type = static_cast<const IdentifierType*>(error_type);
-      if (identifier_type->type_decl->kind == Decl::Kind::kEnum) {
-        auto error_enum = static_cast<const Enum*>(identifier_type->type_decl);
-        ZX_ASSERT(error_enum->subtype_ctor->type->kind == Type::Kind::kPrimitive);
-        error_primitive = static_cast<const PrimitiveType*>(error_enum->subtype_ctor->type);
-      }
-    }
-
-    if (!error_primitive || (error_primitive->subtype != types::PrimitiveSubtype::kInt32 &&
-                             error_primitive->subtype != types::PrimitiveSubtype::kUint32)) {
-      return reporter->Fail(ErrInvalidErrorType, union_decl->name.span().value());
-    }
-  }
-
-  return true;
-}
-
 static bool TransportConstraint(Reporter* reporter, const ExperimentalFlags flags,
                                 const Attribute* attribute, const Element* element) {
   ZX_ASSERT(element);
@@ -464,11 +431,6 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
       .RestrictToAnonymousLayouts()
       .AddArg(AttributeArgSchema(ConstantValue::Kind::kString))
       .CompileEarly();
-  map["result"]
-      .RestrictTo({
-          Element::Kind::kUnion,
-      })
-      .Constrain(ResultShapeConstraint);
   map["selector"]
       .RestrictTo({
           Element::Kind::kProtocolMethod,

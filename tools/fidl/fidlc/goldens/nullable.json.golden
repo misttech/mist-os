@@ -214,6 +214,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 4,
         "alignment": 4,
@@ -333,6 +334,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 8,
         "alignment": 4,
@@ -411,6 +413,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 4,
         "alignment": 4,
@@ -491,6 +494,7 @@
         }
       ],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 4,
         "alignment": 4,
@@ -569,6 +573,7 @@
         }
       ],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 4,
         "alignment": 4,
@@ -647,6 +652,7 @@
         }
       ],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 4,
         "alignment": 4,
@@ -723,6 +729,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 16,
         "alignment": 8,
@@ -800,6 +807,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 8,
         "alignment": 8,
@@ -877,6 +885,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -977,6 +986,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 16,
         "alignment": 8,
@@ -1087,6 +1097,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,

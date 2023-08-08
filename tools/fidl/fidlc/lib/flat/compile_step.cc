@@ -16,7 +16,6 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 #include "tools/fidl/fidlc/include/fidl/ordinals.h"
-#include "tools/fidl/fidlc/include/fidl/program_invocation.h"
 
 namespace fidl::flat {
 
@@ -1063,7 +1062,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
         auto empty = static_cast<const Struct*>(decl)->members.empty();
         auto anonymous = decl->name.as_anonymous();
         auto compiler_generated =
-            anonymous && anonymous->provenance == Name::Provenance::kCompilerGenerated;
+            anonymous && anonymous->provenance == Name::Provenance::kGeneratedEmptySuccessStruct;
         if (empty && !compiler_generated) {
           Fail(ErrEmptyPayloadStructs, method_name, method_name.data());
         }
@@ -1156,6 +1155,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
                 CheckPayloadDeclKind(method.name, success_decl);
               }
             }
+            ValidateDomainErrorType(result_union);
           } else {
             CheckNoDefaultMembers(decl);
             CheckPayloadDeclKind(method.name, decl);
@@ -1192,6 +1192,32 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     if (method.has_response && !method.has_request) {
       CheckNoEventErrorSyntax(method);
     }
+  }
+}
+
+void CompileStep::ValidateDomainErrorType(const Union* result_union) {
+  auto& error_member = result_union->members[1];
+  if (!error_member.maybe_used) {
+    return;
+  }
+  auto error_type = error_member.maybe_used->type_ctor->type;
+  if (!error_type) {
+    return;
+  }
+  const PrimitiveType* error_primitive = nullptr;
+  if (error_type->kind == Type::Kind::kPrimitive) {
+    error_primitive = static_cast<const PrimitiveType*>(error_type);
+  } else if (error_type->kind == Type::Kind::kIdentifier) {
+    auto identifier_type = static_cast<const IdentifierType*>(error_type);
+    if (identifier_type->type_decl->kind == Decl::Kind::kEnum) {
+      auto error_enum = static_cast<const Enum*>(identifier_type->type_decl);
+      ZX_ASSERT(error_enum->subtype_ctor->type->kind == Type::Kind::kPrimitive);
+      error_primitive = static_cast<const PrimitiveType*>(error_enum->subtype_ctor->type);
+    }
+  }
+  if (!error_primitive || (error_primitive->subtype != types::PrimitiveSubtype::kInt32 &&
+                           error_primitive->subtype != types::PrimitiveSubtype::kUint32)) {
+    Fail(ErrInvalidErrorType, result_union->name.span().value());
   }
 }
 

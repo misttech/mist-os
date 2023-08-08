@@ -152,6 +152,7 @@
       },
       "members": [],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 1,
         "alignment": 1,
@@ -547,6 +548,7 @@
         }
       ],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 104,
         "alignment": 8,
@@ -730,6 +732,7 @@
       "members": [],
       "strict": false,
       "resource": true,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -805,6 +808,7 @@
       ],
       "strict": false,
       "resource": true,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,

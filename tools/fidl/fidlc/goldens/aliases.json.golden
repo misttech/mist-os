@@ -648,6 +648,7 @@
         }
       ],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 88,
         "alignment": 8,

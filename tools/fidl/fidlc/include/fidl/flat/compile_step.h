@@ -84,6 +84,7 @@ class CompileStep : public Compiler::Step {
   bool ValidateBitsMembersAndCalcMask(Bits* bits_decl, MemberType* out_mask);
   template <typename MemberType>
   bool ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl, MemberType* out_unknown_value);
+  void ValidateDomainErrorType(const Union* result_union);
 
   // Decl for the HEAD constant, used in attribute_schema.cc.
   Decl* head_decl;

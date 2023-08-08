@@ -3091,6 +3091,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 384,
         "alignment": 8,
@@ -3588,6 +3589,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 408,
         "alignment": 8,
@@ -3979,6 +3981,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 144,
         "alignment": 8,
@@ -4506,6 +4509,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 80,
         "alignment": 8,
@@ -4835,6 +4839,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 88,
         "alignment": 8,
@@ -6372,6 +6377,7 @@
         }
       ],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 512,
         "alignment": 8,
@@ -6406,6 +6412,7 @@
       },
       "members": [],
       "resource": true,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 1,
         "alignment": 1,
@@ -6440,6 +6447,7 @@
       },
       "members": [],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 1,
         "alignment": 1,
@@ -7255,6 +7263,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 192,
         "alignment": 8,
@@ -7752,6 +7761,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 112,
         "alignment": 8,
@@ -8082,6 +8092,7 @@
         }
       ],
       "resource": false,
+      "is_empty_success_struct": false,
       "type_shape_v1": {
         "inline_size": 64,
         "alignment": 8,
@@ -8278,6 +8289,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -8399,6 +8411,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -8520,6 +8533,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -8641,6 +8655,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -8762,6 +8777,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -8883,6 +8899,7 @@
       ],
       "strict": true,
       "resource": true,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -9004,6 +9021,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -9125,6 +9143,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -9246,6 +9265,7 @@
       ],
       "strict": true,
       "resource": false,
+      "is_result": true,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -9317,6 +9337,7 @@
       ],
       "strict": false,
       "resource": true,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,
@@ -9388,6 +9409,7 @@
       ],
       "strict": false,
       "resource": false,
+      "is_result": false,
       "type_shape_v1": {
         "inline_size": 24,
         "alignment": 8,

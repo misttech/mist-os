@@ -1911,8 +1911,6 @@ func Compile(r fidlgen.Root) Root {
 		structs:      map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
 	}
 
-	methodUsage := r.MethodTypeUsageMap()
-
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s
 	}
@@ -1942,20 +1940,14 @@ func Compile(r fidlgen.Root) Root {
 	}
 
 	for _, v := range r.Structs {
-		// Don't emit compiler-generated "TopResponse" structs.
-		if methodUsage[v.Name] == fidlgen.UsedOnlyAsMessageBody {
-			continue
-		}
-		// Don't emit compiler-generated empty structs for error syntax.
-		if methodUsage[v.Name] == fidlgen.UsedOnlyAsPayload && len(v.Members) == 0 {
+		if v.IsEmptySuccessStruct {
 			continue
 		}
 		root.Structs = append(root.Structs, c.compileStruct(v))
 	}
 
 	for _, v := range r.Unions {
-		// Don't emit compiler-generated "Result" unions.
-		if v.HasAttribute("result") {
+		if v.IsResult {
 			continue
 		}
 		root.Unions = append(root.Unions, c.compileUnion(v))
