@@ -7,12 +7,14 @@ package emulator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	ffxlib "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/ffx"
 	fvdpb "go.fuchsia.dev/fuchsia/tools/virtual_device/proto"
@@ -132,11 +134,11 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		)
 	}
 
-	runFfx := func(args ...string) error {
+	runFfx := func(ctx context.Context, args ...string) error {
 		return ffx.RunWithTarget(ctx, args...)
 	}
 
-	if err := runFfx("target", "wait"); err != nil {
+	if err := runFfx(ctx, "target", "wait"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -144,7 +146,7 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		var buf bytes.Buffer
 		ffx.SetStdoutStderr(io.MultiWriter(os.Stdout, &buf), os.Stderr)
 
-		if err := runFfx("--machine", "json", "component", "show", NETWORK_TEST_REALM_MONIKER); err == nil {
+		if err := runFfx(ctx, "--machine", "json", "component", "show", NETWORK_TEST_REALM_MONIKER); err == nil {
 			t.Logf(
 				"ffx --machine json component show %s should have failed (component shouldn't exist)",
 				NETWORK_TEST_REALM_MONIKER,
@@ -152,6 +154,7 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		}
 
 		if err := runFfx(
+			ctx,
 			"component",
 			"create",
 			NETWORK_TEST_REALM_MONIKER,
@@ -166,6 +169,7 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		}
 
 		if err := runFfx(
+			ctx,
 			"net-test-realm",
 			NETWORK_TEST_REALM_MONIKER,
 			"start-hermetic-network-realm",
@@ -175,6 +179,23 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 				"ffx net-test-realm %s start-hermetic-network-realm %s = %s",
 				NETWORK_TEST_REALM_MONIKER,
 				NETSTACK_VERSION,
+				err,
+			)
+		}
+
+		// Check that ffx log can be run for some time without an error.
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		if err := runFfx(
+			ctx,
+			"log",
+			"--filter",
+			NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER,
+		); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf(
+				"ffx log --filter %s = %s",
+				NETWORK_TEST_REALM_TEST_COLLECTION_MONIKER,
 				err,
 			)
 		}

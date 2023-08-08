@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,6 +17,11 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
+	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
+)
+
+const (
+	PERM_USER_READ_WRITE_EXECUTE uint32 = 0700
 )
 
 type FfxInstance struct {
@@ -89,6 +95,72 @@ func NewFfxInstance(
 		wrapperFfxInstance.iOwnOutputDir = true
 	}
 
+	sdkRoot := filepath.Join(wrapperFfxInstance.outputDir, "sdk")
+
+	if err := os.MkdirAll(sdkRoot, fs.FileMode(PERM_USER_READ_WRITE_EXECUTE)); err != nil {
+		return nil, fmt.Errorf(
+			"os.MkdirAll(%q, _) = %w",
+			sdkRoot,
+			err,
+		)
+	}
+
+	sdkManifestFilePath := filepath.Join(sdkRoot, ffxutil.SDKManifestPath)
+	if err := os.MkdirAll(filepath.Dir(sdkManifestFilePath), fs.FileMode(PERM_USER_READ_WRITE_EXECUTE)); err != nil {
+		return nil, fmt.Errorf(
+			"os.MkdirAll(%q, _) = %w",
+			sdkManifestFilePath,
+			err,
+		)
+	}
+
+	hostOutDir, err := util.GetHostOutDirectory()
+	if err != nil {
+		return nil, fmt.Errorf("util.GetHostOutDirectory() = %w", err)
+	}
+
+	// We need to give FFX an SDK manifest that tells it where the `symbolizer`
+	// tool is as required by `ffx log`.
+	//
+	// While the easiest thing to do would be to just point it at the root build
+	// directory and tell it to use the real in-tree SDK there, this makes it
+	// possible to have it work at desk without having it work in infra due to
+	// differences in whether the SDK is "ambiently available" to a host test.
+	//
+	// To make it easier to debug this the same way at-desk and in infra runs, we
+	// instead create our own SDK definition in a temporary directory that
+	// explicitly lists all the tools we're making use of. That way we can be sure
+	// that we've provided all the right dependencies via `host_test_data`.
+	//
+	// Most of this manifest JSON is cargo-culted from a very similar thing that
+	// the FFX self-tests do in src/developer/ffx/plugins/self-test/src/log.rs
+	// (as of commit 6e7a16d197a7d3b3a40d4110394e38bdf51092de).
+	if err := jsonutil.WriteToFile(sdkManifestFilePath, map[string]any{
+		"atoms": []map[string]any{
+			{
+				"category": "partner",
+				"deps":     []string{},
+				"files": []map[string]any{
+					{
+						"destination": "tools/x64/symbolizer",
+						"source":      filepath.Join(hostOutDir, "symbolizer"),
+					},
+					{
+						"destination": "tools/x64/symbolizer-meta.json",
+						"source":      filepath.Join(hostOutDir, "gen/tools/symbolizer/sdk.meta.json"),
+					},
+				},
+				"gn-label": "//tools/symbolizer:sdk(//build/toolchain:host_x64)",
+				"id":       "sdk://tools/x64/symbolizer",
+				"meta":     "tools/x64/symbolizer-meta.json",
+				"plasa":    []string{},
+				"type":     "host_tool",
+			},
+		},
+	}); err != nil {
+		return nil, err
+	}
+
 	ffxInstance, err :=
 		ffxutil.NewFFXInstance(
 			ctx,
@@ -113,16 +185,9 @@ func NewFfxInstance(
 		return nil, fmt.Errorf("wrapperFfxInstance.SetLogLevel(%q) = %w", ffxutil.Warn, err)
 	}
 
-	hostOutDir, err := util.GetHostOutDirectory()
-	if err != nil {
-		return nil, fmt.Errorf("util.GetHostOutDirectory() = %w", err)
-	}
-	rootBuildDir := filepath.Dir(hostOutDir)
-
 	cfgs := map[string]string{
-		"sdk.root":              rootBuildDir,
-		"sdk.type":              "in-tree",
-		"proactive_log.enabled": "true",
+		"sdk.root": sdkRoot,
+		"sdk.type": "in-tree",
 	}
 
 	for key, value := range cfgs {
