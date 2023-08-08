@@ -470,16 +470,16 @@ config("dwarf_version") {
   ldflags = cflags
 }
 
-config("dwarf_compression") {
-  if (dwarf_compression != "none") {
-    cflags = [ "-gz=${dwarf_compression}" ]
+config("compress_debug_sections") {
+  if (compress_debug_sections != "none") {
+    cflags = [ "-gz=${compress_debug_sections}" ]
     asmflags = cflags
     ldflags = cflags
     if (is_fuchsia) {
       rustflags =
-          [ "-Clink-arg=--compress-debug-sections=${dwarf_compression}" ]
+          [ "-Clink-arg=--compress-debug-sections=${compress_debug_sections}" ]
     } else {
-      rustflags = [ "-Clink-arg=-gz=${dwarf_compression}" ]
+      rustflags = [ "-Clink-arg=-gz=${compress_debug_sections}" ]
     }
   }
 }
@@ -489,7 +489,7 @@ config("default_debuginfo") {
   if (current_os != "win" && current_cpu != "wasm32") {
     configs += [
       ":dwarf_version",
-      ":dwarf_compression",
+      ":compress_debug_sections",
     ]
     if (!is_gcc) {
       # This option forces Clang to only emit class type information when
