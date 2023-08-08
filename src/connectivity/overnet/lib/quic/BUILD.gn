@@ -37,7 +37,7 @@ rustc_test("quic_test") {
 fuchsia_unittest_package("overnet-quic-tests") {
   deps = [
     ":quic_test",
-    "//src/connectivity/overnet/overnetstack:certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 

@@ -27,7 +27,7 @@ rustc_library("onet_test_util") {
 fuchsia_unittest_package("overnet-test-util-tests") {
   deps = [
     ":onet_test_util_test",
-    "//src/connectivity/overnet/overnetstack:certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 

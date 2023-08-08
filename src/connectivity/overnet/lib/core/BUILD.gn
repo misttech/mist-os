@@ -114,7 +114,7 @@ if (is_host) {
 fuchsia_unittest_package("overnet-core-tests") {
   deps = [
     ":core_test",
-    "//src/connectivity/overnet/overnetstack:certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 

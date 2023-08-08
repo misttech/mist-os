@@ -39,7 +39,7 @@ rustc_test("fidl") {
 fuchsia_unittest_package("overnet-fidl-tests") {
   deps = [
     ":fidl",
-    "//src/connectivity/overnet/overnetstack:certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 

@@ -56,7 +56,7 @@ fidl("triangle") {
 fuchsia_unittest_package("overnet-integration-tests") {
   deps = [
     ":integration",
-    "//src/connectivity/overnet/overnetstack:certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 

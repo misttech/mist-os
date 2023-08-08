@@ -39,23 +39,12 @@ rustc_binary("bin") {
   ]
 }
 
-# TODO(ctiller): This is clearly not great and we should not be hardcoding certificates
-# and private keys into the overnetstack package. Design and implement security.
-resource("certificates") {
-  sources = [
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt",
-  ]
-  outputs = [ "data/{{source_file_part}}" ]
-}
-
 fuchsia_component("component") {
   component_name = "overnetstack"
 
   deps = [
     ":bin",
-    ":certificates",
+    "//src/connectivity/overnet:certificates",
   ]
   manifest = "meta/overnetstack.cml"
 }
@@ -77,7 +66,7 @@ fuchsia_component("component-with-udp") {
 
   deps = [
     ":bin",
-    ":certificates",
+    "//src/connectivity/overnet:certificates",
   ]
   manifest = "meta/overnetstack-with-udp.cml"
 }
@@ -85,7 +74,7 @@ fuchsia_component("component-with-udp") {
 fuchsia_unittest_package("overnetstack-tests") {
   deps = [
     ":bin_test",
-    ":certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 

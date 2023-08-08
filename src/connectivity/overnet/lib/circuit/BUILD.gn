@@ -36,7 +36,7 @@ rustc_library("circuit") {
 fuchsia_unittest_package("overnet-circuit-tests") {
   deps = [
     ":circuit_test",
-    "//src/connectivity/overnet/overnetstack:certificates",
+    "//src/connectivity/overnet:certificates",
   ]
 }
 
