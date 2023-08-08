@@ -102,7 +102,10 @@ group("non_hermetic_deps") {
   visibility += [ "//tools/docsgen:invoke_helpdoc" ]
 
   # Documentation generation needs to access toolchain's include headers.
-  visibility += [ "//tools/cppdocgen/e2e_test:*" ]
+  visibility += [
+    "//sdk/lib/fdio:docs_clang_doc",
+    "//tools/cppdocgen/e2e_test:*",
+  ]
 
   # Unit tests for the ffx e2e library make their own amber-files to test universe package resolve.
   visibility += [ "//src/developer/ffx/lib/e2e_emu:*" ]

@@ -4,6 +4,9 @@
 
 import("//build/config/clang/clang.gni")
 
+_clang_toolchain_dir = get_path_info(clang_prefix, "dir")
+_clang_include_dir = _clang_toolchain_dir + "/include"
+
 # MOST USERS WILL WANT "clang_doc_headers()" BELOW, not this one.
 #
 # clang_doc_invoke() Runs the "clang-doc" tool over a list of C/C++ source files using the
@@ -65,11 +68,13 @@ template("clang_doc_invoke") {
     }
     outputs = [ invoker.out_zip ]
 
+    # Allow tool to read toolchain's include headers.
+    hermetic_action_ignored_prefixes = [ _clang_include_dir ]
+
     forward_variables_from(invoker,
                            [
                              "deps",
                              "visibility",
-                             "hermetic_action_ignored_prefixes",
                            ])
   }
 }
@@ -157,7 +162,6 @@ template("clang_doc_headers") {
                            [
                              "out_zip",
                              "visibility",
-                             "hermetic_action_ignored_prefixes",
                            ])
     deps = [ ":$compile_source_target_name" ]
   }

@@ -74,7 +74,6 @@ template("cpp_docgen") {
                            [
                              "deps",
                              "headers",
-                             "hermetic_action_ignored_prefixes",
                            ])
     visibility = [ ":$final_target_name" ]
   }
@@ -171,10 +170,6 @@ template("cpp_docgen") {
     args += rebase_path(invoker.headers, root_build_dir)
 
     deps = [ ":$clang_doc_target_name" ]
-    forward_variables_from(invoker,
-                           [
-                             "visibility",
-                             "hermetic_action_ignored_prefixes",
-                           ])
+    forward_variables_from(invoker, [ "visibility" ])
   }
 }

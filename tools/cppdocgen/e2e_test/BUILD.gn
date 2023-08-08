@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/clang/clang.gni")
 import("//build/testing/golden_files.gni")
 import("//tools/cppdocgen/cpp_docgen.gni")
 
@@ -39,9 +38,6 @@ cpp_docgen("docgen_e2e_docs") {
   # template asserts that there are deps to catch the common case of the caller forgetting to depend
   # on the real library.
   deps = []
-
-  # Allow tool to read toolchain's include headers.
-  hermetic_action_ignored_prefixes = [ get_path_info(clang_prefix, "dir") ]
 }
 
 golden_files("e2e_test") {
