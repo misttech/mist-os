@@ -892,8 +892,6 @@ def main():
 
         ### C/C++ toolchain-related
         # Clang standard libraries, compiler runtime, etc are not strict inputs.
-        os.path.join(
-            src_root, "prebuilt", "third_party", "clang", "linux-x64", "lib/"),
         os.path.join(src_root, "prebuilt", "third_party", "sysroot/"),
         os.path.join(os.getcwd(), "gen", "zircon", "public", "sysroot/"),
 

@@ -5,7 +5,6 @@
 import("//build/config/clang/clang.gni")
 
 _clang_toolchain_dir = get_path_info(clang_prefix, "dir")
-_clang_include_dir = _clang_toolchain_dir + "/include"
 
 # MOST USERS WILL WANT "clang_doc_headers()" BELOW, not this one.
 #
@@ -68,8 +67,10 @@ template("clang_doc_invoke") {
     }
     outputs = [ invoker.out_zip ]
 
-    # Allow tool to read toolchain's include headers.
-    hermetic_action_ignored_prefixes = [ _clang_include_dir ]
+    # Allow tool to read toolchain's headers in:
+    #   $CLANG_DIR/include
+    #   $CLANG_DIR/lib/clang/VERSION/include
+    hermetic_action_ignored_prefixes = [ _clang_toolchain_dir ]
 
     forward_variables_from(invoker,
                            [
