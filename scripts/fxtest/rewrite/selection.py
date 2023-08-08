@@ -321,7 +321,7 @@ def _parse_selection_command_line(
 ) -> typing.List[MatchGroup]:
     selection = selection.copy()  # Do not affect input list.
     output_groups: typing.List[MatchGroup] = []
-    cur_group: typing.Optional[MatchGroup] = None
+    cur_group: MatchGroup | None = None
 
     def pop_for_arg(arg: str):
         """Mutate the outer cur_group variable depending on the contents of the argument.

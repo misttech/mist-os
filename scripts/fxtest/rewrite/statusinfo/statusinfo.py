@@ -105,7 +105,7 @@ def ellipsize(input: str, width: int) -> str:
 
         total_chars: int = 0
         output: str = ""
-        insert_ellipsis_index: typing.Optional[int] = None
+        insert_ellipsis_index: int | None = None
         for ch in each_character(input):
             if ch.is_ansi:
                 output += ch.char

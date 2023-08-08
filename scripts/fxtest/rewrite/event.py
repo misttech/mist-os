@@ -177,7 +177,7 @@ class EventGroupPayload:
 
     # An optional count of events queued on the group.
     # If set, this value can be used to create a progress bar for this event group.
-    queued_events: typing.Optional[int]
+    queued_events: int | None
 
 
 class TestGroupPayload(EventGroupPayload):
@@ -216,7 +216,7 @@ class TestSuiteStartedPayload:
     name: str
 
     # If true, this test suite is hermetic and may be run in parallel.
-    hermetic: typing.Optional[bool] = False
+    hermetic: bool | None = False
 
 
 class TestSuiteStatus(enum.Enum):
@@ -241,7 +241,7 @@ class TestSuiteEndedPayload:
     status: TestSuiteStatus
 
     # Optionally, a message describing what happened.
-    message: typing.Optional[str] = None
+    message: str | None = None
 
 
 @dataparse
@@ -273,77 +273,77 @@ class EventPayloadUnion:
     # Other timestamps are in monotonic time, so the mapping of the monotonic
     # time for the containing event to this UNIX timestamp must be used for all
     # time formatting.
-    start_timestamp: typing.Optional[float] = None
+    start_timestamp: float | None = None
 
     # This event denotes parsing command line flags.
     #
     # The parsed command line flags are included in the value.
-    parse_flags: typing.Optional[typing.Dict[str, typing.Any]] = None
+    parse_flags: typing.Dict[str, typing.Any] | None = None
 
     # This event denotes processing the execution environment.
     #
     # The parsed environment is included in the value.
-    process_env: typing.Optional[typing.Dict[str, typing.Any]] = None
+    process_env: typing.Dict[str, typing.Any] | None = None
 
     # This event denotes a message to be shown to the user.
     #
     # The value provides display information.
-    user_message: typing.Optional[Message] = None
+    user_message: Message | None = None
 
     # This event denotes the beginning of a new event group.
     #
     # The value provides details on the group.
-    event_group: typing.Optional[EventGroupPayload] = None
+    event_group: EventGroupPayload | None = None
 
     # This event denotes a generic file parsing duration.
     #
     # The value provides details of the file being parsed.
-    parsing_file: typing.Optional[FileParsingPayload] = None
+    parsing_file: FileParsingPayload | None = None
 
     # This event denotes a program starting executing.
     #
     # The value provides details on the program.
-    program_execution: typing.Optional[ProgramExecutionPayload] = None
+    program_execution: ProgramExecutionPayload | None = None
 
     # This event denotes output from a running program.
     #
     # The value provides contents of the output.
-    program_output: typing.Optional[ProgramOutputPayload] = None
+    program_output: ProgramOutputPayload | None = None
 
     # This event denotes the termination of a program.
     #
     # The value provides details on the return code.
-    program_termination: typing.Optional[ProgramTerminationPayload] = None
+    program_termination: ProgramTerminationPayload | None = None
 
     # This event denotes the results of loading the tests.json file.
     #
     # The value provides details of the parsed data.
-    test_file_loaded: typing.Optional[TestsJsonFilePayload] = None
+    test_file_loaded: TestsJsonFilePayload | None = None
 
     # This event denotes selection of a set of tests.
     #
     # The value provides details on selection decisions.
-    test_selections: typing.Optional[TestSelectionPayload] = None
+    test_selections: TestSelectionPayload | None = None
 
     # This event denotes the beginning of a build operation.
     #
     # The value lists the targets being built.
-    build_targets: typing.Optional[typing.List[str]] = None
+    build_targets: typing.List[str] | None = None
 
     # This event denotes the beginning of a group of test suites.
     #
     # The value provides display information about the tests.
-    test_group: typing.Optional[TestGroupPayload] = None
+    test_group: TestGroupPayload | None = None
 
     # This event denotes the beginning of a test suite.
     #
     # The value provides details on the suite.
-    test_suite_started: typing.Optional[TestSuiteStartedPayload] = None
+    test_suite_started: TestSuiteStartedPayload | None = None
 
     # This event denotes the end of a test suite.
     #
     # The value provides result information.
-    test_suite_ended: typing.Optional[TestSuiteEndedPayload] = None
+    test_suite_ended: TestSuiteEndedPayload | None = None
 
 
 @dataparse
@@ -351,28 +351,28 @@ class EventPayloadUnion:
 class Event:
     # Unique Id for the event. If not set, this event is not
     # associated with a known duration.
-    id: typing.Optional[Id] = None
+    id: Id | None = None
 
     # Monotonic timestamp for the event.
     timestamp: float = 0
 
     # Parent Id for the event. If not set, treat GLOBAL_RUN_ID as
     # the implicit parent
-    parent: typing.Optional[Id] = None
+    parent: Id | None = None
 
     # If set, a new duration is starting with the above Id.
-    starting: typing.Optional[bool] = None
+    starting: bool | None = None
 
     # If set, a duration with the above Id has ended.
-    ending: typing.Optional[bool] = None
+    ending: bool | None = None
 
     # If set, the duration ended with an error. The human-readable
     # message is stored in this field.
-    error: typing.Optional[str] = None
+    error: str | None = None
 
     # Optional payload for the event. See EventPayloadUnion
     # documentation for details.
-    payload: typing.Optional[EventPayloadUnion] = None
+    payload: EventPayloadUnion | None = None
 
 
 class EventRecorder:
@@ -398,7 +398,7 @@ class EventRecorder:
         self._events: typing.List[Event] = []
 
         # Keep track of each asynchronous event consumer queue.
-        self._queues: typing.List[asyncio.Queue[typing.Optional[Event]]] = []
+        self._queues: typing.List[asyncio.Queue[Event | None]] = []
 
         # Async event designating that this recorder is done.
         self._done: asyncio.Event = asyncio.Event()
@@ -485,7 +485,7 @@ class EventRecorder:
         class Iter:
             def __aiter__(self):
                 self._init_items: typing.List[Event] = parent._events.copy()
-                self._queue: asyncio.Queue[typing.Optional[Event]] = asyncio.Queue()
+                self._queue: asyncio.Queue[Event | None] = asyncio.Queue()
                 if not parent._done.is_set():
                     parent._queues.append(self._queue)
                 else:
@@ -531,11 +531,11 @@ class EventRecorder:
             id_line = "[_______]"
         return f"{time_str} {id_line:9} {self._payload_string(event.payload)}"
 
-    def _payload_string(self, payload: typing.Optional[EventPayloadUnion]) -> str:
+    def _payload_string(self, payload: EventPayloadUnion | None) -> str:
         """Format the payload of an event as a string.
 
         Args:
-            payload (typing.Optional[EventPayloadUnion]): Payload to format.
+            payload (EventPayloadUnion | None): Payload to format.
 
         Returns:
             str: String representation of the event payload.
@@ -602,9 +602,7 @@ class EventRecorder:
             )
         )
 
-    def emit_end(
-        self, error: typing.Optional[str] = None, id: typing.Optional[Id] = None
-    ):
+    def emit_end(self, error: str | None = None, id: Id | None = None):
         """Emit an end event for an event duration.
 
         By default, the global run duration is terminated with an error
@@ -613,9 +611,9 @@ class EventRecorder:
         Optionally, a different duration may be ended by giving its id.
 
         Args:
-            error (typing.Optional[str], optional): If set, end the
+            error (str | None): If set, end the
                 given event with an error. Defaults to None.
-            id (typing.Optional[Id], optional): If set, end this
+            id (Id | None): If set, end this
                 event instead of the global run. Defaults to None.
         """
         id = id or GLOBAL_RUN_ID
@@ -708,7 +706,7 @@ class EventRecorder:
         self._emit_user_message(message, level=MessageLevel.VERBATIM)
 
     def emit_start_file_parsing(
-        self, name: str, path: str, parent: typing.Optional[Id] = None
+        self, name: str, path: str, parent: Id | None = None
     ) -> Id:
         """Start parsing a file.
 
@@ -717,8 +715,8 @@ class EventRecorder:
         Args:
             name (str): The name of the file being parsed.
             path (str): The path to the file being parsed.
-            parent (typing.Optional[Id], optional): Parent of the
-                event, if set. Defaults to the global run.
+            parent (Id | None): Parent of the event, if set. Defaults
+                to the global run.
 
         Returns:
             Id: New Id for the parsing event, which must be ended explicitly.
@@ -739,8 +737,8 @@ class EventRecorder:
         self,
         command: str,
         args: typing.List[str],
-        environment: typing.Optional[typing.Dict[str, str]] = None,
-        parent: typing.Optional[Id] = None,
+        environment: typing.Dict[str, str] | None = None,
+        parent: Id | None = None,
     ) -> Id:
         """A program is starting execution.
 
@@ -750,10 +748,10 @@ class EventRecorder:
         Args:
             command (str): The command being executed.
             args (typing.List[str]): The flags passed to the command.
-            environment (typing.Optional[typing.Dict[str, str]], optional):
+            environment (typing.Dict[str, str] | None):
                 The environment passed to the command.  Defaults to None.
-            parent (typing.Optional[Id], optional): Parent for this
-                event. Defaults to the global run.
+            parent (Id, | None): Parent for this event. Defaults
+                to the global run.
 
         Returns:
             Id: New Id for the program event, which must be ended explicitly.
@@ -804,16 +802,16 @@ class EventRecorder:
         )
 
     def emit_program_termination(
-        self, id: Id, return_code: int, error: typing.Optional[str] = None
+        self, id: Id, return_code: int, error: str | None = None
     ):
         """A program terminated.
 
         Args:
             id (Id): An Id returned by emit_program_start.
             return_code (int): The return code for the program.
-            error (typing.Optional[str], optional): If set, this
-                program terminated with an error represented
-                by this string message. Defaults to None.
+            error (str | None): If set, this program terminated
+                with an error represented by this string message.
+                Defaults to None.
         """
         self._emit(
             Event(
@@ -880,8 +878,8 @@ class EventRecorder:
     def emit_event_group(
         self,
         name: str,
-        parent: typing.Optional[Id] = None,
-        queued_events: typing.Optional[int] = None,
+        parent: Id | None = None,
+        queued_events: int | None = None,
     ) -> Id:
         """Create a new event group.
 
@@ -889,10 +887,10 @@ class EventRecorder:
 
         Args:
             name (str): Name of the group.
-            parent (typing.Optional[Id], optional): Parent Id for the group. Defaults to the global run.
-            queued_events (typing.Optional[int], optional): If set,
-                expect this number of events to call this group their
-                parent. Defaults to None.
+            parent (Id | None): Parent Id for the group. Defaults to the global run.
+            queued_events (int | None): If set, expect this number
+                of events to call this group their parent. Defaults to
+                None.
 
         Returns:
             Id: New Id for the created group.
@@ -956,7 +954,7 @@ class EventRecorder:
         return id
 
     def emit_test_suite_started(
-        self, name: str, hermetic: bool, parent: typing.Optional[Id] = None
+        self, name: str, hermetic: bool, parent: Id | None = None
     ) -> Id:
         """A test suite has started executing.
 
@@ -966,7 +964,7 @@ class EventRecorder:
         Args:
             name (str): The name of the test suite.
             hermetic (bool): True only if this suite is executed hermetically.
-            parent (typing.Optional[Id], optional): Parent event. Defaults to global run.
+            parent (Id | None ): Parent event. Defaults to global run.
 
         Returns:
             Id: _description_
@@ -986,14 +984,14 @@ class EventRecorder:
         return id
 
     def emit_test_suite_ended(
-        self, id: Id, status: TestSuiteStatus, message: typing.Optional[str]
+        self, id: Id, status: TestSuiteStatus, message: str | None
     ):
         """A test suite has finished executing.
 
         Args:
             id (Id): The Id of the
             status (str): Status string for the test suite.
-            message (typing.Optional[str]): Optional message
+            message (str | None): Optional message
                 describing the outcome of this suite.
         """
         self._emit(

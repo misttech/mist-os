@@ -14,9 +14,6 @@ class EnvironmentError(Exception):
     """There was an error loading the execution environment."""
 
 
-_Self = typing.TypeVar("_Self", bound="ExecutionEnvironment")
-
-
 @dataclass
 class ExecutionEnvironment:
     """Contains the parsed environment for this invocation of fx test.
@@ -32,7 +29,7 @@ class ExecutionEnvironment:
     out_dir: str
 
     # Path to the log file to write to. If unset, do not log.
-    log_file: typing.Optional[str]
+    log_file: str | None
 
     # Path to the input tests.json file.
     test_json_file: str
@@ -41,7 +38,9 @@ class ExecutionEnvironment:
     test_list_file: str
 
     @classmethod
-    def initialize_from_args(cls: typing.Type[_Self], flags: args.Flags) -> _Self:
+    def initialize_from_args(
+        cls: typing.Type[typing.Self], flags: args.Flags
+    ) -> typing.Self:
         """Initialize an execution environment from the given flags.
 
         Args:

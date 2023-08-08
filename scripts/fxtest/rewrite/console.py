@@ -34,7 +34,7 @@ class DurationInfo:
     start_monotonic: float
 
     # The optional parent of the duration.
-    parent: typing.Optional[event.Id]
+    parent: event.Id | None
 
     # The number of expected children. If set, we can show a progress bar.
     expected_child_tasks: int = 0
@@ -58,10 +58,10 @@ class ConsoleState:
     """
 
     def __init__(self):
-        self.root_path: typing.Optional[str] = None
+        self.root_path: str | None = None
         self.active_durations: typing.Dict[event.Id, DurationInfo] = dict()
         self.complete_durations: typing.Dict[event.Id, DurationInfo] = dict()
-        self.end_duration: typing.Optional[float] = None
+        self.end_duration: float | None = None
         self.test_results: typing.Dict[
             event.TestSuiteStatus, typing.Set[str]
         ] = defaultdict(set)
@@ -172,7 +172,7 @@ class DurationPrintInfo:
     indent: int
 
     # If set, display a progress bar with this percent completion.
-    progress: typing.Optional[float] = None
+    progress: float | None = None
 
 
 @dataclass
@@ -397,7 +397,7 @@ async def _console_event_loop(
         # If set, and we do verbose printing, append this suffix to the output.
         verbose_suffix: str = ""
 
-        old_duration: typing.Optional[DurationInfo] = None
+        old_duration: DurationInfo | None = None
         if (
             next_event.ending
             and next_event.id is not None

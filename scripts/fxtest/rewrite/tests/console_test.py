@@ -15,8 +15,13 @@ import event
 
 class TestConsoleOutput(unittest.IsolatedAsyncioTestCase):
     @mock.patch("console.termout.is_valid", return_value=True)
-    @mock.patch("console.statusinfo.os.get_terminal_size", return_value=mock.MagicMock(columns=80))
-    async def test_console(self, _is_valid_mock: mock.Mock, _terminal_size_mock: mock.Mock):
+    @mock.patch(
+        "console.statusinfo.os.get_terminal_size",
+        return_value=mock.MagicMock(columns=80),
+    )
+    async def test_console(
+        self, _is_valid_mock: mock.Mock, _terminal_size_mock: mock.Mock
+    ):
         """Test that a few different types of events provide some output for the terminal."""
 
         output = io.StringIO()

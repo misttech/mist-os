@@ -32,23 +32,20 @@ class TestSection:
     label: str
 
     # The build label for the component being tested in this test.
-    component_label: typing.Optional[str] = None
+    component_label: str | None = None
 
     # The build label for the package containing the test.
-    package_label: typing.Optional[str] = None
+    package_label: str | None = None
 
     # If the test runs on the device, this is the URL of the test to execute.
-    package_url: typing.Optional[str] = None
+    package_url: str | None = None
 
     # If the test runs on the host, this is the path of the binary to execute.
-    path: typing.Optional[str] = None
+    path: str | None = None
 
 
 class TestFileError(Exception):
     """There was an error processing the contents of the tests.json file."""
-
-
-Self = typing.TypeVar("Self", bound="TestEntry")
 
 
 @dataparse
@@ -59,8 +56,8 @@ class TestEntry:
     # The "test" field for a specific entry in the file.
     test: TestSection
 
-    @staticmethod
-    def from_file(file: str) -> typing.List[Self]:
+    @classmethod
+    def from_file(cls: typing.Type[typing.Self], file: str) -> typing.List[typing.Self]:
         """Parse the file at the given path into a list of TestEntry.
 
         This returns a list of entries because the ordering of the
@@ -85,7 +82,7 @@ class TestEntry:
                     "Expected a list at top-level of tests.json, found "
                     + str(type(vals))
                 )
-            ret: typing.List[Self] = list(
+            ret: typing.List[typing.Self] = list(
                 map(TestEntry.from_dict, vals)  # type:ignore
             )
             names: typing.Set[str] = set()

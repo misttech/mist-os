@@ -23,11 +23,8 @@ class SelectionAction(argparse.Action):
     """
 
     def __init__(
-            self,
-            option_strings: typing.List[str],
-            dest: str,
-            nargs=None,
-            **kwargs):
+        self, option_strings: typing.List[str], dest: str, nargs=None, **kwargs
+    ):
         """Create a SelectionAction.
 
         Args:
@@ -41,7 +38,9 @@ class SelectionAction(argparse.Action):
         # use the longest option as the canonical name.
         self._canonical = (
             [max(map(lambda x: (len(x), x), option_strings))[1]]
-            if option_strings else [])
+            if option_strings
+            else []
+        )
         if nargs is None:
             nargs = "*"
         super().__init__(list(option_strings), dest, nargs=nargs, **kwargs)

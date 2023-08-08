@@ -39,13 +39,13 @@ class TestListExecutionEntry:
     component_url: str
 
     # If set, this is the --realm argument for ffx test.
-    realm: typing.Optional[str] = None
+    realm: str | None = None
 
     # If set, this is the --max-severity-logs argument for ffx test.
-    max_severity_logs: typing.Optional[str] = None
+    max_severity_logs: str | None = None
 
     # If set, this is the --min-severity-logs argument for ffx test.
-    min_severity_logs: typing.Optional[str] = None
+    min_severity_logs: str | None = None
 
 
 @dataparse
@@ -60,7 +60,7 @@ class TestListEntry:
     tags: typing.List[TestListTagKV]
 
     # Execution details for the test.
-    execution: typing.Optional[TestListExecutionEntry] = None
+    execution: TestListExecutionEntry | None = None
 
     def is_hermetic(self) -> bool:
         """Determine if a test is hermetic.
@@ -115,9 +115,6 @@ class TestListFile:
         return ret
 
 
-Self = typing.TypeVar("Self", bound="Test")
-
-
 @dataclass
 class Test:
     """Wrapper containing data from both tests.json and test-list.json.
@@ -141,11 +138,12 @@ class Test:
     def __eq__(self, other) -> bool:
         return self.build.__eq__(other)
 
-    @staticmethod
+    @classmethod
     def join_test_descriptions(
+        cls: typing.Type[typing.Self],
         test_entries: typing.List[tests_json_file.TestEntry],
         test_list_entries: typing.Dict[str, TestListEntry],
-    ) -> typing.List[Self]:
+    ) -> typing.List[typing.Self]:
         """Join the contents of tests.json with the contents of test-list.json.
 
         Args:
@@ -160,8 +158,7 @@ class Test:
         """
         try:
             ret: typing.List[Test] = [
-                Test(entry, test_list_entries[entry.test.name])
-                for entry in test_entries
+                cls(entry, test_list_entries[entry.test.name]) for entry in test_entries
             ]
             # Ignore type for now. With Python 3.11 we can use typing.Self.
             return ret  # type:ignore

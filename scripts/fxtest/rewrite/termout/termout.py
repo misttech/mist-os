@@ -122,7 +122,7 @@ def get_size() -> Size:
     return Size(size.columns, size.lines)
 
 
-_last_line_count: typing.Optional[int] = None
+_last_line_count: int | None = None
 _write_lock: threading.Lock = threading.Lock()
 
 
@@ -139,8 +139,8 @@ def reset():
 
 def write_lines(
     lines: typing.List[str],
-    prepend: typing.Optional[typing.List[str]] = None,
-    size: typing.Optional[Size] = None,
+    prepend: typing.List[str] | None = None,
+    size: Size | None = None,
 ):
     """Write a list of lines to the terminal.
 

@@ -37,9 +37,9 @@ class Weather:
     chance_of_rain: float
     description: str
     city: City
-    temperature_by_hour: typing.Optional[typing.List[TemperatureDataPoint]] = None
-    weather_station_ids: typing.Optional[typing.Set[int]] = None
-    suggested_cities: typing.Optional[typing.Set[City]] = None
+    temperature_by_hour: typing.List[TemperatureDataPoint] | None = None
+    weather_station_ids: typing.Set[int] | None = None
+    suggested_cities: typing.Set[City] | None = None
 
 
 class TestDataParse(unittest.TestCase):

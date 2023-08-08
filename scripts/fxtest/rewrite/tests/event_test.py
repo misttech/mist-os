@@ -170,5 +170,4 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         round_trip_events = [
             event.Event.from_dict(e.to_dict()) for e in events  # type:ignore
         ]
-
         self.assertListEqual(events, round_trip_events)

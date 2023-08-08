@@ -64,7 +64,7 @@ class TerminationEvent:
 
     # If the output of the program was wrapped in another, this
     # value indicates the return code of the wrapper program
-    wrapper_return_code: typing.Optional[int] = None
+    wrapper_return_code: int | None = None
 
     # The monotonic timestamp this program received the termination event.
     timestamp: float = field(default_factory=lambda: time.monotonic())
@@ -92,10 +92,10 @@ class CommandOutput:
 
     # If this program's output was wrapped by another program, this is
     # the return code of that wrapper.
-    wrapper_return_code: typing.Optional[int]
+    wrapper_return_code: int | None
 
 
-CommandEvent = typing.Union[StdoutEvent, StderrEvent, TerminationEvent]
+CommandEvent = StdoutEvent | StderrEvent | TerminationEvent
 
 
 class AsyncCommand:
@@ -109,7 +109,7 @@ class AsyncCommand:
     def __init__(
         self,
         process: asyncio.subprocess.Process,
-        wrapped_process: typing.Optional[asyncio.subprocess.Process] = None,
+        wrapped_process: asyncio.subprocess.Process | None = None,
     ):
         """Create an AsyncCommand that wraps a subprocess.
 
@@ -134,8 +134,8 @@ class AsyncCommand:
         cls,
         program: str,
         *args: str,
-        symbolizer_args: typing.Optional[typing.List[str]] = None,
-        env: typing.Optional[typing.Dict[str, str]] = None,
+        symbolizer_args: typing.List[str] | None = None,
+        env: typing.Dict[str, str] | None = None,
     ):
         """Create a new AsyncCommand that runs the given program.
 
@@ -213,13 +213,13 @@ class AsyncCommand:
 
     async def run_to_completion(
         self,
-        callback: typing.Optional[typing.Callable[[CommandEvent], None]] = None,
+        callback: typing.Callable[[CommandEvent], None] | None = None,
     ) -> CommandOutput:
         """Runs the program to completion, collecting the resulting outputs.
 
         Args:
-            callback (typing.Optional[typing.Callable[[CommandEvent],
-            None]], optional): If set, send all CommandEvents to
+            callback (typing.Callable[[CommandEvent],
+            None] | None): If set, send all CommandEvents to
                 this callback function as they are produced. Defaults
                 to None.
 
@@ -278,7 +278,7 @@ class AsyncCommand:
 
         # Wait for the process to exit and get its return code.
         return_code = await self._process.wait()
-        wrapper_return_code: typing.Optional[int] = None
+        wrapper_return_code: int | None = None
         if self._wrapped_process:
             # Also ensure we wait for the wrapped process, and use it's return code as the canonical code.
             wrapper_return_code = return_code
@@ -294,11 +294,11 @@ class AsyncCommand:
             )
         )
 
-    async def next_event(self) -> typing.Optional[CommandEvent]:
+    async def next_event(self) -> CommandEvent | None:
         """Return the next event from the process execution, if one exists.
 
         Returns:
-            typing.Optional[Event]: The next event on the command, or None if the command is terminated.
+            Event | None: The next event on the command, or None if the command is terminated.
         """
         if self._done_iterating:
             return None

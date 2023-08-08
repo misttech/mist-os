@@ -31,8 +31,8 @@ class Flags:
     simple: bool
     style: bool
     log: bool
-    logpath: typing.Optional[str]
-    status: typing.Optional[bool]
+    logpath: str | None
+    status: bool | None
     verbose: bool
 
     def validate(self):
@@ -63,7 +63,7 @@ class FlagError(Exception):
     """Raised if there was a problem parsing command line flags."""
 
 
-def parse_args(cli_args: typing.Optional[typing.List[str]] = None) -> Flags:
+def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     """Parse command line flags.
 
     Returns:

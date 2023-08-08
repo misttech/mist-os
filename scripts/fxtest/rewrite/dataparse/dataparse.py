@@ -27,6 +27,7 @@ print(weather.to_dict())
 
 import dataclasses
 import enum
+import types
 import typing
 
 
@@ -158,6 +159,18 @@ def dataparse(cls):
                 Returns:
                     Tuple of (base type, optional argument type).
                 """
+
+                def load_union_type():
+                    # Load the union type from incoming_type.
+                    # Only support Optional unions.
+                    args = incoming_type.__args__
+                    if len(args) != 2 or args[1] != type(None):
+                        raise DataParseError(
+                            "Invalid Union type for dataparse. We support only Optional unions with a single type: "
+                            + str(args)
+                        )
+                    return load_real_type(args[0])
+
                 if hasattr(incoming_type, "__origin__"):
                     origin = incoming_type.__origin__
                     if origin == list:
@@ -165,17 +178,14 @@ def dataparse(cls):
                     elif origin == set:
                         return (set, incoming_type.__args__[0])
                     elif origin == typing.Union:
-                        # Only support Optional unions.
-                        args = incoming_type.__args__
-                        if len(args) != 2 or args[1] != type(None):
-                            raise DataParseError(
-                                "Invalid Union type for dataparse. We support only Optional unions with a single type: "
-                                + str(args)
-                            )
-                        return load_real_type(args[0])
+                        return load_union_type()
+                if isinstance(incoming_type, types.UnionType):
+                    return load_union_type()
+
                 return (incoming_type, None)
 
             real_type, real_args = load_real_type(f.type)
+
             name = renames.get(f.name, f.name)
             if name in input:
                 if input[name] is None:
