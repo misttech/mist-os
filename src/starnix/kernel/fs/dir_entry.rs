@@ -568,6 +568,7 @@ impl DirEntry {
     fn destroy(self: DirEntryHandle) {
         self.node.fs().will_destroy_dir_entry(&self);
         self.state.write().is_dead = true;
+        self.notify_deletion();
     }
 
     /// Returns whether this entry is a descendant of |other|.
@@ -846,12 +847,31 @@ impl DirEntry {
         }
     }
 
-    // Notifies watchers on the current node and its parent about an event.
+    /// Notifies watchers on the current node and its parent about an event.
     pub fn notify(&self, event_mask: InotifyMask) {
         if let Some(parent) = self.parent() {
             parent.node.watchers.notify(event_mask, &self.local_name(), self.node.info().mode);
         }
         self.node.watchers.notify(event_mask, &FsString::default(), self.node.info().mode);
+    }
+
+    /// Notifies watchers on the current node about deletion if this is the
+    /// last hardlink, and drops the DirEntryHandle kept by Inotify.
+    /// Parent is also notified about deletion.
+    pub fn notify_deletion(&self) {
+        let mode = self.node.info().mode;
+        if !mode.is_dir() {
+            // Linux notifies link count change for non-directories.
+            self.node.watchers.notify(InotifyMask::ATTRIB, &FsString::default(), mode);
+        }
+
+        if let Some(parent) = self.parent() {
+            parent.node.watchers.notify(InotifyMask::DELETE, &self.local_name(), mode);
+        }
+
+        if Arc::strong_count(&self.node) == 1 {
+            self.node.watchers.notify(InotifyMask::DELETE_SELF, &FsString::default(), mode);
+        }
     }
 }
 

@@ -208,16 +208,10 @@
                 "GetrusageTest.IgnoreZombie",
 
                 // inotify_test
-                "Inotify.RemoveWatchAfterDeletingFileFails",
-                "Inotify.DeletingChildGeneratesEvents",
                 "Inotify.InOnlyDirFlagRespected",
-                "Inotify.RmdirOnWatchedTargetGeneratesEvent",
-                "Inotify.ChildrenDeletionInWatchedDirGeneratesEvent",
                 "Inotify.TruncateGeneratesModifyEvent",
                 "Inotify.SymlinkFollow",
                 "Inotify.UtimesGeneratesAttribEvent",
-                "Inotify.HardlinksReuseSameWatch",
-                "Inotify.EventsGoUpAtMostOneLevel",
                 "Inotify.UnmatchedEventsAreDiscarded",
                 "Inotify.LinkGeneratesAttribAndCreateEvents",
                 "Inotify.ControlEvents",
