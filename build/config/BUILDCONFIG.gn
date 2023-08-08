@@ -609,6 +609,9 @@ default_rust_configs = [
   "//build/config/rust/lints:deny_unused_crate_dependencies",
   "//build/config/rust/lints:deny_unused_results",
   "//build/config/rust/lints:allow_unused_results",
+
+  # TODO(fxbug.dev/131835) Remove once lints cleaned up
+  "//build/config/rust:allow_noop_method_call",
 ]
 
 set_defaults("rustc_binary") {

@@ -241,3 +241,8 @@ config("async_fn_in_trait") {
   # of the feature.
   visibility = []
 }
+
+# TODO(fxbug.dev/131835) Remove once lints cleaned up
+config("allow_noop_method_call") {
+  rustflags = [ "-Anoop-method-call" ]
+}
