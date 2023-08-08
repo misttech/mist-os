@@ -514,7 +514,7 @@ func TestExecute(t *testing.T) {
 			); err != nil {
 				t.Fatal(err)
 			}
-			writeDepFiles(t, tc.flags.buildDir, tc.testSpecs)
+			writeDeps(t, tc.flags.buildDir, tc.testSpecs)
 			for _, repo := range tc.packageRepos {
 				if err := os.MkdirAll(filepath.Join(tc.flags.buildDir, repo.Path), 0o700); err != nil {
 					t.Fatal(err)
@@ -671,9 +671,13 @@ func testListEntry(basename string, hermetic bool) build.TestListEntry {
 	}
 }
 
-func writeDepFiles(t *testing.T, buildDir string, testSpecs []build.TestSpec) {
+func writeDeps(t *testing.T, buildDir string, testSpecs []build.TestSpec) {
+	t.Helper()
 	// Write runtime deps files.
 	for _, testSpec := range testSpecs {
+		if testSpec.Path != "" {
+			touchFile(t, filepath.Join(buildDir, testSpec.Path))
+		}
 		if testSpec.RuntimeDepsFile == "" {
 			continue
 		}
@@ -685,6 +689,18 @@ func writeDepFiles(t *testing.T, buildDir string, testSpecs []build.TestSpec) {
 		if err := jsonutil.WriteToFile(absPath, runtimeDeps); err != nil {
 			t.Fatal(err)
 		}
+		for _, dep := range runtimeDeps {
+			touchFile(t, filepath.Join(buildDir, dep))
+		}
+	}
+}
+
+func touchFile(t *testing.T, path string) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

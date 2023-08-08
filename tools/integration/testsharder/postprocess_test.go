@@ -1303,10 +1303,24 @@ func depsFile(t *testing.T, buildDir string, deps ...string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(name, b, 0o400); err != nil {
+	if err := os.WriteFile(name, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	for _, dep := range deps {
+		// Create an empty file for each dep so that it passes the check that
+		// all deps are built.
+		touchFile(t, filepath.Join(buildDir, dep))
+	}
 	return filepath.Base(name)
+}
+
+func touchFile(t *testing.T, path string) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func shardHasExpectedDeps(t *testing.T, buildDir string, tests []Test, expected []string) {
@@ -1409,6 +1423,8 @@ func TestExtractDeps(t *testing.T) {
 				},
 			},
 		}
+		touchFile(t, filepath.Join(buildDir, "path/to/A"))
+		touchFile(t, filepath.Join(buildDir, "path/to/B"))
 		expected := []string{"1", "2", "path/to/A", "path/to/B"}
 		shardHasExpectedDeps(t, buildDir, tests, expected)
 	})

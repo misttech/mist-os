@@ -86,6 +86,14 @@ func extractDepsFromShard(shard *Shard, fuchsiaBuildDir string) error {
 		if test.OS != "fuchsia" && test.Path != "" {
 			deps = append(deps, test.Path)
 		}
+		for _, dep := range deps {
+			_, err := os.Stat(filepath.Join(fuchsiaBuildDir, dep))
+			if os.IsNotExist(err) {
+				return fmt.Errorf("dependency for test %q was not built: %s", test.Name, dep)
+			} else if err != nil {
+				return err
+			}
+		}
 		shardDeps = append(shardDeps, deps...)
 	}
 	shard.AddDeps(shardDeps)
