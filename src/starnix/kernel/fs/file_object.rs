@@ -216,7 +216,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             {
                 let mut new_rights = zx::Rights::VMO_DEFAULT - zx::Rights::WRITE;
                 if prot_flags.contains(ProtectionFlags::EXEC) {
-                    new_rights -= zx::Rights::EXECUTE;
+                    new_rights |= zx::Rights::EXECUTE;
                 }
                 vmo = Arc::new(vmo.duplicate_handle(new_rights).map_err(impossible_error)?);
 
