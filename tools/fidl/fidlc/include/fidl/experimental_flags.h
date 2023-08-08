@@ -29,9 +29,6 @@ class ExperimentalFlags {
     // fxbug.dev/110294.
     kZxCTypes = 1 << 4,
 
-    // TODO(fxbug.dev/112767): Remove once soft transition is done.
-    kSimpleEmptyResponseSyntax = 1 << 5,
-
     // These experiments control the migration to Unknown Interactions support.
 
     // This flag enables support for Unknown Interactions. By default, unknown
