@@ -61,7 +61,6 @@ pub async fn run_log_listener_with_proxy<'a>(
 ) -> Result<(), Error> {
     let (listener_ptr, listener_stream) = fidl::endpoints::create_request_stream()?;
 
-    let options = options;
     if dump_logs {
         logger.dump_logs_safe(listener_ptr, options).context("failed to register log dumper")?;
     } else {
