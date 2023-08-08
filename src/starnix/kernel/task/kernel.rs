@@ -34,6 +34,7 @@ use crate::{
     lock::RwLock,
     logging::{log_error, set_zx_name},
     mm::FutexTable,
+    power::PowerManager,
     task::*,
     types::{DeviceType, Errno, OpenFlags, *},
     vdso::vdso_loader::Vdso,
@@ -165,6 +166,9 @@ pub struct Kernel {
     // described in seccomp(2).  The value of the bit vector is exposed to users
     // in a text form in the file /proc/sys/kernel/seccomp/actions_logged.
     pub actions_logged: AtomicU16,
+
+    /// The manger for power subsystems including reboot and suspend.
+    pub power_manager: PowerManager,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -257,6 +261,7 @@ impl Kernel {
             inspect_node,
             core_dumps,
             actions_logged: AtomicU16::new(0),
+            power_manager: PowerManager::default(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

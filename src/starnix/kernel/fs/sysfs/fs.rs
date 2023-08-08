@@ -6,7 +6,7 @@ use crate::{
     fs::{
         cgroup::CgroupDirectoryNode,
         kobject::*,
-        sysfs::{CpuClassDirectory, SysFsDirectory},
+        sysfs::{sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
         *,
     },
     task::*,
@@ -69,6 +69,8 @@ impl SysFs {
                 dir_mode,
             );
         });
+
+        sysfs_power_directory(&mut dir, &fs, Arc::downgrade(kernel));
 
         // TODO(fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.

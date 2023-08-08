@@ -44,6 +44,7 @@ mod lock;
 mod logging;
 mod mm;
 mod mutable_state;
+mod power;
 mod selinux;
 mod signals;
 mod syscalls;

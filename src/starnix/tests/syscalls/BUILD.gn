@@ -118,6 +118,7 @@ test("syscalls_test_bin") {
     "signal_handling_test.cc",
     "socket_test.cc",
     "sw_breakpoint_test.cc",
+    "sysfs_power_test.cc",
     "task_test.cc",
     "terminal_test.cc",
     "test_helper_test.cc",
