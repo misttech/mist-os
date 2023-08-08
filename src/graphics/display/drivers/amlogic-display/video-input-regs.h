@@ -5,6 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_REGS_H_
 
+#include <lib/ddk/debug.h>
+#include <zircon/assert.h>
+
 #include <cstdint>
 
 #include <hwreg/bitfields.h>
@@ -360,6 +363,152 @@ class VideoInputChannelFifoControl3
                             static_cast<int>(video_input));
     }
   }
+};
+
+// Selects the clock or data source for a writeback mux.
+//
+// Fields of this type must transition through `kDisabled` when being updated.
+enum class WritebackMuxSource : uint32_t {
+  // Disable the input path. A required intermediate step for changing input
+  // sources.
+  kDisabled = 0b00000,
+  // VIU ENCI domain.
+  kEncoderInterlaced = 0b00001,
+  // VIU ENCP domain.
+  kEncoderProgressive = 0b00010,
+  // VIU ENCT domain.
+  kEncoderTvPanel = 0b00100,
+  // Also known as "VIU writeback domain 1" in S905D3 datasheets.
+  kViuWriteback0 = 0b01000,
+  // Also known as "VIU writeback domain 2" in S905D3 datasheets.
+  kViuWriteback1 = 0b10000,
+};
+
+// VPU_VIU_VDIN_IF_MUX_CTRL
+//
+// Each VDIN (Video Input Module) can receive image data from one of the data
+// sources available on the SoC, selected via the `VideoInputCommandControl`
+// register. Two of the data sources, `kWritebackMux0` and `kWritebackMux1`,
+// are actually multiplexers connected to multiple sources.
+//
+// This register configures the multiplexers. Each multiplexer has clock and
+// data outputs ("paths" in the datasheets), which are configured separately.
+//
+// Many configurations are invalid. For example, a multiplexer's clock and data
+// outputs must be connected to the same source. To reduce the likelihood of
+// errors, this register's fields should be accessed exclusively via the
+// higher-level helper methods defined after the fields.
+//
+// S905D3 Datasheet, Section 8.2.3.1 "VPU Registers", Page 314.
+//
+// This register is not documented in the datasheets for S905D2, A311D and T931.
+// However, experiments on VIM3 (Amlogic A311D), Astro (Amlogic S905D2) and
+// Sherlock (Amlogic T931) show that the register exists and has the same layout
+// and functionality as that in S905D3.
+class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint32_t> {
+ public:  // Selects the data path from VIU/Encoder to writeback mux 1.
+  // This field is effective when a `VideoInputCommandControl` register selects
+  // the `kWritebackMux1` input ("VDIN0/1 source input 9" in the datasheet).
+  //
+  // It's preferred to use `GetMux1Selection()` and `SetMux1Selection()` helper
+  // functions to change the data path. For direct register manipulations,
+  // `mux1_data_selection` and `mux1_clock_selection` must be equal, otherwise
+  // the behavior is undefined.
+  DEF_ENUM_FIELD(WritebackMuxSource, 28, 24, mux1_data_selection);
+
+  // Selects the clock path from VIU/Encoder to writeback mux 1.
+  // This field is effective when a `VideoInputCommandControl` register selects
+  // the `kWritebackMux1` input ("VDIN0/1 source input 9" in the datasheet).
+  //
+  // It's preferred to use `GetMux1Selection()` and `SetMux1Selection()` helper
+  // functions to change the data path. For direct register manipulations,
+  // `mux1_data_selection` and `mux1_clock_selection` must be equal, otherwise
+  // the behavior is undefined.
+  DEF_ENUM_FIELD(WritebackMuxSource, 20, 16, mux1_clock_selection);
+
+  // Selects the data path from VIU/Encoder to writeback mux 0.
+  // This field is effective when a `VideoInputCommandControl` register selects
+  // the `kWritebackMux0` input ("VDIN0/1 source input 7" in the datasheet).
+  //
+  // It's preferred to use `GetMux0Selection()` and `SetMux0Selection()` helper
+  // functions to change the data path. For direct register manipulations,
+  // `mux0_data_selection` and `mux0_clock_selection` must be equal, otherwise
+  // the behavior is undefined.
+  DEF_ENUM_FIELD(WritebackMuxSource, 12, 8, mux0_data_selection);
+
+  // Selects the clock path from VIU/Encoder to writeback mux 0.
+  // This field is effective when a `VideoInputCommandControl` register selects
+  // the `kWritebackMux0` input ("VDIN0/1 source input 7" in the datasheet).
+  //
+  // It's preferred to use `GetMux0Selection()` and `SetMux0Selection()` helper
+  // functions to change the data path. For direct register manipulations,
+  // `mux0_data_selection` and `mux0_clock_selection` must be equal, otherwise
+  // the behavior is WritebackMuxSelection.
+  DEF_ENUM_FIELD(WritebackMuxSource, 4, 0, mux0_clock_selection);
+
+  // The clock/data source selected for writeback mux 1.
+  WritebackMuxSource GetMux1Selection() const {
+    WritebackMuxSource clock = mux1_clock_selection();
+    WritebackMuxSource data = mux1_data_selection();
+    if (clock != data) {
+      zxlogf(WARNING, "Writeback mux1 clock selection %" PRIu32 " != data selection %" PRIu32,
+             static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
+    }
+    return clock;
+  }
+
+  // Set the data/clock source for writeback mux 1.
+  WritebackMuxControl& SetMux1Selection(WritebackMuxSource mux_selection) {
+    ZX_ASSERT(GetMux1Selection() == WritebackMuxSource::kDisabled ||
+              mux_selection == WritebackMuxSource::kDisabled);
+    switch (mux_selection) {
+      case WritebackMuxSource::kDisabled:
+      case WritebackMuxSource::kEncoderInterlaced:
+      case WritebackMuxSource::kEncoderProgressive:
+      case WritebackMuxSource::kEncoderTvPanel:
+      case WritebackMuxSource::kViuWriteback0:
+      case WritebackMuxSource::kViuWriteback1:
+        set_mux1_clock_selection(mux_selection);
+        set_mux1_data_selection(mux_selection);
+        return *this;
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid mux selection %" PRIu32,
+                        static_cast<uint32_t>(mux_selection));
+    return *this;
+  }
+
+  // The clock/data source selected for writeback mux 0.
+  WritebackMuxSource GetMux0Selection() const {
+    WritebackMuxSource clock = mux0_clock_selection();
+    WritebackMuxSource data = mux0_data_selection();
+    if (clock != data) {
+      zxlogf(WARNING, "Writeback mux0 clock selection %" PRIu32 " != data selection %" PRIu32,
+             static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
+    }
+    return clock;
+  }
+
+  // Set the data/clock source for writeback mux 0.
+  WritebackMuxControl& SetMux0Selection(WritebackMuxSource mux_selection) {
+    ZX_ASSERT(GetMux0Selection() == WritebackMuxSource::kDisabled ||
+              mux_selection == WritebackMuxSource::kDisabled);
+    switch (mux_selection) {
+      case WritebackMuxSource::kDisabled:
+      case WritebackMuxSource::kEncoderInterlaced:
+      case WritebackMuxSource::kEncoderProgressive:
+      case WritebackMuxSource::kEncoderTvPanel:
+      case WritebackMuxSource::kViuWriteback0:
+      case WritebackMuxSource::kViuWriteback1:
+        set_mux0_clock_selection(mux_selection);
+        set_mux0_data_selection(mux_selection);
+        return *this;
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid mux selection %" PRIu32,
+                        static_cast<uint32_t>(mux_selection));
+    return *this;
+  }
+
+  static auto Get() { return hwreg::RegisterAddr<WritebackMuxControl>(0x2783 * sizeof(uint32_t)); }
 };
 
 }  // namespace amlogic_display

@@ -112,6 +112,7 @@ test("amlogic-display-test") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "amlogic-display-test.cc",
+    "video-input-regs-test.cc",
     "vout-test.cc",
   ]
   public_deps = [

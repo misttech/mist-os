@@ -418,11 +418,14 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
     return ZX_ERR_UNAVAILABLE;
   }
 
-  // setup VPU path
-  VdInIfMuxCtrlReg::Get()
+  // Set up sources for writeback mux 0.
+  WritebackMuxControl::Get()
       .ReadFrom(&(*vpu_mmio_))
-      .set_vpu_path_1(8)
-      .set_vpu_path_0(8)
+      .SetMux0Selection(WritebackMuxSource::kDisabled)
+      .WriteTo(&(*vpu_mmio_));
+  WritebackMuxControl::Get()
+      .ReadFrom(&(*vpu_mmio_))
+      .SetMux0Selection(WritebackMuxSource::kViuWriteback0)
       .WriteTo(&(*vpu_mmio_));
   WrBackMiscCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_chan0_hsync_enable(1).WriteTo(&(*vpu_mmio_));
   WrBackCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).set_chan0_sel(5).WriteTo(&(*vpu_mmio_));
@@ -643,7 +646,7 @@ void Vpu::CapturePrintRegisters() {
       VideoInputChannelFifoControl3::Get(kVideoInputModuleId).ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInMiscCtrlReg = 0x%x\n", VdInMiscCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
   DISP_INFO("VdInIfMuxCtrlReg = 0x%x\n",
-            VdInIfMuxCtrlReg::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
+            WritebackMuxControl::Get().ReadFrom(&(*vpu_mmio_)).reg_value());
 
   DISP_INFO("Dumping from 0x1300 to 0x1373\n");
   for (int i = 0x1300; i <= 0x1373; i++) {

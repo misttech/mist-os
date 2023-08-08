@@ -143,7 +143,6 @@
 #define VPU_VDIN1_WR_H_START_END (0x1321 << 2)
 #define VPU_VDIN1_WR_V_START_END (0x1322 << 2)
 #define VPU_VDIN1_MISC_CTRL (0x2782 << 2)
-#define VPU_VIU_VDIN_IF_MUX_CTRL (0x2783 << 2)  // undocumented ¯\_(ツ)_/¯
 
 #define VPU_MAFBC_BLOCK_ID (0x3a00 << 2)
 #define VPU_MAFBC_IRQ_RAW_STATUS (0x3a01 << 2)
@@ -311,13 +310,6 @@ class VdInMiscCtrlReg : public hwreg::RegisterBase<VdInMiscCtrlReg, uint32_t> {
  public:
   DEF_BIT(4, mif_reset);
   static auto Get() { return hwreg::RegisterAddr<VdInMiscCtrlReg>(VPU_VDIN1_MISC_CTRL); }
-};
-
-class VdInIfMuxCtrlReg : public hwreg::RegisterBase<VdInIfMuxCtrlReg, uint32_t> {
- public:
-  DEF_FIELD(12, 8, vpu_path_1);  // bit defs are not documented.
-  DEF_FIELD(4, 0, vpu_path_0);   // bit defs are not documented.
-  static auto Get() { return hwreg::RegisterAddr<VdInIfMuxCtrlReg>(VPU_VIU_VDIN_IF_MUX_CTRL); }
 };
 
 class AfbcCommandReg : public RegisterBase<AfbcCommandReg, uint32_t> {
