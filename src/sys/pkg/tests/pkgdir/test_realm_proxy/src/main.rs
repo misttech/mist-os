@@ -37,7 +37,7 @@ async fn main() -> Result<(), Error> {
     package_directory::serve(
         vfs::execution_scope::ExecutionScope::new(),
         blobfs_client,
-        *test_package.meta_far_merkle_root(),
+        *test_package.hash(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         server,
     )

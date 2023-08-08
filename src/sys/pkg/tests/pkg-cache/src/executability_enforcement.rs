@@ -55,7 +55,7 @@ async fn verify_package_executability(
     if let IsRetained::True = is_retained {
         let () = crate::replace_retained_packages(
             &env.proxies.retained_packages,
-            &[(*pkg.meta_far_merkle_root()).into()],
+            &[(*pkg.hash()).into()],
         )
         .await;
     }

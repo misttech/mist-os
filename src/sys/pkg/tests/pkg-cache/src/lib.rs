@@ -137,10 +137,8 @@ async fn get_and_verify_package(
     package_cache: &fpkg::PackageCacheProxy,
     pkg: &Package,
 ) -> fio::DirectoryProxy {
-    let meta_blob_info = fpkg::BlobInfo {
-        blob_id: fpkg_ext::BlobId::from(*pkg.meta_far_merkle_root()).into(),
-        length: 0,
-    };
+    let meta_blob_info =
+        fpkg::BlobInfo { blob_id: fpkg_ext::BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
@@ -230,10 +228,8 @@ async fn verify_package_cached(
     proxy: &fpkg::PackageCacheProxy,
     pkg: &Package,
 ) -> fio::DirectoryProxy {
-    let meta_blob_info = fpkg::BlobInfo {
-        blob_id: fpkg_ext::BlobId::from(*pkg.meta_far_merkle_root()).into(),
-        length: 0,
-    };
+    let meta_blob_info =
+        fpkg::BlobInfo { blob_id: fpkg_ext::BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
@@ -341,7 +337,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
                     let blobfs =
                         BlobfsRamdisk::builder().implementation(blob_impl).start().await.unwrap();
                     let () = system_image_package.write_to_blobfs(&blobfs).await;
-                    (blobfs, Some(*system_image_package.meta_far_merkle_root()))
+                    (blobfs, Some(*system_image_package.hash()))
                 }
                 .boxed()
             }),
@@ -399,7 +395,7 @@ where
         for pkg in extra_packages {
             let () = pkg.write_to_blobfs(&blobfs).await;
         }
-        let system_image_hash = *system_image.meta_far_merkle_root();
+        let system_image_hash = *system_image.hash();
 
         TestEnvBuilder::<_> {
             blobfs_and_system_image: Box::new(move |_| {

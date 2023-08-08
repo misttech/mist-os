@@ -51,8 +51,7 @@ async fn cached_packages_are_retained() {
         .build()
         .await;
 
-    let blob_ids =
-        packages.iter().map(|pkg| BlobId::from(*pkg.meta_far_merkle_root())).collect::<Vec<_>>();
+    let blob_ids = packages.iter().map(|pkg| BlobId::from(*pkg.hash())).collect::<Vec<_>>();
 
     // Mark packages as retained.
     replace_retained_packages(&env.proxies.retained_packages, blob_ids.as_slice()).await;
@@ -61,11 +60,11 @@ async fn cached_packages_are_retained() {
 
     // Verify no retained package blobs are deleted, directly from blobfs.
     for pkg in packages.iter() {
-        assert!(env.blobfs.client().has_blob(pkg.meta_far_merkle_root()).await);
+        assert!(env.blobfs.client().has_blob(pkg.hash()).await);
     }
 
     for pkg in garbage_packages.iter() {
-        assert_eq!(env.blobfs.client().has_blob(pkg.meta_far_merkle_root()).await, false);
+        assert_eq!(env.blobfs.client().has_blob(pkg.hash()).await, false);
     }
 
     // Verify no retained package blobs are deleted, using PackageCache API.
@@ -82,7 +81,7 @@ async fn packages_are_retained_gc_mid_process() {
         .await
         .unwrap();
 
-    let blob_id = BlobId::from(*package.meta_far_merkle_root());
+    let blob_id = BlobId::from(*package.hash());
 
     // Start installing a package (write the meta far).
     let meta_blob_info = BlobInfo { blob_id: blob_id.into(), length: 0 };
@@ -107,7 +106,7 @@ async fn packages_are_retained_gc_mid_process() {
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
 
     // Verify the package’s meta far is not deleted.
-    assert!(env.blobfs.client().has_blob(package.meta_far_merkle_root()).await);
+    assert!(env.blobfs.client().has_blob(package.hash()).await);
 
     write_needed_blobs(&needed_blobs, contents).await;
 
@@ -129,8 +128,7 @@ async fn cached_and_released_packages_are_removed() {
             .await
             .unwrap(),
     ];
-    let blob_ids =
-        packages.iter().map(|pkg| BlobId::from(*pkg.meta_far_merkle_root())).collect::<Vec<_>>();
+    let blob_ids = packages.iter().map(|pkg| BlobId::from(*pkg.hash())).collect::<Vec<_>>();
 
     // Mark packages as retained.
     replace_retained_packages(&env.proxies.retained_packages, blob_ids.as_slice()).await;
@@ -142,7 +140,7 @@ async fn cached_and_released_packages_are_removed() {
 
     // Verify no retained package blobs are deleted, directly from blobfs.
     for pkg in packages.iter() {
-        assert!(env.blobfs.client().has_blob(pkg.meta_far_merkle_root()).await);
+        assert!(env.blobfs.client().has_blob(pkg.hash()).await);
     }
 
     // Verify no retained package blobs are deleted, using PackageCache API.
@@ -154,7 +152,7 @@ async fn cached_and_released_packages_are_removed() {
 
     for package in packages.iter() {
         assert_matches!(
-            env.get_already_cached(&package.meta_far_merkle_root().to_string()).await,
+            env.get_already_cached(&package.hash().to_string()).await,
             Err(e) if e.was_not_cached()
         );
     }

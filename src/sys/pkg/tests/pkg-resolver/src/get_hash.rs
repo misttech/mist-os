@@ -30,7 +30,7 @@ async fn succeeds_if_package_present() {
 
     let package = env.get_hash("fuchsia-pkg://test/a-fake-pkg-name").await;
 
-    assert_eq!(package.unwrap(), pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(package.unwrap(), pkg.hash().clone().into());
 
     env.stop().await;
 }

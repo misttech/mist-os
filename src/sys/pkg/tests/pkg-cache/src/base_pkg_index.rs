@@ -40,7 +40,7 @@ async fn assert_base_packages_match(
 ) {
     let expected_entries = static_packages.iter().map(|pkg| {
         let url = format!("fuchsia-pkg://fuchsia.com/{}", pkg.name());
-        let merkle = *pkg.meta_far_merkle_root();
+        let merkle = *pkg.hash();
         (url, merkle)
     });
 
@@ -141,7 +141,7 @@ async fn base_pkg_index_verify_multiple_chunks() {
         .build()
         .await
         .unwrap();
-    let hash = *pkg_0.meta_far_merkle_root();
+    let hash = *pkg_0.hash();
 
     for i in 0..bundle_size {
         let name = format!("base-package-{i:04}");

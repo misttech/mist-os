@@ -336,7 +336,7 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
                     let blobfs =
                         BlobfsRamdisk::builder().implementation(blob_impl).start().await.unwrap();
                     let () = system_image_package.write_to_blobfs(&blobfs).await;
-                    (blobfs, Some(*system_image_package.meta_far_merkle_root()))
+                    (blobfs, Some(*system_image_package.hash()))
                 }
                 .boxed()
             }),
@@ -410,7 +410,7 @@ where
         for pkg in extra_packages {
             let () = pkg.write_to_blobfs(&blobfs).await;
         }
-        let system_image_hash = *system_image.meta_far_merkle_root();
+        let system_image_hash = *system_image.hash();
 
         TestEnvBuilder::<_, MountsFn> {
             blobfs_and_system_image: Box::new(move |_| {

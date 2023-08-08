@@ -304,7 +304,7 @@ mod tests {
             .unwrap();
         let (meta_far, content_blobs) = pkg.contents();
         blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
-        let root_dir = RootDir::new(blobfs.client(), *pkg.meta_far_merkle_root()).await.unwrap();
+        let root_dir = RootDir::new(blobfs.client(), *pkg.hash()).await.unwrap();
 
         let (missing_blobs, recv) =
             MissingBlobs::new(blobfs.client(), &root_dir, Box::new(blob_recorder.clone()))
@@ -330,7 +330,7 @@ mod tests {
             .await
             .unwrap();
         pkg.write_to_blobfs(&blobfs).await;
-        let root_dir = RootDir::new(blobfs.client(), *pkg.meta_far_merkle_root()).await.unwrap();
+        let root_dir = RootDir::new(blobfs.client(), *pkg.hash()).await.unwrap();
 
         let (missing_blobs, recv) =
             MissingBlobs::new(blobfs.client(), &root_dir, Box::new(blob_recorder.clone()))
@@ -358,7 +358,7 @@ mod tests {
             .unwrap();
         let (meta_far, content_blobs) = pkg.contents();
         blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
-        let root_dir = RootDir::new(blobfs.client(), *pkg.meta_far_merkle_root()).await.unwrap();
+        let root_dir = RootDir::new(blobfs.client(), *pkg.hash()).await.unwrap();
 
         let (missing_blobs, recv) =
             MissingBlobs::new(blobfs.client(), &root_dir, Box::new(blob_recorder.clone()))
@@ -395,7 +395,7 @@ mod tests {
         let (meta_far, _) = superpackage.contents();
         blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
+            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
             blobfs.client(),
@@ -410,10 +410,7 @@ mod tests {
         assert_eq!(read_receiver(recv).await, vec![*content_blobs.keys().next().unwrap()]);
         assert_eq!(
             blob_recorder.hashes().await,
-            HashSet::from_iter([
-                *content_blobs.keys().next().unwrap(),
-                *subpackage.meta_far_merkle_root()
-            ])
+            HashSet::from_iter([*content_blobs.keys().next().unwrap(), *subpackage.hash()])
         );
     }
 
@@ -431,7 +428,7 @@ mod tests {
         let (meta_far, _) = superpackage.contents();
         blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
+            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
             blobfs.client(),
@@ -443,11 +440,8 @@ mod tests {
         assert_eq!(missing_blobs.count_not_cached(), 1);
         drop(missing_blobs);
 
-        assert_eq!(read_receiver(recv).await, vec![*subpackage.meta_far_merkle_root()]);
-        assert_eq!(
-            blob_recorder.hashes().await,
-            HashSet::from_iter([*subpackage.meta_far_merkle_root()])
-        );
+        assert_eq!(read_receiver(recv).await, vec![*subpackage.hash()]);
+        assert_eq!(blob_recorder.hashes().await, HashSet::from_iter([*subpackage.hash()]));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -472,7 +466,7 @@ mod tests {
         let (meta_far, _) = superpackage.contents();
         blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
+            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
             blobfs.client(),
@@ -484,13 +478,10 @@ mod tests {
         assert_eq!(missing_blobs.count_not_cached(), 1);
         drop(missing_blobs);
 
-        assert_eq!(read_receiver(recv).await, vec![*subsubpackage.meta_far_merkle_root()]);
+        assert_eq!(read_receiver(recv).await, vec![*subsubpackage.hash()]);
         assert_eq!(
             blob_recorder.hashes().await,
-            HashSet::from_iter([
-                *subpackage.meta_far_merkle_root(),
-                *subsubpackage.meta_far_merkle_root()
-            ])
+            HashSet::from_iter([*subpackage.hash(), *subsubpackage.hash()])
         );
     }
 
@@ -513,7 +504,7 @@ mod tests {
             .await
             .unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
+            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
             blobfs.client(),
@@ -529,10 +520,7 @@ mod tests {
             read_receiver(recv).await,
             vec![superpackage_content_blobs.into_keys().next().unwrap()]
         );
-        assert_eq!(
-            blob_recorder.hashes().await,
-            HashSet::from_iter([*subpackage.meta_far_merkle_root(),])
-        );
+        assert_eq!(blob_recorder.hashes().await, HashSet::from_iter([*subpackage.hash(),]));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -562,7 +550,7 @@ mod tests {
             .await
             .unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.meta_far_merkle_root()).await.unwrap();
+            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
 
         // Sends the subsubpackage meta.far but only as a content blob.
         let (mut missing_blobs, recv) = MissingBlobs::new(
@@ -599,8 +587,8 @@ mod tests {
         assert_eq!(
             blob_recorder.hashes().await,
             HashSet::from_iter([
-                *subpackage.meta_far_merkle_root(),
-                *subsubpackage.meta_far_merkle_root(),
+                *subpackage.hash(),
+                *subsubpackage.hash(),
                 *subpackage_content_blobs.keys().next().unwrap(),
             ])
         );

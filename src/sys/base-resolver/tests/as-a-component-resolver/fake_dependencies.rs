@@ -17,7 +17,7 @@ async fn main() {
     let this_pkg = fuchsia_pkg_testing::Package::identity().await.unwrap();
     let static_packages = system_image::StaticPackages::from_entries(vec![(
         "mock-package/0".parse().unwrap(),
-        *this_pkg.meta_far_merkle_root(),
+        *this_pkg.hash(),
     )]);
     let mut static_packages_bytes = vec![];
     static_packages.serialize(&mut static_packages_bytes).expect("write static_packages");
@@ -33,7 +33,7 @@ async fn main() {
     let () = the_subpackage.write_to_blobfs(&blobfs).await;
 
     // Use VFS because ServiceFs does not support OPEN_RIGHT_EXECUTABLE, but /blob needs it.
-    let system_image_hash = *system_image.meta_far_merkle_root();
+    let system_image_hash = *system_image.hash();
     let out_dir = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
             fboot::ArgumentsMarker::PROTOCOL_NAME =>

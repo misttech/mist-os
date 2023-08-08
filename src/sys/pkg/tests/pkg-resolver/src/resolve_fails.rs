@@ -264,10 +264,7 @@ async fn failed_resolve_stops_fetching_blobs() {
         .build()
         .await
         .unwrap();
-    assert_ne!(
-        pkg_many_failing_content_blobs.meta_far_merkle_root(),
-        pkg_only_meta_far_different_hash.meta_far_merkle_root()
-    );
+    assert_ne!(pkg_many_failing_content_blobs.hash(), pkg_only_meta_far_different_hash.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -283,10 +280,8 @@ async fn failed_resolve_stops_fetching_blobs() {
     let (record, history) = responder::Record::new();
 
     let (fail_content_blobs, unblock) = responder::FailOneThenTemporarilyBlock::new();
-    let first_meta_far_http_path =
-        format!("/blobs/{}", pkg_many_failing_content_blobs.meta_far_merkle_root());
-    let second_meta_far_http_path =
-        format!("/blobs/{}", pkg_only_meta_far_different_hash.meta_far_merkle_root());
+    let first_meta_far_http_path = format!("/blobs/{}", pkg_many_failing_content_blobs.hash());
+    let second_meta_far_http_path = format!("/blobs/{}", pkg_only_meta_far_different_hash.hash());
     let fail_content_blobs = responder::Filter::new(
         move |req: &hyper::Request<hyper::Body>| {
             req.uri().path() != first_meta_far_http_path

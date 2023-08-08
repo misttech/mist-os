@@ -193,12 +193,9 @@ mod tests {
             let base_packages = BasePackages::new(
                 &blobfs_client,
                 &system_image::SystemImage::from_root_dir(
-                    package_directory::RootDir::new(
-                        blobfs_client.clone(),
-                        *system_image.meta_far_merkle_root(),
-                    )
-                    .await
-                    .unwrap(),
+                    package_directory::RootDir::new(blobfs_client.clone(), *system_image.hash())
+                        .await
+                        .unwrap(),
                 ),
             )
             .await
@@ -292,10 +289,10 @@ mod tests {
         assert_data_tree!(env.inspector, root: {
             "base-packages": {
                 "a-base-package/0": {
-                    "hash": a_base_package.meta_far_merkle_root().to_string(),
+                    "hash": a_base_package.hash().to_string(),
                 },
                 "system_image/0": {
-                    "hash": env.system_image.meta_far_merkle_root().to_string(),
+                    "hash": env.system_image.hash().to_string(),
                 }
             }
         });
@@ -308,7 +305,7 @@ mod tests {
             .build()
             .await
             .unwrap();
-        let a_base_package_hash = *a_base_package.meta_far_merkle_root();
+        let a_base_package_hash = *a_base_package.hash();
         let (env, base_packages) = TestEnv::new(&[&a_base_package]).await;
 
         assert_eq!(
@@ -317,7 +314,7 @@ mod tests {
                 .map(|(p, h)| (p.clone(), *h))
                 .collect::<HashSet<_>>(),
             HashSet::from_iter([
-                ("system_image/0".parse().unwrap(), *env.system_image.meta_far_merkle_root()),
+                ("system_image/0".parse().unwrap(), *env.system_image.hash()),
                 ("a-base-package/0".parse().unwrap(), a_base_package_hash),
             ])
         );
@@ -332,17 +329,14 @@ mod tests {
                 .root_paths_and_hashes()
                 .map(|(p, h)| (p.clone(), *h))
                 .collect::<HashSet<_>>(),
-            HashSet::from_iter([(
-                "system_image/0".parse().unwrap(),
-                *env.system_image.meta_far_merkle_root()
-            ),])
+            HashSet::from_iter([("system_image/0".parse().unwrap(), *env.system_image.hash()),])
         );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn is_base_package_root_package() {
         let (env, base_packages) = TestEnv::new(&[]).await;
-        let system_image = *env.system_image.meta_far_merkle_root();
+        let system_image = *env.system_image.hash();
         let mut not_system_image = Into::<[u8; 32]>::into(system_image);
         not_system_image[0] = !not_system_image[0];
         let not_system_image = Hash::from(not_system_image);
@@ -362,7 +356,7 @@ mod tests {
         let (_env, base_packages) =
             TestEnv::new_with_subpackages(&[&superpackage], &[&subpackage]).await;
 
-        assert!(base_packages.is_base_package(*subpackage.meta_far_merkle_root()));
+        assert!(base_packages.is_base_package(*subpackage.hash()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -378,12 +372,9 @@ mod tests {
         let base_packages_res = BasePackages::new(
             &blobfs_client,
             &system_image::SystemImage::from_root_dir(
-                package_directory::RootDir::new(
-                    blobfs_client.clone(),
-                    *system_image.meta_far_merkle_root(),
-                )
-                .await
-                .unwrap(),
+                package_directory::RootDir::new(blobfs_client.clone(), *system_image.hash())
+                    .await
+                    .unwrap(),
             ),
         )
         .await;

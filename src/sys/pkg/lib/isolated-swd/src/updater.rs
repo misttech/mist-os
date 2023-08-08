@@ -414,7 +414,7 @@ pub(crate) mod for_tests {
                 served_repo,
                 paver: paver_clone,
                 packages: self.packages,
-                update_merkle_root: *update.meta_far_merkle_root(),
+                update_merkle_root: *update.hash(),
                 repo_url: self.repo_url,
                 updater,
                 resolver,
@@ -431,7 +431,7 @@ pub(crate) mod for_tests {
     pub fn generate_packages_json(packages: &[Package], repo_url: &str) -> String {
         let package_urls: Vec<String> = packages
             .iter()
-            .map(|p| format!("{}/{}/0?hash={}", repo_url, p.name(), p.meta_far_merkle_root()))
+            .map(|p| format!("{}/{}/0?hash={}", repo_url, p.name(), p.hash()))
             .collect();
 
         let packages_json = serde_json::json!({

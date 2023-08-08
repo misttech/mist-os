@@ -66,7 +66,7 @@ pub struct BlobContents {
 
 impl Package {
     /// The merkle root of the package's meta.far.
-    pub fn meta_far_merkle_root(&self) -> &Hash {
+    pub fn hash(&self) -> &Hash {
         &self.meta_far_merkle
     }
 
@@ -252,7 +252,7 @@ impl Package {
         }
 
         blobfs_ramdisk
-            .write_blob(*self.meta_far_merkle_root(), &read_file(&self.meta_far().unwrap()))
+            .write_blob(*self.hash(), &read_file(&self.meta_far().unwrap()))
             .await
             .expect("write_blob failed");
         for blob in self.content_blob_files() {
@@ -644,9 +644,7 @@ impl PackageBuilder {
         let name = name.try_into().map_err(|_| ()).expect("valid RelativePackageUrl");
         let manifest_path = subpackage.artifacts().join("manifest.json").into();
 
-        self.builder
-            .add_subpackage(&name, *subpackage.meta_far_merkle_root(), manifest_path)
-            .unwrap();
+        self.builder.add_subpackage(&name, *subpackage.hash(), manifest_path).unwrap();
         self.has_subpackages = true;
 
         match (&mut self.subpackage_blobs, &subpackage.subpackage_blobs) {
@@ -880,7 +878,7 @@ mod tests {
             .build()
             .await?;
 
-        assert_eq!(with_dir.meta_far_merkle_root(), with_direct.meta_far_merkle_root());
+        assert_eq!(with_dir.hash(), with_direct.hash());
 
         Ok(())
     }
@@ -1116,7 +1114,7 @@ mod tests {
                 sub_pkg_meta_far.merkle
             )])
         );
-        expected_all_blobs.insert(*pkg.meta_far_merkle_root());
+        expected_all_blobs.insert(*pkg.hash());
         assert_eq!(pkg.list_blobs().unwrap(), expected_all_blobs);
     }
 

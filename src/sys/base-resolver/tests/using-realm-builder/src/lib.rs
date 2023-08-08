@@ -53,7 +53,7 @@ impl TestEnvBuilder {
 
         Self {
             blobfs: Some(blobfs),
-            boot_args: Some(Arc::new(BootArgsFixedHash::new(*system_image.meta_far_merkle_root()))),
+            boot_args: Some(Arc::new(BootArgsFixedHash::new(*system_image.hash()))),
         }
     }
 

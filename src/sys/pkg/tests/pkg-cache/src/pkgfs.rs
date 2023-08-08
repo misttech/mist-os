@@ -34,7 +34,7 @@ async fn expose_pkgfs_ctl_validation_missing_file() {
         missing_blob = Some(hash);
     }
     let env = TestEnv::builder()
-        .blobfs_and_system_image_hash(blobfs, Some(*system_image_package.meta_far_merkle_root()))
+        .blobfs_and_system_image_hash(blobfs, Some(*system_image_package.hash()))
         .build()
         .await;
 

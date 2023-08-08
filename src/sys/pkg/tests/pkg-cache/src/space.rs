@@ -115,10 +115,8 @@ async fn gc_dynamic_index_protected() {
         .unwrap();
 
     // Here, we persist the meta.far
-    let meta_blob_info = fpkg::BlobInfo {
-        blob_id: BlobId::from(*pkgprime.meta_far_merkle_root()).into(),
-        length: 0,
-    };
+    let meta_blob_info =
+        fpkg::BlobInfo { blob_id: BlobId::from(*pkgprime.hash()).into(), length: 0 };
     let package_cache = &env.proxies.package_cache;
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -142,7 +140,7 @@ async fn gc_dynamic_index_protected() {
     // Ensure that the new meta.far is persisted despite having missing blobs, and the "old" blobs
     // are not removed.
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
-    test_blobs.insert(*pkgprime.meta_far_merkle_root());
+    test_blobs.insert(*pkgprime.hash());
     assert_eq!(env.blobfs.list_blobs().expect("to get new blobs"), test_blobs);
 
     // Fully fetch pkgprime, and ensure that blobs from the old package are not persisted past GC.
@@ -231,10 +229,8 @@ async fn gc_updated_static_package() {
         .unwrap();
 
     // Here, we persist the meta.far
-    let meta_blob_info = fpkg::BlobInfo {
-        blob_id: BlobId::from(*pkgprime.meta_far_merkle_root()).into(),
-        length: 0,
-    };
+    let meta_blob_info =
+        fpkg::BlobInfo { blob_id: BlobId::from(*pkgprime.hash()).into(), length: 0 };
     let package_cache = &env.proxies.package_cache;
 
     let (needed_blobs, needed_blobs_server_end) =
@@ -258,7 +254,7 @@ async fn gc_updated_static_package() {
     // Ensure that the new meta.far is persisted despite having missing blobs, and the "old" blobs
     // are not removed.
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
-    test_blobs.insert(*pkgprime.meta_far_merkle_root());
+    test_blobs.insert(*pkgprime.hash());
     assert_eq!(env.blobfs.list_blobs().expect("to get new blobs"), test_blobs);
 
     // Fully fetch pkgprime, and ensure that blobs from the old package are not persisted past GC.
@@ -315,10 +311,7 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
     let system_image_package = SystemImageBuilder::new().build().await;
     system_image_package.write_to_blobfs(&small_blobfs).await;
     let env = TestEnv::builder()
-        .blobfs_and_system_image_hash(
-            small_blobfs,
-            Some(*system_image_package.meta_far_merkle_root()),
-        )
+        .blobfs_and_system_image_hash(small_blobfs, Some(*system_image_package.hash()))
         .blobfs_impl(blob_implementation)
         .build()
         .await;
@@ -329,9 +322,8 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
         .build()
         .await
         .expect("build large package");
-    assert_ne!(*pkg.meta_far_merkle_root(), orphan_hash);
-    let meta_blob_info =
-        fpkg::BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    assert_ne!(*pkg.hash(), orphan_hash);
+    let meta_blob_info = fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -404,11 +396,11 @@ async fn blobs_protected_from_gc_during_get(gc_protection: GcProtection) {
 
     // Verify that none of the to-be-fetched blobs are in blobfs.
     let to_be_fetched: Vec<(fuchsia_merkle::Hash, Vec<u8>)> = vec![
-        (*superpackage.meta_far_merkle_root(), superpackage.contents().0.contents.clone()),
+        (*superpackage.hash(), superpackage.contents().0.contents.clone()),
         superpackage.contents().1.into_iter().next().unwrap(),
-        (*subpackage.meta_far_merkle_root(), subpackage.contents().0.contents.clone()),
+        (*subpackage.hash(), subpackage.contents().0.contents.clone()),
         subpackage.contents().1.into_iter().next().unwrap(),
-        (*subsubpackage.meta_far_merkle_root(), subsubpackage.contents().0.contents),
+        (*subsubpackage.hash(), subsubpackage.contents().0.contents),
         subsubpackage.contents().1.into_iter().next().unwrap(),
     ];
     let to_be_fetched_hashes = BTreeSet::from_iter(to_be_fetched.iter().map(|(hash, _)| *hash));
@@ -428,7 +420,7 @@ async fn blobs_protected_from_gc_during_get(gc_protection: GcProtection) {
         GcProtection::Retained => {
             crate::replace_retained_packages(
                 &env.proxies.retained_packages,
-                &[(*superpackage.meta_far_merkle_root()).into()],
+                &[(*superpackage.hash()).into()],
             )
             .await
         }
@@ -437,10 +429,8 @@ async fn blobs_protected_from_gc_during_get(gc_protection: GcProtection) {
         // retained index.
         GcProtection::Dynamic => (),
     }
-    let meta_blob_info = fpkg::BlobInfo {
-        blob_id: BlobId::from(*superpackage.meta_far_merkle_root()).into(),
-        length: 0,
-    };
+    let meta_blob_info =
+        fpkg::BlobInfo { blob_id: BlobId::from(*superpackage.hash()).into(), length: 0 };
     let (needed_blobs, needed_blobs_server) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

@@ -286,7 +286,7 @@ async fn pkg_resolver_fetch_blob_success() {
 async fn pkg_resolver_fetch_blob_failure() {
     let pkg = PackageBuilder::new("just_meta_far").build().await.expect("created pkg");
     let responder = responder::ForPath::new(
-        format!("/blobs/{}", pkg.meta_far_merkle_root()),
+        format!("/blobs/{}", pkg.hash()),
         responder::StaticResponseCode::server_error(),
     );
 
@@ -478,7 +478,7 @@ mod pkg_resolver_blob_fetch {
             .server()
             .bind_to_addr(Ipv4Addr::LOCALHOST)
             .response_overrider(responder::ForPath::new(
-                format!("/blobs/{}", pkg.meta_far_merkle_root()),
+                format!("/blobs/{}", pkg.hash()),
                 responder,
             ))
             .start()

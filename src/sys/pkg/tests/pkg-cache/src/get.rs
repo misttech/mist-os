@@ -31,7 +31,7 @@ async fn get_multiple_packages_with_no_content_blobs() {
     // Assert the packages are not present before the get
     for pkg in &packages {
         assert_matches!(
-            env.get_already_cached(&pkg.meta_far_merkle_root().to_string()).await,
+            env.get_already_cached(&pkg.hash().to_string()).await,
             Err(e) if e.was_not_cached()
         );
     }
@@ -46,8 +46,7 @@ async fn get_single_package_with_no_content_blobs(env: TestEnv, blob_type: fpkg:
 
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
 
-    let meta_blob_info =
-        BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -158,8 +157,7 @@ async fn get_and_hold_directory() {
     // Request and write a package, hold the package directory.
     let dir = get_and_verify_package(&env.proxies.package_cache, &package).await;
 
-    let meta_blob_info =
-        BlobInfo { blob_id: BlobId::from(*package.meta_far_merkle_root()).into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*package.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -191,8 +189,7 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
 
     let pkg = PackageBuilder::new("pkg-a").build().await.unwrap();
 
-    let meta_blob_info =
-        BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -219,7 +216,7 @@ async fn handles_partially_written_pkg() {
         .await
         .unwrap();
 
-    let meta_far_hash = *pkg.meta_far_merkle_root();
+    let meta_far_hash = *pkg.hash();
     let meta_far_data = {
         use std::io::Read as _;
 
@@ -287,8 +284,7 @@ async fn get_package_already_present_on_fs() {
         .build()
         .await;
 
-    let meta_blob_info =
-        BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -330,8 +326,7 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
         .build()
         .await;
 
-    let meta_blob_info =
-        BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
@@ -569,8 +564,7 @@ async fn get_with_specific_blobfs_implementation(
         .build()
         .await
         .unwrap();
-    let meta_blob_info =
-        BlobInfo { blob_id: BlobId::from(*pkg.meta_far_merkle_root()).into(), length: 0 };
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

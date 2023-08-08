@@ -84,7 +84,7 @@ impl<'a> SystemImageBuilder<'a> {
             .map(|pkg| {
                 (
                     PackagePath::from_name_and_variant(pkg.name().to_owned(), "0".parse().unwrap()),
-                    *pkg.meta_far_merkle_root(),
+                    *pkg.hash(),
                 )
             })
             .collect()
@@ -97,7 +97,7 @@ impl<'a> SystemImageBuilder<'a> {
                     DEFAULT_PACKAGE_REPO_URL.parse().unwrap(),
                     pkg.name().clone(),
                     Some(fuchsia_url::PackageVariant::zero()),
-                    *pkg.meta_far_merkle_root(),
+                    *pkg.hash(),
                 )
             })
             .collect()

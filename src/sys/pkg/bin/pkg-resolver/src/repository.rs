@@ -490,7 +490,7 @@ mod tests {
             repo.get_merkle_at_path(&target_path).await.expect("fetched merkle from tuf");
 
         // Verify what we got from tuf was correct
-        assert_eq!(merkle.as_bytes(), pkg.meta_far_merkle_root().as_bytes());
+        assert_eq!(merkle.as_bytes(), pkg.hash().as_bytes());
         assert_eq!(size, pkg.meta_far().unwrap().metadata().unwrap().len());
     }
 
@@ -545,7 +545,7 @@ mod tests {
         should_fail.unset();
         let CustomTargetMetadata { merkle, size } =
             repo.get_merkle_at_path(&target_path).await.expect("fetched merkle from tuf");
-        assert_eq!(merkle.as_bytes(), pkg.meta_far_merkle_root().as_bytes());
+        assert_eq!(merkle.as_bytes(), pkg.hash().as_bytes());
         assert_eq!(size, pkg.meta_far().unwrap().metadata().unwrap().len());
     }
 
@@ -676,7 +676,7 @@ mod tests {
             repo.get_merkle_at_path(&target_path).await.expect("fetched merkle from tuf");
 
         // Verify what we got from tuf was correct
-        assert_eq!(merkle.as_bytes(), pkg.meta_far_merkle_root().as_bytes());
+        assert_eq!(merkle.as_bytes(), pkg.hash().as_bytes());
         assert_eq!(size, pkg.meta_far().unwrap().metadata().unwrap().len());
 
         // Make sure the metadata was persisted to disk

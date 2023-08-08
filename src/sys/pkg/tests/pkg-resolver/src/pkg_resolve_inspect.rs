@@ -196,7 +196,7 @@ async fn package_and_blob_queues() {
             .unwrap(),
     );
 
-    let meta_far_blob_path = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let meta_far_blob_path = format!("/blobs/{}", pkg.hash());
 
     let flake_first_attempt = responder::ForPath::new(
         meta_far_blob_path.clone(),
@@ -236,7 +236,7 @@ async fn package_and_blob_queues() {
             root: contains {
                 blob_fetcher: contains {
                     queue: contains {
-                        pkg.meta_far_merkle_root().to_string() => contains {
+                        pkg.hash().to_string() => contains {
                             attempts: {
                                 "2": contains {
                                     state: "read http body"
@@ -264,7 +264,7 @@ async fn package_and_blob_queues() {
         root: contains {
             blob_fetcher: contains {
                 queue: {
-                    pkg.meta_far_merkle_root().to_string() => {
+                    pkg.hash().to_string() => {
                         fetch_ts: AnyProperty,
                         source: "http",
                         mirror: format!("{}{}", served_repository.local_url(), meta_far_blob_path),

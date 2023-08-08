@@ -54,13 +54,13 @@ async fn test_base_package_found() {
 
     // Make sure that repo_pkg is not cached locally.
     assert_matches!(
-        env.get_already_cached(repo_pkg.meta_far_merkle_root().clone().into()).await,
+        env.get_already_cached(repo_pkg.hash().clone().into()).await,
         Err(e) if e.was_not_cached()
     );
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), base_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), base_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -119,7 +119,7 @@ async fn test_base_package_with_variant_found() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), base_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), base_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -152,8 +152,7 @@ async fn test_base_package_with_merkle_pin() {
 
     env.register_repo_at_url(&served_repository, "fuchsia-pkg://fuchsia.com").await;
     // Merkle pin the request to the repo version.
-    let pkg_url =
-        format!("fuchsia-pkg://fuchsia.com/{pkg_name}?hash={}", repo_pkg.meta_far_merkle_root());
+    let pkg_url = format!("fuchsia-pkg://fuchsia.com/{pkg_name}?hash={}", repo_pkg.hash());
     let (package_dir, _resolved_context) = env.resolve_package(&pkg_url).await.unwrap();
 
     // Make sure we got the repo (pinned) version, not the static version.
@@ -162,7 +161,7 @@ async fn test_base_package_with_merkle_pin() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), repo_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), repo_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -194,7 +193,7 @@ async fn test_base_package_while_tuf_broken() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), base_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), base_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -218,7 +217,7 @@ async fn test_base_package_without_repo_configured() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), base_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), base_pkg.hash().clone().into());
 
     env.stop().await;
 }

@@ -73,10 +73,7 @@ async fn package_resolution() {
     // All blobs in the repository should now be present in blobfs.
     assert_eq!(env.blobfs.list_blobs().unwrap(), repo_blobs);
 
-    assert_eq!(
-        resolved_context.blob_id().unwrap(),
-        &pkg::BlobId::from(*pkg.meta_far_merkle_root())
-    );
+    assert_eq!(resolved_context.blob_id().unwrap(), &pkg::BlobId::from(*pkg.hash()));
 
     env.stop().await;
 }
@@ -287,7 +284,7 @@ async fn pinned_merkle_resolution() {
     env.register_repo(&served_repository).await;
 
     let pkg1_url_with_pkg2_merkle =
-        format!("fuchsia-pkg://test/pinned-merkle-foo?hash={}", pkg2.meta_far_merkle_root());
+        format!("fuchsia-pkg://test/pinned-merkle-foo?hash={}", pkg2.hash());
 
     let (package_dir, _resolved_context) =
         env.resolve_package(&pkg1_url_with_pkg2_merkle).await.unwrap();
@@ -441,7 +438,7 @@ async fn handles_429_responses() {
     let served_repository = repo
         .server()
         .response_overrider(responder::ForPath::new(
-            format!("/blobs/{}", pkg1.meta_far_merkle_root()),
+            format!("/blobs/{}", pkg1.hash()),
             responder::ForRequestCount::new(2, responder::StaticResponseCode::too_many_requests()),
         ))
         .response_overrider(responder::ForPath::new(
@@ -550,9 +547,7 @@ async fn use_cached_package() {
 async fn meta_far_already_in_blobfs() {
     verify_resolve_with_altered_env(
         make_pkg_with_extra_blobs("meta_far_already_in_blobfs", 3).await,
-        |env, pkg| {
-            env.add_file_with_hash_to_blobfs(pkg.meta_far().unwrap(), pkg.meta_far_merkle_root())
-        },
+        |env, pkg| env.add_file_with_hash_to_blobfs(pkg.meta_far().unwrap(), pkg.hash()),
     )
     .await
 }
@@ -561,7 +556,7 @@ async fn meta_far_already_in_blobfs() {
 async fn all_blobs_already_in_blobfs() {
     let s = "all_blobs_already_in_blobfs";
     verify_resolve_with_altered_env(make_pkg_with_extra_blobs(s, 3).await, |env, pkg| {
-        env.add_file_with_hash_to_blobfs(pkg.meta_far().unwrap(), pkg.meta_far_merkle_root());
+        env.add_file_with_hash_to_blobfs(pkg.meta_far().unwrap(), pkg.hash());
         env.add_slice_to_blobfs(&test_package_bin(s)[..]);
         for i in 0..3 {
             env.add_slice_to_blobfs(extra_blob_contents(s, i).as_slice());
@@ -574,7 +569,7 @@ async fn all_blobs_already_in_blobfs() {
 async fn meta_far_and_one_content_blob_already_in_blobfs() {
     let s = "meta_far_and_one_content_blob_in_blobfs";
     verify_resolve_with_altered_env(make_pkg_with_extra_blobs(s, 3).await, |env, pkg| {
-        env.add_file_with_hash_to_blobfs(pkg.meta_far().unwrap(), pkg.meta_far_merkle_root());
+        env.add_file_with_hash_to_blobfs(pkg.meta_far().unwrap(), pkg.hash());
         env.add_slice_to_blobfs(&test_package_bin(s)[..]);
     })
     .await
@@ -879,7 +874,7 @@ async fn merkle_pinned_meta_far_size_different_than_tuf_metadata() {
     assert_eq!(pkg_16k_pinned.meta_far().unwrap().metadata().unwrap().len(), 4 * 4096);
     std::fs::copy(
         pkg_16k_pinned.artifacts().join("meta.far"),
-        repo.path().join("blobs").join(pkg_16k_pinned.meta_far_merkle_root().to_string()),
+        repo.path().join("blobs").join(pkg_16k_pinned.hash().to_string()),
     )
     .unwrap();
 
@@ -887,10 +882,7 @@ async fn merkle_pinned_meta_far_size_different_than_tuf_metadata() {
     let repo_config = served_repository.make_repo_config(repo_url);
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
-    let pinned_url = format!(
-        "fuchsia-pkg://test/merkle-pin-size?hash={}",
-        pkg_16k_pinned.meta_far_merkle_root()
-    );
+    let pinned_url = format!("fuchsia-pkg://test/merkle-pin-size?hash={}", pkg_16k_pinned.hash());
     let (resolved_pkg, _resolved_context) =
         env.resolve_package(&pinned_url).await.expect("package to resolve without error");
     pkg_16k_pinned.verify_contents(&resolved_pkg).await.unwrap();

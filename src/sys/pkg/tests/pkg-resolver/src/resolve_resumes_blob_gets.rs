@@ -44,7 +44,7 @@ async fn single_blob_resume_success() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -106,7 +106,7 @@ async fn two_blob_resume_success() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -193,7 +193,7 @@ async fn resume_validates_content_range() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -281,7 +281,7 @@ async fn resume_validates_content_length() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -336,7 +336,7 @@ async fn resume_validates_206_status() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -391,7 +391,7 @@ async fn resume_enforces_max_resumption_limit() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)

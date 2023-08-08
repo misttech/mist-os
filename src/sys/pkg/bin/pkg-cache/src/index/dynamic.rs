@@ -762,25 +762,25 @@ mod tests {
                 "fuchsia-pkg://fuchsia.test".parse().unwrap(),
                 "present0".parse().unwrap(),
                 Some(fuchsia_url::PackageVariant::zero()),
-                *present_package0.meta_far_merkle_root(),
+                *present_package0.hash(),
             ),
             PinnedAbsolutePackageUrl::new(
                 "fuchsia-pkg://fuchsia.test".parse().unwrap(),
                 "missing-content-blob".parse().unwrap(),
                 Some(fuchsia_url::PackageVariant::zero()),
-                *missing_content_blob.meta_far_merkle_root(),
+                *missing_content_blob.hash(),
             ),
             PinnedAbsolutePackageUrl::new(
                 "fuchsia-pkg://fuchsia.test".parse().unwrap(),
                 "missing-meta-far".parse().unwrap(),
                 Some(fuchsia_url::PackageVariant::zero()),
-                *missing_meta_far.meta_far_merkle_root(),
+                *missing_meta_far.hash(),
             ),
             PinnedAbsolutePackageUrl::new(
                 "fuchsia-pkg://fuchsia.test".parse().unwrap(),
                 "present1".parse().unwrap(),
                 Some(fuchsia_url::PackageVariant::zero()),
-                *present_package1.meta_far_merkle_root(),
+                *present_package1.hash(),
             ),
         ]);
 
@@ -801,15 +801,15 @@ mod tests {
         assert_eq!(
             dynamic_index.packages(),
             hashmap! {
-                *present_package0.meta_far_merkle_root() => present0,
-                *present_package1.meta_far_merkle_root() => present1
+                *present_package0.hash() => present0,
+                *present_package1.hash() => present1
             }
         );
         assert_eq!(
             dynamic_index.active_packages(),
             hashmap! {
-                "present0/0".parse().unwrap() => *present_package0.meta_far_merkle_root(),
-                "present1/0".parse().unwrap() => *present_package1.meta_far_merkle_root(),
+                "present0/0".parse().unwrap() => *present_package0.hash(),
+                "present1/0".parse().unwrap() => *present_package1.hash(),
             }
         );
         assert_eq!(

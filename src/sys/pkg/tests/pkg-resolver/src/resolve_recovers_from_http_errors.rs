@@ -62,7 +62,7 @@ async fn verify_resolve_fails_then_succeeds<H: HttpResponder>(
 #[fuchsia::test]
 async fn second_resolve_succeeds_when_far_404() {
     let pkg = make_pkg_with_extra_blobs("second_resolve_succeeds_when_far_404", 1).await;
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     verify_resolve_fails_then_succeeds(
         pkg,
@@ -102,7 +102,7 @@ async fn second_resolve_succeeds_when_far_errors_mid_download() {
         .build()
         .await
         .unwrap();
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     verify_resolve_fails_then_succeeds(
         pkg,
@@ -143,7 +143,7 @@ async fn second_resolve_succeeds_disconnect_before_far_complete() {
         .build()
         .await
         .unwrap();
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     verify_resolve_fails_then_succeeds(
         pkg,
@@ -177,7 +177,7 @@ async fn second_resolve_succeeds_disconnect_before_blob_complete() {
 #[fuchsia::test]
 async fn second_resolve_succeeds_when_far_corrupted() {
     let pkg = make_pkg_with_extra_blobs("second_resolve_succeeds_when_far_corrupted", 1).await;
-    let path_to_override = format!("/blobs/{}", pkg.meta_far_merkle_root());
+    let path_to_override = format!("/blobs/{}", pkg.hash());
 
     verify_resolve_fails_then_succeeds(
         pkg,

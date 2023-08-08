@@ -180,7 +180,7 @@ impl<R> TestEnvBuilder<R> {
                 .map(|p| format!("{}/{}/0?hash={}",
                                  TEST_REPO_URL,
                                  p.name(),
-                                 p.meta_far_merkle_root()))
+                                 p.hash()))
                 .collect::<Vec<String>>(),
         })
         .to_string()
@@ -219,7 +219,7 @@ impl<R> TestEnvBuilder<R> {
                 served_repo.make_repo_config(TEST_REPO_URL.parse().expect("make repo config"))
             ]);
 
-            let update_merkle = *update.meta_far_merkle_root();
+            let update_merkle = *update.hash();
             // Add the update package to the list of packages, so that TestResult::check_packages
             // will expect to see the update package's blobs in blobfs.
             let mut packages = vec![update];

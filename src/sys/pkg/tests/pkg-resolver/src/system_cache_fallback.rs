@@ -66,7 +66,7 @@ async fn test_cache_fallback_succeeds_no_network() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), cache_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), cache_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -100,13 +100,12 @@ async fn test_cache_fallback_succeeds_if_url_merkle_matches() {
     // System cache fallback is only triggered for fuchsia.com repos.
     env.register_repo_at_url(&served_repository, "fuchsia-pkg://fuchsia.com").await;
 
-    let pkg_url =
-        format!("fuchsia-pkg://fuchsia.com/{}?hash={}", pkg_name, pkg.meta_far_merkle_root());
+    let pkg_url = format!("fuchsia-pkg://fuchsia.com/{}?hash={}", pkg_name, pkg.hash());
     let (package_dir, _resolved_context) = env.resolve_package(&pkg_url).await.unwrap();
     pkg.verify_contents(&package_dir).await.unwrap();
 
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -145,7 +144,7 @@ async fn test_cache_fallback_fails_if_url_merkle_differs() {
         .unwrap();
     // System cache fallback is only triggered for fuchsia.com repos.
     env.register_repo_at_url(&served_repository, "fuchsia-pkg://fuchsia.com").await;
-    let wrong_hash = make_different_hash(pkg.meta_far_merkle_root());
+    let wrong_hash = make_different_hash(pkg.hash());
     let pkg_url = format!("fuchsia-pkg://fuchsia.com/{}?hash={}", pkg_name, wrong_hash);
     assert_matches!(
         env.resolve_package(&pkg_url).await,
@@ -202,7 +201,7 @@ async fn test_cache_fallback_succeeds_no_targets() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), cache_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), cache_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -253,7 +252,7 @@ async fn test_cache_fallback_succeeds_rewrite_rule() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), cache_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), cache_pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -314,10 +313,7 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages_with_larg
     );
 
     let env = TestEnvBuilder::new()
-        .blobfs_and_system_image_hash(
-            very_small_blobfs,
-            Some(*system_image_package.meta_far_merkle_root()),
-        )
+        .blobfs_and_system_image_hash(very_small_blobfs, Some(*system_image_package.hash()))
         .build()
         .await;
 
@@ -373,10 +369,7 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages() {
         .await
         .expect("build large package");
     let env = TestEnvBuilder::new()
-        .blobfs_and_system_image_hash(
-            very_small_blobfs,
-            Some(*system_image_package.meta_far_merkle_root()),
-        )
+        .blobfs_and_system_image_hash(very_small_blobfs, Some(*system_image_package.hash()))
         .build()
         .await;
 
@@ -420,10 +413,7 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_previous_ephemeral_packa
     system_image_package.write_to_blobfs(&very_small_blobfs).await;
 
     let env = TestEnvBuilder::new()
-        .blobfs_and_system_image_hash(
-            very_small_blobfs,
-            Some(*system_image_package.meta_far_merkle_root()),
-        )
+        .blobfs_and_system_image_hash(very_small_blobfs, Some(*system_image_package.hash()))
         .build()
         .await;
 
@@ -541,7 +531,7 @@ async fn test_resolve_falls_back_not_in_repo() {
 
     // Check that get_hash fallback behavior matches resolve for the on-disk package
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), cache_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), cache_pkg.hash().clone().into());
 
     // Make sure that the inspect metric for this feature notes that we fell back
     // to an on-disk package.
@@ -613,7 +603,7 @@ async fn test_resolve_prefers_repo() {
 
     // Check that get_hash fallback behavior matches resolve.
     let hash = env.get_hash(pkg_url).await;
-    assert_eq!(hash.unwrap(), repo_pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(hash.unwrap(), repo_pkg.hash().clone().into());
 
     env.stop().await;
 }

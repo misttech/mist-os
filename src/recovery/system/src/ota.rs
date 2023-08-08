@@ -475,13 +475,7 @@ mod tests {
             let package_urls: Vec<String> = self
                 .packages
                 .iter()
-                .map(|p| {
-                    format!(
-                        "fuchsia-pkg://fuchsia.com/{}/0?hash={}",
-                        p.name(),
-                        p.meta_far_merkle_root()
-                    )
-                })
+                .map(|p| format!("fuchsia-pkg://fuchsia.com/{}/0?hash={}", p.name(), p.hash()))
                 .collect();
             let packages = json!({
                 "version": 1,

@@ -383,7 +383,7 @@ mod tests {
         let pkgfs_packages = Arc::new(PkgfsPackages::new(
             Arc::new(BasePackages::new_test_only(
                 HashSet::new(),
-                [("static/0".parse().unwrap(), *package.meta_far_merkle_root())],
+                [("static/0".parse().unwrap(), *package.hash())],
             )),
             blobfs_client,
         ));

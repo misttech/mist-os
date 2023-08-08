@@ -109,7 +109,7 @@ async fn test_eager_resolve_package() {
     let pkg_url = PinnedAbsolutePackageUrl::parse(&format!(
         "fuchsia-pkg://example.com/{}?hash={}",
         pkg_name,
-        pkg.meta_far_merkle_root()
+        pkg.hash()
     ))
     .unwrap();
 
@@ -162,7 +162,7 @@ async fn test_eager_resolve_package_while_updating() {
     let pkg_url = PinnedAbsolutePackageUrl::parse(&format!(
         "fuchsia-pkg://example.com/{}?hash={}",
         pkg_name,
-        pkg.meta_far_merkle_root()
+        pkg.hash()
     ))
     .unwrap();
 
@@ -216,7 +216,7 @@ async fn test_eager_resolve_package_while_updating() {
     let new_pkg_url = PinnedAbsolutePackageUrl::parse(&format!(
         "fuchsia-pkg://example.com/{}?hash={}",
         pkg_name,
-        new_pkg.meta_far_merkle_root()
+        new_pkg.hash()
     ))
     .unwrap();
     let new_cup_response = get_cup_response_with_name(&new_pkg_url);
@@ -259,7 +259,7 @@ async fn test_eager_get_hash() {
     let pkg_url = PinnedAbsolutePackageUrl::parse(&format!(
         "fuchsia-pkg://example.com/{}?hash={}",
         pkg_name,
-        pkg.meta_far_merkle_root()
+        pkg.hash()
     ))
     .unwrap();
 
@@ -295,7 +295,7 @@ async fn test_eager_get_hash() {
 
     let package = env.get_hash("fuchsia-pkg://example.com/test-package").await;
 
-    assert_eq!(package.unwrap(), pkg.meta_far_merkle_root().clone().into());
+    assert_eq!(package.unwrap(), pkg.hash().clone().into());
 
     env.stop().await;
 }
@@ -307,7 +307,7 @@ async fn test_cup_write() {
     let pkg_url = PinnedAbsolutePackageUrl::parse(&format!(
         "fuchsia-pkg://example.com/{}?hash={}",
         pkg_name,
-        pkg.meta_far_merkle_root()
+        pkg.hash()
     ))
     .unwrap();
 
@@ -400,7 +400,7 @@ async fn test_cup_get_info_persisted() {
     let pkg_url = PinnedAbsolutePackageUrl::parse(&format!(
         "fuchsia-pkg://example.com/{}?hash={}",
         pkg_name,
-        pkg.meta_far_merkle_root()
+        pkg.hash()
     ))
     .unwrap();
 

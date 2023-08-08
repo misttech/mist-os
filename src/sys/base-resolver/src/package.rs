@@ -256,7 +256,7 @@ mod tests {
             server,
             &HashMap::from_iter([(
                 "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
-                *pkg.meta_far_merkle_root(),
+                *pkg.hash(),
             )]),
             crate::context_authenticator::ContextAuthenticator::new(),
             &blobfs_client,
@@ -266,7 +266,7 @@ mod tests {
 
         assert_eq!(
             fuchsia_pkg::PackageDirectory::from_proxy(proxy).merkle_root().await.unwrap(),
-            *pkg.meta_far_merkle_root()
+            *pkg.hash()
         );
     }
 

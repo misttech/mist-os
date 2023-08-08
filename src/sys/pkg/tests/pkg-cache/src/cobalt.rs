@@ -67,10 +67,7 @@ async fn pkg_cache_open_success() {
     let env =
         TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
 
-    let _ = env
-        .get_already_cached(&system_image_package.meta_far_merkle_root().clone().to_string())
-        .await
-        .unwrap();
+    let _ = env.get_already_cached(&system_image_package.hash().clone().to_string()).await.unwrap();
 
     assert_count_events(
         &env,

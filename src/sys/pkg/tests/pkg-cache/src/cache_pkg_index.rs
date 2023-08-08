@@ -60,11 +60,7 @@ async fn present_cache_package_manifest() {
 
     verify_cache_packages(
         &env,
-        vec![(
-            "fuchsia-pkg://fuchsia.com/some-cache-package".to_string(),
-            *pkg.meta_far_merkle_root(),
-        )]
-        .into_iter(),
+        vec![("fuchsia-pkg://fuchsia.com/some-cache-package".to_string(), *pkg.hash())].into_iter(),
     )
     .await;
 }

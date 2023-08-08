@@ -212,12 +212,12 @@ async fn make_blobfs_with_minimal_system_image() -> (BlobfsRamdisk, Hash) {
     let blobfs = BlobfsRamdisk::start().await.unwrap();
     let system_image = SystemImageBuilder::new().build().await;
     system_image.write_to_blobfs(&blobfs).await;
-    (blobfs, *system_image.meta_far_merkle_root())
+    (blobfs, *system_image.hash())
 }
 
 async fn make_pkg_for_mock_blobfs_tests(package_name: &str) -> (Package, String, String) {
     let pkg = make_pkg_with_extra_blobs(package_name, 1).await;
-    let pkg_merkle = pkg.meta_far_merkle_root().to_string();
+    let pkg_merkle = pkg.hash().to_string();
     let blob_merkle = MerkleTree::from_reader(extra_blob_contents(package_name, 0).as_slice())
         .expect("merkle slice")
         .root()
