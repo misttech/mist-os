@@ -42,6 +42,23 @@ if (is_host) {
     library = ":codelinks"
   }
 
+  go_library("pyshebangs") {
+    source_dir = "pyshebangs"
+    sources = [
+      "pyshebangs.go",
+      "pyshebangs_test.go",
+    ]
+
+    deps = [
+      "//third_party/golibs:github.com/google/go-cmp",
+      "//tools/staticanalysis",
+    ]
+  }
+
+  go_test("pyshebangs_tests") {
+    library = ":pyshebangs"
+  }
+
   go_library("rfcmeta") {
     source_dir = "rfcmeta"
     sources = [
@@ -66,6 +83,7 @@ group("tests") {
   deps = [
     ":clippy_tests($host_toolchain)",
     ":codelinks_tests($host_toolchain)",
+    ":pyshebangs_tests($host_toolchain)",
     ":rfcmeta_tests($host_toolchain)",
   ]
 }
