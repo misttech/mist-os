@@ -17,6 +17,7 @@ sdk_source_set("unwinder") {
     "error.h",
     "memory.h",
     "module.h",
+    "platform.h",
     "registers.h",
     "unwind.h",
   ]
@@ -63,6 +64,9 @@ sdk_source_set("unwinder") {
   if (is_fuchsia) {
     public += [ "fuchsia.h" ]
     sources += [ "fuchsia.cc" ]
+  } else if (is_linux) {
+    public += [ "linux.h" ]
+    sources += [ "linux.cc" ]
   }
 }
 
