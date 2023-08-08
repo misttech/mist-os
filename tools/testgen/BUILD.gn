@@ -37,11 +37,13 @@ if (is_host) {
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:chrono",
       "//third_party/rust_crates:handlebars",
+      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tempfile",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:tracing-subscriber",
       "//third_party/rust_crates:walkdir",
+      "//tools/lib/cml",
     ]
   }
 
@@ -62,6 +64,8 @@ if (is_host) {
         rebase_path(test_root, root_build_dir),
         "--component-manifest",
         rebase_path("testdata/meta/example-component.cml", root_build_dir),
+        "--component-gn-label",
+        "//tools/testgen/testdata:example-component",
       ]
       inputs = [ "testdata/meta/example-component.cml" ]
       outputs = []  # This is filled in below

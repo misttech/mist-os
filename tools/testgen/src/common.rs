@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
+    anyhow::{Error, Result},
     chrono::Datelike,
     handlebars::{handlebars_helper, Handlebars},
     std::path::{Path, PathBuf},
@@ -22,12 +22,12 @@ use {
 /// # Examples
 ///
 /// ```
-/// # Reads from 'template/realm_factory/src/main.rs.hbrs' and
-/// # chooses the output file 'realm_factory/src/main.rs'
+/// // Reads from 'template/realm_factory/src/main.rs.hbrs' and
+/// // chooses the output file 'realm_factory/src/main.rs'
 /// hbrs_template_file!("realm_factory/src/main.rs")
 ///
-/// # Reads from 'template/realm_factory/src/main.rs.hbrs' and
-/// # chooses the output file 'src/main.rs'
+/// // Reads from 'template/realm_factory/src/main.rs.hbrs' and
+/// // chooses the output file 'src/main.rs'
 /// hbrs_template_file!("realm_factory", "src/main.rs")
 /// ```
 macro_rules! hbrs_template_file {
@@ -54,6 +54,16 @@ pub(crate) use hbrs_template_file;
 pub(crate) struct TemplateFile {
     pub filename: &'static str,
     pub contents: &'static str,
+}
+
+/// Returns the value of the template variable `component_exposed_protocols`.
+pub(crate) fn var_component_exposed_protocols(component: &cml::Document) -> Vec<String> {
+    list_exposed_protocol_names(component)
+}
+
+/// Returns the value of the template variable `rel_component_url`.
+pub(crate) fn var_rel_component_url(component_name: &str) -> String {
+    format!("#meta/{}.cm", component_name)
 }
 
 /// Returns the value of the template variable 'realm_factory_binary_name'.
@@ -144,6 +154,36 @@ pub(crate) fn file_write<P: AsRef<Path>>(path: P, contents: &str) -> Result<(), 
     Ok(())
 }
 
+/// Parses a .cml file as a [`cml::Document`].
+pub(crate) fn load_cml_file<P: AsRef<Path>>(path: P) -> Result<cml::Document> {
+    let path = path.as_ref();
+    let contents = std::fs::read_to_string(path)?;
+    let document = cml::parse_one_document(&contents, path)?;
+    Ok(document)
+}
+
+/// Returns a vector of the protocol capability names exposed by `component`.
+pub(crate) fn list_exposed_protocol_names(component: &cml::Document) -> Vec<String> {
+    match &component.expose {
+        None => return vec![],
+        Some(exposes) => {
+            exposes.iter().fold(vec![], |mut protocols, expose| match &expose.protocol {
+                None => protocols,
+                Some(cml::OneOrMany::One(name)) => {
+                    protocols.push(name.as_str().to_string());
+                    protocols
+                }
+                Some(cml::OneOrMany::Many(names)) => {
+                    for name in names.iter() {
+                        protocols.push(name.as_str().to_string());
+                    }
+                    protocols
+                }
+            })
+        }
+    }
+}
+
 /// Returns the stem of the path `path`.
 ///
 /// The stem is the non-extension portion of the basename.
@@ -182,11 +222,59 @@ pub(crate) fn is_not_hidden(entry: &DirEntry) -> bool {
     entry.file_name().to_str().map(|s| entry.depth() == 0 || !s.starts_with(".")).unwrap_or(false)
 }
 
+/// All variables available to handlebars templates.
+///
+/// All of the variables here are available to all templates, but
+/// different testgen subcommands may use default values for any
+/// subset of these variables.
+#[derive(Default, serde::Serialize)]
+pub(crate) struct TemplateVars {
+    /// The name of the component, derived from the name of the input component manifest.
+    /// Example: /path/to/my-component.cml -> my-component
+    pub component_name: String,
+
+    /// The list of protocols exposed by the component under test, if any.
+    pub component_exposed_protocols: Vec<String>,
+
+    /// The absolute GN target label of the component under test.
+    pub component_gn_label: String,
+
+    /// The package-relative URL of the component under test. This is only valid
+    /// within the generated realm factory package.
+    pub rel_component_url: String,
+
+    /// The name of the generated test binary.
+    pub test_binary_name: String,
+
+    /// The name of the generated test Fuchsia package.
+    /// Example GN usage: `fuchsia_test_package("{{ test_package_name }}")`
+    pub test_package_name: String,
+
+    /// The name of the generated test realm factory binary name.
+    pub realm_factory_binary_name: String,
+
+    /// The name of the Rust crate containing the test's generated RealmFactory FIDL bindings.
+    /// This is primarily useful for importing generated Rust fidl bindings in test code.
+    /// Example Rust usage: `use {{ fidl_rust_crate_name }} as ftest`
+    pub fidl_rust_crate_name: String,
+
+    /// The name of the RealmFactory fidl library. This is primarily useful for defining and importing
+    /// the FIDL library in .fidl files.
+    /// Example FIDL usage: `library {{ fidl_library_name }};`
+    pub fidl_library_name: String,
+}
+
+impl TemplateVars {
+    pub(crate) fn new() -> Self {
+        Self { ..Default::default() }
+    }
+}
+
 /// Generates a directory tree by executing handlebars templates against a set of variables.
 pub(crate) struct CodeGenerator {
     handlebars: handlebars::Handlebars<'static>,
     template_files: Vec<TemplateFile>,
-    template_vars: std::collections::BTreeMap<String, String>,
+    template_vars: TemplateVars,
 }
 
 impl CodeGenerator {
@@ -194,7 +282,7 @@ impl CodeGenerator {
         let mut code_generator = Self {
             handlebars: Handlebars::new(),
             template_files: vec![],
-            template_vars: std::collections::BTreeMap::new(),
+            template_vars: TemplateVars::new(),
         };
         code_generator.install_handlebars_helpers();
         code_generator
@@ -209,15 +297,11 @@ impl CodeGenerator {
         self
     }
 
-    /// Adds a template variable to use when generating code.
+    /// Sets the template variables to use when generating code.
     ///
-    /// The variable will be available for use by all templates when code is generated.
-    pub(crate) fn with_template_var(
-        mut self,
-        name: impl Into<String>,
-        value: impl Into<String>,
-    ) -> Self {
-        self.template_vars.insert(name.into(), value.into());
+    /// The variables will be available for use by all templates when code is generated.
+    pub(crate) fn with_template_vars(mut self, template_vars: TemplateVars) -> Self {
+        self.template_vars = template_vars;
         self
     }
 
@@ -245,5 +329,6 @@ impl CodeGenerator {
         });
 
         self.handlebars.register_helper("year", Box::new(helper_year));
+        self.handlebars.set_strict_mode(true);
     }
 }

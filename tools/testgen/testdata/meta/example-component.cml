@@ -6,11 +6,13 @@
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
-    program: {
-        runner: "elf",
-        binary: "bin/example_main",
-    },
-    use: [
+    capabilities: [
         { protocol: "fuchsia.examples.Echo" },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.examples.Echo",
+            from: "self",
+        },
     ],
 }

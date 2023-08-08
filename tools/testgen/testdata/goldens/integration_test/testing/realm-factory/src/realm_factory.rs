@@ -5,7 +5,7 @@
 use {
     anyhow::*,
     fidl_test_examplecomponent::RealmOptions,
-    fuchsia_component_test::{RealmBuilder, RealmInstance},
+    fuchsia_component_test::{Capability, ChildOptions, Ref, RealmBuilder, RealmInstance, Route},
     tracing::info,
 };
 
@@ -36,8 +36,17 @@ async fn build_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     info!("building the realm using options {:?}", options);
 
     let builder = RealmBuilder::new().await?;
+    let component_ref = builder.add_child("example-component", "#meta/example-component.cm", ChildOptions::new()).await?;
 
-    // FIXME: Copy realm builder code here.
+    // Expose capabilities from example-component.
+    builder.add_route(
+        Route::new()
+            .capability(Capability::protocol_by_name("fuchsia.examples.Echo"))
+            .from(&component_ref)
+            .to(Ref::parent())
+    ).await?;
+
+    // FIXME: Route dependent capabilities to component_ref.
 
     let realm = builder.build().await?;
     Ok(realm)
