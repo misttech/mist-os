@@ -46,7 +46,7 @@ function save_remote_info {
   local remote_dir="$2"
   local remote_os
   remote_os=$(ssh "${host}" "uname") || ( \
-    fx-error "Recieved error detecting remote host's operating system" && \
+    fx-error "Received error detecting remote host's operating system" && \
     exit $?)
 
   echo "${remote_host}:${remote_dir}:${remote_os}" > "${FUCHSIA_DIR}/${_REMOTE_INFO_CACHE_FILE}"
@@ -139,7 +139,7 @@ function fetch_or_build_tool {
   # built locally and if so, just use the locally built version.
   local remote_os
   remote_os=$(ssh "${host}" "uname") || ( \
-    fx-error "Recieved error detecting remote host's operating system" && \
+    fx-error "Received error detecting remote host's operating system" && \
     exit $?)
   local local_os
   local_os=$(uname)
