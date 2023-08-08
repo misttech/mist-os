@@ -4,9 +4,8 @@
 
 use crate::{ConfigMap, Environment, EnvironmentContext};
 use anyhow::{Context, Result};
-use std::{cell::Cell, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tempfile::{NamedTempFile, TempDir};
-use tracing::level_filters::LevelFilter;
 
 use super::ExecutableKind;
 
@@ -19,7 +18,6 @@ pub struct TestEnv {
     pub context: EnvironmentContext,
     pub isolate_root: TempDir,
     pub user_file: NamedTempFile,
-    pub log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync>,
     _guard: async_lock::MutexGuardArc<()>,
 }
 
@@ -38,31 +36,7 @@ impl TestEnv {
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
         );
-        let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> = Arc::new(
-            crate::logging::configure_subscribers(
-                &context,
-                Some(crate::logging::StdioOptions { test_writer: true }),
-                false,
-                LevelFilter::DEBUG,
-            )
-            .await,
-        );
-
-        // Dropping the subscriber guard causes test flakes as the tracing library panics when
-        // closing an instrumentation span on a different subscriber.
-        // To mitigate this, only drop the guards at thread exit.
-        // See https://github.com/tokio-rs/tracing/issues/1656 for more details.
-        let log_guard = tracing::subscriber::set_default(Arc::clone(&log_subscriber));
-
-        thread_local! {
-            static GUARD_STASH: Cell<Option<tracing::subscriber::DefaultGuard>> =
-                const { Cell::new(None) };
-        }
-
-        GUARD_STASH.with(move |guard| guard.set(Some(log_guard)));
-
-        let test_env =
-            TestEnv { env_file, context, user_file, isolate_root, log_subscriber, _guard };
+        let test_env = TestEnv { env_file, context, user_file, isolate_root, _guard };
 
         let mut env = Environment::new_empty(test_env.context.clone());
         env.set_user(Some(&user_file_path));
