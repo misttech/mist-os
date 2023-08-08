@@ -53,21 +53,21 @@ class ScanAndApStartTest : public SimTest {
 
 void ScanTestIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
                             OnScanEndCompleter::Sync& completer) {
-  // Notify test interface framework
-  SimInterface::OnScanEnd(request, arena, completer);
-
   // Notify test
   test_->OnScanEnd();
+
+  // Notify test interface framework
+  SimInterface::OnScanEnd(request, arena, completer);
 }
 
 // When we receive confirmation that the AP start operation has completed, let the test know
 void ScanTestIfc::StartConf(StartConfRequestView request, fdf::Arena& arena,
                             StartConfCompleter::Sync& completer) {
-  // Notify test interface framework
-  SimInterface::StartConf(request, arena, completer);
-
   // Notify test
   test_->OnStartConf();
+
+  // Notify test interface framework
+  SimInterface::StartConf(request, arena, completer);
 }
 
 void ScanAndApStartTest::Init() {
