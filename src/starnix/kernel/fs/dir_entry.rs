@@ -514,8 +514,12 @@ impl DirEntry {
         // The user must be able to search the directory (requires the EXEC permission)
         self.node.check_access(current_task, Access::EXEC)?;
 
+        // child *must* be dropped after self_children and child_children below (even in the error
+        // paths).
+        let child;
+
         let mut self_children = self.lock_children();
-        let child = self_children.component_lookup(current_task, name)?;
+        child = self_children.component_lookup(current_task, name)?;
         let child_children = child.children.read();
 
         if child.state.read().mount_count > 0 {
@@ -654,6 +658,10 @@ impl DirEntry {
                 }
             }
 
+            // We must drop these after the locks are dropped.
+            let renamed;
+            let mut maybe_replaced = None;
+
             // We cannot simply grab the locks on old_parent and new_parent
             // independently because old_parent and new_parent might be the
             // same directory entry. Instead, we use the RenameGuard helper to
@@ -662,7 +670,7 @@ impl DirEntry {
 
             // Now that we know the old_parent child list cannot change, we
             // establish the DirEntry that we are going to try to rename.
-            let renamed = state.old_parent().component_lookup(current_task, old_basename)?;
+            renamed = state.old_parent().component_lookup(current_task, old_basename)?;
 
             // Check whether the sticky bit on the old parent prevents us from
             // removing this child.
@@ -685,44 +693,45 @@ impl DirEntry {
             // We need to check if there is already a DirEntry with
             // new_basename in new_parent. If so, there are additional checks
             // we need to perform.
-            let maybe_replaced =
-                match state.new_parent().component_lookup(current_task, new_basename) {
-                    Ok(replaced) => {
-                        if flags.contains(RenameFlags::NOREPLACE) {
-                            return error!(EEXIST);
-                        }
+            match state.new_parent().component_lookup(current_task, new_basename) {
+                Ok(replaced) => {
+                    // Set `maybe_replaced` now to ensure it gets dropped in the right order.
+                    let replaced = maybe_replaced.insert(replaced);
 
-                        // Sayeth https://man7.org/linux/man-pages/man2/rename.2.html:
-                        //
-                        // "If oldpath and newpath are existing hard links referring to the
-                        // same file, then rename() does nothing, and returns a success
-                        // status."
-                        if Arc::ptr_eq(&renamed.node, &replaced.node) {
-                            return Ok(());
-                        }
-
-                        // Sayeth https://man7.org/linux/man-pages/man2/rename.2.html:
-                        //
-                        // "oldpath can specify a directory.  In this case, newpath must"
-                        // either not exist, or it must specify an empty directory."
-                        if replaced.node.is_dir() {
-                            // Check whether the replaced entry is a mountpoint.
-                            // TODO: We should hold a read lock on the mount points for this
-                            //       namespace to prevent the child from becoming a mount point
-                            //       while this function is executing.
-                            if replaced.state.read().mount_count > 0 {
-                                return error!(EBUSY);
-                            }
-                        } else if renamed.node.is_dir() {
-                            return error!(ENOTDIR);
-                        }
-                        Some(replaced)
+                    if flags.contains(RenameFlags::NOREPLACE) {
+                        return error!(EEXIST);
                     }
-                    // It's fine for the lookup to fail to find a child.
-                    Err(errno) if errno == ENOENT => None,
-                    // However, other errors are fatal.
-                    Err(e) => return Err(e),
-                };
+
+                    // Sayeth https://man7.org/linux/man-pages/man2/rename.2.html:
+                    //
+                    // "If oldpath and newpath are existing hard links referring to the
+                    // same file, then rename() does nothing, and returns a success
+                    // status."
+                    if Arc::ptr_eq(&renamed.node, &replaced.node) {
+                        return Ok(());
+                    }
+
+                    // Sayeth https://man7.org/linux/man-pages/man2/rename.2.html:
+                    //
+                    // "oldpath can specify a directory.  In this case, newpath must"
+                    // either not exist, or it must specify an empty directory."
+                    if replaced.node.is_dir() {
+                        // Check whether the replaced entry is a mountpoint.
+                        // TODO: We should hold a read lock on the mount points for this
+                        //       namespace to prevent the child from becoming a mount point
+                        //       while this function is executing.
+                        if replaced.state.read().mount_count > 0 {
+                            return error!(EBUSY);
+                        }
+                    } else if renamed.node.is_dir() {
+                        return error!(ENOTDIR);
+                    }
+                }
+                // It's fine for the lookup to fail to find a child.
+                Err(errno) if errno == ENOENT => {}
+                // However, other errors are fatal.
+                Err(e) => return Err(e),
+            }
 
             // We've found all the errors that we know how to find. Ask the
             // file system to actually execute the rename operation. Once the
