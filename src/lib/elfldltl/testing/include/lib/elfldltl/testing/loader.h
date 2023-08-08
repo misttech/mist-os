@@ -9,6 +9,7 @@
 #include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/mmap-loader.h>
+#include <lib/elfldltl/phdr.h>
 
 #include <optional>
 #include <string_view>
@@ -116,6 +117,7 @@ class LoadTests : public ::testing::Test {
   using LoadInfo = LoadInfo<Elf, StdContainer<std::vector>::Container>;
   using Addr = typename Elf::Addr;
   using Phdr = typename Elf::Phdr;
+  using TestLib = decltype(Traits::TestLibProvider({}));
 
   struct LoadResult {
     Loader loader;
@@ -123,17 +125,19 @@ class LoadTests : public ::testing::Test {
     Addr phoff;
     Addr entry;
     LoadInfo info;
+    std::optional<typename Elf::size_type> stack_size;
   };
 
   template <typename... LoaderArgs>
-  void Load(std::string_view name, std::optional<LoadResult>& result, LoaderArgs&&... loader_args) {
+  void Load(const TestLib& test_lib, std::optional<LoadResult>& result,
+            LoaderArgs&&... loader_args) {
     result = std::nullopt;
 
-    auto lib = Traits::TestLibProvider(name);
+    // Bail out if the test_lib argument expression had a failure.
     ASSERT_FALSE(this->HasFailure());
 
     auto diag = ExpectOkDiagnostics();
-    auto file = Traits::MakeFile(Traits::LoadFileArgument(lib), diag);
+    auto file = Traits::MakeFile(Traits::LoadFileArgument(test_lib), diag);
 
     auto headers =
         elfldltl::LoadHeadersFromFile<Elf>(diag, file, elfldltl::NewArrayFromFile<Phdr>());
@@ -150,9 +154,16 @@ class LoadTests : public ::testing::Test {
 
     cpp20::span<const Phdr> phdrs = result->phdrs.get();
     ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs,
-                                      result->info.GetPhdrObserver(result->loader.page_size())));
+                                      result->info.GetPhdrObserver(result->loader.page_size()),
+                                      PhdrStackObserver<Elf>{result->stack_size}));
 
-    ASSERT_TRUE(result->loader.Load(diag, result->info, Traits::LoadFileArgument(lib)));
+    ASSERT_TRUE(result->loader.Load(diag, result->info, Traits::LoadFileArgument(test_lib)));
+  }
+
+  template <typename... LoaderArgs>
+  void Load(std::string_view name, std::optional<LoadResult>& result, LoaderArgs&&... loader_args) {
+    ASSERT_NO_FATAL_FAILURE(
+        Load(Traits::TestLibProvider(name), result, std::forward<LoaderArgs>(loader_args)...));
   }
 };
 

@@ -5,14 +5,11 @@
 #include "ld-startup-in-process-tests-zircon.h"
 
 #include <dlfcn.h>
-#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/ld/abi.h>
 #include <lib/zx/channel.h>
-#include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 
 #include <cstddef>
-#include <filesystem>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -52,15 +49,13 @@ void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args)
                 &test_vmar_, &test_base),
             ZX_OK);
 
-  log_ = std::make_unique<elfldltl::testing::TestPipeReader>();
   fbl::unique_fd log_fd;
-  ASSERT_NO_FATAL_FAILURE(log_->Init(log_fd));
-
-  procargs_  //
-      .AddInProcessTestHandles()
-      .AddDuplicateHandle(PA_VMAR_ROOT, test_vmar_.borrow())
-      .AddFd(STDERR_FILENO, std::move(log_fd))
-      .SetArgs(args);
+  ASSERT_NO_FATAL_FAILURE(InitLog(log_fd));
+  ASSERT_NO_FATAL_FAILURE(bootstrap()  //
+                              .AddInProcessTestHandles()
+                              .AddAllocationVmar(test_vmar_.borrow())
+                              .AddFd(STDERR_FILENO, std::move(log_fd))
+                              .SetArgs(args));
 }
 
 void LdStartupInProcessTests::Load(std::string_view executable_name) {
@@ -78,36 +73,23 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   zx::vmar load_image_vmar = std::move(result->loader).Commit();
 
   // Pass along that handle in the bootstrap message.
-  ASSERT_NO_FATAL_FAILURE(procargs_.AddHandle(PA_VMAR_LOADED, std::move(load_image_vmar)));
+  ASSERT_NO_FATAL_FAILURE(procargs_.AddSelfVmar(std::move(load_image_vmar)));
 
   // Send the executable VMO.
-  const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
-  zx::vmo vmo = elfldltl::testing::GetTestLibVmo(executable_path);
-  ASSERT_TRUE(vmo);
-  ASSERT_NO_FATAL_FAILURE(procargs_.AddHandle(PA_VMO_EXECUTABLE, std::move(vmo)));
+  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(InProcessTestExecutable(executable_name)));
 }
 
 int64_t LdStartupInProcessTests::Run() {
   using EntryFunction = int(zx_handle_t, void*);
   auto fn = reinterpret_cast<EntryFunction*>(entry_);
-  zx::channel bootstrap = procargs_.PackBootstrap();
-  return fn(bootstrap.release(), GetVdso());
+  zx::channel bootstrap_receiver = bootstrap().PackBootstrap();
+  return fn(bootstrap_receiver.release(), GetVdso());
 }
 
 LdStartupInProcessTests::~LdStartupInProcessTests() {
-  // The log should have been collected by CheckLog.
-  EXPECT_FALSE(log_);
-
   if (test_vmar_) {
     EXPECT_EQ(test_vmar_.destroy(), ZX_OK);
   }
-}
-
-void LdStartupInProcessTests::ExpectLog(std::string_view expected_log) {
-  ASSERT_TRUE(log_);
-  std::string log = std::move(*std::exchange(log_, {})).Finish();
-
-  EXPECT_EQ(log, expected_log);
 }
 
 }  // namespace ld::testing

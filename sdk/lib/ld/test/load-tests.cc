@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #ifdef __Fuchsia__
+#include "ld-startup-create-process-tests.h"
 #include "ld-startup-in-process-tests-zircon.h"
 #else
 #include "ld-startup-in-process-tests-posix.h"
@@ -15,7 +16,13 @@ namespace {
 template <class Fixture>
 using LdLoadTests = Fixture;
 
-using LoadTypes = ::testing::Types<ld::testing::LdStartupInProcessTests>;
+using LoadTypes = ::testing::Types<
+// TODO(fxbug.dev/130483): The separate-process tests require symbolic
+// relocation so they can make the syscall to exit.
+#if 0  // def __Fuchsia__
+    ld::testing::LdStartupCreateProcessTests<>,
+#endif
+    ld::testing::LdStartupInProcessTests>;
 
 TYPED_TEST_SUITE(LdLoadTests, LoadTypes);
 

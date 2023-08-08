@@ -7,7 +7,10 @@ import("//build/testing/host_test_data.gni")
 # This only gets instantiated in the environment where the test modules are
 # meant to be built.
 
-executables = [ ":ret17" ]
+executables = [
+  ":ret17",
+  ":ret17.in-process",
+]
 libs = []
 modules = []
 
@@ -49,43 +52,74 @@ if (is_fuchsia) {
 }
 
 template("test_executable") {
-  executable(target_name) {
-    testonly = true
+  suffices = [ "" ]
+  if (defined(invoker.can_be_in_process) && invoker.can_be_in_process) {
+    suffices += [ ".in-process" ]
+  }
+  foreach(suffix, suffices) {
+    executable(target_name + suffix) {
+      testonly = true
 
-    deps = []
-    forward_variables_from(invoker, "*", [ "testonly" ])
-    deps += [ ":test-executable" ]
+      deps = []
+      forward_variables_from(invoker, "*", [ "testonly" ])
+      deps += [ ":test-executable$suffix" ]
 
-    # This is needed in the non-Zircon (host/Linux) toolchains to avoid having
-    # any implicit deps injected.
-    disable_syslog_backend = true
+      # This is needed in the non-Zircon (host/Linux) toolchains to avoid
+      # having any implicit deps injected.
+      disable_syslog_backend = true
 
-    exclude_toolchain_tags = [ "instrumentation-runtime" ]
+      exclude_toolchain_tags = [ "instrumentation-runtime" ]
+    }
   }
 }
 
 # The test executables declare an `extern "C" ... TestStart(...)` entry point.
-# For Fuchsia, link the test executables with -e TestStart.  For POSIX, link
-# with an assembly implementation of _start that tail-calls TestStart.
-source_set("test-executable") {
-  visibility = [ ":*" ]
-  testonly = true
+#
+# When built for in-process tests, the ELF entry point will be called directly
+# by the test code.  For Fuchsia, link the test executables with -e TestStart.
+# For POSIX, link with an assembly implementation of _start that tail-calls
+# TestStart.
+#
+# When built for separate-process tests, the ELF entry point cannot return.
+# Instead, it's defined to call TestStart and exit with its value.
+foreach(in_process,
+        [
+          "",
+          ".in-process",
+        ]) {
+  source_set("test-executable$in_process") {
+    visibility = [ ":*" ]
+    testonly = true
 
-  public_deps = [ "//sdk/lib/ld:standalone" ]
-  public_configs = [ "//sdk/lib/ld:abi-interp" ]
-  if (is_fuchsia) {
-    public_configs += [ ":test-executable.config" ]
-  } else {
-    sources = [ "posix-test-start.S" ]
-    deps = [ "//zircon/kernel/lib/arch" ]
+    if (in_process != "") {
+      defines = [ "IN_PROCESS_TEST" ]
+    }
+
+    public_deps = [ "//sdk/lib/ld:standalone" ]
+    public_configs = [ "//sdk/lib/ld:abi-interp" ]
+    if (is_fuchsia) {
+      if (in_process == "") {
+        sources = [ "zircon-test-start.cc" ]
+        deps = [
+          "//src/zircon/lib/zircon",
+          "//zircon/system/public",
+        ]
+      } else {
+        public_configs += [ ":test-executable.in-process.config" ]
+      }
+    } else {
+      sources = [ "posix-test-start.S" ]
+      deps = [ "//zircon/kernel/lib/arch" ]
+    }
   }
 }
 
-config("test-executable.config") {
+config("test-executable.in-process.config") {
   visibility = [ ":*" ]
   ldflags = [ "-Wl,-e,TestStart" ]
 }
 
 test_executable("ret17") {
+  can_be_in_process = true
   sources = [ "ret17.cc" ]
 }

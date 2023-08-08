@@ -6,22 +6,22 @@
 #define LIB_LD_TEST_LD_STARTUP_IN_PROCESS_TESTS_ZIRCON_H_
 
 #include <lib/elfldltl/testing/loader.h>
-#include <lib/elfldltl/testing/test-pipe-reader.h>
 #include <lib/ld/testing/test-processargs.h>
 #include <lib/zx/vmar.h>
 
 #include <cstdint>
 #include <initializer_list>
-#include <memory>
 #include <string_view>
 
-// The in-process here work by doing ELF loading approximately as the system
-// program loader would, but into this process that's running the test.  Once
-// the dynamic linker has been loaded, the InProcessTestLaunch object knows how
-// its entry point wants to be called.  It's responsible for collecting the
-// information to be passed to the dynamic linker, and then doing the call into
-// its entry point to emulate what it would expect from the program loader
-// starting an initial thread.
+#include "ld-load-tests-base.h"
+
+// The in-process tests here work by doing ELF loading approximately as the
+// system program loader would, but into this process that's running the test.
+// Once the dynamic linker has been loaded, the InProcessTestLaunch object
+// knows how its entry point wants to be called.  It's responsible for
+// collecting the information to be passed to the dynamic linker, and then
+// doing the call into its entry point to emulate what it would expect from the
+// program loader starting an initial thread.
 
 namespace ld::testing {
 
@@ -29,7 +29,8 @@ namespace ld::testing {
 // point receives the bootstrap channel (zx_handle_t) and the base address of
 // the vDSO.
 class LdStartupInProcessTests
-    : public elfldltl::testing::LoadTests<elfldltl::testing::LocalVmarLoaderTraits> {
+    : public elfldltl::testing::LoadTests<elfldltl::testing::LocalVmarLoaderTraits>,
+      public LdLoadTestsBase {
  public:
   void Init(std::initializer_list<std::string_view> args = {});
 
@@ -37,9 +38,9 @@ class LdStartupInProcessTests
 
   int64_t Run();
 
-  void ExpectLog(std::string_view expected_log);
-
   ~LdStartupInProcessTests();
+
+  TestProcessArgs& bootstrap() { return procargs_; }
 
  private:
   using Base = elfldltl::testing::LoadTests<elfldltl::testing::LocalVmarLoaderTraits>;
@@ -47,7 +48,6 @@ class LdStartupInProcessTests
 
   uintptr_t entry_ = 0;
   TestProcessArgs procargs_;
-  std::unique_ptr<elfldltl::testing::TestPipeReader> log_;
   zx::vmar test_vmar_;
 };
 

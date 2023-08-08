@@ -1,0 +1,122 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "ld-startup-create-process-tests.h"
+
+#include <lib/elfldltl/machine.h>
+#include <lib/zx/job.h>
+#include <zircon/process.h>
+#include <zircon/processargs.h>
+
+#include <gtest/gtest.h>
+
+namespace ld::testing {
+
+zx::unowned_vmo LdStartupCreateProcessTestsBase::GetVdsoVmo() {
+  static const zx::vmo vdso{zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0))};
+  return vdso.borrow();
+}
+
+void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_view> args) {
+  std::string_view process_name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+  ASSERT_EQ(
+      zx::process::create(*zx::job::default_job(), process_name.data(),
+                          static_cast<uint32_t>(process_name.size()), 0, &process_, &root_vmar_),
+      ZX_OK);
+
+  ASSERT_EQ(zx::thread::create(process_, process_name.data(),
+                               static_cast<uint32_t>(process_name.size()), 0, &thread_),
+            ZX_OK);
+
+  fbl::unique_fd log_fd;
+  ASSERT_NO_FATAL_FAILURE(InitLog(log_fd));
+  ASSERT_NO_FATAL_FAILURE(bootstrap()
+                              .AddProcess(process_.borrow())
+                              .AddThread(thread_.borrow())
+                              .AddAllocationVmar(root_vmar_.borrow())
+                              .AddFd(STDERR_FILENO, std::move(log_fd))
+                              .SetArgs(args));
+}
+
+LdStartupCreateProcessTestsBase::~LdStartupCreateProcessTestsBase() {
+  if (process_) {
+    EXPECT_EQ(process_.kill(), ZX_OK);
+  }
+}
+
+int64_t LdStartupCreateProcessTestsBase::Run() {
+  // Allocate the stack.  This is delayed until here in case the test uses
+  // bootstrap() methods after Init() that affect bootstrap().GetStackSize().
+  zx::vmo stack_vmo;
+  uintptr_t sp;
+  auto allocate_stack = [this, &stack_vmo, &sp]() {
+    std::optional<size_t> stack_size = bootstrap().GetStackSize();
+    if (!stack_size) {
+      ASSERT_TRUE(stack_size_);
+      stack_size = stack_size_;
+    } else {
+      // TODO(mcgrathr): stack use too big for procargs piddly default
+      stack_size = 64 << 10;
+    }
+
+    const size_t page_size = zx_system_get_page_size();
+    const size_t stack_vmo_size = (*stack_size + page_size - 1) & -page_size;
+    const size_t stack_vmar_size = stack_vmo_size + page_size;
+
+    ASSERT_EQ(zx::vmo::create(stack_vmo_size, 0, &stack_vmo), ZX_OK);
+
+    zx::vmar stack_vmar;
+    uintptr_t stack_vmar_base;
+    ASSERT_EQ(
+        root_vmar().allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
+                             stack_vmar_size, &stack_vmar, &stack_vmar_base),
+        ZX_OK);
+
+    zx_vaddr_t stack_base;
+    ASSERT_EQ(
+        stack_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC | ZX_VM_ALLOW_FAULTS,
+                       page_size, stack_vmo, 0, stack_vmo_size, &stack_base),
+        ZX_OK);
+
+    ASSERT_NO_FATAL_FAILURE(bootstrap().AddStackVmo(std::move(stack_vmo)));
+
+    sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_vmo_size);
+  };
+
+  allocate_stack();
+  if (::testing::Test::HasFailure()) {
+    return -1;
+  }
+
+  // Pack up the bootstrap message and start the process running.
+  auto start_process = [this, sp]() {
+    zx::channel bootstrap_receiver = procargs_.PackBootstrap();
+
+    ASSERT_EQ(process_.start(thread_, entry_, sp, std::move(bootstrap_receiver), vdso_base_),
+              ZX_OK);
+  };
+
+  start_process();
+  if (::testing::Test::HasFailure()) {
+    return -1;
+  }
+
+  // Wait for the process to die and collect its exit code.
+  int64_t result = -1;
+  auto wait_for_termination = [this, &result]() {
+    zx_signals_t signals;
+    ASSERT_EQ(process_.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), &signals), ZX_OK);
+    ASSERT_TRUE(signals & ZX_PROCESS_TERMINATED);
+    zx_info_process_t info;
+    ASSERT_EQ(process_.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr), ZX_OK);
+    ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_STARTED);
+    ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_EXITED);
+    result = info.return_code;
+  };
+  wait_for_termination();
+
+  return result;
+}
+
+}  // namespace ld::testing

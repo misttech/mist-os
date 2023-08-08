@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include "../posix.h"
+#include "ld-load-tests-base.h"
 
 namespace ld::testing {
 namespace {
@@ -127,8 +128,7 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   loader_ = std::move(result->loader);
 
   // Now load the executable.
-  result.reset();
-  ASSERT_NO_FATAL_FAILURE(Load(executable_name, result));
+  ASSERT_NO_FATAL_FAILURE(Load(InProcessTestExecutable(executable_name), result));
 
   // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
   cpp20::span phdrs = result->phdrs.get();

@@ -2,4 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-extern "C" int TestStart() { return 17; }
+#include <stdint.h>
+
+extern "C" int64_t TestStart() { return 17; }

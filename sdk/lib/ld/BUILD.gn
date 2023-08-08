@@ -135,6 +135,10 @@ static_library("standalone") {
     "//zircon/system/ulib/c/string:hermetic",
   ]
 
+  if (is_linux) {
+    deps += [ ":linux-syscalls" ]
+  }
+
   public_configs = [ ":standalone.config" ]
 }
 
@@ -210,9 +214,6 @@ shared_library("ld-startup") {
       ":posix-header",
       "//zircon/kernel/lib/arch:headers",
     ]
-    if (is_linux) {
-      deps += [ ":linux-syscalls" ]
-    }
 
     # There is no way to get the data out anyway.
     configs += [ "//build/config:no_profile" ]

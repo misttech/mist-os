@@ -5,10 +5,12 @@
 #include <lib/arch/asm.h>
 
 // This defines the entry point in assembly, such that it calls:
-//   extern "C" StartLdResult StartLd(StartupStack& stack);
-// And then jumps to the user entry point in the return value, with
-// the original stack intact.
-// (See posix-startup.cc for definition.)
+//
+//   extern "C" int64_t TestStart(...);
+//
+// In the in-process version, that's a tail call so it returns directly to the
+// in-process caller.  In the separate-process version, the return value is
+// passed to _exit.
 
 .function _start, global
 
@@ -17,12 +19,26 @@
 #if defined(__aarch64__)
 
   mov x0, sp
+#ifdef IN_PROCESS_TEST
   b TestStart
+#else
+  bl TestStart
+  // Return value in x0 is argument.
+  bl _exit
+  udf #0
+#endif
 
 #elif defined(__riscv)
 
   mv a0, sp
+#ifdef IN_PROCESS_TEST
   b TestStart
+#else
+  call TestStart
+  // Return value in a0 is argument.
+  call _exit
+  unimp
+#endif
 
 #elif defined(__x86_64__)
 
@@ -35,7 +51,15 @@
   // jump so that either an original return address or a fault-inducing zero is
   // the callee's return address.
   sub $8, %rsp
+#ifdef IN_PROCESS_TEST
   jmp TestStart
+#else
+  call TestStart
+  // Move the return value into the argument register.
+  mov %rax, %rdi
+  call _exit
+  ud2
+#endif
 
 #else
 #error "unsupported machine"

@@ -7,7 +7,14 @@
 
 #include <lib/zx/channel.h>
 #include <lib/zx/handle.h>
+#include <lib/zx/process.h>
+#include <lib/zx/thread.h>
+#include <lib/zx/vmar.h>
+#include <lib/zx/vmo.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -74,12 +81,31 @@ class TestProcessArgs {
     return *this;
   }
 
-  // This calls AddHandle with the process, thread, etc.
+  // This calls AddProcess and AddThread.
   TestProcessArgs& AddInProcessTestHandles();
+
+  // These add the handles for the process and initial thread.
+  TestProcessArgs& AddProcess(zx::unowned_process process);
+  TestProcessArgs& AddThread(zx::unowned_thread thread);
 
   // Add a fuchsia.ldsvc.Loader channel handle.  If this is called with a null
   // handle, it will clone the calling process's own loader service.
   TestProcessArgs& AddLdsvc(zx::channel ldsvc = {});
+
+  // Add the VMAR to use for allocation and loading.
+  TestProcessArgs& AddAllocationVmar(zx::vmar vmar);
+  TestProcessArgs& AddAllocationVmar(zx::unowned_vmar vmar);
+
+  // Add the VMAR for the dynamic linker's load image.
+  TestProcessArgs& AddSelfVmar(zx::vmar vmar);
+  TestProcessArgs& AddSelfVmar(zx::unowned_vmar vmar);
+
+  // Add the VMO for the executable.
+  TestProcessArgs& AddExecutableVmo(zx::vmo vmo);
+  TestProcessArgs& AddExecutableVmo(std::string_view executable_name);
+
+  // Add the VMO for the initial stack.
+  TestProcessArgs& AddStackVmo(zx::vmo vmo);
 
   // This packs up a message and sends it on the given channel.  When this
   // returns without raising a gtest fatal failure, the state of the object is
@@ -95,10 +121,16 @@ class TestProcessArgs {
   // raises a gtest fatal failure.
   zx::channel PackBootstrap();
 
-  // Access the sender channel if one was created by PackBootstrap
+  // Access the sender channel if one was created by PackBootstrap.
   zx::channel& bootstrap_sender() { return bootstrap_sender_; }
 
+  // This returns the stack size to use for the initial thread,
+  // if the bootstrap protocol wants to control that.
+  std::optional<size_t> GetStackSize();
+
  private:
+  void PackBootstrap(zx::unowned_channel bootstrap_sender, size_t* count_for_stack_size);
+
   std::vector<zx::handle> handles_;
   std::vector<uint32_t> handle_info_;
   std::vector<std::string> args_, env_, names_;

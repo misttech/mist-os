@@ -32,6 +32,7 @@ test("ld-unittests") {
 
 fuchsia_unittest_package("ld-tests") {
   deps = [ ":ld-unittests" ]
+  manifest = "meta/ld-tests.cml"
 }
 
 # This collects the -DLD_STARTUP_TEST_LIB=... flag in the response file.
@@ -53,16 +54,23 @@ source_set("load-tests") {
   visibility = [ ":*" ]
   testonly = true
 
-  sources = [ "load-tests.cc" ]
+  sources = [
+    "ld-load-tests-base.cc",
+    "ld-load-tests-base.h",
+    "load-tests.cc",
+  ]
   deps = [
     "..:abi-headers",
     "..:posix-header",
     "//src/lib/elfldltl",
     "//src/lib/elfldltl/testing",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
   ]
   if (is_fuchsia) {
     sources += [
+      "ld-startup-create-process-tests.cc",
+      "ld-startup-create-process-tests.h",
       "ld-startup-in-process-tests-zircon.cc",
       "ld-startup-in-process-tests-zircon.h",
     ]

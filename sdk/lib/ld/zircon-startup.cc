@@ -56,8 +56,12 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
   LoadExecutableResult result = {
       .module = StartupModule::New(diag, scratch, "", startup.vmar),
   };
-  elfldltl::UnownedVmoFile file{vmo.borrow(), diag};
-  static_cast<StartupLoadResult&>(result) = result.module->Load(diag, initial_exec, file);
+  if (!vmo) [[unlikely]] {
+    diag.SystemError("no executable VMO in bootstrap message");
+  } else {
+    elfldltl::UnownedVmoFile file{vmo.borrow(), diag};
+    static_cast<StartupLoadResult&>(result) = result.module->Load(diag, initial_exec, file);
+  }
   return result;
 }
 

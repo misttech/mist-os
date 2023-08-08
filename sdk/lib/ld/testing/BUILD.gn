@@ -35,6 +35,7 @@ static_library("ld-testing") {
     deps += [
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
+      "//src/lib/elfldltl/testing",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/zx",
     ]
