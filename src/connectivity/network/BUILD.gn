@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/connectivity/network/use_netstack3.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
@@ -11,8 +10,6 @@ declare_args() {
 }
 
 _netstack2_component = "netstack:component"
-assert(!(enable_netstack2_tracing && use_netstack3),
-       "cannot enable both Netstack3 and tracing in Netstack2")
 if (enable_netstack2_tracing) {
   _netstack2_component = "netstack:component-with-tracing-dropin"
 }

@@ -4,7 +4,6 @@
 
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
-import("//src/connectivity/network/use_netstack3.gni")
 
 assert(
     is_fuchsia,
@@ -82,15 +81,6 @@ product_assembly_configuration("core") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_default, "*")
-
-    # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
-    # Netstack3 CI builders have been transitioned to use the
-    # core_with_netstack3 target below.
-    connectivity = {
-      network = {
-        force_netstack3 = use_netstack3
-      }
-    }
   }
   product = {
   }
@@ -103,15 +93,6 @@ product_assembly_configuration("core_with_fxfs") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_fxfs, "*")
-
-    # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
-    # Netstack3 CI builders have been transitioned to use the
-    # core_with_netstack3 target below.
-    connectivity = {
-      network = {
-        force_netstack3 = use_netstack3
-      }
-    }
   }
   product = {
   }

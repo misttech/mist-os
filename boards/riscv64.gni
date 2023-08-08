@@ -30,6 +30,3 @@ board_bootfs_labels += [
 board_bootfs_labels += _imports.virtio_drivers
 
 partitions_config_label = "//boards/partitions:riscv64"
-
-# The Go toolchain used for netstack2 does not support RISC-V.
-use_netstack3 = true
