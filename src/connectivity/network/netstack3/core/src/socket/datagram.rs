@@ -39,9 +39,9 @@ use crate::{
     socket::{
         self,
         address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerIpAddr},
-        AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, SocketMapAddrSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, SocketState as BoundSocketState,
-        SocketStateSpec,
+        AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
+        SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketState as BoundSocketState, SocketStateSpec,
     },
 };
 
@@ -181,18 +181,6 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash> {
     /// TODO(http://fxbug.dev/110370): Implement this by changing socket
     /// addresses.
     pub(crate) clear_device_on_disconnect: bool,
-}
-
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Shutdown {
-    /// True if the send path is shut down for the owning socket.
-    ///
-    /// If this is true, the socket should not be able to send packets.
-    pub(crate) send: bool,
-    /// True if the receive path is shut down for the owning socket.
-    ///
-    /// If this is true, the socket should not be able to receive packets.
-    pub(crate) receive: bool,
 }
 
 #[derive(Clone, Debug, Derivative)]

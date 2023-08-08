@@ -31,6 +31,7 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     ip::IpExt,
+    socket::Shutdown,
     transport::tcp::{
         self,
         buffer::{
@@ -40,10 +41,10 @@ use netstack3_core::{
         socket::{
             accept, bind, close_conn, connect, create_socket, get_info, get_socket_error, listen,
             receive_buffer_size, remove_bound, remove_unbound, reuseaddr, send_buffer_size,
-            set_device, set_receive_buffer_size, set_reuseaddr, set_send_buffer_size,
-            shutdown_conn, shutdown_listener, with_socket_options, with_socket_options_mut,
-            AcceptError, BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenError,
-            ListenerNotifier, NoConnection, SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
+            set_device, set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown,
+            with_socket_options, with_socket_options_mut, AcceptError, BoundInfo, ConnectError,
+            ConnectionId, ConnectionInfo, ListenError, ListenerNotifier, NoConnection,
+            SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -501,8 +502,20 @@ where
                 close_conn::<I, _>(sync_ctx, non_sync_ctx, conn);
             }
             SocketId::Listener(listener) => {
-                let bound = shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
-                remove_bound::<I, _>(sync_ctx, bound)
+                let mut id = listener.into();
+                assert_matches::assert_matches!(
+                    shutdown::<I, _>(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &mut id,
+                        Shutdown { send: false, receive: true }
+                    ),
+                    Ok(false)
+                );
+                remove_bound::<I, _>(
+                    sync_ctx,
+                    assert_matches::assert_matches!(id, SocketId::Bound(bound) => bound),
+                );
             }
         }
     }
@@ -812,35 +825,24 @@ where
 
     fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer, local_socket_and_watcher: _ }, ctx } = self;
-        match *id {
-            SocketId::Unbound(_) | SocketId::Bound(_) => Err(fposix::Errno::Enotconn),
-            SocketId::Connection(conn_id) => {
-                let mut my_disposition: Option<zx::SocketWriteDisposition> = None;
-                let mut peer_disposition: Option<zx::SocketWriteDisposition> = None;
-                if mode.contains(fposix_socket::ShutdownMode::WRITE) {
-                    peer_disposition = Some(zx::SocketWriteDisposition::Disabled);
-                    let mut ctx = ctx.clone();
-                    let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                    shutdown_conn::<I, _>(&sync_ctx, non_sync_ctx, conn_id)
-                        .map_err(IntoErrno::into_errno)?;
-                }
-                if mode.contains(fposix_socket::ShutdownMode::READ) {
-                    my_disposition = Some(zx::SocketWriteDisposition::Disabled);
-                }
-                peer.set_disposition(peer_disposition, my_disposition)
-                    .expect("failed to set socket disposition");
-                Ok(())
-            }
-            SocketId::Listener(listener) => {
-                if mode.contains(fposix_socket::ShutdownMode::READ) {
-                    let mut ctx = ctx.clone();
-                    let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                    let bound = shutdown_listener::<I, _>(&sync_ctx, non_sync_ctx, listener);
-                    *id = SocketId::Bound(bound);
-                }
-                Ok(())
-            }
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let shutdown_recv = mode.contains(fposix_socket::ShutdownMode::READ);
+        let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
+        let is_conn = shutdown::<I, _>(
+            &sync_ctx,
+            non_sync_ctx,
+            id,
+            Shutdown { send: shutdown_send, receive: shutdown_recv },
+        )
+        .map_err(IntoErrno::into_errno)?;
+        if is_conn {
+            let peer_disposition = shutdown_send.then_some(zx::SocketWriteDisposition::Disabled);
+            let my_disposition = shutdown_recv.then_some(zx::SocketWriteDisposition::Disabled);
+            peer.set_disposition(peer_disposition, my_disposition)
+                .expect("failed to set socket disposition");
         }
+        Ok(())
     }
 
     fn set_bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {

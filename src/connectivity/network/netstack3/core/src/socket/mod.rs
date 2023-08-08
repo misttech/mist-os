@@ -32,6 +32,19 @@ use crate::{
     socket::address::{AddrVecIter, ConnAddr, ListenerAddr, ListenerIpAddr},
 };
 
+/// Describes which direction(s) of the data path should be shut down.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+pub struct Shutdown {
+    /// True if the send path is shut down for the owning socket.
+    ///
+    /// If this is true, the socket should not be able to send packets.
+    pub send: bool,
+    /// True if the receive path is shut down for the owning socket.
+    ///
+    /// If this is true, the socket should not be able to receive packets.
+    pub receive: bool,
+}
+
 /// Determines whether the provided address is underspecified by itself.
 ///
 /// Some addresses are ambiguous and so must have a zone identifier in order

@@ -73,7 +73,7 @@ use crate::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         AddrVec, Bound, BoundSocketMap, Connection as BoundConnection, ConvertSocketTypeState,
         IncompatibleError, InsertError, Inserter, Listener as BoundListener, ListenerAddrInfo,
-        RemoveResult, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
+        RemoveResult, Shutdown, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
         SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
         SocketState as BoundSocketState, SocketStateSpec, UpdateSharingError,
     },
@@ -1302,11 +1302,18 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         remote: SocketAddr<I::Addr, Self::DeviceId>,
     ) -> Result<ConnectionId<I>, ConnectError>;
 
-    fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection>;
     fn close_conn(&mut self, ctx: &mut C, id: ConnectionId<I>);
     fn remove_unbound(&mut self, id: UnboundId<I>);
     fn remove_bound(&mut self, id: BoundId<I>);
-    fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>;
+
+    // TODO(https://fxbug.dev/126141): The `SocketId` is modified in-place, but
+    // would become unnecessary at a later stage of merging socket ID.
+    fn shutdown(
+        &mut self,
+        ctx: &mut C,
+        id: &mut SocketId<I>,
+        shutdown: Shutdown,
+    ) -> Result<bool, NoConnection>;
 
     fn get_info(&mut self, id: SocketId<I>) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
     fn do_send(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
@@ -1700,19 +1707,6 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         )
     }
 
-    fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection> {
-        self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
-            debug!("shutdown on {id:?}");
-            let (conn, _, addr): (_, &mut SharingState, _) =
-                id.get_from_socket_state_mut(&mut sockets.socket_state).expect("invalid conn ID");
-            match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
-                Ok(()) => Ok(do_send_inner(id.into(), conn, addr, ip_transport_ctx, ctx)),
-                Err(CloseError::NoConnection) => Err(NoConnection),
-                Err(CloseError::Closing) => Ok(()),
-            }
-        })
-    }
-
     fn close_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
             debug!("close on {id:?}");
@@ -1761,65 +1755,97 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         });
     }
 
-    fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I> {
+    fn shutdown(
+        &mut self,
+        ctx: &mut C,
+        id: &mut SocketId<I>,
+        shutdown: Shutdown,
+    ) -> Result<bool, NoConnection> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { socket_state, socketmap, port_alloc: _ }| {
-                debug!("shutdown on {id:?}");
-                let listener_state =
-                    id.get_from_socket_state_mut(socket_state).expect("missing listener state");
-                let (maybe_listener, sharing, addr) = listener_state;
-                let entry =
-                    socketmap.listeners_mut().entry(&id.into(), addr).expect("invalid listener ID");
-                let ListenerSharingState { sharing: _, listening } = sharing;
-                assert!(*listening, "listener {id:?} is not listening");
-                let new_sharing = ListenerSharingState { listening: false, ..sharing.clone() };
-                match entry.try_update_sharing(sharing, new_sharing.clone()) {
-                    Ok(()) => (),
-                    Err(e) => {
-                        unreachable!(
-                            "downgrading a TCP listener to bound should not fail, got {e:?}"
-                        )
+                match socket_state.get_mut(id).expect("invalid socket ID") {
+                    SocketState::Unbound(_) => Err(NoConnection),
+                    SocketState::Bound(BoundSocketState::Connected((conn, _sharing, addr))) => {
+                        if !shutdown.send {
+                            return Ok(true);
+                        }
+                        match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
+                            Ok(()) => {
+                                do_send_inner(MaybeClosedConnectionId(id.get_id(), IpVersionMarker::default()), conn, addr, ip_transport_ctx, ctx);
+                                Ok(true)
+                            }
+                            Err(CloseError::NoConnection) => Err(NoConnection),
+                            Err(CloseError::Closing) => Ok(true),
+                        }
                     }
-                };
-
-                let Listener {
-                    backlog: _,
-                    pending,
-                    ready,
-                    buffer_sizes: _,
-                    socket_options: _,
-                    notifier: _,
-                } = maybe_listener.maybe_shutdown().expect("must be a listener");
-                *sharing = new_sharing;
-
-                for conn_id in pending.into_iter().chain(
-                    ready
-                        .into_iter()
-                        .map(|(conn_id, _passive_open): (_, C::ReturnedBuffers)| conn_id),
-                ) {
-                    let _: Option<C::Instant> = ctx.cancel_timer(TimerId::new::<I>(conn_id.into()));
-                    let (mut conn, _sharing, conn_addr) = assert_matches!(
-                        conn_id.get_socket_state_entry(socket_state).remove(),
-                        SocketState::Bound(BoundSocketState::Connected(conn)) => conn
-                    );
-                    assert_matches!(
-                        socketmap.conns_mut().remove(&conn_id.into(), &conn_addr),
-                        Ok(())
-                    );
-                    if let Some(reset) = conn.state.abort() {
-                        let ConnAddr { ip, device: _ } = conn_addr;
-                        let ser = tcp_serialize_segment(reset, ip);
-                        ip_transport_ctx
-                            .send_ip_packet(ctx, &conn.ip_sock, ser, None)
-                            .unwrap_or_else(|(body, err)| {
-                                debug!(
-                                    "failed to reset connection to {:?}, body: {:?}, err: {:?}",
-                                    ip, body, err
+                    SocketState::Bound(BoundSocketState::Listener((maybe_listener, sharing, addr))) => {
+                        if !shutdown.receive {
+                            return Ok(false);
+                        }
+                        match maybe_listener {
+                            MaybeListener::Bound(_) => Err(NoConnection),
+                            MaybeListener::Listener(_) => {
+                                let entry = socketmap
+                                    .listeners_mut()
+                                    .entry(&MaybeListenerId(id.get_id(), IpVersionMarker::default()), addr)
+                                    .expect("invalid listener ID");
+                                let ListenerSharingState { sharing: _, listening } = sharing;
+                                assert!(*listening, "listener {id:?} is not listening");
+                                let new_sharing =
+                                    ListenerSharingState { listening: false, ..sharing.clone() };
+                                match entry.try_update_sharing(sharing, new_sharing.clone()) {
+                                    Ok(()) => (),
+                                    Err(e) => {
+                                        unreachable!(
+                                    "downgrading a TCP listener to bound should not fail, got {e:?}"
                                 )
-                            });
+                                    }
+                                };
+
+                                let Listener {
+                                    backlog: _,
+                                    pending,
+                                    ready,
+                                    buffer_sizes: _,
+                                    socket_options: _,
+                                    notifier: _,
+                                } = maybe_listener.maybe_shutdown().expect("must be a listener");
+                                *sharing = new_sharing;
+
+                                for conn_id in pending.into_iter().chain(
+                                    ready
+                                        .into_iter()
+                                        .map(|(conn_id, _passive_open): (_, C::ReturnedBuffers)| conn_id),
+                                ) {
+                                    let _: Option<C::Instant> = ctx.cancel_timer(TimerId::new::<I>(conn_id.into()));
+                                    let (mut conn, _sharing, conn_addr) = assert_matches!(
+                                        conn_id.get_socket_state_entry(socket_state).remove(),
+                                        SocketState::Bound(BoundSocketState::Connected(conn)) => conn
+                                    );
+                                    assert_matches!(
+                                        socketmap.conns_mut().remove(&conn_id.into(), &conn_addr),
+                                        Ok(())
+                                    );
+                                    if let Some(reset) = conn.state.abort() {
+                                        let ConnAddr { ip, device: _ } = conn_addr;
+                                        let ser = tcp_serialize_segment(reset, ip);
+                                        ip_transport_ctx
+                                            .send_ip_packet(ctx, &conn.ip_sock, ser, None)
+                                            .unwrap_or_else(|(body, err)| {
+                                                debug!(
+                                                    "failed to reset connection to {:?}, body: {:?}, err: {:?}",
+                                                    ip, body, err
+                                                )
+                                            });
+                                    }
+                                }
+
+                                *id = BoundId(id.get_id(), IpVersionMarker::default()).into();
+                                Ok(false)
+                            }
+                        }
                     }
                 }
-                BoundId(id.into(), IpVersionMarker::default())
             },
         )
     }
@@ -2737,25 +2763,38 @@ where
     )
 }
 
-/// Shuts down the write-half of the connection. Calling this function signals
-/// the other side of the connection that we will not be sending anything over
-/// the connection; The connection will still stay in the socketmap even after
-/// reaching `Closed` state. The user needs to call `close_conn` in order to
-/// remove it.
-pub fn shutdown_conn<I, C>(
+/// Shuts down a socket.
+///
+/// For a connection, calling this function signals the other side of the
+/// connection that we will not be sending anything over the connection; The
+/// connection will still stay in the socketmap even after reaching `Closed`
+/// state.
+///
+/// For a Listener, calling this function brings it back to bound state and
+/// shutdowns all the connection that is currently ready to be accepted.
+///
+/// Returns Err(NoConnection) if the shutdown option does not apply. Otherwise,
+/// Whether a connection has been shutdown is returned, i.e., if the socket was
+/// a listener, the operation will succeed but false will be returned.
+pub fn shutdown<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: ConnectionId<I>,
-) -> Result<(), NoConnection>
+    id: &mut SocketId<I>,
+    shutdown: Shutdown,
+) -> Result<bool, NoConnection>
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_conn(sync_ctx, ctx, id),
-        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_conn(sync_ctx, ctx, id),
+        (IpInvariant((&mut sync_ctx, ctx, shutdown)), id),
+        |(IpInvariant((sync_ctx, ctx, shutdown)), id)| {
+            SocketHandler::shutdown(sync_ctx, ctx, id, shutdown)
+        },
+        |(IpInvariant((sync_ctx, ctx, shutdown)), id)| {
+            SocketHandler::shutdown(sync_ctx, ctx, id, shutdown)
+        },
     )
 }
 
@@ -2784,23 +2823,6 @@ where
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::remove_bound(sync_ctx, id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::remove_bound(sync_ctx, id),
-    )
-}
-
-/// Shuts down a listener socket.
-///
-/// The socket remains in the socket map as a bound socket, taking the port
-/// that the socket has been using. Returns the id of that bound socket.
-pub fn shutdown_listener<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_listener(sync_ctx, ctx, id),
-        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_listener(sync_ctx, ctx, id),
     )
 }
 
@@ -4044,8 +4066,20 @@ mod tests {
         );
 
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            let bound = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
-            SocketHandler::remove_bound(sync_ctx, bound);
+            let mut id = server.into();
+            assert_eq!(
+                SocketHandler::shutdown(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &mut id,
+                    Shutdown { receive: true, send: false },
+                ),
+                Ok(false)
+            );
+            SocketHandler::remove_bound(
+                sync_ctx,
+                assert_matches!(id, SocketId::Bound(bound) => bound),
+            );
         });
 
         (net, client, client_snd_end, accepted)
@@ -4921,7 +4955,17 @@ mod tests {
             0.0,
         );
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            assert_eq!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, local), Ok(()));
+            let mut id = local.into();
+            assert_eq!(
+                SocketHandler::shutdown(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &mut id,
+                    Shutdown { send: true, receive: false }
+                ),
+                Ok(true)
+            );
+            assert_eq!(id, local.into());
         });
         loop {
             assert!(!net.step(handle_frame, handle_timer).is_idle());
@@ -4959,12 +5003,32 @@ mod tests {
 
         for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
             net.with_context(name, |TcpCtx { sync_ctx, non_sync_ctx }| {
-                assert_matches!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, id), Ok(()));
+                let mut sock_id = id.into();
+                assert_eq!(
+                    SocketHandler::shutdown(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &mut sock_id,
+                        Shutdown { send: true, receive: false }
+                    ),
+                    Ok(true)
+                );
+                assert_eq!(sock_id, id.into());
                 sync_ctx.with_tcp_sockets(|sockets| {
                     let (conn, _, _addr) = id.get_from_socket_state(&sockets.socket_state).unwrap();
                     assert_matches!(conn.state, State::FinWait1(_));
                 });
-                assert_matches!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, id), Ok(()));
+                let mut sock_id = id.into();
+                assert_eq!(
+                    SocketHandler::shutdown(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &mut sock_id,
+                        Shutdown { send: true, receive: false }
+                    ),
+                    Ok(true)
+                );
+                assert_eq!(sock_id, id.into());
             });
         }
         net.run_until_idle(handle_frame, handle_timer);
@@ -5094,7 +5158,17 @@ mod tests {
         });
 
         let local_bound = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, local_listener)
+            let mut id = local_listener.into();
+            assert_eq!(
+                SocketHandler::shutdown(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &mut id,
+                    Shutdown { send: false, receive: true },
+                ),
+                Ok(false)
+            );
+            assert_matches!(id, SocketId::Bound(bound) => bound)
         });
 
         // The timer for the pending connection should be cancelled.
@@ -5311,8 +5385,17 @@ mod tests {
         );
 
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, local_connection)
-                .expect("is connected");
+            let mut id = local_connection.into();
+            assert_eq!(
+                SocketHandler::shutdown(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &mut id,
+                    Shutdown { send: true, receive: false },
+                ),
+                Ok(true)
+            );
+            assert_eq!(id, local_connection.into());
         });
 
         step_and_increment_buffer_sizes_until_idle(
@@ -5322,8 +5405,17 @@ mod tests {
         );
 
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, remote_connection)
-                .expect("is connected");
+            let mut id = remote_connection.into();
+            assert_eq!(
+                SocketHandler::shutdown(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &mut id,
+                    Shutdown { send: true, receive: false },
+                ),
+                Ok(true),
+            );
+            assert_eq!(id, remote_connection.into());
         });
 
         step_and_increment_buffer_sizes_until_idle(
@@ -5532,8 +5624,20 @@ mod tests {
             let (_server_conn, _, _): (_, SocketAddr<_, _>, ClientBuffers) =
                 SocketHandler::accept(sync_ctx, non_sync_ctx, server).expect("pending connection");
 
-            let server = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
-            SocketHandler::remove_bound(sync_ctx, server);
+            let mut id = server.into();
+            assert_eq!(
+                SocketHandler::shutdown(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &mut id,
+                    Shutdown { send: false, receive: true },
+                ),
+                Ok(false)
+            );
+            SocketHandler::remove_bound(
+                sync_ctx,
+                assert_matches!(id, SocketId::Bound(bound) => bound),
+            );
 
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             assert_eq!(
