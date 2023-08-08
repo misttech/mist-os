@@ -435,7 +435,7 @@ mod test {
         };
         let daemon_hoist = Arc::new(Hoist::new().unwrap());
         let listener = UnixListener::bind(&sockpath).unwrap();
-        let local_link_task = local_hoist.start_socket_link(sockpath.clone());
+        let local_link_task = local_hoist.start_socket_link(sockpath.clone(), hoist::Cso::Enabled);
 
         let (s, p) = fidl::Channel::create();
         daemon_hoist.publish_service(DaemonMarker::PROTOCOL_NAME, ClientEnd::new(p)).unwrap();

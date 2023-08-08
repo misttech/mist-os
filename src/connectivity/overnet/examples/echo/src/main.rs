@@ -144,7 +144,7 @@ async fn exec_server(quiet: bool) -> Result<(), Error> {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let _t = hoist::init_hoist()?.start_default_link()?;
+    let _t = hoist::init_hoist()?.start_default_link(hoist::Cso::Enabled)?;
 
     let app: OvernetEcho = argh::from_env();
 

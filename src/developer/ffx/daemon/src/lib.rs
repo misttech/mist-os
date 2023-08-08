@@ -52,7 +52,8 @@ pub async fn get_daemon_proxy_single_link(
         tracing::warn!("'overnet.cso' config is no longer supported (non-CSO is deprecated)");
     }
 
-    let link = hoist.clone().run_single_ascendd_link(socket_path.clone()).fuse();
+    let link =
+        hoist.clone().run_single_ascendd_link(socket_path.clone(), hoist::Cso::Enabled).fuse();
     let mut link = Box::pin(link);
     let find = find_next_daemon(hoist, exclusions).fuse();
     let mut find = Box::pin(find);
