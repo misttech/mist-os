@@ -211,5 +211,46 @@ TEST_F(ColorTransformManagerTest, SetColorCorrectionAndInversion) {
   EXPECT_TRUE(color_transform_handler_.hasPostOffset(kProtanomalyAndInversionPostOffset));
 }
 
+TEST_F(ColorTransformManagerTest, BuffersChangeBeforeHandlerRegistered) {
+  // Enable color inversion and color correction.
+  color_transform_manager_->ChangeColorTransform(
+      true, fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+  RunLoopUntilIdle();
+
+  // Register the (fake) handler.
+  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  RunLoopUntilIdle();
+
+  // Verify handler gets sent the correct settings.
+  ASSERT_TRUE(color_transform_handler_.color_inversion_enabled_.has_value());
+  EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_.value());
+  ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
+  EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
+            fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+}
+
+TEST_F(ColorTransformManagerTest, ReappliesSettingOnHandlerChange) {
+  // Enable color inversion and color correction.
+  color_transform_manager_->ChangeColorTransform(
+      true, fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+  RunLoopUntilIdle();
+
+  // Register the (fake) handler.
+  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  RunLoopUntilIdle();
+
+  // Create and register a new (fake) handler.
+  FakeColorTransformHandler new_handler;
+  color_transform_manager_->RegisterColorTransformHandler(new_handler.GetHandle());
+  RunLoopUntilIdle();
+
+  // Verify the new handler gets sent the correct settings.
+  ASSERT_TRUE(new_handler.color_inversion_enabled_.has_value());
+  EXPECT_TRUE(new_handler.color_inversion_enabled_.value());
+  ASSERT_TRUE(new_handler.color_correction_mode_.has_value());
+  EXPECT_EQ(new_handler.color_correction_mode_.value(),
+            fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+}
+
 }  // namespace
 }  // namespace accessibility_test
