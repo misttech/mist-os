@@ -34,7 +34,8 @@ class MoblyDriverLibTest(unittest.TestCase):
 
         self.mock_driver.generate_test_config.assert_called()
         self.mock_driver.teardown.assert_called()
-        self.assertIn(mock.call('TEST_OUTPUT'), mock_print.call_args_list)
+        self.assertIn(
+            mock.call('TEST_OUTPUT', flush=True), mock_print.call_args_list)
 
     @parameterized.expand(
         [
@@ -92,7 +93,8 @@ class MoblyDriverLibTest(unittest.TestCase):
             mobly_driver_lib.run(self.mock_driver, '/py/path', '/test/path')
         self.mock_driver.teardown.assert_called()
         self.assertIn(
-            mock.call('MOCK_FAILURE_OUTPUT'), mock_print.call_args_list)
+            mock.call('MOCK_FAILURE_OUTPUT', flush=True),
+            mock_print.call_args_list)
 
     @parameterized.expand([[True], [False]])
     @mock.patch('builtins.print')

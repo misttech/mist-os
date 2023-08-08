@@ -86,7 +86,8 @@ def _execute_test(
                     raise MoblyTestFailureException('Mobly test failed.')
                 output = proc.stdout.readline()
                 if output:
-                    print(output.strip())
+                    # Immediately flush Mobly test output for responsiveness.
+                    print(output.strip(), flush=True)
             # Mobly test timed out.
             proc.kill()
             proc.wait(timeout=10)
