@@ -14,6 +14,7 @@ use {
     fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
+    fuchsia_zircon as zx,
     fxfs::object_store::{directory::Directory, DataObjectHandle, HandleOptions, ObjectStore},
     storage_device::{fake_device::FakeDevice, DeviceHolder},
 };
@@ -31,6 +32,7 @@ pub trait BlobFixture {
     async fn write_blob(&self, data: &[u8]) -> Hash;
     async fn read_blob(&self, name: &str) -> Vec<u8>;
     async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume>;
+    async fn get_blob_vmo(&self, name: &str) -> zx::Vmo;
     async fn create_blob(
         &self,
         hash: &[u8; 32],
@@ -78,6 +80,14 @@ impl BlobFixture for TestFixture {
         ObjectStore::open_object(self.volume().volume(), object_id, HandleOptions::default(), None)
             .await
             .expect("open_object failed")
+    }
+
+    async fn get_blob_vmo(&self, name: &str) -> zx::Vmo {
+        let blob = open_file_checked(self.root(), fio::OpenFlags::RIGHT_READABLE, name).await;
+        blob.get_backing_memory(fio::VmoFlags::READ)
+            .await
+            .expect("FIDL call failed")
+            .expect("get_backing_memory failed")
     }
 
     async fn create_blob(

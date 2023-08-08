@@ -172,9 +172,10 @@ impl Drop for FxBlob {
 /// Implements an on-demand paged VMO that decompresses blobs on the fly from a compressed on-disk
 /// representation.
 impl FxBlob {
-    async fn read_uncached(&self, range: Range<u64>) -> Result<buffer::Buffer<'_>, Error> {
+    // Returns a buffer containing the data, as well as the number of bytes which are actually
+    // available in the buffer.
+    async fn read_uncached(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
         let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize);
-        // TODO(fxbug.dev/122125): zero the tail
         let read = if self.compressed_offsets.is_empty() {
             self.handle.read(range.start, buffer.as_mut()).await?
         } else {
@@ -236,7 +237,9 @@ impl FxBlob {
             );
             offset += bs;
         }
-        Ok(buffer)
+        // Zero the tail.
+        buffer.as_mut_slice()[read..].fill(0);
+        Ok((buffer, read))
     }
 
     fn align_range(&self, range: Range<u64>) -> Range<u64> {
@@ -440,8 +443,10 @@ impl PagerBackedVmo for FxBlob {
         const ZERO_VMO_SIZE: u64 = TRANSFER_BUFFER_MAX_SIZE;
         static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
+        let page_size = zx::system_get_page_size();
+
         let vmo = self.vmo();
-        let aligned_size = round_up(self.uncompressed_size, zx::system_get_page_size()).unwrap();
+        let aligned_size = round_up(self.uncompressed_size, page_size).unwrap();
         let mut offset = std::cmp::max(range.start, aligned_size);
         while offset < range.end {
             let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
@@ -472,8 +477,8 @@ impl PagerBackedVmo for FxBlob {
             buffer.commit(range.end - range.start);
             buffer
         });
-        let buffer = match buffer_result {
-            Ok(buffer) => buffer,
+        let (buffer, len) = match buffer_result {
+            Ok(v) => v,
             Err(e) => {
                 error!(
                     ?range,
@@ -492,12 +497,9 @@ impl PagerBackedVmo for FxBlob {
                 return;
             }
         };
-        let mut buf = buffer.as_slice();
-        // TODO(fxbug.dev/122125): read_uncached should return a buffer representing the correct
-        // size
-        if range.start + buf.len() as u64 > aligned_size {
-            buf = &buf[..(aligned_size - range.start) as usize];
-        }
+        let len = round_up(len, page_size as usize).unwrap();
+        debug_assert!(range.start + len as u64 <= aligned_size);
+        let mut buf = &buffer.as_slice()[..len];
         while !buf.is_empty() {
             let (source, remainder) =
                 buf.split_at(std::cmp::min(buf.len(), TRANSFER_BUFFER_MAX_SIZE as usize));
@@ -658,6 +660,27 @@ mod tests {
         }
 
         assert_eq!(fixture.read_blob(&format!("{}", tree.root())).await, data);
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_non_page_aligned_blob() {
+        let fixture = new_blob_fixture().await;
+
+        let page_size = zx::system_get_page_size() as usize;
+        let data = vec![0xffu8; page_size - 1];
+        let hash = fixture.write_blob(&data).await;
+        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+
+        {
+            let vmo = fixture.get_blob_vmo(&format!("{}", hash)).await;
+            let mut buf = vec![0x11u8; page_size];
+            vmo.read(&mut buf[..], 0).expect("vmo read failed");
+            assert_eq!(data, buf[..data.len()]);
+            // Ensure the tail is zeroed
+            assert_eq!(buf[data.len()], 0);
+        }
 
         fixture.close().await;
     }
