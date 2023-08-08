@@ -308,7 +308,6 @@ hlcpp_visibility = [
   "//src/sys/tools/activity-ctl:*",
   "//src/sys/tools/log:*",
   "//src/testing/loadbench:*",
-  "//src/testing/sl4f_ffx/fidl:*",
   "//src/testing/system-validation/web/apps:*",
   "//src/tests/benchmarks:*",
   "//src/tests/microbenchmarks:*",

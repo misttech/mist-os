@@ -146,9 +146,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx profile gpu usage
   "//src/testing/metrics-logger/fuchsia.metricslogger.test:fuchsia.metricslogger.test",
 
-  # used by ffx sl4f
-  "//src/testing/sl4f_ffx/fidl:fuchsia.sl4f.ffx",
-
   # used by ffx storage blackout
   "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test",
 ]

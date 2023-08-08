@@ -21,7 +21,6 @@ group("tests") {
     "loadbench:tests",
     "metrics-logger:tests",
     "sl4f:tests",
-    "sl4f_ffx/server:tests",
   ]
 }
 
