@@ -5,11 +5,8 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-fuchsia_component("crasher_v2") {
-  component_name = "rust_crasher"
-
+fuchsia_component("rust_crasher") {
   manifest = "meta/crasher.cml"
-
   deps = [ ":crasher_exe" ]
 }
 
@@ -27,4 +24,11 @@ rustc_binary("crasher_exe") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:argh",
   ]
+}
+
+# Because the test package is declared in another file.
+fuchsia_test("tests") {
+  package = "..:crasher_test"
+  component = ":rust_crasher_test"
+  environments = []  # don't run it on any bots
 }

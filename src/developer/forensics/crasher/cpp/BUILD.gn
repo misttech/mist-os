@@ -6,11 +6,8 @@ import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 
-fuchsia_component("crasher_v2") {
-  component_name = "cpp_crasher"
-
+fuchsia_component("cpp_crasher") {
   manifest = "meta/crasher.cml"
-
   deps = [ ":crasher_exe" ]
 }
 
@@ -51,4 +48,11 @@ test("crasher_test") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]
+}
+
+# Because the test package is declared in another file.
+fuchsia_test("tests") {
+  package = "..:crasher_test"
+  component = ":cpp_crasher_test"
+  environments = []  # don't run it on any bots
 }
