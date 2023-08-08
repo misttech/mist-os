@@ -5,12 +5,15 @@
 use {
     super::extent_record::{ExtentKey, ExtentValue},
     super::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty},
-    crate::lsm_tree::{
-        merge::{
-            ItemOp::{Discard, Keep, Replace},
-            MergeLayerIterator, MergeResult,
+    crate::{
+        log::*,
+        lsm_tree::{
+            merge::{
+                ItemOp::{Discard, Keep, Replace},
+                MergeLayerIterator, MergeResult,
+            },
+            types::Item,
         },
-        types::Item,
     },
 };
 
@@ -247,8 +250,12 @@ pub fn merge(
         }
         // Tombstones (ObjectKeyData::Object) compare before others, so always appear on left.
         (ObjectKey { data: ObjectKeyData::Object, .. }, _, ObjectValue::None, _) => {
-            debug_assert!(left.layer_index < right.layer_index);
-            MergeResult::Other { emit: None, left: Keep, right: Discard }
+            if left.layer_index > right.layer_index {
+                warn!("Detected inconsistency: record has been inserted after tombstone");
+                MergeResult::EmitLeft
+            } else {
+                MergeResult::Other { emit: None, left: Keep, right: Discard }
+            }
         }
         // Note that identical keys are sorted by layer_index, so left is always newer.
         (left_key, right_key, _, _) if left_key == right_key => {
