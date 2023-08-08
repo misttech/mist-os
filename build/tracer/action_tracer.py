@@ -891,9 +891,9 @@ def main():
         os.path.join(os.getcwd(), "compile_commands.json"),
 
         ### C/C++ toolchain-related
-        # Clang standard libraries, compiler runtime, etc are not strict inputs.
-        os.path.join(src_root, "prebuilt", "third_party", "sysroot/"),
-        os.path.join(os.getcwd(), "gen", "zircon", "public", "sysroot/"),
+        # Specify toolchain/sysroot related exceptions using explicit
+        # --ignore-prefix (hermetic_action_ignored_prefixes in GN),
+        # instead of hard-coding their paths here.
 
         ### Python
         # Python scripts access Python prebuilts for the interpreter,

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/clang/clang.gni")
+import("//build/config/sysroot.gni")
 
 _clang_toolchain_dir = get_path_info(clang_prefix, "dir")
 
@@ -67,10 +68,15 @@ template("clang_doc_invoke") {
     }
     outputs = [ invoker.out_zip ]
 
-    # Allow tool to read toolchain's headers in:
-    #   $CLANG_DIR/include
-    #   $CLANG_DIR/lib/clang/VERSION/include
-    hermetic_action_ignored_prefixes = [ _clang_toolchain_dir ]
+    hermetic_action_ignored_prefixes = [
+      # Allow tool to read toolchain's headers in:
+      #   $CLANG_DIR/include
+      #   $CLANG_DIR/lib/clang/VERSION/include
+      _clang_toolchain_dir,
+
+      #   $SYSROOT/usr/include
+      sysroot,
+    ]
 
     forward_variables_from(invoker,
                            [
