@@ -217,7 +217,7 @@ impl Kernel {
 
         let framebuffer = Framebuffer::new(features.iter().find(|f| f.starts_with("aspect_ratio")))
             .expect("Failed to create framebuffer");
-        let input_device = InputDevice::new(framebuffer.clone());
+        let input_device = InputDevice::new(framebuffer.clone(), &inspect_node);
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
 
