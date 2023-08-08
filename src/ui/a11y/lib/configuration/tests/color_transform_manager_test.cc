@@ -90,8 +90,9 @@ class FakeColorTransformHandler : public fuchsia::accessibility::ColorTransformH
   std::array<float, 3> pre_offset_;
   std::array<float, 3> post_offset_;
 
-  bool color_inversion_enabled_;
-  fuchsia::accessibility::ColorCorrectionMode color_correction_mode_;
+  // These fields `has_value()` iff SetColorTransformConfiguration() has been called.
+  std::optional<bool> color_inversion_enabled_;
+  std::optional<fuchsia::accessibility::ColorCorrectionMode> color_correction_mode_;
 
  private:
   template <size_t N>
@@ -146,8 +147,10 @@ TEST_F(ColorTransformManagerTest, SetColorTransformDefault) {
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
-  EXPECT_FALSE(color_transform_handler_.color_inversion_enabled_);
-  EXPECT_EQ(color_transform_handler_.color_correction_mode_,
+  ASSERT_TRUE(color_transform_handler_.color_inversion_enabled_.has_value());
+  EXPECT_FALSE(color_transform_handler_.color_inversion_enabled_.value());
+  ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
+  EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
             fuchsia::accessibility::ColorCorrectionMode::DISABLED);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kIdentityMatrix));
 }
@@ -162,8 +165,10 @@ TEST_F(ColorTransformManagerTest, SetColorInversionEnabled) {
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
-  EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_);
-  EXPECT_EQ(color_transform_handler_.color_correction_mode_,
+  ASSERT_TRUE(color_transform_handler_.color_inversion_enabled_.has_value());
+  EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_.value());
+  ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
+  EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
             fuchsia::accessibility::ColorCorrectionMode::DISABLED);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kColorInversionMatrix));
   EXPECT_TRUE(color_transform_handler_.hasPostOffset(kColorInversionPostOffset));
@@ -179,8 +184,10 @@ TEST_F(ColorTransformManagerTest, SetColorCorrection) {
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
-  EXPECT_FALSE(color_transform_handler_.color_inversion_enabled_);
-  EXPECT_EQ(color_transform_handler_.color_correction_mode_,
+  ASSERT_TRUE(color_transform_handler_.color_inversion_enabled_.has_value());
+  EXPECT_FALSE(color_transform_handler_.color_inversion_enabled_.value());
+  ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
+  EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
             fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kCorrectProtanomaly));
 }
@@ -195,8 +202,10 @@ TEST_F(ColorTransformManagerTest, SetColorCorrectionAndInversion) {
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
-  EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_);
-  EXPECT_EQ(color_transform_handler_.color_correction_mode_,
+  ASSERT_TRUE(color_transform_handler_.color_inversion_enabled_.has_value());
+  EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_.value());
+  ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
+  EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
             fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kProtanomalyAndInversionMatrix));
   EXPECT_TRUE(color_transform_handler_.hasPostOffset(kProtanomalyAndInversionPostOffset));
