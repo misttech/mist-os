@@ -78,8 +78,8 @@ TEST(BlkdevTests, blkdev_test_simple) {
   std::unique_ptr<uint8_t[]> out(new (&checker) uint8_t[buffer_size]);
   ASSERT_TRUE(checker.check());
 
-  memset(buf.get(), 'a', sizeof(buf));
-  memset(out.get(), 0, sizeof(out));
+  memset(buf.get(), 'a', buffer_size);
+  memset(out.get(), 0, buffer_size);
 
   // Write three blocks.
   ASSERT_EQ(BWrite(client.borrow(), buf.get(), buffer_size, 0), ZX_OK);
