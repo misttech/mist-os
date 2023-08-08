@@ -236,6 +236,14 @@ impl SessionMultiplexer {
         })
     }
 
+    /// Returns the maximum TX size (in bytes) that can be sent over an individual RFCOMM channel.
+    fn max_tx_for_session_channel(&self) -> usize {
+        // The max TX size is bounded by the negotiated max. For User Data frames, at most 6
+        // bytes of data are added to every frame (5 bytes for headers, 1 byte for FCS).
+        const USER_DATA_HEADER_SIZE: usize = 6;
+        self.parameters().max_frame_size - USER_DATA_HEADER_SIZE
+    }
+
     /// Attempts to establish a SessionChannel for the provided `dlci`.
     /// `user_data_sender` is used by the SessionChannel to relay any received UserData
     /// frames from the client associated with the channel.
@@ -252,14 +260,15 @@ impl SessionMultiplexer {
         }
 
         // Potentially reserve a new SessionChannel for the provided DLCI.
+        let max_tx_size = self.max_tx_for_session_channel();
         let channel = self.find_or_create_session_channel(dlci);
         if channel.is_established() {
             return Err(Error::ChannelAlreadyEstablished(dlci));
         }
 
-        // Create endpoints for the multiplexed channel. Establish the local end and
-        // return the remote end.
-        let (local, remote) = Channel::create();
+        // Create endpoints for the session channel. The local end is held by this component
+        // and the remote end is returned to be held by a RFCOMM profile.
+        let (local, remote) = Channel::create_with_max_tx(max_tx_size);
         channel.establish(local, user_data_sender);
         Ok(remote)
     }

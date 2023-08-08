@@ -1640,6 +1640,7 @@ mod tests {
             let mut establish_fut = Box::pin(session.establish_session_channel(user_dlci));
             exec.run_until_stalled(&mut establish_fut).expect_pending("should wait for channel");
             let channel = expect_channel(&mut exec, &mut channel_receiver);
+            assert_eq!(channel.max_tx_size(), 666); // 672 (default max) - 6
             assert_matches!(exec.run_until_stalled(&mut establish_fut), Poll::Ready(true));
             channel
         };
