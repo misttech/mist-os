@@ -805,6 +805,8 @@ zx_status_t BtHciMarvell::BtHciOpenScoChannel(zx::channel channel) {
                      ControllerChannelId::kChannelScoData, "SCO Data");
 }
 
+zx_status_t BtHciMarvell::BtHciOpenIsoChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
+
 zx_status_t BtHciMarvell::BtHciOpenSnoopChannel(zx::channel channel) {
   return ZX_ERR_NOT_SUPPORTED;
 }

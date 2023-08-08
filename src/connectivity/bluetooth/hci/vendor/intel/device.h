@@ -52,6 +52,7 @@ class Device : public DeviceType, public ddk::BtHciProtocol<Device, ddk::base_pr
                          sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
                          void* cookie);
   void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie);
+  zx_status_t BtHciOpenIsoChannel(zx::channel in);
   zx_status_t BtHciOpenSnoopChannel(zx::channel in);
 
  private:

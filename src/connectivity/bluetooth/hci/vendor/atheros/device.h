@@ -56,6 +56,7 @@ class Device : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
   static zx_status_t OpenScoChannel(void* ctx, zx_handle_t channel);
+  static zx_status_t OpenIsoChannel(void* ctx, zx_handle_t channel);
   static void ConfigureSco(void* ctx, sco_coding_format_t coding_format, sco_encoding_t encoding,
                            sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
                            void* cookie);

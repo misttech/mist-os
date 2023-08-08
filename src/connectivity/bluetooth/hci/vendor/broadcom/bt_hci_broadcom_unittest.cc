@@ -78,6 +78,7 @@ class FakeTransportDevice : public ddk::BtHciProtocol<FakeTransportDevice>,
                          sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
                          void* cookie) {}
   void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {}
+  zx_status_t BtHciOpenIsoChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t BtHciOpenSnoopChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
 
   // ddk::SerialImplAsyncProtocol mixins:

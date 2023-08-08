@@ -74,6 +74,18 @@ closed protocol BtHci {
         s zx.Status;
     });
 
+    /// Opens a channel on the provided handle for sending and receiving isochronous data packets.
+    /// The zircon channel is closed in the event of an error opening the hci channel or if the hci
+    /// channel is already associated with a handle to another zircon channel.
+    /// Returns ZX_ERR_NOT_SUPPORTED if ISO is not supported by the current vendor or transport
+    /// driver.
+    /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
+    strict OpenIsoChannel(resource struct {
+        channel zx.Handle:CHANNEL;
+    }) -> (struct {
+        s zx.Status;
+    });
+
     /// Open an output-only channel for monitoring HCI traffic.
     /// The format of each message is: [1-octet flags] [n-octet payload]
     /// The flags octet is a bitfield with the following values defined:

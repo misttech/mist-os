@@ -1207,6 +1207,8 @@ void Device::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
   ProcessNextIsocAltSettingRequest();
 }
 
+zx_status_t Device::BtHciOpenIsoChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
+
 zx_status_t Device::BtHciOpenSnoopChannel(zx::channel channel) {
   zxlogf(TRACE, "%s", __FUNCTION__);
   return HciOpenChannel(&snoop_channel_, std::move(channel));

@@ -350,6 +350,8 @@ void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 
 zx_status_t Device::OpenScoChannel(void* ctx, zx_handle_t channel) { return ZX_ERR_NOT_SUPPORTED; }
 
+zx_status_t Device::OpenIsoChannel(void* ctx, zx_handle_t channel) { return ZX_ERR_NOT_SUPPORTED; }
+
 void Device::ConfigureSco(void* ctx, sco_coding_format_t coding_format, sco_encoding_t encoding,
                           sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
                           void* cookie) {

@@ -78,6 +78,8 @@ zx_status_t LoopbackDevice::BtHciOpenScoChannel(zx::channel in) {
   return HciOpenChannel(&sco_channel_, in.release());
 }
 
+zx_status_t LoopbackDevice::BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
+
 void LoopbackDevice::ChannelCleanupLocked(zx::channel* channel) {
   FX_LOGS(TRACE) << "LoopbackDevice::ChannelCleanupLocked";
   if (!channel->is_valid()) {

@@ -293,6 +293,8 @@ void Device::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
   hci_.ResetSco(callback, cookie);
 }
 
+zx_status_t Device::BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
+
 zx_status_t Device::BtHciOpenSnoopChannel(zx::channel in) {
   return hci_.OpenSnoopChannel(std::move(in));
 }
