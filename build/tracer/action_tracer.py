@@ -940,6 +940,10 @@ def main():
         # Allow Flutter to read and write tool states.
         "/.config/flutter/tool_state",
 
+        # Allow global access to remote action download file locks,
+        # which are not consumed by any other builds actions.
+        ".dl-lock",
+
         # Allow actions to read .fx-build-dir to figure out the current build
         # directory.
         #
