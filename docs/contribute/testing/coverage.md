@@ -106,7 +106,7 @@ this step.
 In your second terminal:
 
 ```posix-terminal
-ffx repository server start
+fx serve
 ```
 
 ### View coverage in the browser
