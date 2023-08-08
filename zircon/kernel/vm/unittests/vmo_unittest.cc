@@ -971,7 +971,11 @@ static bool vmo_remap_test() {
                                    kArchRwFlags);
   ASSERT_EQ(ZX_OK, ret, "mapping object");
 
-  // fill with known pattern and test
+  // fill with known pattern and test.  The initial virtual address will be used
+  // to generate the seed which is used to generate the fill pattern.  Make sure
+  // we save it off right now to use when we test the fill pattern later on
+  // after re-mapping.
+  const uintptr_t fill_seed = reinterpret_cast<uintptr_t>(ptr);
   if (!fill_and_test(ptr, alloc_size)) {
     all_ok = false;
   }
@@ -984,8 +988,9 @@ static bool vmo_remap_test() {
                               kArchRwFlags);
   ASSERT_EQ(ret, ZX_OK, "mapping object");
 
-  // test that the pattern is still valid
-  bool result = test_region((uintptr_t)ptr, ptr, alloc_size);
+  // test that the pattern is still valid.  Be sure to use the original seed we
+  // saved off earlier when verifying.
+  bool result = test_region(fill_seed, ptr, alloc_size);
   EXPECT_TRUE(result, "testing region for corruption");
 
   err = ka->FreeRegion((vaddr_t)ptr);
