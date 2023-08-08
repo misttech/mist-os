@@ -1224,6 +1224,14 @@ from infra builds, and later inspection.
 
 From //build/toolchain/rbe.gni:176
 
+### compress_debug_sections
+
+Enable compression of debug sections.
+
+**Current value (from the default):** `"zstd"`
+
+From //build/config/compiler.gni:90
+
 ### config_example_cpp_greeting
 
 Set this in args.gn to override the greeting emitted by this example.
@@ -2712,14 +2720,6 @@ These take precedence over `profile_source_files`.
 **Current value (from the default):** `[]`
 
 From //build/config/profile/config.gni:15
-
-### dwarf_compression
-
-Enable DWARF compression.
-
-**Current value (from the default):** `"zstd"`
-
-From //build/config/compiler.gni:90
 
 ### dwarf_version
 
