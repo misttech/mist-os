@@ -12,7 +12,12 @@
 namespace dfv2 {
 
 NodeId NodeRemovalTracker::RegisterNode(Node node) {
-  nodes_[next_node_id_] = std::move(node);
+  if (node.collection == Collection::kPackage) {
+    remaining_pkg_nodes_.emplace(next_node_id_);
+  } else {
+    remaining_non_pkg_nodes_.emplace(next_node_id_);
+  }
+  nodes_[next_node_id_] = node;
   return next_node_id_++;
 }
 
@@ -23,38 +28,28 @@ void NodeRemovalTracker::Notify(NodeId id, NodeState state) {
     return;
   }
   itr->second.state = state;
-  if (state == NodeState::kStopping) {
-    CheckRemovalDone();
+  if (state != NodeState::kStopping) {
+    return;
   }
+
+  if (itr->second.collection == Collection::kPackage) {
+    remaining_pkg_nodes_.erase(id);
+  } else {
+    remaining_non_pkg_nodes_.erase(id);
+  }
+  CheckRemovalDone();
 }
 
 void NodeRemovalTracker::CheckRemovalDone() {
   if (fully_enumerated_ == false) {
     return;
-  }
-  int pkg_count = 0, all_count = 0;
+  };
 
-  for (const auto& [id, value] : nodes_) {
-    const auto& [name, node_collection, state] = value;
-    if (state != NodeState::kStopping) {
-      all_count++;
-      LOGF(DEBUG, "NRT: %s node %s waiting on %s",
-           node_collection == Collection::kPackage ? "package"
-           : node_collection == Collection::kBoot  ? "boot"
-                                                   : "other",
-           name.c_str(),
-           state == NodeState::kWaitingOnDriver     ? "driver"
-           : state == NodeState::kWaitingOnChildren ? "children"
-                                                    : "nothing");
-
-      if (node_collection == Collection::kPackage) {
-        pkg_count++;
-      }
-    }
-  }
+  size_t pkg_count = remaining_pkg_nodes_.size();
+  size_t all_count = pkg_count + remaining_non_pkg_nodes_.size();
 
   // TODO(fxb/130850): Remove logs or lower their severity once the ASAN issue is resolved.
-  LOGF(INFO, "NodeRemovalTracker: %d pkg %d all remaining", pkg_count, all_count);
+  LOGF(INFO, "NodeRemovalTracker: %zu pkg %zu all remaining", pkg_count, all_count);
   if (pkg_callback_ && pkg_count == 0) {
     LOGF(INFO, "NodeRemovalTracker: package removal completed");
     pkg_callback_();
