@@ -5,8 +5,12 @@
 //! Type-safe bindings for Zircon processes.
 
 use crate::ok;
-use crate::{object_get_info, object_get_property, object_set_property, ObjectQuery, Topic};
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Status, Task, Thread};
+use crate::sys::{zx_handle_t, zx_rights_t};
+use crate::{
+    object_get_info, object_get_info_vec, object_get_property, object_set_property, ObjectQuery,
+    Topic,
+};
+use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Koid, Status, Task, Thread};
 use crate::{Property, PropertyQuery};
 use bitflags::bitflags;
 use fuchsia_zircon_sys::{
@@ -65,6 +69,14 @@ impl From<sys::zx_info_process_t> for ProcessInfo {
 unsafe impl ObjectQuery for ProcessInfo {
     const TOPIC: Topic = Topic::PROCESS;
     type InfoTy = ProcessInfo;
+}
+
+struct ProcessThreadsInfo;
+
+// ProcessThreadsInfo is able to be safely replaced with a byte representation and is a PoD type.
+unsafe impl ObjectQuery for ProcessThreadsInfo {
+    const TOPIC: Topic = Topic::PROCESS_THREADS;
+    type InfoTy = Koid;
 }
 
 sys::zx_info_task_stats_t!(TaskStatsInfo);
@@ -282,6 +294,13 @@ impl Process {
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_PROCESS_THREADS topic.
+    pub fn threads(&self) -> Result<Vec<Koid>, Status> {
+        object_get_info_vec::<ProcessThreadsInfo>(self.as_handle_ref())
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_TASK_STATS topic.
     pub fn task_stats(&self) -> Result<TaskStatsInfo, Status> {
         let mut info = TaskStatsInfo::default();
@@ -321,6 +340,23 @@ impl Process {
         object_get_info::<ProcessHandleStats>(self.as_handle_ref(), std::slice::from_mut(&mut info))
             .map(|_| info)
     }
+
+    /// Wraps the
+    /// [zx_object_get_child](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_child.md)
+    /// syscall.
+    pub fn get_child(&self, koid: &Koid, rights: zx_rights_t) -> Result<Handle, Status> {
+        let mut handle: zx_handle_t = Default::default();
+        let status = unsafe {
+            sys::zx_object_get_child(
+                self.raw_handle(),
+                koid.raw_koid(),
+                rights,
+                &mut handle as *mut zx_handle_t,
+            )
+        };
+        ok(status)?;
+        Ok(unsafe { Handle::from_raw(handle) })
+    }
 }
 
 impl Task for Process {}
@@ -331,9 +367,10 @@ mod tests {
     // The unit tests are built with a different crate name, but fdio and fuchsia_runtime return a
     // "real" fuchsia_zircon::Process that we need to use.
     use assert_matches::assert_matches;
+    use fuchsia_zircon::sys::ZX_RIGHT_NONE;
     use fuchsia_zircon::{
-        sys, system_get_page_size, AsHandleRef, ProcessInfo, ProcessInfoFlags, ProcessMapsInfo,
-        Signals, Task, TaskStatsInfo, Time, VmarFlags, Vmo,
+        sys, system_get_page_size, AsHandleRef, Handle, ProcessInfo, ProcessInfoFlags,
+        ProcessMapsInfo, ProcessOptions, Signals, Task, TaskStatsInfo, Time, VmarFlags, Vmo,
     };
     use std::ffi::CString;
 
@@ -512,5 +549,85 @@ mod tests {
 
         assert!(sum > 0);
         assert!(sum < 1_000_000);
+    }
+
+    #[test]
+    fn threads_contain_self() {
+        let current_thread_koid = fuchsia_runtime::thread_self().get_koid().unwrap();
+        let threads_koids = fuchsia_runtime::process_self().threads().unwrap();
+        assert!(threads_koids.contains(&current_thread_koid));
+        let thread_handle =
+            fuchsia_runtime::process_self().get_child(&current_thread_koid, ZX_RIGHT_NONE).unwrap();
+        assert_eq!(thread_handle.get_koid().unwrap(), current_thread_koid);
+    }
+
+    #[test]
+    fn new_process_no_threads() {
+        let job = fuchsia_runtime::job_default().create_child_job().unwrap();
+        let (process, _) =
+            job.create_child_process(ProcessOptions::empty(), b"test-process").unwrap();
+        assert!(process.threads().unwrap().is_empty());
+    }
+
+    #[test]
+    fn non_started_threads_dont_show_up() {
+        let job = fuchsia_runtime::job_default().create_child_job().unwrap();
+        let (process, _) =
+            job.create_child_process(ProcessOptions::empty(), b"test-process").unwrap();
+
+        let thread = process.create_thread(b"test-thread").unwrap();
+        let thread_koid = thread.get_koid().unwrap();
+
+        assert!(process.threads().unwrap().is_empty());
+        assert!(process.get_child(&thread_koid, ZX_RIGHT_NONE).is_err());
+    }
+
+    #[test]
+    fn started_threads_show_up() {
+        let job = fuchsia_runtime::job_default().create_child_job().unwrap();
+        let (process, root_vmar) =
+            job.create_child_process(ProcessOptions::empty(), b"test-process").unwrap();
+
+        let valid_addr = root_vmar.info().unwrap().base;
+
+        let thread1 = process.create_thread(b"test-thread-1").unwrap();
+        let thread2 = process.create_thread(b"test-thread-2").unwrap();
+
+        // start with the thread suspended, so we don't care about executing invalid code.
+        let thread1_suspended = thread1.suspend().unwrap();
+        process.start(&thread1, valid_addr, valid_addr, Handle::invalid(), 0).unwrap();
+
+        let threads_koids = process.threads().unwrap();
+        assert_eq!(threads_koids.len(), 1);
+        assert_eq!(threads_koids[0], thread1.get_koid().unwrap());
+        assert_eq!(
+            process.get_child(&threads_koids[0], ZX_RIGHT_NONE).unwrap().get_koid().unwrap(),
+            threads_koids[0]
+        );
+
+        // Add another thread.
+        let thread2_suspended = thread2.suspend().unwrap();
+        thread2.start(valid_addr, valid_addr, 0, 0).unwrap();
+
+        let threads_koids = process.threads().unwrap();
+        assert_eq!(threads_koids.len(), 2);
+        assert!(threads_koids.contains(&thread1.get_koid().unwrap()));
+        assert!(threads_koids.contains(&thread2.get_koid().unwrap()));
+        assert_eq!(
+            process.get_child(&threads_koids[0], ZX_RIGHT_NONE).unwrap().get_koid().unwrap(),
+            threads_koids[0]
+        );
+        assert_eq!(
+            process.get_child(&threads_koids[1], ZX_RIGHT_NONE).unwrap().get_koid().unwrap(),
+            threads_koids[1]
+        );
+
+        process.kill().unwrap();
+        process.wait_handle(Signals::TASK_TERMINATED, Time::INFINITE).unwrap();
+
+        drop(thread1_suspended);
+        drop(thread2_suspended);
+
+        assert!(process.threads().unwrap().is_empty());
     }
 }
