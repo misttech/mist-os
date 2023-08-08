@@ -152,7 +152,7 @@ template("ffx_tool") {
 
   # Install host tool and metadata as test data
   host_test_data(target_test_data) {
-    deps = [ ":$target_host_tool" ]
+    data_deps = [ ":$target_host_tool" ]
     sources = [
       "${host_tools_dir}/${output_metadata}",
       "${host_tools_dir}/${output_name}",

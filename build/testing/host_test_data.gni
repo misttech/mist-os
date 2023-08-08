@@ -29,9 +29,9 @@ template("host_test_data") {
       !is_fuchsia,
       "host_test_data should only be used on host, to fix this, wrap you target with `if (is_host) { ... }`")
 
-  main_target_name = target_name
   if (defined(invoker.outputs)) {
-    metadata_target_name = "${target_name}_metadata"
+    main_target_name = target_name
+    metadata_target_name = "${target_name}.metadata"
 
     # The main target that copies test data to the build directory.
     # It depends on the generated group `group_target_name`, which
@@ -46,6 +46,10 @@ template("host_test_data") {
       }
       deps += [ ":$metadata_target_name" ]
 
+      if (target_name == "fuchsia_controller_fidl_irs_and_deps") {
+        print_stack_trace()
+      }
+
       # If we are in the context of a variant, also perform the copy for the
       # base toolchain, as we want both the variant-selected and normal
       # versions of the associated test to have its test data available at the
@@ -54,23 +58,32 @@ template("host_test_data") {
         deps += [ ":$main_target_name(${toolchain_variant.base})" ]
       }
     }
-    test_data = get_target_outputs(":$main_target_name")
-  } else {
-    metadata_target_name = main_target_name
-    test_data = invoker.sources
-  }
 
-  # This group exists only to carry the `test_runtime_deps` metadata, which
-  # is aggregated by test_spec().
-  group(metadata_target_name) {
-    testonly = true
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "visibility",
-                           ])
-    metadata = {
-      test_runtime_deps = test_data
+    # This group exists because the metadata needed by test_spec cannot be
+    # generated within the copy() action, as 'process_file_pattern()' rejects
+    # 'source_path_relative', which is valid for 'copy()'.
+    group(metadata_target_name) {
+      testonly = true
+      visibility = [ ":$main_target_name" ]
+      metadata = {
+        test_runtime_deps = get_target_outputs(":$main_target_name")
+      }
+    }
+  } else {
+    # This group exists only to carry the `test_runtime_deps` metadata, which
+    # is aggregated by test_spec().
+    group(target_name) {
+      testonly = true
+      forward_variables_from(invoker,
+                             [
+                               "deps",
+                               "data_deps",
+                               "public_deps",
+                               "visibility",
+                             ])
+      metadata = {
+        test_runtime_deps = invoker.sources
+      }
     }
   }
 }
