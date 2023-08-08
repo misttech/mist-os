@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // TODO(https://fxbug.dev/91474): Only include the network-test-realm shard
-    // in non-prod builds.
     include: [
-        "//src/connectivity/network/meta/test-collection.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
         "trace/offer.shard.cml",

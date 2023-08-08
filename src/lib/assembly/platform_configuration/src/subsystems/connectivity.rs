@@ -88,6 +88,14 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 builder.platform_bundle("netstack2");
             }
 
+            // Add the networking test collection on all eng builds. The test
+            // collection allows components to be launched inside the network
+            // realm with access to all networking related capabilities.
+            match context.build_type {
+                BuildType::Eng => builder.platform_bundle("networking_test_collection"),
+                _ => {}
+            }
+
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
             if has_fullmac || has_softmac {

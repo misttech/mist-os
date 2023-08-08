@@ -542,13 +542,6 @@ assembly_input_bundle("network_realm") {
               rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
           destination = "syslog/offer.shard.cml"
         },
-        {
-          source = rebase_path(
-                  "//src/connectivity/network/meta/test-collection.shard.cml",
-                  root_build_dir)
-          destination =
-              "src/connectivity/network/meta/test-collection.shard.cml"
-        },
       ]
     },
   ]
@@ -591,6 +584,27 @@ assembly_input_bundle("networking_basic") {
           component_name = "network"
           shards = rebase_path(
                   [ "//src/connectivity/network/meta/network-basic.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# networking_test_collection
+#
+# Includes a test collection inside the network realm that has access to all
+# networking administrative capabilities.
+assembly_input_bundle("networking_test_collection") {
+  testonly = true
+  compiled_packages = [
+    {
+      name = "network"
+      component_shards = [
+        {
+          component_name = "network"
+          shards = rebase_path(
+                  [ "//src/connectivity/network/meta/test-collection.shard.cml" ],
                   root_build_dir)
         },
       ]

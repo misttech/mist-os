@@ -212,6 +212,9 @@ eng_only_platform_aib_names =
       # Testing Support
       "testing_support",
 
+      # Networking test support
+      "networking_test_collection",
+
       # UI
       "ui_eng",
       "ui_package_eng",

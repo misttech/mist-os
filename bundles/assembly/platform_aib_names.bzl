@@ -130,6 +130,7 @@ ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PL
     "core_realm_eng",
     "example_assembly_bundle",
     "minimal_eng",
+    "networking_test_collection",
     "system_update_checker",
     "testing_support",
     "ui_eng",
