@@ -364,8 +364,11 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
   cpp20::span entries(map_entries_, map_entry_count_);
 
   struct ClusterPerf {
+    // Index of the node in |map_entries_| representing this cluster.
     size_t cluster_index = 0;
+    // Index of the node in |map_entries_| representing this node's cluster, nested clusters.
     size_t cluster_parent = 0;
+    // Performance class. Arbitrary number representing relative performance across cores.
     uint32_t perf = 1;
   };
 
@@ -385,9 +388,9 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
       perf[current_cluster].cluster_parent = i;
 
       if (entry.cluster_index) {
-        for (size_t j = current_cluster - 1; j >= 0 && j < current_cluster; --j) {
-          if (perf[j].cluster_index == *entry.cluster_index) {
-            perf[current_cluster].cluster_parent = j;
+        for (size_t j = current_cluster; j > 0; --j) {
+          if (perf[j - 1].cluster_index == *entry.cluster_index) {
+            perf[current_cluster].cluster_parent = j - 1;
             break;
           }
         }
