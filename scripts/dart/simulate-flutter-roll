@@ -17,4 +17,4 @@ else
     git checkout -b $INTEGRATION_BRANCH
 fi
 
-python3 "$ROLL_SCRIPT" "$@"
+fuchsia-vendored-python "$ROLL_SCRIPT" "$@"

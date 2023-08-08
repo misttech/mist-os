@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-# Note: we use the host python3 here intentionally; this script calls out into
-# tools such as cbindgen that are not part of the Fuchsia repo and must be
-# installed to the local host so we cannot use the hermetic Fuchsia python.
+# TODO(b/295039695): we use the host python3 here intentionally; this script
+# calls out into tools such as cbindgen that are not part of the Fuchsia repo
+# and must be installed to the local host so we cannot use the hermetic Fuchsia
+# python.
 
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be

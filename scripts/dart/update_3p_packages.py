@@ -66,11 +66,8 @@ def main():
     # of flutter
     flutter_tool = os.path.join(flutter_absolute_root, 'bin', 'flutter')
     subprocess.check_call([flutter_tool, '--version'])
-
-    python_tool = os.path.join(
-        paths.FUCHSIA_ROOT, 'prebuilt', 'third_party', 'python3', platform,
-        'bin', 'python3.8')
-    args = [python_tool, importer_path]
+    # sys.executable provides the absolute path for the python prebuilt interpreter
+    args = [sys.executable, importer_path]
     if script_args.debug:
         args.append('--debug')
     args.extend(['--dart', dart_path])

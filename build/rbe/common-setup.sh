@@ -93,8 +93,8 @@ test -n "$default_project_root" || {
 # This points to the host platform subdir of our prebuilt tools.
 readonly HOST_PLATFORM="${_FUCHSIA_RBE_CACHE_VAR_host_os}-${_FUCHSIA_RBE_CACHE_VAR_host_arch}"
 
-# Point to our prebuilt python3.
-readonly python="$default_project_root"/prebuilt/third_party/python3.11/"$HOST_PLATFORM"/bin/python3
+# Point to our prebuilt python3.11.
+readonly python="$default_project_root"/prebuilt/third_party/python3.11/"$HOST_PLATFORM"/bin/python3.11
 
 function _check_realpath_works_for_relative_paths() {
   if which realpath

@@ -297,7 +297,7 @@ build_angle() {
   [ ! -d "${angle_dir}" ] && git clone https://chromium.googlesource.com/angle/angle "${angle_dir}"
   pushd "${angle_dir}"
 
-  python3 scripts/bootstrap.py
+  fuchsia-vendored-python scripts/bootstrap.py
   gclient sync
   build/linux/sysroot_scripts/install-sysroot.py --arch=${arch}
 
