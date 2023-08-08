@@ -121,7 +121,7 @@ uint64_t* trace_context::AllocRecord(size_t num_bytes) {
   for (int iter = 0; iter < 2; ++iter) {
     // TODO(dje): This can be optimized a bit. Later.
     uint64_t offset_plus_counter =
-        rolling_buffer_current_.fetch_add(num_bytes, std::memory_order_relaxed);
+        rolling_buffer_current_.fetch_add(num_bytes, std::memory_order_acquire);
     uint32_t wrapped_count = GetWrappedCount(offset_plus_counter);
     int buffer_number = GetBufferNumber(wrapped_count);
     uint64_t buffer_offset = GetBufferOffset(offset_plus_counter);
@@ -199,7 +199,7 @@ void trace_context::StreamingBufferFullCheck(uint32_t wrapped_count, uint64_t bu
   // buffer can't change while we're doing this.
   if (unlikely(buffer_offset > MaxUsableBufferOffset())) {
     std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
-    uint32_t current_wrapped_count = CurrentWrappedCount();
+    uint32_t current_wrapped_count = CurrentWrappedCount(std::memory_order_relaxed);
     if (GetBufferNumber(current_wrapped_count) == GetBufferNumber(wrapped_count)) {
       SnapToEnd(wrapped_count);
     }
@@ -220,7 +220,7 @@ bool trace_context::SwitchRollingBuffer(uint32_t wrapped_count, uint64_t buffer_
     return false;
   }
 
-  uint32_t current_wrapped_count = CurrentWrappedCount();
+  uint32_t current_wrapped_count = CurrentWrappedCount(std::memory_order_relaxed);
   // Anything allocated to the durable buffer after this point
   // won't be for this buffer. This is racy, but all we need is
   // some usable value for where the durable pointer is.
@@ -409,7 +409,7 @@ void trace_context::UpdateBufferHeaderAfterStopped() {
     durable_last_offset = durable_buffer_full_mark;
   header_->durable_data_end = durable_last_offset;
 
-  uint64_t offset_plus_counter = rolling_buffer_current_.load(std::memory_order_relaxed);
+  uint64_t offset_plus_counter = rolling_buffer_current_.load(std::memory_order_acquire);
   uint64_t last_offset = GetBufferOffset(offset_plus_counter);
   uint32_t wrapped_count = GetWrappedCount(offset_plus_counter);
   header_->wrapped_count = wrapped_count;
@@ -432,7 +432,7 @@ size_t trace_context::RollingBytesAllocated() const {
       uint64_t full_bytes = rolling_buffer_full_mark_[0].load(std::memory_order_relaxed);
       if (full_bytes != 0)
         return full_bytes;
-      return rolling_buffer_current_.load(std::memory_order_relaxed);
+      return rolling_buffer_current_.load(std::memory_order_acquire);
     }
     case TRACE_BUFFERING_MODE_CIRCULAR:
     case TRACE_BUFFERING_MODE_STREAMING: {
@@ -532,7 +532,19 @@ void trace_context::SwitchRollingBufferLocked(uint32_t prev_wrapped_count,
 
   // Do this last: After this tracing resumes in the new buffer.
   uint64_t new_offset_plus_counter = MakeOffsetPlusCounter(0, new_wrapped_count);
-  rolling_buffer_current_.store(new_offset_plus_counter, std::memory_order_relaxed);
+  // This store is marked memory_order_release to ensure that a thread observing
+  // the buffer swap will also be guaranteed to observe the resets of
+  // rolling_buffer_full_mark[next_buffer] and header_->rolling_data_end[next_buffer]
+  // that were performed above. Otherwise, another thread could observe that we
+  // swapped to the new buffer but believe that it was immediately full,
+  // triggering a transfer of duplicate data.
+  //
+  // Reads of rolling_buffer_current_ will generally use
+  // std::memory_order_acquire, but as this section is done under
+  // buffer_switch_mutex_ any reads that are done while holding
+  // buffer_switch_mutex_ already have a sync point that guarantees a consistent
+  // view of these writes and as such can use memory_order_relaxed.
+  rolling_buffer_current_.store(new_offset_plus_counter, std::memory_order_release);
 }
 
 void trace_context::MarkTracingArtificiallyStopped() {
@@ -544,7 +556,7 @@ void trace_context::MarkTracingArtificiallyStopped() {
   // buffer is full. AllocRecord, on seeing the buffer is full, will
   // then check |tracing_artificially_stopped_|.
   tracing_artificially_stopped_ = true;
-  SnapToEnd(CurrentWrappedCount());
+  SnapToEnd(CurrentWrappedCount(std::memory_order_relaxed));
 }
 
 void trace_context::NotifyRollingBufferFullLocked(uint32_t wrapped_count,

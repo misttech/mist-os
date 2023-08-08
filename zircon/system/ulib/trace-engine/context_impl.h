@@ -214,8 +214,8 @@ struct trace_context {
     return IsRollingBufferReady(!buffer_number);
   }
 
-  uint32_t CurrentWrappedCount() const {
-    auto current = rolling_buffer_current_.load(std::memory_order_relaxed);
+  uint32_t CurrentWrappedCount(std::memory_order memory_order) const {
+    auto current = rolling_buffer_current_.load(memory_order);
     return GetWrappedCount(current);
   }
 
