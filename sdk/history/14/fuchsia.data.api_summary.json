@@ -35,13 +35,13 @@
         "kind": "union/member",
         "name": "fuchsia.data/DictionaryValue.str",
         "ordinal": "1",
-        "type": "string:8192"
+        "type": "string:32768"
     },
     {
         "kind": "union/member",
         "name": "fuchsia.data/DictionaryValue.str_vec",
         "ordinal": "2",
-        "type": "vector<string:8192>:1024"
+        "type": "vector<string:32768>:1024"
     },
     {
         "kind": "union",
@@ -70,7 +70,7 @@
         "kind": "const",
         "name": "fuchsia.data/MAX_VALUE_LENGTH",
         "type": "uint32",
-        "value": "8192"
+        "value": "32768"
     },
     {
         "kind": "library",

@@ -11,8 +11,10 @@ const MAX_KEY_LENGTH uint32 = 1024;
 
 @available(removed=12)
 const MAX_VALUE_LENGTH uint32 = 1024;
-@available(added=12)
+@available(added=12, removed=14)
 const MAX_VALUE_LENGTH uint32 = 8192;
+@available(added=14)
+const MAX_VALUE_LENGTH uint32 = 32768;
 
 /// A dictionary is a sequence of key/value pairs.
 /// Keys must be unique and sorted in lexicographically increasing order.
