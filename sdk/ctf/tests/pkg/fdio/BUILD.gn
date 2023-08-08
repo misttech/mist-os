@@ -30,6 +30,21 @@ ctf_executable("fdio-spawn-tests-bin") {
   ]
 }
 
+# TODO(b/295025303): Runs ResolveTest.* cases at ToT, but is not run in CTF.
+# For some reason, helper test binaries cannot be resolved with '#!resolve' when
+# this test is run as a CTF prebuilt. Debug and merge these back into a single
+# :fdio-spawn-test component.
+ctf_fuchsia_component("fdio-spawn-resolve-test") {
+  testonly = true
+  manifest = "meta/fdio-spawn-resolve-test.cml"
+  deps = [ ":fdio-spawn-tests-bin" ]
+}
+
+fuchsia_test_component("resolve-test-root") {
+  manifest = "meta/fdio-spawn-resolve-tests-root.cml"
+  test_type = "ctf"
+}
+
 # A test utility used to test various features of fdio_spawn, extensively in spawn_test.cc.
 ctf_executable("spawn-child-util-bin") {
   testonly = true
@@ -264,7 +279,8 @@ ctf_fuchsia_package("fdio-spawn-tests") {
   testonly = true
   package_name = "fdio-spawn-tests"
   deps = [
-    # test component
+    # test components
+    ":fdio-spawn-resolve-test",
     ":fdio-spawn-test",
 
     # helper components
@@ -292,7 +308,12 @@ fuchsia_test_component("test-root") {
 }
 
 fuchsia_test_package("fdio-spawn-tests-package") {
-  test_components = [ ":test-root" ]
+  test_components = [
+    ":test-root",
+
+    # TODO(b/295025303): Delete when Resolve tests are fixed.
+    ":resolve-test-root",
+  ]
   subpackages = [ ":fdio-spawn-tests" ]
 }
 
