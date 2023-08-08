@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/testing/environments.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 group("tests") {
@@ -38,14 +39,6 @@ expect_includes("starnix_test_with_expectations") {
   includes = [ "starnix_test_with_expectations.shard.cml" ]
 }
 
-group("container_resources") {
-  deps = [
-    "//src/starnix/containers:data_tmp_target",
-    "//src/starnix/containers:default_init",
-    "//src/starnix/containers/debian:system_image",
-  ]
-}
-
 if (host_os == "linux" && host_cpu == "x64") {
   starnix_host_test_component("fdio-test") {
     test_label = "//sdk/lib/fdio/tests:fdio-test"
@@ -55,8 +48,8 @@ if (host_os == "linux" && host_cpu == "x64") {
   fuchsia_test_package("starnix_user_tests") {
     test_components = [ ":fdio-test" ]
 
-    deps = [ ":container_resources" ]
-    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+    subpackages = starnix_test_subpackages +
+                  [ "//src/starnix/containers/debian:debian_package" ]
   }
 }
 
@@ -85,11 +78,10 @@ fuchsia_test_package("starnix_magma_tests") {
     ":virtmagma_unit_tests",
   ]
 
-  deps = [ ":container_resources" ]
-  subpackages = [
-    "//src/starnix/kernel:starnix_kernel_package",
-    "//src/ui/testing/test_ui_stack:test-ui-stack",
-  ]
+  subpackages = starnix_test_subpackages + [
+                  "//src/starnix/containers/debian:debian_package",
+                  "//src/ui/testing/test_ui_stack:test-ui-stack",
+                ]
 
   test_specs = {
     log_settings = {
