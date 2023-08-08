@@ -109,12 +109,6 @@ In your second terminal:
 ffx repository server start
 ```
 
-Lastly we need to enable experimental test coverage support:
-
-```posix-terminal
-ffx config set coverage true
-```
-
 ### View coverage in the browser
 
 In this workflow we will run our test and produce a coverage report which we can
