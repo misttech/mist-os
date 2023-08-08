@@ -894,7 +894,8 @@ function fx-run-ninja {
     "PATH=${newpath}"
     # By default, also show the number of actively running actions.
     "NINJA_STATUS=${NINJA_STATUS:-"[%f/%t](%r) "}"
-    "NINJA_STATUS_MAX_COMMANDS=${NINJA_STATUS_MAX_COMMANDS:-0}"
+    # By default, print the 4 oldest commands that are still running.
+    "NINJA_STATUS_MAX_COMMANDS=${NINJA_STATUS_MAX_COMMANDS:-4}"
     "NINJA_STATUS_REFRESH_MILLIS=${NINJA_STATUS_REFRESH_MILLIS:-100}"
     ${GOMA_DISABLED+"GOMA_DISABLED=$GOMA_DISABLED"}
     ${TMPDIR+"TMPDIR=$TMPDIR"}
