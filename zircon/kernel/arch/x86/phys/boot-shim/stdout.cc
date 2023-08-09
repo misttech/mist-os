@@ -10,6 +10,7 @@
 #include <lib/boot-options/word-view.h>
 #include <lib/uart/all.h>
 
+#include <phys/boot-options.h>
 #include <phys/uart.h>
 
 // Pure Multiboot loaders like QEMU provide no means of information about the
@@ -17,22 +18,6 @@
 void UartFromCmdLine(ktl::string_view cmdline, uart::all::Driver& uart) {
   BootOptions boot_opts;
   boot_opts.serial = uart;
-  boot_opts.SetMany(cmdline);
+  SetBootOptionsWithoutEntropy(boot_opts, {}, cmdline);
   uart = boot_opts.serial;
-
-  // We only use boot-options parsing for kernel.serial and ignore the rest.
-  // But it destructively scrubs the RedactedHex input so we have to undo that.
-  if (boot_opts.entropy_mixin.len > 0) {
-    // BootOptions already parsed and redacted, so put it back.
-    for (auto word : WordView(cmdline)) {
-      constexpr ktl::string_view kPrefix = "kernel.entropy-mixin=";
-      if (ktl::starts_with(word, kPrefix)) {
-        word.remove_prefix(kPrefix.length());
-        memcpy(const_cast<char*>(word.data()), boot_opts.entropy_mixin.hex.data(),
-               std::min(boot_opts.entropy_mixin.len, word.size()));
-        boot_opts.entropy_mixin = {};
-        break;
-      }
-    }
-  }
 }

@@ -7,10 +7,14 @@
 #include "phys/boot-options.h"
 
 #include <lib/boot-options/boot-options.h>
+#include <lib/boot-options/word-view.h>
 #include <lib/uart/all.h>
 #include <lib/uart/sync.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
+
+#include <explicit-memory/bytes.h>
+#include <ktl/string_view.h>
 
 void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_view legacy_cmdline) {
   {
@@ -37,4 +41,25 @@ void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_vie
 
   // At last the bootloader provided arguments trumps everything.
   boot_opts.SetMany(legacy_cmdline);
+}
+
+void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, zbitl::ByteView zbi,
+                                  ktl::string_view legacy_cmdline) {
+  SetBootOptions(boot_opts, zbi, legacy_cmdline);
+  // Restore the entropy bits.
+  // We only use boot-options parsing for kernel.serial and ignore the rest.
+  // But it destructively scrubs the RedactedHex input so we have to undo that.
+  if (boot_opts.entropy_mixin.len > 0) {
+    // BootOptions already parsed and redacted, so put it back.
+    for (auto word : WordView(legacy_cmdline)) {
+      constexpr ktl::string_view kPrefix = "kernel.entropy-mixin=";
+      if (ktl::starts_with(word, kPrefix)) {
+        word.remove_prefix(kPrefix.length());
+        memcpy(const_cast<char*>(word.data()), boot_opts.entropy_mixin.hex.data(),
+               std::min(boot_opts.entropy_mixin.len, word.size()));
+        mandatory_memset(boot_opts.entropy_mixin.hex.data(), 0, boot_opts.entropy_mixin.len);
+        break;
+      }
+    }
+  }
 }

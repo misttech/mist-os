@@ -83,7 +83,7 @@ void InitMemory(void* dtb) {
   // the proper uart from the cmdline if its present.
   static BootOptions boot_options;
   boot_options.serial = chosen.uart().uart();
-  SetBootOptions(boot_options, {}, chosen.cmdline().value_or(""));
+  SetBootOptionsWithoutEntropy(boot_options, {}, chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
   DevicetreeInitMemory(chosen.zbi(), memory);
 

@@ -27,17 +27,24 @@ using ByteView = ktl::span<const ktl::byte>;
 // |legacy_cmdline| override cmdline items contained in the ZBI.
 //
 // Given a uart specification provided by multiple sources such as lgeacy uart driver,
-// ZBI UART driver item, ZBI cmdline item and legacy command line the priority for determining
+// ZBI UART driver item, ZBI cmdline item and legacy command-line the priority for determining
 // which to use is the following:
 //
-// (1) Legacy cmdline (e.g. boot loader cmdline)
+// (1) Legacy cmdline (e.g. boot loader command-line)
 // (2) ZBI cmdline item.
 // (3) ZBI UART driver item.
 // (4) Legacy UART driver (e.g. ACPI or devicetree).
 //
 // It is expected that |boot_opts.serial| is set to legacy UART driver(if any) in order to preserve
 // this priority.
+//
 void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi,
                     ktl::string_view legacy_cmdline = {});
+
+// Just like |SetBootOptions| but leaves the entropy from the command-line if
+// available, which will restore the entropy bits. This allows to reuse BootOptions infratructure
+// for parsing specific arguments.
+void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, zbitl::ByteView zbi,
+                                  ktl::string_view legacy_cmdline = {});
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_OPTIONS_H_

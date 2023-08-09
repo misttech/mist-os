@@ -368,6 +368,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//src/lib/zbitl",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/libc",
+      "//zircon/system/ulib/explicit-memory",
     ]
   }
 
