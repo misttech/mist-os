@@ -26,7 +26,7 @@ use {
     hex::FromHex,
     pin_utils::pin_mut,
     rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor},
-    std::thread,
+    std::{str::FromStr as _, thread},
 };
 
 use crate::commands::{avc_match_string, Cmd, CmdHelper, ReplControl};
@@ -43,8 +43,15 @@ static CLEAR_LINE: &str = "\x1b[2K";
 #[argh(description = "Bluetooth AVRCP Controller CLI")]
 struct Options {
     /// target device id.
-    #[argh(positional, from_str_fn(PeerId::from))]
+    #[argh(positional, from_str_fn(peer_id_from_str))]
     device: PeerId,
+}
+
+/// Helper to parse `PeerId` from the command line. argh requires the error
+/// return type to be a `String`, which is why we couldn't directly use
+/// `PeerId::from_str`.
+fn peer_id_from_str(s: &str) -> Result<PeerId, String> {
+    PeerId::from_str(s).map_err(|err| err.to_string())
 }
 
 async fn send_passthrough<'a>(

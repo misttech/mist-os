@@ -2,5 +2,5 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/rust_crates/owners.toml.
 # DOCS: https://fuchsia.dev/fuchsia-src/development/languages/rust/third_party#owners_files
 
-include /third_party/rust_crates/vendor/argh-0.1.10/OWNERS
-include /third_party/rust_crates/vendor/argh_derive-0.1.10/OWNERS
+include /third_party/rust_crates/vendor/argh-0.1.12/OWNERS
+include /third_party/rust_crates/vendor/argh_derive-0.1.12/OWNERS

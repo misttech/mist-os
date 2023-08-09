@@ -36,7 +36,7 @@ group("arbitrary") {
 }
 
 group("argh") {
-  public_deps = [ ":argh-v0_1_10" ]
+  public_deps = [ ":argh-v0_1_12" ]
 }
 
 group("arrayvec") {
@@ -1334,67 +1334,68 @@ rust_library("arbitrary-v1_0_3") {
   visibility = [ ":*" ]
 }
 
-rust_library("argh-v0_1_10") {
+rust_library("argh-v0_1_12") {
   crate_name = "argh"
-  crate_root = "//third_party/rust_crates/vendor/argh-0.1.10/src/lib.rs"
-  output_name = "argh-985f0733f1979a4e"
+  crate_root = "//third_party/rust_crates/vendor/argh-0.1.12/src/lib.rs"
+  output_name = "argh-22dc77a208701f30"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":argh_derive-v0_1_10($host_toolchain)" ]
-  deps += [ ":argh_shared-v0_1_10" ]
+  deps += [ ":argh_derive-v0_1_12($host_toolchain)" ]
+  deps += [ ":argh_shared-v0_1_12" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=985f0733f1979a4e",
-    "-Cextra-filename=-985f0733f1979a4e",
+    "-Cmetadata=22dc77a208701f30",
+    "-Cextra-filename=-22dc77a208701f30",
   ]
 
   visibility = [ ":*" ]
 }
 
-rust_proc_macro("argh_derive-v0_1_10") {
+rust_proc_macro("argh_derive-v0_1_12") {
   crate_name = "argh_derive"
-  crate_root = "//third_party/rust_crates/vendor/argh_derive-0.1.10/src/lib.rs"
-  output_name = "argh_derive-e6feaf0d203e8ea9"
+  crate_root = "//third_party/rust_crates/vendor/argh_derive-0.1.12/src/lib.rs"
+  output_name = "argh_derive-5f3acc1b826834de"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":argh_shared-v0_1_10" ]
+  deps += [ ":argh_shared-v0_1_12" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_23" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=e6feaf0d203e8ea9",
-    "-Cextra-filename=-e6feaf0d203e8ea9",
+    "-Cmetadata=5f3acc1b826834de",
+    "-Cextra-filename=-5f3acc1b826834de",
   ]
 
   visibility = [ ":*" ]
 }
 
-rust_library("argh_shared-v0_1_10") {
+rust_library("argh_shared-v0_1_12") {
   crate_name = "argh_shared"
-  crate_root = "//third_party/rust_crates/vendor/argh_shared-0.1.10/src/lib.rs"
-  output_name = "argh_shared-782b5a39ef65589c"
+  crate_root = "//third_party/rust_crates/vendor/argh_shared-0.1.12/src/lib.rs"
+  output_name = "argh_shared-544226982af09ad9"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":serde-v1_0_147" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=782b5a39ef65589c",
-    "-Cextra-filename=-782b5a39ef65589c",
+    "-Cmetadata=544226982af09ad9",
+    "-Cextra-filename=-544226982af09ad9",
   ]
 
   visibility = [ ":*" ]

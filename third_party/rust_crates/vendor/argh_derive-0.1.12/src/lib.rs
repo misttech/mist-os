@@ -19,6 +19,7 @@ use {
     syn::{spanned::Spanned, GenericArgument, LitStr, PathArguments, Type},
 };
 
+mod args_info;
 mod errors;
 mod help;
 mod parse_attrs;
@@ -28,6 +29,14 @@ mod parse_attrs;
 pub fn argh_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
     let gen = impl_from_args(&ast);
+    gen.into()
+}
+
+/// Entrypoint for `#[derive(ArgsInfo)]`.
+#[proc_macro_derive(ArgsInfo, attributes(argh))]
+pub fn args_info_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
+    let gen = args_info::impl_args_info(&ast);
     gen.into()
 }
 

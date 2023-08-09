@@ -30,7 +30,7 @@ aes-gcm-siv = { version = "0.10.3", features = ["std"] }
 ansi_term = "0.12.0"
 anyhow = "1.0.57"
 arbitrary = { version = "1.0.3", features = ["derive"] }
-argh = "0.1.10"
+argh = "0.1.12"
 arrayvec = "0.7.1"
 ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"
