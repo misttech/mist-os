@@ -86,6 +86,8 @@ zx_status_t PressureObserver::InitMemPressureEvents() {
   }
 
   for (size_t i = 0; i < Level::kNumLevels; i++) {
+    FX_LOGS(INFO) << "PressureObserver::InitMemPressureEvents level " << i << " handle "
+                  << events_[i].get();
     wait_items_[i].handle = events_[i].get();
     wait_items_[i].waitfor = ZX_EVENT_SIGNALED;
     wait_items_[i].pending = 0;
@@ -124,12 +126,15 @@ void PressureObserver::WaitOnLevelChange() {
 }
 
 void PressureObserver::OnLevelChanged(zx_handle_t handle) {
+  FX_LOGS(INFO) << "PressureObserver::OnLevelChanged " << handle << " Old level " << level_;
   for (size_t i = 0; i < Level::kNumLevels; i++) {
     if (events_[i].get() == handle) {
       level_ = Level(i);
       break;
     }
   }
+
+  FX_LOGS(INFO) << "PressureObserver::OnLevelChanged new level " << level_;
 
   if (unlikely(!level_initialized_)) {
     // Record that the level has been initialized if this is the first time. Before this, the
@@ -139,6 +144,8 @@ void PressureObserver::OnLevelChanged(zx_handle_t handle) {
     // definition.
     level_initialized_ = true;
   }
+
+  FX_LOGS(INFO) << "PressureObserver::OnLevelChanged notify " << (notifier_ != nullptr);
 
   if (notifier_ != nullptr) {
     // Notify the |PressureNotifier| that the level has changed. |PressureNotifier::Notify()| is a

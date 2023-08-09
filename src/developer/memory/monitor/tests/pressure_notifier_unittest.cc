@@ -85,6 +85,7 @@ class PressureNotifierUnitTest : public fuchsia::memory::Debugger, public gtest:
     if (level >= Level::kNumLevels) {
       return;
     }
+    FX_LOGS(INFO) << "PressureNotifierUnittest: Triggering level change to " << level;
     notifier_->observer_.OnLevelChanged(notifier_->observer_.wait_items_[level].handle);
     RunLoopUntilIdle();
   }

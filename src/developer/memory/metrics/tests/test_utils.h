@@ -5,6 +5,9 @@
 #ifndef SRC_DEVELOPER_MEMORY_METRICS_TESTS_TEST_UTILS_H_
 #define SRC_DEVELOPER_MEMORY_METRICS_TESTS_TEST_UTILS_H_
 
+#include <zircon/types.h>
+
+#include <cstdint>
 #include <vector>
 
 #include "src/developer/memory/metrics/capture.h"
@@ -51,7 +54,7 @@ struct GetInfoResponse {
 };
 
 struct OsResponses {
-  const std::vector<GetProcessesResponse> get_processes;
+  const GetProcessesResponse get_processes;
   const std::vector<GetPropertyResponse> get_property;
   const std::vector<GetInfoResponse> get_info;
 };
@@ -76,8 +79,10 @@ class TestUtils {
   const static zx_handle_t kSelfHandle;
   const static zx_koid_t kSelfKoid;
 
-  static void CreateCapture(Capture* capture, const CaptureTemplate& t, CaptureLevel level = VMO);
-  static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r);
+  static void CreateCapture(Capture* capture, const CaptureTemplate& t,
+                            CaptureLevel level = CaptureLevel::VMO);
+  static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
+                                CaptureFilter* filter = nullptr);
 
   // Sorted by koid.
   static std::vector<ProcessSummary> GetProcessSummaries(const Summary& summary);

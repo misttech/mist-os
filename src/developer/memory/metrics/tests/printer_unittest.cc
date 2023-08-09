@@ -292,7 +292,7 @@ TEST_F(PrinterUnitTest, PrintSummaryKMEM) {
   std::ostringstream oss;
   Printer p(oss);
   Summary s(c);
-  p.PrintSummary(s, KMEM, SORTED);
+  p.PrintSummary(s, CaptureLevel::KMEM, SORTED);
 
   ConfirmLines(oss, {
                         "Time: 1234 VMO: 5K Free: 1K",
@@ -322,7 +322,7 @@ TEST_F(PrinterUnitTest, PrintSummaryPROCESS) {
   std::ostringstream oss;
   Printer p(oss);
   Summary s(c);
-  p.PrintSummary(s, PROCESS, SORTED);
+  p.PrintSummary(s, CaptureLevel::PROCESS, SORTED);
 
   ConfirmLines(oss, {
                         "Time: 1234 VMO: 5K Free: 1K",
@@ -354,7 +354,7 @@ TEST_F(PrinterUnitTest, PrintSummaryVMO) {
   std::ostringstream oss;
   Printer p(oss);
   Summary s(c);
-  p.PrintSummary(s, VMO, SORTED);
+  p.PrintSummary(s, CaptureLevel::VMO, SORTED);
 
   ConfirmLines(oss, {
                         "Time: 1234 VMO: 5K Free: 1K",
@@ -391,7 +391,7 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
   std::ostringstream oss;
   Printer p(oss);
   Summary s(c);
-  p.PrintSummary(s, VMO, SORTED);
+  p.PrintSummary(s, CaptureLevel::VMO, SORTED);
 
   ConfirmLines(oss, {
                         "Time: 1234 VMO: 6K Free: 0B",

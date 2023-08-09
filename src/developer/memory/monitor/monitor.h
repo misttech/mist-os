@@ -12,6 +12,7 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/trace/observer.h>
+#include <lib/zx/socket.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
@@ -65,9 +66,14 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
   // description of the format of the JSON.
   void CollectJsonStats(zx::socket socket) override;
 
+  void CollectJsonStatsWithOptions(
+      fuchsia::memory::inspection::CollectorCollectJsonStatsWithOptionsRequest request) override;
+
   static const char kTraceName[];
 
  private:
+  void CollectJsonStatsWithOptions(zx::socket socket, bool include_starnix_processes);
+
   void PublishBucketConfiguration();
 
   void CreateMetrics(const std::vector<memory::BucketMatch>& bucket_matches);
@@ -88,7 +94,7 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
   // Alerts all watchers when an update has occurred.
   void NotifyWatchers(const zx_info_kmem_stats_t& stats);
 
-  zx_status_t GetCapture(memory::Capture* capture);
+  zx_status_t GetCapture(memory::Capture* capture, memory::CaptureFilter* filter);
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
   void PressureLevelChanged(Level level);
 

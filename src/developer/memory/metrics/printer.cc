@@ -57,8 +57,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
 
   class NameCountHash {
    public:
-    size_t operator()(const NameCount& kc) const {
-      return std::hash<std::string_view>()(kc.name_); }
+    size_t operator()(const NameCount& kc) const { return std::hash<std::string_view>()(kc.name_); }
   };
 
   TRACE_DURATION_BEGIN("memory_metrics", "Printer::DocumentFromCapture::Processes");
@@ -208,7 +207,7 @@ void Printer::PrintSummary(const Summary& summary, CaptureLevel level, Sorted so
   os_ << "Time: " << summary.time() << " VMO: " << FormatSize(kstats.vmo_bytes, vmo_buf)
       << " Free: " << FormatSize(kstats.free_bytes, free_buf) << "\n";
 
-  if (level == KMEM) {
+  if (level == CaptureLevel::KMEM) {
     return;
   }
 
@@ -230,7 +229,7 @@ void Printer::PrintSummary(const Summary& summary, CaptureLevel level, Sorted so
     const auto& s = summaries[i];
     os_ << s.name() << "<" << s.koid() << "> ";
     OutputSizes(s.sizes());
-    if (level == PROCESS) {
+    if (level == CaptureLevel::PROCESS) {
       continue;
     }
 

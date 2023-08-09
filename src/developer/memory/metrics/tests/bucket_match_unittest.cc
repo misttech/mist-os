@@ -44,13 +44,13 @@ TEST_F(ConfigUnitTest, ValidConfiguration) {
   BucketMatch& match_0 = bucket_matches[0];
   EXPECT_EQ(match_0.name(), "ContiguousPool");
   EXPECT_EQ(match_0.event_code(), 1);
-  EXPECT_TRUE(match_0.ProcessMatch(Process{1, "driver_host", {}}));
+  EXPECT_TRUE(match_0.ProcessMatch(Process{1, 0, "driver_host", {}}));
   EXPECT_TRUE(match_0.VmoMatch("SysmemContiguousPool"));
 
   BucketMatch& match_1 = bucket_matches[1];
   EXPECT_EQ(match_1.name(), "Blobfs");
   EXPECT_EQ(match_1.event_code(), 2);
-  EXPECT_TRUE(match_1.ProcessMatch(Process{1, "active_blobfs", {}}));
+  EXPECT_TRUE(match_1.ProcessMatch(Process{1, 0, "active_blobfs", {}}));
   EXPECT_TRUE(match_1.VmoMatch("blob-01234"));
 }
 

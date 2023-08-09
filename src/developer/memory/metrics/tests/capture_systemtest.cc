@@ -22,7 +22,7 @@ TEST_F(CaptureSystemTest, KMEM) {
   auto ret = Capture::GetCaptureState(&state);
   ASSERT_EQ(ZX_OK, ret);
   Capture c;
-  ret = Capture::GetCapture(&c, state, KMEM);
+  ret = Capture::GetCapture(&c, state, CaptureLevel::KMEM, nullptr);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);
@@ -34,7 +34,7 @@ TEST_F(CaptureSystemTest, DISABLED_VMO) {
   auto ret = Capture::GetCaptureState(&state);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   Capture c;
-  ret = Capture::GetCapture(&c, state, VMO);
+  ret = Capture::GetCapture(&c, state, CaptureLevel::VMO, nullptr);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);

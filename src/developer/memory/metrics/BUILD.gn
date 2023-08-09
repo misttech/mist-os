@@ -10,6 +10,8 @@ source_set("metrics") {
     "capture.h",
     "digest.cc",
     "digest.h",
+    "filters.cc",
+    "filters.h",
     "printer.cc",
     "printer.h",
     "summary.cc",
@@ -28,6 +30,7 @@ source_set("metrics") {
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//third_party/rapidjson",
+    "//zircon/system/public",
     "//zircon/system/ulib/task-utils",
     "//zircon/system/ulib/trace",
   ]

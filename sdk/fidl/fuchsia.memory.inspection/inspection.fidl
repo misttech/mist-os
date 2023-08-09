@@ -59,7 +59,18 @@ closed protocol Collector {
     ///    - Processes and Vmos have an initial entry that contains the names of the the fields in
     ///      the rest of the entries.
     ///    - The names of the VMOs are an index into the VMONames array.
+    @available(deprecated=14, note="Use CollectJsonStatsWithOptions instead")
     strict CollectJsonStats(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
+    });
+
+    // See |CollectJsonStats| for details.
+    @available(added=14)
+    strict CollectJsonStatsWithOptions(resource table {
+        // Mandatory. Socket used to return the requested statistics in JSON format.
+        1: socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
+        // Optional. Also include starnix processes in the output. This may make this call much
+        // slower. Defaults to false.
+        2: include_starnix_processes bool;
     });
 };

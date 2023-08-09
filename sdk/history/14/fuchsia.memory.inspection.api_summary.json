@@ -8,6 +8,14 @@
         "request": "fuchsia.memory.inspection/CollectorCollectJsonStatsRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.memory.inspection/Collector.CollectJsonStatsWithOptions",
+        "strictness": "strict",
+        "ordinal": "2108378267279410428",
+        "direction": "one_way",
+        "request": "fuchsia.memory.inspection/CollectorCollectJsonStatsWithOptionsRequest"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.memory.inspection/Collector",
         "openness": "closed",
@@ -22,6 +30,23 @@
     {
         "kind": "struct",
         "name": "fuchsia.memory.inspection/CollectorCollectJsonStatsRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.memory.inspection/CollectorCollectJsonStatsWithOptionsRequest.include_starnix_processes",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.memory.inspection/CollectorCollectJsonStatsWithOptionsRequest.socket",
+        "ordinal": "1",
+        "type": "zx/Handle:<SOCKET,zx.WRITE,zx.WAIT>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.memory.inspection/CollectorCollectJsonStatsWithOptionsRequest",
         "resourceness": "resource"
     },
     {

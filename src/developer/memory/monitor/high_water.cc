@@ -55,7 +55,7 @@ void HighWater::RecordHighWater(const Capture& capture) {
   auto path = files::JoinPath(dir_, kLatest);
   out.open(path);
   Printer p(out);
-  p.PrintSummary(s, VMO, memory::SORTED);
+  p.PrintSummary(s, CaptureLevel::VMO, memory::SORTED);
   out.close();
 
   // Force a sync to filesystem.

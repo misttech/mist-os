@@ -7,19 +7,20 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/fit/function.h>
+#include <lib/zx/handle.h>
 #include <lib/zx/time.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "src/lib/fxl/macros.h"
 
 namespace memory {
 
 struct Process {
   zx_koid_t koid;
+  zx_koid_t job;
   char name[ZX_MAX_NAME_LEN];
   std::vector<zx_koid_t> vmos;
 };
@@ -40,7 +41,21 @@ struct Vmo {
   std::vector<zx_koid_t> children;
 };
 
-using CaptureLevel = enum { KMEM, PROCESS, VMO };
+enum class CaptureLevel { KMEM, PROCESS, VMO };
+
+// A CaptureFilter can be used to skip the capture of some jobs or processes.
+class CaptureFilter {
+ public:
+  virtual ~CaptureFilter() {}
+
+  // For a given capture, |OnNewProcess| is called first for all processes on the system, before
+  // any call to |ShouldCapture|.
+  virtual void OnNewProcess(zx_koid_t job, zx_koid_t process, std::string_view name) = 0;
+
+  // |ShouldCapture| is called before capturing the VMOs of a given process. |ShouldCapture| should
+  // return true if the process should be included in the capture, false if it should be skipped.
+  virtual bool ShouldCapture(zx_koid_t job, zx_koid_t process) = 0;
+};
 
 struct CaptureState {
   fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client;
@@ -53,7 +68,7 @@ class OS {
   virtual zx_handle_t ProcessSelf() = 0;
   virtual zx_time_t GetMonotonic() = 0;
   virtual zx_status_t GetProcesses(
-      fit::function<zx_status_t(int /* depth */, zx_handle_t /* handle */, zx_koid_t /* koid */,
+      fit::function<zx_status_t(int /* depth */, zx::handle /* handle */, zx_koid_t /* koid */,
                                 zx_koid_t /* parent_koid */)>
           cb) = 0;
   virtual zx_status_t GetProperty(zx_handle_t handle, uint32_t property, void* value,
@@ -84,7 +99,7 @@ class Capture {
   //           "fuchsia.kernel.Stats",
   //           ...
   static zx_status_t GetCapture(
-      Capture* capture, const CaptureState& state, CaptureLevel level,
+      Capture* capture, const CaptureState& state, CaptureLevel level, CaptureFilter* filter,
       const std::vector<std::string>& rooted_vmo_names = kDefaultRootedVmoNames);
 
   zx_time_t time() const { return time_; }
@@ -102,7 +117,8 @@ class Capture {
  private:
   static zx_status_t GetCaptureState(CaptureState* state, OS* os);
   static zx_status_t GetCapture(Capture* capture, const CaptureState& state, CaptureLevel level,
-                                OS* os, const std::vector<std::string>& rooted_vmo_names);
+                                CaptureFilter* filter, OS* os,
+                                const std::vector<std::string>& rooted_vmo_names);
   void ReallocateDescendents(const std::vector<std::string>& rooted_vmo_names);
   void ReallocateDescendents(Vmo* parent);
 

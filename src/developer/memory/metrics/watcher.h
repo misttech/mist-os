@@ -10,6 +10,7 @@
 #include <lib/fit/function.h>
 
 #include "src/developer/memory/metrics/capture.h"
+#include "src/lib/fxl/macros.h"
 
 namespace memory {
 

@@ -14,7 +14,6 @@
 #include "src/developer/memory/metrics/summary.h"
 #include "src/developer/memory/metrics/watcher.h"
 #include "src/lib/fxl/macros.h"
-
 namespace monitor {
 
 class HighWater {

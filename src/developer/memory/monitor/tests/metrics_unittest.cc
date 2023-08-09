@@ -144,7 +144,9 @@ TEST_F(MetricsUnitTest, Inspect) {
   sys::ComponentInspector inspector(context_provider_.context());
   Metrics m(
       kBucketMatches, zx::min(5), dispatcher(), &inspector, &logger,
-      [&cs](Capture* c) { return cs.GetCapture(c, VMO, true /*use_capture_supplier_time*/); },
+      [&cs](Capture* c) {
+        return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
+      },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
   RunLoopUntil([&cs] { return cs.empty(); });
 
@@ -175,7 +177,9 @@ TEST_F(MetricsUnitTest, All) {
   sys::ComponentInspector inspector(context_provider_.context());
   Metrics m(
       kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
-      [&cs](Capture* c) { return cs.GetCapture(c, VMO, true /*use_capture_supplier_time*/); },
+      [&cs](Capture* c) {
+        return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
+      },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
   RunLoopUntil([&cs] { return cs.empty(); });
   // memory metric: 20 buckets + 4 (Orphaned, Kernel, Undigested and Free buckets)  +
@@ -344,7 +348,7 @@ TEST_F(MetricsUnitTest, One) {
   sys::ComponentInspector inspector(context_provider_.context());
   Metrics m(
       kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
-      [&cs](Capture* c) { return cs.GetCapture(c, VMO); },
+      [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
   RunLoopUntil([&cs] { return cs.empty(); });
   EXPECT_EQ(21U, logger.event_count());  // 1 + 10 + 10
@@ -379,7 +383,7 @@ TEST_F(MetricsUnitTest, Undigested) {
   sys::ComponentInspector inspector(context_provider_.context());
   Metrics m(
       kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
-      [&cs](Capture* c) { return cs.GetCapture(c, VMO); },
+      [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
   RunLoopUntil([&cs] { return cs.empty(); });
   EXPECT_EQ(22U, logger.event_count());  // 2 + 10 + 10
