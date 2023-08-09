@@ -64,6 +64,7 @@ pub(crate) mod crate_local {
     pub trait AnyCast: Any {
         fn into_any(self: Box<Self>) -> Box<dyn Any>;
         fn as_any(&self) -> &dyn Any;
+        fn as_any_mut(&mut self) -> &mut dyn Any;
     }
 
     impl<T: Any> AnyCast for T {
@@ -71,6 +72,9 @@ pub(crate) mod crate_local {
             self
         }
         fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
             self
         }
     }

@@ -9,6 +9,8 @@ pub mod data;
 pub mod dict;
 pub mod handle;
 pub mod open;
+pub mod receiver;
+pub mod sender;
 
 pub use self::capability::{
     AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote, TryIntoOpen,
@@ -18,6 +20,8 @@ pub use self::data::AsData;
 pub use self::dict::SomeDict;
 pub use self::handle::{CloneHandle, Handle};
 pub use self::open::Open;
+pub use receiver::{Message, Receiver};
+pub use sender::Sender;
 
 pub type CloneDict = dict::Dict<AnyCloneCapability>;
 pub type Dict = dict::Dict<AnyCapability>;

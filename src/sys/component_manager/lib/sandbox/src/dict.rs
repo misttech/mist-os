@@ -17,6 +17,7 @@ use {
     },
     std::collections::hash_map::Entry,
     std::collections::HashMap,
+    std::fmt::Debug,
     vfs::{
         directory::{
             entry::DirectoryEntry,
@@ -217,6 +218,38 @@ impl TryFrom<AnyCapability> for Box<dyn SomeDict> {
             return Ok(value.into_any().downcast::<Dict<AnyCloneCapability>>().unwrap());
         }
         Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a AnyCapability> for &'a Dict<AnyCapability> {
+    type Error = ();
+
+    fn try_from(value: &AnyCapability) -> Result<&Dict<AnyCapability>, ()> {
+        value.as_any().downcast_ref::<Dict<AnyCapability>>().ok_or(())
+    }
+}
+
+impl<'a> TryFrom<&'a mut AnyCapability> for &'a mut Dict<AnyCapability> {
+    type Error = ();
+
+    fn try_from(value: &mut AnyCapability) -> Result<&mut Dict<AnyCapability>, ()> {
+        value.as_any_mut().downcast_mut::<Dict<AnyCapability>>().ok_or(())
+    }
+}
+
+impl<'a> TryFrom<&'a AnyCloneCapability> for &'a Dict<AnyCloneCapability> {
+    type Error = ();
+
+    fn try_from(value: &AnyCloneCapability) -> Result<&Dict<AnyCloneCapability>, ()> {
+        value.as_any().downcast_ref::<Dict<AnyCloneCapability>>().ok_or(())
+    }
+}
+
+impl<'a> TryFrom<&'a mut AnyCloneCapability> for &'a mut Dict<AnyCloneCapability> {
+    type Error = ();
+
+    fn try_from(value: &mut AnyCloneCapability) -> Result<&mut Dict<AnyCloneCapability>, ()> {
+        value.as_any_mut().downcast_mut::<Dict<AnyCloneCapability>>().ok_or(())
     }
 }
 
