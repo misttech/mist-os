@@ -30,4 +30,4 @@ kernel_zbi_extra_deps =
     [ "//src/devices/board/drivers/vim3-devicetree:vim3-dtb-item" ]
 
 # BoardInformation for Product Assembly
-board_information_for_assembly = "//boards/vim3/dfv2_board_information.json5"
+board_information_for_assembly = "//boards/vim3/board_information.json5"
