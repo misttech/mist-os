@@ -16,6 +16,7 @@ group("tests") {
     "android:tests",
     "diagnostics:tests",
     "gvisor:tests",
+    "reboot:tests",
     "syscalls:tests",
   ]
 

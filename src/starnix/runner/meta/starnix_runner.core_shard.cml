@@ -48,7 +48,10 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.kernel.Stats",
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.kernel.Stats",
+            ],
             from: "parent",
             to: "#starnix_runner",
         },

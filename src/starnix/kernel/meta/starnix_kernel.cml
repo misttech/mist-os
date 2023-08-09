@@ -40,7 +40,10 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.kernel.VmexResource",
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.kernel.VmexResource",
+            ],
             from: "parent",
         },
         {

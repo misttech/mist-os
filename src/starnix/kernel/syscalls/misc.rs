@@ -4,7 +4,11 @@
 
 use fuchsia_zircon as zx;
 
+use fidl_fuchsia_hardware_power_statecontrol as fpower;
+use fuchsia_component::client::connect_channel_to_protocol;
+
 use crate::{
+    logging::log_info,
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{decls::SyscallDecl, *},
 };
@@ -145,7 +149,7 @@ pub fn sys_reboot(
     magic: u32,
     magic2: u32,
     cmd: u32,
-    _arg: UserAddress,
+    arg: UserAddress,
 ) -> Result<(), Errno> {
     if magic != LINUX_REBOOT_MAGIC1
         || (magic2 != LINUX_REBOOT_MAGIC2
@@ -170,9 +174,30 @@ pub fn sys_reboot(
         LINUX_REBOOT_CMD_SW_SUSPEND => error!(ENOSYS),
 
         LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
-            // TODO(fxbug.dev/128397): only shut down the current Kernel rather than panicking
-            // the entire process.
-            panic!("starnix reboot({cmd:#x})")
+            // This is an arbitrary limit that should be large enough.
+            const MAX_REBOOT_ARG_LEN: usize = 256;
+            let arg_bytes = current_task
+                .read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)
+                .unwrap_or_default();
+            let reboot_args: Vec<_> = arg_bytes.split(|byte| byte == &b',').collect();
+
+            if reboot_args.contains(&&b"ota_update"[..]) {
+                let (client_end, server_end) = zx::Channel::create();
+                connect_channel_to_protocol::<fpower::AdminMarker>(server_end)
+                    .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
+                let proxy = fpower::AdminSynchronousProxy::new(client_end);
+
+                match proxy.reboot(fpower::RebootReason::SystemUpdate, zx::Time::INFINITE) {
+                    Ok(_) => {
+                        log_info!("Rebooting to apply system update...");
+                        // System is rebooting... wait until runtime ends.
+                        zx::Time::INFINITE.sleep();
+                    }
+                    Err(e) => panic!("Failed to reboot, status: {e}"),
+                }
+            }
+            not_implemented!("Unsupported reboot args: '{}'", String::from_utf8_lossy(&arg_bytes));
+            error!(ENOSYS)
         }
 
         _ => error!(EINVAL),
