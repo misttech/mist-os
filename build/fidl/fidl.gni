@@ -6,6 +6,7 @@
 # the "is_<foo>_toolchain" variables that are used throughout this file.
 import("//build/fidl/toolchain.gni")
 import("//build/go/toolchain.gni")
+import("//build/testing/host_test_data.gni")
 
 # NOTE: The imports of this gni file are dependent on the language used, as
 # there is no need to import the templates for the other languages when
@@ -21,6 +22,7 @@ import("//build/go/toolchain.gni")
 #  * `${target_name}`: available only in the FIDL toolchain
 #  * `${target_name}_go`: available only in the go toolchain
 #  * `${target_name}_${backend_name}`: available in every toolchain but go
+#  * `${target_name}_host_test_data`: available on host toolchain
 #
 # Parameters
 #
@@ -195,6 +197,27 @@ template("fidl") {
            [])
   } else {
     not_needed(invoker, fidl_only)
+  }
+
+  if (is_host) {
+    host_test_data("${target_name}_host_test_data") {
+      forward_variables_from(invoker, [ "visibility" ])
+      sources = [ common_parameters.fidl_ir_json ]
+
+      # It's only necessary to depend on fidl_ir_target got get the FIDL IR json
+      # file, but without depending on fidl_target, there is no entry in
+      # all_fidl_json.txt, which at the moment is the main source for finding
+      # the list of current FIDL IR json files.
+      # TODO(b/295190178): append all_fidl_json.txt with inclusion of
+      # fidl_ir_target target.
+      deps = [ ":${common_parameters.fidl_target}($fidl_toolchain)" ]
+      if (defined(invoker.public_deps)) {
+        foreach(pdep, invoker.public_deps) {
+          label = get_label_info(pdep, "label_no_toolchain")
+          deps += [ "${label}_host_test_data" ]
+        }
+      }
+    }
   }
 
   not_needed(invoker, [ "sources" ])

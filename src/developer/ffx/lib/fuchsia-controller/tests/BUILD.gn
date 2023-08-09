@@ -6,7 +6,7 @@ import("//build/fidl/toolchain.gni")
 import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
 
-host_test_data("fuchsia_controller_test_base") {
+host_test_data("fuchsia_controller_test_data") {
   _sdk_out_dir =
       get_label_info("//sdk:core($default_toolchain)", "root_out_dir")
   sources = [
@@ -19,76 +19,41 @@ host_test_data("fuchsia_controller_test_base") {
     _sdk_out_dir + "/sdk/exported/core",
     _sdk_out_dir + "/sdk/manifest/core",
   ]
-  fidl_deps = [
-    "//sdk/fidl/fuchsia.boot",
-    "//sdk/fidl/fuchsia.buildinfo",
-    "//sdk/fidl/fuchsia.component",
-    "//sdk/fidl/fuchsia.component",
-    "//sdk/fidl/fuchsia.developer.ffx",
-    "//sdk/fidl/fuchsia.developer.remotecontrol",
-    "//sdk/fidl/fuchsia.device",
-    "//sdk/fidl/fuchsia.diagnostics",
-    "//sdk/fidl/fuchsia.gpu.agis",
-    "//sdk/fidl/fuchsia.hwinfo",
-    "//sdk/fidl/fuchsia.io",
-    "//sdk/fidl/fuchsia.kernel",
-    "//sdk/fidl/fuchsia.logger",
-    "//sdk/fidl/fuchsia.mem",
-    "//sdk/fidl/fuchsia.net",
-    "//sdk/fidl/fuchsia.process",
-    "//sdk/fidl/fuchsia.sys",
-    "//sdk/fidl/fuchsia.sys2",
-    "//sdk/fidl/fuchsia.tracing",
-    "//sdk/fidl/fuchsia.tracing.controller",
-    "//sdk/fidl/fuchsia.url",
-    "//sdk/fidl/fuchsia.version",
-    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest",
-    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test",
-    "//zircon/vdso/zx",
-  ]
-  foreach(label, fidl_deps) {
-    name = get_label_info(label, "name")
-    sources += [ get_label_info("${label}($fidl_toolchain)", "target_gen_dir") +
-                 "/${name}.fidl.json" ]
-  }
   deps = [
     "//sdk:core($default_toolchain)",
+    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
     "//src/developer/ffx:test_data",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     "//src/developer/ffx/lib/fuchsia-controller:lib",
-    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest($fidl_toolchain)",
-    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test($fidl_toolchain)",
   ]
 }
 
 host_test_data("fuchsia_controller_fidl_test_data") {
-  sources = [
-    get_label_info("//src/lib/fidl_codec:fidl($fidl_toolchain)",
-                   "target_gen_dir") + "/fidl.fidl.json",
-    get_label_info("//src/lib/fidl_codec:fidl-composed($fidl_toolchain)",
-                   "target_gen_dir") + "/fidl-composed.fidl.json",
-    get_label_info("//src/lib/fidl_codec:fidl-sys($fidl_toolchain)",
-                   "target_gen_dir") + "/fidl-sys.fidl.json",
-  ]
+  sources = []
   deps = [
-    "//src/lib/fidl_codec:fidl($fidl_toolchain)",
-    "//src/lib/fidl_codec:fidl-composed($fidl_toolchain)",
-    "//src/lib/fidl_codec:fidl-sys($fidl_toolchain)",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_host_test_data",
+    "//src/lib/fidl_codec:fidl-composed_host_test_data",
+    "//src/lib/fidl_codec:fidl-sys_host_test_data",
+    "//src/lib/fidl_codec:fidl_host_test_data",
   ]
 }
 
 python_host_test("fuchsia_controller_ir_test") {
   main_source = "ir.py"
   libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [ ":fuchsia_controller_test_data" ]
 }
 
 python_host_test("fuchsia_controller_encode_test") {
   main_source = "encode.py"
   sources = [ "common.py" ]
   libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [
+    ":fuchsia_controller_fidl_test_data",
+    ":fuchsia_controller_test_data",
+  ]
 }
 
 python_host_test("fuchsia_controller_importing_test") {
@@ -99,7 +64,7 @@ python_host_test("fuchsia_controller_importing_test") {
   ]
   deps = [
     ":fuchsia_controller_fidl_test_data",
-    ":fuchsia_controller_test_base",
+    ":fuchsia_controller_test_data",
   ]
 }
 
@@ -107,14 +72,14 @@ python_host_test("fuchsia_controller_errors_test") {
   main_source = "errors.py"
   libraries =
       [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [ ":fuchsia_controller_test_data" ]
 }
 
 python_host_test("fuchsia_controller_isolate_directory_test") {
   main_source = "isolate_directory.py"
   libraries =
       [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [ ":fuchsia_controller_test_data" ]
 }
 
 python_host_test("fuchsia_controller_e2e_test") {
@@ -123,7 +88,7 @@ python_host_test("fuchsia_controller_e2e_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
   ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [ ":fuchsia_controller_test_data" ]
 }
 
 python_host_test("fuchsia_controller_fidl_client_test") {
@@ -132,12 +97,12 @@ python_host_test("fuchsia_controller_fidl_client_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
   ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [ ":fuchsia_controller_test_data" ]
 }
 
 python_host_test("fuchsia_controller_fidl_channel_test") {
   main_source = "fidl_channel.py"
   libraries =
       [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
-  deps = [ ":fuchsia_controller_test_base" ]
+  deps = [ ":fuchsia_controller_test_data" ]
 }
