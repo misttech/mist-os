@@ -22,7 +22,7 @@ use crate::{
     device::{link::LinkDevice, DeviceIdContext, FrameDestination},
     ip::device::nud::{
         BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
-        NudContext, NudHandler, NudState, NudTimerId,
+        NudConfigContext, NudContext, NudHandler, NudState, NudTimerId,
     },
 };
 
@@ -71,13 +71,12 @@ pub(crate) trait BufferArpSenderContext<
     D: ArpDevice,
     C: ArpNonSyncCtx<D, Self::DeviceId>,
     B: BufferMut,
->: DeviceIdContext<D>
+>: ArpConfigContext + DeviceIdContext<D>
 {
     /// Send an IP packet to the neighbor with address `dst_link_address`.
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut C,
-        device_id: &Self::DeviceId,
         dst_link_address: D::HType,
         body: S,
     ) -> Result<(), S>;
@@ -116,6 +115,8 @@ impl<DeviceId, D: ArpDevice, C: TimerContext<ArpTimerId<D, DeviceId>> + CounterC
 pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
     DeviceIdContext<D> + SendFrameContext<C, EmptyBuf, ArpFrameMetadata<D, Self::DeviceId>>
 {
+    type ConfigCtx<'a>: ArpConfigContext;
+
     /// Get a protocol address of this interface.
     ///
     /// If `device_id` does not have any addresses associated with it, return
@@ -129,12 +130,21 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
         device_id: &Self::DeviceId,
     ) -> UnicastAddr<D::HType>;
 
-    /// Calls the function with a mutable reference to ARP state.
-    fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<D>) -> O>(
+    /// Calls the function with a mutable reference to ARP state and the ARP
+    /// configuration context.
+    fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<D>, &mut Self::ConfigCtx<'_>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
+
+/// An execution context for the ARP protocol that allows accessing
+/// configuration parameters.
+pub(crate) trait ArpConfigContext {
+    fn retransmit_timeout(&mut self) -> NonZeroDuration {
+        NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
+    }
 }
 
 /// An execution context for the ARP protocol when a buffer is provided.
@@ -161,16 +171,14 @@ pub(crate) trait BufferArpContext<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D
 impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudContext<Ipv4, D, C>
     for SC
 {
-    fn retrans_timer(&mut self, _device_id: &SC::DeviceId) -> NonZeroDuration {
-        NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
-    }
+    type ConfigCtx<'a> = <SC as ArpContext<D, C>>::ConfigCtx<'a>;
 
-    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv4, D>) -> O>(
+    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv4, D>, &mut Self::ConfigCtx<'_>) -> O>(
         &mut self,
         device_id: &SC::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut(device_id, |ArpState { nud }| cb(nud))
+        self.with_arp_state_mut(device_id, |ArpState { nud }, sync_ctx| cb(nud, sync_ctx))
     }
 
     fn send_neighbor_solicitation(
@@ -180,6 +188,12 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudC
         lookup_addr: SpecifiedAddr<Ipv4Addr>,
     ) {
         send_arp_request(self, ctx, device_id, lookup_addr.get())
+    }
+}
+
+impl<SC: ArpConfigContext> NudConfigContext<Ipv4> for SC {
+    fn retransmit_timeout(&mut self) -> NonZeroDuration {
+        self.retransmit_timeout()
     }
 }
 
@@ -216,13 +230,10 @@ impl<
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut C,
-        device_id: &SC::DeviceId,
         dst_mac: D::HType,
         body: S,
     ) -> Result<(), S> {
-        BufferArpSenderContext::send_ip_packet_to_neighbor_link_addr(
-            self, ctx, device_id, dst_mac, body,
-        )
+        BufferArpSenderContext::send_ip_packet_to_neighbor_link_addr(self, ctx, dst_mac, body)
     }
 }
 
@@ -558,10 +569,14 @@ mod tests {
         hw_addr: UnicastAddr<Mac>,
         arp_state: ArpState<EthernetLinkDevice>,
         inner: FakeArpInnerCtx,
+        config: FakeArpConfigCtx,
     }
 
     /// A fake `BufferArpSenderContext` that sends IP packets.
     struct FakeArpInnerCtx;
+
+    /// A fake `ArpConfigContext`.
+    struct FakeArpConfigCtx;
 
     impl Default for FakeArpCtx {
         fn default() -> FakeArpCtx {
@@ -570,6 +585,7 @@ mod tests {
                 hw_addr: UnicastAddr::new(TEST_LOCAL_MAC).unwrap(),
                 arp_state: ArpState::default(),
                 inner: FakeArpInnerCtx,
+                config: FakeArpConfigCtx,
             }
         }
     }
@@ -619,6 +635,8 @@ mod tests {
     }
 
     impl ArpContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {
+        type ConfigCtx<'a> = FakeArpConfigCtx;
+
         fn get_protocol_addr(
             &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
@@ -635,14 +653,22 @@ mod tests {
             self.get_ref().hw_addr
         }
 
-        fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<EthernetLinkDevice>) -> O>(
+        fn with_arp_state_mut<
+            O,
+            F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::ConfigCtx<'_>) -> O,
+        >(
             &mut self,
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().arp_state)
+            let FakeArpCtx { arp_state, config, proto_addr: _, hw_addr: _, inner: _ } =
+                self.get_mut();
+            cb(arp_state, config)
         }
     }
+
+    impl ArpConfigContext for FakeArpConfigCtx {}
+    impl ArpConfigContext for FakeArpInnerCtx {}
 
     impl<B: BufferMut> BufferArpContext<B, EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {
         type BufferArpSenderCtx<'a> = FakeArpInnerCtx;
@@ -666,7 +692,6 @@ mod tests {
         fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
             &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
-            _device_id: &FakeLinkDeviceId,
             _dst_link_address: Mac,
             _body: S,
         ) -> Result<(), S> {

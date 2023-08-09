@@ -48,6 +48,7 @@ use crate::{
         ethernet::{
             EthernetDeviceState, EthernetDeviceStateBuilder,
             EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice, EthernetTimerId,
+            SyncCtxWithDeviceId,
         },
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackWeakDeviceId},
         queue::{
@@ -1403,6 +1404,30 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
     }
 }
 
+impl<'a, SC: DeviceIdContext<EthernetLinkDevice>> DeviceIdContext<EthernetLinkDevice>
+    for SyncCtxWithDeviceId<'a, SC>
+{
+    type DeviceId = SC::DeviceId;
+    type WeakDeviceId = SC::WeakDeviceId;
+    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+        let Self { sync_ctx, device_id: _ } = self;
+        SC::downgrade_device_id(sync_ctx, device_id)
+    }
+
+    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+        let Self { sync_ctx, device_id: _ } = self;
+        SC::is_device_installed(sync_ctx, device_id)
+    }
+
+    fn upgrade_weak_device_id(
+        &self,
+        weak_device_id: &Self::WeakDeviceId,
+    ) -> Option<Self::DeviceId> {
+        let Self { sync_ctx, device_id: _ } = self;
+        SC::upgrade_weak_device_id(sync_ctx, weak_device_id)
+    }
+}
+
 impl<C: socket::NonSyncContext<DeviceId<C>> + DeviceLayerEventDispatcher>
     socket::NonSyncContext<EthernetDeviceId<C>> for C
 {
@@ -2184,7 +2209,7 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncC
 // TODO(rheacock): remove `cfg(test)` when this is used. Will probably be
 // called by a pub fn in the device mod.
 #[cfg(any(test, feature = "testutils"))]
-pub(super) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
+pub fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
@@ -2210,7 +2235,7 @@ pub(super) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
 /// resolution.
 // TODO(rheacock): Remove when this is called from non-test code.
 #[cfg(any(test, feature = "testutils"))]
-pub(crate) fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
+pub fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
