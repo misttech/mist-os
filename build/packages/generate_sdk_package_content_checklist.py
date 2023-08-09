@@ -84,6 +84,8 @@ def main():
         '--warn',
         help='Whether content checklist changes should only cause warnings',
         action='store_true')
+    parser.add_argument(
+        '--depfile', help='Path for generating depfile.', required=False)
 
     args = parser.parse_args()
 
@@ -93,6 +95,7 @@ def main():
             file=sys.stderr)
         return 1
 
+    depfile_collection = {args.output: []}
     manifest = {}
     with open(args.manifest, 'r') as manifest_file:
         manifest = json.load(manifest_file)
@@ -109,6 +112,7 @@ def main():
                 meta_far_paths_and_merkles = get_meta_far_contents(
                     args.ffx_bin, args.far_bin, meta_far_source_path)
                 paths_and_merkles += meta_far_paths_and_merkles
+                depfile_collection[args.output] += [meta_far_source_path]
 
                 break
 
@@ -158,10 +162,13 @@ def main():
 
     # If present, ensure generated file matches golden.
     if args.reference is not None:
+        # Absolute path used for more actionable error messages.
+        reference_abs_path = os.path.abspath(args.reference)
+        depfile_collection[args.output] += [args.reference]
         passed_golden = False
         if not os.path.isfile(args.reference):
             print(
-                f"Golden file specified, but no file found at {args.reference}.",
+                f"Golden file specified, but no file found at {reference_abs_path}.",
                 file=sys.stderr)
         else:
             with open(args.reference, 'r') as manifest_file:
@@ -188,10 +195,18 @@ def main():
                 "To overwrite the golden file location with the newly generated content checklist file, issue this command:",
                 file=sys.stderr)
             print(
-                f'  mkdir -p "{os.path.dirname(args.reference)}" && cp {os.path.abspath(args.output)} {args.reference}',
+                f'  mkdir -p "{os.path.dirname(reference_abs_path)}" && cp {os.path.abspath(args.output)} {reference_abs_path}',
                 file=sys.stderr)
             if not args.warn:
                 return 1
+
+    # Write out depfile
+    if args.depfile and len(depfile_collection[args.output]) > 0:
+        os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
+        with open(args.depfile, "w") as f:
+            for out_file in sorted(depfile_collection.keys()):
+                in_file_list = sorted(depfile_collection[out_file])
+                f.write(f"{out_file}: {' '.join(in_file_list)}")
 
     return 0
 

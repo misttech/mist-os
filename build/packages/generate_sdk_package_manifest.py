@@ -189,7 +189,7 @@ def main():
     parser.add_argument(
         '--target-cpu', help='Target build architecture.', required=True)
     parser.add_argument(
-        '--depfile', help='Path for generating depfile.', required=True)
+        '--depfile', help='Path for generating depfile.', required=False)
 
     args = parser.parse_args()
 

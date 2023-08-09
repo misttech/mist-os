@@ -129,6 +129,8 @@ template("sdk_fuchsia_package") {
     computed_content_checklist_file =
         "${_sdk_package_dir}/content_checklist.json"
     _content_checklist_target = "${target_name}.content_checklist"
+    _content_checklist_depfile =
+        "${target_gen_dir}/${_content_checklist_target}.d"
 
     # Generates content checklist file using input package manifest, and runs checks
     # against golden. See
@@ -149,6 +151,7 @@ template("sdk_fuchsia_package") {
         "//src/sys/pkg/bin/far:bin($host_toolchain)",
         _full_package_label,
       ]
+      depfile = _content_checklist_depfile
 
       args = [
         "--manifest",
@@ -156,11 +159,13 @@ template("sdk_fuchsia_package") {
         "--output",
         rebase_path(computed_content_checklist_file, root_build_dir),
         "--reference",
-        rebase_path("${golden_content_checklist_file}"),
+        rebase_path("${golden_content_checklist_file}", root_build_dir),
         "--ffx-bin",
         rebase_path("${host_out_dir}/ffx", root_build_dir),
         "--far-bin",
         rebase_path("${host_out_dir}/far", root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
       ]
 
       foreach(exact_file, expected_files_exact) {
