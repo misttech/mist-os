@@ -800,20 +800,10 @@ pub fn sys_renameat2(
     new_user_path: UserCString,
     flags: u32,
 ) -> Result<(), Errno> {
-    let flags = RenameFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
-
-    // RENAME_EXCHANGE cannot be combined with the other flags.
-    if flags.contains(RenameFlags::EXCHANGE)
-        && flags.intersects(RenameFlags::NOREPLACE | RenameFlags::WHITEOUT)
-    {
+    if flags & !RENAME_NOREPLACE != 0 {
+        not_implemented!("renameat flags {:?}", flags);
         return error!(EINVAL);
     }
-
-    // RENAME_WHITEOUT is not supported.
-    if flags.contains(RenameFlags::WHITEOUT) {
-        not_implemented!("RENAME_WHITEOUT is not implemented");
-        return error!(ENOSYS);
-    };
 
     let lookup = |dir_fd, user_path| {
         lookup_parent_at(current_task, dir_fd, user_path, |_, parent, basename| {
@@ -828,6 +818,7 @@ pub fn sys_renameat2(
         return error!(ENAMETOOLONG);
     }
 
+    let flags = RenameFlags::from_bits_truncate(flags);
     NamespaceNode::rename(
         current_task,
         &old_parent,
@@ -835,7 +826,8 @@ pub fn sys_renameat2(
         &new_parent,
         &new_basename,
         flags,
-    )
+    )?;
+    Ok(())
 }
 
 pub fn sys_fchmod(current_task: &CurrentTask, fd: FdNumber, mode: FileMode) -> Result<(), Errno> {

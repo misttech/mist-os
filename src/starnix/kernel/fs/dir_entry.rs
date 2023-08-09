@@ -19,14 +19,8 @@ use crate::{
 
 bitflags! {
     pub struct RenameFlags: u32 {
-        // Exchange the entries.
-        const EXCHANGE = RENAME_EXCHANGE;
-
         // Don't overwrite an existing DirEntry.
         const NOREPLACE = RENAME_NOREPLACE;
-
-        // Create a "whiteout" object to replace the file.
-        const WHITEOUT = RENAME_WHITEOUT;
     }
 }
 
@@ -635,10 +629,7 @@ impl DirEntry {
 
         // We need to hold these DirEntryHandles until after we drop all the
         // locks so that we do not deadlock when we drop them.
-        let renamed;
-        let mut maybe_replaced = None;
-
-        {
+        let (renamed, maybe_replaced) = {
             // Before we take any locks, we need to take the rename mutex on
             // the file system. This lock ensures that no other rename
             // operations are happening in this file system while we're
@@ -661,6 +652,10 @@ impl DirEntry {
                     new_parent_ancestor_list.push(entry);
                 }
             }
+
+            // We must drop these after the locks are dropped.
+            let renamed;
+            let mut maybe_replaced = None;
 
             // We cannot simply grab the locks on old_parent and new_parent
             // independently because old_parent and new_parent might be the
@@ -723,7 +718,7 @@ impl DirEntry {
                         if replaced.state.read().mount_count > 0 {
                             return error!(EBUSY);
                         }
-                    } else if renamed.node.is_dir() && !flags.contains(RenameFlags::EXCHANGE) {
+                    } else if renamed.node.is_dir() {
                         return error!(ENOTDIR);
                     }
                 }
@@ -738,29 +733,15 @@ impl DirEntry {
             // file system has executed the rename, we are no longer allowed to
             // fail because we will not be able to return the system to a
             // consistent state.
-
-            if flags.contains(RenameFlags::EXCHANGE) {
-                let replaced = maybe_replaced.as_ref().ok_or_else(|| errno!(ENOENT))?;
-                fs.exchange(
-                    current_task,
-                    &renamed.node,
-                    &old_parent.node,
-                    old_basename,
-                    &replaced.node,
-                    &new_parent.node,
-                    new_basename,
-                )?;
-            } else {
-                fs.rename(
-                    current_task,
-                    &old_parent.node,
-                    old_basename,
-                    &new_parent.node,
-                    new_basename,
-                    &renamed.node,
-                    maybe_replaced.as_ref().map(|replaced| &replaced.node),
-                )?;
-            }
+            fs.rename(
+                current_task,
+                &old_parent.node,
+                old_basename,
+                &new_parent.node,
+                new_basename,
+                &renamed.node,
+                maybe_replaced.as_ref().map(|replaced| &replaced.node),
+            )?;
 
             {
                 // We need to update the parent and local name for the DirEntry
@@ -774,28 +755,17 @@ impl DirEntry {
             // from the child list.
             state.new_parent().children.insert(new_basename.to_owned(), Arc::downgrade(&renamed));
 
-            if flags.contains(RenameFlags::EXCHANGE) {
-                // Reparent `replaced` when exchanging.
-                let replaced =
-                    maybe_replaced.as_ref().expect("replaced expected with RENAME_EXCHANGE");
-                {
-                    let mut replaced_state = replaced.state.write();
-                    replaced_state.parent = Some(old_parent.clone());
-                    replaced_state.local_name = old_basename.to_owned();
-                }
-                state.old_parent().children.insert(old_basename.to_vec(), Arc::downgrade(replaced));
-            } else {
-                // Remove the renamed child from the old_parent's child list.
-                state.old_parent().children.remove(old_basename);
-            }
+            // Finally, remove the renamed child from the old_parent's child
+            // list.
+            state.old_parent().children.remove(old_basename);
+
+            (renamed, maybe_replaced)
         };
 
         fs.purge_old_entries();
 
         if let Some(replaced) = maybe_replaced {
-            if !flags.contains(RenameFlags::EXCHANGE) {
-                replaced.destroy();
-            }
+            replaced.destroy();
         }
 
         // Renaming a file updates its ctime.

@@ -292,21 +292,6 @@ impl FileSystem {
         )
     }
 
-    /// Exchanges `node1` and `node2`. Parent directory node and the corresponding names
-    /// for the two exchanged nodes are passed as `parent1`, `name1`, `parent2`, `name2`.
-    pub fn exchange(
-        &self,
-        current_task: &CurrentTask,
-        node1: &FsNodeHandle,
-        parent1: &FsNodeHandle,
-        name1: &FsStr,
-        node2: &FsNodeHandle,
-        parent2: &FsNodeHandle,
-        name2: &FsStr,
-    ) -> Result<(), Errno> {
-        self.ops.exchange(self, current_task, node1, parent1, name1, node2, parent2, name2)
-    }
-
     /// Returns the `statfs` for this filesystem.
     ///
     /// Each `FileSystemOps` impl is expected to override this to return the specific statfs for
@@ -430,20 +415,6 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
         error!(EROFS)
-    }
-
-    fn exchange(
-        &self,
-        _fs: &FileSystem,
-        _current_task: &CurrentTask,
-        _node1: &FsNodeHandle,
-        _parent1: &FsNodeHandle,
-        _name1: &FsStr,
-        _node2: &FsNodeHandle,
-        _parent2: &FsNodeHandle,
-        _name2: &FsStr,
-    ) -> Result<(), Errno> {
-        error!(EINVAL)
     }
 
     /// Called when the filesystem is unmounted.

@@ -81,38 +81,6 @@ impl FileSystemOps for Arc<TmpFs> {
         }
         Ok(())
     }
-
-    fn exchange(
-        &self,
-        _fs: &FileSystem,
-        _current_task: &CurrentTask,
-        node1: &FsNodeHandle,
-        parent1: &FsNodeHandle,
-        _name1: &FsStr,
-        node2: &FsNodeHandle,
-        parent2: &FsNodeHandle,
-        _name2: &FsStr,
-    ) -> Result<(), Errno> {
-        if node1.is_dir() {
-            parent1.update_info(|info| {
-                info.link_count -= 1;
-            });
-            parent2.update_info(|info| {
-                info.link_count += 1;
-            });
-        }
-
-        if node2.is_dir() {
-            parent1.update_info(|info| {
-                info.link_count += 1;
-            });
-            parent2.update_info(|info| {
-                info.link_count -= 1;
-            });
-        }
-
-        Ok(())
-    }
 }
 
 impl TmpFs {
