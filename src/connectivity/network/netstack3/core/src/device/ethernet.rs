@@ -245,8 +245,16 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         ctx: &mut NonSyncCtx,
         device_id: &EthernetDeviceId<NonSyncCtx>,
         lookup_addr: SpecifiedAddr<Ipv6Addr>,
+        remote_link_addr: Option<Mac>,
     ) {
-        let dst_ip = lookup_addr.to_solicited_node_address().into_specified();
+        let dst_ip = match remote_link_addr {
+            // TODO(https://fxbug.dev/131547): once `send_ndp_packet` does not go through
+            // the normal IP egress flow, using the NUD table to resolve the link address,
+            // use the specified link address to determine where to unicast the
+            // solicitation.
+            Some(_) => lookup_addr,
+            None => lookup_addr.to_solicited_node_address().into_specified(),
+        };
         let src_ip = crate::ip::IpDeviceStateContext::<Ipv6, _>::get_local_addr_for_remote(
             self,
             &device_id.clone().into(),

@@ -186,8 +186,9 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudC
         ctx: &mut C,
         device_id: &SC::DeviceId,
         lookup_addr: SpecifiedAddr<Ipv4Addr>,
+        remote_link_addr: Option<D::Address>,
     ) {
-        send_arp_request(self, ctx, device_id, lookup_addr.get())
+        send_arp_request(self, ctx, device_id, lookup_addr.get(), remote_link_addr)
     }
 }
 
@@ -478,22 +479,24 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
     ctx: &mut C,
     device_id: &SC::DeviceId,
     lookup_addr: Ipv4Addr,
+    remote_link_addr: Option<D::Address>,
 ) {
     if let Some(sender_protocol_addr) = sync_ctx.get_protocol_addr(ctx, device_id) {
         let self_hw_addr = sync_ctx.get_hardware_addr(ctx, device_id);
         // TODO(joshlf): Do something if send_frame returns an error?
+        let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
         let _ = SendFrameContext::send_frame(
             sync_ctx,
             ctx,
-            ArpFrameMetadata { device_id: device_id.clone(), dst_addr: D::HType::BROADCAST },
+            ArpFrameMetadata { device_id: device_id.clone(), dst_addr },
             ArpPacketBuilder::new(
                 ArpOp::Request,
                 self_hw_addr.get(),
                 sender_protocol_addr,
                 // This is meaningless, since RFC 826 does not specify the
-                // behaviour. However, the broadcast address is sensible, as
-                // this is the actual address we are sending the packet to.
-                D::HType::BROADCAST,
+                // behaviour. However, `dst_addr` is sensible, as this is the
+                // actual address we are sending the packet to.
+                dst_addr,
                 lookup_addr,
             )
             .into_serializer(),
