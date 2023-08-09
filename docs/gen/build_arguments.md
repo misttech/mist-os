@@ -1222,7 +1222,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:176
+From //build/toolchain/rbe.gni:180
 
 ### config_example_cpp_greeting
 
@@ -1387,7 +1387,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:171
+From //build/toolchain/rbe.gni:175
 
 ### cxx_rbe_enable
 
@@ -1400,7 +1400,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:129
+From //build/toolchain/rbe.gni:133
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1408,7 +1408,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:129
+From //build/toolchain/rbe.gni:133
 
 ### cxx_rbe_exec_strategy
 
@@ -1431,7 +1431,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:147
+From //build/toolchain/rbe.gni:151
 
 ### dart_aot_debug_build_cfg
 
@@ -2731,7 +2731,7 @@ From //build/config/compiler.gni:66
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:51
+From //build/product.gni:54
 
 ### emu_window_size_width
 
@@ -2739,7 +2739,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:50
+From //build/product.gni:53
 
 ### enable_api_diff
 
@@ -4658,13 +4658,13 @@ From //src/storage/fshost/generated_fshost_config.gni:68
 
 **Current value (from the default):** `false`
 
-From //third_party/mini_chromium/src/build/platform.gni:31
+From //third_party/mini_chromium/src/build/platform.gni:32
 
 ### mini_chromium_is_chromeos_lacros
 
 **Current value (from the default):** `false`
 
-From //third_party/mini_chromium/src/build/platform.gni:30
+From //third_party/mini_chromium/src/build/platform.gni:31
 
 ### monolithic_binaries
 
@@ -7292,7 +7292,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:114
+From //build/toolchain/rbe.gni:118
 
 ### rust_rbe_download_unstripped_binaries
 
@@ -7304,7 +7304,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:121
+From //build/toolchain/rbe.gni:125
 
 ### rust_rbe_enable
 
@@ -7316,7 +7316,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:70
+From //build/toolchain/rbe.gni:74
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7324,7 +7324,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:70
+From //build/toolchain/rbe.gni:74
 
 ### rust_rbe_exec_strategy
 
@@ -7347,7 +7347,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:88
+From //build/toolchain/rbe.gni:92
 
 ### rust_toolchain_triple_suffix
 
@@ -8603,7 +8603,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:47
+From //build/product.gni:50
 
 ### vm_tracing_level
 
@@ -8751,6 +8751,14 @@ List of arguments to populate /boot/config/additional_boot_args in the Zedboot i
 **Current value (from the default):** `[]`
 
 From //build/images/zedboot/zedboot_args.gni:7
+
+### zedboot_product_assembly_config_label
+
+The product assembly config used to configure the Zedboot image.
+
+**Current value (from the default):** `"//products/zedboot"`
+
+From //build/product.gni:44
 
 ### zircon_a_partition
 
