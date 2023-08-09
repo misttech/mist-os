@@ -59,6 +59,10 @@
                     from: "#elf_test_create_raw_processes_runner",
                 },
                 {
+                    runner: "elf_test_create_raw_processes_ambient_exec_runner",
+                    from: "#elf_test_create_raw_processes_ambient_exec_runner",
+                },
+                {
                     runner: "gtest_runner",
                     from: "#gtest_runner",
                 },

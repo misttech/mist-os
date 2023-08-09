@@ -1,0 +1,50 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("//build/zircon/embedded_blob.gni")
+import("//build/zircon/hermetic_code_blob.gni")
+
+user_basic_redirect("write_to_stack.basic") {
+  visibility = [ "//src/zircon/tests/restricted-mode-shared:bin" ]
+  testonly = true
+
+  public_deps = [ ":write_to_stack" ]
+}
+
+embedded_blob("write_to_stack") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "$target_out_dir/write_to_stack.bin" ]
+  deps = [ ":write_to_stack.blob" ]
+  public_deps = [ ":write_to_stack.blob.public" ]
+}
+
+hermetic_code_blob("write_to_stack.blob") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  output_name = "write_to_stack"
+  public_deps = [ "//zircon/system/public" ]
+
+  allow_rodata = true
+
+  entrypoint = "write_to_stack"
+  sources = []
+  if (current_cpu == "x64") {
+    sources += [ "x64.S" ]
+  } else if (current_cpu == "arm64") {
+    sources += [ "arm64.S" ]
+  } else if (current_cpu == "riscv64") {
+    sources += [ "riscv64.S" ]
+  }
+
+  # TODO(fxbug.dev/129545): LLD lets --no-pie trump the code generation
+  # switches, but this needs to be compiled as PIC though linked differently.
+  if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
+      toolchain_variant.tags) {
+    ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
+  }
+}

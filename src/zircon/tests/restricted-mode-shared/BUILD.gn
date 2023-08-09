@@ -1,0 +1,45 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+
+group("tests") {
+  testonly = true
+  deps = []
+  if (!is_asan) {
+    deps += [ ":restricted-mode-shared-test" ]
+  }
+}
+
+if (!is_asan) {
+  test("bin") {
+    output_name = "restricted-mode-shared-test"
+    sources = [ "restricted-mode-shared.cc" ]
+    if (current_cpu == "x64") {
+      sources += [ "x64.S" ]
+    } else if (current_cpu == "arm64") {
+      sources += [ "arm64.S" ]
+    } else if (current_cpu == "riscv64") {
+      sources += [ "riscv64.S" ]
+    }
+
+    deps = [
+      "restricted-blob:write_to_stack.basic",
+      "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+      "//sdk/lib/component/incoming/cpp",
+      "//zircon/system/ulib/zxtest",
+    ]
+  }
+
+  fuchsia_unittest_component("restricted-mode-shared") {
+    manifest = "meta/restricted-mode-shared-test.cml"
+    deps = [ ":bin" ]
+    test_type = "system"
+  }
+
+  fuchsia_test_package("restricted-mode-shared-test") {
+    test_components = [ ":restricted-mode-shared" ]
+  }
+}
