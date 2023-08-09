@@ -111,6 +111,7 @@
           "prebuilt/tools/gsutil": true,
           "prebuilt/tools/lkg": true,
           "prebuilt/tools/logdog": true,
+          "prebuilt/tools/shac": true,
           "prebuilt/tools/zedmon": true,
           "prebuilt/virtualization/packages/debian_guest/images/arm64": true,
           "prebuilt/virtualization/packages/debian_guest/images/x64": true,
