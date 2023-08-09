@@ -160,6 +160,16 @@ pub struct StartCommand {
     #[argh(switch)]
     pub reuse: bool,
 
+    /// reuse a persistent emulator's state when starting up after version check. If an emulator
+    /// with the same name as this instance has been previously started and then stopped without
+    /// cleanup, the zbi and disk volume files are compared against the original. If they match,
+    /// the instance will reuse the images from the previous instance. If the files do not match,
+    /// the instance is started using the latest files. If there is no staged instance, the emulator
+    /// is started using the latest files and the hash information is recorded so this instance
+    /// can take advantage of this option.
+    #[argh(switch)]
+    pub reuse_with_check: bool,
+
     /// sets up the emulation configuration and stages files, but doesn't start the emulator. The
     /// command line arguments that the staged configuration generates will be printed to stdout
     /// for review.

@@ -16,24 +16,17 @@ use ffx_emulator_common::{
 };
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
-use pbms::{load_product_bundle, ListingMode, ProductBundle};
+use pbms::ProductBundle;
 use std::{
     collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, str::FromStr,
     time::Duration,
 };
 
-/// Lists the virtual device spec names in the specified product.
-pub(crate) async fn list_virtual_devices(
-    cmd: &StartCommand,
-    sdk: &ffx_config::Sdk,
-) -> Result<Vec<String>> {
-    let bundle: ProductBundle =
-        load_product_bundle(&sdk, &cmd.product_bundle, ListingMode::ReadyBundlesOnly).await?.into();
-    bundle.device_refs()
-}
-
 /// Create a RuntimeConfiguration based on the command line args.
-pub(crate) async fn make_configs(cmd: &StartCommand) -> Result<EmulatorConfiguration> {
+pub(crate) async fn make_configs(
+    cmd: &StartCommand,
+    product_bundle: Option<ProductBundle>,
+) -> Result<EmulatorConfiguration> {
     // Start with a default structure, than fill it in as we go.
     let mut emu_config = EmulatorConfiguration::default();
 
@@ -44,11 +37,14 @@ pub(crate) async fn make_configs(cmd: &StartCommand) -> Result<EmulatorConfigura
         emu_config.runtime.template = PathBuf::from(env::current_dir()?).join(template_file);
         emu_config.runtime.config_override = true;
     } else {
-        // Apply the values from the manifest to an emulation configuration.
-        emu_config =
-            convert_bundle_to_configs(cmd.product_bundle.clone(), cmd.device().await?, cmd.verbose)
+        if let Some(pb) = product_bundle {
+            // Apply the values from the manifest to an emulation configuration.
+            emu_config = convert_bundle_to_configs(&pb, cmd.device().await?, cmd.verbose)
                 .await
                 .context("problem with convert_bundle_to_configs")?;
+        } else {
+            bail!("Product bundle required for configuring the emulator instance.")
+        }
     }
 
     // HostConfig values that come from the OS environment.

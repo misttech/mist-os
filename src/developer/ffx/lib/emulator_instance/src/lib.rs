@@ -111,6 +111,14 @@ pub struct GuestConfig {
 
     /// Zircon Boot image, this is Fuchsia's initial ram disk used in the boot process.
     pub zbi_image: PathBuf,
+
+    /// Hash of zbi_image. Used to detect changes when reusing an emulator instance.
+    #[serde(default)]
+    pub zbi_hash: String,
+
+    /// Hash of disk_image. Used to detect changes when reusing an emulator instance.
+    #[serde(default)]
+    pub disk_hash: String,
 }
 
 /// Host-side configuration data, such as physical hardware and host OS details.

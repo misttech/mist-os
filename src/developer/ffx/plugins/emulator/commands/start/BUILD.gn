@@ -37,13 +37,22 @@ if (is_host) {
       "src/pbm.rs",
     ]
     test_deps = [
+      "//build/sdk/meta:rust",
       "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
+      "//src/lib/assembly/assembly_manifest",
+      "//src/lib/assembly/partitions_config",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:camino",
       "//third_party/rust_crates:mockall",
       "//third_party/rust_crates:regex",
       "//third_party/rust_crates:tempfile",
+    ]
+    inputs = [
+      "test_data/virtual_device.json",
+      "test_data/device_1.json.template",
+      "test_data/test_core.json",
     ]
   }
 

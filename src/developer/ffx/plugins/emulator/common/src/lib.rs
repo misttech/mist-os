@@ -15,9 +15,12 @@ use std::{
 
 // Provides access to ffx_config properties.
 pub mod config;
+pub mod fletcher64;
 pub mod process;
 pub mod target;
 pub mod tuntap;
+
+pub use fletcher64::{get_file_hash, FletcherHasher};
 
 /// A utility function for checking whether the host OS is MacOS.
 pub fn host_is_mac() -> bool {

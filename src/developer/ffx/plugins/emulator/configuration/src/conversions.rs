@@ -12,9 +12,10 @@ use camino::Utf8PathBuf;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
+use pbms::ListingMode;
 #[cfg(feature = "build_pb_v1")]
 use pbms::{fms_entries_from, get_images_dir, select_product_bundle};
-use pbms::{load_product_bundle, ListingMode};
+
 #[cfg(feature = "build_pb_v1")]
 use sdk_metadata::ProductBundleV1;
 use sdk_metadata::{
@@ -25,7 +26,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub async fn convert_bundle_to_configs(
-    product_bundle_name: Option<String>,
+    product_bundle: &ProductBundle,
     device_name: Option<String>,
     verbose: bool,
 ) -> Result<EmulatorConfiguration> {
@@ -33,10 +34,6 @@ pub async fn convert_bundle_to_configs(
         .context("loading global environment context")?
         .get_sdk()
         .await?;
-    let product_bundle =
-        load_product_bundle(&sdk, &product_bundle_name, ListingMode::ReadyBundlesOnly)
-            .await?
-            .into();
     match &product_bundle {
         ProductBundle::V1(_product_bundle) => {
             #[cfg(feature = "build_pb_v1")]
@@ -98,7 +95,7 @@ pub async fn convert_bundle_to_configs(
                         &_product_bundle.name, &_product_bundle.device_refs, &virtual_device
                     );
                 }
-                convert_v1_bundle_to_configs(_product_bundle, &virtual_device, &data_root)
+                convert_v1_bundle_to_configs(&_product_bundle, &virtual_device, &data_root)
                     .context("problem with internal conversion")
             }
             #[cfg(not(feature = "build_pb_v1"))]
@@ -242,6 +239,7 @@ fn convert_v1_bundle_to_configs(
             disk_image,
             kernel_image: data_root.join(&emu.kernel),
             zbi_image: data_root.join(&emu.initial_ramdisk),
+            ..Default::default()
         };
     } else {
         return Err(anyhow!(
@@ -314,7 +312,8 @@ fn convert_v2_bundle_to_configs(
         })
         .ok_or(anyhow!("No ZBI in the product bundle"))?;
 
-    emulator_configuration.guest = GuestConfig { disk_image, kernel_image, zbi_image };
+    emulator_configuration.guest =
+        GuestConfig { disk_image, kernel_image, zbi_image, ..Default::default() };
 
     Ok(emulator_configuration)
 }

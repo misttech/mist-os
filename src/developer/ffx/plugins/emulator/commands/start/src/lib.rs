@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::pbm::{list_virtual_devices, make_configs};
+use crate::pbm::make_configs;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use emulator_instance::{EmulatorConfiguration, EngineType};
+use emulator_instance::{EmulatorConfiguration, EngineType, NetworkingMode};
 use errors::ffx_bail;
 use ffx_config::Sdk;
+use ffx_emulator_common::get_file_hash;
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter, TryFromEnvWith};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
+use pbms::{ListingMode, LoadedProductBundle};
 use std::{marker::PhantomData, str::FromStr};
 
 mod editor;
@@ -32,7 +34,18 @@ pub trait EngineOperations: Default + 'static {
 
     fn edit_configuration(&self, emu_config: &mut EmulatorConfiguration) -> Result<()>;
 
-    async fn new_engine(&self, cmd: &StartCommand) -> Result<Box<dyn EmulatorEngine>>;
+    async fn new_engine(
+        &self,
+        emulator_configuration: &EmulatorConfiguration,
+        engine_type: EngineType,
+    ) -> Result<Box<dyn EmulatorEngine>>;
+
+    async fn load_product_bundle(
+        &self,
+        sdk: &ffx_config::Sdk,
+        product_bundle: &Option<String>,
+        mode: ListingMode,
+    ) -> Result<LoadedProductBundle>;
 }
 
 #[derive(Default)]
@@ -61,20 +74,32 @@ impl EngineOperations for EngineOperationsData {
         crate::editor::edit_configuration(emu_config)
     }
 
-    async fn new_engine(&self, cmd: &StartCommand) -> Result<Box<dyn EmulatorEngine>> {
-        let emulator_configuration = make_configs(&cmd).await?;
+    async fn new_engine(
+        &self,
+        emulator_configuration: &EmulatorConfiguration,
+        engine_type: EngineType,
+    ) -> Result<Box<dyn EmulatorEngine>> {
+        EngineBuilder::new()
+            .config(emulator_configuration.clone())
+            .engine_type(engine_type)
+            .build()
+            .await
+    }
 
-        // Initialize an engine of the requested type with the configuration defined in the manifest.
-        let engine_type = EngineType::from_str(&cmd.engine().await.unwrap_or("femu".to_string()))
-            .context("Couldn't retrieve engine type from ffx config.")?;
-
-        EngineBuilder::new().config(emulator_configuration).engine_type(engine_type).build().await
+    async fn load_product_bundle(
+        &self,
+        sdk: &ffx_config::Sdk,
+        product_bundle: &Option<String>,
+        mode: ListingMode,
+    ) -> Result<LoadedProductBundle> {
+        pbms::load_product_bundle(sdk, product_bundle, mode).await
     }
 }
 
 fn engine_operations_getter<P: EngineOperations>() -> WithEngineOperations<P> {
     WithEngineOperations(PhantomData::<P>::default())
 }
+
 /// Sub-sub tool for `emu start`
 #[derive(FfxTool)]
 pub struct EmuStartTool<T: EngineOperations> {
@@ -100,22 +125,31 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
     type Writer = SimpleWriter;
 
     async fn main(mut self, _writer: Self::Writer) -> fho::Result<()> {
+        let loaded_product_bundle = self.finalize_start_command().await?;
+
+        let product_bundle: Option<pbms::ProductBundle> = loaded_product_bundle.map(|b| b.into());
+
         // List the devices available in this product bundle
         if self.cmd.device_list {
-            let sdk = self.sdk;
-            let devices = list_virtual_devices(&self.cmd, &sdk)
-                .await
+            let devices = &product_bundle
+                .expect("product bundle needed for device list")
+                .device_refs()
                 .user_message("Error listing available virtual device specifications")?;
             println!("Valid virtual device specifications are: {:?}", devices);
             return Ok(());
         }
 
-        let mut engine = self.get_engine().await?;
+        let emulator_configuration = make_configs(&self.cmd, product_bundle.clone()).await?;
+        let engine_type =
+            EngineType::from_str(&self.cmd.engine().await.unwrap_or("femu".to_string()))
+                .context("Reading engine type from ffx config.")?;
 
-        // We do an initial build here, because we need an initial configuration before staging.
-        let mut emulator_cmd = engine.build_emulator_cmd();
+        // Get the staged instance, if any
+        let existing = self.engine_operations.get_engine_by_name(&mut self.cmd.name).await?;
 
-        if self.cmd.config.is_none() && !self.cmd.reuse {
+        let mut engine = self.get_engine(&emulator_configuration, engine_type, existing).await?;
+
+        if self.cmd.config.is_none() && !self.cmd.reuse && !self.cmd.dry_run {
             // We don't stage files for custom configurations, because the EmulatorConfiguration
             // doesn't hold valid paths to the system images.
             engine
@@ -123,11 +157,9 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
                 .await
                 .user_message("Error staging the emulator's instance directory.")?;
 
-            // We rebuild the command, since staging likely changed the file paths.
-            emulator_cmd = engine.build_emulator_cmd();
-
             if self.cmd.stage {
                 if self.cmd.verbose {
+                    let emulator_cmd = engine.build_emulator_cmd();
                     println!("\n[emulator] Command line after Staging: {:?}\n", emulator_cmd);
                     println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
                 }
@@ -139,61 +171,224 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
             self.engine_operations
                 .edit_configuration(engine.emu_config_mut())
                 .user_message("Problem editing configuration.")?;
-            // We rebuild the command again to pull in the user's changes.
-            emulator_cmd = engine.build_emulator_cmd();
         }
 
+        let emulator_cmd = engine.build_emulator_cmd();
         if self.cmd.verbose || self.cmd.dry_run {
             println!("\n[emulator] Final Command line: {:?}\n", emulator_cmd);
             println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
         }
 
-        if self.cmd.dry_run {
-            engine.save_to_disk().await?;
-            return Ok(());
+        // If we're just staging the instance, do not call start.
+        if !self.cmd.stage && !self.cmd.dry_run {
+            match engine.start(emulator_cmd, &self.target_collection).await {
+                Ok(0) => Ok(()),
+                Ok(_) => ffx_bail!("Non zero return code"),
+                Err(e) => ffx_bail!("{:?}", e.context("The emulator failed to start.")),
+            }
+        } else {
+            Ok(())
         }
-
-        let rc = engine
-            .start(emulator_cmd, &self.target_collection)
-            .await
-            .user_message("The emulator failed to start")?;
-        if rc != 0 {
-            ffx_bail!("The emulator failed to start and returned a non zero return code: {rc}");
-        }
-        Ok(())
     }
 }
 
 impl<T: EngineOperations> EmuStartTool<T> {
-    async fn get_engine(&mut self) -> Result<Box<dyn EmulatorEngine>> {
-        if self.cmd.reuse && self.cmd.config.is_none() {
-            // Set the name from the default, and make sure it is not empty.
-            let name_from_cmd = self.cmd.name().await?;
-            let mut name = if &name_from_cmd == "" {
-                Some(crate::DEFAULT_NAME.into())
-            } else {
-                Some(name_from_cmd)
-            };
+    async fn get_engine(
+        &mut self,
+        emulator_configuration: &EmulatorConfiguration,
+        engine_type: EngineType,
+        existing_engine: Option<Box<dyn EmulatorEngine>>,
+    ) -> Result<Box<dyn EmulatorEngine>> {
+        let mut engine: Box<dyn EmulatorEngine>;
+        // For reuse with check, we need to compare the existing hashes of the zbi and disk
+        // to the product bundle. If they are the same, reuse the existing configuration and
+        // data.
+        //
+        // If they are different, then restage from the product bundle.
+        if self.cmd.reuse_with_check {
+            if let Some(existing_engine) = existing_engine {
+                let reused: bool;
+                (reused, engine) =
+                    self.check_if_reusable(&emulator_configuration, existing_engine).await?;
 
-            let engine_result = self.engine_operations.get_engine_by_name(&mut name).await?;
-
-            if let Some(engine) = engine_result {
-                // Set the cmd name to the engine name.
-                self.cmd.name = name;
-                return Ok(engine);
+                if reused {
+                    self.cmd.reuse = true;
+                    println!("Reusing existing instance.");
+                } else {
+                    // They do not match, so don't reuse and reset the engine.
+                    self.cmd.reuse = false;
+                    println!("Created new instance. Product bundle data has changed.");
+                }
             } else {
-                let message = format!(
-                    "Instance '{name}' not found with --reuse flag. \
-                Creating a new emulator named '{name}'.",
-                    name = name.unwrap()
-                );
-                tracing::debug!("{message}");
-                println!("{message}");
-                self.cmd.reuse = false;
-                return self.engine_operations.new_engine(&self.cmd).await;
+                tracing::debug!("No existing instance to check as reusable.");
+                engine = self
+                    .engine_operations
+                    .new_engine(&emulator_configuration, engine_type)
+                    .await
+                    .user_message("Error creating new engine")?;
+                let config = engine.emu_config_mut();
+                Self::save_disk_hashes(config)?;
+            }
+        } else {
+            engine = if !emulator_configuration.runtime.config_override && existing_engine.is_some()
+            {
+                existing_engine.expect("existing engine instance")
+            } else {
+                if self.cmd.reuse {
+                    let message = format!(
+                        "Instance '{name}' not found with --reuse flag. \
+                        Creating a new emulator named '{name}'.",
+                        name = emulator_configuration.runtime.name
+                    );
+                    tracing::debug!("{message}");
+                    println!("{message}");
+                    self.cmd.reuse = false;
+                }
+                self.engine_operations
+                    .new_engine(&emulator_configuration, engine_type)
+                    .await
+                    .user_message("Error creating new engine")?
             }
         }
-        self.engine_operations.new_engine(&self.cmd).await
+        Ok(engine)
+    }
+
+    async fn finalize_start_command(&mut self) -> Result<Option<LoadedProductBundle>> {
+        // name is important to not be empty since it is used to
+        // create a directory path.
+        let mut name = self.cmd.name().await?;
+        if self.cmd.name.is_none() || name == "" {
+            if name == "" {
+                name = DEFAULT_NAME.into();
+            }
+
+            self.cmd.name = Some(name.into());
+        }
+
+        // if a custom config is used, skip the product bundle checks.
+        if self.cmd.config.is_none() {
+            let loaded_product_bundle = self
+                .engine_operations
+                .load_product_bundle(
+                    &self.sdk,
+                    &self.cmd.product_bundle,
+                    ListingMode::ReadyBundlesOnly,
+                )
+                .await?;
+
+            // if we're just printing a device list, return
+            if self.cmd.device_list {
+                return Ok(Some(loaded_product_bundle));
+            }
+
+            let engine = self.cmd.engine().await?;
+            if self.cmd.engine.is_none() && engine != "" {
+                self.cmd.engine = Some(engine);
+            }
+
+            let gpu = self.cmd.gpu().await?;
+            if self.cmd.gpu.is_none() && gpu != "" {
+                self.cmd.gpu = Some(gpu);
+            }
+
+            let net = self.cmd.net().await?;
+            if self.cmd.net.is_none() && net != "" {
+                self.cmd.net = Some(net);
+            }
+
+            let startup_timeout = self.cmd.startup_timeout().await?;
+            if self.cmd.startup_timeout.is_none() && startup_timeout > 0 {
+                self.cmd.startup_timeout = Some(startup_timeout);
+            }
+
+            if self.cmd.product_bundle.is_none() {
+                self.cmd.product_bundle = Some(loaded_product_bundle.loaded_from_path().to_string())
+            }
+
+            if self.cmd.device.is_none() {
+                // Virtual device spec name
+                if let Some(device_name) = self.cmd.device().await? {
+                    if self.cmd.device.is_none() && device_name != "" {
+                        self.cmd.device = Some(device_name);
+                    } else {
+                        self.cmd.device = Some(loaded_product_bundle.device_refs()?[0].clone());
+                    }
+                } else {
+                    self.cmd.device = Some(loaded_product_bundle.device_refs()?[0].clone());
+                }
+            }
+            return Ok(Some(loaded_product_bundle));
+        }
+        Ok(None)
+    }
+
+    /// Checks the configuration of the given engine against the
+    /// product bundle based on the command line. If they match,
+    /// the given engine is reusable, and returned, otherwise a
+    /// new engine instance is returned.
+    async fn check_if_reusable(
+        &self,
+        new_config: &EmulatorConfiguration,
+        mut engine: Box<dyn EmulatorEngine>,
+    ) -> Result<(bool, Box<dyn EmulatorEngine>)> {
+        let new_zbi_hash: u64;
+        let new_disk_hash: u64;
+
+        tracing::debug!(
+            "New config image files zbi:{zbi:?} disk:{fvm:?}",
+            zbi = new_config.guest.zbi_image,
+            fvm = new_config.guest.disk_image
+        );
+
+        new_zbi_hash = get_file_hash(&new_config.guest.zbi_image)
+            .bug_context("could not calculate zbi hash")?;
+
+        if let Some(disk) = &new_config.guest.disk_image {
+            new_disk_hash =
+                get_file_hash(disk.as_ref()).bug_context("could not calculate disk hash")?;
+        } else {
+            new_disk_hash = 0;
+        }
+
+        let new_zbi = format!("{new_zbi_hash:x}");
+        let new_disk = format!("{new_disk_hash:x}");
+        let config = engine.emu_config();
+        let zbi_hash = &config.guest.zbi_hash;
+        let disk_hash = &config.guest.disk_hash;
+
+        if &new_zbi == zbi_hash && &new_disk == disk_hash {
+            // Reset the host port map.
+            if engine.emu_config().host.networking == NetworkingMode::User {
+                engine.emu_config_mut().host.port_map = new_config.host.port_map.clone();
+            }
+            engine.save_to_disk().await?;
+            return Ok((true, engine));
+        } else {
+            let engine_type =
+                EngineType::from_str(&self.cmd.engine().await.unwrap_or("femu".to_string()))
+                    .context("Reading engine type from ffx config.")?;
+            engine = self.engine_operations.new_engine(&new_config, engine_type).await?;
+            let config = engine.emu_config_mut();
+            config.guest.zbi_hash = new_zbi.clone();
+            config.guest.disk_hash = new_disk.clone();
+            return Ok((false, engine));
+        }
+    }
+
+    fn save_disk_hashes(config: &mut EmulatorConfiguration) -> Result<()> {
+        let new_disk_hash: u64;
+        let new_zbi_hash =
+            get_file_hash(&config.guest.zbi_image).bug_context("could not calculate zbi hash")?;
+
+        if let Some(disk) = &config.guest.disk_image {
+            new_disk_hash =
+                get_file_hash(disk.as_ref()).bug_context("could not calculate disk hash")?;
+        } else {
+            new_disk_hash = 0;
+        }
+        config.guest.zbi_hash = format!("{new_zbi_hash:x}");
+        config.guest.disk_hash = format!("{new_disk_hash:x}");
+        Ok(())
     }
 }
 
@@ -201,11 +396,20 @@ impl<T: EngineOperations> EmuStartTool<T> {
 mod tests {
     use super::*;
     use anyhow::bail;
-    use emulator_instance::RuntimeConfig;
-    use ffx_config::ConfigLevel;
+    use assembly_manifest::Image;
+    use assembly_partitions_config::PartitionsConfig;
+    use camino::Utf8PathBuf;
+    use emulator_instance::{GuestConfig, RuntimeConfig};
+    use ffx_config::{BuildOverride, ConfigLevel, SdkRoot, TestEnv};
     use ffx_emulator_config::EmulatorEngine;
-    use std::process::Command;
+    use pbms::ProductBundle;
+    use sdk_metadata::ProductBundleV2;
+    use serde_json::json;
+    use std::{fs, path::Path, process::Command};
 
+    const VIRTUAL_DEVICE_VALID: &str = include_str!("../test_data/virtual_device.json");
+    const VIRTUAL_DEVICE_TEMPLATE_VALID: &str = include_str!("../test_data/device_1.json.template");
+    const CORE_JSON: &str = include_str!("../test_data/test_core.json");
     /// TestEngine is a test struct for implementing the EmulatorEngine trait. This version
     /// just captures when the stage and start functions are called, and asserts that they were
     /// supposed to be. On tear-down, if they were supposed to be and weren't, it will detect this
@@ -265,6 +469,10 @@ mod tests {
         fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration {
             &mut self.config
         }
+
+        fn emu_config(&self) -> &EmulatorConfiguration {
+            &self.config
+        }
     }
 
     impl Drop for TestEngine {
@@ -284,12 +492,81 @@ mod tests {
         }
     }
 
-    async fn make_test_emu_start_tool(cmd: StartCommand) -> EmuStartTool<MockEngineOperations> {
+    async fn make_intree_sdk(env: &TestEnv) -> Result<Sdk> {
+        let manifest_path = env.isolate_root.path().join("sdk/manifest");
+        std::fs::create_dir_all(&manifest_path).expect("create sdk dir");
+        fs::write(manifest_path.join("core"), CORE_JSON)?;
+
+        env.context
+            .query("sdk.root")
+            .build(Some(BuildOverride::NoBuild))
+            .level(Some(ConfigLevel::User))
+            .set(json!(env.isolate_root.path().to_path_buf()))
+            .await
+            .expect("set sdk.root");
+
+        let s = SdkRoot::Full(env.isolate_root.path().to_path_buf());
+        s.get_sdk()
+    }
+
+    fn make_test_product_bundle(dir: &Path) -> Result<ProductBundleV2> {
+        let dev_manifest = dir.join("virtual_device_manifest.json");
+        fs::write(&dev_manifest,r#"
+        {"recommended":"virtual_device_1","device_paths":{"virtual_device_1":"virtual_device_1.json","virtual_device_2":"virtual_device_2.json"}}
+        "#).unwrap();
+
+        let kernel_path = dir.join("kernel.dat");
+        fs::write(&kernel_path, "this is kernel file").bug_context("writing test kernel")?;
+
+        let zbi_path = dir.join("zbi-file.zbi");
+        fs::write(&zbi_path, "this is zbi file").bug_context("writing test zbi")?;
+
+        let fvm_path = dir.join("fvm-file.fvm");
+        fs::write(&fvm_path, "this is fvm file").bug_context("writing test fvm")?;
+
+        fs::write(dir.join("virtual_device_1.json"), VIRTUAL_DEVICE_VALID)
+            .expect("writing device json");
+
+        fs::write(dir.join("device_1.json.template"), VIRTUAL_DEVICE_TEMPLATE_VALID)
+            .expect("writing template json");
+
+        Ok(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig {
+                bootstrap_partitions: vec![],
+                bootloader_partitions: vec![],
+                partitions: vec![],
+                hardware_revision: "board".into(),
+                unlock_credentials: vec![],
+            },
+            sdk_version: "".to_string(),
+            system_a: Some(vec![
+                Image::QemuKernel(
+                    Utf8PathBuf::from_path_buf(kernel_path).expect("utf path from buf"),
+                ),
+                Image::ZBI {
+                    path: Utf8PathBuf::from_path_buf(zbi_path).expect("utf path from buf"),
+                    signed: false,
+                },
+                Image::FVM(Utf8PathBuf::from_path_buf(fvm_path).expect("utf path from buf")),
+            ]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: Some(dev_manifest.to_str().unwrap().into()),
+        })
+    }
+
+    async fn make_test_emu_start_tool(
+        cmd: StartCommand,
+        sdk: Sdk,
+    ) -> EmuStartTool<MockEngineOperations> {
         let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
             <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
         >()
         .unwrap();
-        let sdk = Sdk::get_empty_sdk_with_version(ffx_config::sdk::SdkVersion::Unknown);
 
         EmuStartTool {
             cmd,
@@ -302,99 +579,158 @@ mod tests {
     // Check that new_engine gets called by default and get_engine_by_name doesn't
     #[fuchsia::test]
     async fn test_get_engine_no_reuse_makes_new() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
         let cmd = StartCommand::default();
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>));
-        tool.engine_operations.expect_get_engine_by_name().times(0);
+            .returning(|_, _| {
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
+            .times(1);
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
 
-        let _ = tool.get_engine().await?;
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await.expect("main in test_get_engine_no_reuse_makes_new");
         Ok(())
     }
 
     // Check that reuse and config together is still new_engine (i.e. config overrides reuse)
     #[fuchsia::test]
     async fn test_get_engine_with_config_doesnt_reuse() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let cmd =
-            StartCommand { reuse: true, config: Some("config.file".into()), ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let cmd = StartCommand {
+            reuse: true,
+            net: Some("user".into()),
+            config: Some("config.file".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            .returning(|_, _| {
+                Ok(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
             .times(1);
-        tool.engine_operations.expect_get_engine_by_name().times(0);
+        tool.engine_operations
+            .expect_get_engine_by_name()
+            .returning(|_| {
+                Ok(Some(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: false,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
+            })
+            .times(1);
 
-        let _ = tool.get_engine().await?;
+        tool.engine_operations.expect_load_product_bundle().times(0);
+
+        tool.main(SimpleWriter::new())
+            .await
+            .expect("main in test_get_engine_with_config_doesnt_reuse");
+
         Ok(())
     }
 
     // Check that reuse and config.is_none calls get_engine_by_name
     #[fuchsia::test]
     async fn test_get_engine_without_config_does_reuse() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let cmd = StartCommand { reuse: true, config: None, ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let cmd = StartCommand { reuse: true, net: Some("user".into()), ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations.expect_new_engine().times(0);
         tool.engine_operations
             .expect_get_engine_by_name()
-            .returning(|_| Ok(Some(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>)))
+            .returning(|_| {
+                Ok(Some(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
+            })
             .times(1);
 
-        let _ = tool.get_engine().await?;
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new())
+            .await
+            .expect("main in test_get_engine_without_config_does_reuse");
+
         Ok(())
     }
 
     // Check that if get_engine_by_name returns DoesNotExist, new_engine still gets called and reuse is reset
+    // reuse is checked to be false, by watching do_stage. stage() is only called on non-reused instances.
     #[fuchsia::test]
     async fn test_get_engine_doesnotexist_creates_new() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
-        let cmd = StartCommand { reuse: true, config: None, ..Default::default() };
+        let cmd = StartCommand { reuse: true, net: Some("user".into()), ..Default::default() };
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            .returning(|config, _| {
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    do_start: true,
+                    config: config.clone(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
             .times(1);
         tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
 
-        let _ = tool.get_engine().await?;
-        Ok(())
-    }
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
 
-    // Check that if DoesExist, then cmd.name is updated too
-    #[fuchsia::test]
-    async fn test_get_engine_updates_cmd_name() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-
-        let cmd = StartCommand {
-            name: Some("".to_string()),
-            reuse: true,
-            config: None,
-            ..Default::default()
-        };
-
-        let mut tool = make_test_emu_start_tool(cmd).await;
-        tool.engine_operations.expect_new_engine().times(0);
         tool.engine_operations
-            .expect_get_engine_by_name()
-            .returning(|name| {
-                *name = Some("NewName".to_string());
-                Ok(Some(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
-            })
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
             .times(1);
 
-        let _ = tool.get_engine().await?;
-        assert_eq!(tool.cmd.name().await?, "NewName".to_string());
+        tool.main(SimpleWriter::new())
+            .await
+            .expect("main in test_get_engine_doesnotexist_creates_new");
+
         Ok(())
     }
 
@@ -403,79 +739,129 @@ mod tests {
     async fn test_get_engine_updates_cmd_name_when_blank() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         env.context.query("emu.name").level(Some(ConfigLevel::User)).set("".into()).await?;
+        let sdk = make_intree_sdk(&env).await?;
 
         let cmd = StartCommand { name: None, reuse: true, config: None, ..Default::default() };
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations.expect_new_engine().times(0);
         tool.engine_operations
             .expect_get_engine_by_name()
             .returning(|name| {
                 assert_eq!(name, &Some(DEFAULT_NAME.to_string()));
-                Ok(Some(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+                Ok(Some(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
             })
             .times(1);
 
-        let _ = tool.get_engine().await?;
-        assert_eq!(tool.cmd.name().await?, DEFAULT_NAME.to_string());
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new())
+            .await
+            .expect("main in test_get_engine_updates_cmd_name_when_blank");
         Ok(())
     }
 
     // Ensure dry-run stops after building command, doesn't stage/run
     #[fuchsia::test]
     async fn test_dry_run() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let cmd = StartCommand { dry_run: true, verbose: true, ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let cmd = StartCommand {
+            dry_run: true,
+            verbose: true,
+            net: Some("user".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| {
+            .returning(|_, _| {
                 Ok(Box::new(TestEngine {
-                    do_stage: true,
+                    do_stage: false,
+                    do_start: false,
                     config: EmulatorConfiguration::default(),
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>)
             })
             .times(1);
-        let _ = tool.main(SimpleWriter::new()).await?;
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
+
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await?;
+
         Ok(())
     }
 
     // Ensure stage stops after staging the files, doesn't run
     #[fuchsia::test]
     async fn test_stage() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let cmd = StartCommand { stage: true, ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let cmd = StartCommand { stage: true, net: Some("user".into()), ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| {
+            .returning(|_, _| {
                 Ok(Box::new(TestEngine {
                     do_stage: true,
+                    do_start: false,
                     config: EmulatorConfiguration::default(),
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>)
             })
             .times(1);
-        let _ = tool.main(SimpleWriter::new()).await?;
+
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None));
+
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await?;
         Ok(())
     }
 
     // Ensure start goes through config and staging by default and calls start
     #[fuchsia::test]
     async fn test_start() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
+
         let cmd = StartCommand::default();
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| {
+            .returning(|_, _| {
                 Ok(Box::new(TestEngine {
                     do_stage: true,
                     do_start: true,
@@ -483,6 +869,16 @@ mod tests {
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>)
             })
+            .times(1);
+
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None));
+
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
             .times(1);
 
         let result = tool.main(SimpleWriter::new()).await;
@@ -493,10 +889,12 @@ mod tests {
     // Ensure start() skips the stage() call if the reuse flag is true
     #[fuchsia::test]
     async fn test_reuse_doesnt_stage() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let cmd = StartCommand { reuse: true, ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let cmd = StartCommand { reuse: true, net: Some("user".into()), ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_get_engine_by_name()
@@ -509,21 +907,35 @@ mod tests {
                 }) as Box<dyn EmulatorEngine>))
             })
             .times(1);
-        let _ = tool.main(SimpleWriter::new()).await?;
+        tool.engine_operations.expect_new_engine().times(0);
+
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await?;
         Ok(())
     }
 
     // Ensure start() skips the stage() call is a custom config is provided
     #[fuchsia::test]
     async fn test_custom_config_doesnt_stage() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
+
         let cmd = StartCommand { config: Some("filename".into()), ..Default::default() };
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| {
+            .returning(|_, _| {
                 Ok(Box::new(TestEngine {
                     do_stage: false,
                     do_start: true,
@@ -532,21 +944,26 @@ mod tests {
                 }) as Box<dyn EmulatorEngine>)
             })
             .times(1);
-        let _ = tool.main(SimpleWriter::new()).await?;
+
+        tool.engine_operations.expect_load_product_bundle().times(0);
+
+        tool.main(SimpleWriter::new()).await?;
         Ok(())
     }
 
     // Check that the final command reflects changes from the edit stage
     #[fuchsia::test]
     async fn test_edit() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
+
         let cmd = StartCommand { edit: true, ..Default::default() };
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| {
+            .returning(|_, _| {
                 Ok(Box::new(TestEngine {
                     do_stage: true,
                     do_start: true,
@@ -562,6 +979,7 @@ mod tests {
                 }) as Box<dyn EmulatorEngine>)
             })
             .times(1);
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
 
         tool.engine_operations
             .expect_edit_configuration()
@@ -570,21 +988,31 @@ mod tests {
                 Ok(())
             })
             .times(1);
-        let _ = tool.main(SimpleWriter::new()).await?;
+
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await?;
         Ok(())
     }
 
     // Check that the final command reflects changes from staging
     #[fuchsia::test]
     async fn test_staging_edits() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await?;
+
         let cmd = StartCommand::default();
 
-        let mut tool = make_test_emu_start_tool(cmd).await;
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
         tool.engine_operations
             .expect_new_engine()
-            .returning(|_| {
+            .returning(|_, _| {
                 Ok(Box::new(TestEngine {
                     do_stage: true,
                     do_start: true,
@@ -604,7 +1032,197 @@ mod tests {
                 }) as Box<dyn EmulatorEngine>)
             })
             .times(1);
-        let _ = tool.main(SimpleWriter::new()).await?;
+
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
+
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await?;
         Ok(())
+    }
+
+    // Tests that if check_if_reusable is set, but there is no existing instance, it starts a new engine
+    // and sets the disk hashes in the config.
+    #[fuchsia::test]
+    async fn test_check_if_reusable_new() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        let cmd = StartCommand {
+            name: Some("reuse-test".into()),
+            reuse_with_check: true,
+            net: Some("user".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        // Only load the product bundle once.
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        // Only look for the existing engine once.
+        tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
+
+        // Only make the engine once.
+        tool.engine_operations
+            .expect_new_engine()
+            .returning(|config, _| {
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    do_start: true,
+                    config: config.clone(),
+                    stage_test_fn: |config| {
+                        assert_eq!("d53f0b8a19b29d74", config.guest.zbi_hash);
+                        assert_eq!("d547336219b6b160", config.guest.disk_hash);
+                        Ok(())
+                    },
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
+            .times(1);
+
+        tool.main(SimpleWriter::new()).await.expect("main with stage");
+    }
+
+    // Checks that if the existing instance has matching disk hashes, it is reused.
+    #[fuchsia::test]
+    async fn test_check_if_reusable_matching() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        let cmd = StartCommand {
+            name: Some("reuse-test".into()),
+            reuse_with_check: true,
+            net: Some("user".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        // Only load the product bundle once.
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        // Only look for the existing engine once, and find it.
+        tool.engine_operations
+            .expect_get_engine_by_name()
+            .returning(|_| {
+                let config = EmulatorConfiguration {
+                    guest: GuestConfig {
+                        // These match the hashes of the test files.
+                        zbi_hash: "d53f0b8a19b29d74".into(),
+                        disk_hash: "d547336219b6b160".into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                Ok(Some(Box::new(TestEngine {
+                    // no staging should happen since we're reusing an instance.
+                    do_stage: false,
+                    do_start: true,
+                    config: config.clone(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
+            })
+            .times(1);
+
+        // New engine should not be made.
+        tool.engine_operations.expect_new_engine().times(0);
+
+        tool.main(SimpleWriter::new()).await.expect("main with stage");
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_named() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand { name: Some("test-instance-name".into()), ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.finalize_start_command().await.unwrap();
+
+        assert_eq!(tool.cmd.name, Some("test-instance-name".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_noname() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand { name: None, ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.finalize_start_command().await.unwrap();
+
+        assert_eq!(tool.cmd.name, Some(DEFAULT_NAME.into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_nodevice() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
+
+        let cmd = StartCommand { device: None, ..Default::default() };
+
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        tool.finalize_start_command().await.unwrap();
+
+        // This is set as the recommended device in the product bundle.
+        assert_eq!(tool.cmd.device, Some("virtual_device_1".into()));
     }
 }

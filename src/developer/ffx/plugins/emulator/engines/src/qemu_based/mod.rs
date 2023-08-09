@@ -960,6 +960,7 @@ mod tests {
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
+            ..Default::default()
         };
         assert_eq!(actual, expected);
 
@@ -982,6 +983,7 @@ mod tests {
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
+            ..Default::default()
         };
         assert_eq!(actual, expected);
 
@@ -1055,6 +1057,7 @@ mod tests {
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
+            ..Default::default()
         };
         assert_eq!(actual, expected);
 
@@ -1078,6 +1081,7 @@ mod tests {
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
+            ..Default::default()
         };
         assert_eq!(actual, expected);
 
@@ -1147,6 +1151,7 @@ mod tests {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
             disk_image: Some(DiskImage::Fxfs(root.join(instance_name).join("disk"))),
+            ..Default::default()
         };
         assert_eq!(config, expected);
 
