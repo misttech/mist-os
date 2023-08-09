@@ -99,7 +99,7 @@ use {
 #[async_trait]
 pub trait Action: Send + Sync + 'static {
     type Output: Send + Sync + Clone + Debug;
-    async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output;
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output;
     fn key(&self) -> ActionKey;
 }
 
@@ -300,8 +300,9 @@ impl ActionSet {
 
         let action_fut = async move {
             prereq.await;
+            let key = action.key();
             let res = action.handle(&component).await;
-            Self::finish(&component, &action.key()).await;
+            Self::finish(&component, &key).await;
             res
         }
         .boxed();

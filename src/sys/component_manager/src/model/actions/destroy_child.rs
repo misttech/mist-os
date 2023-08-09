@@ -30,7 +30,7 @@ impl DestroyChildAction {
 #[async_trait]
 impl Action for DestroyChildAction {
     type Output = Result<(), DestroyActionError>;
-    async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_destroy_child(component, &self.moniker, self.incarnation).await
     }
     fn key(&self) -> ActionKey {

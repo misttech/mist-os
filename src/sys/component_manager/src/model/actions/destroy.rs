@@ -31,7 +31,7 @@ impl DestroyAction {
 #[async_trait]
 impl Action for DestroyAction {
     type Output = Result<(), DestroyActionError>;
-    async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_destroy(component).await
     }
     fn key(&self) -> ActionKey {
@@ -145,7 +145,7 @@ pub mod tests {
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
-        futures::{channel::mpsc, lock::Mutex, StreamExt},
+        futures::{channel::mpsc, StreamExt},
         moniker::{ChildName, Moniker, MonikerBase},
         std::fmt::Debug,
         std::sync::atomic::Ordering,
@@ -317,7 +317,7 @@ pub mod tests {
 
     // An action that blocks until it receives a value on an mpsc channel.
     pub struct MockAction<O: Send + Sync + Clone + Debug + 'static> {
-        rx: Mutex<mpsc::Receiver<()>>,
+        rx: mpsc::Receiver<()>,
         key: ActionKey,
         result: O,
     }
@@ -325,7 +325,7 @@ pub mod tests {
     impl<O: Send + Sync + Clone + Debug + 'static> MockAction<O> {
         pub fn new(key: ActionKey, result: O) -> (Self, mpsc::Sender<()>) {
             let (tx, rx) = mpsc::channel::<()>(0);
-            let action = Self { rx: Mutex::new(rx), key, result };
+            let action = Self { rx, key, result };
             (action, tx)
         }
     }
@@ -334,10 +334,9 @@ pub mod tests {
     impl<O: Send + Sync + Clone + Debug + 'static> Action for MockAction<O> {
         type Output = O;
 
-        async fn handle(&self, _: &Arc<ComponentInstance>) -> O {
-            let mut rx = self.rx.lock().await;
-            rx.next().await.unwrap();
-            self.result.clone()
+        async fn handle(mut self, _: &Arc<ComponentInstance>) -> O {
+            self.rx.next().await.unwrap();
+            self.result
         }
 
         fn key(&self) -> ActionKey {

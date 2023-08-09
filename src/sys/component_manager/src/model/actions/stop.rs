@@ -26,7 +26,7 @@ impl StopAction {
 #[async_trait]
 impl Action for StopAction {
     type Output = Result<(), StopActionError>;
-    async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
         component.stop_instance_internal(self.shut_down).await
     }
     fn key(&self) -> ActionKey {

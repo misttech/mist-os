@@ -25,7 +25,6 @@ use {
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::lock::Mutex,
     moniker::Moniker,
     std::sync::Arc,
     tracing::warn,
@@ -34,9 +33,9 @@ use {
 /// Starts a component instance.
 pub struct StartAction {
     start_reason: StartReason,
-    execution_controller_task: Mutex<Option<controller::ExecutionControllerTask>>,
-    numbered_handles: Mutex<Option<Vec<fprocess::HandleInfo>>>,
-    additional_namespace_entries: Mutex<Option<Vec<fcrunner::ComponentNamespaceEntry>>>,
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
+    numbered_handles: Vec<fprocess::HandleInfo>,
+    additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
 }
 
 impl StartAction {
@@ -48,9 +47,9 @@ impl StartAction {
     ) -> Self {
         Self {
             start_reason,
-            execution_controller_task: Mutex::new(execution_controller_task),
-            numbered_handles: Mutex::new(Some(numbered_handles)),
-            additional_namespace_entries: Mutex::new(Some(additional_namespace_entries)),
+            execution_controller_task,
+            numbered_handles,
+            additional_namespace_entries,
         }
     }
 }
@@ -58,16 +57,13 @@ impl StartAction {
 #[async_trait]
 impl Action for StartAction {
     type Output = Result<fsys::StartResult, StartActionError>;
-    async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_start(
             component,
             &self.start_reason,
-            self.execution_controller_task.lock().await.take(),
-            self.numbered_handles.lock().await.take().expect("StartAction was run twice"),
-            self.additional_namespace_entries.lock().await.take().expect(
-                "StartAction was run
-                 twice",
-            ),
+            self.execution_controller_task,
+            self.numbered_handles,
+            self.additional_namespace_entries,
         )
         .await
     }

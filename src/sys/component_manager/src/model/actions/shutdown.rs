@@ -38,7 +38,7 @@ impl ShutdownAction {
 #[async_trait]
 impl Action for ShutdownAction {
     type Output = Result<(), StopActionError>;
-    async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_shutdown(component).await
     }
     fn key(&self) -> ActionKey {
