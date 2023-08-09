@@ -153,26 +153,92 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
   value_type->set_type(interner.InternString("location"));
   value_type->set_unit(interner.InternString("count"));
 
-  bool reading_bt = false;
   std::vector<BackTraceEntry> entries;
+  std::string pid;
+  std::string tid;
+  enum ParsingState {
+    MODULES,
+    PID_TID,
+    FIRST_ENTRY,
+    ENTRIES,
+  };
+  ParsingState state = MODULES;
+  // The sample file looks like:
+  //
+  // [[[ELF module declaration]]
+  // [[[ELF module declaration]]
+  // ...
+  // [[[ELF module declaration]]
+  // <pid>
+  // <tid>
+  //    #0    <addr> in <function> <file>:<line> <library>+<offset>
+  //    #1    <addr> in <function> <file>:<line> <library>+<offset>
+  //    ...
+  //    #<n>    <addr> in <function> <file>:<line> <library>+<offset>
+  // <pid>
+  // <tid>
+  //    #0    <addr> in <function> <file>:<line> <library>+<offset>
+  //    #1    <addr> in <function> <file>:<line> <library>+<offset>
+  //    ...
+  //    #<n>    <addr> in <function> <file>:<line> <library>+<offset>
+  //
+  // The following loop parses it using a state machine that looks like:
+  //
+  //  [ START ]
+  //     |
+  //     v
+  //  [ MODULES ] -> [ PID_TID ] -> [ FIRST_ENTRY ]
+  //    ^   |             ^              |
+  //    \---/             |              v
+  //                      \-------- [ ENTRIES ]-\
+  //                                      ^     |
+  //                                      \-----/
+  //
   for (std::string line; std::getline(in, line);) {
-    // Skip until we find a backtrace starting point
-    if (!reading_bt) {
-      if (line[0] != ' ') {
-        continue;
+    switch (state) {
+      case MODULES:
+        // Skip the ELF module declarations
+        if (!std::isdigit(line[0])) {
+          break;
+        } else {
+          state = PID_TID;
+          pid = line;
+          break;
+        }
+      case PID_TID: {
+        state = FIRST_ENTRY;
+        tid = line;
+        break;
       }
-      reading_bt = true;
-    }
-
-    if (line[4] == '0') {
-      if (!entries.empty()) {
-        interner.AddSample(entries);
-        entries.clear();
+      case FIRST_ENTRY: {
+        if (!entries.empty()) {
+          interner.AddSample(entries);
+          entries.clear();
+        }
+        std::optional<BackTraceEntry> entry = parseBackTraceEntry(line);
+        if (entry && entry->addr != 0) {
+          entries.push_back(*entry);
+        }
+        state = ENTRIES;
+        break;
       }
-    }
-    std::optional<BackTraceEntry> entry = parseBackTraceEntry(line);
-    if (entry) {
-      entries.push_back(*entry);
+      case ENTRIES: {
+        if (line[0] != ' ') {
+          // Include two artificial frames containing the pid and tid of the sample. This way
+          // profiles which include samples from multiple threads and processes will have their
+          // samples properly nested.
+          entries.emplace_back(0xDEADBEEF, "tid: " + tid, "<>", 1);
+          entries.emplace_back(0xDEADBEEF, "pid: " + pid, "<>", 1);
+          pid = line;
+          state = PID_TID;
+          break;
+        }
+        std::optional<BackTraceEntry> entry = parseBackTraceEntry(line);
+        if (entry) {
+          entries.push_back(*entry);
+        }
+        break;
+      }
     }
   }
   if (!entries.empty()) {

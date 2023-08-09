@@ -20,6 +20,11 @@
 #include "src/performance/profiler/profile/profile.pb.h"
 
 struct BackTraceEntry {
+  BackTraceEntry(uint64_t addr, std::string function_name, std::string file_name, int64_t line_no)
+      : addr(addr),
+        function_name(std::move(function_name)),
+        file_name(std::move(file_name)),
+        line_no(line_no) {}
   uint64_t addr;
   std::string function_name;
   std::string file_name;
