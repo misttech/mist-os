@@ -1,0 +1,54 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  testonly = true
+  edition = "2021"
+  name = "triage_detect_realm_factory"
+  sources = [
+    "src/main.rs",
+    "src/realm_events.rs",
+    "src/realm_factory.rs",
+    "src/realm_options.rs",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/diagnostics/detect/testing/fidl/fuchsia.diagnostics.test:fuchsia.diagnostics.test_rust",
+    "//src/lib/diagnostics/testing/fake-archive-accessor",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl_server",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/lib/component-events",
+    "//src/testing/realm_proxy",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_component("realm-factory-component") {
+  testonly = true
+  component_name = "realm-factory"
+  manifest = "meta/realm-factory.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("triage-detect-realm-factory") {
+  testonly = true
+  deps = [
+    ":realm-factory-component",
+    "//src/diagnostics/detect:triage-detect-component",
+    "//src/diagnostics/detect:triage-detect-test-config",
+  ]
+}
