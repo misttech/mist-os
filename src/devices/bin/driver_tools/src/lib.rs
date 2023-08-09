@@ -130,13 +130,11 @@ pub async fn driver(
         }
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::Lsusb(subcmd) => {
-            let device_watcher_proxy = driver_connector
-                .get_device_watcher_proxy()
+            let dev = driver_connector
+                .get_dev_proxy(false)
                 .await
                 .context("Failed to get device watcher proxy")?;
-            subcommands::lsusb::lsusb(subcmd, device_watcher_proxy)
-                .await
-                .context("Lsusb subcommand failed")?;
+            subcommands::lsusb::lsusb(subcmd, &dev).await.context("Lsusb subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::PrintInputReport(ref subcmd) => {

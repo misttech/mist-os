@@ -7,7 +7,6 @@ use ffx_driver_args::DriverCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_device_manager as fdm;
 use fidl_fuchsia_driver_development as fdd;
 use fidl_fuchsia_driver_playground as fdp;
 use fidl_fuchsia_driver_registrar as fdr;
@@ -186,19 +185,6 @@ impl driver_connector::DriverConnector for DriverConnector {
         )
         .await
         .context("Failed to get dev component")
-    }
-
-    async fn get_device_watcher_proxy(&self) -> Result<fdm::DeviceWatcherProxy> {
-        self.get_component_with_capability::<fdm::DeviceWatcherMarker>(
-            "/bootstrap/driver_manager",
-            CapabilityOptions {
-                capability_name: "fuchsia.hardware.usb.DeviceWatcher",
-                default_capability_name_for_query: "fuchsia.hardware.usb.DeviceWatcher",
-            },
-            false,
-        )
-        .await
-        .context("Failed to get device watcher component")
     }
 
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {

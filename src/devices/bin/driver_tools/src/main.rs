@@ -5,9 +5,9 @@
 use {
     anyhow::{Context, Result},
     driver_tools::args::DriverCommand,
-    fidl_fuchsia_device_manager as fdm, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_playground as fdp, fidl_fuchsia_driver_registrar as fdr,
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm, fuchsia_async as fasync,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
+    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm,
+    fuchsia_async as fasync,
     fuchsia_component::client,
 };
 
@@ -38,12 +38,6 @@ impl driver_connector::DriverConnector for DriverConnector {
         }
         fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::empty())
             .map_err(Into::into)
-    }
-
-    async fn get_device_watcher_proxy(&self) -> Result<fdm::DeviceWatcherProxy> {
-        fuchsia_component::client::connect_to_protocol_at_path::<fdm::DeviceWatcherMarker>(
-            "/svc/fuchsia.hardware.usb.DeviceWatcher",
-        )
     }
 
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {

@@ -9,10 +9,11 @@ use {
     crate::args::{Args, UsbDevice},
     crate::descriptors::*,
     anyhow::{format_err, Context, Result},
-    fidl_fuchsia_device_manager::DeviceWatcherProxy,
+    fidl_fuchsia_io as fio,
     fuchsia_async::TimeoutExt,
     fuchsia_zircon_status as zx,
     futures::future::{BoxFuture, FutureExt},
+    futures::TryStreamExt,
     std::sync::Mutex,
 };
 
@@ -20,45 +21,52 @@ use {
 #[allow(unused_imports)]
 use zerocopy::{AsBytes, Ref};
 
-pub async fn lsusb(device_watcher: DeviceWatcherProxy, args: Args) -> Result<()> {
+pub async fn lsusb(usb_device_dir: fio::DirectoryProxy, args: Args) -> Result<()> {
     if args.tree {
-        list_tree(&device_watcher, &args).await
+        list_tree(&usb_device_dir, &args).await
     } else {
-        list_devices(&device_watcher, &args).await
+        list_devices(&usb_device_dir, &args).await
     }
 }
 
-async fn list_devices(device_watcher: &DeviceWatcherProxy, args: &Args) -> Result<()> {
+async fn list_devices(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Result<()> {
+    let mut stream = device_watcher::watch_for_files(usb_device_dir).await?;
+
     println!("ID    VID:PID   SPEED  MANUFACTURER PRODUCT");
 
-    let mut idx = 0;
-    while let Ok(device) = device_watcher
-        .next_device()
+    while let Some(filename) = stream
+        .try_next()
         // This will wait forever, so if there are no more devices, lets stop waiting.
-        .on_timeout(std::time::Duration::from_millis(200), || Ok(Err(-1)))
+        .on_timeout(std::time::Duration::from_millis(200), || Ok(None))
         .await
         .context("FIDL call to get next device returned an error")?
     {
-        let channel = fidl::AsyncChannel::from_channel(device)?;
-        let device = fidl_fuchsia_hardware_usb_device::DeviceProxy::new(channel);
+        let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
 
-        match list_device(&device, idx, 0, 0, &args).await {
+        let (device, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
+        usb_device_dir.open(
+            fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
+            &filename,
+            server_end.into_channel().into(),
+        )?;
+
+        match list_device(&device, filename, 0, 0, &args).await {
             Ok(()) => {}
             Err(e) => eprintln!("Error: {:?}", e),
         }
-
-        idx += 1
     }
     Ok(())
 }
 async fn list_device(
     device: &fidl_fuchsia_hardware_usb_device::DeviceProxy,
-    devnum: u32,
+    filename: &str,
     depth: usize,
     max_depth: usize,
     args: &Args,
 ) -> Result<()> {
-    let devname = &format!("/dev/class/usb-device/{:03}", devnum);
+    let devname = &format!("/dev/class/usb-device/{:03}", filename);
 
     let device_desc_buf = device
         .get_device_descriptor()
@@ -104,7 +112,7 @@ async fn list_device(
     println!(
         "{0:left_pad$}{1:03}  {0:right_pad$}{2:04X}:{3:04X}  {4:<5}  {5} {6}",
         "",
-        devnum,
+        filename,
         { device_desc.id_vendor },
         { device_desc.id_product },
         UsbSpeed(speed),
@@ -282,7 +290,7 @@ async fn list_device(
 
 struct DeviceNode {
     pub device: fidl_fuchsia_hardware_usb_device::DeviceProxy,
-    pub devnum: u32,
+    pub filename: String,
     pub device_id: u32,
     pub hub_id: u32,
     // Depth in tree, None if not computed yet.
@@ -307,19 +315,29 @@ impl DeviceNode {
     }
 }
 
-async fn list_tree(device_watcher: &DeviceWatcherProxy, args: &Args) -> Result<()> {
+async fn list_tree(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Result<()> {
+    let mut stream = device_watcher::watch_for_files(usb_device_dir).await?;
     let mut devices = Vec::new();
-    while let Ok(device) = device_watcher
-        .next_device()
+
+    while let Some(filename) = stream
+        .try_next()
         // This will wait forever, so if there are no more devices, lets stop waiting.
-        .on_timeout(std::time::Duration::from_millis(200), || Ok(Err(-1)))
+        .on_timeout(std::time::Duration::from_millis(200), || Ok(None))
         .await
         .context("FIDL call to get next device returned an error")?
     {
-        let channel = fidl::AsyncChannel::from_channel(device)?;
-        let device = fidl_fuchsia_hardware_usb_device::DeviceProxy::new(channel);
+        let filename = filename.to_str().ok_or(format_err!("to_str for filename failed"))?;
 
-        devices.push(get_device_info(device, devices.len() as u32).await?);
+        let (device, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>()?;
+        usb_device_dir.open(
+            fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
+            &filename,
+            server_end.into_channel().into(),
+        )?;
+
+        devices.push(get_device_info(device, filename).await?);
     }
 
     for device in devices.iter() {
@@ -351,7 +369,7 @@ fn do_list_tree<'a>(
         for device in devices.iter() {
             if device.hub_id == hub_id {
                 let depth = device.depth.lock().unwrap().unwrap().clone();
-                match list_device(&device.device, device.devnum, depth, max_depth, args).await {
+                match list_device(&device.device, &device.filename, depth, max_depth, args).await {
                     Ok(()) => {}
                     Err(e) => eprintln!("Error: {:?}", e),
                 }
@@ -365,9 +383,9 @@ fn do_list_tree<'a>(
 
 async fn get_device_info(
     device: fidl_fuchsia_hardware_usb_device::DeviceProxy,
-    devnum: u32,
+    filename: &str,
 ) -> Result<DeviceNode> {
-    let devname = &format!("/dev/class/usb-device/{:03}", devnum);
+    let devname = &format!("/dev/class/usb-device/{:03}", filename);
 
     let device_id =
         device.get_device_id().await.context(format!("GetDeviceId failed for {}", devname))?;
@@ -375,7 +393,8 @@ async fn get_device_info(
     let hub_id =
         device.get_hub_device_id().await.context(format!("GeHubId failed for {}", devname))?;
 
-    Ok(DeviceNode { device, devnum, device_id, hub_id, depth: Mutex::new(None) })
+    let filename = filename.to_string();
+    Ok(DeviceNode { device, filename, device_id, hub_id, depth: Mutex::new(None) })
 }
 
 async fn get_string_descriptor(
@@ -514,7 +533,7 @@ mod test {
         let test_task = async move {
             let args = Args { tree: false, verbose: true, configuration: None, device: None };
             println!("ID    VID:PID   SPEED  MANUFACTURER PRODUCT");
-            list_device(&device, 0, 0, 0, &args).await.unwrap();
+            list_device(&device, "", 0, 0, &args).await.unwrap();
         }
         .fuse();
         futures::pin_mut!(server_task, test_task);

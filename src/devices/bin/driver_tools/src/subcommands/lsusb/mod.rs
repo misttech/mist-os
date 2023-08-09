@@ -4,8 +4,15 @@
 
 pub mod args;
 
-use {anyhow::Result, args::LsusbCommand, fidl_fuchsia_device_manager as fdm};
+use {anyhow::Result, args::LsusbCommand, fidl_fuchsia_io as fio};
 
-pub async fn lsusb(cmd: LsusbCommand, device_watcher_proxy: fdm::DeviceWatcherProxy) -> Result<()> {
-    lsusb::lsusb(device_watcher_proxy, cmd.into()).await
+pub async fn lsusb(cmd: LsusbCommand, dev: &fio::DirectoryProxy) -> Result<()> {
+    let (client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    let () = dev.open(
+        fio::OpenFlags::DIRECTORY,
+        fio::ModeType::empty(),
+        &"class/usb-device",
+        server_end.into_channel().into(),
+    )?;
+    lsusb::lsusb(client, cmd.into()).await
 }
