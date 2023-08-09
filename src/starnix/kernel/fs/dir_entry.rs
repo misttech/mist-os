@@ -822,7 +822,8 @@ impl DirEntry {
             return Ok((child, true));
         }
 
-        let (child, exists) = self.lock_children().get_or_create_child(name, create_fn)?;
+        let (child, exists) =
+            self.lock_children().get_or_create_child(current_task, name, create_fn)?;
         child.node.fs().purge_old_entries();
         Ok((child, exists))
     }
@@ -896,13 +897,13 @@ impl<'a> DirEntryLockedChildren<'a> {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         assert!(!DirEntry::is_reserved_name(name));
-        let (node, _) =
-            self.get_or_create_child(name, || self.entry.node.lookup(current_task, name))?;
+        let (node, _) = self.get_or_create_child(current_task, name, || error!(ENOENT))?;
         Ok(node)
     }
 
     fn get_or_create_child<F>(
         &mut self,
+        current_task: &CurrentTask,
         name: &FsStr,
         create_fn: F,
     ) -> Result<(DirEntryHandle, bool), Errno>
@@ -910,11 +911,18 @@ impl<'a> DirEntryLockedChildren<'a> {
         F: FnOnce() -> Result<FsNodeHandle, Errno>,
     {
         let create_child = || {
-            let node = create_fn()?;
+            // Before creating the child, check for existence.
+            let (node, exists) = match self.entry.node.lookup(current_task, name) {
+                Ok(node) => (node, true),
+                Err(e) if e == ENOENT => (create_fn()?, false),
+                Err(e) => return Err(e),
+            };
+
             assert!(
                 node.info().mode & FileMode::IFMT != FileMode::EMPTY,
                 "FsNode initialization did not populate the FileMode in FsNodeInfo."
             );
+
             let entry = DirEntry::new(node, Some(self.entry.clone()), name.to_vec());
             #[cfg(any(test, debug_assertions))]
             {
@@ -922,14 +930,14 @@ impl<'a> DirEntryLockedChildren<'a> {
                 // ordering will trigger the tracing-mutex at the right call site.
                 let _l1 = entry.state.read();
             }
-            Ok(entry)
+            Ok((entry, exists))
         };
 
-        let child = match self.children.entry(name.to_vec()) {
+        let (child, exists) = match self.children.entry(name.to_vec()) {
             Entry::Vacant(entry) => {
-                let child = create_child()?;
+                let (child, exists) = create_child()?;
                 entry.insert(Arc::downgrade(&child));
-                child
+                (child, exists)
             }
             Entry::Occupied(mut entry) => {
                 // It's possible that the upgrade will succeed this time around because we dropped
@@ -939,13 +947,13 @@ impl<'a> DirEntryLockedChildren<'a> {
                     child.node.fs().did_access_dir_entry(&child);
                     return Ok((child, true));
                 }
-                let child = create_child()?;
+                let (child, exists) = create_child()?;
                 entry.insert(Arc::downgrade(&child));
-                child
+                (child, exists)
             }
         };
         child.node.fs().did_create_dir_entry(&child);
-        Ok((child, false))
+        Ok((child, exists))
     }
 }
 

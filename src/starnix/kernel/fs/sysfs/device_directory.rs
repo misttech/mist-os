@@ -192,6 +192,8 @@ impl DynamicFileSource for ReadAheadKbSource {
 struct ReadAheadKbNode;
 
 impl FsNodeOps for ReadAheadKbNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

@@ -183,17 +183,6 @@ impl FsNodeOps for TmpfsDirectory {
         Ok(Box::new(MemoryDirectoryFile::new()))
     }
 
-    fn lookup(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        // Lookups for tmpfs should terminate in the DirEntry layer if they're going to succeed. If
-        // a lookup gets this far we know it was a failure.
-        error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
-    }
-
     fn mkdir(
         &self,
         node: &FsNode,
@@ -294,6 +283,7 @@ impl TmpfsSpecialNode {
 }
 
 impl FsNodeOps for TmpfsSpecialNode {
+    fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
     fn create_file_ops(

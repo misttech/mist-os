@@ -74,6 +74,8 @@ impl Namespace {
 }
 
 impl FsNodeOps for Arc<Namespace> {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

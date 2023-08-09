@@ -220,6 +220,8 @@ pub fn check_unmapped(current_task: &CurrentTask, addr: UserAddress) {
 pub struct PanickingFsNode;
 
 impl FsNodeOps for PanickingFsNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

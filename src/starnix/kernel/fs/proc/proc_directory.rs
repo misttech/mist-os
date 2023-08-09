@@ -78,6 +78,8 @@ impl ProcDirectory {
 }
 
 impl FsNodeOps for Arc<ProcDirectory> {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

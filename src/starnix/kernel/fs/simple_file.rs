@@ -37,6 +37,8 @@ where
     F: Fn() -> Result<O, Errno> + Send + Sync + 'static,
     O: FileOps,
 {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

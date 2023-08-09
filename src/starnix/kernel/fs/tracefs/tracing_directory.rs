@@ -95,6 +95,8 @@ impl FileOps for TraceMarkerFile {
 }
 
 impl FsNodeOps for Arc<TracingDirectory> {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

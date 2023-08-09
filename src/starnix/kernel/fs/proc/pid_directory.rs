@@ -340,6 +340,8 @@ impl FdInfoDirectory {
 }
 
 impl FsNodeOps for FdInfoDirectory {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -386,6 +388,8 @@ struct TaskListDirectory {
 }
 
 impl FsNodeOps for TaskListDirectory {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

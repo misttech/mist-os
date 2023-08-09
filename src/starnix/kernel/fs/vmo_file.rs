@@ -40,6 +40,7 @@ impl VmoFileNode {
 }
 
 impl FsNodeOps for VmoFileNode {
+    fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
     fn create_file_ops(

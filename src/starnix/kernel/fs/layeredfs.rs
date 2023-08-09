@@ -48,6 +48,8 @@ impl FileSystemOps for Arc<LayeredFs> {
 }
 
 impl FsNodeOps for Arc<LayeredFs> {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

@@ -445,9 +445,11 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         &self,
         _node: &FsNode,
         _current_task: &CurrentTask,
-        _name: &FsStr,
+        name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        error!(ENOTDIR)
+        // The default implementation here is suitable for filesystems that have permanent entries;
+        // entries that already exist will get found in the cache and shouldn't get this far.
+        error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
     }
 
     /// Create and return the given child node.
@@ -465,9 +467,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         _mode: FileMode,
         _dev: DeviceType,
         _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(ENOTDIR)
-    }
+    ) -> Result<FsNodeHandle, Errno>;
 
     /// Create and return the given child node as a subdirectory.
     fn mkdir(
@@ -477,9 +477,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         _name: &FsStr,
         _mode: FileMode,
         _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(ENOTDIR)
-    }
+    ) -> Result<FsNodeHandle, Errno>;
 
     /// Creates a symlink with the given `target` path.
     fn create_symlink(
@@ -489,9 +487,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         _name: &FsStr,
         _target: &FsStr,
         _owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(ENOTDIR)
-    }
+    ) -> Result<FsNodeHandle, Errno>;
 
     /// Creates an anonymous file.
     ///
@@ -538,9 +534,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         _current_task: &CurrentTask,
         _name: &FsStr,
         _child: &FsNodeHandle,
-    ) -> Result<(), Errno> {
-        error!(ENOTDIR)
-    }
+    ) -> Result<(), Errno>;
 
     /// Change the length of the file.
     fn truncate(
@@ -640,6 +634,8 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
 /// You must implement [`FsNodeOps::readlink`].
 macro_rules! fs_node_impl_symlink {
     () => {
+        fs_node_impl_not_dir!();
+
         fn create_file_ops(
             &self,
             _node: &crate::fs::FsNode,
@@ -755,6 +751,64 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($delegate:expr) => { fs_node_impl_xattr_delegate(self, $delegate) };
 }
 
+/// Stubs out [`FsNodeOps`] methods that only apply to directories.
+macro_rules! fs_node_impl_not_dir {
+    () => {
+        fn lookup(
+            &self,
+            _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
+            _name: &crate::fs::FsStr,
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
+            error!(ENOTDIR)
+        }
+
+        fn mknod(
+            &self,
+            _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
+            _name: &crate::fs::FsStr,
+            _mode: crate::types::FileMode,
+            _dev: crate::types::DeviceType,
+            _owner: crate::auth::FsCred,
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
+            error!(ENOTDIR)
+        }
+
+        fn mkdir(
+            &self,
+            _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
+            _name: &crate::fs::FsStr,
+            _mode: crate::types::FileMode,
+            _owner: crate::auth::FsCred,
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
+            error!(ENOTDIR)
+        }
+
+        fn create_symlink(
+            &self,
+            _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
+            _name: &crate::fs::FsStr,
+            _target: &crate::fs::FsStr,
+            _owner: crate::auth::FsCred,
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
+            error!(ENOTDIR)
+        }
+
+        fn unlink(
+            &self,
+            _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
+            _name: &crate::fs::FsStr,
+            _child: &crate::fs::FsNodeHandle,
+        ) -> Result<(), crate::types::Errno> {
+            error!(ENOTDIR)
+        }
+    };
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeUpdateType {
     Now,
@@ -764,12 +818,15 @@ pub enum TimeUpdateType {
 
 // Public re-export of macros allows them to be used like regular rust items.
 pub(crate) use fs_node_impl_dir_readonly;
+pub(crate) use fs_node_impl_not_dir;
 pub(crate) use fs_node_impl_symlink;
 pub(crate) use fs_node_impl_xattr_delegate;
 
 pub struct SpecialNode;
 
 impl FsNodeOps for SpecialNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

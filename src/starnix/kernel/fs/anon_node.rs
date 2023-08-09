@@ -12,6 +12,8 @@ use std::sync::Arc;
 pub struct Anon;
 
 impl FsNodeOps for Anon {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

@@ -12,9 +12,9 @@ use std::sync::Arc;
 use crate::{
     auth::FsCred,
     fs::{
-        buffers::InputBuffer, fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf,
-        DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        MemoryDirectoryFile,
+        buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_not_dir,
+        DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle,
+        FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
     lock::Mutex,
     task::{CurrentTask, Task},
@@ -58,15 +58,6 @@ impl FsNodeOps for CgroupDirectoryNode {
         Ok(Box::new(MemoryDirectoryFile::new()))
     }
 
-    fn lookup(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
-    }
-
     fn mkdir(
         &self,
         node: &FsNode,
@@ -102,6 +93,27 @@ impl FsNodeOps for CgroupDirectoryNode {
         });
         Ok(node)
     }
+
+    fn unlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
+        error!(EPERM)
+    }
+
+    fn create_symlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _target: &FsStr,
+        _owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        error!(EPERM)
+    }
 }
 
 /// A `ControlGroupNode` backs the `cgroup.procs` file.
@@ -118,6 +130,8 @@ impl ControlGroupNode {
 }
 
 impl FsNodeOps for ControlGroupNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

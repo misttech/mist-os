@@ -107,6 +107,7 @@ struct ExtDirectory {
 }
 
 impl FsNodeOps for ExtDirectory {
+    fs_node_impl_dir_readonly!();
     fs_node_impl_xattr_delegate!(self, self.inner);
 
     fn create_file_ops(
@@ -182,6 +183,7 @@ impl ExtFile {
 }
 
 impl FsNodeOps for ExtFile {
+    fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.inner);
 
     fn create_file_ops(

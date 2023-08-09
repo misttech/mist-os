@@ -675,6 +675,8 @@ struct RemoteSpecialNode {
 }
 
 impl FsNodeOps for RemoteSpecialNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

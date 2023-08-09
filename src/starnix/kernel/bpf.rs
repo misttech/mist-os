@@ -441,15 +441,6 @@ impl FsNodeOps for BpfFsDir {
         Ok(Box::new(MemoryDirectoryFile::new()))
     }
 
-    fn lookup(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        error!(ENOENT)
-    }
-
     fn mkdir(
         &self,
         node: &FsNode,
@@ -525,6 +516,7 @@ impl BpfFsObject {
 }
 
 impl FsNodeOps for BpfFsObject {
+    fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
     fn create_file_ops(

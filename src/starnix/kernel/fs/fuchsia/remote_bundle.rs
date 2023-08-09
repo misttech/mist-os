@@ -115,6 +115,8 @@ struct File {
 }
 
 impl FsNodeOps for File {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -215,6 +217,8 @@ impl FileOps for DirectoryObject {
 }
 
 impl FsNodeOps for DirectoryObject {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,

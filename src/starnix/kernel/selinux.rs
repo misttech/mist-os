@@ -202,6 +202,8 @@ impl FileOps for AccessFile {
 struct DeviceFileNode;
 
 impl FsNodeOps for DeviceFileNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -223,6 +225,8 @@ impl AccessFileNode {
 }
 
 impl FsNodeOps for AccessFileNode {
+    fs_node_impl_not_dir!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -249,6 +253,8 @@ impl SeLinuxClassDirectory {
 }
 
 impl FsNodeOps for Arc<SeLinuxClassDirectory> {
+    fs_node_impl_dir_readonly!();
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
