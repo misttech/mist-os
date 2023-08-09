@@ -3685,6 +3685,32 @@ pub fn offer_to_all_would_duplicate(
     Ok(true)
 }
 
+impl Offer {
+    /// Creates a new empty offer. This offer just has the `from` and `to` fields set, so to make
+    /// it useful it needs at least the capability name set in the necesssary attribute.
+    pub fn empty(from: OneOrMany<OfferFromRef>, to: OneOrMany<OfferToRef>) -> Offer {
+        Self {
+            protocol: None,
+            from,
+            to,
+            r#as: None,
+            service: None,
+            directory: None,
+            runner: None,
+            resolver: None,
+            storage: None,
+            dependency: None,
+            rights: None,
+            subdir: None,
+            filter: None,
+            event_stream: None,
+            scope: None,
+            availability: None,
+            source_availability: None,
+        }
+    }
+}
+
 #[cfg(test)]
 pub fn create_offer(
     protocol_name: &str,
@@ -3693,22 +3719,7 @@ pub fn create_offer(
 ) -> Offer {
     Offer {
         protocol: Some(OneOrMany::One(Name::from_str(protocol_name).unwrap())),
-        from,
-        to,
-        r#as: None,
-        service: None,
-        directory: None,
-        runner: None,
-        resolver: None,
-        storage: None,
-        dependency: None,
-        rights: None,
-        subdir: None,
-        filter: None,
-        event_stream: None,
-        scope: None,
-        availability: None,
-        source_availability: None,
+        ..Offer::empty(from, to)
     }
 }
 
