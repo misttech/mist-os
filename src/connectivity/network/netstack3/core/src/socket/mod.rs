@@ -135,9 +135,9 @@ impl<A: Eq + Hash, S> Default for ConnSocketMap<A, S> {
 /// identifiers for a protocol.
 pub(crate) trait SocketMapAddrSpec {
     /// The local identifier portion of a socket address.
-    type LocalIdentifier: Clone + Debug + Hash + Eq;
+    type LocalIdentifier: Copy + Clone + Debug + Hash + Eq;
     /// The remote identifier portion of a socket address.
-    type RemoteIdentifier: Clone + Debug + Hash + Eq;
+    type RemoteIdentifier: Copy + Clone + Debug + Hash + Eq;
 }
 
 pub(crate) struct ListenerAddrInfo {

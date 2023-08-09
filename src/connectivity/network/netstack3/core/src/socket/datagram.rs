@@ -18,7 +18,7 @@ use either::Either;
 use explicit::UnreachableExt as _;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
+    MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness as _, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ip::{IpProto, IpProtoExt};
@@ -63,9 +63,9 @@ impl<I: IpExt, NewIp: IpExt, D: device::WeakId, S: DatagramSocketSpec> GenericOv
 pub(crate) trait IpExt: crate::ip::IpExt + DualStackIpExt {}
 impl<I: crate::ip::IpExt + DualStackIpExt> IpExt for I {}
 
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum SocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+pub(crate) enum SocketState<I: Ip + IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     Unbound(UnboundSocketState<I::Addr, D, S::UnboundSharingState<I>>),
     Bound(BoundSocketState<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>),
 }
@@ -288,7 +288,9 @@ fn leave_all_joined_groups<A: IpAddress, C, SC: MulticastMembershipHandler<A::Ve
     memberships: MulticastMemberships<A, SC::WeakDeviceId>,
 ) {
     for (addr, device) in memberships {
-        let Some(device) = sync_ctx.upgrade_weak_device_id(&device) else { continue; };
+        let Some(device) = sync_ctx.upgrade_weak_device_id(&device) else {
+            continue;
+        };
         sync_ctx.leave_multicast_group(ctx, &device, addr)
     }
 }
@@ -458,6 +460,9 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         S::AddrSpec,
     >>::ReceivingId;
 
+    /// Converts an other-IP-version address to an address for IP version `I`.
+    fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
+
     /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
@@ -470,6 +475,24 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
                 S::AddrSpec,
                 S::SocketMapSpec<I, Self::WeakDeviceId>,
             >,
+            &mut BoundSockets<
+                I::OtherVersion,
+                Self::WeakDeviceId,
+                S::AddrSpec,
+                S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the provided callback with mutable access to the demultiplexing
+    /// map for the other IP version.
+    fn with_other_bound_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
             &mut BoundSockets<
                 I::OtherVersion,
                 Self::WeakDeviceId,
@@ -558,6 +581,10 @@ where
         self.uninstantiable_unreachable()
     }
 
+    fn from_other_ip_addr(&self, _addr: <I::OtherVersion as Ip>::Addr) -> I::Addr {
+        self.uninstantiable_unreachable()
+    }
+
     fn with_both_bound_sockets_mut<
         O,
         F: FnOnce(
@@ -573,6 +600,24 @@ where
                 Self::WeakDeviceId,
                 S::AddrSpec,
                 S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        _cb: F,
+    ) -> O {
+        self.uninstantiable_unreachable()
+    }
+
+    fn with_other_bound_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut BoundSockets<
+                I::OtherVersion,
+                Self::WeakDeviceId,
+                S::AddrSpec,
+                S::SocketMapSpec<<I>::OtherVersion, Self::WeakDeviceId>,
             >,
         ) -> O,
     >(
@@ -885,12 +930,25 @@ pub(crate) trait DatagramSocketSpec {
     /// acted on by calls like [`listen`], [`connect`], [`remove`], etc.
     type SocketId<I: IpExt>: Clone + Debug + EntryKey + From<usize> + Eq;
 
+    /// The sharing state for a listening socket in a [`BoundSocketMap`].
+    ///
+    /// This is provided here as an associated type to allow constraining the
+    /// associated type on [`DatagramSocketSpec::SocketMapSpec`]. Having a
+    /// single type that's not parameterized over the IP version requires that
+    /// the `SocketMapSpec::ListenerSharingState` is IP-invariant.
+    type ListenerSharingState: Clone + Debug;
+
     /// The specification for the [`BoundSocketMap`] for a given IP version.
     ///
     /// Describes the per-address and per-socket values held in the
     /// demultiplexing map for a given IP version.
     type SocketMapSpec<I: IpExt + DualStackIpExt, D: device::WeakId>: SocketStateSpec<ListenerState = ListenerState<I::Addr, D>, ConnState = ConnState<I, D>>
-        + DatagramSocketMapSpec<I, D, Self::AddrSpec>;
+        + DatagramSocketMapSpec<
+            I,
+            D,
+            Self::AddrSpec,
+            ListenerSharingState = Self::ListenerSharingState,
+        >;
 
     /// The sharing state for a socket that hasn't yet been bound.
     type UnboundSharingState<I: IpExt>: Clone + Debug + Default;
@@ -1050,6 +1108,284 @@ where
     })
 }
 
+/// Abstraction for operations over one or two demultiplexing maps.
+trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
+    /// The type of address that can be checked for insertion.
+    type InsertAddr: Clone;
+    /// The type of ID that can be inserted.
+    type InsertId;
+    /// The type of sharing state that can be inserted for listeners.
+    type InsertListenerSharingState;
+
+    /// Checks whether an entry could be inserted for the specified address and
+    /// identifier.
+    ///
+    /// Returns `true` if a value could be inserted at the specified address and
+    /// local ID, with the provided sharing state; otherwise returns `false`.
+    fn is_listener_entry_available(
+        &self,
+        addr: Self::InsertAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        sharing_state: &Self::InsertListenerSharingState,
+    ) -> bool;
+
+    /// Inserts `id` at a listener address or returns an error.
+    ///
+    /// Inserts the identifier `id` at the listener address for `addr` and
+    /// local `identifier` with device `device` and the given sharing state. If
+    /// the insertion conflicts with an existing socket, a `LocalAddressError`
+    /// is returned.
+    fn try_insert_listener(
+        &mut self,
+        addr: Self::InsertAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        device: Option<D>,
+        sharing: Self::InsertListenerSharingState,
+        id: Self::InsertId,
+    ) -> Result<(), LocalAddressError>;
+}
+
+/// A sentinel type for the unspecified address in a dual-stack context.
+///
+/// This is kind of like [`Ipv6::UNSPECIFIED_ADDRESS`], but makes it clear that
+/// the value is being used in a dual-stack context.
+#[derive(Copy, Clone, Debug)]
+struct DualStackUnspecifiedAddr;
+
+/// Implementation of BoundStateHandler for a single demultiplexing map.
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S, D>
+    for BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>
+{
+    type InsertAddr = Option<SpecifiedAddr<I::Addr>>;
+    type InsertId =
+        <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId;
+    type InsertListenerSharingState =
+        <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ListenerSharingState;
+    fn is_listener_entry_available(
+        &self,
+        addr: Option<SpecifiedAddr<I::Addr>>,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        sharing: &Self::InsertListenerSharingState,
+    ) -> bool {
+        let check_addr = ListenerAddr { device: None, ip: ListenerIpAddr { identifier, addr } };
+        match self.listeners().could_insert(&check_addr, sharing) {
+            Ok(()) => true,
+            Err(
+                InsertError::Exists
+                | InsertError::IndirectConflict
+                | InsertError::ShadowAddrExists
+                | InsertError::ShadowerExists,
+            ) => false,
+        }
+    }
+
+    fn try_insert_listener(
+        &mut self,
+        addr: Self::InsertAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        device: Option<D>,
+        sharing: Self::InsertListenerSharingState,
+        id: Self::InsertId,
+    ) -> Result<(), LocalAddressError> {
+        try_insert_single_listener(self, addr, identifier, device, sharing, id).map(|_entry| ())
+    }
+}
+
+struct PairedSocketMapMut<'a, I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+    bound: &'a mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+    other_bound: &'a mut BoundSocketMap<
+        I::OtherVersion,
+        D,
+        S::AddrSpec,
+        S::SocketMapSpec<I::OtherVersion, D>,
+    >,
+}
+
+struct PairedReceivingIds<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+    this: <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId,
+    other: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
+        I::OtherVersion,
+        D,
+        S::AddrSpec,
+    >>::ReceivingId,
+}
+
+/// Implementation for a pair of demultiplexing maps for different IP versions.
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S, D>
+    for PairedSocketMapMut<'_, I, D, S>
+{
+    type InsertAddr = DualStackUnspecifiedAddr;
+    type InsertId = PairedReceivingIds<I, D, S>;
+    type InsertListenerSharingState = S::ListenerSharingState;
+
+    fn is_listener_entry_available(
+        &self,
+        DualStackUnspecifiedAddr: Self::InsertAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        sharing: &Self::InsertListenerSharingState,
+    ) -> bool {
+        let PairedSocketMapMut { bound, other_bound } = self;
+        BoundStateHandler::<I, S, D>::is_listener_entry_available(*bound, None, identifier, sharing)
+            && BoundStateHandler::<I::OtherVersion, S, D>::is_listener_entry_available(
+                *other_bound,
+                None,
+                identifier,
+                sharing,
+            )
+    }
+
+    fn try_insert_listener(
+        &mut self,
+        DualStackUnspecifiedAddr: Self::InsertAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        device: Option<D>,
+        sharing: Self::InsertListenerSharingState,
+        id: Self::InsertId,
+    ) -> Result<(), LocalAddressError> {
+        let PairedSocketMapMut { bound: this, other_bound: other } = self;
+        let PairedReceivingIds { this: this_id, other: other_id } = id;
+        try_insert_single_listener(this, None, identifier, device.clone(), sharing.clone(), this_id)
+            .and_then(|first_entry| {
+                match try_insert_single_listener(other, None, identifier, device, sharing, other_id)
+                {
+                    Ok(_second_entry) => Ok(()),
+                    Err(e) => {
+                        first_entry.remove();
+                        Err(e)
+                    }
+                }
+            })
+    }
+}
+
+fn try_insert_single_listener<
+    I: IpExt,
+    D: device::WeakId,
+    A: SocketMapAddrSpec,
+    S: DatagramSocketMapSpec<I, D, A>,
+>(
+    bound: &mut BoundSocketMap<I, D, A, S>,
+    addr: Option<SpecifiedAddr<I::Addr>>,
+    identifier: A::LocalIdentifier,
+    device: Option<D>,
+    sharing: S::ListenerSharingState,
+    id: S::ListenerId,
+) -> Result<socket::SocketStateEntry<'_, I, D, A, S, socket::Listener>, LocalAddressError> {
+    bound
+        .listeners_mut()
+        .try_insert(ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }, sharing, id)
+        .map_err(|e| match e {
+            (
+                InsertError::ShadowAddrExists
+                | InsertError::Exists
+                | InsertError::IndirectConflict
+                | InsertError::ShadowerExists,
+                sharing,
+            ) => {
+                let _: S::ListenerSharingState = sharing;
+                LocalAddressError::AddressInUse
+            }
+        })
+}
+
+fn try_pick_identifier<
+    I: IpExt,
+    S: DatagramSocketSpec,
+    D: device::WeakId,
+    BS: BoundStateHandler<I, S, D>,
+    C: RngContext,
+>(
+    addr: BS::InsertAddr,
+    bound: &BS,
+    ctx: &mut C,
+    sharing: &BS::InsertListenerSharingState,
+) -> Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
+    S::try_alloc_listen_identifier::<I, D>(ctx, move |identifier| {
+        bound
+            .is_listener_entry_available(addr.clone(), identifier, sharing)
+            .then_some(())
+            .ok_or(InUseError)
+    })
+}
+
+fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
+    addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+    device: &Option<SC::WeakDeviceId>,
+    sync_ctx: &mut SC,
+    identifier: LI,
+) -> Result<
+    (Option<SpecifiedAddr<I::Addr>>, Option<EitherDeviceId<SC::DeviceId, SC::WeakDeviceId>>, LI),
+    LocalAddressError,
+> {
+    let (addr, device, identifier) = match addr {
+        Some(addr) => {
+            // Extract the specified address and the device. The device
+            // is either the one from the address or the one to which
+            // the socket was previously bound.
+            let (addr, device) = crate::transport::resolve_addr_with_device(addr, device.clone())?;
+
+            // Binding to multicast addresses is allowed regardless.
+            // Other addresses can only be bound to if they are assigned
+            // to the device.
+            if !addr.is_multicast() {
+                let mut assigned_to =
+                    TransportIpContext::<I, _>::get_devices_with_assigned_addr(sync_ctx, addr);
+                if let Some(device) = &device {
+                    if !assigned_to.any(|d| device == &EitherDeviceId::Strong(d)) {
+                        return Err(LocalAddressError::AddressMismatch);
+                    }
+                } else {
+                    if !assigned_to.any(|_: SC::DeviceId| true) {
+                        return Err(LocalAddressError::CannotBindToAddress);
+                    }
+                }
+            }
+            (Some(addr), device, identifier)
+        }
+        None => (None, device.clone().map(EitherDeviceId::Weak), identifier),
+    };
+    Ok((addr, device, identifier))
+}
+
+#[derive(GenericOverIp)]
+enum TryUnmapResult<I: Ip + DualStackIpExt, D> {
+    /// The address does not have an un-mapped representation.
+    ///
+    /// This spits back the input address unmodified.
+    CannotBeUnmapped(ZonedAddr<I::Addr, D>),
+    /// The address in the other stack that corresponds to the input.
+    ///
+    /// Since [`ZonedAddr`] is guaranteed to hold a specified address, this must
+    /// hold an `Option<ZonedAddr>`. Since `::FFFF:0.0.0.0` is a legal
+    /// IPv4-mapped IPv6 address, this allows us to represent it as the
+    /// unspecified IPv4 address.
+    Mapped(Option<ZonedAddr<<I::OtherVersion as Ip>::Addr, D>>),
+}
+
+/// Try to convert a specified address into the address that maps to it from
+/// the other stack.
+///
+/// This is an IP-generic function that tries to invert the
+/// IPv4-to-IPv4-mapped-IPv6 conversion that is performed by
+/// [`Ipv4Addr::to_ipv6_mapped`].
+///
+/// The only inputs that will produce [`TryUnmapResult::Mapped`] are
+/// IPv4-mapped IPv6 addresses. All other inputs will produce
+/// [`TryUnmapResult::CannotBeUnmapped`].
+fn try_unmap<A: IpAddress, D>(addr: ZonedAddr<A, D>) -> TryUnmapResult<A::Version, D>
+where
+    A::Version: DualStackIpExt,
+{
+    <A::Version as Ip>::map_ip(
+        addr,
+        |v4| TryUnmapResult::CannotBeUnmapped(v4),
+        |v6| match v6.addr().to_ipv4_mapped() {
+            Some(v4) => TryUnmapResult::Mapped(SpecifiedAddr::new(v4).map(ZonedAddr::Unzoned)),
+            None => TryUnmapResult::CannotBeUnmapped(v6),
+        },
+    )
+}
+
 fn listen_inner<
     I: IpExt,
     C: DatagramStateNonSyncContext<I, S>,
@@ -1066,102 +1402,208 @@ fn listen_inner<
 where
     S::UnboundSharingState<I>: Clone
         + Into<<S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState>,
-    <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState: Default,
 {
-    sync_ctx.with_bound_sockets_mut(|sync_ctx, bound, _id_allocator| {
-        let mut entry = match state.entry(id.get_key_index()) {
-            IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-            IdMapEntry::Occupied(o) => o,
-        };
+    /// Possible operations that might be performed, depending on whether the
+    /// socket state spec supports dual-stack operation and what the address
+    /// looks like.
+    #[derive(Debug, GenericOverIp)]
+    enum BoundOperation<'a, I: Ip + IpExt, DS: DeviceIdContext<AnyDevice>> {
+        /// Bind to the "any" address on both stacks.
+        DualStackAnyAddr(&'a mut DS),
+        /// Bind to a non-dual-stack address only on the current stack.
+        OnlyCurrentStack(Option<ZonedAddr<I::Addr, DS::DeviceId>>),
+        /// Bind to an address only on the other stack.
+        OnlyOtherStack(&'a mut DS, Option<ZonedAddr<<I::OtherVersion as Ip>::Addr, DS::DeviceId>>),
+    }
 
-        let UnboundSocketState { device, sharing, ip_options } = match entry.get() {
-            SocketState::Unbound(state) => state,
-            SocketState::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
-        };
+    let mut entry = match state.entry(id.get_key_index()) {
+        IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
+        IdMapEntry::Occupied(o) => o,
+    };
+    let UnboundSocketState { device, sharing, ip_options } = match entry.get() {
+        SocketState::Unbound(state) => state,
+        SocketState::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
+    };
 
+    let dual_stack = sync_ctx
+        .dual_stack_context()
+        .and_then(|ds| ds.dual_stack_enabled(entry.get()).then_some(ds));
+
+    let bound_operation: BoundOperation<'_, I, _> = match (dual_stack, addr) {
+        // No dual-stack support, so only bind on the current stack.
+        (None, None) => BoundOperation::OnlyCurrentStack(None),
+        // Dual-stack support and unspecified address means bind as dual-stack.
+        (Some(dual_stack), None) => BoundOperation::DualStackAnyAddr(dual_stack),
+        // There is dual-stack support and the address is not unspecified so how
+        // to proceed is going to depend on the value of `addr`.
+        (Some(dual_stack), Some(addr)) => match try_unmap(addr) {
+            // `addr` can't be represented in the other stack.
+            TryUnmapResult::CannotBeUnmapped(addr) => BoundOperation::OnlyCurrentStack(Some(addr)),
+            // There's a representation in the other stack, so use that.
+            TryUnmapResult::Mapped(addr) => BoundOperation::OnlyOtherStack(dual_stack, addr),
+        },
+        // No dual-stack support, so check the address is allowed in the current
+        // stack.
+        (None, Some(addr)) => match try_unmap(addr) {
+            // The address is only representable in the current stack.
+            TryUnmapResult::CannotBeUnmapped(addr) => BoundOperation::OnlyCurrentStack(Some(addr)),
+            // The address has a representation in the other stack but there's
+            // no dual-stack support!
+            TryUnmapResult::Mapped(_addr) => {
+                let _: Option<ZonedAddr<<I::OtherVersion as Ip>::Addr, _>> = _addr;
+                return Err(Either::Right(LocalAddressError::CannotBindToAddress));
+            }
+        },
+    };
+
+    fn try_bind_single_stack<
+        I: IpExt,
+        S: DatagramSocketSpec,
+        SC: TransportIpContext<I, C>,
+        C: RngContext,
+    >(
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        bound: &mut BoundSocketMap<
+            I,
+            SC::WeakDeviceId,
+            S::AddrSpec,
+            S::SocketMapSpec<I, SC::WeakDeviceId>,
+        >,
+        addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+        device: &Option<SC::WeakDeviceId>,
+        local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+        id: <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerId,
+        sharing: S::ListenerSharingState,
+    ) -> Result<
+        ListenerAddr<
+            I::Addr,
+            SC::WeakDeviceId,
+            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        >,
+        LocalAddressError,
+    > {
         let identifier = match local_id {
-            Some(local_id) => Ok(local_id),
-            None => {
-                let addr = addr.clone().map(|addr| addr.into_addr_zone().0);
-                let sharing_options = Default::default();
-                S::try_alloc_listen_identifier::<I, SC::WeakDeviceId>(ctx, |identifier| {
-                    let check_addr =
-                        ListenerAddr { device: None, ip: ListenerIpAddr { identifier, addr } };
-                    bound.listeners().could_insert(&check_addr, &sharing_options).map_err(|e| {
-                        match e {
-                            InsertError::Exists
-                            | InsertError::IndirectConflict
-                            | InsertError::ShadowAddrExists
-                            | InsertError::ShadowerExists => InUseError,
-                        }
-                    })
-                })
-            }
-            .ok_or(Either::Right(LocalAddressError::FailedToAllocateLocalPort)),
-        }?;
-
-        let (addr, device, identifier) = match addr {
-            Some(addr) => {
-                // Extract the specified address and the device. The device
-                // is either the one from the address or the one to which
-                // the socket was previously bound.
-                let (addr, device) =
-                    crate::transport::resolve_addr_with_device(addr, device.clone())
-                        .map_err(|e| Either::Right(e.into()))?;
-
-                // Binding to multicast addresses is allowed regardless.
-                // Other addresses can only be bound to if they are assigned
-                // to the device.
-                if !addr.is_multicast() {
-                    let mut assigned_to =
-                        TransportIpContext::<I, _>::get_devices_with_assigned_addr(sync_ctx, addr);
-                    if let Some(device) = &device {
-                        if !assigned_to.any(|d| device == &EitherDeviceId::Strong(d)) {
-                            return Err(Either::Right(LocalAddressError::AddressMismatch));
-                        }
-                    } else {
-                        if !assigned_to.any(|_: SC::DeviceId| true) {
-                            return Err(Either::Right(LocalAddressError::CannotBindToAddress));
-                        }
-                    }
-                }
-                (Some(addr), device, identifier)
-            }
-            None => (None, device.clone().map(EitherDeviceId::Weak), identifier),
-        };
-
-        let ip_options = ip_options.clone();
-        match bound.listeners_mut().try_insert(
-            ListenerAddr {
-                ip: ListenerIpAddr { addr, identifier },
-                device: device.map(|d| d.as_weak(sync_ctx).into_owned()),
-            },
-            sharing.clone().into(),
-            S::make_receiving_map_id(id),
-        ) {
-            Ok(bound_entry) => {
-                // Replace the unbound state only after we're sure the
-                // insertion has succeeded.
-                *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
-                    { ListenerState { ip_options } },
-                    sharing.clone().into(),
-                    bound_entry.get_addr().clone(),
-                )));
-                Ok(())
-            }
-            Err((
-                InsertError::ShadowAddrExists
-                | InsertError::Exists
-                | InsertError::IndirectConflict
-                | InsertError::ShadowerExists,
-                sharing,
-            )) => {
-                let _: <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ListenerSharingState =
-                    sharing;
-                Err(Either::Right(LocalAddressError::AddressInUse))
-            }
+            Some(id) => Some(id),
+            None => try_pick_identifier::<I, S, _, _, _>(
+                addr.as_ref().map(ZonedAddr::addr),
+                bound,
+                ctx,
+                &sharing,
+            ),
         }
-    })
+        .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
+        let (addr, device, identifier) =
+            try_pick_bound_address::<I, _, _, _>(addr, device, sync_ctx, identifier)?;
+        let weak_device = device.map(|d| d.as_weak(sync_ctx).into_owned());
+
+        BoundStateHandler::<_, S, _>::try_insert_listener(
+            bound,
+            addr,
+            identifier,
+            weak_device.clone(),
+            sharing,
+            id,
+        )
+        .map(|()| ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device: weak_device })
+    }
+
+    let bound_addr = match bound_operation {
+        BoundOperation::OnlyCurrentStack(addr) => {
+            sync_ctx.with_bound_sockets_mut(|sync_ctx, bound, _allocator| {
+                let id = S::make_receiving_map_id(id);
+
+                try_bind_single_stack::<I, S, _, _>(
+                    sync_ctx,
+                    ctx,
+                    bound,
+                    addr,
+                    device,
+                    local_id,
+                    id,
+                    sharing.clone().into(),
+                )
+            })
+        }
+        BoundOperation::OnlyOtherStack(sync_ctx, addr) => {
+            let id = sync_ctx.to_other_receiving_id(id);
+            sync_ctx
+                .with_other_bound_sockets_mut(|sync_ctx, other_bound| {
+                    try_bind_single_stack::<_, S, _, _>(
+                        sync_ctx,
+                        ctx,
+                        other_bound,
+                        addr,
+                        device,
+                        local_id,
+                        id,
+                        sharing.clone().into(),
+                    )
+                })
+                .map(
+                    |ListenerAddr {
+                         ip: ListenerIpAddr { addr, identifier },
+                         device: weak_device,
+                     }| {
+                        let addr =
+                            addr.map_or(<I::OtherVersion as Ip>::UNSPECIFIED_ADDRESS, |a| a.get());
+                        let addr = SpecifiedAddr::new(sync_ctx.from_other_ip_addr(addr));
+                        ListenerAddr {
+                            ip: ListenerIpAddr { addr, identifier },
+                            device: weak_device,
+                        }
+                    },
+                )
+        }
+        BoundOperation::DualStackAnyAddr(sync_ctx) => {
+            let ids = PairedReceivingIds {
+                this: S::make_receiving_map_id(id.clone()),
+                other: sync_ctx.to_other_receiving_id(id),
+            };
+            sync_ctx.with_both_bound_sockets_mut(|sync_ctx, bound, other_bound| {
+                let mut bound_pair = PairedSocketMapMut { bound, other_bound };
+                let sharing = sharing.clone().into();
+
+                let identifier = match local_id {
+                    Some(id) => Some(id),
+                    None => try_pick_identifier::<I, S, _, _, _>(
+                        DualStackUnspecifiedAddr,
+                        &bound_pair,
+                        ctx,
+                        &sharing,
+                    ),
+                }
+                .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
+                let (addr, device, identifier) =
+                    try_pick_bound_address::<I, _, _, _>(None, device, sync_ctx, identifier)?;
+                let weak_device = device.map(|d| d.as_weak(sync_ctx).into_owned());
+
+                BoundStateHandler::<_, S, _>::try_insert_listener(
+                    &mut bound_pair,
+                    DualStackUnspecifiedAddr,
+                    identifier,
+                    weak_device.clone(),
+                    sharing,
+                    ids,
+                )
+                .map(|()| ListenerAddr {
+                    ip: ListenerIpAddr { addr, identifier },
+                    device: weak_device,
+                })
+            })
+        }
+    }
+    .map_err(Either::Right)?;
+
+    // Replace the unbound state only after we're sure the
+    // insertion has succeeded.
+    *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
+        // TODO(https://fxbug.dev/131970): Remove this clone().
+        { ListenerState { ip_options: ip_options.clone() } },
+        sharing.clone().into(),
+        bound_addr,
+    )));
+    Ok(())
 }
 
 /// An error when attempting to create a datagram socket.
@@ -1646,11 +2088,7 @@ where
                         ip: ListenerIpAddr { addr: local_ip, identifier: local_port },
                         device,
                     },
-                ): &(
-                    _,
-                    <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ListenerSharingState,
-                    _,
-                ) = state;
+                ): &(_, S::ListenerSharingState, _) = state;
                 ((*local_ip, local_port.clone()), device, ip_options, proto)
             }
         };
@@ -1741,8 +2179,8 @@ pub(crate) fn set_device<
                     // Don't allow changing the device if one of the IP addresses in the socket
                     // address vector requires a zone (scope ID).
                     let (_, _, addr): &(
-                        <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketStateSpec>::ListenerState,
-                        <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState,
+                        <S::SocketMapSpec<I, _> as SocketStateSpec>::ListenerState,
+                        S::ListenerSharingState,
                         _,
                     ) = state;
                     let ListenerAddr {
@@ -1779,8 +2217,8 @@ pub(crate) fn set_device<
                     )?;
 
                     let (_, _, addr): &mut (
-                        <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketStateSpec>::ListenerState,
-                        <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState,
+                        <S::SocketMapSpec<I, _> as SocketStateSpec>::ListenerState,
+                        S::ListenerSharingState,
                         _,
                     ) = state;
                     *addr = new_addr;
@@ -2063,7 +2501,7 @@ fn get_options_device<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
         SocketState::Bound(BoundSocketState::Listener(state)) => {
             let (ListenerState { ip_options }, _, ListenerAddr { device, ip: _ }): &(
                 _,
-                <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ListenerSharingState,
+                S::ListenerSharingState,
                 _,
             ) = state;
             (ip_options, device)
@@ -2098,7 +2536,7 @@ where
         SocketState::Bound(BoundSocketState::Listener(state)) => {
             let (ListenerState { ip_options }, _, _): &mut (
                 _,
-                <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ListenerSharingState,
+                S::ListenerSharingState,
                 ListenerAddr<_, _, _>,
             ) = state;
             ip_options
@@ -2311,6 +2749,7 @@ mod test {
         type SocketId<I: IpExt> = Id;
         type UnboundSharingState<I: IpExt> = Sharing;
         type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
+        type ListenerSharingState = Sharing;
 
         fn make_receiving_map_id<I: IpExt, D: device::WeakId>(
             s: Self::SocketId<I>,

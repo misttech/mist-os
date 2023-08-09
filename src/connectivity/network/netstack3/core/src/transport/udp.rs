@@ -412,6 +412,7 @@ impl DatagramSocketSpec for Udp {
     type SocketId<I: IpExt> = SocketId<I>;
     type UnboundSharingState<I: IpExt> = Sharing;
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
+    type ListenerSharingState = Sharing;
 
     type Serializer<I: Ip, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
 
@@ -2368,7 +2369,9 @@ mod tests {
         }
     }
 
-    impl<Outer: Default> Wrapped<Outer, FakeUdpInnerSyncCtx<FakeDeviceId>> {
+    impl<Outer: Default, const DUAL_STACK_ENABLED: bool>
+        Wrapped<Outer, FakeUdpInnerSyncCtx<FakeDeviceId, DUAL_STACK_ENABLED>>
+    {
         fn with_local_remote_ip_addrs<A: Into<SpecifiedAddr<IpAddr>>>(
             local_ips: Vec<A>,
             remote_ips: Vec<A>,
@@ -2381,7 +2384,9 @@ mod tests {
         }
     }
 
-    impl<Outer: Default, D: FakeStrongDeviceId> Wrapped<Outer, FakeUdpInnerSyncCtx<D>> {
+    impl<Outer: Default, D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
+        Wrapped<Outer, FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>>
+    {
         fn with_state(state: FakeDualStackIpSocketCtx<D>) -> Self {
             Wrapped {
                 outer: Outer::default(),
@@ -2395,12 +2400,14 @@ mod tests {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct FakeBoundSockets<D: WeakId> {
+    struct FakeBoundSockets<D: WeakId, const DUAL_STACK_ENABLED: bool> {
         v4: BoundSockets<Ipv4, D>,
         v6: BoundSockets<Ipv6, D>,
     }
 
-    impl<D: WeakId, I: IpExt> AsRef<BoundSockets<I, D>> for FakeBoundSockets<D> {
+    impl<D: WeakId, I: IpExt, const DUAL_STACK_ENABLED: bool> AsRef<BoundSockets<I, D>>
+        for FakeBoundSockets<D, DUAL_STACK_ENABLED>
+    {
         fn as_ref(&self) -> &BoundSockets<I, D> {
             #[derive(GenericOverIp)]
             struct Wrap<'a, I: Ip + IpExt, D: WeakId>(&'a BoundSockets<I, D>);
@@ -2413,7 +2420,9 @@ mod tests {
         }
     }
 
-    impl<D: WeakId, I: IpExt> AsMut<BoundSockets<I, D>> for FakeBoundSockets<D> {
+    impl<D: WeakId, I: IpExt, const DUAL_STACK_ENABLED: bool> AsMut<BoundSockets<I, D>>
+        for FakeBoundSockets<D, DUAL_STACK_ENABLED>
+    {
         fn as_mut(&mut self) -> &mut BoundSockets<I, D> {
             #[derive(GenericOverIp)]
             struct Wrap<'a, I: Ip + IpExt, D: WeakId>(&'a mut BoundSockets<I, D>);
@@ -2440,10 +2449,11 @@ mod tests {
 
     /// `FakeSyncCtx` specialized for UDP.
     type FakeUdpSyncCtx<I, D> =
-        Wrapped<SocketsState<I, FakeWeakDeviceId<D>>, FakeUdpInnerSyncCtx<D>>;
+        Wrapped<SocketsState<I, FakeWeakDeviceId<D>>, FakeUdpSingleStackInnerSyncCtx<D>>;
 
-    type FakeUdpInnerSyncCtx<D> =
-        Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>>, FakeBufferSyncCtx<D>>;
+    type FakeUdpInnerSyncCtx<D, const DUAL_STACK_ENABLED: bool> =
+        Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>, FakeBufferSyncCtx<D>>;
+    type FakeUdpSingleStackInnerSyncCtx<D> = FakeUdpInnerSyncCtx<D, false>;
 
     /// `FakeNonSyncCtx` specialized for UDP.
     type FakeUdpNonSyncCtx = FakeNonSyncCtx<(), (), FakeNonSyncCtxState>;
@@ -2517,9 +2527,11 @@ mod tests {
             D: FakeStrongDeviceId + 'static,
             Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
                 + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
-        > StateContext<I, FakeUdpNonSyncCtx> for Wrapped<Outer, FakeUdpInnerSyncCtx<D>>
+            const DUAL_STACK_ENABLED: bool,
+        > StateContext<I, FakeUdpNonSyncCtx>
+        for Wrapped<Outer, FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>>
     {
-        type SocketStateCtx<'a> = FakeUdpInnerSyncCtx<D>;
+        type SocketStateCtx<'a> = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
 
         fn with_sockets_state<
             O,
@@ -2556,8 +2568,11 @@ mod tests {
         }
     }
 
-    impl<I: IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
-        BoundStateContext<I, FakeUdpNonSyncCtx> for FakeUdpInnerSyncCtx<D>
+    impl<
+            I: IpExt + IpDeviceStateIpExt,
+            D: FakeStrongDeviceId + 'static,
+            const DUAL_STACK_ENABLED: bool,
+        > BoundStateContext<I, FakeUdpNonSyncCtx> for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
         type DualStackContext = Self;
@@ -2595,13 +2610,17 @@ mod tests {
         fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
             match I::VERSION {
                 IpVersion::V4 => None,
-                IpVersion::V6 => Some(self),
+                IpVersion::V6 => DUAL_STACK_ENABLED.then_some(self),
             }
         }
     }
 
-    impl<I: IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
-        DualStackDatagramBoundStateContext<I, FakeUdpNonSyncCtx, Udp> for FakeUdpInnerSyncCtx<D>
+    impl<
+            I: IpExt + IpDeviceStateIpExt,
+            D: FakeStrongDeviceId + 'static,
+            const DUAL_STACK_ENABLED: bool,
+        > DualStackDatagramBoundStateContext<I, FakeUdpNonSyncCtx, Udp>
+        for Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>, FakeBufferSyncCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
 
@@ -2609,9 +2628,9 @@ mod tests {
             &self,
             _socket: &DatagramSocketState<I, Self::WeakDeviceId, Udp>,
         ) -> bool {
-            // TODO(https://fxbug.dev/21198): Change this to true to test
-            // dual-stack socket map insertion.
-            false
+            // TODO(https://fxbug.dev/21198): Check the actual socket state
+            // instead of assuming all IPv6 sockets are dual-stack enabled.
+            true
         }
 
         fn to_other_receiving_id(
@@ -2628,6 +2647,16 @@ mod tests {
                 |id| RxIdWrapper(EitherIpSocket::V6(id)),
             );
             id
+        }
+
+        fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr {
+            #[derive(GenericOverIp)]
+            struct WrapOtherVersion<I: Ip + IpExt>(<I::OtherVersion as Ip>::Addr);
+            I::map_ip(
+                WrapOtherVersion(addr),
+                |_| unreachable!("can't convert V6 address to V4"),
+                |WrapOtherVersion(v4)| v4.to_ipv6_mapped(),
+            )
         }
 
         fn with_both_bound_sockets_mut<
@@ -2660,6 +2689,30 @@ mod tests {
             );
             cb(inner, version, other_version)
         }
+
+        fn with_other_bound_sockets_mut<
+            O,
+            F: FnOnce(
+                &mut Self::IpSocketsCtx<'_>,
+                &mut DatagramBoundSockets<
+                    <I>::OtherVersion,
+                    Self::WeakDeviceId,
+                    <Udp as DatagramSocketSpec>::AddrSpec,
+                    <Udp as DatagramSocketSpec>::SocketMapSpec<
+                        <I>::OtherVersion,
+                        Self::WeakDeviceId,
+                    >,
+                >,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            DualStackDatagramBoundStateContext::<I, _, _>::with_both_bound_sockets_mut(
+                self,
+                |sync_ctx, _bound, other_bound| cb(sync_ctx, other_bound),
+            )
+        }
     }
 
     impl<
@@ -2668,13 +2721,26 @@ mod tests {
             B: BufferMut,
             Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
                 + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
-        > BufferStateContext<I, FakeUdpNonSyncCtx, B> for Wrapped<Outer, FakeUdpInnerSyncCtx<D>>
+            const DUAL_STACK_ENABLED: bool,
+        > BufferStateContext<I, FakeUdpNonSyncCtx, B>
+        for Wrapped<
+            Outer,
+            Wrapped<
+                FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>,
+                FakeBufferSyncCtx<D>,
+            >,
+        >
     {
         type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId + 'static, B: BufferMut>
-        BufferBoundStateContext<I, FakeUdpNonSyncCtx, B> for FakeUdpInnerSyncCtx<D>
+    impl<
+            I: TestIpExt,
+            D: FakeStrongDeviceId + 'static,
+            B: BufferMut,
+            const DUAL_STACK_ENABLED: bool,
+        > BufferBoundStateContext<I, FakeUdpNonSyncCtx, B>
+        for Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>, FakeBufferSyncCtx<D>>
     {
         type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
     }
@@ -2763,8 +2829,10 @@ mod tests {
         }
     }
 
+    type FakeUdpDualStackInnerSyncCtx<D> =
+        Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, true>, FakeBufferSyncCtx<D>>;
     type FakeUdpDualStackSyncCtx<D> =
-        Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpInnerSyncCtx<D>>;
+        Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpDualStackInnerSyncCtx<D>>;
 
     /// Dual-stack delivery for [`FakeUdpDualStackSyncCtx`].
     impl<
@@ -6454,12 +6522,35 @@ where {
         assert_eq!(send_and_get_ttl(remote_ip::<I>()), Some(UNICAST_HOPS));
     }
 
-    #[test]
-    fn dual_stack_delivery() {
+    const DUAL_STACK_ANY_ADDR: Ipv6Addr = net_ip_v6!("::");
+    const DUAL_STACK_V4_ANY_ADDR: Ipv6Addr = net_ip_v6!("::FFFF:0.0.0.0");
+
+    #[derive(Copy, Clone, Debug)]
+    enum DualStackBindAddr {
+        Any,
+        V4Any,
+        V4Specific,
+    }
+
+    impl DualStackBindAddr {
+        const fn v6_addr(&self) -> Option<Ipv6Addr> {
+            match self {
+                Self::Any => Some(DUAL_STACK_ANY_ADDR),
+                Self::V4Any => Some(DUAL_STACK_V4_ANY_ADDR),
+                Self::V4Specific => None,
+            }
+        }
+    }
+
+    #[test_case(DualStackBindAddr::Any; "dual-stack")]
+    #[test_case(DualStackBindAddr::V4Any; "v4 any")]
+    #[test_case(DualStackBindAddr::V4Specific; "v4 specific")]
+    fn dual_stack_delivery(bind_addr: DualStackBindAddr) {
         const LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
-        const LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
+        const LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
         const REMOTE_IP: Ipv4Addr = ip_v4!("8.8.8.8");
-        const REMOTE_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
+        const REMOTE_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
+        let bind_addr = bind_addr.v6_addr().unwrap_or(LOCAL_IP_MAPPED);
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
                 vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
@@ -6467,19 +6558,14 @@ where {
             ));
 
         let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
-        // TODO(https://fxbug.dev/21198): Use bind() and connect() instead of
-        // inserting directly into the socket map once those are supported.
-        let listeners = sync_ctx.inner.outer.v4.bound_sockets.listeners_mut();
-        let _: crate::socket::SocketStateEntry<'_, _, _, _, _, _> = listeners
-            .try_insert(
-                ListenerAddr {
-                    device: None,
-                    ip: ListenerIpAddr { addr: None, identifier: LOCAL_PORT },
-                },
-                Sharing::Exclusive,
-                EitherIpSocket::V6(listener),
-            )
-            .expect("can insert");
+        SocketHandler::listen_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            listener,
+            SpecifiedAddr::new(bind_addr).map(ZonedAddr::Unzoned),
+            Some(LOCAL_PORT),
+        )
+        .expect("can bind");
 
         const BODY: &[u8] = b"abcde";
         receive_udp_packet(
@@ -6502,13 +6588,84 @@ where {
                     packets: vec![ReceivedPacket {
                         body: BODY.into(),
                         addr: ReceivedPacketAddrs {
-                            src_ip: LOCAL_IP_MAPPED,
-                            dst_ip: REMOTE_IP_MAPPED,
+                            dst_ip: LOCAL_IP_MAPPED,
+                            src_ip: REMOTE_IP_MAPPED,
                             src_port: Some(REMOTE_PORT),
                         }
                     }],
                 }
             )])
+        );
+    }
+
+    #[test_case(DualStackBindAddr::Any, true; "dual-stack any bind v4 first")]
+    #[test_case(DualStackBindAddr::V4Any, true; "v4 any bind v4 first")]
+    #[test_case(DualStackBindAddr::V4Specific, true; "v4 specific bind v4 first")]
+    #[test_case(DualStackBindAddr::Any, false; "dual-stack any bind v4 second")]
+    #[test_case(DualStackBindAddr::V4Any, false; "v4 any bind v4 second")]
+    #[test_case(DualStackBindAddr::V4Specific, false; "v4 specific bind v4 second")]
+    fn dual_stack_bind_conflict(bind_addr: DualStackBindAddr, bind_v4_first: bool) {
+        const LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
+        const LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
+                vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
+                vec![],
+            ));
+
+        let v4_listener = SocketHandler::<Ipv4, _>::create_udp(&mut sync_ctx);
+        let v6_listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+
+        let bind_v4 = |sync_ctx, non_sync_ctx| {
+            SocketHandler::listen_udp(
+                sync_ctx,
+                non_sync_ctx,
+                v4_listener,
+                SpecifiedAddr::new(LOCAL_IP).map(ZonedAddr::Unzoned),
+                Some(LOCAL_PORT),
+            )
+        };
+        let bind_v6 = |sync_ctx, non_sync_ctx| {
+            SocketHandler::listen_udp(
+                sync_ctx,
+                non_sync_ctx,
+                v6_listener,
+                SpecifiedAddr::new(bind_addr.v6_addr().unwrap_or(LOCAL_IP_MAPPED))
+                    .map(ZonedAddr::Unzoned),
+                Some(LOCAL_PORT),
+            )
+        };
+
+        let second_bind_error = if bind_v4_first {
+            bind_v4(&mut sync_ctx, &mut non_sync_ctx).expect("no conflict");
+            bind_v6(&mut sync_ctx, &mut non_sync_ctx).expect_err("should conflict")
+        } else {
+            bind_v6(&mut sync_ctx, &mut non_sync_ctx).expect("no conflict");
+            bind_v4(&mut sync_ctx, &mut non_sync_ctx).expect_err("should conflict")
+        };
+        assert_eq!(second_bind_error, Either::Right(LocalAddressError::AddressInUse));
+    }
+
+    #[test]
+    fn dual_stack_bind_unassigned_v4_address() {
+        const LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
+        const NOT_ASSIGNED_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
+                vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
+                vec![],
+            ));
+
+        let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        assert_eq!(
+            SocketHandler::listen_udp(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                listener,
+                SpecifiedAddr::new(NOT_ASSIGNED_MAPPED).map(ZonedAddr::Unzoned),
+                Some(LOCAL_PORT),
+            ),
+            Err(Either::Right(LocalAddressError::CannotBindToAddress))
         );
     }
 
