@@ -20,7 +20,6 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
-#include <cerrno>
 #include <memory>
 
 #include <fbl/unique_fd.h>
@@ -60,32 +59,45 @@ int main(int argc, char** argv) {
     sink_map = early_boot_instrumentation::ExtractDebugData(std::move(response->resource));
   }();
 
-  // Even if we fail to populate from the sources, we expose empty directories,
-  // such that the contract remains.
-  fbl::unique_fd boot_instrumentation_data_dir(open("/boot/kernel/i", O_RDONLY));
-  if (!boot_instrumentation_data_dir) {
-    if (errno != ENOENT) {
+  // TODO(fxbug.dev/124317): This code does not create any directories when
+  // profraw files are not available. Fix it as per contract.
+  [&sink_map]() {
+    fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
+    if (!kernel_data_dir) {
       const char* err = strerror(errno);
-      FX_LOGS(ERROR)
-          << "Could not obtain handle to '/boot/kernel/i'(boot instrumentation data directory). "
-          << err;
+      FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data': " << err;
+      return;
     }
-  } else {
-    if (auto res = early_boot_instrumentation::ExposeBootDebugdata(boot_instrumentation_data_dir,
-                                                                   sink_map);
-        res.is_error()) {
-      FX_LOGS(ERROR) << "Could not expose kernel profile data. " << res.status_value();
-    }
-  }
 
-  auto debug_data = std::make_unique<vfs::PseudoDir>();
+    if (zx::result<> result =
+            early_boot_instrumentation::ExposeKernelProfileData(kernel_data_dir, sink_map);
+        result.is_error()) {
+      FX_PLOGS(ERROR, result.status_value()) << "Could not expose kernel profile data";
+    }
+  }();
+
+  [&sink_map]() {
+    fbl::unique_fd phys_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
+    if (!phys_data_dir) {
+      const char* err = strerror(errno);
+      FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data/phys': " << err;
+      return;
+    }
+
+    if (zx::result<> result =
+            early_boot_instrumentation::ExposePhysbootProfileData(phys_data_dir, sink_map);
+        result.is_error()) {
+      FX_PLOGS(ERROR, result.status_value()) << "Could not expose physboot profile data";
+    }
+  }();
+
+  std::unique_ptr context = sys::ComponentContext::Create();
+  vfs::PseudoDir* debug_data = context->outgoing()->GetOrCreateDirectory("debugdata");
   for (auto& [sink, root] : sink_map) {
     debug_data->AddEntry(sink, std::move(root));
   }
   sink_map.clear();
 
-  std::unique_ptr context = sys::ComponentContext::Create();
-  context->outgoing()->root_dir()->AddEntry("debugdata", std::move(debug_data));
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   if (zx_status_t status = context->outgoing()->ServeFromStartupInfo(loop.dispatcher());
       status != ZX_OK) {

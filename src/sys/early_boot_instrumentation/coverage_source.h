@@ -17,6 +17,22 @@
 
 namespace early_boot_instrumentation {
 
+// Filenames for each exposed profraw/symbolizer files.
+
+// Zircon's profraw and optionally symbolizer log.
+static constexpr std::string_view kKernelFile = "zircon.profraw";
+
+// This file may be available, only if, the kernel exposes a symbolizer log as well.
+// This might eventually be replaced by self-describing profraw file.
+static constexpr std::string_view kKernelSymbolizerFile = "zircon.log";
+
+// Physboot's profraw and optionally symbolizer log.
+static constexpr std::string_view kPhysFile = "physboot.profraw";
+
+// This file may be available, only if, the physboot exposes a symbolizer log as well.
+// This might eventually be replaced by self-describing profraw file.
+static constexpr std::string_view kPhysSymbolizerFile = "physboot.log";
+
 // Subdirectory names for each type of debugdata.
 static constexpr std::string_view kDynamicDir = "dynamic";
 static constexpr std::string_view kStaticDir = "static";
@@ -28,17 +44,17 @@ static constexpr std::string_view kLlvmSinkExtension = "profraw";
 // Alias for str to unique_ptr<PseudoDir> map that allows lookup by string_view.
 using SinkDirMap = std::map<std::string, std::unique_ptr<vfs::PseudoDir>, std::less<>>;
 
-// Given a handle to |boot_debug_data_dir|, will extract the debugdata vmos from it,
-// and add them as VMO file into |sink_map|.
+// Given a handle to |kernel_data_dir|, will extract the kernel coverage vmos from it,
+// and add them as VMO file into |sink_map| as if it where published with the sink "llvm-profile".
 //
-// The kernel encodes sink name, data type and module information in the path as described in
-// "lib/instrumentation/debugdata.h".
+// Usually |kernel_data_dir| is '/boot/kernel/data'.
+zx::result<> ExposeKernelProfileData(fbl::unique_fd& kernel_data_dir, SinkDirMap& sink_map);
+
+// Given a handle to |phys_data_dir|, will extract the physboot's coverage vmos from it,
+// and add them as VMO file into |sink_map| as if it where published with the sink "llvm-profile".
 //
-// Usually |boot_debug_data_dir| is '/boot/kernel/i'.
-//
-// Each of the surfaced files is exposed with 'module_name-n.suffix', where 'n' is the index of the
-// file, such that repeated module names are not overwritten.
-zx::result<> ExposeBootDebugdata(fbl::unique_fd& boot_debug_data_dir, SinkDirMap& sink_map);
+// Usually |phys_data_dir| is '/boot/kernel/data/phys'.
+zx::result<> ExposePhysbootProfileData(fbl::unique_fd& physboot_data_dir, SinkDirMap& sink_map);
 
 // Given a channel speaking the |fuchsia.boot.SvcStash| protocol, this will extract all published
 // debug data, and return a map from 'sink_name' to a root directory for each sink. Each root

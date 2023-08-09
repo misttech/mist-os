@@ -5,7 +5,6 @@
 // https://opensource.org/licenses/MIT
 
 #include <align.h>
-#include <lib/instrumentation/debugdata.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
 #include <lib/version.h>
 #include <stdint.h>
@@ -25,9 +24,7 @@
 
 namespace {
 
-constexpr ktl::string_view kSink = "llvm-profile";
-constexpr ktl::string_view kModule = "zircon.elf";
-constexpr ktl::string_view kSufix = "profraw";
+constexpr ktl::string_view kVmoName = "data/zircon.elf.profraw";
 
 // This holds the pinned mapping of the live-updated counters.
 KernelMappedVmo gProfdataCounters;
@@ -87,12 +84,9 @@ InstrumentationDataVmo LlvmProfdataVmo() {
   // area should never be accessed again.
   LlvmProfdata::UseCounters(counters);
 
-  auto vmo_name = instrumentation::DebugdataVmoName(kSink, kModule, kSufix, /*is_static=*/false);
-
   return {
       .announce = LlvmProfdata::kAnnounce,
       .sink_name = LlvmProfdata::kDataSinkName,
-      .handle = gProfdataCounters.Publish(ktl::string_view(vmo_name.data(), vmo_name.size()),
-                                          profdata.size_bytes()),
+      .handle = gProfdataCounters.Publish(kVmoName, profdata.size_bytes()),
   };
 }

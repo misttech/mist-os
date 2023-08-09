@@ -4,7 +4,7 @@
 
 #include "src/sys/early_boot_instrumentation/coverage_source.h"
 
-#include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.debugdata/cpp/wire.h>
@@ -45,26 +45,34 @@
 namespace early_boot_instrumentation {
 namespace {
 
-zx::result<> ExportBootDebugData(vfs::PseudoDir& out_dir, fbl::unique_fd fd,
-                                 std::string_view export_as) {
-  // Get the underlying vmo of the fd.
-  zx::vmo vmo;
-  if (auto res = fdio_get_vmo_exact(fd.get(), vmo.reset_and_get_address()); res != ZX_OK) {
-    FX_LOGS(INFO) << 1;
-    return zx::error(res);
-  }
-  size_t size = 0;
-  if (auto res = vmo.get_prop_content_size(&size); res != ZX_OK) {
-    FX_LOGS(INFO) << 2;
-    return zx::error(res);
-  }
+constexpr std::string_view kKernelProfRaw = "zircon.elf.profraw";
+constexpr std::string_view kKernelSymbolizerLog = "symbolizer.log";
 
-  auto file = std::make_unique<vfs::VmoFile>(std::move(vmo), size);
-  if (auto res = out_dir.AddEntry(std::string(export_as), std::move(file)); res != ZX_OK) {
-    FX_LOGS(INFO) << 3;
-    return zx::error(res);
-  }
+constexpr std::string_view kPhysbootProfRaw = "physboot.profraw";
+constexpr std::string_view kPhysbootSymbolizerLog = "symbolizer.log";
 
+struct ExportedFd {
+  fbl::unique_fd fd;
+  std::string export_name;
+};
+
+zx::result<> Export(vfs::PseudoDir& out_dir, cpp20::span<ExportedFd> exported_fds) {
+  for (const auto& [fd, export_as] : exported_fds) {
+    // Get the underlying vmo of the fd.
+    zx::vmo vmo;
+    if (auto res = fdio_get_vmo_exact(fd.get(), vmo.reset_and_get_address()); res != ZX_OK) {
+      return zx::error(res);
+    }
+    size_t size = 0;
+    if (auto res = vmo.get_size(&size); res != ZX_OK) {
+      return zx::error(res);
+    }
+
+    auto file = std::make_unique<vfs::VmoFile>(std::move(vmo), size);
+    if (auto res = out_dir.AddEntry(export_as, std::move(file)); res != ZX_OK) {
+      return zx::error(res);
+    }
+  }
   return zx::success();
 }
 
@@ -79,17 +87,6 @@ enum class DataType {
   kDynamic,
   kStatic,
 };
-
-constexpr std::string_view DataTypeDir(DataType t) {
-  switch (t) {
-    case DataType::kDynamic:
-      return kDynamicDir;
-    case DataType::kStatic:
-      return kStaticDir;
-    default:
-      return "Unknown DataType.";
-  }
-}
 
 // Returns or creates the respective instance for a given |sink_name|.
 vfs::PseudoDir& GetOrCreate(std::string_view sink_name, DataType type, SinkDirMap& sink_map) {
@@ -106,7 +103,7 @@ vfs::PseudoDir& GetOrCreate(std::string_view sink_name, DataType type, SinkDirMa
     it->second->AddEntry(std::string(kDynamicDir), std::make_unique<vfs::PseudoDir>());
   }
 
-  std::string path(DataTypeDir(type));
+  std::string path(type == DataType::kDynamic ? kDynamicDir : kStaticDir);
 
   auto& root_dir = *(it->second);
   vfs::internal::Node* node = nullptr;
@@ -118,83 +115,64 @@ vfs::PseudoDir& GetOrCreate(std::string_view sink_name, DataType type, SinkDirMa
 
 }  // namespace
 
-zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sink_map) {
-  // Iterate on every entry in the directory.
-  static constexpr auto for_each_dentry = [](DIR* root, auto&& visitor) {
-    // Borrow underlying FD for opening relative files.
-    int root_fd = dirfd(root);
-    while (auto* dentry = readdir(root)) {
-      std::string_view dentry_name(dentry->d_name);
-      if (dentry_name == "." || dentry_name == "..") {
-        continue;
-      }
+zx::result<> ExposeKernelProfileData(fbl::unique_fd& kernel_data_dir, SinkDirMap& sink_map) {
+  std::vector<ExportedFd> exported_fds;
 
-      fbl::unique_fd entry_fd(openat(root_fd, dentry->d_name, O_RDONLY));
-      if (!entry_fd) {
-        FX_LOGS(INFO) << "Failed to obtain FD for " << dentry->d_name << ". " << strerror(errno);
-        continue;
-      }
-
-      visitor(dentry, std::move(entry_fd));
+  fbl::unique_fd kernel_profile(openat(kernel_data_dir.get(), kKernelProfRaw.data(), O_RDONLY));
+  if (!kernel_profile) {
+    if (errno == ENOENT) {
+      // This file is only available in instrumented builds.
+      FX_LOGS(INFO) << kKernelProfRaw << " is not available.";
+      // return success as there is nothing to export.
+      return zx::success();
     }
-  };
-
-  DIR* root = fdopendir(debugdata_root.get());
-  if (!root) {
-    FX_LOGS(INFO) << "Failed to obtain DIR entry from FD. " << strerror(errno);
-    return zx::error(ZX_ERR_INVALID_ARGS);
+    const char* err = strerror(errno);
+    FX_LOGS(ERROR) << "Could not obtain handle to " << kKernelProfRaw << ": " << err;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
-  // Taken by fdopendir.
-  debugdata_root.release();
 
-  auto for_each_debugdata = [&sink_map](std::string_view sink_name, DataType type,
-                                        struct dirent* entry, fbl::unique_fd debugdata_fd) {
-    auto res = ExportBootDebugData(GetOrCreate(sink_name, type, sink_map), std::move(debugdata_fd),
-                                   entry->d_name);
-    if (res.is_error()) {
-      FX_LOGS(ERROR) << "Failed to export boot debugdata to: " << sink_name << "/"
-                     << DataTypeDir(type) << "/" << entry->d_name;
-      return;
+  exported_fds.emplace_back(
+      ExportedFd{.fd = std::move(kernel_profile), .export_name = std::string(kKernelFile)});
+  FX_LOGS(INFO) << "Exposing " << kKernelFile;
+
+  fbl::unique_fd kernel_log(openat(kernel_data_dir.get(), kKernelSymbolizerLog.data(), O_RDONLY));
+  if (kernel_log) {
+    FX_LOGS(INFO) << "Exposing " << kKernelSymbolizerFile;
+    exported_fds.emplace_back(
+        ExportedFd{.fd = std::move(kernel_log), .export_name = std::string(kKernelSymbolizerFile)});
+  }
+
+  return Export(GetOrCreate(kLlvmSink, DataType::kDynamic, sink_map), exported_fds);
+}
+
+zx::result<> ExposePhysbootProfileData(fbl::unique_fd& physboot_data_dir, SinkDirMap& sink_map) {
+  std::vector<ExportedFd> exported_fds;
+
+  fbl::unique_fd phys_profile(openat(physboot_data_dir.get(), kPhysbootProfRaw.data(), O_RDONLY));
+  if (!phys_profile) {
+    if (errno == ENOENT) {
+      // This file is only available in instrumented builds.
+      FX_LOGS(INFO) << kPhysbootProfRaw << " is not available.";
+      // return success as there is nothing to export.
+      return zx::success();
     }
+    const char* err = strerror(errno);
+    FX_LOGS(ERROR) << "Could not obtain handle to " << kPhysbootProfRaw << ": " << err;
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
 
-    FX_LOGS(INFO) << " Exported boot debugdata to " << sink_name << "/" << DataTypeDir(type) << "/"
-                  << entry->d_name;
-  };
+  exported_fds.emplace_back(
+      ExportedFd{.fd = std::move(phys_profile), .export_name = std::string(kPhysFile)});
+  FX_LOGS(INFO) << "Exposing " << kPhysFile;
 
-  // Each sink contains at most two entries, mapped to either static or dynamic data.
-  // "s" or "d", each of them a directory.
-  auto for_each_sink = [&for_each_debugdata](struct dirent* entry, fbl::unique_fd sink_dir_fd) {
-    std::string_view sink_name(entry->d_name);
+  fbl::unique_fd phys_log(openat(physboot_data_dir.get(), kPhysbootSymbolizerLog.data(), O_RDONLY));
+  if (phys_log) {
+    FX_LOGS(INFO) << "Exposing " << kPhysSymbolizerFile;
+    exported_fds.emplace_back(
+        ExportedFd{.fd = std::move(phys_log), .export_name = std::string(kPhysSymbolizerFile)});
+  }
 
-    fbl::unique_fd static_dir_fd(openat(sink_dir_fd.get(), "s", O_DIRECTORY | O_RDONLY));
-    if (static_dir_fd) {
-      DIR* static_dir = fdopendir(static_dir_fd.get());
-      if (static_dir) {
-        static_dir_fd.release();
-        for_each_dentry(static_dir, [&](auto* dentry, fbl::unique_fd debugdata_fd) {
-          for_each_debugdata(sink_name, DataType::kStatic, dentry, std::move(debugdata_fd));
-        });
-        closedir(static_dir);
-      }
-    }
-
-    fbl::unique_fd dynamic_dir_fd(openat(sink_dir_fd.get(), "d", O_DIRECTORY | O_RDONLY));
-    if (dynamic_dir_fd) {
-      DIR* dynamic_dir = fdopendir(dynamic_dir_fd.release());
-      if (dynamic_dir) {
-        dynamic_dir_fd.release();
-        for_each_dentry(dynamic_dir, [&](auto* dentry, fbl::unique_fd debugdata_fd) {
-          for_each_debugdata(sink_name, DataType::kDynamic, dentry, std::move(debugdata_fd));
-        });
-        closedir(dynamic_dir);
-      }
-    }
-  };
-
-  // Each entry in the root is a directory named after the sink.
-  for_each_dentry(root, for_each_sink);
-  closedir(root);
-  return zx::success();
+  return Export(GetOrCreate(kLlvmSink, DataType::kStatic, sink_map), exported_fds);
 }
 
 namespace {

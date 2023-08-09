@@ -8,7 +8,6 @@
 
 #include <ctype.h>
 #include <lib/boot-options/boot-options.h>
-#include <lib/instrumentation/debugdata.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
 #include <lib/memalloc/pool-mem-config.h>
 #include <lib/memalloc/pool.h>
@@ -81,6 +80,25 @@ void FindTestRamReservation(RamReservation& ram) {
          ProgramName(), ram.size);
 }
 
+// Construct a VMO name for the instrumentation data from the debugdata
+// protocol sink name, the module name and the canonical file name suffix for
+// this sink.
+constexpr PhysVmo::Name DebugdataVmoName(ktl::string_view sink_name, ktl::string_view vmo_name,
+                                         ktl::string_view vmo_name_suffix) {
+  PhysVmo::Name name{};
+  ktl::span<char> buffer{name};
+  // TODO(fxbug.dev/120396)): Currently this matches the old "data/phys/..."
+  // format and doesn't contain the sink name.  Later change maybe to
+  // "i/sink-name/module+suffix" but omit whole suffix if it doesn't all fit?
+  for (ktl::string_view str : {"data/phys/"sv, vmo_name, vmo_name_suffix}) {
+    buffer = buffer.subspan(str.copy(buffer.data(), buffer.size() - 1));
+    if (buffer.empty()) {
+      break;
+    }
+  }
+  return name;
+}
+
 // Returns a pointer into the array that was passed by reference.
 constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
   ktl::string_view str(name.data(), name.size());
@@ -102,8 +120,7 @@ void HandoffPrep::Init(ktl::span<ktl::byte> buffer) {
 void HandoffPrep::SetInstrumentation() {
   auto publish_debugdata = [this](ktl::string_view sink_name, ktl::string_view vmo_name,
                                   ktl::string_view vmo_name_suffix, size_t content_size) {
-    PhysVmo::Name phys_vmo_name =
-        instrumentation::DebugdataVmoName(sink_name, vmo_name, vmo_name_suffix, /*is_static=*/true);
+    PhysVmo::Name phys_vmo_name = DebugdataVmoName(sink_name, vmo_name, vmo_name_suffix);
     return PublishVmo(VmoNameString(phys_vmo_name), content_size);
   };
   for (const ElfImage* module : gSymbolize->modules()) {
@@ -115,6 +132,7 @@ ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t conte
   if (content_size == 0) {
     return {};
   }
+
   fbl::AllocChecker ac;
   HandoffVmo* handoff_vmo = new (gPhysNew<memalloc::Type::kPhysScratch>, ac) HandoffVmo;
   ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu scratch bytes for HandoffVmo",
@@ -235,7 +253,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
   // This transfers the log, so logging after this is not preserved.
   // Extracting the log buffer will automatically detach it from stdout.
   // TODO(mcgrathr): Rename to physboot.log with some prefix.
-  PublishLog("i/llvm-profile/s/physboot.log", ktl::move(*ktl::exchange(gLog, nullptr)));
+  PublishLog("data/phys/symbolizer.log", ktl::move(*ktl::exchange(gLog, nullptr)));
 
   // Finalize the published VMOs, including the log just published above.
   FinishVmos();
