@@ -121,8 +121,6 @@ supported_conformance_types = [
   "test.conformance/PaddingEndOfOutOfLineObject5Byte",
   "test.conformance/PaddingEndOfOutOfLineObject6Byte",
   "test.conformance/PaddingEndOfOutOfLineObject7Byte",
-  "test.conformance/Persistent1Message",
-  "test.conformance/PersistentHeader",
   "test.conformance/Regression1",
   "test.conformance/Regression10V1",
   "test.conformance/Regression10V2",
