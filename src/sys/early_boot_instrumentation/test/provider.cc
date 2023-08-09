@@ -147,9 +147,11 @@ int main(int argc, char** argv) {
 
   // Add prof_data dir.
   auto* boot = context->outgoing()->GetOrCreateDirectory("boot");
+  auto debugdata = std::make_unique<vfs::PseudoDir>();
   auto kernel = std::make_unique<vfs::PseudoDir>();
-  auto data = std::make_unique<vfs::PseudoDir>();
-  auto phys = std::make_unique<vfs::PseudoDir>();
+  auto boot_llvm_sink = std::make_unique<vfs::PseudoDir>();
+  auto llvm_static = std::make_unique<vfs::PseudoDir>();
+  auto llvm_dynamic = std::make_unique<vfs::PseudoDir>();
 
   // Fake Kernel vmo.
   zx::vmo kernel_vmo;
@@ -160,7 +162,7 @@ int main(int argc, char** argv) {
       FX_LOGS(ERROR) << "Failed to write Kernel VMO contents. Error: " << zx_status_get_string(res);
     }
     auto kernel_file = std::make_unique<vfs::VmoFile>(std::move(kernel_vmo), 4096);
-    data->AddEntry("zircon.elf.profraw", std::move(kernel_file));
+    llvm_dynamic->AddEntry("zircon.profraw", std::move(kernel_file));
   }
 
   // Fake Physboot VMO.
@@ -172,16 +174,15 @@ int main(int argc, char** argv) {
       FX_LOGS(ERROR) << "Failed to write Kernel VMO contents. Error: " << zx_status_get_string(res);
     }
     auto physboot_file = std::make_unique<vfs::VmoFile>(std::move(phys_vmo), 4096);
-    phys->AddEntry("physboot.profraw", std::move(physboot_file));
+    llvm_static->AddEntry("physboot.profraw", std::move(physboot_file));
   }
 
-  // outgoing/boot/kernel/data/phys
-  data->AddEntry("phys", std::move(phys));
-  // outgoing/boot/kernel/data
-  kernel->AddEntry("data", std::move(data));
-  // outgoing/boot/kernel
+  boot_llvm_sink->AddEntry("s", std::move(llvm_static));
+  boot_llvm_sink->AddEntry("d", std::move(llvm_dynamic));
+  debugdata->AddEntry("llvm-profile", std::move(boot_llvm_sink));
+  kernel->AddEntry("i", std::move(debugdata));
   boot->AddEntry("kernel", std::move(kernel));
-
+  // boot/kernel/i/llvm-profile/{s,d}/{vmos}
   loop.Run();
   return 0;
 }
