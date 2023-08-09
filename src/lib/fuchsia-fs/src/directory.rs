@@ -21,7 +21,7 @@ mod watcher;
 pub use watcher::{WatchEvent, WatchMessage, Watcher, WatcherCreateError, WatcherStreamError};
 
 /// Error returned by readdir_recursive.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum RecursiveEnumerateError {
     #[error("fidl error during {}: {:?}", _0, _1)]
     Fidl(&'static str, fidl::Error),
@@ -37,7 +37,7 @@ pub enum RecursiveEnumerateError {
 }
 
 /// Error returned by readdir.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum EnumerateError {
     #[error("a directory entry could not be decoded: {:?}", _0)]
     DecodeDirent(DecodeDirentError),
@@ -59,7 +59,7 @@ pub enum EnumerateError {
 }
 
 /// An error encountered while decoding a single directory entry.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum DecodeDirentError {
     #[error("an entry extended past the end of the buffer")]
     BufferOverrun,

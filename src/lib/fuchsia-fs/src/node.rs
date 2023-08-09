@@ -10,7 +10,7 @@ use {
 };
 
 /// An error encountered while opening a node
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 #[allow(missing_docs)]
 pub enum OpenError {
     #[error("while making a fidl proxy: {0}")]
@@ -39,7 +39,7 @@ pub enum OpenError {
 }
 
 /// An error encountered while cloning a node
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 #[allow(missing_docs)]
 pub enum CloneError {
     #[error("while making a fidl proxy: {0}")]
@@ -50,7 +50,7 @@ pub enum CloneError {
 }
 
 /// An error encountered while closing a node
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 #[allow(missing_docs)]
 pub enum CloseError {
     #[error("while sending close request: {0}")]
@@ -61,7 +61,7 @@ pub enum CloseError {
 }
 
 /// An error encountered while renaming a node
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 #[allow(missing_docs)]
 pub enum RenameError {
     #[error("while sending rename request")]
