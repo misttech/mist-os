@@ -13,6 +13,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 from honeydew import custom_types
 from honeydew import errors
+from honeydew.affordances.ffx import session as session_ffx
+from honeydew.interfaces.affordances import session
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import affordances_capable
@@ -32,6 +34,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
                         affordances_capable.RebootCapableDevice,
+                        affordances_capable.SessionCapableDevice,
                         transports_capable.FastbootCapableDevice,
                         transports_capable.FFXCapableDevice,
                         transports_capable.SSHCapableDevice):
@@ -172,6 +175,15 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             username=self._ssh_user,
             private_key=self._ssh_private_key)
         return ssh_obj
+
+    @properties.Affordance
+    def session(self) -> session.Session:
+        """Returns a session affordance object.
+
+        Returns:
+            session.Session object
+        """
+        return session_ffx.Session()
 
     # List all the public methods in alphabetical order
     def health_check(self) -> None:

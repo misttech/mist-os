@@ -9,6 +9,7 @@ from typing import Callable, Dict, Optional
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import component
+from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.auxiliary_devices import \
@@ -110,6 +111,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             component.Component object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def session(self) -> session.Session:
+        """Returns a session affordance object.
+
+        Returns:
+            session.Session object
         """
 
     @properties.Affordance

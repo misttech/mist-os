@@ -62,3 +62,7 @@ class FuchsiaDeviceError(HoneyDewError):
 
 class FastbootCommandError(HoneyDewError):
     """Exception for errors raised by Fastboot commands."""
+
+
+class SessionError(HoneyDewError):
+    """Exception for errors raised by Session."""
