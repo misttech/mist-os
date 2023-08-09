@@ -855,8 +855,7 @@ impl<
 pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
     DeviceIdContext<AnyDevice>
 {
-    /// The synchronized context passed to the callback provided to
-    /// `with_sockets_mut`.
+    /// The synchronized context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, C>
         + MulticastMembershipHandler<I, C>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
