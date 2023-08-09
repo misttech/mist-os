@@ -178,11 +178,15 @@ pub fn create_remotefs_filesystem(
     kernel: &Arc<Kernel>,
     root: &fio::DirectorySynchronousProxy,
     rights: fio::OpenFlags,
-    fs_src: &str,
+    options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Error> {
-    let root = syncio::directory_open_directory_async(root, fs_src, rights)
-        .map_err(|e| anyhow!("Failed to open root: {}", e))?;
-    RemoteFs::new_fs(kernel, root.into_channel(), fs_src, rights).map_err(|e| e.into())
+    let root = syncio::directory_open_directory_async(
+        root,
+        std::str::from_utf8(&options.source).map_err(|_| anyhow!("source path is not utf8"))?,
+        rights,
+    )
+    .map_err(|e| anyhow!("Failed to open root: {}", e))?;
+    RemoteFs::new_fs(kernel, root.into_channel(), options, rights).map_err(|e| e.into())
 }
 
 pub fn create_filesystem_from_spec<'a>(
@@ -214,7 +218,7 @@ pub fn create_filesystem_from_spec<'a>(
     // common code that also handles the mount() system call.
     let fs = match fs_type {
         "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, rights, fs_src)?,
-        "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, fs_src)?,
+        "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, options)?,
         _ => kernel.create_filesystem(fs_type.as_bytes(), options)?,
     };
     Ok((mount_point.as_bytes(), fs))

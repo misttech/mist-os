@@ -365,7 +365,12 @@ fn create_fs_context(
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let container_fs = LayeredFs::new_fs(
         kernel,
-        create_remotefs_filesystem(kernel, pkg_dir_proxy, rights, "data")?,
+        create_remotefs_filesystem(
+            kernel,
+            pkg_dir_proxy,
+            rights,
+            FileSystemOptions { source: b"data".to_vec(), ..Default::default() },
+        )?,
         BTreeMap::from([(b"component".to_vec(), TmpFs::new_fs(kernel))]),
     );
     let mut mappings =
