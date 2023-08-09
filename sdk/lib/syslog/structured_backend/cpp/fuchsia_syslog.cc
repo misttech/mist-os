@@ -274,11 +274,6 @@ struct RecordState final {
   bool encode_success = true;
   // True if end was called
   bool ended = false;
-  // Message string -- valid if severity is FATAL. For FATAL
-  // logs the caller is responsible for ensuring the string
-  // is valid for the duration of the call (which our macros
-  // will ensure for current users).
-  cpp17::optional<cpp17::string_view> msg_string;
   static RecordState* CreatePtr(fuchsia_syslog::internal::LogBufferData* buffer) {
     return reinterpret_cast<RecordState*>(&buffer->record_state);
   }
@@ -489,9 +484,6 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
   // inside the LogBuffer.
   new (state) RecordState;
   state->socket = std::move(socket);
-  if (severity == FUCHSIA_LOG_FATAL) {
-    state->msg_string = message;
-  }
   state->corrected_severity = severity;
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);

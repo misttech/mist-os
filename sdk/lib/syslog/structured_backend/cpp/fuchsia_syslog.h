@@ -54,10 +54,7 @@ class LogBuffer final {
   // severity -- The severity of the log
   // file_name -- The name of the file that generated the log message
   // line -- The line number that caused this message to be generated
-  // message -- The message to output. OWNERSHIP: If severity is LOG_FATAL
-  // then the caller maintains ownership of the message buffer and MUST NOT
-  // mutate of free the string until FlushRecord is called or the buffer is reset/discarded
-  // with another call to BeginRecord.
+  // message -- The message to output.
   // the message should be interpreted as a C-style printf before being displayed to the
   // user.
   // socket -- The socket to write the message to.
@@ -74,10 +71,7 @@ class LogBuffer final {
   // severity -- The severity of the log
   // file_name -- The name of the file that generated the log message
   // line -- The line number that caused this message to be generated
-  // message -- The message to output. OWNERSHIP: If severity is LOG_FATAL
-  // then the caller maintains ownership of the message buffer and MUST NOT
-  // mutate of free the string until FlushRecord is called or the buffer is reset/discarded
-  // with another call to BeginRecord.
+  // message -- The message to output.
   // is_printf -- Whether or not this is a printf message. If true,
   // the message should be interpreted as a C-style printf before being displayed to the
   // user.
