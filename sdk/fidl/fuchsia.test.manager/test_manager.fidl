@@ -4,10 +4,11 @@
 library fuchsia.test.manager;
 
 using fuchsia.component;
+using fuchsia.component.decl;
 using fuchsia.developer.remotecontrol;
 using fuchsia.diagnostics;
 using fuchsia.io;
-using fuchsia.component.decl;
+using fuchsia.test;
 using fuchsia.url;
 using zx;
 
@@ -49,8 +50,9 @@ type LaunchError = flexible enum {
     /// Test manifest is invalid.
     INVALID_MANIFEST = 8;
 };
+
 /// Human-readable name for a test case.
-alias CaseName = string:512;
+alias CaseName = string:fuchsia.test.MAX_TEST_NAME;
 
 /// Information about the enumerated test case.
 type Case = table {

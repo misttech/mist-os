@@ -15,6 +15,7 @@ fidl("fuchsia.test.manager") {
     "//sdk/fidl/fuchsia.developer.remotecontrol",
     "//sdk/fidl/fuchsia.diagnostics",
     "//sdk/fidl/fuchsia.io",
+    "//sdk/fidl/fuchsia.test",
     "//sdk/fidl/fuchsia.url",
   ]
 

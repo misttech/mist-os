@@ -6,13 +6,17 @@ library fuchsia.test;
 
 using zx;
 
+/// Max length in bytes of a name used in test case or tag.
+@available(added=14)
+const MAX_TEST_NAME uint64 = 2048;
+
 /// Human-readable name for a test case.
 @available(removed=14)
 alias Name = string:512;
 
 /// Human-readable name for a test case.
 @available(added=14)
-alias Name = string:2048;
+alias Name = string:MAX_TEST_NAME;
 
 /// Optional unique tag to identify Invocation.
 @available(removed=14)
@@ -20,7 +24,7 @@ alias Tag = string:512;
 
 /// Optional unique tag to identify Invocation.
 @available(added=14)
-alias Tag = string:2048;
+alias Tag = string:MAX_TEST_NAME;
 
 /// Describes a single test case.
 type Case = table {

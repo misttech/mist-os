@@ -80,6 +80,12 @@
         "name": "fuchsia.test/Invocation"
     },
     {
+        "kind": "const",
+        "name": "fuchsia.test/MAX_TEST_NAME",
+        "type": "uint64",
+        "value": "2048"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.test/Result.status",
         "ordinal": "1",
