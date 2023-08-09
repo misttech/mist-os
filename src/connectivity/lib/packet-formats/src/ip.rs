@@ -244,24 +244,9 @@ pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
     fn dst_ip(&self) -> I::Addr;
 }
 
-impl<I: IpExt> IpPacketBuilder<I> for Never {
-    fn new(_src_ip: I::Addr, _dst_ip: I::Addr, _ttl: u8, _proto: I::Proto) -> Never {
-        unreachable!()
-    }
-
-    fn src_ip(&self) -> I::Addr {
-        unreachable!()
-    }
-
-    fn dst_ip(&self) -> I::Addr {
-        unreachable!()
-    }
-}
-
 /// An IPv4 or IPv6 protocol number.
 pub trait IpProtocol: From<IpProto> + Sealed {}
 
-impl IpProtocol for Never {}
 impl Sealed for Never {}
 
 create_protocol_enum!(
@@ -280,12 +265,6 @@ create_protocol_enum!(
         Udp, 17, "UDP";
     }
 );
-
-impl From<IpProto> for Never {
-    fn from(_: IpProto) -> Never {
-        unreachable!()
-    }
-}
 
 create_protocol_enum!(
     /// An IPv4 protocol number.
