@@ -19,6 +19,7 @@ py_binary(
     srcs = ["diff_json.py"],
 )
 
+# TODO(b/294853608): Remove once clients have moved to //products/zedboot.
 fuchsia_product_configuration(
     name = "zedboot",
     json_config = {

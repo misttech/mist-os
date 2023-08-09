@@ -40,6 +40,9 @@ declare_args() {
   # The product assembly config used to configure the main Fuchsia image.
   fuchsia_product_assembly_config_label = false
 
+  # The product assembly config used to configure the Zedboot image.
+  zedboot_product_assembly_config_label = "//products/zedboot"
+
   # TODO(fxbug.dev/94051): move to board definitions.
   # Adds a prefix to the start of the virtual device name. Used to distinguish
   # between similar virtual device's using different configuration's such as

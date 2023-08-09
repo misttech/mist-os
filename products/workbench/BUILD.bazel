@@ -130,7 +130,7 @@ fuchsia_product_image(
     create_system_mode = "bootfs",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    product_config = "//build/bazel/assembly/product_configurations:zedboot",
+    product_config = "//products/zedboot",
 )
 
 fuchsia_product_image(
@@ -147,7 +147,7 @@ fuchsia_product_image(
     create_system_mode = "bootfs",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    product_config = "//build/bazel/assembly/product_configurations:zedboot",
+    product_config = "//products/zedboot",
 )
 
 fuchsia_product_image(
@@ -172,7 +172,7 @@ fuchsia_product_image(
     create_system_mode = "bootfs",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
-    product_config = "//build/bazel/assembly/product_configurations:zedboot",
+    product_config = "//products/zedboot",
 )
 
 fuchsia_elf_sizes(

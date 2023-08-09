@@ -6,6 +6,12 @@ import(
     "//build/bazel/assembly/product_configurations/verify_product_configuration.gni")
 import("//build/board.gni")
 
+verify_product_configuration("verify_zedboot_product_configuration") {
+  gn_product_config_target = "//products/zedboot"
+  bazel_product_config_target = "//products/zedboot"
+  bazel_inputs = []
+}
+
 verify_product_configuration("verify_default_product_configuration") {
   gn_product_config_target = "//build/assembly:default_product_config"
   bazel_product_config_target = ":default"
@@ -34,5 +40,6 @@ group("verifications") {
   deps = [
     ":verify_default_product_configuration",
     ":verify_minimal_product_configuration",
+    ":verify_zedboot_product_configuration",
   ]
 }

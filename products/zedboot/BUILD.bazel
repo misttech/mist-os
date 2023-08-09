@@ -1,0 +1,31 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "BUILD_TYPES",
+    "fuchsia_product_configuration",
+)
+
+package(default_visibility = [
+    "//build/bazel/assembly:__subpackages__",
+    "//products:__subpackages__",
+    "//vendor/google:__subpackages__",
+])
+
+fuchsia_product_configuration(
+    name = "zedboot",
+    json_config = {
+        "platform": {
+            "build_type": BUILD_TYPES.ENG,
+            "feature_set_level": "bootstrap",
+            "storage": {
+                "filesystems": {
+                    "image_name": "zedboot",
+                    "volume": "none",
+                },
+            },
+        },
+    },
+)

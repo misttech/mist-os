@@ -1,0 +1,20 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/product_assembly_configuration.gni")
+
+product_assembly_configuration("zedboot") {
+  platform = {
+    build_type = "eng"
+    feature_set_level = "bootstrap"
+    storage = {
+      filesystems = {
+        image_name = "zedboot"
+        volume = "none"
+      }
+    }
+  }
+  product = {
+  }
+}
