@@ -464,43 +464,21 @@ config("debuginfo_debug") {
   rustflags = [ "-Cdebuginfo=2" ]
 }
 
-config("dwarf_version") {
-  cflags = [ "-gdwarf-${dwarf_version}" ]
-  asmflags = cflags
-  ldflags = cflags
-}
-
-config("dwarf_compression") {
-  if (dwarf_compression != "none") {
-    cflags = [ "-gz=${dwarf_compression}" ]
-    asmflags = cflags
-    ldflags = cflags
-    if (is_fuchsia) {
-      rustflags =
-          [ "-Clink-arg=--compress-debug-sections=${dwarf_compression}" ]
-    } else {
-      rustflags = [ "-Clink-arg=-gz=${dwarf_compression}" ]
-    }
-  }
-}
-
 config("default_debuginfo") {
   configs = [ ":debuginfo_${debuginfo}" ]
-  if (current_os != "win" && current_cpu != "wasm32") {
-    configs += [
-      ":dwarf_version",
-      ":dwarf_compression",
-    ]
+  if (current_os != "win") {
+    cflags = [ "-gdwarf-${dwarf_version}" ]
     if (!is_gcc) {
       # This option forces Clang to only emit class type information when
       # constructors are emitted which can significantly reduce debug info
       # size. Eventually, this option will enabled by default in Clang when
       # -fno-standalone-debug is used.
-      cflags = [
+      cflags += [
         "-Xclang",
         "-debug-info-kind=constructor",
       ]
     }
+    asmflags = cflags
   } else if (debuginfo != "none" && current_os == "win") {
     # TODO(fxbug.dev/55244): This produces the .pdb file, but it doesn't seem
     # to get the DWARF data out of the main output file.

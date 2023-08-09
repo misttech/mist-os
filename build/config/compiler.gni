@@ -77,25 +77,3 @@ declare_args() {
 
 assert(dwarf_version >= 2 && dwarf_version <= 5,
        "`dwarf_version=\"...\"` must be between 2 and 5")
-
-if (is_gcc) {
-  # TODO(fxbug.dev/126220): GCC doesn't yet support zstd.
-  default_dwarf_compression = "zlib"
-} else {
-  default_dwarf_compression = "zstd"
-}
-
-declare_args() {
-  # Enable DWARF compression.
-  dwarf_compression = default_dwarf_compression
-}
-
-_dwarf_compression_valid = [
-  "none",
-  "zlib",
-  "zstd",
-]
-
-assert(_dwarf_compression_valid + [ dwarf_compression ] -
-           [ dwarf_compression ] != _dwarf_compression_valid,
-       "`dwarf_compression=\"...\"` must be one of $_dwarf_compression_valid")
