@@ -1691,6 +1691,19 @@ assembly_input_bundle("virtualization_support") {
 #
 assembly_input_bundle("netstack2") {
   base_packages = [ "//src/connectivity/network:netstack2" ]
+  compiled_packages = [
+    {
+      name = "network"
+      component_shards = [
+        {
+          component_name = "network"
+          shards = rebase_path(
+                  [ "//src/connectivity/network/meta/netstack2.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # AIB to include Netstack3 as the netstack for use by base networking.
@@ -1700,6 +1713,19 @@ assembly_input_bundle("netstack2") {
 #
 assembly_input_bundle("netstack3") {
   base_packages = [ "//src/connectivity/network:netstack3" ]
+  compiled_packages = [
+    {
+      name = "network"
+      component_shards = [
+        {
+          component_name = "network"
+          shards = rebase_path(
+                  [ "//src/connectivity/network/meta/netstack3.shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # WLAN base support

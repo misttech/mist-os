@@ -25,14 +25,6 @@
             url: "fuchsia-pkg://fuchsia.com/http-client#meta/http-client.cm",
         },
         {
-            name: "netstack",
-
-            // TODO(https://fxbug.dev/131601): Move netstack package selection
-            // to assembly.
-            url: "fuchsia-pkg://fuchsia.com/netstack#meta/netstack.cm",
-            on_terminate: "reboot",
-        },
-        {
             name: "reachability",
             url: "fuchsia-pkg://fuchsia.com/reachability#meta/reachability.cm",
             startup: "eager",

@@ -137,15 +137,6 @@ fuchsia_component("component-debug") {
   testonly = true
 }
 
-# Variant of `:component` whose component name shows up in the package as
-# #meta/netstack.cm and can be used in place of Netstack2 when assembling
-# images.
-fuchsia_component("component-dropin") {
-  component_name = "netstack"
-  manifest = "meta/netstack3.cml"
-  deps = [ ":bin" ]
-}
-
 fuchsia_unittest_component("netstack3-bin_test") {
   deps = [
     ":bin_test",

@@ -110,7 +110,7 @@ product_assembly_configuration("core_with_netstack3") {
 
     connectivity = {
       network = {
-        force_netstack3 = true
+        netstack_version = "netstack3"
       }
     }
   }

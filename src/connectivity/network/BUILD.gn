@@ -48,13 +48,13 @@ fuchsia_package("netstack2") {
 }
 
 fuchsia_package("netstack3") {
-  package_name = "netstack"
+  package_name = "netstack3"
   deps = [
     # TODO(https://fxbug.dev/125773): Move this component out of this package
     # and into the network package once both Netstack2 and Netstack3 are using
     # the component for all DHCPv4 functionality.
     "dhcpv4/client/bindings:component",
-    "netstack3:component-dropin",
+    "netstack3:component",
   ]
   visibility = [
     ":*",
