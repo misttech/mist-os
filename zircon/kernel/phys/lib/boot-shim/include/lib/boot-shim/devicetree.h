@@ -22,6 +22,7 @@
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/item.h>
 #include <lib/zbitl/storage-traits.h>
 #include <stdarg.h>
 #include <stdint.h>

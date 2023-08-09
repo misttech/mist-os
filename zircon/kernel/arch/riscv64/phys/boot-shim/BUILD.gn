@@ -20,10 +20,11 @@ group("boot-shim") {
   }
 }
 
-phys_executable("linux-riscv64-devicetree-boot-shim") {
-  sources = [ "linux-riscv64-devicetree-main.cc" ]
+phys_executable("linux-riscv64-boot-shim") {
+  sources = [ "linux-riscv64-boot-shim.cc" ]
 
   deps = [
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/phys:allocation",

@@ -7,10 +7,11 @@
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
-phys_executable("linux-arm64-devicetree-boot-shim") {
-  sources = [ "linux-arm64-devicetree-main.cc" ]
+phys_executable("linux-arm64-boot-shim") {
+  sources = [ "linux-arm64-boot-shim.cc" ]
 
   deps = [
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/phys:allocation",

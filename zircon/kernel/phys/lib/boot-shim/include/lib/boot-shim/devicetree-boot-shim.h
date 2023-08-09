@@ -54,14 +54,10 @@ class DevicetreeBootShim : public BootShim<Items...> {
   // from the devicetree.
   bool Init() {
     auto match_with = [this](auto&... items) {
-      auto init_item = [this](auto& item) {
-        item.Init(*this);
-        return 0;
-      };
-      std::ignore = (init_item(items) + ...);
+      (items.Init(*this), ...);
       return devicetree::Match(dt_, items...);
     };
-    return Base::template OnSelectItems<IsDevicetreeItem>(match_with);
+    return this->template OnSelectItems<IsDevicetreeItem>(match_with);
   }
 
   const devicetree::Devicetree& devicetree() const { return dt_; }
