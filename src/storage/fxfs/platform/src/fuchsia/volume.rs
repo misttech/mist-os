@@ -42,6 +42,7 @@ use {
     std::{
         boxed::Box,
         convert::TryInto,
+        future::Future,
         marker::Unpin,
         sync::{Arc, Mutex, Weak},
         time::Duration,
@@ -108,15 +109,16 @@ impl FxVolume {
         store: Arc<ObjectStore>,
         fs_id: u64,
     ) -> Result<Self, Error> {
+        let scope = ExecutionScope::new();
         Ok(Self {
             parent,
             cache: NodeCache::new(),
             store,
-            pager: Pager::new()?,
+            pager: Pager::new(scope.clone())?,
             executor: fasync::EHandle::local(),
             flush_task: Mutex::new(None),
             fs_id,
-            scope: ExecutionScope::new(),
+            scope,
         })
     }
 
@@ -147,8 +149,8 @@ impl FxVolume {
     pub async fn terminate(&self) {
         self.cache.clear();
         self.scope.shutdown();
+        self.pager.terminate();
         self.scope.wait().await;
-        self.pager.terminate().await;
         self.store.filesystem().graveyard().flush().await;
         let task = std::mem::replace(&mut *self.flush_task.lock().unwrap(), None);
         if let Some((task, terminate)) = task {
@@ -358,6 +360,16 @@ impl FxVolume {
             flushed += 1;
         }
         debug!(store_id = self.store.store_object_id(), file_count = flushed, "FxVolume flushed");
+    }
+
+    /// Spawns a short term task for the volume that includes a guard that will prevent termination.
+    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+        let guard = self.scope().active_guard();
+        fasync::Task::spawn_on(&self.executor, async move {
+            task.await;
+            std::mem::drop(guard);
+        })
+        .detach();
     }
 }
 

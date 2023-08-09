@@ -1251,7 +1251,6 @@ mod tests {
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
-        volume.volume().scope().wait().await;
         volume.volume().terminate().await;
         fs.close().await.expect("close filesystem failed");
     }
@@ -1308,7 +1307,6 @@ mod tests {
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
-        volume.volume().scope().wait().await;
         volume.volume().terminate().await;
         fs.close().await.expect("close filesystem failed");
     }
@@ -1497,7 +1495,6 @@ mod tests {
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
-        volume.volume().scope().wait().await;
         volume.volume().terminate().await;
         fs.close().await.expect("close filesystem failed");
     }
@@ -1787,7 +1784,6 @@ mod tests {
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
-        volume.volume().scope().wait().await;
         volume.volume().terminate().await;
         fs.close().await.expect("close filesystem failed");
     }
@@ -1847,7 +1843,6 @@ mod tests {
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
-        volume.volume().scope().wait().await;
         volume.volume().terminate().await;
         fs.close().await.expect("close filesystem failed");
     }
