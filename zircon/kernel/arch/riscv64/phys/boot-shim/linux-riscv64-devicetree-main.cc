@@ -42,7 +42,8 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   // The list here is architecture dependant, and should be factored out eventually.
   static boot_shim::DevicetreeBootShim<
       boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::RiscvDevicetreePlicItem,
-      boot_shim::RiscvDevicetreeTimerItem, boot_shim::RiscvDevictreeCpuTopologyItem>
+      boot_shim::RiscvDevicetreeTimerItem, boot_shim::RiscvDevictreeCpuTopologyItem,
+      boot_shim::DevicetreeDtbItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_allocator([](size_t size, size_t align) -> void* {
     if (auto alloc = Allocation::GetPool().Allocate(memalloc::Type::kPhysScratch, size, align);
@@ -53,6 +54,9 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
+  shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
+      {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
+       gDevicetreeBoot.fdt.size_bytes()});
   shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
 
   // Fill DevicetreeItems.

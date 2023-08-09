@@ -579,6 +579,9 @@ class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
   std::optional<uint64_t> boot_hart_id_;
 };
 
+// A flat Devicetree ZBI Item.
+using DevicetreeDtbItem = SingleItem<ZBI_TYPE_DEVICETREE>;
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_
