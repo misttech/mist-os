@@ -340,7 +340,7 @@ mod tests {
     ) {
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         for item in items {
-            writer.write_record(item);
+            writer.write_record(item).unwrap();
         }
         writer.pad_to_block().expect("pad_to_block failed");
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
@@ -400,9 +400,9 @@ mod tests {
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
-        writer.write_record(&4u32);
+        writer.write_record(&4u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
-        writer.write_record(&7u32);
+        writer.write_record(&7u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
@@ -442,10 +442,10 @@ mod tests {
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         // Write one byte so that everything else is misaligned.
-        writer.write_record(&4u8);
+        writer.write_record(&4u8).unwrap();
         let mut count: i32 = 0;
         while writer.journal_file_checkpoint().file_offset < BLOCK_SIZE {
-            writer.write_record(&12345678u32);
+            writer.write_record(&12345678u32).unwrap();
             count += 1;
         }
         // Check that writing didn't end up being aligned on a block.
@@ -498,11 +498,11 @@ mod tests {
             version: new_version,
         });
         new_version.serialize_into(&mut writer).expect("write version failed");
-        writer.write_record(&13u32);
+        writer.write_record(&13u32).unwrap();
         let checkpoint = writer.journal_file_checkpoint();
-        writer.write_record(&78u32);
+        writer.write_record(&78u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
-        writer.write_record(&90u32);
+        writer.write_record(&90u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");

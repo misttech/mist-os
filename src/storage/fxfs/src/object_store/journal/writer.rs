@@ -11,6 +11,7 @@ use {
         object_store::journal::JournalCheckpoint,
         serialized_types::{Versioned, LATEST_VERSION},
     },
+    anyhow::{anyhow, Error},
     byteorder::{LittleEndian, WriteBytesExt},
     fuchsia_inspect::{Property as _, UintProperty},
     std::{cmp::min, io::Write},
@@ -54,13 +55,24 @@ impl JournalWriter {
     }
 
     /// Serializes a new journal record to the journal stream.
-    pub fn write_record<T: Versioned + std::fmt::Debug>(&mut self, record: &T) {
+    pub fn write_record<T: Versioned + std::fmt::Debug>(
+        &mut self,
+        record: &T,
+    ) -> Result<(), Error> {
         let buf_len = self.buf.len();
         record.serialize_into(&mut *self).unwrap(); // Our write implementation cannot fail at the
                                                     // moment.
 
         // For now, our reader cannot handle records that are bigger than a block.
-        assert!(self.buf.len() - buf_len <= self.block_size, "{:?}", record);
+        if self.buf.len() - buf_len <= self.block_size {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Serialized record too big ({} bytes): {:?}",
+                self.buf.len() - buf_len,
+                record
+            ))
+        }
     }
 
     /// Pads from the current offset in the buffer to the end of the block.
@@ -175,7 +187,7 @@ mod tests {
     async fn test_write_single_record_and_pad() {
         let object = Arc::new(FakeObject::new());
         let mut writer = JournalWriter::new(TEST_BLOCK_SIZE, 0);
-        writer.write_record(&4u32);
+        writer.write_record(&4u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
         let handle = FakeObjectHandle::new(object.clone());
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
@@ -207,10 +219,10 @@ mod tests {
     async fn test_journal_file_checkpoint() {
         let object = Arc::new(FakeObject::new());
         let mut writer = JournalWriter::new(TEST_BLOCK_SIZE, 0);
-        writer.write_record(&4u32);
+        writer.write_record(&4u32).unwrap();
         let checkpoint = writer.journal_file_checkpoint();
         assert_eq!(checkpoint.checksum, 0);
-        writer.write_record(&17u64);
+        writer.write_record(&17u64).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
         let handle = FakeObjectHandle::new(object.clone());
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
