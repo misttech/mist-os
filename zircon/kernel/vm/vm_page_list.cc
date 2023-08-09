@@ -234,11 +234,11 @@ ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalStartForEnd(
 
   // We could not find the start in the same node. Check the previous one.
   pln--;
-  for (index = VmPageListNode::kPageFanOut - 1; index >= 0; index--) {
-    auto slot = &pln->Lookup(index);
+  for (index = VmPageListNode::kPageFanOut; index >= 1; index--) {
+    auto slot = &pln->Lookup(index - 1);
     if (!slot->IsEmpty()) {
       DEBUG_ASSERT(slot->IsIntervalStart());
-      return {slot, pln->offset() + index * PAGE_SIZE - list_skew_};
+      return {slot, pln->offset() + (index - 1) * PAGE_SIZE - list_skew_};
     }
   }
 
