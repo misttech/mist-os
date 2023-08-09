@@ -13,6 +13,9 @@ use packet::BufferMut;
 use crate::{
     device::WeakDeviceId,
     ip::{device::IpDeviceNonSyncContext, BufferTransportIpContext},
+    socket::datagram::{
+        DualStackDatagramBoundStateContext, EitherIpSocket, UninstantiableDualStackContext,
+    },
     transport::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
         udp,
@@ -132,6 +135,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::BoundStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
+    type DualStackContext = UninstantiableDualStackContext<Ipv4, udp::Udp, Self>;
 
     fn with_bound_sockets<
         O,
@@ -155,6 +159,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
         let (mut bound_sockets, mut locked) =
             self.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
         cb(&mut locked, &mut bound_sockets)
+    }
+
+    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
+        None
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -209,10 +217,11 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv6>>>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::BoundStateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
+    type DualStackContext = Self;
 
     fn with_bound_sockets<
         O,
@@ -238,11 +247,49 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv6>>>
         cb(&mut locked, &mut bound_sockets)
     }
 
+    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
+        Some(self)
+    }
+
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.cast_locked())
+        cb(&mut self.cast_locked::<crate::lock_ordering::UdpBoundMap<Ipv6>>())
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+    DualStackDatagramBoundStateContext<Ipv6, C, udp::Udp> for Locked<&SyncCtx<C>, L>
+{
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
+    fn dual_stack_enabled(&self, _socket: &udp::SocketState<Ipv6, Self::WeakDeviceId>) -> bool {
+        // TODO(https://fxbug.dev/21198): Enable dual-stack socket support.
+        false
+    }
+
+    fn to_other_receiving_id(&self, id: udp::SocketId<Ipv6>) -> EitherIpSocket<udp::Udp> {
+        EitherIpSocket::V6(id)
+    }
+
+    fn with_both_bound_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut udp::UdpBoundSocketMap<Ipv6, Self::WeakDeviceId>,
+            &mut udp::UdpBoundSocketMap<Ipv4, Self::WeakDeviceId>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut bound_v4, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
+        let (mut bound_v6, mut locked) =
+            locked.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv6>>();
+        let udp::BoundSockets { bound_sockets: bound_first, lazy_port_alloc: _ } = &mut *bound_v6;
+        let udp::BoundSockets { bound_sockets: bound_second, lazy_port_alloc: _ } = &mut *bound_v4;
+        cb(&mut locked, bound_first, bound_second)
     }
 }
 
