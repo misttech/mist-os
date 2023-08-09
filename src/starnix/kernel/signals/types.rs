@@ -4,7 +4,7 @@
 
 use crate::{
     lock::RwLock,
-    task::{WaitQueue, WaiterRef},
+    task::{WaitQueue, Waiter, WaiterRef},
     types::*,
 };
 use std::{collections::VecDeque, sync::Arc};
@@ -51,6 +51,61 @@ impl SignalActions {
     }
 }
 
+/// Whether, and how, this task is blocked. This enum can be extended with new
+/// variants to optimize different kinds of waiting.
+#[derive(Debug)]
+pub enum RunState {
+    /// This task is not blocked.
+    ///
+    /// The task might be running in userspace or kernel.
+    Running,
+
+    /// This thread is blocked in a `Waiter`.
+    Waiter(WaiterRef),
+    // As we optimize blocking primitives, we will add more variants to this enum.
+}
+
+impl Default for RunState {
+    fn default() -> Self {
+        RunState::Running
+    }
+}
+
+impl RunState {
+    /// Whether this task is blocked.
+    ///
+    /// If the task is blocked, you can break the task out of the wait using the `wake` function.
+    pub fn is_blocked(&self) -> bool {
+        match self {
+            RunState::Running => false,
+            RunState::Waiter(waiter) => waiter.is_valid(),
+        }
+    }
+
+    /// Unblock the task by interrupting whatever wait the task is blocked upon.
+    pub fn wake(&self) {
+        match self {
+            RunState::Running => (),
+            RunState::Waiter(waiter) => {
+                waiter.access(|waiter| {
+                    if let Some(waiter) = waiter {
+                        waiter.interrupt()
+                    }
+                });
+            }
+        }
+    }
+}
+
+impl PartialEq<Waiter> for RunState {
+    fn eq(&self, other: &Waiter) -> bool {
+        match self {
+            RunState::Waiter(waiter) => waiter.access(|waiter| waiter == Some(other)),
+            _ => false,
+        }
+    }
+}
+
 /// Per-task signal handling state.
 #[derive(Default)]
 pub struct SignalState {
@@ -60,8 +115,8 @@ pub struct SignalState {
     /// Wait queue for signalfd and sigtimedwait. Signaled whenever a signal is added to the queue.
     pub signal_wait: WaitQueue,
 
-    /// The waiter that the task is currently sleeping on, if any.
-    pub waiter: WaiterRef,
+    /// A handle for interrupting this task, if any.
+    pub run_state: RunState,
 
     /// The signal mask of the task.
     // See https://man7.org/linux/man-pages/man2/rt_sigprocmask.2.html

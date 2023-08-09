@@ -316,7 +316,7 @@ mod test {
         let other_task_weak = kernel.pids.read().get_task(tid);
         let other_task = other_task_weak.upgrade().expect("task");
         loop {
-            let other_task_waiting = other_task.read().signals.waiter.is_valid();
+            let other_task_waiting = other_task.read().signals.run_state.is_blocked();
             if other_task_waiting {
                 break;
             }

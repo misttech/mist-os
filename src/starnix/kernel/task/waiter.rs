@@ -16,6 +16,7 @@ use crate::{
     fs::FdEvents,
     lock::Mutex,
     logging::*,
+    signals::RunState,
     task::*,
     types::{Errno, *},
 };
@@ -156,6 +157,12 @@ impl WaitCallback {
 /// A type that can put a thread to sleep waiting for a condition.
 pub struct Waiter(Arc<WaiterImpl>);
 
+impl PartialEq<Waiter> for Waiter {
+    fn eq(&self, other: &Waiter) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
 /// Waiter has been destroyed by keeping a Weak reference. But this is an implementation detail and
 /// a Waiter should have a single owner. So the Arc is hidden inside Waiter.
@@ -220,21 +227,20 @@ impl Waiter {
 
         if is_waiting {
             let mut state = current_task.write();
-            assert!(!state.signals.waiter.is_valid());
+            assert!(!state.signals.run_state.is_blocked());
             if state.signals.is_any_pending() {
                 return error!(EINTR);
             }
-            state.signals.waiter = self.weak();
+            state.signals.run_state = RunState::Waiter(self.weak());
         }
 
         scopeguard::defer! {
             if is_waiting {
                 let mut state = current_task.write();
-                assert!(
-                    state.signals.waiter.access(|waiter| Arc::ptr_eq(&waiter.unwrap().0, &self.0)),
-                    "SignalState waiter changed while waiting!"
+                assert_eq!(&state.signals.run_state, self,
+                    "SignalState run state changed while waiting!"
                 );
-                state.signals.waiter = WaiterRef::empty();
+                state.signals.run_state = RunState::Running;
             }
         };
 
@@ -246,8 +252,8 @@ impl Waiter {
         // It's impossible to non-racily guarantee that a signal is pending so there might always
         // be an EINTR result here with no signal. But any signal we get when !is_waiting we know is
         // leftover from before: the top of this function only sets ourself as the
-        // current_task.signals.waiter when there's a nonzero timeout, and that waiter reference is
-        // what is used to signal the interrupt().
+        // current_task.signals.run_state when there's a nonzero timeout, and that waiter reference
+        // is what is used to signal the interrupt().
         loop {
             let wait_result = self.wait_internal(deadline);
             if let Err(errno) = &wait_result {

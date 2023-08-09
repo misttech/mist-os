@@ -1225,11 +1225,7 @@ impl Task {
     /// This will interrupt any blocking syscalls if the task is blocked on one.
     /// The signal_state of the task must not be locked.
     pub fn interrupt(&self) {
-        self.read().signals.waiter.access(|waiter| {
-            if let Some(waiter) = waiter {
-                waiter.interrupt()
-            }
-        });
+        self.read().signals.run_state.wake();
         if let Some(thread) = self.thread.read().as_ref() {
             crate::execution::interrupt_thread(thread);
         }
@@ -1267,7 +1263,7 @@ impl Task {
         let status = self.read();
         if status.exit_status.is_some() {
             TaskStateCode::Zombie
-        } else if status.signals.waiter.is_valid() {
+        } else if status.signals.run_state.is_blocked() {
             TaskStateCode::Sleeping
         } else {
             TaskStateCode::Running

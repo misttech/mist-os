@@ -1420,7 +1420,7 @@ mod tests {
         // Wait for the first task to be suspended.
         let mut suspended = false;
         while !suspended {
-            suspended = first_task_temp.read().signals.waiter.is_valid();
+            suspended = first_task_temp.read().signals.run_state.is_blocked();
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
 
@@ -1429,7 +1429,7 @@ mod tests {
 
         // Wait for the sigsuspend to complete.
         rx.await.expect("receive");
-        assert!(!first_task_temp.read().signals.waiter.is_valid());
+        assert!(!first_task_temp.read().signals.run_state.is_blocked());
         // Drop the borrow to let the task ends.
         std::mem::drop(first_task_temp);
         let _ = thread.join();
@@ -1600,7 +1600,7 @@ mod tests {
         });
 
         // Wait for the thread to be blocked on waiting for a child.
-        while !weak_task.upgrade().unwrap().read().signals.waiter.is_valid() {
+        while !weak_task.upgrade().unwrap().read().signals.run_state.is_blocked() {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         child.thread_group.exit(ExitStatus::Exit(0));

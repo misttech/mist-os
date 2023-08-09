@@ -272,7 +272,7 @@ mod tests {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
-                while !task.read().signals.waiter.is_valid() {
+                while !task.read().signals.run_state.is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
 
@@ -306,7 +306,7 @@ mod tests {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
-                while !task.read().signals.waiter.is_valid() {
+                while !task.read().signals.run_state.is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
 
