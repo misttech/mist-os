@@ -59,6 +59,23 @@ impl PersistServer {
         Ok(PersistServer { service_name, fetchers: persisters })
     }
 
+    async fn handle_tag(tag: &str, fetchers: &mut HashMap<Tag, Fetcher>) -> PersistResult {
+        match fetchers.get_mut(tag) {
+            None => {
+                warn!("Tag '{}' was requested but is not configured", tag);
+                PersistResult::BadName
+            }
+            Some(fetcher) => match fetcher.queue_fetch().await {
+                Ok(_) => PersistResult::Queued,
+                Err(e) => {
+                    fetchers.remove(tag);
+                    warn!("Fetcher {} removed because queuing tasks is now failing: {:?}", tag, e);
+                    PersistResult::InternalError
+                }
+            },
+        }
+    }
+
     // Serve the Persist FIDL protocol.
     pub fn launch_server(self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Result<(), Error> {
         let fetchers = self
@@ -75,26 +92,25 @@ impl PersistServer {
             move |mut stream: DataPersistenceRequestStream| {
                 let mut fetchers = fetchers.clone();
                 fasync::Task::spawn(async move {
-                    while let Some(Ok(DataPersistenceRequest::Persist { tag, responder, .. })) =
-                        stream.next().await
-                    {
-                        match fetchers.get_mut(tag.as_str()) {
-                            None => {
-                                warn!("Tag '{}' was requested but is not configured", tag);
-                                let _ = responder.send(PersistResult::BadName);
+                    while let Some(Ok(request)) = stream.next().await {
+                        match request {
+                            DataPersistenceRequest::Persist { tag, responder, .. } => {
+                                let response = Self::handle_tag(&tag, &mut fetchers).await;
+                                responder.send(response).unwrap_or_else(|err| {
+                                    warn!("Failed to respond {:?} to client: {}", response, err)
+                                });
                             }
-                            Some(fetcher) => {
-                                match fetcher.queue_fetch().await {
-                                    Ok(_) => {
-                                        responder.send(PersistResult::Queued).unwrap_or_else(|err| warn!("Failed to notify client that work was queued: {}", err));
-                                    }
-                                    Err(e) => {
-                                        fetchers.remove(tag.as_str());
-                                        warn!("Fetcher removed because queuing tasks is now failing: {:?}", e);
-                                    }
+                            DataPersistenceRequest::PersistTags { tags, responder, .. } => {
+                                let mut response = vec![];
+                                // TODO(fxbug.dev/130139): Change the logic to combine selectors.
+                                for tag in tags {
+                                    response.push(Self::handle_tag(&tag, &mut fetchers).await);
                                 }
+                                responder.send(&response).unwrap_or_else(|err| {
+                                    warn!("Failed to respond {:?} to client: {}", response, err)
+                                });
                             }
-                        };
+                        }
                     }
                 })
                 .detach();

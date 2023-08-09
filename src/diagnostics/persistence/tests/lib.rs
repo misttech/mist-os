@@ -77,6 +77,7 @@ struct TestRealm {
 async fn diagnostics_persistence_integration() {
     crate::mock_filesystems::setup_backing_directories();
     let persisted_data_path = "/tmp/cache/current/test-service/test-component-metric";
+    let persisted_data_path_2 = "/tmp/cache/current/test-service/test-component-metric-two";
     let persisted_too_big_path = "/tmp/cache/current/test-service/test-component-too-big";
 
     // Verify that the backoff mechanism works by observing the time between first and second
@@ -157,8 +158,93 @@ async fn diagnostics_persistence_integration() {
         after: None,
     });
 
-    let _realm = realm.restart().await;
+    let realm = realm.restart().await;
     verify_diagnostics_persistence_publication(Published::SizeError).await;
+
+    // Tests for multiple-tag persistence.
+
+    // An empty vector should be allowed and cause no change.
+    assert_eq!(realm.request_persist_tags(&vec![]).await, vec![]);
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::None,
+        file_name: persisted_data_path,
+        after: None,
+    });
+
+    // One tag should report correctly and save correctly.
+    realm.set_inspect(Some(1i64)).await;
+    assert_eq!(
+        realm.request_persist_tags(&vec!["test-component-metric-two"]).await,
+        vec![PersistResult::Queued]
+    );
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::Int(1),
+        file_name: persisted_data_path_2,
+        after: None,
+    });
+
+    // Two tags should report correctly and save correctly.
+    realm.set_inspect(Some(2i64)).await;
+    assert_eq!(
+        realm
+            .request_persist_tags(&vec!["test-component-metric", "test-component-metric-two"])
+            .await,
+        vec![PersistResult::Queued, PersistResult::Queued]
+    );
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::Int(2),
+        file_name: persisted_data_path,
+        after: None,
+    });
+    expect_file_change(FileChange {
+        old: FileState::Int(1),
+        new: FileState::Int(2),
+        file_name: persisted_data_path_2,
+        after: None,
+    });
+
+    // One good and one bad tag should report correctly and save correctly.
+    realm.set_inspect(Some(4i64)).await;
+    assert_eq!(
+        realm.request_persist_tags(&vec!["wrong_component_metric", "test-component-metric"]).await,
+        vec![PersistResult::BadName, PersistResult::Queued]
+    );
+    expect_file_change(FileChange {
+        old: FileState::Int(2),
+        new: FileState::Int(4),
+        file_name: persisted_data_path,
+        after: None,
+    });
+    expect_file_change(FileChange {
+        old: FileState::Int(2),
+        new: FileState::Int(2),
+        file_name: persisted_data_path_2,
+        after: None,
+    });
+
+    // Duplicate tags aren't recommended, but we might as well handle them.
+    realm.set_inspect(Some(6i64)).await;
+    assert_eq!(
+        realm
+            .request_persist_tags(&vec!["test-component-metric-two", "test-component-metric-two"])
+            .await,
+        vec![PersistResult::Queued, PersistResult::Queued]
+    );
+    expect_file_change(FileChange {
+        old: FileState::Int(4),
+        new: FileState::Int(4),
+        file_name: persisted_data_path,
+        after: None,
+    });
+    expect_file_change(FileChange {
+        old: FileState::Int(2),
+        new: FileState::Int(6),
+        file_name: persisted_data_path_2,
+        after: None,
+    });
 }
 
 /// The Inspect source may not publish Inspect (via take_and_serve_directory_handle()) until
@@ -220,6 +306,14 @@ impl TestRealm {
     /// Ask for a tag's associated data to be persisted.
     async fn request_persistence(&self, tag: &str) -> PersistResult {
         self.persistence.persist(tag).await.unwrap()
+    }
+
+    /// Ask for a tag's associated data to be persisted.
+    async fn request_persist_tags(&self, tags: &Vec<&str>) -> Vec<PersistResult> {
+        self.persistence
+            .persist_tags(&tags.iter().map(|t| t.to_string()).collect::<Vec<String>>())
+            .await
+            .unwrap()
     }
 
     /// Tear down the realm to make sure everything is gone before you restart it.

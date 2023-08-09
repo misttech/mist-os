@@ -31,6 +31,15 @@ func (server *fakePersistServer) Persist(ctx fidl.Context, tag string) (persist.
 	return persist.PersistResultQueued, nil
 }
 
+func (server *fakePersistServer) PersistTags(ctx fidl.Context, tags []string) ([]persist.PersistResult, error) {
+	var responses []persist.PersistResult
+	for _, tag := range tags {
+		server.requests = append(server.requests, tag)
+		responses = append(responses, persist.PersistResultQueued)
+	}
+	return responses, nil
+}
+
 func (server *fakePersistServer) ServeInBackground(t *testing.T, req persist.DataPersistenceWithCtxInterfaceRequest, ctx context.Context) chan struct{} {
 	stub := persist.DataPersistenceWithCtxStub{Impl: server}
 	serveDone := make(chan struct{})

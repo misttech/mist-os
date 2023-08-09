@@ -4,6 +4,7 @@
 library fuchsia.diagnostics.persist;
 
 const MAX_NAME_SIZE uint64 = 100;
+const MAX_TAGS uint64 = 100;
 
 type PersistResult = strict enum {
     // The persistence request was scheduled to
@@ -23,12 +24,21 @@ type PersistResult = strict enum {
 /// the "diagnostics-persistence" component's inspect tree.
 @discoverable
 closed protocol DataPersistence {
-    /// Schedule the persistence the selected data associated with this
+    /// Schedule the persistence of the selected data associated with this
     /// tag in diagnostics-persistence config files.  Fetching the selected
     /// data may be delayed if there is other work in a given service's queue.
     strict Persist(struct {
         tag string:MAX_NAME_SIZE;
     }) -> (struct {
         result PersistResult;
+    });
+
+    /// Schedule the persistence of the selected data associated with these
+    /// tags in diagnostics-persistence config files.  Fetching the selected
+    /// data may be delayed if there is other work in a given service's queue.
+    strict PersistTags(struct {
+        tags vector<string:MAX_NAME_SIZE>:MAX_TAGS;
+    }) -> (struct {
+        results vector<PersistResult>:MAX_TAGS;
     });
 };
