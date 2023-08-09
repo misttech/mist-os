@@ -8,7 +8,7 @@ See source file or run `code_points.py -h` for usage instructions
 
 To run tests, execute
 ```shell
-$ python3 -m unittest
+$ fuchsia-vendored-python -m unittest
 ```
 
 from this directory.

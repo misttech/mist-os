@@ -52,5 +52,5 @@ interactive use-cases.
 Tests can be run from the Fuchsia project root with:
 
 ```
-python3 -m unittest discover -s scripts/gn_complete
+fuchsia-vendored-python -m unittest discover -s scripts/gn_complete
 ```

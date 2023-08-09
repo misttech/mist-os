@@ -13,7 +13,7 @@ Example usage:
 
 ```
 $ unzip /path/to/snapshot.zip
-$ python3 snapshot_histograms.py /path/to/unzipped/inspect.json
+$ fuchsia-vendored-python snapshot_histograms.py /path/to/unzipped/inspect.json
 // open html in browser.
 ```
 """

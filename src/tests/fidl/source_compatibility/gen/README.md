@@ -7,4 +7,4 @@ on using this tool to generate tests.
 
 ### Testing
 
-    python3 $FUCHSIA_DIR/src/tests/fidl/source_compatibility/gen/tests.py
+    fuchsia-vendored-python $FUCHSIA_DIR/src/tests/fidl/source_compatibility/gen/tests.py

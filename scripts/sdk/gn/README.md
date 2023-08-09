@@ -47,14 +47,14 @@ The above instructions is not what is run during testing and CQ. The GN build st
 1. Run the generate script:
 
    ```sh
-   $ prebuilt/third_party/python3/linux-x64/bin/python3.8 scripts/sdk/gn/generate.py \
+   $ fuchsia-vendored-python scripts/sdk/gn/generate.py \
        --archive out/default/sdk/archive/core.tar.gz \
        --output gn_sdk_dir
    ```
 
 ### Testing
 
-Note: many of these tests require `python3.8` to be on `$PATH`. This might need to be added.
+Note: many of these tests require `${FUCHSIA_DIR}/.jiri_root/bin` to be on `$PATH`. This might need to be added.
 
 #### Execute GN SDK scripts/tools
 
@@ -69,7 +69,7 @@ $ gn_sdk_dir/tools/x64/fserve
 To test the generator, run the `test_generate.py` script.
 
 ```sh
-$ prebuilt/third_party/python3/linux-x64/bin/python3.8 scripts/sdk/gn/test_generate.py
+$ fuchsia-vendored-python scripts/sdk/gn/test_generate.py
 ```
 
 This runs the generator against the `testdata` directory and compares the output
@@ -80,7 +80,7 @@ needed to exercise your new code, then run the `update_golden.py` script to fix
 the `golden` files.
 
 ```sh
-$ prebuilt/third_party/python3/linux-x64/bin/python3.8 scripts/sdk/gn/update_golden.py
+$ fuchsia-vendored-python scripts/sdk/gn/update_golden.py
 ```
 
 Commit your changes to the generator, `testdata` contents, and `golden` contents
@@ -108,7 +108,7 @@ directory (assuming the current directory is $FUCHSIA_DIR):
 1. Generate the test workspace into a temporary directory:
 
    ```sh
-   $ prebuilt/third_party/python3/linux-x64/bin/python3.8 scripts/sdk/gn/generate.py \
+   $ fuchsia-vendored-python scripts/sdk/gn/generate.py \
     --archive out/temp/idk.tar.gz \
     --output out/temp/gn_sdk_dir/ \
     --tests out/temp/test_workspace
@@ -117,5 +117,5 @@ directory (assuming the current directory is $FUCHSIA_DIR):
 1. Run the `run.py` file in the test workspace:
 
    ```sh
-   $ prebuilt/third_party/python3/linux-x64/bin/python3.8 out/temp/test_workspace/run.py
+   $ fuchsia-vendored-python out/temp/test_workspace/run.py
    ```

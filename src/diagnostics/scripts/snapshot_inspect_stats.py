@@ -10,7 +10,7 @@ Example usage:
 
 ```
 $ unzip /path/to/snapshot.zip
-$ python3 snapshot_inspect_stats.py --sort nodes /path/to/unzipped/inspect.json
+$ fuchsia-vendored-python snapshot_inspect_stats.py --sort nodes /path/to/unzipped/inspect.json
 ```
 """
 

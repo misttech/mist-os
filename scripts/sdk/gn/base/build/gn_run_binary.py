@@ -5,7 +5,7 @@
 """Helper script for GN to run an arbitrary binary.
 
 Run with:
-  python3.8 gn_run_binary.py <binary_name> [args ...]
+ fuchsia-vendored-python gn_run_binary.py <binary_name> [args ...]
 """
 
 import os

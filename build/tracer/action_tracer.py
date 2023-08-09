@@ -752,7 +752,7 @@ def get_python_script(command: ToolCommand) -> Optional[str]:
     if command.tool.endswith(('.py', '.pyz')):
         return command.tool
     # 2. is explicitly executed by an interpreter
-    #    for example: path/to/prebuilt/python3.8 build.py
+    #    for example: path/to/prebuilt/python3.11 build.py
     elif _tool_is_python(command.tool):
         script_index = _find_first_index(
             command.args, lambda x: x.endswith(('.py', '.pyz')))

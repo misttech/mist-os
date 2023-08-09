@@ -5,7 +5,7 @@
 """Unit test for main.py.
 
 To manually run this test:
-  python3 main_test.py
+  fuchsia-vendored-python main_test.py
 """
 import json
 import os
