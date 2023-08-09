@@ -87,7 +87,7 @@ zx_status_t CopyPhysicalRegionToBuffer(
 }
 }  // namespace
 
-void ScsiCommandProcessor::BuildSenseData(ResponseUpiu::Data &response_upiu, uint8_t sense_key) {
+void ScsiCommandProcessor::BuildSenseData(ResponseUpiuData &response_upiu, uint8_t sense_key) {
   response_upiu.header.data_segment_length = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
   response_upiu.sense_data_len = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response_upiu.sense_data);
@@ -97,7 +97,7 @@ void ScsiCommandProcessor::BuildSenseData(ResponseUpiu::Data &response_upiu, uin
 }
 
 zx_status_t ScsiCommandProcessor::HandleScsiCommand(
-    CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   constexpr uint8_t kIllegalRequest = 0x05;
   scsi::Opcode opcode = static_cast<scsi::Opcode>(command_upiu.cdb[0]);
@@ -121,14 +121,14 @@ zx_status_t ScsiCommandProcessor::HandleScsiCommand(
 }
 
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandler(
-    UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
-  auto request_sense_command = ScsiCommandUpiu::CopyFrom<ScsiRequestSenseUpiu>(&command_upiu);
-  if (request_sense_command->desc() != 0) {
+  ScsiRequestSenseUpiu request_sense_command(command_upiu);
+  if (request_sense_command.desc() != 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  std::vector<uint8_t> data_buffer(request_sense_command->allocation_length());
+  std::vector<uint8_t> data_buffer(request_sense_command.allocation_length());
 
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(data_buffer.data());
   sense_data->set_response_code(0x70);
@@ -145,16 +145,16 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandle
 }
 
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRead10Handler(
-    UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   uint8_t lun = command_upiu.header.lun;
-  auto read10_command = ScsiCommandUpiu::CopyFrom<ScsiRead10Upiu>(&command_upiu);
+  ScsiRead10Upiu read10_command(command_upiu, kMockBlockSize);
 
-  std::vector<uint8_t> data_buffer(read10_command->GetTransferBytes());
+  std::vector<uint8_t> data_buffer(read10_command.GetTransferBytes());
 
   if (auto status = mock_device.BufferRead(lun, data_buffer.data(),
-                                           read10_command->GetTransferBytes() / kMockBlockSize,
-                                           read10_command->GetStartLba().value());
+                                           read10_command.GetTransferBytes() / kMockBlockSize,
+                                           read10_command.GetStartLba().value());
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -168,12 +168,12 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRead10Handler(
 }
 
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
-    UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   uint8_t lun = command_upiu.header.lun;
-  auto write10_command = ScsiCommandUpiu::CopyFrom<ScsiWrite10Upiu>(&command_upiu);
+  ScsiWrite10Upiu write10_command(command_upiu, kMockBlockSize);
 
-  std::vector<uint8_t> data_buffer(write10_command->GetTransferBytes());
+  std::vector<uint8_t> data_buffer(write10_command.GetTransferBytes());
 
   if (auto status = CopyPhysicalRegionToBuffer(mock_device, data_buffer, prdt_upius);
       status != ZX_OK) {
@@ -181,8 +181,8 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
   }
 
   if (auto status = mock_device.BufferWrite(lun, data_buffer.data(),
-                                            write10_command->GetTransferBytes() / kMockBlockSize,
-                                            write10_command->GetStartLba().value());
+                                            write10_command.GetTransferBytes() / kMockBlockSize,
+                                            write10_command.GetStartLba().value());
       status != ZX_OK) {
     return zx::error(status);
   }
@@ -191,7 +191,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
 }
 
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultSynchronizeCache10Handler(
-    UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   std::vector<uint8_t> data_buffer;
 
@@ -199,7 +199,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultSynchronizeCache10
 }
 
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultTestUnitReadyHandler(
-    UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   std::vector<uint8_t> data_buffer;
 

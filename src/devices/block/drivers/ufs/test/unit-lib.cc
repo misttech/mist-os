@@ -47,11 +47,13 @@ void UfsTest::TearDown() {
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_));
 }
 
-zx::result<> UfsTest::SendCommand(uint8_t slot, TransferRequestDescriptorDataDirection ddir,
-                                  uint16_t resp_offset, uint16_t resp_len, uint16_t prdt_offset,
-                                  uint16_t prdt_len, bool sync) {
-  return ufs_->GetTransferRequestProcessor().SendCommand(slot, ddir, resp_offset, resp_len,
-                                                         prdt_offset, prdt_len, sync);
+zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot,
+                                                   TransferRequestDescriptorDataDirection ddir,
+                                                   uint16_t resp_offset, uint16_t resp_len,
+                                                   uint16_t prdt_offset, uint16_t prdt_len,
+                                                   bool sync) {
+  return ufs_->GetTransferRequestProcessor().FillDescriptorAndSendRequest(
+      slot, ddir, resp_offset, resp_len, prdt_offset, prdt_len, sync);
 }
 
 zx::result<std::array<zx_paddr_t, 2>> UfsTest::MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,

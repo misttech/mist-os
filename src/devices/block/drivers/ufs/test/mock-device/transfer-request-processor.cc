@@ -68,8 +68,8 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
 
 zx_status_t TransferRequestProcessor::DefaultNopOutHandler(
     UfsMockDevice &mock_device, CommandDescriptorData command_descriptor_data) {
-  NopInUpiu::Data *nop_in_upiu =
-      reinterpret_cast<NopInUpiu::Data *>(command_descriptor_data.response_upiu_base_addr);
+  NopInUpiuData *nop_in_upiu =
+      reinterpret_cast<NopInUpiuData *>(command_descriptor_data.response_upiu_base_addr);
   nop_in_upiu->header.data_segment_length = 0;
   nop_in_upiu->header.flags = 0;
   nop_in_upiu->header.response = 0;
@@ -78,10 +78,10 @@ zx_status_t TransferRequestProcessor::DefaultNopOutHandler(
 
 zx_status_t TransferRequestProcessor::DefaultQueryHandler(
     UfsMockDevice &mock_device, CommandDescriptorData command_descriptor_data) {
-  QueryRequestUpiu::Data *request_upiu =
-      reinterpret_cast<QueryRequestUpiu::Data *>(command_descriptor_data.command_upiu_base_addr);
-  QueryResponseUpiu::Data *response_upiu =
-      reinterpret_cast<QueryResponseUpiu::Data *>(command_descriptor_data.response_upiu_base_addr);
+  QueryRequestUpiuData *request_upiu =
+      reinterpret_cast<QueryRequestUpiuData *>(command_descriptor_data.command_upiu_base_addr);
+  QueryResponseUpiuData *response_upiu =
+      reinterpret_cast<QueryResponseUpiuData *>(command_descriptor_data.response_upiu_base_addr);
 
   response_upiu->opcode = request_upiu->opcode;
   response_upiu->idn = request_upiu->idn;
@@ -96,10 +96,10 @@ zx_status_t TransferRequestProcessor::DefaultQueryHandler(
 
 zx_status_t TransferRequestProcessor::DefaultCommandHandler(
     UfsMockDevice &mock_device, CommandDescriptorData command_descriptor_data) {
-  CommandUpiu::Data *command_upiu =
-      reinterpret_cast<CommandUpiu::Data *>(command_descriptor_data.command_upiu_base_addr);
-  ResponseUpiu::Data *response_upiu =
-      reinterpret_cast<ResponseUpiu::Data *>(command_descriptor_data.response_upiu_base_addr);
+  CommandUpiuData *command_upiu =
+      reinterpret_cast<CommandUpiuData *>(command_descriptor_data.command_upiu_base_addr);
+  ResponseUpiuData *response_upiu =
+      reinterpret_cast<ResponseUpiuData *>(command_descriptor_data.response_upiu_base_addr);
   cpp20::span<PhysicalRegionDescriptionTableEntry> prdt_upius(
       reinterpret_cast<PhysicalRegionDescriptionTableEntry *>(
           command_descriptor_data.prdt_base_addr),

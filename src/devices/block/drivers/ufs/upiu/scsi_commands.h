@@ -83,16 +83,19 @@ class ScsiWrite10Upiu;
 
 // UFS Specification Version 3.1, section 11.3 "Universal Flash Storage SCSI Commands".
 class ScsiCommandUpiu : public CommandUpiu {
+ protected:
+  struct ScsiCommonCDB {
+    scsi::Opcode opcode;
+  } __PACKED;
+
  public:
-  DEF_SUBFIELD(data_.cdb[0], 7, 0, opcode);
+  explicit ScsiCommandUpiu(scsi::Opcode opcode) : CommandUpiu(UpiuCommandSetType::kScsi) {
+    scsi_cdb_->opcode = opcode;
+  }
 
   ~ScsiCommandUpiu() override = default;
 
-  explicit ScsiCommandUpiu(scsi::Opcode opcode) : CommandUpiu(UpiuCommandSetType::kScsi) {
-    set_opcode(static_cast<uint8_t>(opcode));
-  }
-
-  scsi::Opcode GetOpcode() const { return static_cast<scsi::Opcode>(opcode()); }
+  scsi::Opcode GetOpcode() const { return scsi_cdb_->opcode; }
 
   // Get the address of first block. Returns std::nullopt if not applicable.
   virtual std::optional<uint32_t> GetStartLba() const { return std::nullopt; }
@@ -101,24 +104,12 @@ class ScsiCommandUpiu : public CommandUpiu {
   virtual uint32_t GetTransferBytes() const { return 0; }
 
   // for test
-  ScsiCommandUpiu() = default;
-  // Because |CopyFrom()| does not copy member variables, classes that inherit from
-  // |ScsiCommandUpiu| must copy member variables separately if they are declared.
-  template <class T>
-  static std::unique_ptr<const T> CopyFrom(const CommandUpiu::Data *data) {
-    static_assert(std::is_base_of<CommandUpiu, T>::value);
-    T *upiu;
-    // |ScsiRead10Upiu| and |ScsiWrite10Upiu| have block size information as a member variable, so
-    // we must pass the block size information to the constructor.
-    if constexpr (std::is_same_v<ScsiRead10Upiu, T> || std::is_same_v<ScsiWrite10Upiu, T>) {
-      // TODO(fxbug.dev/124835): We should pass kMockBlockSize to the constructor
-      upiu = new T(4096);
-    } else {
-      upiu = new T();
-    }
-    std::memcpy(upiu->GetData(), data, sizeof(CommandUpiu::Data));
-    return std::unique_ptr<const T>(upiu);
+  explicit ScsiCommandUpiu(const CommandUpiuData &data) {
+    std::memcpy(GetData(), &data, sizeof(CommandUpiuData));
   }
+
+ private:
+  ScsiCommonCDB *scsi_cdb_ = reinterpret_cast<ScsiCommonCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.6 "READ (10) Command".
@@ -127,7 +118,7 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
   explicit ScsiRead10Upiu(uint32_t start, uint16_t length, uint32_t block_size, bool fua,
                           uint8_t group_num)
       : ScsiCommandUpiu(scsi::Opcode::READ_10), block_size_(block_size) {
-    set_header_flags_r(1);
+    GetData<CommandUpiuData>()->set_header_flags_r(1);
 
     UnalignedStore32(&scsi_cdb_->logical_block_address, htobe32(start));
     UnalignedStore16(&scsi_cdb_->transfer_length, htobe16(length));
@@ -151,12 +142,13 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
     return betoh16(UnalignedLoad16(&scsi_cdb_->transfer_length)) * block_size_;
   }
 
- private:
-  scsi::Read10CDB *scsi_cdb_ = reinterpret_cast<scsi::Read10CDB *>(data_.cdb);
-  const uint32_t block_size_;
   // for test
-  friend class ScsiCommandUpiu;
-  explicit ScsiRead10Upiu(uint32_t block_size) : block_size_(block_size) {}
+  explicit ScsiRead10Upiu(const CommandUpiuData &data, uint32_t block_size)
+      : ScsiCommandUpiu(data), block_size_(block_size) {}
+
+ private:
+  scsi::Read10CDB *scsi_cdb_ = reinterpret_cast<scsi::Read10CDB *>(GetData<CommandUpiuData>()->cdb);
+  const uint32_t block_size_;
 };
 
 // UFS Specification Version 3.1, section 11.3.10 "START STOP UNIT Command".
@@ -168,15 +160,9 @@ class ScsiStartStopUnitUpiu : public ScsiCommandUpiu {
     scsi_cdb_->set_start(start);
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
-
  private:
-  scsi::StartStopCDB *scsi_cdb_ = reinterpret_cast<scsi::StartStopCDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
-  ScsiStartStopUnitUpiu() = default;
+  scsi::StartStopCDB *scsi_cdb_ =
+      reinterpret_cast<scsi::StartStopCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.11 "TEST UNIT READY Command".
@@ -186,14 +172,9 @@ class ScsiTestUnitReadyUpiu : public ScsiCommandUpiu {
     scsi_cdb_->control = 0;
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
-
  private:
-  scsi::TestUnitReadyCDB *scsi_cdb_ = reinterpret_cast<scsi::TestUnitReadyCDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
+  scsi::TestUnitReadyCDB *scsi_cdb_ =
+      reinterpret_cast<scsi::TestUnitReadyCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.15 "WRITE (10) Command".
@@ -202,7 +183,7 @@ class ScsiWrite10Upiu : public ScsiCommandUpiu {
   explicit ScsiWrite10Upiu(uint32_t start, uint16_t length, uint32_t block_size, bool fua,
                            uint8_t group_num)
       : ScsiCommandUpiu(scsi::Opcode::WRITE_10), block_size_(block_size) {
-    set_header_flags_w(1);
+    GetData<CommandUpiuData>()->set_header_flags_w(1);
 
     UnalignedStore32(&scsi_cdb_->logical_block_address, htobe32(start));
     UnalignedStore16(&scsi_cdb_->transfer_length, htobe16(length));
@@ -226,12 +207,14 @@ class ScsiWrite10Upiu : public ScsiCommandUpiu {
     return betoh16(UnalignedLoad16(&scsi_cdb_->transfer_length)) * block_size_;
   }
 
- private:
-  scsi::Write10CDB *scsi_cdb_ = reinterpret_cast<scsi::Write10CDB *>(data_.cdb);
-  const uint32_t block_size_;
   // for test
-  friend class ScsiCommandUpiu;
-  explicit ScsiWrite10Upiu(uint32_t block_size) : block_size_(block_size) {}
+  explicit ScsiWrite10Upiu(const CommandUpiuData &data, uint32_t block_size)
+      : ScsiCommandUpiu(data), block_size_(block_size) {}
+
+ private:
+  scsi::Write10CDB *scsi_cdb_ =
+      reinterpret_cast<scsi::Write10CDB *>(GetData<CommandUpiuData>()->cdb);
+  const uint32_t block_size_;
 };
 
 // UFS Specification Version 3.1, section 11.3.17 "REQUEST SENSE Command".
@@ -252,8 +235,12 @@ class ScsiRequestSenseUpiu : public ScsiCommandUpiu {
   uint8_t desc() const { return scsi_cdb_->desc; }
   uint8_t allocation_length() const { return scsi_cdb_->allocation_length; }
 
+  // for test
+  explicit ScsiRequestSenseUpiu(const CommandUpiuData &data) : ScsiCommandUpiu(data) {}
+
  private:
-  scsi::RequestSenseCDB *scsi_cdb_ = reinterpret_cast<scsi::RequestSenseCDB *>(data_.cdb);
+  scsi::RequestSenseCDB *scsi_cdb_ =
+      reinterpret_cast<scsi::RequestSenseCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.21 "SECURITY PROTOCOL IN Command".
@@ -279,10 +266,7 @@ class ScsiSecurityProtocolInUpiu : public ScsiCommandUpiu {
 
  private:
   scsi::SecurityProtocolInCDB *scsi_cdb_ =
-      reinterpret_cast<scsi::SecurityProtocolInCDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
-  ScsiSecurityProtocolInUpiu() = default;
+      reinterpret_cast<scsi::SecurityProtocolInCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.22 "SECURITY PROTOCOL OUT Command".
@@ -300,6 +284,7 @@ class ScsiSecurityProtocolOutUpiu : public ScsiCommandUpiu {
     UnalignedStore16(&scsi_cdb_->security_protocol_specific, htobe16(0x01));
     UnalignedStore32(&scsi_cdb_->transfer_length, htobe32(length));
   }
+
   TransferRequestDescriptorDataDirection GetDataDirection() const override {
     return TransferRequestDescriptorDataDirection::kHostToDevice;
   }
@@ -310,10 +295,7 @@ class ScsiSecurityProtocolOutUpiu : public ScsiCommandUpiu {
 
  private:
   scsi::SecurityProtocolOutCDB *scsi_cdb_ =
-      reinterpret_cast<scsi::SecurityProtocolOutCDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
-  ScsiSecurityProtocolOutUpiu() = default;
+      reinterpret_cast<scsi::SecurityProtocolOutCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.24 "SYNCHRONIZE CACHE (10) Command".
@@ -331,10 +313,7 @@ class ScsiSynchronizeCache10Upiu : public ScsiCommandUpiu {
 
  private:
   scsi::SynchronizeCache10CDB *scsi_cdb_ =
-      reinterpret_cast<scsi::SynchronizeCache10CDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
-  ScsiSynchronizeCache10Upiu() = default;
+      reinterpret_cast<scsi::SynchronizeCache10CDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.26 "UNMAP Command".
@@ -356,10 +335,7 @@ class ScsiUnmapUpiu : public ScsiCommandUpiu {
   }
 
  private:
-  scsi::UnmapCDB *scsi_cdb_ = reinterpret_cast<scsi::UnmapCDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
-  ScsiUnmapUpiu() = default;
+  scsi::UnmapCDB *scsi_cdb_ = reinterpret_cast<scsi::UnmapCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 // UFS Specification Version 3.1, section 11.3.28 "WRITE BUFFER Command".
@@ -395,10 +371,8 @@ class ScsiWriteBufferUpiu : public ScsiCommandUpiu {
   }
 
  private:
-  scsi::WriteBufferCDB *scsi_cdb_ = reinterpret_cast<scsi::WriteBufferCDB *>(data_.cdb);
-  // for test
-  friend class ScsiCommandUpiu;
-  ScsiWriteBufferUpiu() = default;
+  scsi::WriteBufferCDB *scsi_cdb_ =
+      reinterpret_cast<scsi::WriteBufferCDB *>(GetData<CommandUpiuData>()->cdb);
 };
 
 }  // namespace ufs

@@ -5,7 +5,10 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_TRANSFER_REQUEST_PROCESSOR_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_TRANSFER_REQUEST_PROCESSOR_H_
 
+#include <lib/trace/event.h>
+
 #include "request_processor.h"
+#include "src/devices/block/drivers/ufs/upiu/scsi_commands.h"
 
 namespace ufs {
 
@@ -29,39 +32,117 @@ class TransferRequestProcessor : public RequestProcessor {
   zx::result<> Init() override;
   zx::result<uint8_t> ReserveSlot() override;
 
-  zx::result<> SendRequest(uint8_t slot, bool sync) override;
+  zx::result<> RingRequestDoorbell(uint8_t slot, bool sync) override;
   uint32_t RequestCompletion() override;
 
-  template <typename T>
-  zx::result<T *> SendUpiu(RequestUpiu &request) {
+  // |SendRequestUpiu| allocates a slot for request UPIU and calls SendRequestUsingSlot.
+  template <class RequestType, class ResponseType>
+  zx::result<std::unique_ptr<ResponseType>> SendRequestUpiu(RequestType &request) {
+    zx::result<uint8_t> slot = ReserveSlot();
+    if (slot.is_error()) {
+      return zx::error(ZX_ERR_NO_RESOURCES);
+    }
+
     zx::result<void *> response;
-    if (response = SendUpiu(request); response.is_error()) {
+    if (response = SendRequestUsingSlot<RequestType>(request, slot.value()); response.is_error()) {
       return response.take_error();
     }
-    T *response_upiu = static_cast<T *>(response.value());
+    auto response_upiu = std::make_unique<ResponseType>(response.value());
 
     // Check response.
     if (response_upiu->GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
       zxlogf(ERROR, "Failed to get response: response=%x", response_upiu->GetHeader().response);
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    return zx::ok(response_upiu);
+    return zx::ok(std::move(response_upiu));
   }
-  // TODO(fxbug.dev/124835): |SendUpiu()| and |SendScsiUpiu()| have many of the same behaviours and
-  // should be combined into a single method.
-  zx::result<ResponseUpiu> SendScsiUpiu(std::unique_ptr<struct scsi_xfer> xfer, uint8_t slot,
-                                        bool sync);
+
+  template <class RequestType>
+  std::tuple<uint16_t, uint32_t> PreparePrdt(RequestType &request, uint8_t slot,
+                                             std::unique_ptr<scsi_xfer> xfer,
+                                             uint16_t response_offset, uint16_t response_length) {
+    return {0, 0};
+  }
+
+  template <>
+  std::tuple<uint16_t, uint32_t> PreparePrdt<ScsiCommandUpiu>(ScsiCommandUpiu &request,
+                                                              uint8_t slot,
+                                                              std::unique_ptr<scsi_xfer> xfer,
+                                                              uint16_t response_offset,
+                                                              uint16_t response_length);
+
+  template <class RequestType>
+  zx::result<void *> SendRequestUsingSlot(
+      RequestType &request, uint8_t slot,
+      std::optional<std::unique_ptr<scsi_xfer>> xfer = std::nullopt) {
+    const bool is_scsi = std::is_base_of<ScsiCommandUpiu, RequestType>::value;
+
+    const uint16_t response_offset = request.GetResponseOffset();
+    const uint16_t response_length = request.GetResponseLength();
+
+    if (is_scsi) {
+      ZX_ASSERT(xfer != std::nullopt && xfer.value() != nullptr);
+      TRACE_DURATION_BEGIN("ufs", "SendRequestUsingSlot SCSI command", "offset",
+                           xfer.value()->start_lba, "length", xfer.value()->block_count);
+    }
+
+    // Copy request and prepare response.
+    void *response;
+    {
+      std::lock_guard lock(request_list_lock_);
+      RequestSlot &request_slot = request_list_.GetSlot(slot);
+      ZX_ASSERT_MSG(request_slot.state == SlotState::kReserved, "Invalid slot state");
+      ZX_ASSERT_MSG(request_slot.xfer == nullptr, "Slot already occupied");
+
+      const size_t length = static_cast<size_t>(response_offset) + response_length;
+      ZX_DEBUG_ASSERT_MSG(length <= request_list_.GetDescriptorBufferSize(slot),
+                          "Invalid UPIU size");
+
+      memcpy(request_list_.GetDescriptorBuffer(slot), request.GetData(), response_offset);
+      memset(request_list_.GetDescriptorBuffer<uint8_t>(slot) + response_offset, 0,
+             response_length);
+      response = request_list_.GetDescriptorBuffer(slot, response_offset);
+    }
+
+    // Record the slot number to |task_tag| for debugging.
+    request.GetHeader().task_tag = slot;
+
+    auto [prdt_offset, prdt_length] =
+        PreparePrdt<RequestType>(request, slot, (is_scsi ? std::move(xfer.value()) : nullptr),
+                                 response_offset, response_length);
+
+    if (zx::result<> result =
+            FillDescriptorAndSendRequest(slot, request.GetDataDirection(), response_offset,
+                                         response_length, prdt_offset, prdt_length, /*sync=*/true);
+        result.is_error()) {
+      if (is_scsi) {
+        auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
+            ResponseUpiu(response).GetSenseData());
+        zxlogf(ERROR, "Failed to send scsi command upiu, response code 0x%x, sense key 0x%x",
+               sense_data->response_code(), sense_data->sense_key());
+      } else {
+        zxlogf(ERROR, "Failed to send upiu: %s", result.status_string());
+      }
+
+      return result.take_error();
+    }
+
+    if (is_scsi) {
+      TRACE_DURATION_END("ufs", "SendRequestUsingSlot SCSI command");
+    }
+
+    return zx::ok(response);
+  }
 
  private:
   friend class UfsTest;
 
-  zx::result<void *> SendUpiu(RequestUpiu &request);
-  // Fill in the transfer request descriptor fields and call the |SendRequest()| method.
-  zx::result<> SendCommand(uint8_t slot, TransferRequestDescriptorDataDirection data_dir,
-                           uint16_t response_offset, uint16_t response_length, uint16_t prdt_offset,
-                           uint32_t prdt_length, bool sync);
-  zx::result<> GetResponseStatus(TransferRequestDescriptor *descriptor, ResponseUpiu *response,
-                                 uint8_t transaction_type);
+  zx::result<> FillDescriptorAndSendRequest(uint8_t slot,
+                                            TransferRequestDescriptorDataDirection data_dir,
+                                            uint16_t response_offset, uint16_t response_length,
+                                            uint16_t prdt_offset, uint32_t prdt_length, bool sync);
+  zx::result<> GetResponseStatus(TransferRequestDescriptor *descriptor,
+                                 AbstractResponseUpiu &response, uint8_t transaction_type);
 
   void ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                       TransferRequestDescriptor *descriptor) TA_REQ(request_list_lock_);

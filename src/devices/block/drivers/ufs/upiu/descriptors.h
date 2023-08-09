@@ -306,7 +306,7 @@ class ReadDescriptorUpiu : public QueryReadRequestUpiu {
  public:
   explicit ReadDescriptorUpiu(DescriptorType type, uint8_t index = 0)
       : QueryReadRequestUpiu(QueryOpcode::kReadDescriptor, static_cast<uint8_t>(type), index) {
-    data_.length = htobe16(GetDescriptorSize(type));
+    GetData<QueryRequestUpiuData>()->length = htobe16(GetDescriptorSize(type));
   }
 };
 
@@ -315,14 +315,14 @@ class WriteDescriptorUpiu : public QueryWriteRequestUpiu {
   explicit WriteDescriptorUpiu(DescriptorType type, void* descriptor_data)
       : QueryWriteRequestUpiu(QueryOpcode::kWriteDescriptor, static_cast<uint8_t>(type)) {
     uint16_t length = safemath::checked_cast<uint16_t>(GetDescriptorSize(type));
-    data_.length = htobe16(length);
+    GetData<QueryRequestUpiuData>()->length = htobe16(length);
 
     // Fill data segment
-    ZX_ASSERT_MSG(length <= sizeof(data_.command_data),
+    ZX_ASSERT_MSG(length <= sizeof(GetData<QueryRequestUpiuData>()->command_data),
                   "Tried to copy %u bytes to a buffer of size %zu.", length,
-                  sizeof(data_.command_data));
-    std::memcpy(data_.command_data.data(), descriptor_data, length);
-    data_.header.data_segment_length = htobe16(length);
+                  sizeof(GetData<QueryRequestUpiuData>()->command_data));
+    std::memcpy(GetData<QueryRequestUpiuData>()->command_data.data(), descriptor_data, length);
+    GetData<QueryRequestUpiuData>()->header.data_segment_length = htobe16(length);
   }
 };
 
@@ -330,7 +330,7 @@ class DescriptorResponseUpiu : public QueryResponseUpiu {
  public:
   template <typename T>
   T& GetDescriptor() {
-    return reinterpret_cast<T&>(data_.command_data[0]);
+    return reinterpret_cast<T&>(GetData<QueryRequestUpiuData>()->command_data[0]);
   }
 };
 

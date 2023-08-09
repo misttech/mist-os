@@ -85,57 +85,98 @@ struct UpiuHeader {
 } __PACKED;
 static_assert(sizeof(UpiuHeader) == 12, "UpiuHeader struct must be 12 bytes");
 
-class RequestUpiu {
+class AbstractUpiu {
  public:
-  virtual ~RequestUpiu() = default;
+  // TODO(fxbug.dev/124835): Make |AbstractUpiu| to template class for removing the |Data| struct
+  // within |AbstractUpiu|. Currently each derived class must have a |UpiuHeader| as the first
+  // member in its |Data| struct.
+  struct Data {
+    UpiuHeader header;
+  } __PACKED;
+
+  explicit AbstractUpiu() = default;
+  explicit AbstractUpiu(void* data) : data_ptr_(data) {}
+
+  virtual ~AbstractUpiu() = default;
 
   // Used to read or write the request descriptor in the UPIU.
-  virtual void *GetData() = 0;
-  virtual UpiuHeader &GetHeader() = 0;
+  template <typename T = void>
+  T* GetData() {
+    return reinterpret_cast<T*>(data_ptr_);
+  }
+  UpiuHeader& GetHeader() {
+    ZX_ASSERT(GetData());
+    return GetData<Data>()->header;
+  }
+
+ protected:
+  void SetData(void* data) { data_ptr_ = data; }
+
+ private:
+  void* data_ptr_ = nullptr;
+};
+
+template <typename RequestData, typename ResponseData>
+class AbstractRequestUpiu : public AbstractUpiu {
+ public:
+  explicit AbstractRequestUpiu() {
+    data_ = std::make_unique<RequestData>();
+    SetData(data_.get());
+  }
+  explicit AbstractRequestUpiu(void* data) = delete;
+
+  ~AbstractRequestUpiu() override = default;
+
   // Get the direction of the data transfer to be written to the request descriptor. The
   // TransferRequestDescriptorDataDirection determines whether the target device will read or write
   // the system memory area pointed to by the PRDT.
-  virtual TransferRequestDescriptorDataDirection GetDataDirection() const = 0;
+  virtual TransferRequestDescriptorDataDirection GetDataDirection() const {
+    return TransferRequestDescriptorDataDirection::kNone;
+  }
 
   // Get the offset that ResponseUpiu will be written to.
-  virtual uint16_t GetResponseOffset() const = 0;
+  uint16_t GetResponseOffset() const { return sizeof(RequestData); }
+
   // Get the length of the ResponseUpiu.
-  virtual uint16_t GetResponseLength() const = 0;
+  uint16_t GetResponseLength() const { return sizeof(ResponseData); }
+
+ private:
+  std::unique_ptr<RequestData> data_ = nullptr;
 };
+
+using AbstractResponseUpiu = AbstractUpiu;
+
+struct ResponseUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3
+  uint32_t residual_transfer_count = 0;  // (Big-endian)
+
+  // dword 4 ~ 6
+  uint8_t reserved[16] = {0};
+
+  // Sense Data
+  uint16_t sense_data_len = 0;  // (Big-endian)
+  uint8_t sense_data[18] = {0};
+
+  // Add padding to align the kUpiuAlignment.
+  uint8_t padding[4] = {0};
+
+  DEF_SUBBIT(header.flags, 6, header_flags_o);
+  DEF_SUBBIT(header.flags, 5, header_flags_u);
+  DEF_SUBBIT(header.flags, 4, header_flags_d);
+} __PACKED;
+static_assert(sizeof(ResponseUpiuData) == 56, "ResponseUpiu struct, must be 56 bytes");
+static_assert(sizeof(ResponseUpiuData) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
 
 // UFS Specification Version 3.1, section 10.7.2 "RESPONSE UPIU".
-class ResponseUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3
-    uint32_t residual_transfer_count = 0;  // (Big-endian)
-
-    // dword 4 ~ 6
-    uint8_t reserved[16] = {0};
-
-    // Sense Data
-    uint16_t sense_data_len = 0;  // (Big-endian)
-    uint8_t sense_data[18] = {0};
-
-    // Add padding to align the kUpiuAlignment.
-    uint8_t padding[4] = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(ResponseUpiu::Data) == 56, "ResponseUpiu struct, must be 56 bytes");
-  static_assert(sizeof(ResponseUpiu::Data) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
-
+class ResponseUpiu : public AbstractResponseUpiu {
  public:
-  DEF_SUBBIT(data_.header.flags, 6, header_flags_o);
-  DEF_SUBBIT(data_.header.flags, 5, header_flags_u);
-  DEF_SUBBIT(data_.header.flags, 4, header_flags_d);
+  explicit ResponseUpiu(void* data) : AbstractResponseUpiu(data) {}
 
-  explicit ResponseUpiu() { data_.header.set_trans_code(UpiuTransactionCodes::kResponse); }
+  ~ResponseUpiu() override = default;
 
-  UpiuHeader &GetHeader() { return data_.header; }
-  uint8_t *GetSenseData() { return data_.sense_data; }
-
-  static uint16_t GetDataSize() { return sizeof(ResponseUpiu::Data); }
+  uint8_t* GetSenseData() { return GetData<ResponseUpiuData>()->sense_data; }
 
  private:
   // for test
@@ -143,52 +184,38 @@ class ResponseUpiu {
   friend class ufs_mock_device::ScsiCommandProcessor;
   friend class UfsTest;
 };
+
+struct CommandUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3
+  uint32_t expected_data_transfer_length = 0;  // (Big-endian)
+
+  // dword 4 ~ 7
+  uint8_t cdb[16] = {0};
+
+  DEF_SUBBIT(header.flags, 6, header_flags_r);
+  DEF_SUBBIT(header.flags, 5, header_flags_w);
+  DEF_SUBBIT(header.flags, 2, header_flags_cp);
+  DEF_SUBFIELD(header.flags, 1, 0, header_flags_attr);
+} __PACKED;
+static_assert(sizeof(CommandUpiuData) == 32, "CommandUpiu struct must be 32 bytes");
+static_assert(sizeof(CommandUpiuData) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
 
 // UFS Specification Version 3.1, section 10.7.1 "COMMAND UPIU".
-class CommandUpiu : public RequestUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3
-    uint32_t expected_data_transfer_length = 0;  // (Big-endian)
-
-    // dword 4 ~ 7
-    uint8_t cdb[16] = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(CommandUpiu::Data) == 32, "CommandUpiu struct must be 32 bytes");
-  static_assert(sizeof(CommandUpiu::Data) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
-
+class CommandUpiu : public AbstractRequestUpiu<CommandUpiuData, ResponseUpiuData> {
  public:
-  DEF_SUBBIT(data_.header.flags, 6, header_flags_r);
-  DEF_SUBBIT(data_.header.flags, 5, header_flags_w);
-  DEF_SUBBIT(data_.header.flags, 2, header_flags_cp);
-  DEF_SUBFIELD(data_.header.flags, 1, 0, header_flags_attr);
+  explicit CommandUpiu() { GetHeader().set_trans_code(UpiuTransactionCodes::kCommand); }
 
-  explicit CommandUpiu(UpiuCommandSetType command_set_type) {
-    data_.header.set_trans_code(UpiuTransactionCodes::kCommand);
-    data_.header.set_command_set_type(command_set_type);
+  explicit CommandUpiu(UpiuCommandSetType command_set_type) : CommandUpiu() {
+    GetHeader().set_command_set_type(command_set_type);
   }
+
   ~CommandUpiu() override = default;
 
-  void *GetData() override { return static_cast<void *>(&data_); }
-  UpiuHeader &GetHeader() override { return data_.header; }
-
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
-
-  uint16_t GetResponseOffset() const override { return GetDataSize(); }
-  uint16_t GetResponseLength() const override { return ResponseUpiu::GetDataSize(); }
-
   void SetExpectedDataTransferLength(uint32_t length) {
-    data_.expected_data_transfer_length = htobe32(length);
+    GetData<CommandUpiuData>()->expected_data_transfer_length = htobe32(length);
   }
-
-  static uint16_t GetDataSize() { return sizeof(CommandUpiu::Data); }
-
-  // for test
-  CommandUpiu() = default;
 
  private:
   // for test
@@ -197,67 +224,55 @@ class CommandUpiu : public RequestUpiu {
   friend class UfsTest;
 };
 
-// UFS Specification Version 3.1, section 10.7.7 "TASK MANAGEMENT RESPONSE UPIU".
-class TaskManagementResponseUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3
-    uint32_t param1 = 0;  // (Big-endian)
-    // dword 4
-    uint32_t param2 = 0;  // (Big-endian)
-    // dword 5 ~ 7
-    uint8_t reserved[12] = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(TaskManagementResponseUpiu::Data) == 32,
-                "TaskManagementResponseUpiu struct must be 32 bytes");
-  static_assert(sizeof(TaskManagementResponseUpiu::Data) % kUpiuAlignment == 0,
-                "UPIU requires 64-bit alignment");
+struct TaskManagementResponseUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3
+  uint32_t param1 = 0;  // (Big-endian)
+  // dword 4
+  uint32_t param2 = 0;  // (Big-endian)
+  // dword 5 ~ 7
+  uint8_t reserved[12] = {0};
+} __PACKED;
+static_assert(sizeof(TaskManagementResponseUpiuData) == 32,
+              "TaskManagementResponseUpiu struct must be 32 bytes");
+static_assert(sizeof(TaskManagementResponseUpiuData) % kUpiuAlignment == 0,
+              "UPIU requires 64-bit alignment");
 
+// UFS Specification Version 3.1, section 10.7.7 "TASK MANAGEMENT RESPONSE UPIU".
+class TaskManagementResponseUpiu : public AbstractResponseUpiu {
  public:
-  explicit TaskManagementResponseUpiu() {
-    data_.header.set_trans_code(UpiuTransactionCodes::kTaskManagementResponse);
-  }
-  static uint16_t GetDataSize() { return sizeof(TaskManagementResponseUpiu::Data); }
+  explicit TaskManagementResponseUpiu(void* data) : AbstractResponseUpiu(data) {}
+
+  ~TaskManagementResponseUpiu() override = default;
 };
 
-// UFS Specification Version 3.1, section 10.7.6 "TASK MANAGEMENT REQUEST UPIU".
-class TaskManagementRequestUpiu : public RequestUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3
-    uint32_t param1 = 0;  // (Big-endian)
-    // dword 4
-    uint32_t param2 = 0;  // (Big-endian)
-    // dword 5
-    uint32_t param3 = 0;  // (Big-endian)
-    // dword 6 ~ 7
-    uint8_t reserved[8] = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(TaskManagementRequestUpiu::Data) == 32,
-                "TaskManagementRequestUpiu struct must be 32 bytes");
-  static_assert(sizeof(TaskManagementRequestUpiu::Data) % kUpiuAlignment == 0,
-                "UPIU requires 64-bit alignment");
+struct TaskManagementRequestUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3
+  uint32_t param1 = 0;  // (Big-endian)
+  // dword 4
+  uint32_t param2 = 0;  // (Big-endian)
+  // dword 5
+  uint32_t param3 = 0;  // (Big-endian)
+  // dword 6 ~ 7
+  uint8_t reserved[8] = {0};
+} __PACKED;
+static_assert(sizeof(TaskManagementRequestUpiuData) == 32,
+              "TaskManagementRequestUpiu struct must be 32 bytes");
+static_assert(sizeof(TaskManagementRequestUpiuData) % kUpiuAlignment == 0,
+              "UPIU requires 64-bit alignment");
 
+// UFS Specification Version 3.1, section 10.7.6 "TASK MANAGEMENT REQUEST UPIU".
+class TaskManagementRequestUpiu
+    : public AbstractRequestUpiu<TaskManagementRequestUpiuData, TaskManagementResponseUpiuData> {
  public:
   explicit TaskManagementRequestUpiu() {
-    data_.header.set_trans_code(UpiuTransactionCodes::kTaskManagementRequest);
+    GetHeader().set_trans_code(UpiuTransactionCodes::kTaskManagementRequest);
   }
+
   ~TaskManagementRequestUpiu() override = default;
-
-  void *GetData() override { return static_cast<void *>(&data_); }
-  UpiuHeader &GetHeader() override { return data_.header; }
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
-
-  uint16_t GetResponseOffset() const override { return GetDataSize(); }
-  uint16_t GetResponseLength() const override { return TaskManagementResponseUpiu::GetDataSize(); }
-
-  static uint16_t GetDataSize() { return sizeof(TaskManagementRequestUpiu::Data); }
 };
 
 enum class QueryFunction {
@@ -277,67 +292,57 @@ enum class QueryOpcode {
   kToggleFlag,
 };
 
-// UFS Specification Version 3.1, section 10.7.9 "QUERY RESPONSE UPIU".
-class QueryResponseUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3
-    uint8_t opcode = 0;
-    uint8_t idn = 0;
-    uint8_t index = 0;
-    uint8_t selector = 0;
+struct QueryResponseUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3
+  uint8_t opcode = 0;
+  uint8_t idn = 0;
+  uint8_t index = 0;
+  uint8_t selector = 0;
 
-    // dword 4
-    uint8_t reserved1[2] = {0};
-    uint16_t length = 0;  // (Big-endian)
+  // dword 4
+  uint8_t reserved1[2] = {0};
+  uint16_t length = 0;  // (Big-endian)
 
-    // dword 5
-    union {
-      uint32_t value = 0;  // (Big-endian)
-      struct {
-        uint8_t reserved2[3];
-        uint8_t flag_value;
-      };
+  // dword 5
+  union {
+    uint32_t value = 0;  // (Big-endian)
+    struct {
+      uint8_t reserved2[3];
+      uint8_t flag_value;
     };
+  } __PACKED;
 
-    // dword 6
-    uint8_t reserved3[4] = {0};
+  // dword 6
+  uint8_t reserved3[4] = {0};
 
-    // dword 7
-    uint8_t reserved4[4] = {0};
-    std::array<uint8_t, 256> command_data = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(QueryResponseUpiu::Data) == 288,
-                "QueryResponseUpiu struct must be 288 bytes");
-  static_assert(sizeof(QueryResponseUpiu::Data) % kUpiuAlignment == 0,
-                "UPIU requires 64-bit alignment");
+  // dword 7
+  uint8_t reserved4[4] = {0};
+  std::array<uint8_t, 256> command_data = {0};
+} __PACKED;
+static_assert(sizeof(QueryResponseUpiuData) == 288, "QueryResponseUpiu struct must be 288 bytes");
+static_assert(sizeof(QueryResponseUpiuData) % kUpiuAlignment == 0,
+              "UPIU requires 64-bit alignment");
 
+// UFS Specification Version 3.1, section 10.7.9 "QUERY RESPONSE UPIU".
+class QueryResponseUpiu : public AbstractResponseUpiu {
  public:
-  explicit QueryResponseUpiu(uint8_t query_function, uint8_t query_opcode, uint8_t type) {
-    data_.header.set_trans_code(UpiuTransactionCodes::kQueryResponse);
-    data_.header.function = query_function;
+  explicit QueryResponseUpiu(void* data) : AbstractResponseUpiu(data) {}
 
-    data_.opcode = query_opcode;
-    data_.idn = type;
-  }
-
-  UpiuHeader &GetHeader() { return data_.header; }
+  ~QueryResponseUpiu() override = default;
 
   template <typename U>
-  constexpr U &GetResponse() {
+  constexpr U& GetResponse() {
     static_assert(std::is_base_of<QueryResponseUpiu, U>::value);
     static_assert(sizeof(U) == sizeof(QueryResponseUpiu));
-    return *reinterpret_cast<U *>(this);
+    return *reinterpret_cast<U*>(this);
   }
 
-  static uint16_t GetDataSize() { return sizeof(QueryResponseUpiu::Data); }
-
   // for test
-  uint8_t GetOpcode() const { return data_.opcode; }
-  uint8_t GetIdn() const { return data_.idn; }
-  uint8_t GetIndex() const { return data_.index; }
+  uint8_t GetOpcode() { return GetData<QueryResponseUpiuData>()->opcode; }
+  uint8_t GetIdn() { return GetData<QueryResponseUpiuData>()->idn; }
+  uint8_t GetIndex() { return GetData<QueryResponseUpiuData>()->index; }
 
  private:
   // for test
@@ -346,58 +351,47 @@ class QueryResponseUpiu {
   friend class UfsTest;
 };
 
+struct QueryRequestUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3
+  uint8_t opcode = 0;
+  uint8_t idn = 0;
+  uint8_t index = 0;
+  uint8_t selector = 0;
+
+  // dword 4
+  uint8_t reserved1[2] = {0};
+  uint16_t length = 0;  // (Big-endian)
+
+  // dword 5
+  uint32_t value = 0;  // (Big-endian)
+
+  // dword 6
+  uint8_t reserved2[4] = {0};
+
+  // dword 7
+  uint8_t reserved3[4] = {0};
+  std::array<uint8_t, 256> command_data = {0};
+} __PACKED;
+static_assert(sizeof(QueryRequestUpiuData) == 288, "QueryRequestUpiu struct must be 288 bytes");
+static_assert(sizeof(QueryRequestUpiuData) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
+
 // UFS Specification Version 3.1, section 10.7.8 "QUERY REQUEST UPIU".
-class QueryRequestUpiu : public RequestUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3
-    uint8_t opcode = 0;
-    uint8_t idn = 0;
-    uint8_t index = 0;
-    uint8_t selector = 0;
-
-    // dword 4
-    uint8_t reserved1[2] = {0};
-    uint16_t length = 0;  // (Big-endian)
-
-    // dword 5
-    uint32_t value = 0;  // (Big-endian)
-
-    // dword 6
-    uint8_t reserved2[4] = {0};
-
-    // dword 7
-    uint8_t reserved3[4] = {0};
-    std::array<uint8_t, 256> command_data = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(QueryRequestUpiu::Data) == 288, "QueryRequestUpiu struct must be 288 bytes");
-  static_assert(sizeof(QueryRequestUpiu::Data) % kUpiuAlignment == 0,
-                "UPIU requires 64-bit alignment");
-
+class QueryRequestUpiu : public AbstractRequestUpiu<QueryRequestUpiuData, QueryResponseUpiuData> {
  public:
   explicit QueryRequestUpiu(QueryFunction query_function, QueryOpcode query_opcode, uint8_t type,
                             uint8_t index = 0) {
-    data_.header.set_trans_code(UpiuTransactionCodes::kQueryRequest);
-    data_.header.function = static_cast<uint8_t>(query_function);
+    GetHeader().set_trans_code(UpiuTransactionCodes::kQueryRequest);
 
-    data_.opcode = static_cast<uint8_t>(query_opcode);
-    data_.idn = type;
-    data_.index = index;
+    GetHeader().function = static_cast<uint8_t>(query_function);
+
+    GetData<QueryRequestUpiuData>()->opcode = static_cast<uint8_t>(query_opcode);
+    GetData<QueryRequestUpiuData>()->idn = type;
+    GetData<QueryRequestUpiuData>()->index = index;
   }
+
   ~QueryRequestUpiu() override = default;
-
-  void *GetData() override { return static_cast<void *>(&data_); }
-  UpiuHeader &GetHeader() override { return data_.header; }
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
-
-  uint16_t GetResponseOffset() const override { return GetDataSize(); }
-  uint16_t GetResponseLength() const override { return QueryResponseUpiu::GetDataSize(); }
-
-  static uint16_t GetDataSize() { return sizeof(QueryRequestUpiu::Data); }
 
  private:
   // for test
@@ -406,23 +400,21 @@ class QueryRequestUpiu : public RequestUpiu {
   friend class UfsTest;
 };
 
+struct NopInUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3 ~ 7
+  uint8_t reserved[20] = {0};
+} __PACKED;
+static_assert(sizeof(NopInUpiuData) == 32, "NopInUpiu struct must be 32 bytes");
+static_assert(sizeof(NopInUpiuData) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
+
 // UFS Specification Version 3.1, section 10.7.12 "NOP IN UPIU".
-class NopInUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3 ~ 7
-    uint8_t reserved[20] = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(NopInUpiu::Data) == 32, "NopInUpiu struct must be 32 bytes");
-  static_assert(sizeof(NopInUpiu::Data) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
-
+class NopInUpiu : public AbstractResponseUpiu {
  public:
-  explicit NopInUpiu() { data_.header.set_trans_code(UpiuTransactionCodes::kNopIn); }
+  explicit NopInUpiu(void* data) : AbstractResponseUpiu(data) {}
 
-  UpiuHeader &GetHeader() { return data_.header; }
-  static uint16_t GetDataSize() { return sizeof(NopInUpiu::Data); }
+  ~NopInUpiu() override = default;
 
  private:
   // for test
@@ -430,33 +422,22 @@ class NopInUpiu {
   friend class UfsTest;
 };
 
-// UFS Specification Version 3.1, section 10.7.11 "NOP OUT UPIU".
-class NopOutUpiu : public RequestUpiu {
- protected:
-  struct Data {
-    // dword 0 ~ 2
-    UpiuHeader header;
-    // dword 3 ~ 7
-    uint8_t reserved[20] = {0};
-  } data_ __PACKED;
-  static_assert(sizeof(NopOutUpiu::Data) == 32, "NopOutUpiu struct must be 32 bytes");
-  static_assert(sizeof(NopOutUpiu::Data) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
-
- public:
-  explicit NopOutUpiu() { data_.header.set_trans_code(UpiuTransactionCodes::kNopOut); }
-  ~NopOutUpiu() override = default;
-
-  void *GetData() override { return static_cast<void *>(&data_); }
-  UpiuHeader &GetHeader() override { return data_.header; }
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
-
-  uint16_t GetResponseOffset() const override { return GetDataSize(); }
-  uint16_t GetResponseLength() const override { return NopInUpiu::GetDataSize(); }
-
-  static uint16_t GetDataSize() { return sizeof(NopOutUpiu::Data); }
+struct NopOutUpiuData {
+  // dword 0 ~ 2
+  UpiuHeader header;
+  // dword 3 ~ 7
+  uint8_t reserved[20] = {0};
 } __PACKED;
+static_assert(sizeof(NopOutUpiuData) == 32, "NopOutUpiu struct must be 32 bytes");
+static_assert(sizeof(NopOutUpiuData) % kUpiuAlignment == 0, "UPIU requires 64-bit alignment");
+
+// UFS Specification Version 3.1, section 10.7.11 "NOP OUT UPIU".
+class NopOutUpiu : public AbstractRequestUpiu<NopOutUpiuData, NopInUpiuData> {
+ public:
+  explicit NopOutUpiu() { GetHeader().set_trans_code(UpiuTransactionCodes::kNopOut); }
+
+  ~NopOutUpiu() override = default;
+};
 
 }  // namespace ufs
 

@@ -35,7 +35,7 @@ class RequestProcessor {
   virtual zx::result<uint8_t> ReserveSlot() = 0;
 
   // Ring the door bell and wait for completion.
-  virtual zx::result<> SendRequest(uint8_t slot, bool sync) = 0;
+  virtual zx::result<> RingRequestDoorbell(uint8_t slot, bool sync) = 0;
   // Check all slots to process completed requests. This function returns the number of completed
   // requests. This function is called by the ISR.
   virtual uint32_t RequestCompletion() = 0;

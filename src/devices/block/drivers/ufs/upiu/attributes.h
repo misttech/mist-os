@@ -66,14 +66,14 @@ class WriteAttributeUpiu : public QueryWriteRequestUpiu {
   explicit WriteAttributeUpiu(Attributes type, uint32_t value)
       : QueryWriteRequestUpiu(QueryOpcode::kWriteAttribute, static_cast<uint8_t>(type)) {
     if (value) {
-      data_.value = htobe32(value);
+      GetData<QueryRequestUpiuData>()->value = htobe32(value);
     }
   }
 };
 
 class AttributeResponseUpiu : public QueryResponseUpiu {
  public:
-  uint32_t GetAttribute() { return betoh32(data_.value); }
+  uint32_t GetAttribute() { return betoh32(GetData<QueryResponseUpiuData>()->value); }
 };
 
 }  // namespace ufs

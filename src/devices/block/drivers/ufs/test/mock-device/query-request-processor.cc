@@ -9,8 +9,8 @@
 namespace ufs {
 namespace ufs_mock_device {
 
-zx_status_t QueryRequestProcessor::HandleQueryRequest(QueryRequestUpiu::Data &req_upiu,
-                                                      QueryResponseUpiu::Data &rsp_upiu) {
+zx_status_t QueryRequestProcessor::HandleQueryRequest(QueryRequestUpiuData &req_upiu,
+                                                      QueryResponseUpiuData &rsp_upiu) {
   zx_status_t status;
   if (auto it = handlers_.find(static_cast<QueryOpcode>(req_upiu.opcode)); it != handlers_.end()) {
     status = (it->second)(mock_device_, req_upiu, rsp_upiu);
@@ -22,8 +22,8 @@ zx_status_t QueryRequestProcessor::HandleQueryRequest(QueryRequestUpiu::Data &re
 }
 
 zx_status_t QueryRequestProcessor::DefaultReadDescriptorHandler(UfsMockDevice &mock_device,
-                                                                QueryRequestUpiu::Data &req_upiu,
-                                                                QueryResponseUpiu::Data &rsp_upiu) {
+                                                                QueryRequestUpiuData &req_upiu,
+                                                                QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardReadRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -47,9 +47,23 @@ zx_status_t QueryRequestProcessor::DefaultReadDescriptorHandler(UfsMockDevice &m
   return ZX_OK;
 }
 
+zx_status_t QueryRequestProcessor::DefaultWriteDescriptorHandler(UfsMockDevice &mock_device,
+                                                                 QueryRequestUpiuData &req_upiu,
+                                                                 QueryResponseUpiuData &rsp_upiu) {
+  if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest) ||
+      req_upiu.idn != static_cast<uint8_t>(DescriptorType::kConfiguration)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  mock_device.GetDeviceDesc().bHighPriorityLUN =
+      reinterpret_cast<ConfigurationDescriptor *>(req_upiu.command_data.data())->bHighPriorityLUN;
+
+  return ZX_OK;
+}
+
 zx_status_t QueryRequestProcessor::DefaultReadAttributeHandler(UfsMockDevice &mock_device,
-                                                               QueryRequestUpiu::Data &req_upiu,
-                                                               QueryResponseUpiu::Data &rsp_upiu) {
+                                                               QueryRequestUpiuData &req_upiu,
+                                                               QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardReadRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -60,8 +74,8 @@ zx_status_t QueryRequestProcessor::DefaultReadAttributeHandler(UfsMockDevice &mo
 }
 
 zx_status_t QueryRequestProcessor::DefaultWriteAttributeHandler(UfsMockDevice &mock_device,
-                                                                QueryRequestUpiu::Data &req_upiu,
-                                                                QueryResponseUpiu::Data &rsp_upiu) {
+                                                                QueryRequestUpiuData &req_upiu,
+                                                                QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -73,8 +87,8 @@ zx_status_t QueryRequestProcessor::DefaultWriteAttributeHandler(UfsMockDevice &m
 }
 
 zx_status_t QueryRequestProcessor::DefaultReadFlagHandler(UfsMockDevice &mock_device,
-                                                          QueryRequestUpiu::Data &req_upiu,
-                                                          QueryResponseUpiu::Data &rsp_upiu) {
+                                                          QueryRequestUpiuData &req_upiu,
+                                                          QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardReadRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -85,8 +99,8 @@ zx_status_t QueryRequestProcessor::DefaultReadFlagHandler(UfsMockDevice &mock_de
 }
 
 zx_status_t QueryRequestProcessor::DefaultSetFlagHandler(UfsMockDevice &mock_device,
-                                                         QueryRequestUpiu::Data &req_upiu,
-                                                         QueryResponseUpiu::Data &rsp_upiu) {
+                                                         QueryRequestUpiuData &req_upiu,
+                                                         QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -103,8 +117,8 @@ zx_status_t QueryRequestProcessor::DefaultSetFlagHandler(UfsMockDevice &mock_dev
 }
 
 zx_status_t QueryRequestProcessor::DefaultToggleFlagHandler(UfsMockDevice &mock_device,
-                                                            QueryRequestUpiu::Data &req_upiu,
-                                                            QueryResponseUpiu::Data &rsp_upiu) {
+                                                            QueryRequestUpiuData &req_upiu,
+                                                            QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -115,8 +129,8 @@ zx_status_t QueryRequestProcessor::DefaultToggleFlagHandler(UfsMockDevice &mock_
 }
 
 zx_status_t QueryRequestProcessor::DefaultClearFlagHandler(UfsMockDevice &mock_device,
-                                                           QueryRequestUpiu::Data &req_upiu,
-                                                           QueryResponseUpiu::Data &rsp_upiu) {
+                                                           QueryRequestUpiuData &req_upiu,
+                                                           QueryResponseUpiuData &rsp_upiu) {
   if (req_upiu.header.function != static_cast<uint8_t>(QueryFunction::kStandardWriteRequest)) {
     return ZX_ERR_INVALID_ARGS;
   }

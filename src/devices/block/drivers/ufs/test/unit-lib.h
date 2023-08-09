@@ -15,13 +15,6 @@ namespace ufs {
 
 class UfsTest : public zxtest::Test {
  public:
-  // To access the Data struct declared as protect, we re-declare it as public.
-  using ResponseUpiuData = ResponseUpiu::Data;
-  using CommandUpiuData = CommandUpiu::Data;
-  using QueryResponseUpiuData = QueryResponseUpiu::Data;
-  using QueryRequestUpiuData = QueryRequestUpiu::Data;
-  using NopInUpiuData = NopInUpiu::Data;
-
   void SetUp() override;
 
   void RunInit();
@@ -34,9 +27,10 @@ class UfsTest : public zxtest::Test {
   zx_status_t EnableController() { return ufs_->EnableHostController(); }
 
   // Helper functions for accessing private functions.
-  zx::result<> SendCommand(uint8_t slot, TransferRequestDescriptorDataDirection ddir,
-                           uint16_t resp_offset, uint16_t resp_len, uint16_t prdt_offset,
-                           uint16_t prdt_len, bool sync);
+  zx::result<> FillDescriptorAndSendRequest(uint8_t slot,
+                                            TransferRequestDescriptorDataDirection ddir,
+                                            uint16_t resp_offset, uint16_t resp_len,
+                                            uint16_t prdt_offset, uint16_t prdt_len, bool sync);
 
   // Map the data vmo to the address space and assign physical addresses. Currently, it only
   // supports 8KB vmo. So, we get two physical addresses. The return value is the physical address

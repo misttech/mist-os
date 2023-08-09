@@ -41,7 +41,9 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorSendRequestSync) {
   auto &slot = ufs_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
   ASSERT_EQ(slot.state, SlotState::kReserved);
 
-  ASSERT_EQ(ufs_->GetTransferRequestProcessor().SendRequest(slot_num.value(), true).status_value(),
+  ASSERT_EQ(ufs_->GetTransferRequestProcessor()
+                .RingRequestDoorbell(slot_num.value(), true)
+                .status_value(),
             ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kFree);
 }
@@ -62,7 +64,9 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorSendRequestSyncTimeout) {
   ASSERT_EQ(slot.state, SlotState::kReserved);
 
   ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
-  ASSERT_EQ(ufs_->GetTransferRequestProcessor().SendRequest(slot_num.value(), true).status_value(),
+  ASSERT_EQ(ufs_->GetTransferRequestProcessor()
+                .RingRequestDoorbell(slot_num.value(), true)
+                .status_value(),
             ZX_ERR_TIMED_OUT);
 }
 
@@ -81,14 +85,16 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorSendRequestAsync) {
   auto &slot = ufs_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
   ASSERT_EQ(slot.state, SlotState::kReserved);
 
-  ASSERT_EQ(ufs_->GetTransferRequestProcessor().SendRequest(slot_num.value(), false).status_value(),
+  ASSERT_EQ(ufs_->GetTransferRequestProcessor()
+                .RingRequestDoorbell(slot_num.value(), false)
+                .status_value(),
             ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kScheduled);
   ASSERT_EQ(ufs_->GetTransferRequestProcessor().RequestCompletion(), 1);
   ASSERT_EQ(slot.state, SlotState::kFree);
 }
 
-TEST_F(RequestProcessorTest, SendCommand) {
+TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   // Disable completion interrupt
@@ -110,8 +116,8 @@ TEST_F(RequestProcessorTest, SendCommand) {
   constexpr uint16_t prdt_offset = 0x56;
   constexpr uint16_t prdt_length = 0x78;
   constexpr bool sync = false;
-  ASSERT_EQ(SendCommand(slot_num.value(), data_dir, response_offset, response_length, prdt_offset,
-                        prdt_length, sync)
+  ASSERT_EQ(FillDescriptorAndSendRequest(slot_num.value(), data_dir, response_offset,
+                                         response_length, prdt_offset, prdt_length, sync)
                 .status_value(),
             ZX_OK);
 
@@ -145,7 +151,7 @@ TEST_F(RequestProcessorTest, SendCommand) {
   EXPECT_EQ(descriptor->prdt_length(), prdt_length / kDwordSize);
 }
 
-TEST_F(RequestProcessorTest, SendCommandTimeout) {
+TEST_F(RequestProcessorTest, SendRequestDescriptorTimeout) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   // Disable completion interrupt
@@ -167,14 +173,16 @@ TEST_F(RequestProcessorTest, SendCommandTimeout) {
   uint16_t prdt_offset = 0x56;
   uint16_t prdt_length = 0x78;
   bool sync = false;
-  ASSERT_EQ(SendCommand(slot_num.value(), data_dir, response_offset, response_length, prdt_offset,
-                        prdt_length, sync)
+  ASSERT_EQ(FillDescriptorAndSendRequest(slot_num.value(), data_dir, response_offset,
+                                         response_length, prdt_offset, prdt_length, sync)
                 .status_value(),
             ZX_OK);
 
   ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
   slot.state = SlotState::kReserved;
-  ASSERT_EQ(ufs_->GetTransferRequestProcessor().SendRequest(slot_num.value(), true).status_value(),
+  ASSERT_EQ(ufs_->GetTransferRequestProcessor()
+                .RingRequestDoorbell(slot_num.value(), true)
+                .status_value(),
             ZX_ERR_TIMED_OUT);
 }
 
@@ -182,14 +190,17 @@ TEST_F(RequestProcessorTest, SendQueryUpiu) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   ReadAttributeUpiu request(Attributes::bBootLunEn);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(request);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          request);
   ASSERT_EQ(response.status_value(), ZX_OK);
 
   // Check that the Request UPIU is copied into the command descriptor.
   constexpr uint8_t slot_num = 0;
-  auto command_descriptor =
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num);
-  ASSERT_EQ(memcmp(request.GetData(), command_descriptor, QueryRequestUpiu::GetDataSize()), 0);
+  AbstractUpiu command_descriptor(
+      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num));
+  ASSERT_EQ(memcmp(request.GetData(), command_descriptor.GetData(), sizeof(QueryRequestUpiuData)),
+            0);
 
   // Check response
   ASSERT_EQ(response->GetHeader().trans_code(), UpiuTransactionCodes::kQueryResponse);
@@ -214,7 +225,9 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
 
   ReadAttributeUpiu request(Attributes::bBootLunEn);
   ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(request);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          request);
   ASSERT_EQ(response.status_value(), ZX_ERR_TIMED_OUT);
 
   // Enable completion interrupt
@@ -244,7 +257,9 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
                                                                          *response_upiu);
       });
 
-  response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(request);
+  response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          request);
   ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
 }
 
@@ -252,14 +267,15 @@ TEST_F(RequestProcessorTest, SendNopUpiu) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   NopOutUpiu nop_out_upiu;
-  auto nop_in = ufs_->GetTransferRequestProcessor().SendUpiu<NopInUpiu>(nop_out_upiu);
+  auto nop_in =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_OK);
 
   // Check that the nop out UPIU is copied into the command descriptor.
   constexpr uint8_t slot_num = 0;
-  auto command_descriptor =
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num);
-  ASSERT_EQ(memcmp(nop_out_upiu.GetData(), command_descriptor, sizeof(NopOutUpiu::GetDataSize())),
+  AbstractUpiu command_descriptor(
+      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num));
+  ASSERT_EQ(memcmp(nop_out_upiu.GetData(), command_descriptor.GetData(), sizeof(NopOutUpiuData)),
             0);
 
   // Check response
@@ -281,7 +297,8 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
 
   NopOutUpiu nop_out_upiu;
   ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
-  auto nop_in = ufs_->GetTransferRequestProcessor().SendUpiu<NopInUpiu>(nop_out_upiu);
+  auto nop_in =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_TIMED_OUT);
 
   // Enable completion interrupt
@@ -302,7 +319,7 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
         return ZX_OK;
       });
 
-  nop_in = ufs_->GetTransferRequestProcessor().SendUpiu<NopInUpiu>(nop_out_upiu);
+  nop_in = ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_BAD_STATE);
 }
 
@@ -331,25 +348,25 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
 
   xfer->done = &xfer->local_event;
 
-  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(std::move(xfer), slot.value(),
-                                                                   /*sync=*/true);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  auto response_or = ufs_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
+      *(xfer->upiu), slot.value(), std::move(xfer));
+  ASSERT_EQ(response_or.status_value(), ZX_OK);
 
   // Check that the SCSI UPIU is copied into the command descriptor.
-  auto command_descriptor =
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot.value());
+  AbstractUpiu command_descriptor(
+      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot.value()));
 
   upiu_backup->GetHeader().lun = lun;
   upiu_backup->GetHeader().task_tag = slot.value();
   upiu_backup->SetExpectedDataTransferLength(upiu_backup->GetTransferBytes());
-  ASSERT_EQ(
-      memcmp(upiu_backup->GetData(), command_descriptor, ScsiSynchronizeCache10Upiu::GetDataSize()),
-      0);
+  ASSERT_EQ(memcmp(upiu_backup->GetData(), command_descriptor.GetData(), sizeof(CommandUpiuData)),
+            0);
 
   // Check response
-  ASSERT_EQ(response->GetHeader().trans_code(), UpiuTransactionCodes::kResponse);
-  ASSERT_EQ(response->GetHeader().status, static_cast<uint8_t>(scsi::StatusCode::GOOD));
-  ASSERT_EQ(response->GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+  ResponseUpiu response(response_or.value());
+  ASSERT_EQ(response.GetHeader().trans_code(), UpiuTransactionCodes::kResponse);
+  ASSERT_EQ(response.GetHeader().status, static_cast<uint8_t>(scsi::StatusCode::GOOD));
+  ASSERT_EQ(response.GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
 }
 
 }  // namespace ufs

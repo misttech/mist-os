@@ -52,7 +52,7 @@ class ToggleFlagUpiu : public QueryWriteRequestUpiu {
 
 class FlagResponseUpiu : public QueryResponseUpiu {
  public:
-  uint8_t GetFlag() { return data_.flag_value; }
+  uint8_t GetFlag() { return GetData<QueryResponseUpiuData>()->flag_value; }
 };
 
 }  // namespace ufs

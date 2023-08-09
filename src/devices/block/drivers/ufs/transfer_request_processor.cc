@@ -9,6 +9,7 @@
 #include <safemath/checked_math.h>
 #include <safemath/safe_conversions.h>
 
+#include "src/devices/block/drivers/ufs/upiu/upiu_transactions.h"
 #include "ufs.h"
 
 namespace ufs {
@@ -32,6 +33,68 @@ void FillPrdt(PhysicalRegionDescriptionTableEntry *prdt,
   ZX_DEBUG_ASSERT(data_length == 0);
 }
 }  // namespace
+
+template <>
+std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommandUpiu>(
+    ScsiCommandUpiu &request, uint8_t slot, std::unique_ptr<scsi_xfer> xfer,
+    uint16_t response_offset, uint16_t response_length) {
+  ZX_ASSERT(xfer != nullptr);
+
+  const uint32_t data_transfer_length = std::min(request.GetTransferBytes(), kMaxPrdtDataLength);
+
+  request.GetHeader().lun = xfer->lun;
+  request.GetHeader().task_tag = slot;  // Record the slot number to |task_tag| for debugging.
+  request.SetExpectedDataTransferLength(data_transfer_length);
+
+  // Prepare PRDT(physical region description table).
+  const uint32_t prdt_entry_count =
+      fbl::round_up(data_transfer_length, kPrdtEntryDataLength) / kPrdtEntryDataLength;
+  ZX_DEBUG_ASSERT(prdt_entry_count <= kMaxPrdtNum);
+
+  uint16_t prdt_offset = response_offset + response_length;
+  uint32_t prdt_length = prdt_entry_count * sizeof(PhysicalRegionDescriptionTableEntry);
+  const size_t total_length = static_cast<size_t>(prdt_offset) + prdt_length;
+
+  PhysicalRegionDescriptionTableEntry *prdt;
+  {
+    std::lock_guard lock(request_list_lock_);
+    ZX_DEBUG_ASSERT_MSG(total_length <= request_list_.GetDescriptorBufferSize(slot),
+                        "Invalid UPIU size for prdt");
+    prdt =
+        request_list_.GetDescriptorBuffer<PhysicalRegionDescriptionTableEntry>(slot, prdt_offset);
+    memset(prdt, 0, prdt_length);
+  }
+  FillPrdt(prdt, xfer->buffer_phys, prdt_entry_count, data_transfer_length);
+
+  // TODO(fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
+  // the xfer->count value differently.
+  // TODO(fxbug.dev/124835): Support large size transfer.
+
+  if (zxlog_level_enabled(TRACE)) {
+    std::lock_guard lock(request_list_lock_);
+    zxlogf(TRACE, "1. SCSI: Command Descriptor = 0x%lx",
+           request_list_.GetRequestDescriptorPhysicalAddress<TransferRequestDescriptor>(slot));
+    zxlogf(TRACE, "2. SCSI: Command UPIU = 0x%lx",
+           request_list_.GetSlot(slot).command_descriptor_io.phys());
+    zxlogf(TRACE, "3. SCSI: Response UPIU = 0x%lx",
+           request_list_.GetSlot(slot).command_descriptor_io.phys() + response_offset);
+    zxlogf(TRACE, "4. SCSI: PRDT = 0x%lx",
+           request_list_.GetSlot(slot).command_descriptor_io.phys() + response_offset +
+               response_length);
+    zxlogf(TRACE, "5. SCSI: Data Buffer = 0x%lx, 0x%lx", xfer->buffer_phys[0],
+           xfer->buffer_phys[1]);
+    zxlogf(TRACE, "6. SCSI: PRDT prdt_offset = %hu, prdt_length = %hu, prdt_entry_count = %d",
+           prdt_offset, prdt_length, prdt_entry_count);
+  }
+
+  {
+    std::lock_guard lock(request_list_lock_);
+    RequestSlot &request_slot = request_list_.GetSlot(slot);
+    request_slot.xfer = std::move(xfer);
+  }
+
+  return {prdt_offset, prdt_length};
+}
 
 zx::result<std::unique_ptr<TransferRequestProcessor>> TransferRequestProcessor::Create(
     Ufs &ufs, zx::unowned_bti bti, fdf::MmioBuffer &mmio, uint8_t entry_count) {
@@ -104,134 +167,14 @@ zx::result<uint8_t> TransferRequestProcessor::ReserveSlot() {
   return zx::error(ZX_ERR_NO_RESOURCES);
 }
 
-zx::result<void *> TransferRequestProcessor::SendUpiu(RequestUpiu &request) {
-  zx::result<uint8_t> slot = ReserveSlot();
-  if (slot.is_error()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  const uint16_t response_offset = request.GetResponseOffset();
-  const uint16_t response_length = request.GetResponseLength();
-
-  const size_t total_length = static_cast<size_t>(response_offset) + response_length;
-
-  // Record the slot number to |task_tag| for debugging.
-  request.GetHeader().task_tag = slot.value();
-
-  // Copy request and prepare response.
-  void *response;
-  {
-    std::lock_guard lock(request_list_lock_);
-    ZX_DEBUG_ASSERT_MSG(total_length <= request_list_.GetDescriptorBufferSize(slot.value()),
-                        "Invalid UPIU size");
-    memcpy(request_list_.GetDescriptorBuffer(slot.value()), request.GetData(), response_offset);
-    memset(request_list_.GetDescriptorBuffer<uint8_t>(slot.value()) + response_offset, 0,
-           response_length);
-    response = request_list_.GetDescriptorBuffer(slot.value(), response_offset);
-  }
-
-  if (zx::result<> result = SendCommand(slot.value(), request.GetDataDirection(), response_offset,
-                                        response_length, 0, 0, /*sync=*/true);
-      result.is_error()) {
-    zxlogf(ERROR, "Failed to send UPIU: %s", result.status_string());
-    return result.take_error();
-  }
-
-  return zx::ok(response);
-}
-
-zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<scsi_xfer> xfer,
-                                                                uint8_t slot, bool sync) {
-  TRACE_DURATION("ufs", "SendScsiUpiu", "offset", xfer->start_lba, "length", xfer->block_count);
-
-  ScsiCommandUpiu *request = xfer->upiu.get();
-
-  const uint16_t response_offset = request->GetResponseOffset();
-  const uint16_t response_length = request->GetResponseLength();
-  const uint32_t data_transfer_length = std::min(request->GetTransferBytes(), kMaxPrdtDataLength);
-
-  request->GetHeader().lun = xfer->lun;
-  request->GetHeader().task_tag = slot;  // Record the slot number to |task_tag| for debugging.
-  request->SetExpectedDataTransferLength(data_transfer_length);
-
-  // Copy request and prepare response.
-  ResponseUpiu *response;
-  {
-    std::lock_guard lock(request_list_lock_);
-    memcpy(request_list_.GetDescriptorBuffer(slot), request->GetData(), response_offset);
-    memset(request_list_.GetDescriptorBuffer<uint8_t>(slot) + response_offset, 0, response_length);
-    response = request_list_.GetDescriptorBuffer<ResponseUpiu>(slot, response_offset);
-  }
-
-  // Prepare PRDT(physical region description table).
-  const uint32_t prdt_entry_count =
-      fbl::round_up(data_transfer_length, kPrdtEntryDataLength) / kPrdtEntryDataLength;
-  ZX_DEBUG_ASSERT(prdt_entry_count <= kMaxPrdtNum);
-
-  const uint16_t prdt_offset = response_offset + response_length;
-  const uint32_t prdt_length = prdt_entry_count * sizeof(PhysicalRegionDescriptionTableEntry);
-
-  const size_t total_length = static_cast<size_t>(prdt_offset) + prdt_length;
-
-  PhysicalRegionDescriptionTableEntry *prdt;
-  {
-    std::lock_guard lock(request_list_lock_);
-    ZX_DEBUG_ASSERT_MSG(total_length <= request_list_.GetDescriptorBufferSize(slot),
-                        "Invalid UPIU size");
-    prdt =
-        request_list_.GetDescriptorBuffer<PhysicalRegionDescriptionTableEntry>(slot, prdt_offset);
-    memset(prdt, 0, prdt_length);
-  }
-  FillPrdt(prdt, xfer->buffer_phys, prdt_entry_count, data_transfer_length);
-
-  // TODO(fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
-  // the xfer->count value differently.
-  // TODO(fxbug.dev/124835): Support large size transfer.
-
-  if (zxlog_level_enabled(TRACE)) {
-    std::lock_guard lock(request_list_lock_);
-    zxlogf(TRACE, "1. SCSI: Command Descriptor = 0x%lx",
-           request_list_.GetRequestDescriptorPhysicalAddress<TransferRequestDescriptor>(slot));
-    zxlogf(TRACE, "2. SCSI: Command UPIU = 0x%lx",
-           request_list_.GetSlot(slot).command_descriptor_io.phys());
-    zxlogf(TRACE, "3. SCSI: Response UPIU = 0x%lx",
-           request_list_.GetSlot(slot).command_descriptor_io.phys() + response_offset);
-    zxlogf(TRACE, "4. SCSI: PRDT = 0x%lx",
-           request_list_.GetSlot(slot).command_descriptor_io.phys() + response_offset +
-               response_length);
-    zxlogf(TRACE, "5. SCSI: Data Buffer = 0x%lx, 0x%lx", xfer->buffer_phys[0],
-           xfer->buffer_phys[1]);
-    zxlogf(TRACE, "6. SCSI: PRDT prdt_offset = %hu, prdt_length = %hu, prdt_entry_count = %d",
-           prdt_offset, prdt_length, prdt_entry_count);
-  }
-
-  {
-    std::lock_guard lock(request_list_lock_);
-    RequestSlot &request_slot = request_list_.GetSlot(slot);
-    request_slot.xfer = std::move(xfer);
-  }
-
-  if (zx::result<> result = SendCommand(slot, request->GetDataDirection(), response_offset,
-                                        response_length, prdt_offset, prdt_length, sync);
-      result.is_error()) {
-    auto *sense_data =
-        reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response->GetSenseData());
-    zxlogf(ERROR, "Failed to send scsi command upiu, response code 0x%x, sense key 0x%x",
-           sense_data->response_code(), sense_data->sense_key());
-    return result.take_error();
-  }
-
-  return zx::ok(*response);
-}
-
 void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                                               TransferRequestDescriptor *descriptor) {
   TRACE_DURATION("ufs", "ScsiCompletion", "offset", request_slot.xfer->start_lba, "length",
                  request_slot.xfer->block_count, "slot", slot_num);
 
   // TODO(fxbug.dev/124835): Support large size transfer.
-  ResponseUpiu *response =
-      request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, CommandUpiu::GetDataSize());
+  ResponseUpiu response(
+      request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, sizeof(CommandUpiuData)));
 
   // TODO(fxbug.dev/124835): Need to check if response.header.trans_code() is a kCommnad.
   request_slot.xfer->status =
@@ -240,8 +183,8 @@ void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &req
   sync_completion_signal(request_slot.xfer->done);
 }
 
-zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) {
-  TRACE_DURATION("ufs", "SendRequest", "slot", slot_num);
+zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num, bool sync) {
+  TRACE_DURATION("ufs", "RingRequestDoorbell", "slot", slot_num);
 
   ZX_DEBUG_ASSERT_MSG(UtrListRunStopReg::Get().ReadFrom(&register_).value(),
                       "Transfer request list is not running");
@@ -275,7 +218,7 @@ zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) 
   }
 
   // Wait for completion.
-  TRACE_DURATION("ufs", "SendRequest::sync_completion_wait", "offset", start_lba, "length",
+  TRACE_DURATION("ufs", "RingRequestDoorbell::sync_completion_wait", "offset", start_lba, "length",
                  block_count, "slot", slot_num);
   if (zx_status_t status = sync_completion_wait(complete, ZX_MSEC(GetTimeoutMsec()));
       status != ZX_OK) {
@@ -321,7 +264,7 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
   return completion_count;
 }
 
-zx::result<> TransferRequestProcessor::SendCommand(
+zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
     uint8_t slot, const TransferRequestDescriptorDataDirection data_dir,
     const uint16_t response_offset, const uint16_t response_length, const uint16_t prdt_offset,
     const uint32_t prdt_length, bool sync) {
@@ -349,7 +292,7 @@ zx::result<> TransferRequestProcessor::SendCommand(
   descriptor->set_prdt_offset(prdt_offset / kDwordSize);
   descriptor->set_prdt_length(prdt_length / kDwordSize);
 
-  if (zx::result<> result = SendRequest(slot, sync); result.is_error()) {
+  if (zx::result<> result = RingRequestDoorbell(slot, sync); result.is_error()) {
     zxlogf(ERROR, "Failed to send cmd %s", result.status_string());
     return result.take_error();
   }
@@ -360,15 +303,15 @@ zx::result<> TransferRequestProcessor::SendCommand(
 
   std::lock_guard lock(request_list_lock_);
   auto header = request_list_.GetDescriptorBuffer<UpiuHeader>(slot);
-  auto response = request_list_.GetDescriptorBuffer<ResponseUpiu>(slot, response_offset);
+  AbstractResponseUpiu response(request_list_.GetDescriptorBuffer(slot, response_offset));
   return GetResponseStatus(descriptor, response, header->trans_code());
 }
 
 zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescriptor *descriptor,
-                                                         ResponseUpiu *response,
+                                                         AbstractResponseUpiu &response,
                                                          uint8_t transaction_type) {
-  uint8_t status = response->GetHeader().status;
-  uint8_t header_response = response->GetHeader().response;
+  uint8_t status = response.GetHeader().status;
+  uint8_t header_response = response.GetHeader().response;
 
   // TODO(fxbug.dev/124835): Needs refactoring.
   if (transaction_type == UpiuTransactionCodes::kCommand &&
@@ -377,8 +320,8 @@ zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescript
        header_response != UpiuHeaderResponse::kTargetSuccess)) {
     zxlogf(ERROR, "SCSI failure: ocs=0x%x, status=0x%x, header_response=0x%x",
            descriptor->overall_command_status(), status, header_response);
-    auto *sense_data =
-        reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response->GetSenseData());
+    auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
+        static_cast<ResponseUpiu &>(response).GetSenseData());
     zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x", sense_data->sense_key(),
            sense_data->additional_sense_code, sense_data->additional_sense_code_qualifier);
   } else if (transaction_type == UpiuTransactionCodes::kQueryRequest &&

@@ -264,10 +264,10 @@ int Ufs::ScsiLoop() {
     }
     ZX_ASSERT(xfer != nullptr);
 
-    zx::result<ResponseUpiu> response =
-        transfer_request_processor_->SendScsiUpiu(std::move(xfer), slot.value(), /*sync=*/true);
+    auto response = transfer_request_processor_->SendRequestUsingSlot<ScsiCommandUpiu>(
+        *(xfer->upiu), slot.value(), std::move(xfer));
     if (response.is_error()) {
-      zxlogf(ERROR, "ScsiThread SendScsiUpiu() is Failed: %s", response.status_string());
+      zxlogf(ERROR, "ScsiThread SendRequestUsingSlot() is Failed: %s", response.status_string());
     }
   }
   return thrd_success;
@@ -502,7 +502,7 @@ zx::result<> Ufs::InitDeviceInterface() {
   // TODO(fxbug.dev/124835): Configure interrupt aggregation. (default 0)
 
   NopOutUpiu nop_upiu;
-  auto nop_response = transfer_request_processor_->SendUpiu<NopInUpiu>(nop_upiu);
+  auto nop_response = transfer_request_processor_->SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_upiu);
   if (nop_response.is_error()) {
     zxlogf(ERROR, "Send NopInUpiu failed: %s", nop_response.status_string());
     return nop_response.take_error();
@@ -510,7 +510,9 @@ zx::result<> Ufs::InitDeviceInterface() {
 
   zx::time device_init_start_time = zx::clock::get_monotonic();
   SetFlagUpiu set_flag_upiu(Flags::fDeviceInit);
-  auto query_response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(set_flag_upiu);
+  auto query_response =
+      transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          set_flag_upiu);
   if (query_response.is_error()) {
     zxlogf(ERROR, "Failed to set fDeviceInit flag: %s", query_response.status_string());
     return query_response.take_error();
@@ -519,7 +521,9 @@ zx::result<> Ufs::InitDeviceInterface() {
   zx::time device_init_time_out = device_init_start_time + zx::msec(kDeviceInitTimeoutMs);
   while (true) {
     ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
-    auto response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(read_flag_upiu);
+    auto response =
+        transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+            read_flag_upiu);
     if (response.is_error()) {
       zxlogf(ERROR, "Failed to read fDeviceInit flag: %s", response.status_string());
       return response.take_error();
@@ -543,7 +547,9 @@ zx::result<> Ufs::InitDeviceInterface() {
   // 26MHz is a default value written in spec.
   // UFS Specification Version 3.1, section 6.4 "Reference Clock".
   WriteAttributeUpiu write_attribute_upiu(Attributes::bRefClkFreq, AttributeReferenceClock::k26MHz);
-  query_response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(write_attribute_upiu);
+  query_response =
+      transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          write_attribute_upiu);
   if (query_response.is_error()) {
     zxlogf(ERROR, "Failed to write bRefClkFreq attribute: %s", query_response.status_string());
   }
@@ -581,7 +587,10 @@ zx::result<> Ufs::InitDeviceInterface() {
 
   // Read bBootLunEn to confirm device interface is ok.
   ReadAttributeUpiu read_attribute_upiu(Attributes::bBootLunEn);
-  query_response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(read_attribute_upiu);
+
+  query_response =
+      transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          read_attribute_upiu);
   if (query_response.is_error()) {
     zxlogf(ERROR, "Failed to read bBootLunEn attribute: %s", query_response.status_string());
     return query_response.take_error();
@@ -596,7 +605,8 @@ zx::result<> Ufs::InitDeviceInterface() {
 
 zx::result<> Ufs::GetControllerDescriptor() {
   ReadDescriptorUpiu read_device_desc_upiu(DescriptorType::kDevice);
-  auto response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(read_device_desc_upiu);
+  auto response = transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+      read_device_desc_upiu);
   if (response.is_error()) {
     zxlogf(ERROR, "Failed to read device descriptor: %s", response.status_string());
     return response.take_error();
@@ -613,7 +623,8 @@ zx::result<> Ufs::GetControllerDescriptor() {
   zxlogf(INFO, "%u enabled LUNs found", device_descriptor_.bNumberLU);
 
   ReadDescriptorUpiu read_geometry_desc_upiu(DescriptorType::kGeometry);
-  response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(read_geometry_desc_upiu);
+  response = transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+      read_geometry_desc_upiu);
   if (response.is_error()) {
     zxlogf(ERROR, "Failed to read geometry descriptor: %s", response.status_string());
     return response.take_error();
@@ -675,13 +686,16 @@ zx::result<> Ufs::ScanLogicalUnits() {
 
   for (uint8_t i = 0; i < max_luns; ++i) {
     ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, i);
-    auto response = transfer_request_processor_->SendUpiu<QueryResponseUpiu>(read_unit_desc_upiu);
+    auto response =
+        transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+            read_unit_desc_upiu);
     if (response.is_error()) {
       continue;
     }
 
     auto unit_descriptor =
         response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
+
     if (unit_descriptor.bLUEnable != 1) {
       continue;
     }

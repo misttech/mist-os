@@ -20,7 +20,9 @@ TEST_F(QueryRequestTest, DeviceDescriptor) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   ReadDescriptorUpiu device_desc_upiu(DescriptorType::kDevice);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(device_desc_upiu);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          device_desc_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
   auto device_descriptor =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<DeviceDescriptor>();
@@ -41,7 +43,8 @@ TEST_F(QueryRequestTest, GeometryDescriptor) {
 
   ReadDescriptorUpiu geometry_desc_upiu(DescriptorType::kGeometry);
   auto response =
-      ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(geometry_desc_upiu);
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          geometry_desc_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
   auto geometry_desc =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<GeometryDescriptor>();
@@ -56,7 +59,9 @@ TEST_F(QueryRequestTest, UnitDescriptor) {
 
   uint8_t lun = 0;
   ReadDescriptorUpiu unit_desc_upiu(DescriptorType::kUnit, lun);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(unit_desc_upiu);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          unit_desc_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
   auto unit_desc = response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
 
@@ -67,6 +72,30 @@ TEST_F(QueryRequestTest, UnitDescriptor) {
   ASSERT_EQ(unit_desc.bLogicalBlockSize, mock_desc.bLogicalBlockSize);
 }
 
+TEST_F(QueryRequestTest, WriteDescriptor) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+
+  // 0x7F: Same priority for all LUNs
+  // If all LUNs already have the same priority, change the priority of LUN0 higher
+  // If specific LUN has higher priority, change to the same priority for all LUNs
+  uint8_t high_priority_lun = mock_device_->GetDeviceDesc().bHighPriorityLUN == 0x7F ? 0 : 0x7F;
+
+  ConfigurationDescriptor descriptor;
+  std::memset(&descriptor, 0, sizeof(ConfigurationDescriptor));
+  descriptor.bLength = 0xE6;
+  descriptor.bDescriptorIDN = 0x01;
+  descriptor.bConfDescContinue = 0x00;
+  descriptor.bHighPriorityLUN = high_priority_lun;
+
+  WriteDescriptorUpiu config_desc_upiu(DescriptorType::kConfiguration, &descriptor);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          config_desc_upiu);
+  ASSERT_EQ(response.status_value(), ZX_OK);
+
+  ASSERT_EQ(high_priority_lun, mock_device_->GetDeviceDesc().bHighPriorityLUN);
+}
+
 TEST_F(QueryRequestTest, WriteAttribute) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
@@ -75,7 +104,8 @@ TEST_F(QueryRequestTest, WriteAttribute) {
   uint8_t power_mode = 0x11;  // Active power mode
   WriteAttributeUpiu write_attribute_upiu(Attributes::bCurrentPowerMode, power_mode);
   auto response =
-      ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(write_attribute_upiu);
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          write_attribute_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
 
   ASSERT_EQ(power_mode, mock_device_->GetAttribute(Attributes::bCurrentPowerMode));
@@ -89,7 +119,8 @@ TEST_F(QueryRequestTest, ReadAttribute) {
 
   ReadAttributeUpiu read_attribute_upiu(Attributes::bCurrentPowerMode);
   auto response =
-      ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(read_attribute_upiu);
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          read_attribute_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
   auto attribute = response->GetResponse<AttributeResponseUpiu>().GetAttribute();
 
@@ -103,7 +134,9 @@ TEST_F(QueryRequestTest, ReadFlag) {
   mock_device_->SetFlag(Flags::fDeviceInit, device_init);
 
   ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(read_flag_upiu);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          read_flag_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
   auto flag = response->GetResponse<FlagResponseUpiu>().GetFlag();
 
@@ -116,7 +149,9 @@ TEST_F(QueryRequestTest, SetFlag) {
   mock_device_->SetFlag(Flags::fPermanentWPEn, false);
 
   SetFlagUpiu set_flag_upiu(Flags::fPermanentWPEn);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(set_flag_upiu);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          set_flag_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
 
   ASSERT_EQ(true, mock_device_->GetFlag(Flags::fPermanentWPEn));
@@ -129,7 +164,9 @@ TEST_F(QueryRequestTest, ToggleFlag) {
   mock_device_->SetFlag(Flags::fDeviceInit, device_init);
 
   ToggleFlagUpiu toggle_flag_upiu(Flags::fDeviceInit);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(toggle_flag_upiu);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          toggle_flag_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
 
   ASSERT_EQ(!device_init, mock_device_->GetFlag(Flags::fDeviceInit));
@@ -142,7 +179,9 @@ TEST_F(QueryRequestTest, ClearFlag) {
   mock_device_->SetFlag(Flags::fDeviceInit, device_init);
 
   ClearFlagUpiu clear_flag_upiu(Flags::fDeviceInit);
-  auto response = ufs_->GetTransferRequestProcessor().SendUpiu<QueryResponseUpiu>(clear_flag_upiu);
+  auto response =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
+          clear_flag_upiu);
   ASSERT_EQ(response.status_value(), ZX_OK);
 
   device_init = false;

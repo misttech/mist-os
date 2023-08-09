@@ -48,7 +48,7 @@ zx::result<> RequestList::Init(zx::unowned_bti bti, size_t entry_size, uint8_t e
 }
 
 zx::result<> RequestList::IoBufferInit(zx::unowned_bti &bti, ddk::IoBuffer &io, size_t size) {
-  if (zx_status_t status = io.Init(bti->get(), size, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  if (zx_status_t status = io.InitAligned(bti->get(), size, 0, IO_BUFFER_RW | IO_BUFFER_CONTIG);
       status != ZX_OK) {
     return zx::error(status);
   }
