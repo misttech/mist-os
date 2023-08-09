@@ -34,6 +34,7 @@
 
 #include "sampler.h"
 #include "symbolization_context.h"
+#include "symbolizer_markup.h"
 #include "targets.h"
 #include "taskfinder.h"
 
@@ -248,53 +249,24 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     completer.Close(modules.status_value());
   }
 
-  std::stringstream modules_ss;
-  modules_ss << "{{{reset}}}\n";
-  for (const auto& [pid, modules] : modules->process_contexts) {
-    const size_t kPageSize = zx_system_get_page_size();
-    for (const profiler::Module& mod : modules) {
-      modules_ss << "{{{module:0x" << std::hex << mod.module_id << std::dec << ":"
-                 << mod.module_name << ":elf:" << mod.build_id << "}}}\n";
-      for (const profiler::Segment& segment : mod.loads) {
-        uintptr_t start = segment.p_vaddr & -kPageSize;
-        uintptr_t end = (segment.p_vaddr + segment.p_memsz + kPageSize - 1) & -kPageSize;
-        modules_ss << "{{{mmap:0x" << std::hex << mod.vaddr + start << ":0x" << end - start
-                   << ":load:" << mod.module_id << ":";
-
-        if (segment.p_flags & PF_R) {
-          modules_ss << 'r';
-        }
-        if (segment.p_flags & PF_W) {
-          modules_ss << 'w';
-        }
-        if (segment.p_flags & PF_X) {
-          modules_ss << 'x';
-        }
-        modules_ss << ":0x" << start << "}}}\n";
-      }
-    }
-  }
-  if (!fsl::BlockingCopyFromString(modules_ss.str(), socket_)) {
+  if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
     completer.Close(ZX_ERR_IO);
     return;
   }
 
-  // Then write out each sample
-  for (const Sample& sample : sampler_->GetSamples()) {
-    std::stringstream ss;
-    ss << sample.pid << "\n" << sample.tid << "\n";
-    int n = 0;
-    for (const auto& frame : sample.stack) {
-      const char* address_type = "ra";
-      if (n == 0) {
-        address_type = "pc";
-      }
-      ss << "{{{bt:" << n++ << ":0x" << std::hex << frame << std::dec << ":" << address_type
-         << "}}}\n";
-      if (!fsl::BlockingCopyFromString(ss.str(), socket_)) {
+  for (const auto& [_, modules] : modules->process_contexts) {
+    for (const profiler::Module& mod : modules) {
+      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatModule(mod), socket_)) {
         completer.Close(ZX_ERR_IO);
         return;
       }
+    }
+  }
+
+  for (const Sample& sample : sampler_->GetSamples()) {
+    if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatSample(sample), socket_)) {
+      completer.Close(ZX_ERR_IO);
+      return;
     }
   }
 

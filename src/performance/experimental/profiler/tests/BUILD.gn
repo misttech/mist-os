@@ -43,6 +43,7 @@ fuchsia_test_package("profiler_integration_test") {
 executable("profiler_unittest_bin") {
   sources = [
     "process_watcher_test.cc",
+    "symbolizer_markup_test.cc",
     "targets_test.cc",
   ]
   deps = [

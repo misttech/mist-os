@@ -20,9 +20,9 @@ struct Segment {
 };
 
 struct Module {
-  size_t module_id;
+  unsigned module_id;
   std::string module_name;
-  std::string build_id;
+  std::vector<std::byte> build_id;
   uintptr_t vaddr;
   std::vector<Segment> loads;
 };

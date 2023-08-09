@@ -11,6 +11,7 @@ source_set("lib") {
     "process_watcher.cc",
     "sampler.cc",
     "symbolization_context.cc",
+    "symbolizer_markup.cc",
     "targets.cc",
     "taskfinder.cc",
   ]
@@ -20,6 +21,7 @@ source_set("lib") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/symbolizer-markup",
     "//src/lib/unwinder",
     "//src/lib/zxdump",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
