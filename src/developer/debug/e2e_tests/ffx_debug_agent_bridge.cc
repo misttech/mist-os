@@ -6,26 +6,43 @@
 
 #include <lib/syslog/cpp/macros.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <csignal>
 #include <filesystem>
-#include <memory>
+#include <system_error>
 
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
+#include "src/developer/debug/zxdb/common/inet_util.h"
 
 namespace zxdb {
 
 namespace {
 
-constexpr std::string_view kFuchsiaDeviceAddr = "FUCHSIA_DEVICE_ADDR";
+constexpr std::string_view kFuchsiaDeviceSshAddr = "FUCHSIA_DEVICE_ADDR";
+constexpr std::string_view kFuchsiaDeviceSshPort = "FUCHSIA_SSH_PORT";
 constexpr std::string_view kFuchsiaSshKey = "FUCHSIA_SSH_KEY";
 constexpr std::string_view kTestOutDir = "FUCHSIA_TEST_OUTDIR";
+constexpr std::string_view kFfxIsolateDir = "zxdb_e2e_tests_ffx_isolate_dir";
 
-FfxDebugAgentBridge* global_instance = nullptr;
+// This is atomic so it can be used in the signal handler below.
+std::atomic<FfxDebugAgentBridge*> global_instance = nullptr;
+
+// When running tests locally, we need to cleanup the child process and the ffx isolate carefully if
+// the user ctrl+c's the tests. The child process can be cleaned up with async-signal-safe
+// functions, and then we exit the parent process immediately. Note: we cannot post to the message
+// loop here, since PostTask will end up taking a lock and may create a deadlock.
+void OnSigInt(int /*signum*/, siginfo_t* /*info*/, void* /*ptr*/) {
+  auto bridge = global_instance.load();
+  if (bridge)
+    bridge->Cleanup();
+
+  exit(EXIT_FAILURE);
+}
 
 Err KillProcessWithSignal(pid_t pid, int signal) {
   if (kill(pid, signal) != 0) {
@@ -55,13 +72,14 @@ Err KillProcessWithSignal(pid_t pid, int signal) {
              "), this is likely a bug.");
 }
 
-std::vector<char*> GetFfxArgV(const std::filesystem::path& ffx_test_data_path) {
+std::vector<char*> GetFfxArgV(const std::filesystem::path& ffx_test_data_path,
+                              const std::string& isolate_dir) {
   std::vector<char*> ffx_args = {const_cast<char*>("ffx")};
 
   // In infra, this environment variable is populated with the device that's been assigned to the
   // infra bot. Locally, a user can also set this to point to a specific device if they choose, but
   // `fx set-device` will also work just as well.
-  char* device_addr = std::getenv(kFuchsiaDeviceAddr.data());
+  char* device_addr = std::getenv(kFuchsiaDeviceSshAddr.data());
   if (device_addr) {
     ffx_args.push_back(const_cast<char*>("--target"));
     ffx_args.push_back(device_addr);
@@ -76,6 +94,8 @@ std::vector<char*> GetFfxArgV(const std::filesystem::path& ffx_test_data_path) {
   }
   ffx_args.push_back(const_cast<char*>(strdup(ffx_config_arg.data())));
 
+  ffx_args.push_back(const_cast<char*>("--isolate-dir"));
+  ffx_args.push_back(const_cast<char*>(isolate_dir.data()));
   ffx_args.push_back(const_cast<char*>("debug"));
   ffx_args.push_back(const_cast<char*>("connect"));
   ffx_args.push_back(const_cast<char*>("--agent-only"));
@@ -115,9 +135,62 @@ std::vector<char*> GetFfxEnv() {
   return new_env;
 }
 
+Err InitFfxIsolate(const std::string& isolate_dir) {
+  // In the isolate directory, this will spawn the daemon and add the configured target.
+  std::string target_add_cmd = "ffx --isolate-dir " + isolate_dir + " target add ";
+
+  if (auto dev = std::getenv(kFuchsiaDeviceSshAddr.data()); dev != nullptr) {
+    if (Ipv6HostPortIsMissingBrackets(dev)) {
+      target_add_cmd.push_back('[');
+    }
+
+    target_add_cmd.append(dev);
+
+    if (Ipv6HostPortIsMissingBrackets(dev)) {
+      target_add_cmd.push_back(']');
+    }
+
+    // When running the tests locally it's likely that the ssh port is not on the default port 22.
+    // FX will fill in another environment variable for us in this case.
+    if (auto port = std::getenv(kFuchsiaDeviceSshPort.data()); port != nullptr) {
+      target_add_cmd.push_back(':');
+      target_add_cmd.append(port);
+    }
+
+    system(target_add_cmd.data());
+  } else {
+    return Err("%s was not defined in the environment!", kFuchsiaDeviceSshAddr.data());
+  }
+
+  return Err();
+}
+
 }  // namespace
 
 Err FfxDebugAgentBridge::Init() {
+  struct sigaction sa;
+  sa.sa_sigaction = OnSigInt;
+  sa.sa_flags = SA_SIGINFO;
+
+  // Handle ctrl+c.
+  sigaction(SIGINT, &sa, nullptr);
+
+  ffx_isolate_dir_ = std::filesystem::temp_directory_path() / kFfxIsolateDir;
+  std::error_code ec;
+
+  // If the isolate directory already exists, we either failed to cleanup from a prior run (could
+  // have been ctrl+c'd if running locally) or had been forcibly killed which would leave a zombie
+  // process anyway. Cleaning up the directory will stop the isolate running.
+  if (std::filesystem::exists(ffx_isolate_dir_)) {
+    if (std::filesystem::remove_all(ffx_isolate_dir_, ec); ec) {
+      FX_LOGS(WARNING) << ffx_isolate_dir_ << " exists, but could not be deleted: " << ec.message();
+    }
+  }
+
+  if (!std::filesystem::create_directory(ffx_isolate_dir_, ec)) {
+    return Err("could not create FFX isolate directory: %s", ec.message().c_str());
+  }
+
   Err e = SetupPipeAndFork();
   if (e.has_error()) {
     return e;
@@ -127,29 +200,13 @@ Err FfxDebugAgentBridge::Init() {
 }
 
 FfxDebugAgentBridge::FfxDebugAgentBridge() {
-  FX_CHECK(!global_instance);
-  global_instance = this;
+  FX_CHECK(!global_instance.load());
+  global_instance.store(this);
 }
 
-FfxDebugAgentBridge::~FfxDebugAgentBridge() {
-  socket_path_.clear();
+FfxDebugAgentBridge::~FfxDebugAgentBridge() { Cleanup(); }
 
-  if (pipe_read_end_ != 0) {
-    close(pipe_read_end_);
-  }
-
-  if (child_pid_ != 0) {
-    Err e = CleanupChild();
-    if (e.has_error()) {
-      FX_LOGS(ERROR) << "Error encountered while cleaning up child: " << e.msg();
-    }
-  }
-
-  FX_CHECK(global_instance == this);
-  global_instance = nullptr;
-}
-
-FfxDebugAgentBridge* FfxDebugAgentBridge::Get() { return global_instance; }
+FfxDebugAgentBridge* FfxDebugAgentBridge::Get() { return global_instance.load(); }
 
 Err FfxDebugAgentBridge::SetupPipeAndFork() {
   int p[2];
@@ -161,15 +218,6 @@ Err FfxDebugAgentBridge::SetupPipeAndFork() {
 
   pipe_read_end_ = p[0];
   pipe_write_end_ = p[1];
-
-  // HACK: try to get the ffx daemon up and running before we setup debug_agent. I'm not sure if
-  // this will help.
-  // for (size_t i = 0; i < 5; i++) {
-  //   if (system("ffx target get-ssh-address") == 0) {
-  //     break;
-  //   }
-  //   usleep(5000);
-  // }
 
   const pid_t child_pid = fork();
 
@@ -198,8 +246,15 @@ Err FfxDebugAgentBridge::SetupPipeAndFork() {
       exit(EXIT_FAILURE);
     }
 
-    std::vector<char*> env = GetFfxEnv();
-    execve(ffx_path.c_str(), GetFfxArgV(ffx_test_data).data(), env.data());
+    // Initialize the isolated FFX daemon and add the target (which will not be discovered via
+    // mdns).
+    if (auto err = InitFfxIsolate(ffx_isolate_dir_); err.has_error()) {
+      FX_LOGS(ERROR) << "Failed to initialize the ffx isolate: " << err.msg();
+      exit(EXIT_FAILURE);
+    }
+
+    execve(ffx_path.c_str(), GetFfxArgV(ffx_test_data, ffx_isolate_dir_).data(),
+           GetFfxEnv().data());
 
     FX_NOTREACHED();
   } else {
@@ -208,6 +263,37 @@ Err FfxDebugAgentBridge::SetupPipeAndFork() {
   }
 
   return Err();
+}
+
+void FfxDebugAgentBridge::Cleanup() {
+  if (global_instance.load()) {
+    FX_CHECK(global_instance.load() == this);
+
+    socket_path_.clear();
+
+    if (pipe_read_end_ != 0) {
+      close(pipe_read_end_);
+    }
+
+    if (child_pid_ != 0) {
+      Err e = CleanupChild();
+      if (e.has_error()) {
+        FX_LOGS(ERROR) << "Error encountered while cleaning up child: " << e.msg();
+      }
+    }
+
+    // Remove the isolate directory, which implicitly stops the isolate's daemon to complete
+    // cleanup. This should be signal safe, since there is no state handled by
+    // `std::filesystem::remove_all`.
+    std::error_code ec;
+    std::filesystem::remove_all(ffx_isolate_dir_, ec);
+    if (ec) {
+      FX_LOGS(ERROR) << "Failed to remove FFX isolate directory: " << ec.message();
+    }
+
+    FX_CHECK(global_instance.load() == this);
+    global_instance.store(nullptr);
+  }
 }
 
 Err FfxDebugAgentBridge::ReadDebugAgentSocketPath() {

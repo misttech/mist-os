@@ -4,8 +4,8 @@
 #ifndef SRC_DEVELOPER_DEBUG_E2E_TESTS_FFX_DEBUG_AGENT_BRIDGE_H_
 #define SRC_DEVELOPER_DEBUG_E2E_TESTS_FFX_DEBUG_AGENT_BRIDGE_H_
 
+#include <filesystem>
 #include <string>
-#include <vector>
 
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/lib/fxl/macros.h"
@@ -29,6 +29,10 @@ class FfxDebugAgentBridge {
  public:
   FfxDebugAgentBridge();
   ~FfxDebugAgentBridge();
+
+  // Unconditionally shutdown the bridge, and cleanup the child process. This function is signal
+  // safe and can be called from a signal handler.
+  void Cleanup();
 
   // It is expected that this method is called once per test executable, and that many test cases
   // can be run with this object constructed before all cases and destructed after all cases.
@@ -68,6 +72,7 @@ class FfxDebugAgentBridge {
   int child_pid_ = 0;
 
   std::string socket_path_;
+  std::filesystem::path ffx_isolate_dir_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(FfxDebugAgentBridge);
 };
