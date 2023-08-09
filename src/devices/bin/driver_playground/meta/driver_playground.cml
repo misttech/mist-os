@@ -18,7 +18,6 @@
             protocol: [
                 "fuchsia.driver.development.DriverDevelopment",
                 "fuchsia.driver.registrar.DriverRegistrar",
-                "fuchsia.hardware.usb.DeviceWatcher",
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",
             ],

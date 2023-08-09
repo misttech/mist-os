@@ -104,7 +104,6 @@
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.hardware.serial.DeviceProxy",
-                "fuchsia.hardware.usb.DeviceWatcher",
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",

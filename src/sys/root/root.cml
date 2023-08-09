@@ -167,7 +167,6 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.hardware.pty.Device",
-                "fuchsia.hardware.usb.DeviceWatcher",
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",

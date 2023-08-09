@@ -179,8 +179,6 @@
             protocol: [
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.DriverDevelopment",
-                "fuchsia.hardware.pci.DeviceWatcher",
-                "fuchsia.hardware.usb.DeviceWatcher",
             ],
             from: "#driver_manager",
         },

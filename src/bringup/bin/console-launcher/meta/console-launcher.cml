@@ -85,7 +85,6 @@
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.pty.Device",
-                "fuchsia.hardware.usb.DeviceWatcher",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.kernel.RootJobForInspect",

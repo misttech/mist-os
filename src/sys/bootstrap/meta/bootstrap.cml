@@ -577,10 +577,7 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.driver.development.DriverDevelopment",
-                "fuchsia.hardware.usb.DeviceWatcher",
-            ],
+            protocol: [ "fuchsia.driver.development.DriverDevelopment" ],
             from: "#driver_manager",
             to: [
                 "#console-launcher",
@@ -1193,10 +1190,7 @@
             from: "#device_name_provider",
         },
         {
-            protocol: [
-                "fuchsia.driver.development.DriverDevelopment",
-                "fuchsia.hardware.usb.DeviceWatcher",
-            ],
+            protocol: [ "fuchsia.driver.development.DriverDevelopment" ],
             from: "#driver_manager",
         },
         {

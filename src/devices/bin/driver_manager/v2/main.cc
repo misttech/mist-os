@@ -41,7 +41,6 @@
 #include <fbl/unique_fd.h>
 
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
-#include "src/devices/bin/driver_manager/device_watcher.h"
 #include "src/devices/bin/driver_manager/driver_host_loader_service.h"
 #include "src/devices/bin/driver_manager/v2/driver_development_service.h"
 #include "src/devices/bin/driver_manager/v2/driver_runner.h"
@@ -132,54 +131,10 @@ int RunDfv2(driver_manager_config::Config config,
   dfv2::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
   shutdown_manager.Publish(outgoing);
 
-  async::Loop usb_watcher_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  usb_watcher_loop.StartThread();
-
   // TODO(https://fxbug.dev/99076) Remove this when this issue is fixed.
   LOGF(INFO, "driver_manager loader loop started");
 
   fs::SynchronousVfs vfs(loop.dispatcher());
-
-  // Serve the USB device watcher protocol.
-  {
-    zx::result devfs_client = devfs.value().Connect(vfs);
-    ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
-
-    const zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::DeviceWatcher>(
-        [devfs_client = std::move(devfs_client.value()),
-         dispatcher = usb_watcher_loop.dispatcher()](
-            fidl::ServerEnd<fuchsia_device_manager::DeviceWatcher> request) {
-          // Move off the main loop, which is also serving devfs.
-          async::PostTask(
-              dispatcher, [&devfs_client, dispatcher, request = std::move(request)]() mutable {
-                zx::result dir =
-                    [&devfs_client]() -> zx::result<fidl::ClientEnd<fuchsia_io::Directory>> {
-                  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-                  if (endpoints.is_error()) {
-                    return endpoints.take_error();
-                  }
-                  auto& [client, server] = endpoints.value();
-
-                  if (const zx_status_t status =
-                          fdio_service_connect_at(devfs_client.channel().get(), "class/usb-device",
-                                                  server.TakeChannel().release());
-                      status != ZX_OK) {
-                    return zx::error(status);
-                  }
-
-                  return zx::ok(std::move(client));
-                }();
-                if (dir.is_error()) {
-                  request.Close(dir.status_value());
-                }
-                std::unique_ptr watcher =
-                    std::make_unique<DeviceWatcher>(dispatcher, std::move(dir.value()));
-                fidl::BindServer(dispatcher, std::move(request), std::move(watcher));
-              });
-        },
-        "fuchsia.hardware.usb.DeviceWatcher");
-    ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-  }
 
   // Add the devfs folder to the tree:
   {
