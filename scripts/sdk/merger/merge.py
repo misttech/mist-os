@@ -406,7 +406,8 @@ class MergeState(object):
         for temp_dir in self._temp_dirs:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def _is_temp_file(self, path: Path) -> bool:
+    def is_temp_file(self, path: Path) -> bool:
+        """Return true if path is inside one of our temporary directories."""
         assert os.path.isabs(path)
         for tmp_dir in self._temp_dirs:
             if os.path.commonprefix([path, tmp_dir]) == tmp_dir:
@@ -417,7 +418,7 @@ class MergeState(object):
         """Add an output path, ignored if temporary."""
         # For outputs, do not follow symlinks.
         path = os.path.abspath(path)
-        if not self._is_temp_file(path):
+        if not self.is_temp_file(path):
             self._all_outputs.add(path)
 
     def add_input(self, path: Path):
@@ -425,7 +426,7 @@ class MergeState(object):
         # For inputs, always resolve symlinks since that what matters
         # for Ninja (which never follows symlinks themselves).
         path = os.path.abspath(os.path.realpath(path))
-        if not self._is_temp_file(path):
+        if not self.is_temp_file(path):
             self._all_inputs.add(path)
 
     def get_depfile_inputs_and_outputs(
@@ -558,14 +559,49 @@ class OutputSdk(object):
         '''Copies a file to a given sub-path, taking care of creating directories if
        needed.
        '''
-        source = os.path.join(source_dir, file)
+        source = os.path.realpath(os.path.join(source_dir, file))
         destination = os.path.join(self._directory, file)
         if not self._dry_run:
             _ensure_directory(destination)
-            # shutil.copy2() will complain when copying a symlinks into the same symlink.
-            if os.path.islink(destination):
+
+            if os.path.exists(destination):
                 os.unlink(destination)
-            shutil.copy2(source, destination, follow_symlinks=False)
+
+            destination = os.path.realpath(destination)
+
+            # Creating a relative symlink to the source file is sufficient,
+            # except in the case where the source path is within a temporary
+            # directory (which will be removed before script exit), and the
+            # destination is in the final output directory.
+            #
+            # This can happen because the script creates new files when
+            # merging the content of meta.json files, for example consider
+            # this case:
+            #
+            #   # merging input1 and input2 which both have foo/meta.json
+            #   input1/foo/meta.json + input2/foo/meta.json
+            #     -> tmpdir/foo/meta.json   (a new file)
+            #
+            #   # merging tmpdir and input3, where input3/foo/meta.json
+            #   # does not exist:
+            #   tmpdir/foo/meta.json + {}
+            #     -> output_dir/foo/meta.json
+            #
+            # In that last case, a symlink to tmpdir/foo/meta.json would
+            # become stale on script exit, so a copy is required instead.
+            #
+            # Note that source is a real path here, so if it points inside
+            # a temporary directory, this means it is a real file from a
+            # previous merge operation.
+            #
+            if self._state.is_temp_file(source) and \
+                    not self._state.is_temp_file(destination):
+                shutil.copy2(source, destination)
+            else:
+                target_path = os.path.relpath(
+                    source, os.path.dirname(destination))
+                os.symlink(target_path, destination)
+
         self._state.add_input(source)
         self._state.add_output(destination)
 

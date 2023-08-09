@@ -23,6 +23,18 @@ def make_dir(path, is_dir=False):
             raise
 
 
+def force_symlink(target_path, link_path):
+    target_path = os.path.relpath(target_path, os.path.dirname(link_path))
+    try:
+        os.symlink(target_path, link_path)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_path)
+            os.symlink(target_path, link_path)
+        else:
+            raise
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -53,8 +65,7 @@ def main():
     for dest, source in mappings:
         destination = os.path.join(args.out_dir, dest)
         make_dir(destination)
-        # Absolute path needed to symlink correctly.
-        os.symlink(os.path.abspath(source), destination)
+        force_symlink(source, destination)
         # Relative path required in depfile.
         sources.append(os.path.relpath(source))
         destinations.append(destination)
