@@ -26,7 +26,7 @@ pub use crate::{
 
 /// How long a benchmarked operation took to complete.
 #[derive(Debug)]
-pub struct OperationDuration(f64);
+pub struct OperationDuration(u64);
 
 /// A timer for tracking how long an operation took to complete.
 #[derive(Debug)]
@@ -41,7 +41,7 @@ impl OperationTimer {
     }
 
     pub fn stop(self) -> OperationDuration {
-        OperationDuration(Instant::now().duration_since(self.start_time).as_nanos() as f64)
+        OperationDuration(Instant::now().duration_since(self.start_time).as_nanos() as u64)
     }
 }
 
@@ -53,12 +53,12 @@ pub trait Benchmark<T>: Send + Sync {
 }
 
 struct BenchmarkResultsStatistics {
-    p50: f64,
-    p95: f64,
-    p99: f64,
-    mean: f64,
-    min: f64,
-    max: f64,
+    p50: u64,
+    p95: u64,
+    p99: u64,
+    mean: u64,
+    min: u64,
+    max: u64,
     count: u64,
 }
 
@@ -68,7 +68,7 @@ struct BenchmarkResults {
     values: Vec<OperationDuration>,
 }
 
-fn percentile(data: &[f64], p: u8) -> f64 {
+fn percentile(data: &[u64], p: u8) -> u64 {
     assert!(p <= 100 && !data.is_empty());
     if data.len() == 1 || p == 0 {
         return *data.first().unwrap();
@@ -81,12 +81,12 @@ fn percentile(data: &[f64], p: u8) -> f64 {
     // data points.
     let fraction = rank - rank.floor();
     let rank = rank as usize;
-    data[rank] + (data[rank + 1] - data[rank]) * fraction
+    data[rank] + ((data[rank + 1] - data[rank]) as f64 * fraction).round() as u64
 }
 
 impl BenchmarkResults {
     fn statistics(&self) -> BenchmarkResultsStatistics {
-        let mut data: Vec<f64> = self.values.iter().map(|d| d.0).collect();
+        let mut data: Vec<u64> = self.values.iter().map(|d| d.0).collect();
         data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let min = *data.first().unwrap();
         let max = *data.last().unwrap();
@@ -94,12 +94,12 @@ impl BenchmarkResults {
         let p95 = percentile(&data, 95);
         let p99 = percentile(&data, 99);
 
-        let mut sum = 0.0;
+        let mut sum = 0;
         for value in &data {
             sum += value;
         }
         let count = data.len() as u64;
-        let mean = sum / (count as f64);
+        let mean = sum / count;
         BenchmarkResultsStatistics { min, p50, p95, p99, max, mean, count }
     }
 
@@ -124,12 +124,12 @@ impl BenchmarkResults {
         row![
             l->self.filesystem_name,
             l->self.benchmark_name,
-            r->format_nanos_with_commas(stats.min),
-            r->format_nanos_with_commas(stats.p50),
-            r->format_nanos_with_commas(stats.p95),
-            r->format_nanos_with_commas(stats.p99),
-            r->format_nanos_with_commas(stats.max),
-            r->format_nanos_with_commas(stats.mean),
+            r->format_u64_with_commas(stats.min),
+            r->format_u64_with_commas(stats.p50),
+            r->format_u64_with_commas(stats.p95),
+            r->format_u64_with_commas(stats.p99),
+            r->format_u64_with_commas(stats.max),
+            r->format_u64_with_commas(stats.mean),
             r->format_u64_with_commas(stats.count),
         ]
     }
@@ -184,7 +184,7 @@ where
         let timer = OperationTimer::start();
         let durations = self.benchmark.run(&mut fs).await;
         let benchmark_duration = timer.stop();
-        info!("Finished {} {}ns", self.name(), format_nanos_with_commas(benchmark_duration.0));
+        info!("Finished {} {}ns", self.name(), format_u64_with_commas(benchmark_duration.0));
         fs.shutdown().await;
 
         BenchmarkResults {
@@ -259,7 +259,7 @@ impl BenchmarkSetResults {
                 label: format!("{}/{}", result.benchmark_name, result.filesystem_name),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: NANOSECONDS.to_owned(),
-                values: result.values.iter().map(|d| d.0).collect(),
+                values: result.values.iter().map(|d| d.0 as f64).collect(),
             })
             .collect();
 
@@ -300,11 +300,6 @@ fn format_u64_with_commas(num: u64) -> String {
     result
 }
 
-fn format_nanos_with_commas(nanos: f64) -> String {
-    assert!(nanos > 0.0);
-    format_u64_with_commas(nanos as u64)
-}
-
 /// Macro to add many benchmark and filesystem pairs to a `BenchmarkSet`.
 ///
 /// Expands:
@@ -340,17 +335,13 @@ mod tests {
         crate::{block_device::PanickingBlockDeviceFactory, FilesystemConfig},
     };
 
-    fn assert_approximately_eq(a: f64, b: f64) {
-        assert!((a - b).abs() < f64::EPSILON, "{} != {}", a, b);
-    }
-
     #[derive(Clone)]
     struct TestBenchmark(&'static str);
 
     #[async_trait]
     impl<T: Filesystem> Benchmark<T> for TestBenchmark {
         async fn run(&self, _fs: &mut T) -> Vec<OperationDuration> {
-            vec![OperationDuration(1.0), OperationDuration(2.0), OperationDuration(3.0)]
+            vec![OperationDuration(100), OperationDuration(200), OperationDuration(300)]
         }
 
         fn name(&self) -> String {
@@ -455,49 +446,49 @@ mod tests {
             benchmark_name: benchmark_name.clone(),
             filesystem_name: filesystem_name.clone(),
             values: vec![
-                OperationDuration(6.0),
-                OperationDuration(7.0),
-                OperationDuration(5.0),
-                OperationDuration(8.0),
-                OperationDuration(4.0),
+                OperationDuration(600),
+                OperationDuration(700),
+                OperationDuration(500),
+                OperationDuration(800),
+                OperationDuration(400),
             ],
         };
         let stats = result.statistics();
-        assert_approximately_eq(stats.p50, 6.0);
-        assert_approximately_eq(stats.p95, 7.8);
-        assert_approximately_eq(stats.p99, 7.96);
-        assert_approximately_eq(stats.mean, 6.0);
-        assert_eq!(stats.min, 4.0);
-        assert_eq!(stats.max, 8.0);
+        assert_eq!(stats.p50, 600);
+        assert_eq!(stats.p95, 780);
+        assert_eq!(stats.p99, 796);
+        assert_eq!(stats.mean, 600);
+        assert_eq!(stats.min, 400);
+        assert_eq!(stats.max, 800);
         assert_eq!(stats.count, 5);
     }
 
     #[fuchsia::test]
     fn percentile_test() {
-        let data = [4.0];
-        assert_approximately_eq(percentile(&data, 50), 4.0);
-        assert_approximately_eq(percentile(&data, 95), 4.0);
-        assert_approximately_eq(percentile(&data, 99), 4.0);
+        let data = [400];
+        assert_eq!(percentile(&data, 50), 400);
+        assert_eq!(percentile(&data, 95), 400);
+        assert_eq!(percentile(&data, 99), 400);
 
-        let data = [4.0, 5.0];
-        assert_approximately_eq(percentile(&data, 50), 4.5);
-        assert_approximately_eq(percentile(&data, 95), 4.95);
-        assert_approximately_eq(percentile(&data, 99), 4.99);
+        let data = [400, 500];
+        assert_eq!(percentile(&data, 50), 450);
+        assert_eq!(percentile(&data, 95), 495);
+        assert_eq!(percentile(&data, 99), 499);
 
-        let data = [4.0, 5.0, 6.0];
-        assert_approximately_eq(percentile(&data, 50), 5.0);
-        assert_approximately_eq(percentile(&data, 95), 5.9);
-        assert_approximately_eq(percentile(&data, 99), 5.98);
+        let data = [400, 500, 600];
+        assert_eq!(percentile(&data, 50), 500);
+        assert_eq!(percentile(&data, 95), 590);
+        assert_eq!(percentile(&data, 99), 598);
 
-        let data = [4.0, 5.0, 6.0, 7.0];
-        assert_approximately_eq(percentile(&data, 50), 5.5);
-        assert_approximately_eq(percentile(&data, 95), 6.85);
-        assert_approximately_eq(percentile(&data, 99), 6.97);
+        let data = [400, 500, 600, 700];
+        assert_eq!(percentile(&data, 50), 550);
+        assert_eq!(percentile(&data, 95), 685);
+        assert_eq!(percentile(&data, 99), 697);
 
-        let data = [4.0, 5.0, 6.0, 7.0, 8.0];
-        assert_approximately_eq(percentile(&data, 50), 6.0);
-        assert_approximately_eq(percentile(&data, 95), 7.8);
-        assert_approximately_eq(percentile(&data, 99), 7.96);
+        let data = [400, 500, 600, 700, 800];
+        assert_eq!(percentile(&data, 50), 600);
+        assert_eq!(percentile(&data, 95), 780);
+        assert_eq!(percentile(&data, 99), 796);
     }
 
     #[fuchsia::test]
@@ -512,18 +503,6 @@ mod tests {
         assert_eq!(format_u64_with_commas(999_999_999), "999,999,999");
         assert_eq!(format_u64_with_commas(1_000_000_000), "1,000,000,000");
         assert_eq!(format_u64_with_commas(999_999_999_999), "999,999,999,999");
-    }
-
-    #[fuchsia::test]
-    fn format_nanos_with_commas_test() {
-        assert_eq!(format_nanos_with_commas(0.1), "0");
-        assert_eq!(format_nanos_with_commas(0.9), "0");
-        assert_eq!(format_nanos_with_commas(1.0), "1");
-        assert_eq!(format_nanos_with_commas(1.9), "1");
-        assert_eq!(format_nanos_with_commas(999.9), "999");
-        assert_eq!(format_nanos_with_commas(1_000.0), "1,000");
-        assert_eq!(format_nanos_with_commas(999_999.9), "999,999");
-        assert_eq!(format_nanos_with_commas(1_000_000.0), "1,000,000");
     }
 
     #[fuchsia::test]
