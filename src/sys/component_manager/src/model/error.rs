@@ -67,8 +67,8 @@ pub enum ModelError {
         #[from]
         err: ComponentInstanceError,
     },
-    #[error("error in collection service dir VFS for component {moniker}: {err}")]
-    CollectionServiceDirError {
+    #[error("error in service dir VFS for component {moniker}: {err}")]
+    ServiceDirError {
         moniker: Moniker,
 
         #[source]
@@ -537,7 +537,7 @@ pub enum CapabilityProviderError {
 }
 
 impl CapabilityProviderError {
-    fn as_zx_status(&self) -> zx::Status {
+    pub fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::StreamCreationError => zx::Status::BAD_HANDLE,
             Self::BadFlags | Self::BadPath => zx::Status::INVALID_ARGS,

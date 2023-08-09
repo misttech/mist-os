@@ -111,13 +111,22 @@ type OfferService = table {
     /// (Required) The name under which the capability is being offered.
     4: target_name name;
 
-    /// (Optional) The list of allow listed instances to be offered. Instances
+    /// (Optional) The list of allowlisted instances to be offered. Instances
     /// of the service not in this list will not be accessible by the target
     /// component. If this is not set that means all instances from the source
     /// service are offered.
     5: source_instance_filter vector<string:MAX_NAME_LENGTH>:MAX;
 
-    /// (Optional) List of renamed service instances.
+    /// (Optional) The list of allowlisted instances to be offered, with
+    /// renames.
+    ///
+    /// If this is provided, the set of instances in the target service will be
+    /// restricted to the instances in this list, renaming `source_name` to
+    /// `target_name`.
+    ///
+    /// If set, `source_instance_filter`, will further restrict the set of
+    /// instances to those whose `target_name` appears in that list. There is
+    /// generally no reason to set both, but we support it for compatibility.
     6: renamed_instances vector<NameMapping>:MAX;
 
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.

@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples as fexamples, fidl_fuchsia_io as fio,
     fuchsia_component::client,
-    itertools::Itertools,
     std::collections::HashMap,
     tracing::*,
 };
@@ -55,12 +54,8 @@ async fn renamed_instances_test() {
 
     let _ = verify_original_service(&provider_exposed_dir).await;
 
-    let expected_visible_instance_list = vec![
-        "goodbye".to_string(),
-        "hello".to_string(),
-        "renamed_default".to_string(),
-        "renamed_default_again".to_string(),
-    ];
+    let expected_visible_instance_list =
+        vec!["renamed_default".to_string(), "renamed_default_again".to_string()];
 
     let renamed_instances = vec![
         fdecl::NameMapping {
@@ -113,14 +108,6 @@ async fn renamed_instances_test() {
         regular_echo_at_service_instance(&filtered_exposed_dir, "renamed_default_again")
             .await
             .unwrap(),
-    );
-    assert_eq!(
-        regular_echo_at_service_instance(&provider_exposed_dir, "hello").await.unwrap(),
-        regular_echo_at_service_instance(&filtered_exposed_dir, "hello").await.unwrap(),
-    );
-    assert_eq!(
-        regular_echo_at_service_instance(&provider_exposed_dir, "goodbye").await.unwrap(),
-        regular_echo_at_service_instance(&filtered_exposed_dir, "goodbye").await.unwrap(),
     );
 
     // Test that the original name of the renamed instance is no longer accessible from the filtered service
@@ -235,25 +222,12 @@ async fn filtered_service_through_collection_test() {
         ("goodbye".to_string(), "goodbye".to_string()),
         ("hello".to_string(), "hello".to_string()),
     ]);
-    let expected_visible_instance_list: Vec<String> = original_service_instances
-        .clone()
-        .into_iter()
-        .filter_map(|n| original_to_renamed.get(&n))
-        .map(|s| s.clone())
-        .filter(|n| source_instance_filter.contains(&n))
-        .sorted()
-        .collect();
+    let expected_visible_instance_list = vec!["goodbye".to_string(), "renamed_default".to_string()];
 
-    let renamed_instances = {
-        let mut renaming = vec![];
-        for (k, v) in &original_to_renamed {
-            if k != v {
-                renaming
-                    .push(fdecl::NameMapping { source_name: k.clone(), target_name: v.clone() });
-            }
-        }
-        Some(renaming)
-    };
+    let renamed_instances = original_to_renamed
+        .into_iter()
+        .map(|(k, v)| fdecl::NameMapping { source_name: k.clone(), target_name: v.clone() })
+        .collect();
 
     create_dynamic_service_provider(dynamic_child_provider_name).await;
     let dynamic_provider_child_ref = fdecl::ChildRef {
@@ -278,7 +252,7 @@ async fn filtered_service_through_collection_test() {
     create_dynamic_service_client(
         dynamic_child_name,
         provider_source,
-        renamed_instances,
+        Some(renamed_instances),
         Some(source_instance_filter.clone()),
     )
     .await;

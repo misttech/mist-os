@@ -3541,9 +3541,8 @@ async fn use_filtered_service_from_sibling() {
         .into_iter()
         .map(|d| d.name)
         .collect();
-    assert_eq!(entries.len(), 2);
+    assert_eq!(entries.len(), 1);
     assert!(entries.contains("renamed_default"));
-    assert!(entries.contains("variantinstance"));
     capability_util::add_dir_to_namespace(&namespace_d, "/svc", dir_d).await;
 
     let _server_handle = fasync::Task::spawn(async move {
@@ -3566,16 +3565,6 @@ async fn use_filtered_service_from_sibling() {
         CheckUse::Service {
             path: "/svc/my.service.Service".parse().unwrap(),
             instance: ServiceInstance::Named("renamed_default".to_string()),
-            member: "echo".to_string(),
-            expected_res: ExpectedResult::Ok,
-        },
-    )
-    .await;
-    test.check_use(
-        vec!["d"].try_into().unwrap(),
-        CheckUse::Service {
-            path: "/svc/my.service.Service".parse().unwrap(),
-            instance: ServiceInstance::Named("variantinstance".to_string()),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },

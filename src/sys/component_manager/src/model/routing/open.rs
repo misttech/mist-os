@@ -222,38 +222,26 @@ impl<'a> OpenRequest<'a> {
                 component,
                 source_instance_filter,
                 instance_name_source_to_target,
-            } => {
-                // First get the base service capability provider
-                match capability.source_path() {
-                    Some(path) => {
-                        let base_capability_provider =
-                            Box::new(DefaultComponentCapabilityProvider {
-                                target,
-                                source: component.clone(),
-                                name: capability
-                                    .source_name()
-                                    .expect("capability with source path should have a name")
-                                    .clone(),
-                                path: path.clone(),
-                            });
-
-                        let source_component = component.upgrade()?;
-                        let provider = FilteredServiceProvider::new(
-                            &source_component,
-                            source_instance_filter.clone(),
-                            instance_name_source_to_target.clone(),
-                            base_capability_provider,
-                        )
-                        .await?;
-                        Ok(Some(Box::new(provider)))
-                    }
-                    _ => Ok(None),
+            } => match capability.source_path() {
+                Some(_) => {
+                    let base_capability_source = Arc::new(CapabilitySource::Component {
+                        capability: capability.clone(),
+                        component: component.clone(),
+                    });
+                    let provider = FilteredServiceProvider::new(
+                        base_capability_source,
+                        source_instance_filter.clone(),
+                        instance_name_source_to_target.clone(),
+                    )
+                    .await?;
+                    Ok(Some(Box::new(provider)))
                 }
-            }
+                _ => Ok(None),
+            },
             CapabilitySource::OfferAggregate { capability_provider, component, .. } => {
                 // TODO(fxbug.dev/4776): This should cache the directory
                 Ok(Some(Box::new(
-                    AggregateServiceDirectoryProvider::create(
+                    AggregateServiceDirectoryProvider::new(
                         component.clone(),
                         target,
                         capability_provider.clone(),

@@ -198,11 +198,11 @@ pub struct RouteSource<C: ComponentInstanceInterface> {
 }
 
 impl<C: ComponentInstanceInterface> RouteSource<C> {
-    fn new(source: CapabilitySource<C>) -> Self {
+    pub fn new(source: CapabilitySource<C>) -> Self {
         Self { source, relative_path: "".into() }
     }
 
-    fn new_with_relative_path(source: CapabilitySource<C>, relative_path: PathBuf) -> Self {
+    pub fn new_with_relative_path(source: CapabilitySource<C>, relative_path: PathBuf) -> Self {
         Self { source, relative_path }
     }
 }

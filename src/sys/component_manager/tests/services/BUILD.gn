@@ -78,7 +78,6 @@ rustc_test("filtered-service-routing-test-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/sys/component_manager/tests/services/src/fidl:fuchsia.examples_rust",
-    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:tracing",
   ]
 
