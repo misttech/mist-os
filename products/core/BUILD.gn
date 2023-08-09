@@ -27,8 +27,6 @@ _base_driver_packages = [
   },
 ]
 
-# LINT.IfChange
-
 # This is the base platform configuration used by core
 _platform_configuration_base = {
   build_type = "eng"
@@ -68,6 +66,21 @@ _storage_default = {
   }
 }
 
+_storage_minfs = {
+  storage = {
+    filesystems = {
+      volume = {
+        fvm = {
+          data = {
+          }
+          blob = {
+          }
+        }
+      }
+    }
+  }
+}
+
 _storage_fxfs = {
   storage = {
     filesystems = {
@@ -88,6 +101,18 @@ product_assembly_configuration("core") {
   base_driver_packages = _base_driver_packages
 }
 
+product_assembly_configuration("core_with_minfs") {
+  testonly = true
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_storage_minfs, "*")
+  }
+  product = {
+  }
+
+  base_driver_packages = _base_driver_packages
+}
+
 product_assembly_configuration("core_with_fxfs") {
   testonly = true
   platform = {
@@ -99,8 +124,6 @@ product_assembly_configuration("core_with_fxfs") {
 
   base_driver_packages = _base_driver_packages
 }
-
-# LINT.ThenChange(//build/bazel/assembly/product_configurations/BUILD.bazel)
 
 product_assembly_configuration("core_with_netstack3") {
   testonly = true
