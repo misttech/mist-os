@@ -181,7 +181,6 @@
                 "sys_timex.adjtimex_smoke",
                 "sys_timex.clock_adjtime_EFAULT",
                 "sys_timex.clock_adjtime_smoke",
-                "sys_uio.process_vm_writev",
                 "time.clock_getcpuclockid_ESRCH",
                 "time.clock_settime",
                 "unistd.close_range",

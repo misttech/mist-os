@@ -215,8 +215,12 @@ pub fn sys_process_vm_readv(
     local_iov_count: i32,
     remote_iov_addr: UserAddress,
     remote_iov_count: i32,
-    _flags: usize,
+    flags: usize,
 ) -> Result<usize, Errno> {
+    if flags != 0 {
+        return error!(EINVAL);
+    }
+
     // Source and destination are allowed to be of different length. It is valid to use a nullptr if
     // the associated length is 0. Thus, if either source or destination length is 0 and nullptr,
     // make sure to return Ok(0) before doing any other validation/operations.
@@ -244,6 +248,49 @@ pub fn sys_process_vm_readv(
     // point.
     let mut input = UserBuffersInputBuffer::new(&remote_task.mm, remote_iov)?;
     let mut output = UserBuffersOutputBuffer::new(&current_task.mm, local_iov)?;
+    output.write_buffer(&mut input)
+}
+
+pub fn sys_process_vm_writev(
+    current_task: &CurrentTask,
+    pid: pid_t,
+    local_iov_addr: UserAddress,
+    local_iov_count: i32,
+    remote_iov_addr: UserAddress,
+    remote_iov_count: i32,
+    flags: usize,
+) -> Result<usize, Errno> {
+    if flags != 0 {
+        return error!(EINVAL);
+    }
+
+    // Source and destination are allowed to be of different length. It is valid to use a nullptr if
+    // the associated length is 0. Thus, if either source or destination length is 0 and nullptr,
+    // make sure to return Ok(0) before doing any other validation/operations.
+    if (local_iov_count == 0 && local_iov_addr.is_null())
+        || (remote_iov_count == 0 && remote_iov_addr.is_null())
+    {
+        return Ok(0);
+    }
+
+    let weak_remote_task = current_task.get_task(pid);
+    let remote_task = Task::from_weak(&weak_remote_task)?;
+
+    current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
+
+    let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
+    let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;
+    log_trace!(
+        "sys_process_vm_writev(pid={}, local_iov={:?}, remote_iov={:?})",
+        pid,
+        local_iov,
+        remote_iov
+    );
+    // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
+    // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
+    // point.
+    let mut input = UserBuffersInputBuffer::new(&current_task.mm, local_iov)?;
+    let mut output = UserBuffersOutputBuffer::new(&remote_task.mm, remote_iov)?;
     output.write_buffer(&mut input)
 }
 

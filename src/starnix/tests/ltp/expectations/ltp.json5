@@ -210,8 +210,6 @@
                 "prctl07",
                 "prctl08",
                 "prctl10",
-                "process_vm_writev01",
-                "process_vm_writev02",
                 "ptem01",
                 "ptrace01",
                 "ptrace02",
