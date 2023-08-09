@@ -543,10 +543,6 @@ config("default_warnings") {
     "-Wno-sign-conversion",
     "-Wno-unused-parameter",
     "-Wnonportable-system-include-path",
-
-    # TODO(fxbug.dev/121140) Remove this after we fixes all
-    # type limits warnings.
-    "-Wno-type-limits",
   ]
 
   cflags_cc = []
