@@ -1,0 +1,10 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/session/bin/session_manager/meta/all_products_capabilities.core_shard.cml",
+        "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
+        "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",
+    ],
+}

@@ -49,7 +49,16 @@ product_assembly_configuration("terminal") {
       # TODO(fxbug.dev/122855): Add `fonts_collection` once OOT is ready to
       # use the updated fonts provisioning methods.
     }
+
+    session = {
+      enabled = true
+
+      # avoid impacting existing terminal users like chromium tests
+      autolaunch = false
+    }
   }
   product = {
+    session_url =
+        "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
   }
 }

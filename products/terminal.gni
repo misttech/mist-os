@@ -24,6 +24,7 @@ legacy_base_package_labels += [ "//src/cobalt/bin/app:build_type_eng" ]
 legacy_cache_package_labels += [
   "//src/fonts/collections:small-open-fonts-collection",
   "//src/ui/bin/terminal",
+  "//src/ui/bin/tiles-session",
 
   # Used to mock out display hardware in UI integration tests.
   "//src/graphics/display/testing/fake-coordinator-connector",
@@ -64,7 +65,7 @@ core_realm_shards += [ "//src/testing/sl4f:sl4f_terminal_core_shard" ]
 legacy_base_package_labels += [
   "//src/sys/bin/start_sl4f",
 
-  # TODO(https://fxbug.dev/107904) remove once tiles-session is used for e2e tests
+  # TODO(https://fxbug.dev/107904) remove once dart version flatland test removed.
   "//src/ui/tools/tiles",
 ]
 
@@ -92,3 +93,6 @@ fuchsia_product_assembly_config_label = "//products/terminal"
 
 fuchsia_structured_config_policy =
     "//products/terminal/terminal_user_structured_config_policy.json5"
+
+# Include the session framework
+core_realm_shards += [ "//src/session/bin/session_manager:terminal_core_shard" ]
