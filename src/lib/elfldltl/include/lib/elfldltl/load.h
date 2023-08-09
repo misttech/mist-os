@@ -172,7 +172,8 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
 //
 // Segment is just an alias for std::variant<...> of the several specific
 // types.  All segment types have vaddr() and memsz(); most have offset() and
-// filesz().  All these are normalized to whole pages.
+// filesz(). All these are normalized to whole pages. Segments with memsz == 0
+// will always be elided.
 //
 //  * ConstantSegment is loaded directly from the file (or was relocated);
 //    * It also has `bool readable()` and `bool executable()`.
@@ -275,6 +276,32 @@ class LoadInfo {
   template <typename T>
   constexpr bool VisitSegments(T&& visitor) const {
     return VisitAllOf(std::forward<T>(visitor), segments_);
+  }
+
+  template <typename T>
+  constexpr bool VisitSegment(T&& visitor, const Segment& segment) const {
+    return internal::Visit(visitor, segment);
+  }
+
+  constexpr typename Container<Segment>::iterator FindSegment(const size_type vaddr) {
+    auto within_bounds = [vaddr](const auto& segment) {
+      return segment.vaddr() <= vaddr && vaddr < segment.vaddr() + segment.memsz();
+    };
+
+    auto it = std::lower_bound(
+        segments_.begin(), segments_.end(), vaddr, [&](const auto& segment, size_type vaddr) {
+          // Pass over segments where its entire vaddr range is less than vaddr,
+          // subtracting 1 from vaddr + memsz to exclude the vaddr of the next segment.
+          // This relies on the guarantee from LoadInfo::AddSegment that all segments' memsz > 0.
+          return internal::Visit(
+              [vaddr](const auto& s) { return s.vaddr() + s.memsz() - 1 < vaddr; }, segment);
+        });
+
+    if (it != segments_.end() && !internal::Visit(within_bounds, *it)) {
+      it = segments_.end();
+    }
+
+    return it;
   }
 
   // When loading before relocation, the RelroBounds() region can just be made

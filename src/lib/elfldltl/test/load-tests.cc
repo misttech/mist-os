@@ -133,6 +133,7 @@ template <class Elf, bool Merged, template <class ElfLayout> typename Segment1,
 void DoMergeTest() {
   using Segment1T = Segment1<Elf>;
   using Segment2T = Segment2<Elf>;
+  using size_type = typename Elf::size_type;
   constexpr unsigned totalSegments = Merged ? 1 : 2;
 
   auto diag = ExpectOkDiagnostics();
@@ -140,7 +141,7 @@ void DoMergeTest() {
   elfldltl::LoadInfo<Elf, elfldltl::StaticVector<2>::Container> loadInfo;
   const auto& segments = loadInfo.segments();
 
-  int offset = 0;
+  size_type offset = 0;
   auto phdr1 = GetPhdr1<Elf>{}(offset);
   auto phdr2 = GetPhdr2<Elf>{}(offset);
   auto expectedSize = Merged ? phdr1.memsz() + phdr2.memsz() : phdr2.memsz();
@@ -181,7 +182,7 @@ template <uint64_t Flags, uint64_t FileSz = kPageSize, uint64_t MemSz = kPageSiz
 struct CreatePhdr {
   template <typename Elf>
   struct type {
-    auto operator()(int& offset) {
+    constexpr auto operator()(typename Elf::size_type& offset) {
       using Phdr = typename Elf::Phdr;
       Phdr phdr{.type = elfldltl::ElfPhdrType::kLoad,
                 .offset = offset,
@@ -279,6 +280,7 @@ TYPED_TEST(ElfldltlLoadTests, CantMergeData) {
 TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
   using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
+  using size_type = typename Elf::size_type;
 
   auto diag = ExpectOkDiagnostics();
 
@@ -286,7 +288,7 @@ TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
   using ConstantSegment = typename decltype(loadInfo)::ConstantSegment;
   using DataWithZeroFillSegment = typename decltype(loadInfo)::DataWithZeroFillSegment;
 
-  int offset = 0;
+  size_type offset = 0;
   const Phdr kPhdrs[] = {
       ConstantPhdr<Elf>{}(offset), ConstantPhdr<Elf>{}(offset), DataPhdr<Elf>{}(offset),
       DataPhdr<Elf>{}(offset),     ZeroFillPhdr<Elf>{}(offset),
@@ -306,6 +308,7 @@ TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
 TYPED_TEST(ElfldltlLoadTests, VisitSegments) {
   using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
+  using size_type = typename Elf::size_type;
 
   auto diag = ExpectOkDiagnostics();
 
@@ -317,7 +320,7 @@ TYPED_TEST(ElfldltlLoadTests, VisitSegments) {
     return true;
   }));
 
-  int offset = 0;
+  size_type offset = 0;
   const Phdr kPhdrs[] = {
       ConstantPhdr<Elf>{}(offset),
       DataPhdr<Elf>{}(offset),
@@ -377,12 +380,13 @@ TYPED_TEST(ElfldltlLoadTests, RelroBounds) {
 TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
   using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
+  using size_type = typename Elf::size_type;
 
   auto diag = ExpectOkDiagnostics();
 
   elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
 
-  int offset = kPageSize;
+  size_type offset = kPageSize;
   Phdr phdrs[] = {
       DataPhdr<Elf>{}(offset),
       {.type = elfldltl::ElfPhdrType::kRelro, .memsz = kPageSize},
@@ -692,6 +696,62 @@ foo: {{{mmap:0x12342000:0x1000:load:17:rw:0x2000}}}
             &(info.SymbolizerContext(writer, 17, "foo", cpp20::span(kBuildId), 0x12340000, "foo")));
 
   EXPECT_EQ(kExpectedContext, markup);
+}
+
+TYPED_TEST(ElfldltlLoadTests, FindSegment) {
+  using Elf = typename TestFixture::Elf;
+  using Phdr = typename Elf::Phdr;
+  using size_type = typename Elf::size_type;
+
+  auto diag = ExpectOkDiagnostics();
+
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
+
+  // Expect the first lookup to an empty segment list to return not found.
+  ASSERT_TRUE(loadInfo.segments().empty());
+  ASSERT_EQ(loadInfo.FindSegment(0u), loadInfo.segments().end());
+
+  size_type offset = kPageSize;
+  const std::array kPhdrs = {ConstantPhdr<Elf>{}(offset), DataPhdr<Elf>{}(offset),
+                             ConstantPhdr<Elf>{}(offset)};
+  // Load all segments first so we can search the segments container with
+  // multiple entries.
+  for (const Phdr& phdr : kPhdrs) {
+    ASSERT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+  }
+
+  ASSERT_EQ(loadInfo.segments().size(), 3u);
+
+  // Test finding a segment from its starting vaddr.
+  for (const Phdr& phdr : kPhdrs) {
+    size_type vaddr = phdr.vaddr;
+    const auto found = loadInfo.FindSegment(vaddr);
+    ASSERT_NE(found, loadInfo.segments().end());
+    ASSERT_TRUE(
+        loadInfo.VisitSegment([vaddr](const auto& s) { return s.vaddr() == vaddr; }, *found));
+  };
+
+  // Test finding a segment from a vaddr in its vaddr range.
+  for (const Phdr& phdr : kPhdrs) {
+    size_type vaddr = phdr.vaddr + (phdr.memsz / 2);
+    const auto found = loadInfo.FindSegment(vaddr);
+    ASSERT_NE(found, loadInfo.segments().end());
+    ASSERT_TRUE(loadInfo.VisitSegment(
+        [vaddr](const auto& s) { return s.vaddr() < vaddr && vaddr < s.vaddr() + s.memsz(); },
+        *found));
+  };
+
+  // Test finding a segment out of bounds of the first and last segments
+  {
+    size_type under_bounds_vaddr = kPhdrs[0].vaddr / 2;
+    const auto found = loadInfo.FindSegment(under_bounds_vaddr);
+    ASSERT_EQ(found, loadInfo.segments().end());
+  }
+  {
+    size_type over_bounds_vaddr = kPhdrs[2].vaddr * 2;
+    const auto found = loadInfo.FindSegment(over_bounds_vaddr);
+    ASSERT_EQ(found, loadInfo.segments().end());
+  }
 }
 
 }  // namespace
