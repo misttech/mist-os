@@ -24,13 +24,6 @@ pub mod logger {
     }
 }
 
-/// Parameter to indicate whether to enable CSO.
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum Cso {
-    Enabled,
-    Disabled,
-}
-
 pub trait OvernetInstance: std::fmt::Debug + Sync + Send {
     fn connect_as_service_consumer(&self) -> Result<ServiceConsumerProxy, Error>;
     fn connect_as_service_publisher(&self) -> Result<ServicePublisherProxy, Error>;

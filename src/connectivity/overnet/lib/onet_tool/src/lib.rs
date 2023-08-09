@@ -180,7 +180,7 @@ async fn list_links(args: ListLinks) -> Result<(), Error> {
 }
 
 pub async fn run_onet(hoist: &hoist::Hoist, opts: Opts) -> Result<(), Error> {
-    let _t = hoist.start_default_link(hoist::Cso::Enabled)?;
+    let _t = hoist.start_default_link()?;
     match opts.command {
         Command::ListPeers(_) => list_peers().await,
         Command::ListLinks(args) => list_links(args).await,
