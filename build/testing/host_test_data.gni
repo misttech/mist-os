@@ -46,10 +46,6 @@ template("host_test_data") {
       }
       deps += [ ":$metadata_target_name" ]
 
-      if (target_name == "fuchsia_controller_fidl_irs_and_deps") {
-        print_stack_trace()
-      }
-
       # If we are in the context of a variant, also perform the copy for the
       # base toolchain, as we want both the variant-selected and normal
       # versions of the associated test to have its test data available at the
