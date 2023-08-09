@@ -55,6 +55,7 @@ pub struct TaskInfo {
 /// Executes the provided `syscall` in `current_task`.
 ///
 /// Returns an `ErrorContext` if the system call returned an error.
+#[inline(never)] // Inlining this function breaks the CFI directives used to unwind into user code.
 pub fn execute_syscall(
     current_task: &mut CurrentTask,
     syscall_decl: SyscallDecl,
