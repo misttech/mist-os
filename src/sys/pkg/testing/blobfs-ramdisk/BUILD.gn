@@ -68,7 +68,7 @@ fuchsia_test_package("unit-tests-package") {
       max_severity = "ERROR"
     }
   }
-  package_name = "blobfs-ramdisk-unit-tests"
+  package_name = "blobfs-ramdisk-tests"
   test_components = [ ":test-component" ]
 }
 

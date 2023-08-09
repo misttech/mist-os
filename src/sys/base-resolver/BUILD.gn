@@ -17,7 +17,7 @@ group("base-resolver") {
 group("tests") {
   testonly = true
   deps = [
-    ":base-resolver-unittests",
+    ":base-resolver-tests",
     "tests",
   ]
 }
@@ -81,7 +81,7 @@ fuchsia_component("base-resolver-component") {
   deps = [ ":bin" ]
 }
 
-fuchsia_unittest_package("base-resolver-unittests") {
+fuchsia_unittest_package("base-resolver-tests") {
   manifest = "meta/base-resolver-unittests.cml"
   deps = [
     ":bin_test",

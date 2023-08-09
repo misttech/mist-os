@@ -6,7 +6,7 @@
     children: [
         {
             name: "test_driver",
-            url: "fuchsia-pkg://fuchsia.com/pkg-resolver-unit-tests#meta/test_driver.cm",
+            url: "#meta/test_driver.cm",
         },
     ],
     offer: [

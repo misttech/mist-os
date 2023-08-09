@@ -10,7 +10,7 @@ import("//build/rust/rustc_test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":base-resolver-tests" ]
+  deps = [ ":base-resolver-as-a-component-resolver-tests" ]
 }
 
 rustc_test("integration_test_bin") {
@@ -146,7 +146,7 @@ fidl("test.ping") {
   sources = [ "ping.test.fidl" ]
 }
 
-fuchsia_test_package("base-resolver-tests") {
+fuchsia_test_package("base-resolver-as-a-component-resolver-tests") {
   test_components = [ ":root" ]
   deps = [
     ":fake-dependencies",

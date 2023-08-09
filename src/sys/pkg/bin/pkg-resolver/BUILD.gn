@@ -172,7 +172,7 @@ fuchsia_test_package("unit-tests-package") {
       max_severity = "ERROR"
     }
   }
-  package_name = "pkg-resolver-unit-tests"
+  package_name = "pkg-resolver-tests"
   deps = [
     ":unit-tests-driver",
     "//src/connectivity/network/dns:component",
