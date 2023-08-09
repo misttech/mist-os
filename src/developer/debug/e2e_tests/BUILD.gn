@@ -129,6 +129,7 @@ if (is_host && has_board) {
     # When fetching of unstripped binaries is delayed,
     # use dlwrap to explicitly fetch them just-in-time.
     if (!rust_rbe_download_unstripped_binaries) {
+      inputs += [ script ] + rbe_dlwrap_inputs
       _args = [
                 "--download_list",
                 rebase_path(unstripped_binaries_list_file, root_build_dir),

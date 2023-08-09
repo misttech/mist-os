@@ -60,6 +60,10 @@ cxx_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
 prebuilt_tool_remote_wrapper = "//build/rbe/prebuilt_tool_remote_wrapper.py"
 
 rbe_dlwrap = "//build/rbe/dlwrap.py"
+rbe_dlwrap_inputs = [
+  "//prebuilt/proprietary/third_party/reclient/$host_platform/remotetool",
+  reproxy_config_file,
+]
 
 declare_args() {
   #########################

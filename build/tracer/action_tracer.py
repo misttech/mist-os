@@ -942,6 +942,10 @@ def main():
         # which are not consumed by any other builds actions.
         ".dl-lock",
 
+        # Downloads stubs can be kept as backups after downloading
+        # the real artifact.  No build action consumes these backups.
+        ".dl-stub",
+
         # Allow actions to read .fx-build-dir to figure out the current build
         # directory.
         #
