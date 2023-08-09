@@ -274,13 +274,18 @@ std::optional<fdecl::wire::Offer> CreateCompositeOffer(fidl::AnyArena& arena,
 
 Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
            NodeManager* node_manager, async_dispatcher_t* dispatcher, DeviceInspect inspect,
-           uint32_t primary_index)
+           uint32_t primary_index, NodeType type)
     : name_(name),
+      type_(type),
       parents_(std::move(parents)),
       primary_index_(primary_index),
       node_manager_(node_manager),
       dispatcher_(dispatcher),
       inspect_(std::move(inspect)) {
+  if (type == NodeType::kNormal) {
+    ZX_ASSERT(parents_.size() <= 1);
+  }
+
   ZX_ASSERT(primary_index_ == 0 || primary_index_ < parents_.size());
   if (auto primary_parent = GetPrimaryParent()) {
     // By default, we set `driver_host_` to match the primary parent's
@@ -290,21 +295,12 @@ Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
   }
 }
 
-Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
-           NodeManager* node_manager, async_dispatcher_t* dispatcher, DeviceInspect inspect,
-           DriverHost* driver_host)
-    : name_(name),
-      parents_(std::move(parents)),
-      node_manager_(node_manager),
-      dispatcher_(dispatcher),
-      driver_host_(driver_host),
-      inspect_(std::move(inspect)) {}
-
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
     std::vector<std::string> parents_names,
     const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
-    NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
+    NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
+    uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
   if (primary_index >= parents.size()) {
     LOGF(ERROR, "Primary node index is out of bounds");
@@ -318,8 +314,9 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   }
   DeviceInspect inspect =
       primary_node_ptr->inspect_.CreateChild(std::string(node_name), zx::vmo(), 0);
-  std::shared_ptr composite = std::make_shared<Node>(node_name, std::move(parents), driver_binder,
-                                                     dispatcher, std::move(inspect), primary_index);
+  std::shared_ptr composite = std::make_shared<Node>(
+      node_name, std::move(parents), driver_binder, dispatcher, std::move(inspect), primary_index,
+      is_legacy ? NodeType::kLegacyComposite : NodeType::kComposite);
   composite->parents_names_ = std::move(parents_names);
 
   for (const auto& prop : properties) {
