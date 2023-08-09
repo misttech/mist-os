@@ -6,9 +6,8 @@ use {
     crate::{repository::Repository, repository_manager::Stats, TCP_KEEPALIVE_TIMEOUT},
     cobalt_sw_delivery_registry as metrics,
     fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{self as fpkg, LocalMirrorProxy},
+    fidl_fuchsia_pkg::{self as fpkg},
     fidl_fuchsia_pkg_ext::{self as pkg, BlobId, BlobInfo, MirrorConfig, RepositoryConfig},
     fuchsia_cobalt_builders::MetricEventExt as _,
     fuchsia_pkg::PackageDirectory,
@@ -107,7 +106,6 @@ pub async fn cache_package<'a>(
                     opener: get.make_open_meta_blob(),
                     mirrors: Arc::clone(&mirrors),
                     expected_len: size,
-                    use_local_mirror: config.use_local_mirror(),
                     parent_trace_id: trace_id,
                 },
             )
@@ -146,7 +144,6 @@ pub async fn cache_package<'a>(
                                     opener: get.make_open_blob(need.blob_id),
                                     mirrors: Arc::clone(&mirrors),
                                     expected_len: None,
-                                    use_local_mirror: config.use_local_mirror(),
                                     parent_trace_id: trace_id,
                                 },
                             )
@@ -374,9 +371,6 @@ impl ToResolveError for FetchError {
             BlobUrl(_) => pkg::ResolveError::Internal,
             FidlError(_) => pkg::ResolveError::Internal,
             IoError(_) => pkg::ResolveError::Io,
-            LocalMirror(_) => pkg::ResolveError::Internal,
-            NoBlobSource { .. } => pkg::ResolveError::Internal,
-            ConflictingBlobSources => pkg::ResolveError::Internal,
             BlobHeaderTimeout { .. } => pkg::ResolveError::UnavailableBlob,
             BlobBodyTimeout { .. } => pkg::ResolveError::UnavailableBlob,
             ExpectedHttpStatus206 { .. } => pkg::ResolveError::UnavailableBlob,
@@ -453,7 +447,6 @@ pub struct FetchBlobContext {
     opener: pkg::cache::DeferredOpenBlob,
     mirrors: Arc<[MirrorConfig]>,
     expected_len: Option<u64>,
-    use_local_mirror: bool,
     parent_trace_id: ftrace::Id,
 }
 
@@ -482,7 +475,7 @@ impl work_queue::TryMerge for FetchBlobContext {
 
         // Don't attempt to merge mirrors, but do merge these contexts if the mirrors are
         // equivalent.
-        if self.mirrors != other.mirrors || self.use_local_mirror != other.use_local_mirror {
+        if self.mirrors != other.mirrors {
             return Err(other);
         }
 
@@ -509,7 +502,6 @@ impl BlobFetcher {
         max_concurrency: usize,
         stats: Arc<Mutex<Stats>>,
         cobalt_sender: ProtocolSender<MetricEvent>,
-        local_mirror_proxy: Option<LocalMirrorProxy>,
         blob_fetch_params: BlobFetchParams,
     ) -> (impl Future<Output = ()>, BlobFetcher) {
         let http_client = Arc::new(fuchsia_hyper::new_https_client_from_tcp_options(
@@ -524,7 +516,6 @@ impl BlobFetcher {
                 let http_client = Arc::clone(&http_client);
                 let stats = Arc::clone(&stats);
                 let cobalt_sender = cobalt_sender.clone();
-                let local_mirror_proxy = local_mirror_proxy.clone();
 
                 async move {
                     fetch_blob(
@@ -534,7 +525,6 @@ impl BlobFetcher {
                         cobalt_sender,
                         merkle,
                         context,
-                        local_mirror_proxy.as_ref(),
                         blob_fetch_params,
                     )
                     .map_err(Arc::new)
@@ -582,103 +572,65 @@ async fn fetch_blob(
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     merkle: BlobId,
     context: FetchBlobContext,
-    local_mirror_proxy: Option<&LocalMirrorProxy>,
     blob_fetch_params: BlobFetchParams,
 ) -> Result<(), FetchError> {
-    let use_remote_mirror = context.mirrors.len() != 0;
-    let use_local_mirror = context.use_local_mirror;
+    // TODO try the other mirrors depending on the errors encountered trying this one.
+    let mirror = context.mirrors.get(0).ok_or(FetchError::NoMirrors)?;
     let trace_id = ftrace::Id::random();
+    let guard = ftrace::async_enter!(
+        trace_id,
+        "app",
+        "fetch_blob_http",
+        // Async tracing does not support multiple concurrent child durations, so we create
+        // a new top-level duration and attach the parent duration as metadata.
+        "parent_trace_id" => u64::from(context.parent_trace_id),
+        "hash" => merkle.to_string().as_str()
+    );
+    let inspect = inspect.http();
+    let mut res = fetch_blob_http(
+        &inspect,
+        http_client,
+        &mirror,
+        merkle,
+        &context.opener,
+        context.expected_len,
+        blob_fetch_params,
+        &stats,
+        cobalt_sender.clone(),
+        trace_id,
+    )
+    .await;
+    if let (Err(FetchErrorKind::NotFound), fpkg::BlobType::Delivery, true) = (
+        res.as_ref().map_err(FetchError::kind),
+        blob_fetch_params.blob_type(),
+        blob_fetch_params.delivery_blob_fallback(),
+    ) {
+        tracing::info!("Delivery blob {merkle} not found, falling back to uncompressed blob");
+        res = fetch_blob_http(
+            &inspect,
+            http_client,
+            &mirror,
+            merkle,
+            &context.opener,
+            context.expected_len,
+            BlobFetchParams { blob_type: fpkg::BlobType::Uncompressed, ..blob_fetch_params },
+            &stats,
+            cobalt_sender.clone(),
+            trace_id,
+        )
+        .await;
 
-    match (use_remote_mirror, use_local_mirror, local_mirror_proxy) {
-        (true, true, _) => Err(FetchError::ConflictingBlobSources),
-        (false, true, Some(local_mirror)) => {
-            let guard = ftrace::async_enter!(
-                trace_id,
-                "app",
-                "fetch_blob_local",
-                // Async tracing does not support multiple concurrent child durations, so we create
-                // a new top-level duration and attach the parent duration as metadata.
-                "parent_trace_id" => u64::from(context.parent_trace_id),
-                "hash" => merkle.to_string().as_str()
-            );
-            let res = fetch_blob_local(
-                inspect.local_mirror(),
-                local_mirror,
-                merkle,
-                context.opener,
-                context.expected_len,
-            )
-            .await;
-            guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
-            res
-        }
-        (true, false, _) => {
-            let guard = ftrace::async_enter!(
-                trace_id,
-                "app",
-                "fetch_blob_http",
-                // Async tracing does not support multiple concurrent child durations, so we create
-                // a new top-level duration and attach the parent duration as metadata.
-                "parent_trace_id" => u64::from(context.parent_trace_id),
-                "hash" => merkle.to_string().as_str()
-            );
-            let inspect = inspect.http();
-            let mut res = fetch_blob_http(
-                &inspect,
-                http_client,
-                &context.mirrors,
-                merkle,
-                &context.opener,
-                context.expected_len,
-                blob_fetch_params,
-                &stats,
-                cobalt_sender.clone(),
-                trace_id,
-            )
-            .await;
-            if let (Err(FetchErrorKind::NotFound), fpkg::BlobType::Delivery, true) = (
-                res.as_ref().map_err(FetchError::kind),
-                blob_fetch_params.blob_type(),
-                blob_fetch_params.delivery_blob_fallback(),
-            ) {
-                tracing::info!(
-                    "Delivery blob {merkle} not found, falling back to uncompressed blob"
-                );
-                res = fetch_blob_http(
-                    &inspect,
-                    http_client,
-                    &context.mirrors,
-                    merkle,
-                    &context.opener,
-                    context.expected_len,
-                    BlobFetchParams {
-                        blob_type: fpkg::BlobType::Uncompressed,
-                        ..blob_fetch_params
-                    },
-                    &stats,
-                    cobalt_sender.clone(),
-                    trace_id,
-                )
-                .await;
-
-                cobalt_sender.send(
-                    MetricEvent::builder(metrics::DELIVERY_BLOB_FALLBACK_METRIC_ID)
-                        .with_event_codes(match &res {
-                            Ok(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Success,
-                            Err(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Failure,
-                        })
-                        .as_occurrence(1),
-                );
-            }
-            guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
-            res
-        }
-        (use_remote_mirror, use_local_mirror, local_mirror) => Err(FetchError::NoBlobSource {
-            use_remote_mirror,
-            use_local_mirror,
-            allow_local_mirror: local_mirror.is_some(),
-        }),
+        cobalt_sender.send(
+            MetricEvent::builder(metrics::DELIVERY_BLOB_FALLBACK_METRIC_ID)
+                .with_event_codes(match &res {
+                    Ok(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Success,
+                    Err(_) => metrics::DeliveryBlobFallbackMetricDimensionResult::Failure,
+                })
+                .as_occurrence(1),
+        );
     }
+    guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
+    res
 }
 
 #[derive(Default)]
@@ -700,7 +652,7 @@ impl FetchStats {
 async fn fetch_blob_http(
     inspect: &inspect::TriggerAttempt<inspect::Http>,
     client: &fuchsia_hyper::HttpsClient,
-    mirrors: &[MirrorConfig],
+    mirror: &MirrorConfig,
     merkle: BlobId,
     opener: &pkg::cache::DeferredOpenBlob,
     expected_len: Option<u64>,
@@ -709,12 +661,7 @@ async fn fetch_blob_http(
     cobalt_sender: ProtocolSender<MetricEvent>,
     trace_id: ftrace::Id,
 ) -> Result<(), FetchError> {
-    // TODO try the other mirrors depending on the errors encountered trying this one.
-    let blob_mirror_url = if let Some(mirror) = mirrors.get(0) {
-        mirror.blob_mirror_url().to_owned()
-    } else {
-        return Err(FetchError::NoMirrors);
-    };
+    let blob_mirror_url = mirror.blob_mirror_url().to_owned();
     let mirror_stats = &stats.lock().for_mirror(blob_mirror_url.to_string());
     let blob_url = &make_blob_url(blob_mirror_url, &merkle, blob_fetch_params.blob_type)
         .map_err(FetchError::BlobUrl)?;
@@ -802,90 +749,6 @@ async fn fetch_blob_http(
         }
     })
     .await
-}
-
-async fn fetch_blob_local(
-    inspect: inspect::TriggerAttempt<inspect::LocalMirror>,
-    local_mirror: &LocalMirrorProxy,
-    merkle: BlobId,
-    opener: pkg::cache::DeferredOpenBlob,
-    expected_len: Option<u64>,
-) -> Result<(), FetchError> {
-    let inspect = inspect.attempt();
-    inspect.state(inspect::LocalMirror::CreateBlob);
-    if let Some(pkg::cache::NeededBlob { blob, closer: blob_closer }) =
-        opener.open(fpkg::BlobType::Uncompressed).await.map_err(FetchError::CreateBlob)?
-    {
-        let res = read_local_blob(&inspect, local_mirror, merkle, expected_len, blob).await;
-        inspect.state(inspect::LocalMirror::CloseBlob);
-        blob_closer.close().await;
-        res?;
-    }
-    Ok(())
-}
-
-async fn read_local_blob(
-    inspect: &inspect::Attempt<inspect::LocalMirror>,
-    proxy: &LocalMirrorProxy,
-    merkle: BlobId,
-    expected_len: Option<u64>,
-    dest: pkg::cache::Blob<pkg::cache::NeedsTruncate>,
-) -> Result<(), FetchError> {
-    let (local_file, remote) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(FetchError::FidlError)?;
-
-    inspect.state(inspect::LocalMirror::GetBlob);
-    proxy
-        .get_blob(&merkle.into(), remote)
-        .await
-        .map_err(FetchError::FidlError)?
-        .map_err(FetchError::LocalMirror)?;
-
-    let (status, info) = local_file.get_attr().await.map_err(FetchError::FidlError)?;
-    Status::ok(status).map_err(FetchError::IoError)?;
-
-    if let Some(ref val) = expected_len {
-        match val.cmp(&info.content_size) {
-            std::cmp::Ordering::Greater => {
-                return Err(FetchError::BlobTooSmall { uri: merkle.to_string() });
-            }
-            std::cmp::Ordering::Less => {
-                return Err(FetchError::BlobTooLarge { uri: merkle.to_string() });
-            }
-            _ => {}
-        }
-    }
-
-    inspect.state(inspect::LocalMirror::TruncateBlob);
-    let dest = match dest.truncate(info.content_size).await.map_err(FetchError::Truncate)? {
-        pkg::cache::TruncateBlobSuccess::AllWritten(dest) => dest,
-        pkg::cache::TruncateBlobSuccess::NeedsData(mut dest) => loop {
-            inspect.state(inspect::LocalMirror::ReadBlob);
-            let data = local_file
-                .read(fio::MAX_BUF)
-                .await
-                .map_err(FetchError::FidlError)?
-                .map_err(Status::from_raw)
-                .map_err(FetchError::IoError)?;
-            if data.is_empty() {
-                return Err(FetchError::BlobTooSmall { uri: merkle.to_string() });
-            }
-            inspect.state(inspect::LocalMirror::WriteBlob);
-            dest = match dest
-                .write(&data)
-                .await
-                .map_err(|e| FetchError::Write { e, uri: merkle.to_string() })?
-            {
-                pkg::cache::BlobWriteSuccess::NeedsData(dest) => dest,
-                pkg::cache::BlobWriteSuccess::AllWritten(dest) => break dest,
-            };
-            inspect.write_bytes(data.len());
-        },
-    };
-
-    let () = dest.blob_written().await.map_err(FetchError::BlobWritten)?;
-
-    Ok(())
 }
 
 fn make_blob_url(
@@ -1046,22 +909,6 @@ pub enum FetchError {
     #[error("IO error while reading blob")]
     IoError(#[source] Status),
 
-    #[error("LocalMirror error while fetching {0:?}")]
-    LocalMirror(
-        // The FIDL error type doesn't derive Error, so we can't use #[source].
-        fidl_fuchsia_pkg::GetBlobError,
-    ),
-
-    #[error(
-        "No valid source could be found for the requested blob. \
-        use_remote_mirror={use_remote_mirror}, use_local_mirror={use_local_mirror}, \
-        allow_local_mirror={allow_local_mirror}"
-    )]
-    NoBlobSource { use_remote_mirror: bool, use_local_mirror: bool, allow_local_mirror: bool },
-
-    #[error("Tried to request a blob with HTTP and local mirrors")]
-    ConflictingBlobSources,
-
     #[error("timed out waiting for http response header while downloading blob: {uri}")]
     BlobHeaderTimeout { uri: String },
 
@@ -1154,9 +1001,6 @@ impl From<&FetchError> for metrics::FetchBlobMigratedMetricDimensionResult {
             BlobUrl { .. } => EventCodes::BlobUrl,
             FidlError { .. } => EventCodes::FidlError,
             IoError { .. } => EventCodes::IoError,
-            LocalMirror { .. } => EventCodes::LocalMirror,
-            NoBlobSource { .. } => EventCodes::NoBlobSource,
-            ConflictingBlobSources => EventCodes::ConflictingBlobSources,
             BlobHeaderTimeout { .. } => EventCodes::BlobHeaderDeadlineExceeded,
             BlobBodyTimeout { .. } => EventCodes::BlobBodyDeadlineExceeded,
             ExpectedHttpStatus206 { .. } => EventCodes::ExpectedHttpStatus206,
@@ -1203,10 +1047,7 @@ impl FetchError {
             | BlobWritten { .. }
             | BlobUrl { .. }
             | FidlError { .. }
-            | IoError { .. }
-            | LocalMirror { .. }
-            | NoBlobSource { .. }
-            | ConflictingBlobSources => FetchErrorKind::Other,
+            | IoError { .. } => FetchErrorKind::Other,
         }
     }
 
@@ -1239,10 +1080,7 @@ impl FetchError {
             | BlobTooSmall { .. }
             | BlobTooLarge { .. }
             | BlobUrl { .. }
-            | IoError { .. }
-            | LocalMirror { .. }
-            | NoBlobSource { .. }
-            | ConflictingBlobSources => None,
+            | IoError { .. } => None,
         }
     }
 

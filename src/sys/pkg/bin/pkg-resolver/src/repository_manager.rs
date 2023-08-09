@@ -13,7 +13,6 @@ use {
     fidl_contrib::protocol_connector::ProtocolSender,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::LocalMirrorProxy,
     fidl_fuchsia_pkg_ext::{self as pkg, cache, BlobId, RepositoryConfig, RepositoryConfigs},
     fuchsia_inspect as inspect,
     fuchsia_pkg::PackageDirectory,
@@ -43,7 +42,6 @@ pub struct RepositoryManager {
     repositories: Arc<RwLock<HashMap<RepositoryUrl, Arc<AsyncMutex<Repository>>>>>,
     cobalt_sender: ProtocolSender<MetricEvent>,
     inspect: RepositoryManagerInspectState,
-    local_mirror: Option<LocalMirrorProxy>,
     tuf_metadata_timeout: Duration,
     data_proxy: Option<fio::DirectoryProxy>,
 }
@@ -285,7 +283,6 @@ impl RepositoryManager {
             url.repository(),
             self.cobalt_sender.clone(),
             Arc::clone(&self.inspect.repos_node),
-            self.local_mirror.clone(),
             self.tuf_metadata_timeout,
         );
 
@@ -328,7 +325,6 @@ impl RepositoryManager {
             url.repository(),
             self.cobalt_sender.clone(),
             Arc::clone(&self.inspect.repos_node),
-            self.local_mirror.clone(),
             self.tuf_metadata_timeout,
         );
 
@@ -354,7 +350,6 @@ async fn open_cached_or_new_repository(
     url: &RepositoryUrl,
     cobalt_sender: ProtocolSender<MetricEvent>,
     inspect_node: Arc<inspect::Node>,
-    local_mirror: Option<LocalMirrorProxy>,
     tuf_metadata_timeout: Duration,
 ) -> Result<Arc<AsyncMutex<Repository>>, OpenRepoError> {
     if let Some(conn) = repositories.read().get(url) {
@@ -373,7 +368,6 @@ async fn open_cached_or_new_repository(
             &config,
             cobalt_sender,
             inspect_node.create_child(url.host()),
-            local_mirror,
             tuf_metadata_timeout,
         )
         .await
@@ -402,7 +396,6 @@ pub struct RepositoryManagerBuilder<S = UnsetCobaltSender, N = UnsetInspectNode>
     dynamic_configs: HashMap<RepositoryUrl, Arc<RepositoryConfig>>,
     cobalt_sender: S,
     inspect_node: N,
-    local_mirror: Option<LocalMirrorProxy>,
     tuf_metadata_timeout: Duration,
     data_proxy: Option<fio::DirectoryProxy>,
 }
@@ -438,12 +431,6 @@ impl<S, N> RepositoryManagerBuilder<S, N> {
         P: Into<String>,
     {
         self.persisted_repos_dir = Some(path.into());
-        self
-    }
-
-    /// Customize the [RepositoryManager] with a local mirror.
-    pub fn with_local_mirror(mut self, proxy: Option<LocalMirrorProxy>) -> Self {
-        self.local_mirror = proxy;
         self
     }
 }
@@ -483,7 +470,6 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
                 .collect(),
             cobalt_sender: UnsetCobaltSender,
             inspect_node: UnsetInspectNode,
-            local_mirror: None,
             tuf_metadata_timeout,
             data_proxy,
         };
@@ -538,7 +524,6 @@ impl<S> RepositoryManagerBuilder<S, UnsetInspectNode> {
             dynamic_configs: self.dynamic_configs,
             cobalt_sender: self.cobalt_sender,
             inspect_node,
-            local_mirror: self.local_mirror,
             tuf_metadata_timeout: self.tuf_metadata_timeout,
             data_proxy: self.data_proxy,
         }
@@ -558,7 +543,6 @@ impl<N> RepositoryManagerBuilder<UnsetCobaltSender, N> {
             dynamic_configs: self.dynamic_configs,
             cobalt_sender,
             inspect_node: self.inspect_node,
-            local_mirror: self.local_mirror,
             tuf_metadata_timeout: self.tuf_metadata_timeout,
             data_proxy: self.data_proxy,
         }
@@ -632,7 +616,6 @@ impl RepositoryManagerBuilder<ProtocolSender<MetricEvent>, inspect::Node> {
             repositories: Arc::new(RwLock::new(HashMap::new())),
             cobalt_sender: self.cobalt_sender,
             inspect,
-            local_mirror: self.local_mirror,
             tuf_metadata_timeout: self.tuf_metadata_timeout,
             data_proxy: self.data_proxy,
         }

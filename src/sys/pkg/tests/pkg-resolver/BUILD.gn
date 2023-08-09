@@ -115,7 +115,6 @@ rustc_test("resolve_fails") {
     ":lib",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//src/lib/fuchsia",
-    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/metrics:cobalt_sw_delivery_registry_rustlib",
     "//third_party/rust_crates:hyper",
@@ -429,7 +428,6 @@ fuchsia_structured_config_values("pkg-resolver-config") {
   values = {
     fetch_delivery_blob = false
     delivery_blob_fallback = true
-    allow_local_mirror = false
 
     # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
     # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf
@@ -485,7 +483,6 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
     # For ramdisk devices, needed to back blobfs (which in turn backs pkg-cache)
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
-    "//src/sys/pkg/bin/pkg-local-mirror",
 
     # Isolated, low-deps netstack
     "//src/connectivity/network/netstack:component",

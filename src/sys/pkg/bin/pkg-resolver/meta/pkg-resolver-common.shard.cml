@@ -30,11 +30,6 @@
             from: "parent",
         },
         {
-            protocol: [ "fuchsia.pkg.LocalMirror" ],
-            from: "parent",
-            availability: "optional",
-        },
-        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
 
@@ -80,9 +75,6 @@
 
         // Whether to fallback to uncompressed blob if fetching delivery blob fails.
         delivery_blob_fallback: { type: "bool" },
-
-        // Whether to allow resolving packages using fuchsia.pkg/LocalMirror.
-        allow_local_mirror: { type: "bool" },
 
         // The timeout, in seconds, to use when performing TUF metadata network operations.
         tuf_metadata_timeout_seconds: { type: "uint32" },

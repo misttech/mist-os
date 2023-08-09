@@ -58,12 +58,6 @@ impl NeedsRemoteType {
         self.node.record_string("source", "http");
         TriggerAttempt::<Http>::new(self.node)
     }
-
-    /// Mark that the blob contents will be obtained via fuchsia.pkg/LocalMirror.
-    pub fn local_mirror(self) -> TriggerAttempt<LocalMirror> {
-        self.node.record_string("source", "local-mirror");
-        TriggerAttempt::<LocalMirror>::new(self.node)
-    }
 }
 
 pub struct TriggerAttempt<S: State> {
@@ -111,16 +105,6 @@ pub enum Http {
     WriteComplete,
 }
 
-/// Sub-states for a fuchsia.pkg/LocalMirror fetch.
-pub enum LocalMirror {
-    CreateBlob,
-    GetBlob,
-    TruncateBlob,
-    ReadBlob,
-    WriteBlob,
-    CloseBlob,
-}
-
 /// A sub-state for a fetch. The stringification will be exported via Inspect.
 pub trait State {
     fn as_str(&self) -> &'static str;
@@ -137,19 +121,6 @@ impl State for Http {
             Http::ReadHttpBody => "read http body",
             Http::WriteBlob => "write blob",
             Http::WriteComplete => "write complete",
-        }
-    }
-}
-
-impl State for LocalMirror {
-    fn as_str(&self) -> &'static str {
-        match self {
-            LocalMirror::CreateBlob => "create blob",
-            LocalMirror::GetBlob => "get blob",
-            LocalMirror::TruncateBlob => "truncate blob",
-            LocalMirror::ReadBlob => "read blob",
-            LocalMirror::WriteBlob => "write blob",
-            LocalMirror::CloseBlob => "close blob",
         }
     }
 }
@@ -349,91 +320,11 @@ mod tests {
     }
 
     #[test]
-    fn local_mirror_state_progression() {
-        let inspector = Inspector::default();
-
-        let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
-        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap());
-        assert_data_tree!(
-            inspector,
-            root: {
-                blob_fetcher: contains {
-                    queue: {
-                        ZEROES_HASH.to_string() => {
-                            fetch_ts: AnyProperty,
-                        }
-                    }
-                }
-            }
-        );
-
-        let inspect = inspect.local_mirror();
-        assert_data_tree!(
-            inspector,
-            root: {
-                blob_fetcher: contains {
-                    queue: {
-                        ZEROES_HASH.to_string() => {
-                            fetch_ts: AnyProperty,
-                            source: "local-mirror",
-                            attempts: {},
-                        }
-                    }
-                }
-            }
-        );
-
-        let attempt = inspect.attempt();
-        assert_data_tree!(
-            inspector,
-            root: {
-                blob_fetcher: contains {
-                    queue: {
-                        ZEROES_HASH.to_string() => {
-                            fetch_ts: AnyProperty,
-                            source: "local-mirror",
-                            attempts: {
-                                "1": {
-                                    state: "initial",
-                                    state_ts: AnyProperty,
-                                    bytes_written: 0u64,
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        );
-
-        attempt.state(LocalMirror::CreateBlob);
-        assert_data_tree!(
-            inspector,
-            root: {
-                blob_fetcher: contains {
-                    queue: {
-                        ZEROES_HASH.to_string() => {
-                            fetch_ts: AnyProperty,
-                            source: "local-mirror",
-                            attempts: {
-                                "1": {
-                                    state: "create blob",
-                                    state_ts: AnyProperty,
-                                    bytes_written: 0u64,
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        );
-    }
-
-    #[test]
     fn state_does_not_change_other_data() {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
-        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).local_mirror();
+        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).http();
         let attempt = inspect.attempt();
         attempt.expected_size_bytes(9);
         attempt.write_bytes(6);
@@ -458,7 +349,7 @@ mod tests {
             }
         );
 
-        attempt.state(LocalMirror::TruncateBlob);
+        attempt.state(Http::TruncateBlob);
 
         assert_data_tree!(
             inspector,
@@ -486,7 +377,7 @@ mod tests {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
-        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).local_mirror();
+        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).http();
         let attempt = inspect.attempt();
         attempt.write_bytes(7);
 
@@ -553,7 +444,7 @@ mod tests {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
-        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).local_mirror();
+        let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).http();
         let _attempt0 = inspect.attempt();
         let _attempt1 = inspect.attempt();
 

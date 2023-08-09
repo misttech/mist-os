@@ -14,7 +14,6 @@ rustc_library("fuchsia-pkg-testing") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fdio/rust:fdio",
@@ -28,7 +27,6 @@ rustc_library("fuchsia-pkg-testing") {
     "//src/lib/versioning/version-history/rust:version-history",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
-    "//src/sys/pkg/bin/pkg-local-mirror:lib",
     "//src/sys/pkg/lib/blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//src/sys/pkg/lib/fuchsia-hash",
@@ -64,7 +62,6 @@ rustc_library("fuchsia-pkg-testing") {
   sources = [
     "src/blobfs.rs",
     "src/delivery_blob.rs",
-    "src/fake_pkg_local_mirror.rs",
     "src/inspect.rs",
     "src/lib.rs",
     "src/package.rs",

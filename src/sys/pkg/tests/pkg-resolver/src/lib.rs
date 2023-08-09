@@ -29,7 +29,7 @@ use {
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
     },
     fuchsia_merkle::{Hash, MerkleTree},
-    fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder, Repository},
+    fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder},
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
     fuchsia_zircon as zx,
     futures::prelude::*,
@@ -314,10 +314,8 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blobfs_and_system_image:
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     mounts: MountsFn,
-    local_mirror_repo: Option<(Arc<Repository>, RepositoryUrl)>,
     fetch_delivery_blob: Option<bool>,
     delivery_blob_fallback: Option<bool>,
-    allow_local_mirror: Option<bool>,
     tuf_metadata_timeout_seconds: Option<u32>,
     blob_network_header_timeout_seconds: Option<u32>,
     blob_network_body_timeout_seconds: Option<u32>,
@@ -353,10 +351,8 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
                     })
                     .build()
             },
-            local_mirror_repo: None,
             fetch_delivery_blob: None,
             delivery_blob_fallback: None,
-            allow_local_mirror: None,
             tuf_metadata_timeout_seconds: None,
             blob_network_header_timeout_seconds: None,
             blob_network_body_timeout_seconds: None,
@@ -384,10 +380,8 @@ where
         TestEnvBuilder::<_, MountsFn> {
             blobfs_and_system_image: Box::new(move |_| future::ready((blobfs, system_image))),
             mounts: self.mounts,
-            local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
             delivery_blob_fallback: self.delivery_blob_fallback,
-            allow_local_mirror: self.allow_local_mirror,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
@@ -417,10 +411,8 @@ where
                 future::ready((blobfs, Some(system_image_hash)))
             }),
             mounts: self.mounts,
-            local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
             delivery_blob_fallback: self.delivery_blob_fallback,
-            allow_local_mirror: self.allow_local_mirror,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
@@ -436,27 +428,14 @@ where
         TestEnvBuilder::<_, _> {
             blobfs_and_system_image: self.blobfs_and_system_image,
             mounts: || mounts,
-            local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
             delivery_blob_fallback: self.delivery_blob_fallback,
-            allow_local_mirror: self.allow_local_mirror,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
             blob_implementation: self.blob_implementation,
         }
-    }
-
-    pub fn local_mirror_repo(mut self, repo: &Arc<Repository>, hostname: RepositoryUrl) -> Self {
-        self.local_mirror_repo = Some((repo.clone(), hostname));
-        self
-    }
-
-    pub fn allow_local_mirror(mut self, allow: bool) -> Self {
-        assert_eq!(self.allow_local_mirror, None);
-        self.allow_local_mirror = Some(allow);
-        self
     }
 
     pub fn tuf_metadata_timeout_seconds(mut self, seconds: u32) -> Self {
@@ -559,26 +538,6 @@ where
                 .unwrap();
         }
 
-        let local_mirror_dir = tempfile::tempdir().unwrap();
-        if let Some((repo, url)) = self.local_mirror_repo {
-            let proxy = fuchsia_fs::directory::open_in_namespace(
-                local_mirror_dir.path().to_str().unwrap(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .unwrap();
-            let () = repo.copy_local_repository_to_dir(&proxy, &url).await;
-            let () = local_child_out_dir
-                .add_entry(
-                    "usb",
-                    vfs::pseudo_directory! {
-                        "0" => vfs::pseudo_directory! {
-                            "fuchsia_pkg" => vfs::remote::remote_dir(proxy),
-                        },
-                    },
-                )
-                .unwrap();
-        }
-
         let local_child_out_dir = Mutex::new(Some(local_child_out_dir));
 
         let builder = RealmBuilder::new().await.unwrap();
@@ -621,10 +580,6 @@ where
             )
             .await
             .unwrap();
-        let local_mirror = builder
-            .add_child("local_mirror", "#meta/pkg-local-mirror.cm", ChildOptions::new())
-            .await
-            .unwrap();
 
         let pkg_resolver = builder
             .add_child(PKG_RESOLVER_CHILD_NAME, "#meta/pkg-resolver.cm", ChildOptions::new())
@@ -633,7 +588,6 @@ where
 
         if self.fetch_delivery_blob.is_some()
             || self.delivery_blob_fallback.is_some()
-            || self.allow_local_mirror.is_some()
             || self.tuf_metadata_timeout_seconds.is_some()
             || self.blob_network_header_timeout_seconds.is_some()
             || self.blob_network_body_timeout_seconds.is_some()
@@ -657,12 +611,6 @@ where
                         "delivery_blob_fallback",
                         delivery_blob_fallback,
                     )
-                    .await
-                    .unwrap();
-            }
-            if let Some(allow_local_mirror) = self.allow_local_mirror {
-                builder
-                    .set_config_value_bool(&pkg_resolver, "allow_local_mirror", allow_local_mirror)
                     .await
                     .unwrap();
             }
@@ -736,7 +684,6 @@ where
                     .from(Ref::parent())
                     .to(&pkg_cache)
                     .to(&system_update_committer)
-                    .to(&local_mirror)
                     .to(&pkg_resolver),
             )
             .await
@@ -764,15 +711,6 @@ where
                     )
                     .from(&service_reflector)
                     .to(&pkg_cache)
-                    .to(&pkg_resolver),
-            )
-            .await
-            .unwrap();
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fpkg::LocalMirrorMarker>())
-                    .from(&local_mirror)
                     .to(&pkg_resolver),
             )
             .await
@@ -845,16 +783,6 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::directory("usb").path("/usb").rights(fio::RW_STAR_DIR))
-                    .from(&service_reflector)
-                    .to(&local_mirror),
-            )
-            .await
-            .unwrap();
-
-        builder
-            .add_route(
-                Route::new()
                     .capability(
                         Capability::directory("config-data")
                             .path("/config/data")
@@ -883,7 +811,6 @@ where
             realm_instance,
             _mounts: mounts,
             mocks: Mocks { logger_factory },
-            local_mirror_dir,
         }
     }
 }
@@ -922,7 +849,6 @@ pub struct TestEnv<B = BlobfsRamdisk> {
     pub proxies: Proxies,
     pub _mounts: Mounts,
     pub mocks: Mocks,
-    pub local_mirror_dir: TempDir,
 }
 
 impl TestEnv<BlobfsRamdisk> {

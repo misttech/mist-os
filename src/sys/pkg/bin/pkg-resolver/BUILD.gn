@@ -95,7 +95,6 @@ rustc_library("lib") {
     "src/metrics_util.rs",
     "src/repository.rs",
     "src/repository/filesystem_repository.rs",
-    "src/repository/local_provider.rs",
     "src/repository/updating_tuf_client.rs",
     "src/repository_manager.rs",
     "src/repository_service.rs",
@@ -204,7 +203,6 @@ fuchsia_structured_config_rust_lib("config_lib") {
 structured_config_values = {
   fetch_delivery_blob = false
   delivery_blob_fallback = true
-  allow_local_mirror = false
 
   # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
   # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf

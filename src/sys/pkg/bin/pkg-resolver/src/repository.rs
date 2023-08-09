@@ -12,10 +12,7 @@ use {
     fidl_contrib::protocol_connector::ProtocolSender,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::LocalMirrorProxy,
-    fidl_fuchsia_pkg_ext::{
-        BlobId, MirrorConfig, RepositoryConfig, RepositoryKey, RepositoryStorageType,
-    },
+    fidl_fuchsia_pkg_ext as pkg,
     fuchsia_async::TimeoutExt as _,
     fuchsia_cobalt_builders::MetricEventExt as _,
     fuchsia_inspect::{self as inspect, Property},
@@ -40,20 +37,17 @@ use {
 mod updating_tuf_client;
 use updating_tuf_client::UpdateResult;
 
-mod local_provider;
-use local_provider::LocalMirrorRepositoryProvider;
-
 mod filesystem_repository;
 use filesystem_repository::{FuchsiaFileSystemRepository, RWRepository};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CustomTargetMetadata {
-    merkle: BlobId,
+    merkle: pkg::BlobId,
     size: u64,
 }
 
 impl CustomTargetMetadata {
-    pub fn merkle(&self) -> BlobId {
+    pub fn merkle(&self) -> pkg::BlobId {
         self.merkle
     }
     pub fn size(&self) -> u64 {
@@ -87,16 +81,26 @@ impl Repository {
     pub async fn new(
         data_proxy: Option<fio::DirectoryProxy>,
         persisted_repos_dir: Option<&str>,
-        config: &RepositoryConfig,
+        config: &pkg::RepositoryConfig,
         mut cobalt_sender: ProtocolSender<MetricEvent>,
         node: inspect::Node,
-        local_mirror: Option<LocalMirrorProxy>,
         tuf_metadata_timeout: Duration,
     ) -> Result<Self, anyhow::Error> {
-        let mirror_config = config.mirrors().get(0);
+        let mirror_config = config
+            .mirrors()
+            .get(0)
+            .ok_or_else(|| anyhow!("cannot create repository, no mirrors {config:?}"))?;
         let local = get_local_repo(data_proxy, persisted_repos_dir, config).await?;
         let local = RWRepository::new(local);
-        let remote = get_remote_repo(config, mirror_config, local_mirror)?;
+        let remote: Box<dyn RepositoryProvider<Pouf1> + Send> = Box::new(
+            HttpRepositoryBuilder::new_with_uri(
+                mirror_config.mirror_url().to_owned(),
+                fuchsia_hyper::new_https_client_from_tcp_options(
+                    fuchsia_hyper::TcpOptions::keepalive_timeout(TCP_KEEPALIVE_TIMEOUT),
+                ),
+            )
+            .build(),
+        );
         let root_keys = get_root_keys(config)?;
 
         let updating_client =
@@ -211,14 +215,14 @@ impl Repository {
 async fn get_local_repo(
     data_proxy: Option<fio::DirectoryProxy>,
     persisted_repos_dir: Option<&str>,
-    config: &RepositoryConfig,
+    config: &pkg::RepositoryConfig,
 ) -> Result<Box<dyn RepositoryStorageProvider<Pouf1> + Sync + Send>, anyhow::Error> {
     match config.repo_storage_type() {
-        RepositoryStorageType::Ephemeral => {
+        pkg::RepositoryStorageType::Ephemeral => {
             let local = EphemeralRepository::new();
             Ok(Box::new(local))
         }
-        RepositoryStorageType::Persistent => {
+        pkg::RepositoryStorageType::Persistent => {
             // This can only be true when config_repos.json was present, parsed, and contained a
             // non-empty string value for the persistence directory. Therefore, even in cases where
             // `enable_dynamic_configuration` is set, a `RST::Persistent` repo will still yield the
@@ -264,46 +268,7 @@ async fn get_local_repo(
     }
 }
 
-fn get_remote_repo(
-    config: &RepositoryConfig,
-    mirror_config: Option<&MirrorConfig>,
-    local_mirror: Option<LocalMirrorProxy>,
-) -> Result<Box<dyn RepositoryProvider<Pouf1> + Send>, anyhow::Error> {
-    if config.use_local_mirror() && mirror_config.is_some() {
-        return Err(format_err!("Cannot have a local mirror and remote mirrors!"));
-    }
-
-    let remote: Box<dyn RepositoryProvider<Pouf1> + Send> =
-        match (local_mirror, config.use_local_mirror(), mirror_config.as_ref()) {
-            (Some(local_mirror), true, _) => Box::new(LocalMirrorRepositoryProvider::new(
-                local_mirror,
-                config.repo_url().clone(),
-            )),
-            (_, false, Some(mirror_config)) => {
-                let remote_url = mirror_config.mirror_url().to_owned();
-                Box::new(
-                    HttpRepositoryBuilder::new_with_uri(
-                        remote_url,
-                        fuchsia_hyper::new_https_client_from_tcp_options(
-                            fuchsia_hyper::TcpOptions::keepalive_timeout(TCP_KEEPALIVE_TIMEOUT),
-                        ),
-                    )
-                    .build(),
-                )
-            }
-            (local_mirror, _, _) => {
-                return Err(format_err!(
-            "Repo config has invalid mirror configuration: config={:?}, use_local_mirror={}",
-            config,
-            local_mirror.is_some()
-        ))
-            }
-        };
-
-    Ok(remote)
-}
-
-fn get_root_keys(config: &RepositoryConfig) -> Result<Vec<PublicKey>, anyhow::Error> {
+fn get_root_keys(config: &pkg::RepositoryConfig) -> Result<Vec<PublicKey>, anyhow::Error> {
     let mut root_keys = vec![];
 
     // FIXME(42863) we used keyid_hash_algorithms in order to verify compatibility with the
@@ -315,7 +280,7 @@ fn get_root_keys(config: &RepositoryConfig) -> Result<Vec<PublicKey>, anyhow::Er
     // remove our use of `PublicKey::from_ed25519_with_keyid_hash_algorithms`.
     for key in config.root_keys().iter() {
         match key {
-            RepositoryKey::Ed25519(bytes) => {
+            pkg::RepositoryKey::Ed25519(bytes) => {
                 root_keys.push(PublicKey::from_ed25519(bytes.clone())?);
                 root_keys.push(PublicKey::from_ed25519_with_keyid_hash_algorithms(
                     bytes.clone(),
@@ -408,7 +373,7 @@ mod tests {
             ServerBuilder { builder: Arc::clone(&self.repo).server(), subscribe: false }
         }
 
-        async fn repo(&self, config: &RepositoryConfig) -> Result<Repository, anyhow::Error> {
+        async fn repo(&self, config: &pkg::RepositoryConfig) -> Result<Repository, anyhow::Error> {
             let (sender, _) = futures::channel::mpsc::channel(0);
             let cobalt_sender = ProtocolSender::new(sender);
             let proxy = fuchsia_fs::directory::open_in_namespace(
@@ -422,7 +387,6 @@ mod tests {
                 config,
                 cobalt_sender,
                 inspect::Inspector::default().root().create_child("inner-node"),
-                None,
                 std::time::Duration::from_secs(30),
             )
             .await
@@ -445,7 +409,7 @@ mod tests {
             self
         }
 
-        fn start(self, repo_url: &str) -> (ServedRepository, RepositoryConfig) {
+        fn start(self, repo_url: &str) -> (ServedRepository, pkg::RepositoryConfig) {
             let served_repository = self.builder.start().expect("create served repo");
             let repo_url = RepositoryUrl::parse(repo_url).expect("created repo url");
 
@@ -663,7 +627,7 @@ mod tests {
             .repo
             .make_repo_config_builder(repo_url)
             .add_mirror(served_repository.get_mirror_config_builder().build())
-            .repo_storage_type(RepositoryStorageType::Persistent)
+            .repo_storage_type(pkg::RepositoryStorageType::Persistent)
             .build();
 
         let mut repo = env.repo(&repo_config).await.expect("created opened repo");
@@ -778,7 +742,6 @@ mod inspect_tests {
             &repo_config,
             dummy_sender(),
             inspector.root().create_child("repo-node"),
-            None,
             std::time::Duration::from_secs(30),
         )
         .await
@@ -833,7 +796,6 @@ mod inspect_tests {
             &repo_config,
             dummy_sender(),
             inspector.root().create_child("repo-node"),
-            None,
             std::time::Duration::from_secs(30),
         )
         .await
@@ -894,7 +856,6 @@ mod inspect_tests {
             &repo_config,
             dummy_sender(),
             inspector.root().create_child("repo-node"),
-            None,
             std::time::Duration::from_secs(30),
         )
         .await

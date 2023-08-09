@@ -891,42 +891,6 @@ async fn merkle_pinned_meta_far_size_different_than_tuf_metadata() {
 }
 
 #[fuchsia::test]
-async fn resolve_local_mirror() {
-    let pkg = PackageBuilder::new("test")
-        .add_resource_at("test_file", "hi there".as_bytes())
-        .build()
-        .await
-        .unwrap();
-
-    let repo = Arc::new(
-        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
-            .add_package(&pkg)
-            .build()
-            .await
-            .unwrap(),
-    );
-
-    let env = TestEnvBuilder::new()
-        .allow_local_mirror(true)
-        .local_mirror_repo(&repo, "fuchsia-pkg://test".parse().unwrap())
-        .build()
-        .await;
-    let mut startup_blobs = env.blobfs.list_blobs().unwrap();
-    let repo_config = repo.make_repo_config("fuchsia-pkg://test".parse().unwrap(), None, true);
-    env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-
-    let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let (package_dir, _resolved_context) = env.resolve_package(&pkg_url).await.unwrap();
-
-    pkg.verify_contents(&package_dir).await.unwrap();
-    let mut repo_blobs = repo.list_blobs().unwrap();
-    repo_blobs.append(&mut startup_blobs);
-    assert_eq!(env.blobfs.list_blobs().unwrap(), repo_blobs);
-
-    env.stop().await;
-}
-
-#[fuchsia::test]
 async fn superpackage() {
     let env = TestEnvBuilder::new().build().await;
     let startup_blobs = env.blobfs.list_blobs().unwrap();

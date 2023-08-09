@@ -127,19 +127,18 @@ pub struct RepoVersions {
 impl UpdatingTufClient {
     pub fn from_tuf_client_and_mirror_config(
         client: TufClient,
-        config: Option<&MirrorConfig>,
+        config: &MirrorConfig,
         tuf_metadata_timeout: Duration,
         node: inspect::Node,
         cobalt_sender: ProtocolSender<MetricEvent>,
     ) -> Arc<AsyncMutex<Self>> {
-        let (auto_client_aborter, auto_client_node_and_registration) =
-            if config.map_or(false, |c| c.subscribe()) {
-                let (aborter, registration) = AbortHandle::new_pair();
-                let auto_client_node = node.create_child("auto_client");
-                (Some(aborter.into()), Some((auto_client_node, registration, config.unwrap())))
-            } else {
-                (None, None)
-            };
+        let (auto_client_aborter, auto_client_node_and_registration) = if config.subscribe() {
+            let (aborter, registration) = AbortHandle::new_pair();
+            let auto_client_node = node.create_child("auto_client");
+            (Some(aborter.into()), Some((auto_client_node, registration, config)))
+        } else {
+            (None, None)
+        };
         let root_version = client.database().trusted_root().version();
 
         let ret = Arc::new(AsyncMutex::new(Self {

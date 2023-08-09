@@ -14,10 +14,10 @@ use {
     fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{self as fpkg, LocalMirrorMarker, LocalMirrorProxy, PackageCacheMarker},
+    fidl_fuchsia_pkg::{self as fpkg, PackageCacheMarker},
     fuchsia_async as fasync,
     fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
+    fuchsia_component::server::ServiceFs,
     fuchsia_inspect as inspect, fuchsia_trace as ftrace,
     futures::{prelude::*, stream::FuturesUnordered},
     std::{
@@ -110,14 +110,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     let pkg_cache_proxy = fuchsia_component::client::connect_to_protocol::<PackageCacheMarker>()
         .context("error connecting to package cache")?;
     let pkg_cache = fidl_fuchsia_pkg_ext::cache::Client::from_proxy(pkg_cache_proxy);
-    let local_mirror = if structured_config.allow_local_mirror {
-        Some(
-            connect_to_protocol::<LocalMirrorMarker>()
-                .context("error connecting to local mirror")?,
-        )
-    } else {
-        None
-    };
 
     let base_package_index = Arc::new(
         BasePackageIndex::from_proxy(pkg_cache.proxy())
@@ -174,7 +166,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             inspector.root().create_child("repository_manager"),
             &config,
             cobalt_sender.clone(),
-            local_mirror.clone(),
             std::time::Duration::from_secs(structured_config.tuf_metadata_timeout_seconds.into()),
             data_proxy.clone(),
         )
@@ -195,7 +186,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         MAX_CONCURRENT_BLOB_FETCHES,
         repo_manager.read().await.stats(),
         cobalt_sender.clone(),
-        local_mirror,
         cache::BlobFetchParams::builder()
             .header_network_timeout(std::time::Duration::from_secs(
                 structured_config.blob_network_header_timeout_seconds.into(),
@@ -347,7 +337,6 @@ async fn load_repo_manager(
     node: inspect::Node,
     config: &Config,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
-    local_mirror: Option<LocalMirrorProxy>,
     tuf_metadata_timeout: Duration,
     data_proxy: Option<fio::DirectoryProxy>,
 ) -> RepositoryManager {
@@ -365,7 +354,6 @@ async fn load_repo_manager(
         error!("error loading dynamic repo config: {:#}", anyhow!(err));
         builder
     })
-    .with_local_mirror(local_mirror)
     .inspect_node(node)
     .load_static_configs_dir(STATIC_REPO_DIR)
     {
