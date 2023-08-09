@@ -1,2 +1,4 @@
 fuchsia.flatland_latency.view-provider-example: CPU Load
 fuchsia.flatland_latency.view-provider-example: flatland_vsync_latency
+# The "GPU Utilization" metric is currently produced on VIM3 but not on NUC.
+fuchsia.flatland_latency.view-provider-example: GPU Utilization [optional]
