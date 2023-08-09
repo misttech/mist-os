@@ -818,12 +818,15 @@ pub fn sys_renameat2(
         return error!(ENAMETOOLONG);
     }
 
-    if !NamespaceNode::mount_eq(&old_parent, &new_parent) {
-        return error!(EXDEV);
-    }
-
     let flags = RenameFlags::from_bits_truncate(flags);
-    DirEntry::rename(current_task, &old_parent, &old_basename, &new_parent, &new_basename, flags)?;
+    NamespaceNode::rename(
+        current_task,
+        &old_parent,
+        &old_basename,
+        &new_parent,
+        &new_basename,
+        flags,
+    )?;
     Ok(())
 }
 

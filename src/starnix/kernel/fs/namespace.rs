@@ -1200,6 +1200,31 @@ impl NamespaceNode {
         a.mount.as_ref().map(Arc::as_ptr) == b.mount.as_ref().map(Arc::as_ptr)
     }
 
+    pub fn rename(
+        current_task: &CurrentTask,
+        old_parent: &NamespaceNode,
+        old_name: &FsStr,
+        new_parent: &NamespaceNode,
+        new_name: &FsStr,
+        flags: RenameFlags,
+    ) -> Result<(), Errno> {
+        if !NamespaceNode::mount_eq(&old_parent, &new_parent) {
+            return error!(EXDEV);
+        }
+
+        old_parent.check_readonly_filesystem()?;
+        new_parent.check_readonly_filesystem()?;
+
+        DirEntry::rename(
+            current_task,
+            &old_parent.entry,
+            old_name,
+            &new_parent.entry,
+            new_name,
+            flags,
+        )
+    }
+
     fn with_new_entry(&self, entry: DirEntryHandle) -> NamespaceNode {
         NamespaceNode { mount: self.mount.clone(), entry }
     }

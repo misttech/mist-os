@@ -33,6 +33,7 @@ impl FileSystemOps for Arc<TmpFs> {
     fn rename(
         &self,
         _fs: &FileSystem,
+        _current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         _old_name: &FsStr,
         new_parent: &FsNodeHandle,

@@ -598,9 +598,9 @@ impl DirEntry {
     /// old_parent and new_parent must belong to the same file system.
     pub fn rename(
         current_task: &CurrentTask,
-        old_parent_name: &NamespaceNode,
+        old_parent: &DirEntryHandle,
         old_basename: &FsStr,
-        new_parent_name: &NamespaceNode,
+        new_parent: &DirEntryHandle,
         new_basename: &FsStr,
         flags: RenameFlags,
     ) -> Result<(), Errno> {
@@ -613,19 +613,14 @@ impl DirEntry {
             return error!(EBUSY);
         }
 
-        let old_parent = &old_parent_name.entry;
-        let new_parent = &new_parent_name.entry;
-
         // If the names and parents are the same, then there's nothing to do
         // and we can report success.
-        if Arc::ptr_eq(old_parent, new_parent) && old_basename == new_basename {
+        if Arc::ptr_eq(&old_parent.node, &new_parent.node) && old_basename == new_basename {
             return Ok(());
         }
 
         // This task must have write access to the old and new parent nodes.
-        old_parent_name.check_readonly_filesystem()?;
         old_parent.node.check_access(current_task, Access::WRITE)?;
-        new_parent_name.check_readonly_filesystem()?;
         new_parent.node.check_access(current_task, Access::WRITE)?;
 
         // The mount_eq check in sys_renameat ensures that the nodes we're touching are part of the
@@ -739,6 +734,7 @@ impl DirEntry {
             // fail because we will not be able to return the system to a
             // consistent state.
             fs.rename(
+                current_task,
                 &old_parent.node,
                 old_basename,
                 &new_parent.node,

@@ -133,6 +133,7 @@ impl FileSystemOps for FuseFs {
     fn rename(
         &self,
         _fs: &FileSystem,
+        _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,
         _old_name: &FsStr,
         _new_parent: &FsNodeHandle,

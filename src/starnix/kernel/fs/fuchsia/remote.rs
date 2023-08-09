@@ -66,6 +66,7 @@ impl FileSystemOps for RemoteFs {
     fn rename(
         &self,
         _fs: &FileSystem,
+        _current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         old_name: &FsStr,
         new_parent: &FsNodeHandle,

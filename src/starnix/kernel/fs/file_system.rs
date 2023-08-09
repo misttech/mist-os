@@ -272,6 +272,7 @@ impl FileSystem {
     /// directory and that |replaced| is empty.
     pub fn rename(
         &self,
+        current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         old_name: &FsStr,
         new_parent: &FsNodeHandle,
@@ -279,7 +280,16 @@ impl FileSystem {
         renamed: &FsNodeHandle,
         replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
-        self.ops.rename(self, old_parent, old_name, new_parent, new_name, renamed, replaced)
+        self.ops.rename(
+            self,
+            current_task,
+            old_parent,
+            old_name,
+            new_parent,
+            new_name,
+            renamed,
+            replaced,
+        )
     }
 
     /// Returns the `statfs` for this filesystem.
@@ -396,6 +406,7 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     fn rename(
         &self,
         _fs: &FileSystem,
+        _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,
         _old_name: &FsStr,
         _new_parent: &FsNodeHandle,

@@ -5,7 +5,7 @@
 use crate::{
     fs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
-        DirEntry, DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
+        DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
         RenameFlags, SeekTarget, UnlinkKind,
     },
     mm::ProtectionFlags,
@@ -451,7 +451,7 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
             src_dir.into_any().downcast::<StarnixNodeConnection>().map_err(|_| errno!(EXDEV))?;
         let (src_node, src_name) = src_dir.lookup_parent(src_name.as_bytes())?;
         let (dst_node, dst_name) = self.lookup_parent(dst_name.as_bytes())?;
-        DirEntry::rename(
+        NamespaceNode::rename(
             self.task()?.as_ref(),
             &src_node,
             src_name,
