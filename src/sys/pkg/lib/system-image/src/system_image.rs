@@ -33,8 +33,9 @@ impl SystemImage {
         boot_args: &fidl_fuchsia_boot::ArgumentsProxy,
     ) -> Result<Self, anyhow::Error> {
         let hash = get_system_image_hash(boot_args).await.context("getting system_image hash")?;
-        let root_dir =
-            RootDir::new(blobfs, hash).await.context("creating RootDir for system_image")?;
+        let root_dir = RootDir::new(blobfs, hash)
+            .await
+            .with_context(|| format!("creating RootDir for system_image: {hash}"))?;
         Ok(SystemImage { root_dir })
     }
 
