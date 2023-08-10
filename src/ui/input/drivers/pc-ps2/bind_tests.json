@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.acpi.hid": "\"PNP0303\"",
+            "fuchsia.acpi.HID": "\"PNP0303\"",
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "match",
@@ -16,7 +16,7 @@
     },
     {
         "device": {
-            "fuchsia.acpi.first_cid": "\"PNP0303\"",
+            "fuchsia.acpi.FIRST_CID": "\"PNP0303\"",
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "match",

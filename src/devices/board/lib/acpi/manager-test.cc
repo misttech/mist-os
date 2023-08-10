@@ -12,6 +12,7 @@
 #include <map>
 #include <optional>
 
+#include <bind/fuchsia/acpi/cpp/bind.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
@@ -179,9 +180,9 @@ TEST_F(AcpiManagerTest, TestDeviceWithHidCid) {
   ASSERT_NO_FATAL_FAILURE(
       ExpectProps(builder, {},
                   {
-                      zx_device_str_prop_t{.key = "fuchsia.acpi.hid",
+                      zx_device_str_prop_t{.key = bind_fuchsia_acpi::HID.c_str(),
                                            .property_value = str_prop_str_val("GGGG0000")},
-                      zx_device_str_prop_t{.key = "fuchsia.acpi.first_cid",
+                      zx_device_str_prop_t{.key = bind_fuchsia_acpi::FIRST_CID.c_str(),
                                            .property_value = str_prop_str_val("AAAA1111")},
                   }));
 }
@@ -214,7 +215,7 @@ TEST_F(AcpiManagerTest, TestDeviceWithDeviceTreeHid) {
   ASSERT_NO_FATAL_FAILURE(
       ExpectProps(builder, {},
                   {
-                      zx_device_str_prop_t{.key = "fuchsia.acpi.first_cid",
+                      zx_device_str_prop_t{.key = "fuchsia.acpi.FIRST_CID",
                                            .property_value = str_prop_str_val("google,cr50")},
                   }));
 }
@@ -244,7 +245,7 @@ TEST_F(AcpiManagerTest, TestDeviceWithDeviceTreeCid) {
   ASSERT_NO_FATAL_FAILURE(
       ExpectProps(builder, {},
                   {
-                      zx_device_str_prop_t{.key = "fuchsia.acpi.first_cid",
+                      zx_device_str_prop_t{.key = "fuchsia.acpi.FIRST_CID",
                                            .property_value = str_prop_str_val("google,cr50")},
                   }));
 }

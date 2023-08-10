@@ -5,7 +5,7 @@
 using fuchsia.acpi;
 using fuchsia.driver.framework;
 
-accept fuchsia.acpi.hid {
+accept fuchsia.acpi.HID {
 	"GOOG0016",
 	"GGL0001",
 }

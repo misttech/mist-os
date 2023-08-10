@@ -3,7 +3,7 @@
         "device": {
             "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.first_cid": "\"google,cr50\""
+            "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
         },
         "expected": "abort",
         "name": "Wrong bus type"
@@ -12,7 +12,7 @@
         "device": {
             "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.first_cid": "\"google,not-cr50\""
+            "fuchsia.acpi.FIRST_CID": "\"google,not-cr50\""
         },
         "expected": "abort",
         "name": "Wrong compatible"
@@ -20,7 +20,7 @@
     {
         "device": {
             "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
-            "fuchsia.acpi.first_cid": "\"google,cr50\""
+            "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
         },
         "expected": "abort",
         "name": "Not composite"
@@ -29,7 +29,7 @@
         "device": {
             "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.first_cid": "\"google,cr50\""
+            "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
         },
         "expected": "match",
         "name": "SPI cr50"

@@ -11,7 +11,7 @@
         "expected": "match",
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.hid": "\"PNP0501\""
+            "fuchsia.acpi.HID": "\"PNP0501\""
         }
     }
 ]

@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.acpi.hid": "\"GFSH0000\"",
+            "fuchsia.acpi.HID": "\"GFSH0000\"",
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "abort",
@@ -16,7 +16,7 @@
     },
     {
         "device": {
-            "fuchsia.acpi.hid": "\"GFSH0006\"",
+            "fuchsia.acpi.HID": "\"GFSH0006\"",
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "match",

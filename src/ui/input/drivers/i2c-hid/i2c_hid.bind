@@ -6,5 +6,5 @@ using fuchsia.i2c;
 using fuchsia.acpi;
 
 fuchsia.BIND_ACPI_BUS_TYPE == fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C;
-fuchsia.acpi.first_cid == "PNP0C50";
+fuchsia.acpi.FIRST_CID == "PNP0C50";
 fuchsia.BIND_COMPOSITE == 1;

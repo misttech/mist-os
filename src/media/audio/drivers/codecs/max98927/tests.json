@@ -2,7 +2,7 @@
     {
         "device": {
             "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
-            "fuchsia.acpi.hid": "\"MX98927\"",
+            "fuchsia.acpi.HID": "\"MX98927\"",
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "match",
@@ -11,7 +11,7 @@
     {
         "device": {
             "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
-            "fuchsia.acpi.hid": "\"MX98927\"",
+            "fuchsia.acpi.HID": "\"MX98927\"",
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "abort",

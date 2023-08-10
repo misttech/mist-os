@@ -4,4 +4,4 @@
 
 using fuchsia.acpi;
 
-fuchsia.acpi.hid == "MSFT0101";
+fuchsia.acpi.HID == "MSFT0101";

@@ -6,8 +6,8 @@ using fuchsia.acpi;
 using fuchsia.driver.framework;
 
 fuchsia.BIND_COMPOSITE == 1;
-if fuchsia.acpi.hid == "PNP0303" {
+if fuchsia.acpi.HID == "PNP0303" {
     true;
 } else {
-    fuchsia.acpi.first_cid == "PNP0303";
+    fuchsia.acpi.FIRST_CID == "PNP0303";
 }

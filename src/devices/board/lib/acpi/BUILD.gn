@@ -54,6 +54,7 @@ shared_fuchsia_deps = [
   "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
   "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp_wire",
+  "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/pci/lib/pci",
   "//zircon/system/ulib/sync:sync-cpp",

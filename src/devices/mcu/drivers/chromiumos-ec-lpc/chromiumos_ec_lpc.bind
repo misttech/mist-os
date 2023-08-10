@@ -4,5 +4,5 @@
 
 using fuchsia.acpi;
 
-fuchsia.acpi.hid == "GOOG0004";
+fuchsia.acpi.HID == "GOOG0004";
 fuchsia.BIND_COMPOSITE == 1;

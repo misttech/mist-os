@@ -9,6 +9,7 @@
 #include <lib/ddk/driver.h>
 #include <zircon/compiler.h>
 
+#include <bind/fuchsia/acpi/cpp/bind.h>
 #include <fbl/string_printf.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
@@ -125,7 +126,8 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
     if (!strcmp(info->HardwareId.String, kDeviceTreeLinkID)) {
       has_devicetree_cid = CheckForDeviceTreeCompatible(acpi);
     } else {
-      str_props_.emplace_back(OwnedStringProp("fuchsia.acpi.hid", info->HardwareId.String));
+      str_props_.emplace_back(
+          OwnedStringProp(bind_fuchsia_acpi::HID.c_str(), info->HardwareId.String));
     }
   }
 
@@ -135,7 +137,7 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
       has_devicetree_cid = CheckForDeviceTreeCompatible(acpi);
     } else {
       // We only expose the first CID.
-      str_props_.emplace_back(OwnedStringProp("fuchsia.acpi.first_cid", first.String));
+      str_props_.emplace_back(OwnedStringProp(bind_fuchsia_acpi::FIRST_CID.c_str(), first.String));
     }
   }
 
@@ -519,7 +521,7 @@ bool DeviceBuilder::CheckForDeviceTreeCompatible(acpi::Acpi* acpi) {
     }
 
     if (!strcmp("compatible", key->String.Pointer) && value->Type == ACPI_TYPE_STRING) {
-      str_props_.emplace_back(OwnedStringProp{"fuchsia.acpi.first_cid", value->String.Pointer});
+      str_props_.emplace_back(OwnedStringProp{"fuchsia.acpi.FIRST_CID", value->String.Pointer});
       return true;
     }
   }

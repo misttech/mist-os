@@ -4,7 +4,7 @@
         "expected": "match",
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.hid": "\"PNP0B00\""
+            "fuchsia.acpi.HID": "\"PNP0B00\""
         }
     },
     {
@@ -12,7 +12,7 @@
         "expected": "match",
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.first_cid": "\"PNP0B00\""
+            "fuchsia.acpi.FIRST_CID": "\"PNP0B00\""
         }
     },
     {
@@ -20,7 +20,7 @@
         "expected": "abort",
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.hid": "\"PNP0B01\""
+            "fuchsia.acpi.HID": "\"PNP0B01\""
         }
     },
     {
@@ -28,15 +28,15 @@
         "expected": "abort",
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.first_cid": "\"PNP0B01\""
+            "fuchsia.acpi.FIRST_CID": "\"PNP0B01\""
         }
     },
     {
         "name": "Missing protocol",
         "expected": "abort",
         "device": {
-            "fuchsia.acpi.first_cid": "\"PNP0B00\"",
-            "fuchsia.acpi.hid": "\"PNP0B00\""
+            "fuchsia.acpi.FIRST_CID": "\"PNP0B00\"",
+            "fuchsia.acpi.HID": "\"PNP0B00\""
         }
     }
 ]

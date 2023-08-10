@@ -5,5 +5,5 @@
 using fuchsia.acpi;
 
 fuchsia.BIND_ACPI_BUS_TYPE == fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C;
-fuchsia.acpi.hid == "DLGS7219";
+fuchsia.acpi.HID == "DLGS7219";
 fuchsia.BIND_COMPOSITE == 1;

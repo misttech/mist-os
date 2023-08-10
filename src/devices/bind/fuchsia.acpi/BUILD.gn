@@ -5,6 +5,6 @@
 import("//build/bind/bind.gni")
 
 bind_library("fuchsia.acpi") {
-  sdk_category = "experimental"
+  sdk_category = "partner"
   source = "fuchsia.acpi.bind"
 }

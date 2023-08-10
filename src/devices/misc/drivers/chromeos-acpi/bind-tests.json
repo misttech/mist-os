@@ -2,7 +2,7 @@
     {
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.hid": "\"GGL0001\""
+            "fuchsia.acpi.HID": "\"GGL0001\""
         },
         "expected": "match",
         "name": "Legacy HID"
@@ -10,7 +10,7 @@
     {
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.hid": "\"GOOG0016\""
+            "fuchsia.acpi.HID": "\"GOOG0016\""
         },
         "expected": "match",
         "name": "New HID"
@@ -18,7 +18,7 @@
     {
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.hid": "\"GOOG0015\""
+            "fuchsia.acpi.HID": "\"GOOG0015\""
         },
         "expected": "abort",
         "name": "Wrong HID"

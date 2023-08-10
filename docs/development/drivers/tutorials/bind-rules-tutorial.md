@@ -44,7 +44,7 @@ Driver   : None
 [ 2/  5] : Key fuchsia.BIND_PCI_VID Value 0x1AF4
 [ 3/  5] : Key fuchsia.BIND_PCI_DID Value 0x1052
 [ 4/  5] : Key fuchsia.COMPOSITE_BIND Value 1
-[ 5/  5] : Key "fuchsia.acpi.hid" Value "GFSH0005"
+[ 5/  5] : Key "fuchsia.acpi.HID" Value "GFSH0005"
 ```
 
 ### Driver properties in the driver source code
@@ -146,7 +146,7 @@ fuchsia.BIND_PROTOCOL == fuchsia.pci.BIND_PROTOCOL.DEVICE;
 fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.VIRTIO;
 fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_INPUT;
 fuchsia.BIND_COMPOSITE == 1;
-fuchsia.acpi.hid == "GFSH0005";
+fuchsia.acpi.HID == "GFSH0005";
 ```
 
 ### Property key
@@ -214,7 +214,7 @@ primary node "pci_sample" {
   fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.VIRTIO;
   fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_INPUT;
   fuchsia.BIND_COMPOSITE == 1;
-  fuchsia.acpi.hid == "GFSH0005";
+  fuchsia.acpi.HID == "GFSH0005";
 }
 
 node "acpi" {
