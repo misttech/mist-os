@@ -246,7 +246,7 @@ void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* co
                       : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
-  DISP_TRACE("pre offset0_1=%u offset2=%u\n", offset0_1, offset2);
+  zxlogf(TRACE, "pre offset0_1=%u offset2=%u", offset0_1, offset2);
 
   // Load PostOffset values (or 0 if none entered)
   offset0_1 = (config->cc_flags & COLOR_CONVERSION_POSTOFFSET
@@ -259,7 +259,7 @@ void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* co
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET0_1, offset0_1);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
-  DISP_TRACE("post offset0_1=%u offset2=%u\n", offset0_1, offset2);
+  zxlogf(TRACE, "post offset0_1=%u offset2=%u", offset0_1, offset2);
 
   // clang-format off
   const float identity[3][3] = {
@@ -284,8 +284,8 @@ void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* co
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_COEF20_21, coef20_21);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_COEF22, coef22);
   // TODO(b/182481217): remove when this bug is closed.
-  DISP_TRACE("color correction regs 00_01=%xu 02_12=%xu 11_12=%xu 20_21=%u 22=%xu\n", coef00_01,
-             coef02_10, coef11_12, coef20_21, coef22);
+  zxlogf(TRACE, "color correction regs 00_01=%xu 02_12=%xu 11_12=%xu 20_21=%u 22=%xu", coef00_01,
+         coef02_10, coef11_12, coef20_21, coef22);
 }
 
 void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
@@ -293,17 +293,17 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image.handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
-    DISP_ERROR("No table available!");
+    zxlogf(ERROR, "No table available!");
     return;
   }
 
-  DISP_TRACE("Table index %d used", next_table_idx);
-  DISP_TRACE("AFBC %s", info->is_afbc ? "enabled" : "disabled");
+  zxlogf(TRACE, "Table index %d used", next_table_idx);
+  zxlogf(TRACE, "AFBC %s", info->is_afbc ? "enabled" : "disabled");
 
   if ((config[0].mode.h_addressable != display_width_) ||
       (config[0].mode.v_addressable != display_height_)) {
-    DISP_INFO("Mode change (%d x %d) to (%d x %d)", display_width_, display_height_,
-              config[0].mode.h_addressable, config[0].mode.v_addressable);
+    zxlogf(INFO, "Mode change (%d x %d) to (%d x %d)", display_width_, display_height_,
+           config[0].mode.h_addressable, config[0].mode.v_addressable);
     display_width_ = config[0].mode.h_addressable;
     display_height_ = config[0].mode.v_addressable;
     fb_width_ = config[0].mode.h_addressable;
@@ -738,9 +738,10 @@ void Osd::Dump() {
   rdma_->DumpRdmaRegisters();
 }
 
-#define LOG_REG(reg) DISP_INFO("reg[0x%x]: 0x%08x " #reg, (reg), READ32_REG(VPU, (reg)))
-#define LOG_REG_INSTANCE(reg, offset, index) \
-  DISP_INFO("reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), READ32_REG(VPU, (reg)), index + 1)
+#define LOG_REG(reg) zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg, (reg), READ32_REG(VPU, (reg)))
+#define LOG_REG_INSTANCE(reg, offset, index)                                               \
+  zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), READ32_REG(VPU, (reg)), \
+         index + 1)
 void Osd::DumpNonRdmaRegisters() {
   uint32_t offset = 0;
   uint32_t index = 0;
@@ -797,24 +798,26 @@ void Osd::DumpNonRdmaRegisters() {
     }
   }
 
-  DISP_INFO("Dumping all Color Correction Matrix related Registers\n");
-  DISP_INFO("VPU_VPP_POST_MATRIX_COEF00_01 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF00_01));
-  DISP_INFO("VPU_VPP_POST_MATRIX_COEF02_10 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF02_10));
-  DISP_INFO("VPU_VPP_POST_MATRIX_COEF11_12 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF11_12));
-  DISP_INFO("VPU_VPP_POST_MATRIX_COEF20_21 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF20_21));
-  DISP_INFO("VPU_VPP_POST_MATRIX_COEF22 = 0x%x", vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF22));
-  DISP_INFO("VPU_VPP_POST_MATRIX_OFFSET0_1 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_OFFSET0_1));
-  DISP_INFO("VPU_VPP_POST_MATRIX_OFFSET2 = 0x%x", vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_OFFSET2));
-  DISP_INFO("VPU_VPP_POST_MATRIX_PRE_OFFSET0_1 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET0_1));
-  DISP_INFO("VPU_VPP_POST_MATRIX_PRE_OFFSET2 = 0x%x",
-            vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET2));
-  DISP_INFO("VPU_VPP_POST_MATRIX_EN_CTRL = 0x%x", vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
+  zxlogf(INFO, "Dumping all Color Correction Matrix related Registers");
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF00_01 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF00_01));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF02_10 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF02_10));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF11_12 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF11_12));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF20_21 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF20_21));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_COEF22 = 0x%x", vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_COEF22));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_OFFSET0_1 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_OFFSET0_1));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_OFFSET2 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_OFFSET2));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_PRE_OFFSET0_1 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET0_1));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_PRE_OFFSET2 = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET2));
+  zxlogf(INFO, "VPU_VPP_POST_MATRIX_EN_CTRL = 0x%x",
+         vpu_mmio_->Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
 }
 
 void Osd::Release() {
@@ -831,7 +834,7 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_wi
   // Map vpu mmio used by the OSD object
   zx_status_t status = pdev->MapMmio(MMIO_VPU, &vpu_mmio);
   if (status != ZX_OK) {
-    DISP_ERROR("osd: Could not map VPU mmio");
+    zxlogf(ERROR, "osd: Could not map VPU mmio");
     return zx::error(status);
   }
 
@@ -850,7 +853,7 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_wi
 
   status = self->rdma_->SetupRdma(&(*self->vpu_mmio_));
   if (status != ZX_OK) {
-    DISP_ERROR("Could not setup RDMA");
+    zxlogf(ERROR, "Could not setup RDMA");
     return zx::error(status);
   }
 
@@ -860,7 +863,7 @@ zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, uint32_t fb_wi
   status = thrd_create_with_name(&self->rdma_irq_thread_, start_thread, self->rdma_.get(),
                                  "rdma_irq_thread");
   if (status != ZX_OK) {
-    DISP_ERROR("Could not create rdma_thread");
+    zxlogf(ERROR, "Could not create rdma_thread");
     return zx::error(status);
   }
 

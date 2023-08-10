@@ -52,7 +52,7 @@ zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
     case PANEL_MTF050FHDI_03:
       return zx::ok(kDisplaySettingMTF050FHDI_03);
     default:
-      DISP_ERROR("Unsupported panel detected!\n");
+      zxlogf(ERROR, "Unsupported panel detected!");
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 }
@@ -70,7 +70,7 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
 
   auto dsi_host = DsiHost::Create(parent, panel_type);
   if (dsi_host.is_error()) {
-    DISP_ERROR("Could not create DSI host: %s\n", dsi_host.status_string());
+    zxlogf(ERROR, "Could not create DSI host: %s", dsi_host.status_string());
     return dsi_host.status_value();
   }
   dsi_.dsi_host = std::move(dsi_host.value());
@@ -79,19 +79,19 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   ddk::PDevFidl pdev;
   auto status = ddk::PDevFidl::FromFragment(parent, &pdev);
   if (status != ZX_OK) {
-    DISP_ERROR("Could not get PDEV protocol\n");
+    zxlogf(ERROR, "Could not get PDEV protocol");
     return status;
   }
   auto clock = Clock::Create(pdev, kBootloaderDisplayEnabled);
   if (clock.is_error()) {
-    DISP_ERROR("Could not create Clock: %s\n", clock.status_string());
+    zxlogf(ERROR, "Could not create Clock: %s", clock.status_string());
     return clock.status_value();
   }
 
   dsi_.clock = std::move(clock.value());
   ZX_ASSERT(dsi_.clock);
 
-  DISP_INFO("Fixed panel type is %d", dsi_.dsi_host->panel_type());
+  zxlogf(INFO, "Fixed panel type is %d", dsi_.dsi_host->panel_type());
   zx::result display_setting = GetDisplaySettingForPanel(dsi_.dsi_host->panel_type());
   if (display_setting.is_error()) {
     return display_setting.error_value();
@@ -128,7 +128,7 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware
   }
 
   if (zx_status_t status = hdmi_.hdmi_host->Init(); status != ZX_OK) {
-    zxlogf(ERROR, "Could not initialize HDMI host %s\n", zx_status_get_string(status));
+    zxlogf(ERROR, "Could not initialize HDMI host: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -136,7 +136,7 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware
 }
 
 zx_status_t Vout::RestartDisplay() {
-  DISP_INFO("restarting display");
+  zxlogf(INFO, "restarting display");
   zx_status_t status;
   switch (type_) {
     case VoutType::kDsi:
@@ -144,7 +144,7 @@ zx_status_t Vout::RestartDisplay() {
       // Enable all display related clocks
       status = dsi_.clock->Enable(dsi_.disp_setting);
       if (status != ZX_OK) {
-        DISP_ERROR("Could not enable display clocks!\n");
+        zxlogf(ERROR, "Could not enable display clocks!");
         return status;
       }
 
@@ -152,7 +152,7 @@ zx_status_t Vout::RestartDisplay() {
       // Program and Enable DSI Host Interface
       status = dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate());
       if (status != ZX_OK) {
-        DISP_ERROR("DSI Host On failed! %d\n", status);
+        zxlogf(ERROR, "DSI Host On failed: %s", zx_status_get_string(status));
         return status;
       }
       dsi_.clock->SetVideoOn(true);
@@ -161,12 +161,12 @@ zx_status_t Vout::RestartDisplay() {
     case VoutType::kHdmi:
       status = hdmi_.hdmi_host->HostOn();
       if (status != ZX_OK) {
-        DISP_ERROR("HDMI initialization failed! %d\n", status);
+        zxlogf(ERROR, "HDMI initialization failed: %s", zx_status_get_string(status));
         return status;
       }
       break;
     default:
-      DISP_ERROR("Unrecognized Vout type %u\n", type_);
+      zxlogf(ERROR, "Unrecognized Vout type %u", type_);
       return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -197,7 +197,7 @@ void Vout::PopulateAddedDisplayArgs(
       args->cursor_info_count = 0;
       break;
     default:
-      zxlogf(ERROR, "Unrecognized vout type %u\n", type_);
+      zxlogf(ERROR, "Unrecognized vout type %u", type_);
       return;
   }
 }
@@ -275,7 +275,7 @@ zx_status_t Vout::ApplyConfiguration(const display_mode_t* mode) {
       memcpy(&modified_mode, mode, sizeof(display_mode_t));
       status = hdmi_.hdmi_host->GetVic(&modified_mode);
       if (status != ZX_OK) {
-        DISP_ERROR("Apply with bad mode");
+        zxlogf(ERROR, "Apply with bad mode");
         return status;
       }
 
@@ -315,55 +315,55 @@ zx_status_t Vout::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count)
 void Vout::Dump() {
   switch (type_) {
     case VoutType::kDsi:
-      DISP_INFO("#############################\n");
-      DISP_INFO("Dumping disp_setting structure:\n");
-      DISP_INFO("#############################\n");
-      DISP_INFO("h_active = 0x%x (%u)\n", dsi_.disp_setting.h_active, dsi_.disp_setting.h_active);
-      DISP_INFO("v_active = 0x%x (%u)\n", dsi_.disp_setting.v_active, dsi_.disp_setting.v_active);
-      DISP_INFO("h_period = 0x%x (%u)\n", dsi_.disp_setting.h_period, dsi_.disp_setting.h_period);
-      DISP_INFO("v_period = 0x%x (%u)\n", dsi_.disp_setting.v_period, dsi_.disp_setting.v_period);
-      DISP_INFO("hsync_width = 0x%x (%u)\n", dsi_.disp_setting.hsync_width,
-                dsi_.disp_setting.hsync_width);
-      DISP_INFO("hsync_bp = 0x%x (%u)\n", dsi_.disp_setting.hsync_bp, dsi_.disp_setting.hsync_bp);
-      DISP_INFO("hsync_pol = 0x%x (%u)\n", dsi_.disp_setting.hsync_pol,
-                dsi_.disp_setting.hsync_pol);
-      DISP_INFO("vsync_width = 0x%x (%u)\n", dsi_.disp_setting.vsync_width,
-                dsi_.disp_setting.vsync_width);
-      DISP_INFO("vsync_bp = 0x%x (%u)\n", dsi_.disp_setting.vsync_bp, dsi_.disp_setting.vsync_bp);
-      DISP_INFO("vsync_pol = 0x%x (%u)\n", dsi_.disp_setting.vsync_pol,
-                dsi_.disp_setting.vsync_pol);
-      DISP_INFO("lcd_clock = 0x%x (%u)\n", dsi_.disp_setting.lcd_clock,
-                dsi_.disp_setting.lcd_clock);
-      DISP_INFO("lane_num = 0x%x (%u)\n", dsi_.disp_setting.lane_num, dsi_.disp_setting.lane_num);
-      DISP_INFO("bit_rate_max = 0x%x (%u)\n", dsi_.disp_setting.bit_rate_max,
-                dsi_.disp_setting.bit_rate_max);
-      DISP_INFO("clock_factor = 0x%x (%u)\n", dsi_.disp_setting.clock_factor,
-                dsi_.disp_setting.clock_factor);
+      zxlogf(INFO, "#############################");
+      zxlogf(INFO, "Dumping disp_setting structure:");
+      zxlogf(INFO, "#############################");
+      zxlogf(INFO, "h_active = 0x%x (%u)", dsi_.disp_setting.h_active, dsi_.disp_setting.h_active);
+      zxlogf(INFO, "v_active = 0x%x (%u)", dsi_.disp_setting.v_active, dsi_.disp_setting.v_active);
+      zxlogf(INFO, "h_period = 0x%x (%u)", dsi_.disp_setting.h_period, dsi_.disp_setting.h_period);
+      zxlogf(INFO, "v_period = 0x%x (%u)", dsi_.disp_setting.v_period, dsi_.disp_setting.v_period);
+      zxlogf(INFO, "hsync_width = 0x%x (%u)", dsi_.disp_setting.hsync_width,
+             dsi_.disp_setting.hsync_width);
+      zxlogf(INFO, "hsync_bp = 0x%x (%u)", dsi_.disp_setting.hsync_bp, dsi_.disp_setting.hsync_bp);
+      zxlogf(INFO, "hsync_pol = 0x%x (%u)", dsi_.disp_setting.hsync_pol,
+             dsi_.disp_setting.hsync_pol);
+      zxlogf(INFO, "vsync_width = 0x%x (%u)", dsi_.disp_setting.vsync_width,
+             dsi_.disp_setting.vsync_width);
+      zxlogf(INFO, "vsync_bp = 0x%x (%u)", dsi_.disp_setting.vsync_bp, dsi_.disp_setting.vsync_bp);
+      zxlogf(INFO, "vsync_pol = 0x%x (%u)", dsi_.disp_setting.vsync_pol,
+             dsi_.disp_setting.vsync_pol);
+      zxlogf(INFO, "lcd_clock = 0x%x (%u)", dsi_.disp_setting.lcd_clock,
+             dsi_.disp_setting.lcd_clock);
+      zxlogf(INFO, "lane_num = 0x%x (%u)", dsi_.disp_setting.lane_num, dsi_.disp_setting.lane_num);
+      zxlogf(INFO, "bit_rate_max = 0x%x (%u)", dsi_.disp_setting.bit_rate_max,
+             dsi_.disp_setting.bit_rate_max);
+      zxlogf(INFO, "clock_factor = 0x%x (%u)", dsi_.disp_setting.clock_factor,
+             dsi_.disp_setting.clock_factor);
       break;
     case VoutType::kHdmi:
-      DISP_INFO("pixel_clock_10khz = 0x%x (%u)\n", hdmi_.cur_display_mode_.pixel_clock_10khz,
-                hdmi_.cur_display_mode_.pixel_clock_10khz);
-      DISP_INFO("h_addressable = 0x%x (%u)\n", hdmi_.cur_display_mode_.h_addressable,
-                hdmi_.cur_display_mode_.h_addressable);
-      DISP_INFO("h_front_porch = 0x%x (%u)\n", hdmi_.cur_display_mode_.h_front_porch,
-                hdmi_.cur_display_mode_.h_front_porch);
-      DISP_INFO("h_sync_pulse = 0x%x (%u)\n", hdmi_.cur_display_mode_.h_sync_pulse,
-                hdmi_.cur_display_mode_.h_sync_pulse);
-      DISP_INFO("h_blanking = 0x%x (%u)\n", hdmi_.cur_display_mode_.h_blanking,
-                hdmi_.cur_display_mode_.h_blanking);
-      DISP_INFO("v_addressable = 0x%x (%u)\n", hdmi_.cur_display_mode_.v_addressable,
-                hdmi_.cur_display_mode_.v_addressable);
-      DISP_INFO("v_front_porch = 0x%x (%u)\n", hdmi_.cur_display_mode_.v_front_porch,
-                hdmi_.cur_display_mode_.v_front_porch);
-      DISP_INFO("v_sync_pulse = 0x%x (%u)\n", hdmi_.cur_display_mode_.v_sync_pulse,
-                hdmi_.cur_display_mode_.v_sync_pulse);
-      DISP_INFO("v_blanking = 0x%x (%u)\n", hdmi_.cur_display_mode_.v_blanking,
-                hdmi_.cur_display_mode_.v_blanking);
-      DISP_INFO("flags = 0x%x (%u)\n", hdmi_.cur_display_mode_.flags,
-                hdmi_.cur_display_mode_.flags);
+      zxlogf(INFO, "pixel_clock_10khz = 0x%x (%u)", hdmi_.cur_display_mode_.pixel_clock_10khz,
+             hdmi_.cur_display_mode_.pixel_clock_10khz);
+      zxlogf(INFO, "h_addressable = 0x%x (%u)", hdmi_.cur_display_mode_.h_addressable,
+             hdmi_.cur_display_mode_.h_addressable);
+      zxlogf(INFO, "h_front_porch = 0x%x (%u)", hdmi_.cur_display_mode_.h_front_porch,
+             hdmi_.cur_display_mode_.h_front_porch);
+      zxlogf(INFO, "h_sync_pulse = 0x%x (%u)", hdmi_.cur_display_mode_.h_sync_pulse,
+             hdmi_.cur_display_mode_.h_sync_pulse);
+      zxlogf(INFO, "h_blanking = 0x%x (%u)", hdmi_.cur_display_mode_.h_blanking,
+             hdmi_.cur_display_mode_.h_blanking);
+      zxlogf(INFO, "v_addressable = 0x%x (%u)", hdmi_.cur_display_mode_.v_addressable,
+             hdmi_.cur_display_mode_.v_addressable);
+      zxlogf(INFO, "v_front_porch = 0x%x (%u)", hdmi_.cur_display_mode_.v_front_porch,
+             hdmi_.cur_display_mode_.v_front_porch);
+      zxlogf(INFO, "v_sync_pulse = 0x%x (%u)", hdmi_.cur_display_mode_.v_sync_pulse,
+             hdmi_.cur_display_mode_.v_sync_pulse);
+      zxlogf(INFO, "v_blanking = 0x%x (%u)", hdmi_.cur_display_mode_.v_blanking,
+             hdmi_.cur_display_mode_.v_blanking);
+      zxlogf(INFO, "flags = 0x%x (%u)", hdmi_.cur_display_mode_.flags,
+             hdmi_.cur_display_mode_.flags);
       break;
     default:
-      DISP_ERROR("Unrecognized Vout type %u\n", type_);
+      zxlogf(ERROR, "Unrecognized Vout type %u", type_);
   }
 }
 

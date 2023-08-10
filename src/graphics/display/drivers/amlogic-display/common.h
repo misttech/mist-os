@@ -29,10 +29,6 @@
 #define WRITE32_REG(x, a, v) WRITE32_##x##_REG(a, v)
 #define READ32_REG(x, a) READ32_##x##_REG(a)
 
-#define DISP_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define DISP_INFO(fmt, ...) zxlogf(INFO, "[%s %d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define DISP_TRACE(fmt, ...) zxlogf(TRACE, "[%s %d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
-
 // Should match display_mmios table in board driver
 enum {
   MMIO_VPU,       // VPU (Video Processing Unit)

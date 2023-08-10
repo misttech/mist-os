@@ -83,33 +83,34 @@ zx_status_t MipiPhy::PhyCfgLoad(uint32_t bitrate) {
   // Ensure both clk-trail and hs-trail do not exceed Teot (End of Transmission Time)
   const uint32_t time_req_max = NsToLaneByte(DPHY_TIME_EOT(ui), lanebytetime);
   if ((dsi_phy_cfg_.clk_trail > time_req_max) || (dsi_phy_cfg_.hs_trail > time_req_max)) {
-    DISP_ERROR("Invalid clk-trail and/or hs-trail exceed Teot!\n");
-    DISP_ERROR("clk-trail = 0x%02x, hs-trail =  0x%02x, Teot = 0x%02x\n", dsi_phy_cfg_.clk_trail,
-               dsi_phy_cfg_.hs_trail, time_req_max);
+    zxlogf(ERROR, "Invalid clk-trail and/or hs-trail exceed Teot!");
+    zxlogf(ERROR, "clk-trail = 0x%02x, hs-trail =  0x%02x, Teot = 0x%02x", dsi_phy_cfg_.clk_trail,
+           dsi_phy_cfg_.hs_trail, time_req_max);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  DISP_TRACE(
-      "lp_tesc     = 0x%02x\n"
-      "lp_lpx      = 0x%02x\n"
-      "lp_ta_sure  = 0x%02x\n"
-      "lp_ta_go    = 0x%02x\n"
-      "lp_ta_get   = 0x%02x\n"
-      "hs_exit     = 0x%02x\n"
-      "hs_trail    = 0x%02x\n"
-      "hs_zero     = 0x%02x\n"
-      "hs_prepare  = 0x%02x\n"
-      "clk_trail   = 0x%02x\n"
-      "clk_post    = 0x%02x\n"
-      "clk_zero    = 0x%02x\n"
-      "clk_prepare = 0x%02x\n"
-      "clk_pre     = 0x%02x\n"
-      "init        = 0x%02x\n"
-      "wakeup      = 0x%02x\n\n",
-      dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_go,
-      dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_zero,
-      dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_post, dsi_phy_cfg_.clk_zero,
-      dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.init, dsi_phy_cfg_.wakeup);
+  zxlogf(TRACE,
+         "lp_tesc     = 0x%02x"
+         "lp_lpx      = 0x%02x"
+         "lp_ta_sure  = 0x%02x"
+         "lp_ta_go    = 0x%02x"
+         "lp_ta_get   = 0x%02x"
+         "hs_exit     = 0x%02x"
+         "hs_trail    = 0x%02x"
+         "hs_zero     = 0x%02x"
+         "hs_prepare  = 0x%02x"
+         "clk_trail   = 0x%02x"
+         "clk_post    = 0x%02x"
+         "clk_zero    = 0x%02x"
+         "clk_prepare = 0x%02x"
+         "clk_pre     = 0x%02x"
+         "init        = 0x%02x"
+         "wakeup      = 0x%02x",
+         dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_go,
+         dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_zero,
+         dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_post,
+         dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.init,
+         dsi_phy_cfg_.wakeup);
   return ZX_OK;
 }
 
@@ -200,7 +201,7 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(ddk::PDevFidl& pdev,
   fbl::AllocChecker ac;
   std::unique_ptr<MipiPhy> self(new (&ac) MipiPhy);
   if (!ac.check()) {
-    DISP_ERROR("MipiPhy: Could not allocate memory\n");
+    zxlogf(ERROR, "MipiPhy: Could not allocate memory");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   self->dsiimpl_ = dsi;
@@ -209,7 +210,7 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(ddk::PDevFidl& pdev,
   // Map Mipi Dsi and Dsi Phy registers
   zx_status_t status = pdev.MapMmio(MMIO_DSI_PHY, &self->dsi_phy_mmio_);
   if (status != ZX_OK) {
-    DISP_ERROR("MipiPhy: Could not map DSI PHY mmio\n");
+    zxlogf(ERROR, "MipiPhy: Could not map DSI PHY mmio");
     return zx::error(status);
   }
 
@@ -217,45 +218,45 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(ddk::PDevFidl& pdev,
 }
 
 void MipiPhy::Dump() {
-  DISP_INFO("%s: DUMPING PHY REGS", __func__);
-  DISP_INFO("MIPI_DSI_PHY_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_PHY_CTRL));
-  DISP_INFO("MIPI_DSI_CHAN_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CHAN_CTRL));
-  DISP_INFO("MIPI_DSI_CHAN_STS = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CHAN_STS));
-  DISP_INFO("MIPI_DSI_CLK_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CLK_TIM));
-  DISP_INFO("MIPI_DSI_HS_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_HS_TIM));
-  DISP_INFO("MIPI_DSI_LP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LP_TIM));
-  DISP_INFO("MIPI_DSI_ANA_UP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ANA_UP_TIM));
-  DISP_INFO("MIPI_DSI_INIT_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_INIT_TIM));
-  DISP_INFO("MIPI_DSI_WAKEUP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_WAKEUP_TIM));
-  DISP_INFO("MIPI_DSI_LPOK_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LPOK_TIM));
-  DISP_INFO("MIPI_DSI_LP_WCHDOG = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LP_WCHDOG));
-  DISP_INFO("MIPI_DSI_ANA_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ANA_CTRL));
-  DISP_INFO("MIPI_DSI_CLK_TIM1 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CLK_TIM1));
-  DISP_INFO("MIPI_DSI_TURN_WCHDOG = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TURN_WCHDOG));
-  DISP_INFO("MIPI_DSI_ULPS_CHECK = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ULPS_CHECK));
-  DISP_INFO("MIPI_DSI_TEST_CTRL0 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TEST_CTRL0));
-  DISP_INFO("MIPI_DSI_TEST_CTRL1 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TEST_CTRL1));
-  DISP_INFO("");
+  zxlogf(INFO, "%s: DUMPING PHY REGS", __func__);
+  zxlogf(INFO, "MIPI_DSI_PHY_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_PHY_CTRL));
+  zxlogf(INFO, "MIPI_DSI_CHAN_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CHAN_CTRL));
+  zxlogf(INFO, "MIPI_DSI_CHAN_STS = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CHAN_STS));
+  zxlogf(INFO, "MIPI_DSI_CLK_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CLK_TIM));
+  zxlogf(INFO, "MIPI_DSI_HS_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_HS_TIM));
+  zxlogf(INFO, "MIPI_DSI_LP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LP_TIM));
+  zxlogf(INFO, "MIPI_DSI_ANA_UP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ANA_UP_TIM));
+  zxlogf(INFO, "MIPI_DSI_INIT_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_INIT_TIM));
+  zxlogf(INFO, "MIPI_DSI_WAKEUP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_WAKEUP_TIM));
+  zxlogf(INFO, "MIPI_DSI_LPOK_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LPOK_TIM));
+  zxlogf(INFO, "MIPI_DSI_LP_WCHDOG = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LP_WCHDOG));
+  zxlogf(INFO, "MIPI_DSI_ANA_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ANA_CTRL));
+  zxlogf(INFO, "MIPI_DSI_CLK_TIM1 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CLK_TIM1));
+  zxlogf(INFO, "MIPI_DSI_TURN_WCHDOG = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TURN_WCHDOG));
+  zxlogf(INFO, "MIPI_DSI_ULPS_CHECK = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ULPS_CHECK));
+  zxlogf(INFO, "MIPI_DSI_TEST_CTRL0 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TEST_CTRL0));
+  zxlogf(INFO, "MIPI_DSI_TEST_CTRL1 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TEST_CTRL1));
+  zxlogf(INFO, "");
 
-  DISP_INFO("#############################");
-  DISP_INFO("Dumping dsi_phy_cfg structure:");
-  DISP_INFO("#############################");
-  DISP_INFO("lp_tesc = 0x%x (%u)", dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_tesc);
-  DISP_INFO("lp_lpx = 0x%x (%u)", dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_lpx);
-  DISP_INFO("lp_ta_sure = 0x%x (%u)", dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_sure);
-  DISP_INFO("lp_ta_go = 0x%x (%u)", dsi_phy_cfg_.lp_ta_go, dsi_phy_cfg_.lp_ta_go);
-  DISP_INFO("lp_ta_get = 0x%x (%u)", dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.lp_ta_get);
-  DISP_INFO("hs_exit = 0x%x (%u)", dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_exit);
-  DISP_INFO("hs_trail = 0x%x (%u)", dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_trail);
-  DISP_INFO("hs_zero = 0x%x (%u)", dsi_phy_cfg_.hs_zero, dsi_phy_cfg_.hs_zero);
-  DISP_INFO("hs_prepare = 0x%x (%u)", dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.hs_prepare);
-  DISP_INFO("clk_trail = 0x%x (%u)", dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_trail);
-  DISP_INFO("clk_post = 0x%x (%u)", dsi_phy_cfg_.clk_post, dsi_phy_cfg_.clk_post);
-  DISP_INFO("clk_zero = 0x%x (%u)", dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_zero);
-  DISP_INFO("clk_prepare = 0x%x (%u)", dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_prepare);
-  DISP_INFO("clk_pre = 0x%x (%u)", dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.clk_pre);
-  DISP_INFO("init = 0x%x (%u)", dsi_phy_cfg_.init, dsi_phy_cfg_.init);
-  DISP_INFO("wakeup = 0x%x (%u)", dsi_phy_cfg_.wakeup, dsi_phy_cfg_.wakeup);
+  zxlogf(INFO, "#############################");
+  zxlogf(INFO, "Dumping dsi_phy_cfg structure:");
+  zxlogf(INFO, "#############################");
+  zxlogf(INFO, "lp_tesc = 0x%x (%u)", dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_tesc);
+  zxlogf(INFO, "lp_lpx = 0x%x (%u)", dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_lpx);
+  zxlogf(INFO, "lp_ta_sure = 0x%x (%u)", dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_sure);
+  zxlogf(INFO, "lp_ta_go = 0x%x (%u)", dsi_phy_cfg_.lp_ta_go, dsi_phy_cfg_.lp_ta_go);
+  zxlogf(INFO, "lp_ta_get = 0x%x (%u)", dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.lp_ta_get);
+  zxlogf(INFO, "hs_exit = 0x%x (%u)", dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_exit);
+  zxlogf(INFO, "hs_trail = 0x%x (%u)", dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_trail);
+  zxlogf(INFO, "hs_zero = 0x%x (%u)", dsi_phy_cfg_.hs_zero, dsi_phy_cfg_.hs_zero);
+  zxlogf(INFO, "hs_prepare = 0x%x (%u)", dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.hs_prepare);
+  zxlogf(INFO, "clk_trail = 0x%x (%u)", dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_trail);
+  zxlogf(INFO, "clk_post = 0x%x (%u)", dsi_phy_cfg_.clk_post, dsi_phy_cfg_.clk_post);
+  zxlogf(INFO, "clk_zero = 0x%x (%u)", dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_zero);
+  zxlogf(INFO, "clk_prepare = 0x%x (%u)", dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_prepare);
+  zxlogf(INFO, "clk_pre = 0x%x (%u)", dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.clk_pre);
+  zxlogf(INFO, "init = 0x%x (%u)", dsi_phy_cfg_.init, dsi_phy_cfg_.init);
+  zxlogf(INFO, "wakeup = 0x%x (%u)", dsi_phy_cfg_.wakeup, dsi_phy_cfg_.wakeup);
 }
 
 }  // namespace amlogic_display

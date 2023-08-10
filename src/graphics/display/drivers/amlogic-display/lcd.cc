@@ -40,12 +40,12 @@ static zx_status_t CheckMipiReg(ddk::DsiImplProtocolClient* dsiimpl, uint8_t reg
 
   zx_status_t status;
   if ((status = dsiimpl->SendCmd(&cmd, 1)) != ZX_OK) {
-    DISP_ERROR("Could not read register %c\n", reg);
+    zxlogf(ERROR, "Could not read register %c", reg);
     return status;
   }
   if (cmd.rsp_data_count != count) {
-    DISP_ERROR("MIPI-DSI register read was short: got %zu want %zu. Ignoring", cmd.rsp_data_count,
-               count);
+    zxlogf(ERROR, "MIPI-DSI register read was short: got %zu want %zu. Ignoring",
+           cmd.rsp_data_count, count);
   }
   return ZX_OK;
 }
@@ -62,12 +62,12 @@ zx_status_t Lcd::GetDisplayId(ddk::DsiImplProtocolClient dsiimpl, uint32_t* out)
   status = mipi_dsi::MipiDsi::CreateCommand(&txcmd, 1, rsp, READ_DISPLAY_ID_LEN, COMMAND_GEN, &cmd);
   if (status == ZX_OK) {
     if ((status = dsiimpl.SendCmd(&cmd, 1)) != ZX_OK) {
-      DISP_ERROR("Could not read out Display ID\n");
+      zxlogf(ERROR, "Could not read out Display ID");
       return status;
     }
     *out = rsp[0] << 16 | rsp[1] << 8 | rsp[2];
   } else {
-    DISP_ERROR("Invalid command (%d)\n", status);
+    zxlogf(ERROR, "Invalid command: %s", zx_status_get_string(status));
   }
 
   return status;
@@ -77,7 +77,7 @@ zx_status_t Lcd::GetDisplayId() {
   uint32_t id;
   auto status = Lcd::GetDisplayId(dsiimpl_, &id);
   if (status == ZX_OK) {
-    DISP_INFO("Display ID: 0x%x\n", id);
+    zxlogf(INFO, "Display ID: 0x%x", id);
   }
   return status;
 }
@@ -106,8 +106,8 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
       continue;
     }
     if ((i + payload_size + kMinCmdSize) > buffer.size()) {
-      DISP_ERROR("buffer[%lu] command 0x%x size=0x%x would overflow buffer size=%lu", i, cmd_type,
-                 payload_size, buffer.size());
+      zxlogf(ERROR, "buffer[%lu] command 0x%x size=0x%x would overflow buffer size=%lu", i,
+             cmd_type, payload_size, buffer.size());
       return ZX_ERR_OUT_OF_RANGE;
     }
 
@@ -122,9 +122,9 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
         }
         break;
       case kDsiOpGpio:
-        DISP_TRACE("dsi_set_gpio size=%d value=%d", payload_size, buffer[i + 3]);
+        zxlogf(TRACE, "dsi_set_gpio size=%d value=%d", payload_size, buffer[i + 3]);
         if (buffer[i + 2] != 0) {
-          DISP_ERROR("Unrecognized GPIO pin (%d)", buffer[i + 2]);
+          zxlogf(ERROR, "Unrecognized GPIO pin (%d)", buffer[i + 2]);
           // We _should_ bail here, but this spec-violating behavior is present
           // in the other drivers for this hardware.
           //
@@ -132,37 +132,39 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
         } else {
           fidl::WireResult result = gpio_->ConfigOut(buffer[i + 3]);
           if (!result.ok()) {
-            DISP_ERROR("Failed to send ConfigOut request to gpio: %s", result.status_string());
+            zxlogf(ERROR, "Failed to send ConfigOut request to gpio: %s", result.status_string());
             return result.status();
           }
           if (result->is_error()) {
-            DISP_ERROR("Failed to configure gpio to output: %s",
-                       zx_status_get_string(result->error_value()));
+            zxlogf(ERROR, "Failed to configure gpio to output: %s",
+                   zx_status_get_string(result->error_value()));
             return result->error_value();
           }
         }
         if (payload_size > 2 && buffer[i + 4]) {
-          DISP_TRACE("dsi_set_gpio sleep %d", buffer[i + 4]);
+          zxlogf(TRACE, "dsi_set_gpio sleep %d", buffer[i + 4]);
           zx::nanosleep(zx::deadline_after(zx::msec(buffer[i + 4])));
         }
         break;
       case kDsiOpReadReg:
-        DISP_TRACE("dsi_read size=%d reg=%d, count=%d", payload_size, buffer[i + 2], buffer[i + 3]);
+        zxlogf(TRACE, "dsi_read size=%d reg=%d, count=%d", payload_size, buffer[i + 2],
+               buffer[i + 3]);
         if (payload_size != 2) {
-          DISP_ERROR("Invalid MIPI-DSI reg check, expected a register and a target value!");
+          zxlogf(ERROR, "Invalid MIPI-DSI reg check, expected a register and a target value!");
         }
         status = CheckMipiReg(&dsiimpl_, /*reg=*/buffer[i + 2], /*count=*/buffer[i + 3]);
         if (status != ZX_OK) {
-          DISP_ERROR("Error reading MIPI register 0x%x (%d)", buffer[i + 2], status);
+          zxlogf(ERROR, "Error reading MIPI register 0x%x: %s", buffer[i + 2],
+                 zx_status_get_string(status));
           return status;
         }
         break;
       case kDsiOpPhyPowerOn:
-        DISP_TRACE("dsi_phy_power_on size=%d", payload_size);
+        zxlogf(TRACE, "dsi_phy_power_on size=%d", payload_size);
         set_signal_power_(/*on=*/true);
         break;
       case kDsiOpPhyPowerOff:
-        DISP_TRACE("dsi_phy_power_off size=%d", payload_size);
+        zxlogf(TRACE, "dsi_phy_power_off size=%d", payload_size);
         set_signal_power_(/*on=*/false);
         break;
       // All other cmd_type bytes are real DSI commands
@@ -174,8 +176,8 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
         is_dcs = true;
         __FALLTHROUGH;
       default:
-        DISP_TRACE("dsi_cmd op=0x%x size=%d is_dcs=%s", cmd_type, payload_size,
-                   is_dcs ? "yes" : "no");
+        zxlogf(TRACE, "dsi_cmd op=0x%x size=%d is_dcs=%s", cmd_type, payload_size,
+               is_dcs ? "yes" : "no");
         ZX_DEBUG_ASSERT(cmd_type != 0x37);
         // Create the command using mipi-dsi library
         mipi_dsi_cmd_t cmd;
@@ -183,11 +185,13 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
             mipi_dsi::MipiDsi::CreateCommand(&buffer[i + 2], payload_size, NULL, 0, is_dcs, &cmd);
         if (status == ZX_OK) {
           if ((status = dsiimpl_.SendCmd(&cmd, 1)) != ZX_OK) {
-            DISP_ERROR("Error loading LCD init table. Aborting %d\n", status);
+            zxlogf(ERROR, "Error loading LCD init table. Aborting: %s",
+                   zx_status_get_string(status));
             return status;
           }
         } else {
-          DISP_ERROR("Invalid command at byte 0x%lx (%d). Skipping\n", i, status);
+          zxlogf(ERROR, "Invalid command at byte 0x%lx (%s). Skipping", i,
+                 zx_status_get_string(status));
         }
         break;
     }
@@ -199,17 +203,17 @@ zx_status_t Lcd::LoadInitTable(cpp20::span<const uint8_t> buffer) {
 
 zx_status_t Lcd::Disable() {
   if (!enabled_) {
-    DISP_INFO("LCD is already off, no work to do");
+    zxlogf(INFO, "LCD is already off, no work to do");
     return ZX_OK;
   }
   if (dsi_off_.size() == 0) {
-    DISP_ERROR("Unsupported panel (%d) detected!", panel_type_);
+    zxlogf(ERROR, "Unsupported panel (%d) detected!", panel_type_);
     return ZX_ERR_NOT_SUPPORTED;
   }
-  DISP_INFO("Powering off the LCD [type=%d]", panel_type_);
+  zxlogf(INFO, "Powering off the LCD [type=%d]", panel_type_);
   auto status = LoadInitTable(dsi_off_);
   if (status != ZX_OK) {
-    DISP_ERROR("Failed to execute panel off sequence (%d)", status);
+    zxlogf(ERROR, "Failed to execute panel off sequence: %s", zx_status_get_string(status));
     return status;
   }
   enabled_ = false;
@@ -218,25 +222,25 @@ zx_status_t Lcd::Disable() {
 
 zx_status_t Lcd::Enable() {
   if (enabled_) {
-    DISP_INFO("LCD is already on, no work to do");
+    zxlogf(INFO, "LCD is already on, no work to do");
     return ZX_OK;
   }
 
   if (dsi_on_.size() == 0) {
-    DISP_ERROR("Unsupported panel (%d) detected!", panel_type_);
+    zxlogf(ERROR, "Unsupported panel (%d) detected!", panel_type_);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  DISP_INFO("Powering on the LCD [type=%d]", panel_type_);
+  zxlogf(INFO, "Powering on the LCD [type=%d]", panel_type_);
   auto status = LoadInitTable(dsi_on_);
   if (status != ZX_OK) {
-    DISP_ERROR("Failed to execute panel init sequence (%d)", status);
+    zxlogf(ERROR, "Failed to execute panel init sequence: %s", zx_status_get_string(status));
     return status;
   }
 
   // check status
   if (GetDisplayId() != ZX_OK) {
-    DISP_ERROR("Cannot communicate with LCD Panel!\n");
+    zxlogf(ERROR, "Cannot communicate with LCD Panel!");
     return ZX_ERR_TIMED_OUT;
   }
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
@@ -264,14 +268,14 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<co
   lcd->dsiimpl_ = dsiimpl;
 
   if (!gpio.is_valid()) {
-    DISP_ERROR("Could not obtain GPIO protocol\n");
+    zxlogf(ERROR, "Could not obtain GPIO protocol");
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
   lcd->gpio_.Bind(std::move(gpio));
 
   lcd->enabled_ = already_enabled;
   if (already_enabled) {
-    DISP_INFO("LCD Enabled by Bootloader. Skipping panel init\n");
+    zxlogf(INFO, "LCD Enabled by Bootloader. Skipping panel init");
   } else {
     lcd->Enable();
   }

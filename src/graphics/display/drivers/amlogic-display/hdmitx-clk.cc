@@ -56,7 +56,7 @@ void HdmiHost::WaitForPllLocked() {
             .WriteTo(&(*hhi_mmio_));
       }
     }
-    DISP_ERROR("pll[0x%x] reset %d times\n", HHI_HDMI_PLL_CNTL0, 10000 - cnt);
+    zxlogf(ERROR, "pll[0x%x] reset %d times", HHI_HDMI_PLL_CNTL0, 10000 - cnt);
     if (cnt <= 0)
       err = true;
   } while (err);
@@ -130,7 +130,7 @@ zx_status_t HdmiHost::ConfigurePll() {
     HhiVidClkCntlReg::Get().ReadFrom(&(*hhi_mmio_)).set_clk_en0(1).WriteTo(&(*hhi_mmio_));
   }
 
-  DISP_INFO("done!\n");
+  zxlogf(INFO, "done!");
   return ZX_OK;
 }
 
@@ -141,8 +141,8 @@ void HdmiHost::ConfigureHpllClkOut(uint32_t hpll) {
   whole = (uint8_t)desired_pll;
   frac = static_cast<uint16_t>(((float)desired_pll - (float)whole) * kFracMax);
 
-  DISP_ERROR("Desired PLL = %f (frac = %d, whole = %d) (hpll = %d)\n", desired_pll, frac, whole,
-             hpll);
+  zxlogf(ERROR, "Desired PLL = %f (frac = %d, whole = %d) (hpll = %d)", desired_pll, frac, whole,
+         hpll);
 
   HhiHdmiPllCntlReg::Get().FromValue(0x0b3a0400).set_hdmi_dpll_M(whole).WriteTo(&(*hhi_mmio_));
 
@@ -189,7 +189,7 @@ void HdmiHost::ConfigureOd3Div(uint32_t div_sel) {
     /* TODO(fxb/69679): Add in Resets
     auto result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 7, 1 << 7);
     if ((result.status() != ZX_OK) || result->is_error()) {
-      zxlogf(ERROR, "Reset0 Set failed\n");
+      zxlogf(ERROR, "Reset0 Set failed");
     }
     */
   }
@@ -262,7 +262,7 @@ void HdmiHost::ConfigureOd3Div(uint32_t div_sel) {
       shift_sel = 2;
       break;
     default:
-      DISP_ERROR("Error: clocks_set_vid_clk_div:  Invalid parameter\n");
+      zxlogf(ERROR, "Error: clocks_set_vid_clk_div:  Invalid parameter");
       break;
   }
 
