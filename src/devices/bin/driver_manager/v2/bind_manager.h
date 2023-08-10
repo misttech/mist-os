@@ -87,9 +87,12 @@ class BindNodeSet {
   void EndBindProcess();
 
   void AddOrphanedNode(Node& node);
+
+  // If available, remove the node with the matching |node_moniker| from |orphaned_nodes_|.
   void RemoveOrphanedNode(std::string node_moniker);
 
-  void AddMultibindNode(Node& node);
+  // Add |node| to |multibind_nodes_|. Remove it from |orphaned_nodes_| if it exists.
+  void AddOrMoveMultibindNode(Node& node);
   bool MultibindContains(std::string node_moniker) const;
 
   // Functions to return a copy of |orphaned_nodes_| and |multibind_nodes_|. We return a copy, not
@@ -113,13 +116,14 @@ class BindNodeSet {
 
   // Orphaned nodes are nodes that have failed to bind to a driver, either
   // because no matching driver could be found, or because the matching driver
-  // failed to start. Maps the node's component moniker to its weak pointer.
+  // failed to start. Maps the node's component moniker to its weak pointer. Should be mutually
+  // exclusive to |multibind_nodes_|.
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes_;
 
   // A list of nodes that can multibind to composites. In DFv1, a node can parent multiple composite
   // nodes. To follow that same behavior, we store the parents in a map to bind them
-  // to other composites.
-  // TODO(fxb/122531): Support composite node specs for multibind.
+  // to other composites. A node is added to this set if it's matched to a composite's parent and
+  // contains the composite multibindable flag. Should be mutually exclusive to |orphaned_nodes_|.
   std::unordered_map<std::string, std::weak_ptr<Node>> multibind_nodes_;
 
   // Sets that contain the new changes to |orphaned_nodes_| and |multibind_nodes_|. When

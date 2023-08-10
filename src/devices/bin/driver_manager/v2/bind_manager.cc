@@ -36,11 +36,13 @@ void BindNodeSet::CompleteOngoingBind() {
 }
 
 void BindNodeSet::AddOrphanedNode(Node& node) {
+  std::string moniker = node.MakeComponentMoniker();
+  ZX_ASSERT(!MultibindContains(moniker));
   if (is_bind_ongoing_) {
-    new_orphaned_nodes_.emplace(node.MakeComponentMoniker(), node.weak_from_this());
+    new_orphaned_nodes_.emplace(moniker, node.weak_from_this());
     return;
   }
-  orphaned_nodes_.emplace(node.MakeComponentMoniker(), node.weak_from_this());
+  orphaned_nodes_.emplace(moniker, node.weak_from_this());
 }
 
 void BindNodeSet::RemoveOrphanedNode(std::string node_moniker) {
@@ -51,7 +53,8 @@ void BindNodeSet::RemoveOrphanedNode(std::string node_moniker) {
   orphaned_nodes_.erase(node_moniker);
 }
 
-void BindNodeSet::AddMultibindNode(Node& node) {
+void BindNodeSet::AddOrMoveMultibindNode(Node& node) {
+  RemoveOrphanedNode(node.MakeComponentMoniker());
   if (is_bind_ongoing_) {
     new_multibind_nodes_.emplace(node.MakeComponentMoniker(), node.weak_from_this());
     return;
@@ -186,7 +189,7 @@ void BindManager::BindInternal(BindRequest request,
       return;
     }
 
-    bind_node_set_.AddMultibindNode(*node);
+    bind_node_set_.AddOrMoveMultibindNode(*node);
 
     // If the node matched to a legacy composite, then it should only be matched to
     // other composites.
@@ -236,12 +239,16 @@ void BindManager::OnMatchDriverCallback(
   BindResult bind_result =
       BindNodeToResult(*node, request.composite_only, result, request.tracker != nullptr);
 
-  if (!bind_result.bound() && !request.composite_only) {
+  auto node_moniker = node->MakeComponentMoniker();
+
+  // If the node fails to bind to anything, add it to the orphaned nodes.
+  if (!bind_result.bound() && !request.composite_only &&
+      !bind_node_set_.MultibindContains(node_moniker)) {
     bind_node_set_.AddOrphanedNode(*node);
     return;
   }
 
-  auto node_moniker = node->MakeComponentMoniker();
+  // Remove bound nodes from the orphaned nodes.
   bind_node_set_.RemoveOrphanedNode(node_moniker);
 
   if (bind_result.bound()) {
@@ -336,7 +343,7 @@ BindResult BindManager::BindNodeToResult(
 zx::result<std::vector<fdi::wire::MatchedCompositeNodeSpecInfo>> BindManager::BindNodeToSpec(
     Node& node, fdi::wire::MatchedCompositeNodeParentInfo parents) {
   if (node.can_multibind_composites()) {
-    bind_node_set_.AddMultibindNode(node);
+    bind_node_set_.AddOrMoveMultibindNode(node);
   }
 
   auto result =
