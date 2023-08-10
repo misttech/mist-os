@@ -55,6 +55,14 @@
             },
             {
                 "paths": [
+                    "prebuilt/tools/shac"
+                ],
+                "notes": [
+                    "1-P project. Metadata files & license files may come in a future CL."
+                ]
+            },
+            {
+                "paths": [
                     "docs"
                 ],
                 "notes": [
