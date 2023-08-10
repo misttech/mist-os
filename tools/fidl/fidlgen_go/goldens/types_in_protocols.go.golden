@@ -305,120 +305,190 @@ func (msg *VectorOptional) Marshaler() _bindings.Marshaler {
 	return _mVectorOptional
 }
 
-type I_resourceUnionTag uint64
+type I_protocolErrorArrayBasicResultTag uint64
 
 const (
-	ResourceUnion_unknownData = 0 // 0x00000000
-	ResourceUnionB            = 1 // 0x00000001
+	ProtocolErrorArrayBasicResultResponse = 1 // 0x00000001
+	ProtocolErrorArrayBasicResultErr      = 2 // 0x00000002
 )
 
-type ResourceUnion struct {
-	I_resourceUnionTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
-	I_unknownData      interface{}
-	B                  bool `fidl_ordinal:"1"`
+type ProtocolErrorArrayBasicResult struct {
+	I_protocolErrorArrayBasicResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                           ArrayBasic `fidl_ordinal:"1"`
+	Err                                uint32     `fidl_ordinal:"2"`
 }
 
-var _mResourceUnion = _bindings.CreateLazyMarshaler(ResourceUnion{})
+var _mProtocolErrorArrayBasicResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayBasicResult{})
 
-func (msg *ResourceUnion) Marshaler() _bindings.Marshaler {
-	return _mResourceUnion
+func (msg *ProtocolErrorArrayBasicResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorArrayBasicResult
 }
 
-func (_m *ResourceUnion) reset() {
-	switch _m.I_resourceUnionTag {
+func (_m *ProtocolErrorArrayBasicResult) reset() {
+	switch _m.I_protocolErrorArrayBasicResultTag {
 	case 1:
-		var _zeroed bool
-		_m.B = _zeroed
-	default:
-		var _zeroed interface{}
-		_m.I_unknownData = _zeroed
+		var _zeroed ArrayBasic
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
 	}
 }
 
-func (_m *ResourceUnion) Which() I_resourceUnionTag {
-	switch _m.I_resourceUnionTag {
-	case 1:
-		return ResourceUnionB
-	default:
-		return ResourceUnion_unknownData
-	}
+func (_m *ProtocolErrorArrayBasicResult) Which() I_protocolErrorArrayBasicResultTag {
+	return _m.I_protocolErrorArrayBasicResultTag
 }
 
-func (_m *ResourceUnion) Ordinal() uint64 {
-	return uint64(_m.I_resourceUnionTag)
+func (_m *ProtocolErrorArrayBasicResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorArrayBasicResultTag)
 }
 
-func (_m *ResourceUnion) SetB(b bool) {
+func (_m *ProtocolErrorArrayBasicResult) SetResponse(response ArrayBasic) {
 	_m.reset()
-	_m.I_resourceUnionTag = ResourceUnionB
-	_m.B = b
+	_m.I_protocolErrorArrayBasicResultTag = ProtocolErrorArrayBasicResultResponse
+	_m.Response = response
 }
 
-func ResourceUnionWithB(b bool) ResourceUnion {
-	var _u ResourceUnion
-	_u.SetB(b)
+func ProtocolErrorArrayBasicResultWithResponse(response ArrayBasic) ProtocolErrorArrayBasicResult {
+	var _u ProtocolErrorArrayBasicResult
+	_u.SetResponse(response)
 	return _u
 }
-func (_m *ResourceUnion) GetUnknownData() _bindings.UnknownData {
-	return _m.I_unknownData.(_bindings.UnknownData)
+
+func (_m *ProtocolErrorArrayBasicResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorArrayBasicResultTag = ProtocolErrorArrayBasicResultErr
+	_m.Err = err
 }
 
-type I_unionTag uint64
+func ProtocolErrorArrayBasicResultWithErr(err uint32) ProtocolErrorArrayBasicResult {
+	var _u ProtocolErrorArrayBasicResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorArrayCompoundResultTag uint64
 
 const (
-	Union_unknownData = 0 // 0x00000000
-	UnionB            = 1 // 0x00000001
+	ProtocolErrorArrayCompoundResultResponse = 1 // 0x00000001
+	ProtocolErrorArrayCompoundResultErr      = 2 // 0x00000002
 )
 
-type Union struct {
-	I_unionTag    `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData interface{}
-	B             bool `fidl_ordinal:"1"`
+type ProtocolErrorArrayCompoundResult struct {
+	I_protocolErrorArrayCompoundResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                              ArrayCompound `fidl_ordinal:"1"`
+	Err                                   uint32        `fidl_ordinal:"2"`
 }
 
-var _mUnion = _bindings.CreateLazyMarshaler(Union{})
+var _mProtocolErrorArrayCompoundResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayCompoundResult{})
 
-func (msg *Union) Marshaler() _bindings.Marshaler {
-	return _mUnion
+func (msg *ProtocolErrorArrayCompoundResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorArrayCompoundResult
 }
 
-func (_m *Union) reset() {
-	switch _m.I_unionTag {
+func (_m *ProtocolErrorArrayCompoundResult) reset() {
+	switch _m.I_protocolErrorArrayCompoundResultTag {
 	case 1:
-		var _zeroed bool
-		_m.B = _zeroed
-	default:
-		var _zeroed interface{}
-		_m.I_unknownData = _zeroed
+		var _zeroed ArrayCompound
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
 	}
 }
 
-func (_m *Union) Which() I_unionTag {
-	switch _m.I_unionTag {
-	case 1:
-		return UnionB
-	default:
-		return Union_unknownData
-	}
+func (_m *ProtocolErrorArrayCompoundResult) Which() I_protocolErrorArrayCompoundResultTag {
+	return _m.I_protocolErrorArrayCompoundResultTag
 }
 
-func (_m *Union) Ordinal() uint64 {
-	return uint64(_m.I_unionTag)
+func (_m *ProtocolErrorArrayCompoundResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorArrayCompoundResultTag)
 }
 
-func (_m *Union) SetB(b bool) {
+func (_m *ProtocolErrorArrayCompoundResult) SetResponse(response ArrayCompound) {
 	_m.reset()
-	_m.I_unionTag = UnionB
-	_m.B = b
+	_m.I_protocolErrorArrayCompoundResultTag = ProtocolErrorArrayCompoundResultResponse
+	_m.Response = response
 }
 
-func UnionWithB(b bool) Union {
-	var _u Union
-	_u.SetB(b)
+func ProtocolErrorArrayCompoundResultWithResponse(response ArrayCompound) ProtocolErrorArrayCompoundResult {
+	var _u ProtocolErrorArrayCompoundResult
+	_u.SetResponse(response)
 	return _u
 }
-func (_m *Union) GetUnknownData() _bindings.UnknownData {
-	return _m.I_unknownData.(_bindings.UnknownData)
+
+func (_m *ProtocolErrorArrayCompoundResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorArrayCompoundResultTag = ProtocolErrorArrayCompoundResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorArrayCompoundResultWithErr(err uint32) ProtocolErrorArrayCompoundResult {
+	var _u ProtocolErrorArrayCompoundResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_protocolErrorArrayVectorNestedResultTag uint64
+
+const (
+	ProtocolErrorArrayVectorNestedResultResponse = 1 // 0x00000001
+	ProtocolErrorArrayVectorNestedResultErr      = 2 // 0x00000002
+)
+
+type ProtocolErrorArrayVectorNestedResult struct {
+	I_protocolErrorArrayVectorNestedResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                                  ArrayVectorNested `fidl_ordinal:"1"`
+	Err                                       uint32            `fidl_ordinal:"2"`
+}
+
+var _mProtocolErrorArrayVectorNestedResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayVectorNestedResult{})
+
+func (msg *ProtocolErrorArrayVectorNestedResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorArrayVectorNestedResult
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) reset() {
+	switch _m.I_protocolErrorArrayVectorNestedResultTag {
+	case 1:
+		var _zeroed ArrayVectorNested
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) Which() I_protocolErrorArrayVectorNestedResultTag {
+	return _m.I_protocolErrorArrayVectorNestedResultTag
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorArrayVectorNestedResultTag)
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) SetResponse(response ArrayVectorNested) {
+	_m.reset()
+	_m.I_protocolErrorArrayVectorNestedResultTag = ProtocolErrorArrayVectorNestedResultResponse
+	_m.Response = response
+}
+
+func ProtocolErrorArrayVectorNestedResultWithResponse(response ArrayVectorNested) ProtocolErrorArrayVectorNestedResult {
+	var _u ProtocolErrorArrayVectorNestedResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *ProtocolErrorArrayVectorNestedResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_protocolErrorArrayVectorNestedResultTag = ProtocolErrorArrayVectorNestedResultErr
+	_m.Err = err
+}
+
+func ProtocolErrorArrayVectorNestedResultWithErr(err uint32) ProtocolErrorArrayVectorNestedResult {
+	var _u ProtocolErrorArrayVectorNestedResult
+	_u.SetErr(err)
+	return _u
 }
 
 type I_protocolErrorBasicResultTag uint64
@@ -545,29 +615,29 @@ func ProtocolErrorCompoundResultWithErr(err uint32) ProtocolErrorCompoundResult 
 	return _u
 }
 
-type I_protocolErrorArrayBasicResultTag uint64
+type I_protocolErrorResourceResultTag uint64
 
 const (
-	ProtocolErrorArrayBasicResultResponse = 1 // 0x00000001
-	ProtocolErrorArrayBasicResultErr      = 2 // 0x00000002
+	ProtocolErrorResourceResultResponse = 1 // 0x00000001
+	ProtocolErrorResourceResultErr      = 2 // 0x00000002
 )
 
-type ProtocolErrorArrayBasicResult struct {
-	I_protocolErrorArrayBasicResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                           ArrayBasic `fidl_ordinal:"1"`
-	Err                                uint32     `fidl_ordinal:"2"`
+type ProtocolErrorResourceResult struct {
+	I_protocolErrorResourceResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
+	Response                         Resource `fidl_ordinal:"1"`
+	Err                              uint32   `fidl_ordinal:"2"`
 }
 
-var _mProtocolErrorArrayBasicResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayBasicResult{})
+var _mProtocolErrorResourceResult = _bindings.CreateLazyMarshaler(ProtocolErrorResourceResult{})
 
-func (msg *ProtocolErrorArrayBasicResult) Marshaler() _bindings.Marshaler {
-	return _mProtocolErrorArrayBasicResult
+func (msg *ProtocolErrorResourceResult) Marshaler() _bindings.Marshaler {
+	return _mProtocolErrorResourceResult
 }
 
-func (_m *ProtocolErrorArrayBasicResult) reset() {
-	switch _m.I_protocolErrorArrayBasicResultTag {
+func (_m *ProtocolErrorResourceResult) reset() {
+	switch _m.I_protocolErrorResourceResultTag {
 	case 1:
-		var _zeroed ArrayBasic
+		var _zeroed Resource
 		_m.Response = _zeroed
 	case 2:
 		var _zeroed uint32
@@ -575,96 +645,34 @@ func (_m *ProtocolErrorArrayBasicResult) reset() {
 	}
 }
 
-func (_m *ProtocolErrorArrayBasicResult) Which() I_protocolErrorArrayBasicResultTag {
-	return _m.I_protocolErrorArrayBasicResultTag
+func (_m *ProtocolErrorResourceResult) Which() I_protocolErrorResourceResultTag {
+	return _m.I_protocolErrorResourceResultTag
 }
 
-func (_m *ProtocolErrorArrayBasicResult) Ordinal() uint64 {
-	return uint64(_m.I_protocolErrorArrayBasicResultTag)
+func (_m *ProtocolErrorResourceResult) Ordinal() uint64 {
+	return uint64(_m.I_protocolErrorResourceResultTag)
 }
 
-func (_m *ProtocolErrorArrayBasicResult) SetResponse(response ArrayBasic) {
+func (_m *ProtocolErrorResourceResult) SetResponse(response Resource) {
 	_m.reset()
-	_m.I_protocolErrorArrayBasicResultTag = ProtocolErrorArrayBasicResultResponse
+	_m.I_protocolErrorResourceResultTag = ProtocolErrorResourceResultResponse
 	_m.Response = response
 }
 
-func ProtocolErrorArrayBasicResultWithResponse(response ArrayBasic) ProtocolErrorArrayBasicResult {
-	var _u ProtocolErrorArrayBasicResult
+func ProtocolErrorResourceResultWithResponse(response Resource) ProtocolErrorResourceResult {
+	var _u ProtocolErrorResourceResult
 	_u.SetResponse(response)
 	return _u
 }
 
-func (_m *ProtocolErrorArrayBasicResult) SetErr(err uint32) {
+func (_m *ProtocolErrorResourceResult) SetErr(err uint32) {
 	_m.reset()
-	_m.I_protocolErrorArrayBasicResultTag = ProtocolErrorArrayBasicResultErr
+	_m.I_protocolErrorResourceResultTag = ProtocolErrorResourceResultErr
 	_m.Err = err
 }
 
-func ProtocolErrorArrayBasicResultWithErr(err uint32) ProtocolErrorArrayBasicResult {
-	var _u ProtocolErrorArrayBasicResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_protocolErrorArrayCompoundResultTag uint64
-
-const (
-	ProtocolErrorArrayCompoundResultResponse = 1 // 0x00000001
-	ProtocolErrorArrayCompoundResultErr      = 2 // 0x00000002
-)
-
-type ProtocolErrorArrayCompoundResult struct {
-	I_protocolErrorArrayCompoundResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                              ArrayCompound `fidl_ordinal:"1"`
-	Err                                   uint32        `fidl_ordinal:"2"`
-}
-
-var _mProtocolErrorArrayCompoundResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayCompoundResult{})
-
-func (msg *ProtocolErrorArrayCompoundResult) Marshaler() _bindings.Marshaler {
-	return _mProtocolErrorArrayCompoundResult
-}
-
-func (_m *ProtocolErrorArrayCompoundResult) reset() {
-	switch _m.I_protocolErrorArrayCompoundResultTag {
-	case 1:
-		var _zeroed ArrayCompound
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *ProtocolErrorArrayCompoundResult) Which() I_protocolErrorArrayCompoundResultTag {
-	return _m.I_protocolErrorArrayCompoundResultTag
-}
-
-func (_m *ProtocolErrorArrayCompoundResult) Ordinal() uint64 {
-	return uint64(_m.I_protocolErrorArrayCompoundResultTag)
-}
-
-func (_m *ProtocolErrorArrayCompoundResult) SetResponse(response ArrayCompound) {
-	_m.reset()
-	_m.I_protocolErrorArrayCompoundResultTag = ProtocolErrorArrayCompoundResultResponse
-	_m.Response = response
-}
-
-func ProtocolErrorArrayCompoundResultWithResponse(response ArrayCompound) ProtocolErrorArrayCompoundResult {
-	var _u ProtocolErrorArrayCompoundResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *ProtocolErrorArrayCompoundResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_protocolErrorArrayCompoundResultTag = ProtocolErrorArrayCompoundResultErr
-	_m.Err = err
-}
-
-func ProtocolErrorArrayCompoundResultWithErr(err uint32) ProtocolErrorArrayCompoundResult {
-	var _u ProtocolErrorArrayCompoundResult
+func ProtocolErrorResourceResultWithErr(err uint32) ProtocolErrorResourceResult {
+	var _u ProtocolErrorResourceResult
 	_u.SetErr(err)
 	return _u
 }
@@ -855,128 +863,120 @@ func ProtocolErrorVectorOptionalResultWithErr(err uint32) ProtocolErrorVectorOpt
 	return _u
 }
 
-type I_protocolErrorArrayVectorNestedResultTag uint64
+type I_resourceUnionTag uint64
 
 const (
-	ProtocolErrorArrayVectorNestedResultResponse = 1 // 0x00000001
-	ProtocolErrorArrayVectorNestedResultErr      = 2 // 0x00000002
+	ResourceUnion_unknownData = 0 // 0x00000000
+	ResourceUnionB            = 1 // 0x00000001
 )
 
-type ProtocolErrorArrayVectorNestedResult struct {
-	I_protocolErrorArrayVectorNestedResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                  ArrayVectorNested `fidl_ordinal:"1"`
-	Err                                       uint32            `fidl_ordinal:"2"`
+type ResourceUnion struct {
+	I_resourceUnionTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
+	I_unknownData      interface{}
+	B                  bool `fidl_ordinal:"1"`
 }
 
-var _mProtocolErrorArrayVectorNestedResult = _bindings.CreateLazyMarshaler(ProtocolErrorArrayVectorNestedResult{})
+var _mResourceUnion = _bindings.CreateLazyMarshaler(ResourceUnion{})
 
-func (msg *ProtocolErrorArrayVectorNestedResult) Marshaler() _bindings.Marshaler {
-	return _mProtocolErrorArrayVectorNestedResult
+func (msg *ResourceUnion) Marshaler() _bindings.Marshaler {
+	return _mResourceUnion
 }
 
-func (_m *ProtocolErrorArrayVectorNestedResult) reset() {
-	switch _m.I_protocolErrorArrayVectorNestedResultTag {
+func (_m *ResourceUnion) reset() {
+	switch _m.I_resourceUnionTag {
 	case 1:
-		var _zeroed ArrayVectorNested
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
+		var _zeroed bool
+		_m.B = _zeroed
+	default:
+		var _zeroed interface{}
+		_m.I_unknownData = _zeroed
 	}
 }
 
-func (_m *ProtocolErrorArrayVectorNestedResult) Which() I_protocolErrorArrayVectorNestedResultTag {
-	return _m.I_protocolErrorArrayVectorNestedResultTag
-}
-
-func (_m *ProtocolErrorArrayVectorNestedResult) Ordinal() uint64 {
-	return uint64(_m.I_protocolErrorArrayVectorNestedResultTag)
-}
-
-func (_m *ProtocolErrorArrayVectorNestedResult) SetResponse(response ArrayVectorNested) {
-	_m.reset()
-	_m.I_protocolErrorArrayVectorNestedResultTag = ProtocolErrorArrayVectorNestedResultResponse
-	_m.Response = response
-}
-
-func ProtocolErrorArrayVectorNestedResultWithResponse(response ArrayVectorNested) ProtocolErrorArrayVectorNestedResult {
-	var _u ProtocolErrorArrayVectorNestedResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *ProtocolErrorArrayVectorNestedResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_protocolErrorArrayVectorNestedResultTag = ProtocolErrorArrayVectorNestedResultErr
-	_m.Err = err
-}
-
-func ProtocolErrorArrayVectorNestedResultWithErr(err uint32) ProtocolErrorArrayVectorNestedResult {
-	var _u ProtocolErrorArrayVectorNestedResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_protocolErrorResourceResultTag uint64
-
-const (
-	ProtocolErrorResourceResultResponse = 1 // 0x00000001
-	ProtocolErrorResourceResultErr      = 2 // 0x00000002
-)
-
-type ProtocolErrorResourceResult struct {
-	I_protocolErrorResourceResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
-	Response                         Resource `fidl_ordinal:"1"`
-	Err                              uint32   `fidl_ordinal:"2"`
-}
-
-var _mProtocolErrorResourceResult = _bindings.CreateLazyMarshaler(ProtocolErrorResourceResult{})
-
-func (msg *ProtocolErrorResourceResult) Marshaler() _bindings.Marshaler {
-	return _mProtocolErrorResourceResult
-}
-
-func (_m *ProtocolErrorResourceResult) reset() {
-	switch _m.I_protocolErrorResourceResultTag {
+func (_m *ResourceUnion) Which() I_resourceUnionTag {
+	switch _m.I_resourceUnionTag {
 	case 1:
-		var _zeroed Resource
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
+		return ResourceUnionB
+	default:
+		return ResourceUnion_unknownData
 	}
 }
 
-func (_m *ProtocolErrorResourceResult) Which() I_protocolErrorResourceResultTag {
-	return _m.I_protocolErrorResourceResultTag
+func (_m *ResourceUnion) Ordinal() uint64 {
+	return uint64(_m.I_resourceUnionTag)
 }
 
-func (_m *ProtocolErrorResourceResult) Ordinal() uint64 {
-	return uint64(_m.I_protocolErrorResourceResultTag)
-}
-
-func (_m *ProtocolErrorResourceResult) SetResponse(response Resource) {
+func (_m *ResourceUnion) SetB(b bool) {
 	_m.reset()
-	_m.I_protocolErrorResourceResultTag = ProtocolErrorResourceResultResponse
-	_m.Response = response
+	_m.I_resourceUnionTag = ResourceUnionB
+	_m.B = b
 }
 
-func ProtocolErrorResourceResultWithResponse(response Resource) ProtocolErrorResourceResult {
-	var _u ProtocolErrorResourceResult
-	_u.SetResponse(response)
+func ResourceUnionWithB(b bool) ResourceUnion {
+	var _u ResourceUnion
+	_u.SetB(b)
 	return _u
 }
-
-func (_m *ProtocolErrorResourceResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_protocolErrorResourceResultTag = ProtocolErrorResourceResultErr
-	_m.Err = err
+func (_m *ResourceUnion) GetUnknownData() _bindings.UnknownData {
+	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-func ProtocolErrorResourceResultWithErr(err uint32) ProtocolErrorResourceResult {
-	var _u ProtocolErrorResourceResult
-	_u.SetErr(err)
+type I_unionTag uint64
+
+const (
+	Union_unknownData = 0 // 0x00000000
+	UnionB            = 1 // 0x00000001
+)
+
+type Union struct {
+	I_unionTag    `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData interface{}
+	B             bool `fidl_ordinal:"1"`
+}
+
+var _mUnion = _bindings.CreateLazyMarshaler(Union{})
+
+func (msg *Union) Marshaler() _bindings.Marshaler {
+	return _mUnion
+}
+
+func (_m *Union) reset() {
+	switch _m.I_unionTag {
+	case 1:
+		var _zeroed bool
+		_m.B = _zeroed
+	default:
+		var _zeroed interface{}
+		_m.I_unknownData = _zeroed
+	}
+}
+
+func (_m *Union) Which() I_unionTag {
+	switch _m.I_unionTag {
+	case 1:
+		return UnionB
+	default:
+		return Union_unknownData
+	}
+}
+
+func (_m *Union) Ordinal() uint64 {
+	return uint64(_m.I_unionTag)
+}
+
+func (_m *Union) SetB(b bool) {
+	_m.reset()
+	_m.I_unionTag = UnionB
+	_m.B = b
+}
+
+func UnionWithB(b bool) Union {
+	var _u Union
+	_u.SetB(b)
 	return _u
+}
+func (_m *Union) GetUnknownData() _bindings.UnknownData {
+	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
 type ResourceTable struct {

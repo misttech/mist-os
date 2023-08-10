@@ -9,6 +9,42 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/protocolrequest/c/fidl.h>
+test_protocolrequest_ParentGetChildRequestResponseInLine {
+    r flags[fidl_handle_presence, int32]
+} [packed]
+test_protocolrequest_ParentGetChildRequestResponseOutOfLine {
+    void void
+} [packed]
+test_protocolrequest_ParentGetChildRequestResponseHandles {
+    r zx_chan_test_protocolrequest_Child_server
+} [packed]
+test_protocolrequest_ParentGetChildResponseInLine {
+    c flags[fidl_handle_presence, int32]
+} [packed]
+test_protocolrequest_ParentGetChildResponseOutOfLine {
+    void void
+} [packed]
+test_protocolrequest_ParentGetChildResponseHandles {
+    c zx_chan_test_protocolrequest_Child_client
+} [packed]
+test_protocolrequest_ParentTakeChildRequestInLine {
+    c flags[fidl_handle_presence, int32]
+} [packed]
+test_protocolrequest_ParentTakeChildRequestOutOfLine {
+    void void
+} [packed]
+test_protocolrequest_ParentTakeChildRequestHandles {
+    c zx_chan_test_protocolrequest_Child_client
+} [packed]
+test_protocolrequest_ParentTakeChildRequestRequestInLine {
+    r flags[fidl_handle_presence, int32]
+} [packed]
+test_protocolrequest_ParentTakeChildRequestRequestOutOfLine {
+    void void
+} [packed]
+test_protocolrequest_ParentTakeChildRequestRequestHandles {
+    r zx_chan_test_protocolrequest_Child_server
+} [packed]
 
 
 

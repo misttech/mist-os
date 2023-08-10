@@ -24,6 +24,66 @@ func (msg *LocalStructPayload) Marshaler() _bindings.Marshaler {
 	return _mLocalStructPayload
 }
 
+type MainProtocolOnAnonRequest struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
+	A uint32   `fidl_offset_v2:"0"`
+	B uint32   `fidl_offset_v2:"4"`
+}
+
+var _mMainProtocolOnAnonRequest = _bindings.CreateLazyMarshaler(MainProtocolOnAnonRequest{})
+
+func (msg *MainProtocolOnAnonRequest) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolOnAnonRequest
+}
+
+type MainProtocolOneWayAnonRequest struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
+	A uint32   `fidl_offset_v2:"0"`
+	B uint32   `fidl_offset_v2:"4"`
+}
+
+var _mMainProtocolOneWayAnonRequest = _bindings.CreateLazyMarshaler(MainProtocolOneWayAnonRequest{})
+
+func (msg *MainProtocolOneWayAnonRequest) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolOneWayAnonRequest
+}
+
+type MainProtocolTwoWayAnonRequest struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
+	A uint32   `fidl_offset_v2:"0"`
+	B uint32   `fidl_offset_v2:"4"`
+}
+
+var _mMainProtocolTwoWayAnonRequest = _bindings.CreateLazyMarshaler(MainProtocolTwoWayAnonRequest{})
+
+func (msg *MainProtocolTwoWayAnonRequest) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolTwoWayAnonRequest
+}
+
+type MainProtocolTwoWayAnonResponse struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
+	A uint32   `fidl_offset_v2:"0"`
+	B uint32   `fidl_offset_v2:"4"`
+}
+
+var _mMainProtocolTwoWayAnonResponse = _bindings.CreateLazyMarshaler(MainProtocolTwoWayAnonResponse{})
+
+func (msg *MainProtocolTwoWayAnonResponse) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolTwoWayAnonResponse
+}
+
+type MainProtocolTwoWayAnonWithErrorRequest struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
+	A uint32   `fidl_offset_v2:"0"`
+	B uint32   `fidl_offset_v2:"4"`
+}
+
+var _mMainProtocolTwoWayAnonWithErrorRequest = _bindings.CreateLazyMarshaler(MainProtocolTwoWayAnonWithErrorRequest{})
+
+func (msg *MainProtocolTwoWayAnonWithErrorRequest) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolTwoWayAnonWithErrorRequest
+}
+
 type MainProtocolOnAnonWithErrorResponse struct {
 	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
 	A uint32   `fidl_offset_v2:"0"`
@@ -48,89 +108,29 @@ func (msg *MainProtocolTwoWayAnonWithErrorResponse) Marshaler() _bindings.Marsha
 	return _mMainProtocolTwoWayAnonWithErrorResponse
 }
 
-type mainProtocolWithCtxOneWayAnonRequest struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
-	A uint32   `fidl_offset_v2:"0"`
-	B uint32   `fidl_offset_v2:"4"`
-}
-
-var _mmainProtocolWithCtxOneWayAnonRequest = _bindings.CreateLazyMarshaler(mainProtocolWithCtxOneWayAnonRequest{})
-
-func (msg *mainProtocolWithCtxOneWayAnonRequest) Marshaler() _bindings.Marshaler {
-	return _mmainProtocolWithCtxOneWayAnonRequest
-}
-
-type mainProtocolWithCtxTwoWayAnonRequest struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
-	A uint32   `fidl_offset_v2:"0"`
-	B uint32   `fidl_offset_v2:"4"`
-}
-
-var _mmainProtocolWithCtxTwoWayAnonRequest = _bindings.CreateLazyMarshaler(mainProtocolWithCtxTwoWayAnonRequest{})
-
-func (msg *mainProtocolWithCtxTwoWayAnonRequest) Marshaler() _bindings.Marshaler {
-	return _mmainProtocolWithCtxTwoWayAnonRequest
-}
-
-type mainProtocolWithCtxTwoWayAnonResponse struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
-	A uint32   `fidl_offset_v2:"0"`
-	B uint32   `fidl_offset_v2:"4"`
-}
-
-var _mmainProtocolWithCtxTwoWayAnonResponse = _bindings.CreateLazyMarshaler(mainProtocolWithCtxTwoWayAnonResponse{})
-
-func (msg *mainProtocolWithCtxTwoWayAnonResponse) Marshaler() _bindings.Marshaler {
-	return _mmainProtocolWithCtxTwoWayAnonResponse
-}
-
-type mainProtocolWithCtxTwoWayAnonWithErrorRequest struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
-	A uint32   `fidl_offset_v2:"0"`
-	B uint32   `fidl_offset_v2:"4"`
-}
-
-var _mmainProtocolWithCtxTwoWayAnonWithErrorRequest = _bindings.CreateLazyMarshaler(mainProtocolWithCtxTwoWayAnonWithErrorRequest{})
-
-func (msg *mainProtocolWithCtxTwoWayAnonWithErrorRequest) Marshaler() _bindings.Marshaler {
-	return _mmainProtocolWithCtxTwoWayAnonWithErrorRequest
-}
-
-type mainProtocolWithCtxOnAnonResponse struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"4"`
-	A uint32   `fidl_offset_v2:"0"`
-	B uint32   `fidl_offset_v2:"4"`
-}
-
-var _mmainProtocolWithCtxOnAnonResponse = _bindings.CreateLazyMarshaler(mainProtocolWithCtxOnAnonResponse{})
-
-func (msg *mainProtocolWithCtxOnAnonResponse) Marshaler() _bindings.Marshaler {
-	return _mmainProtocolWithCtxOnAnonResponse
-}
-
-type I_mainProtocolTwoWayLocalWithErrorResultTag uint64
+type I_mainProtocolOnAnonWithErrorResultTag uint64
 
 const (
-	MainProtocolTwoWayLocalWithErrorResultResponse = 1 // 0x00000001
-	MainProtocolTwoWayLocalWithErrorResultErr      = 2 // 0x00000002
+	MainProtocolOnAnonWithErrorResultResponse = 1 // 0x00000001
+	MainProtocolOnAnonWithErrorResultErr      = 2 // 0x00000002
 )
 
-type MainProtocolTwoWayLocalWithErrorResult struct {
-	I_mainProtocolTwoWayLocalWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                    LocalStructPayload `fidl_ordinal:"1"`
-	Err                                         uint32             `fidl_ordinal:"2"`
+type MainProtocolOnAnonWithErrorResult struct {
+	I_mainProtocolOnAnonWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                               MainProtocolOnAnonWithErrorResponse `fidl_ordinal:"1"`
+	Err                                    uint32                              `fidl_ordinal:"2"`
 }
 
-var _mMainProtocolTwoWayLocalWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolTwoWayLocalWithErrorResult{})
+var _mMainProtocolOnAnonWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolOnAnonWithErrorResult{})
 
-func (msg *MainProtocolTwoWayLocalWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolTwoWayLocalWithErrorResult
+func (msg *MainProtocolOnAnonWithErrorResult) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolOnAnonWithErrorResult
 }
 
-func (_m *MainProtocolTwoWayLocalWithErrorResult) reset() {
-	switch _m.I_mainProtocolTwoWayLocalWithErrorResultTag {
+func (_m *MainProtocolOnAnonWithErrorResult) reset() {
+	switch _m.I_mainProtocolOnAnonWithErrorResultTag {
 	case 1:
-		var _zeroed LocalStructPayload
+		var _zeroed MainProtocolOnAnonWithErrorResponse
 		_m.Response = _zeroed
 	case 2:
 		var _zeroed uint32
@@ -138,158 +138,34 @@ func (_m *MainProtocolTwoWayLocalWithErrorResult) reset() {
 	}
 }
 
-func (_m *MainProtocolTwoWayLocalWithErrorResult) Which() I_mainProtocolTwoWayLocalWithErrorResultTag {
-	return _m.I_mainProtocolTwoWayLocalWithErrorResultTag
+func (_m *MainProtocolOnAnonWithErrorResult) Which() I_mainProtocolOnAnonWithErrorResultTag {
+	return _m.I_mainProtocolOnAnonWithErrorResultTag
 }
 
-func (_m *MainProtocolTwoWayLocalWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_mainProtocolTwoWayLocalWithErrorResultTag)
+func (_m *MainProtocolOnAnonWithErrorResult) Ordinal() uint64 {
+	return uint64(_m.I_mainProtocolOnAnonWithErrorResultTag)
 }
 
-func (_m *MainProtocolTwoWayLocalWithErrorResult) SetResponse(response LocalStructPayload) {
+func (_m *MainProtocolOnAnonWithErrorResult) SetResponse(response MainProtocolOnAnonWithErrorResponse) {
 	_m.reset()
-	_m.I_mainProtocolTwoWayLocalWithErrorResultTag = MainProtocolTwoWayLocalWithErrorResultResponse
+	_m.I_mainProtocolOnAnonWithErrorResultTag = MainProtocolOnAnonWithErrorResultResponse
 	_m.Response = response
 }
 
-func MainProtocolTwoWayLocalWithErrorResultWithResponse(response LocalStructPayload) MainProtocolTwoWayLocalWithErrorResult {
-	var _u MainProtocolTwoWayLocalWithErrorResult
+func MainProtocolOnAnonWithErrorResultWithResponse(response MainProtocolOnAnonWithErrorResponse) MainProtocolOnAnonWithErrorResult {
+	var _u MainProtocolOnAnonWithErrorResult
 	_u.SetResponse(response)
 	return _u
 }
 
-func (_m *MainProtocolTwoWayLocalWithErrorResult) SetErr(err uint32) {
+func (_m *MainProtocolOnAnonWithErrorResult) SetErr(err uint32) {
 	_m.reset()
-	_m.I_mainProtocolTwoWayLocalWithErrorResultTag = MainProtocolTwoWayLocalWithErrorResultErr
+	_m.I_mainProtocolOnAnonWithErrorResultTag = MainProtocolOnAnonWithErrorResultErr
 	_m.Err = err
 }
 
-func MainProtocolTwoWayLocalWithErrorResultWithErr(err uint32) MainProtocolTwoWayLocalWithErrorResult {
-	var _u MainProtocolTwoWayLocalWithErrorResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_mainProtocolOnLocalWithErrorResultTag uint64
-
-const (
-	MainProtocolOnLocalWithErrorResultResponse = 1 // 0x00000001
-	MainProtocolOnLocalWithErrorResultErr      = 2 // 0x00000002
-)
-
-type MainProtocolOnLocalWithErrorResult struct {
-	I_mainProtocolOnLocalWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                LocalStructPayload `fidl_ordinal:"1"`
-	Err                                     uint32             `fidl_ordinal:"2"`
-}
-
-var _mMainProtocolOnLocalWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolOnLocalWithErrorResult{})
-
-func (msg *MainProtocolOnLocalWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolOnLocalWithErrorResult
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) reset() {
-	switch _m.I_mainProtocolOnLocalWithErrorResultTag {
-	case 1:
-		var _zeroed LocalStructPayload
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) Which() I_mainProtocolOnLocalWithErrorResultTag {
-	return _m.I_mainProtocolOnLocalWithErrorResultTag
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_mainProtocolOnLocalWithErrorResultTag)
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) SetResponse(response LocalStructPayload) {
-	_m.reset()
-	_m.I_mainProtocolOnLocalWithErrorResultTag = MainProtocolOnLocalWithErrorResultResponse
-	_m.Response = response
-}
-
-func MainProtocolOnLocalWithErrorResultWithResponse(response LocalStructPayload) MainProtocolOnLocalWithErrorResult {
-	var _u MainProtocolOnLocalWithErrorResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *MainProtocolOnLocalWithErrorResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_mainProtocolOnLocalWithErrorResultTag = MainProtocolOnLocalWithErrorResultErr
-	_m.Err = err
-}
-
-func MainProtocolOnLocalWithErrorResultWithErr(err uint32) MainProtocolOnLocalWithErrorResult {
-	var _u MainProtocolOnLocalWithErrorResult
-	_u.SetErr(err)
-	return _u
-}
-
-type I_mainProtocolTwoWayImportWithErrorResultTag uint64
-
-const (
-	MainProtocolTwoWayImportWithErrorResultResponse = 1 // 0x00000001
-	MainProtocolTwoWayImportWithErrorResultErr      = 2 // 0x00000002
-)
-
-type MainProtocolTwoWayImportWithErrorResult struct {
-	I_mainProtocolTwoWayImportWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                                     testprotocolpayloadsimported.ImportStructPayload `fidl_ordinal:"1"`
-	Err                                          uint32                                           `fidl_ordinal:"2"`
-}
-
-var _mMainProtocolTwoWayImportWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolTwoWayImportWithErrorResult{})
-
-func (msg *MainProtocolTwoWayImportWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolTwoWayImportWithErrorResult
-}
-
-func (_m *MainProtocolTwoWayImportWithErrorResult) reset() {
-	switch _m.I_mainProtocolTwoWayImportWithErrorResultTag {
-	case 1:
-		var _zeroed testprotocolpayloadsimported.ImportStructPayload
-		_m.Response = _zeroed
-	case 2:
-		var _zeroed uint32
-		_m.Err = _zeroed
-	}
-}
-
-func (_m *MainProtocolTwoWayImportWithErrorResult) Which() I_mainProtocolTwoWayImportWithErrorResultTag {
-	return _m.I_mainProtocolTwoWayImportWithErrorResultTag
-}
-
-func (_m *MainProtocolTwoWayImportWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_mainProtocolTwoWayImportWithErrorResultTag)
-}
-
-func (_m *MainProtocolTwoWayImportWithErrorResult) SetResponse(response testprotocolpayloadsimported.ImportStructPayload) {
-	_m.reset()
-	_m.I_mainProtocolTwoWayImportWithErrorResultTag = MainProtocolTwoWayImportWithErrorResultResponse
-	_m.Response = response
-}
-
-func MainProtocolTwoWayImportWithErrorResultWithResponse(response testprotocolpayloadsimported.ImportStructPayload) MainProtocolTwoWayImportWithErrorResult {
-	var _u MainProtocolTwoWayImportWithErrorResult
-	_u.SetResponse(response)
-	return _u
-}
-
-func (_m *MainProtocolTwoWayImportWithErrorResult) SetErr(err uint32) {
-	_m.reset()
-	_m.I_mainProtocolTwoWayImportWithErrorResultTag = MainProtocolTwoWayImportWithErrorResultErr
-	_m.Err = err
-}
-
-func MainProtocolTwoWayImportWithErrorResultWithErr(err uint32) MainProtocolTwoWayImportWithErrorResult {
-	var _u MainProtocolTwoWayImportWithErrorResult
+func MainProtocolOnAnonWithErrorResultWithErr(err uint32) MainProtocolOnAnonWithErrorResult {
+	var _u MainProtocolOnAnonWithErrorResult
 	_u.SetErr(err)
 	return _u
 }
@@ -356,6 +232,68 @@ func MainProtocolOnImportWithErrorResultWithErr(err uint32) MainProtocolOnImport
 	return _u
 }
 
+type I_mainProtocolOnLocalWithErrorResultTag uint64
+
+const (
+	MainProtocolOnLocalWithErrorResultResponse = 1 // 0x00000001
+	MainProtocolOnLocalWithErrorResultErr      = 2 // 0x00000002
+)
+
+type MainProtocolOnLocalWithErrorResult struct {
+	I_mainProtocolOnLocalWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                                LocalStructPayload `fidl_ordinal:"1"`
+	Err                                     uint32             `fidl_ordinal:"2"`
+}
+
+var _mMainProtocolOnLocalWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolOnLocalWithErrorResult{})
+
+func (msg *MainProtocolOnLocalWithErrorResult) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolOnLocalWithErrorResult
+}
+
+func (_m *MainProtocolOnLocalWithErrorResult) reset() {
+	switch _m.I_mainProtocolOnLocalWithErrorResultTag {
+	case 1:
+		var _zeroed LocalStructPayload
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *MainProtocolOnLocalWithErrorResult) Which() I_mainProtocolOnLocalWithErrorResultTag {
+	return _m.I_mainProtocolOnLocalWithErrorResultTag
+}
+
+func (_m *MainProtocolOnLocalWithErrorResult) Ordinal() uint64 {
+	return uint64(_m.I_mainProtocolOnLocalWithErrorResultTag)
+}
+
+func (_m *MainProtocolOnLocalWithErrorResult) SetResponse(response LocalStructPayload) {
+	_m.reset()
+	_m.I_mainProtocolOnLocalWithErrorResultTag = MainProtocolOnLocalWithErrorResultResponse
+	_m.Response = response
+}
+
+func MainProtocolOnLocalWithErrorResultWithResponse(response LocalStructPayload) MainProtocolOnLocalWithErrorResult {
+	var _u MainProtocolOnLocalWithErrorResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *MainProtocolOnLocalWithErrorResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_mainProtocolOnLocalWithErrorResultTag = MainProtocolOnLocalWithErrorResultErr
+	_m.Err = err
+}
+
+func MainProtocolOnLocalWithErrorResultWithErr(err uint32) MainProtocolOnLocalWithErrorResult {
+	var _u MainProtocolOnLocalWithErrorResult
+	_u.SetErr(err)
+	return _u
+}
+
 type I_mainProtocolTwoWayAnonWithErrorResultTag uint64
 
 const (
@@ -418,29 +356,29 @@ func MainProtocolTwoWayAnonWithErrorResultWithErr(err uint32) MainProtocolTwoWay
 	return _u
 }
 
-type I_mainProtocolOnAnonWithErrorResultTag uint64
+type I_mainProtocolTwoWayImportWithErrorResultTag uint64
 
 const (
-	MainProtocolOnAnonWithErrorResultResponse = 1 // 0x00000001
-	MainProtocolOnAnonWithErrorResultErr      = 2 // 0x00000002
+	MainProtocolTwoWayImportWithErrorResultResponse = 1 // 0x00000001
+	MainProtocolTwoWayImportWithErrorResultErr      = 2 // 0x00000002
 )
 
-type MainProtocolOnAnonWithErrorResult struct {
-	I_mainProtocolOnAnonWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	Response                               MainProtocolOnAnonWithErrorResponse `fidl_ordinal:"1"`
-	Err                                    uint32                              `fidl_ordinal:"2"`
+type MainProtocolTwoWayImportWithErrorResult struct {
+	I_mainProtocolTwoWayImportWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                                     testprotocolpayloadsimported.ImportStructPayload `fidl_ordinal:"1"`
+	Err                                          uint32                                           `fidl_ordinal:"2"`
 }
 
-var _mMainProtocolOnAnonWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolOnAnonWithErrorResult{})
+var _mMainProtocolTwoWayImportWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolTwoWayImportWithErrorResult{})
 
-func (msg *MainProtocolOnAnonWithErrorResult) Marshaler() _bindings.Marshaler {
-	return _mMainProtocolOnAnonWithErrorResult
+func (msg *MainProtocolTwoWayImportWithErrorResult) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolTwoWayImportWithErrorResult
 }
 
-func (_m *MainProtocolOnAnonWithErrorResult) reset() {
-	switch _m.I_mainProtocolOnAnonWithErrorResultTag {
+func (_m *MainProtocolTwoWayImportWithErrorResult) reset() {
+	switch _m.I_mainProtocolTwoWayImportWithErrorResultTag {
 	case 1:
-		var _zeroed MainProtocolOnAnonWithErrorResponse
+		var _zeroed testprotocolpayloadsimported.ImportStructPayload
 		_m.Response = _zeroed
 	case 2:
 		var _zeroed uint32
@@ -448,34 +386,96 @@ func (_m *MainProtocolOnAnonWithErrorResult) reset() {
 	}
 }
 
-func (_m *MainProtocolOnAnonWithErrorResult) Which() I_mainProtocolOnAnonWithErrorResultTag {
-	return _m.I_mainProtocolOnAnonWithErrorResultTag
+func (_m *MainProtocolTwoWayImportWithErrorResult) Which() I_mainProtocolTwoWayImportWithErrorResultTag {
+	return _m.I_mainProtocolTwoWayImportWithErrorResultTag
 }
 
-func (_m *MainProtocolOnAnonWithErrorResult) Ordinal() uint64 {
-	return uint64(_m.I_mainProtocolOnAnonWithErrorResultTag)
+func (_m *MainProtocolTwoWayImportWithErrorResult) Ordinal() uint64 {
+	return uint64(_m.I_mainProtocolTwoWayImportWithErrorResultTag)
 }
 
-func (_m *MainProtocolOnAnonWithErrorResult) SetResponse(response MainProtocolOnAnonWithErrorResponse) {
+func (_m *MainProtocolTwoWayImportWithErrorResult) SetResponse(response testprotocolpayloadsimported.ImportStructPayload) {
 	_m.reset()
-	_m.I_mainProtocolOnAnonWithErrorResultTag = MainProtocolOnAnonWithErrorResultResponse
+	_m.I_mainProtocolTwoWayImportWithErrorResultTag = MainProtocolTwoWayImportWithErrorResultResponse
 	_m.Response = response
 }
 
-func MainProtocolOnAnonWithErrorResultWithResponse(response MainProtocolOnAnonWithErrorResponse) MainProtocolOnAnonWithErrorResult {
-	var _u MainProtocolOnAnonWithErrorResult
+func MainProtocolTwoWayImportWithErrorResultWithResponse(response testprotocolpayloadsimported.ImportStructPayload) MainProtocolTwoWayImportWithErrorResult {
+	var _u MainProtocolTwoWayImportWithErrorResult
 	_u.SetResponse(response)
 	return _u
 }
 
-func (_m *MainProtocolOnAnonWithErrorResult) SetErr(err uint32) {
+func (_m *MainProtocolTwoWayImportWithErrorResult) SetErr(err uint32) {
 	_m.reset()
-	_m.I_mainProtocolOnAnonWithErrorResultTag = MainProtocolOnAnonWithErrorResultErr
+	_m.I_mainProtocolTwoWayImportWithErrorResultTag = MainProtocolTwoWayImportWithErrorResultErr
 	_m.Err = err
 }
 
-func MainProtocolOnAnonWithErrorResultWithErr(err uint32) MainProtocolOnAnonWithErrorResult {
-	var _u MainProtocolOnAnonWithErrorResult
+func MainProtocolTwoWayImportWithErrorResultWithErr(err uint32) MainProtocolTwoWayImportWithErrorResult {
+	var _u MainProtocolTwoWayImportWithErrorResult
+	_u.SetErr(err)
+	return _u
+}
+
+type I_mainProtocolTwoWayLocalWithErrorResultTag uint64
+
+const (
+	MainProtocolTwoWayLocalWithErrorResultResponse = 1 // 0x00000001
+	MainProtocolTwoWayLocalWithErrorResultErr      = 2 // 0x00000002
+)
+
+type MainProtocolTwoWayLocalWithErrorResult struct {
+	I_mainProtocolTwoWayLocalWithErrorResultTag `fidl:"x!" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	Response                                    LocalStructPayload `fidl_ordinal:"1"`
+	Err                                         uint32             `fidl_ordinal:"2"`
+}
+
+var _mMainProtocolTwoWayLocalWithErrorResult = _bindings.CreateLazyMarshaler(MainProtocolTwoWayLocalWithErrorResult{})
+
+func (msg *MainProtocolTwoWayLocalWithErrorResult) Marshaler() _bindings.Marshaler {
+	return _mMainProtocolTwoWayLocalWithErrorResult
+}
+
+func (_m *MainProtocolTwoWayLocalWithErrorResult) reset() {
+	switch _m.I_mainProtocolTwoWayLocalWithErrorResultTag {
+	case 1:
+		var _zeroed LocalStructPayload
+		_m.Response = _zeroed
+	case 2:
+		var _zeroed uint32
+		_m.Err = _zeroed
+	}
+}
+
+func (_m *MainProtocolTwoWayLocalWithErrorResult) Which() I_mainProtocolTwoWayLocalWithErrorResultTag {
+	return _m.I_mainProtocolTwoWayLocalWithErrorResultTag
+}
+
+func (_m *MainProtocolTwoWayLocalWithErrorResult) Ordinal() uint64 {
+	return uint64(_m.I_mainProtocolTwoWayLocalWithErrorResultTag)
+}
+
+func (_m *MainProtocolTwoWayLocalWithErrorResult) SetResponse(response LocalStructPayload) {
+	_m.reset()
+	_m.I_mainProtocolTwoWayLocalWithErrorResultTag = MainProtocolTwoWayLocalWithErrorResultResponse
+	_m.Response = response
+}
+
+func MainProtocolTwoWayLocalWithErrorResultWithResponse(response LocalStructPayload) MainProtocolTwoWayLocalWithErrorResult {
+	var _u MainProtocolTwoWayLocalWithErrorResult
+	_u.SetResponse(response)
+	return _u
+}
+
+func (_m *MainProtocolTwoWayLocalWithErrorResult) SetErr(err uint32) {
+	_m.reset()
+	_m.I_mainProtocolTwoWayLocalWithErrorResultTag = MainProtocolTwoWayLocalWithErrorResultErr
+	_m.Err = err
+}
+
+func MainProtocolTwoWayLocalWithErrorResultWithErr(err uint32) MainProtocolTwoWayLocalWithErrorResult {
+	var _u MainProtocolTwoWayLocalWithErrorResult
 	_u.SetErr(err)
 	return _u
 }
@@ -602,27 +602,27 @@ func (p *MainProtocolWithCtxInterface) ExpectOnImportWithError(ctx_ _bindings.Co
 }
 
 func (p *MainProtocolWithCtxInterface) OneWayAnon(ctx_ _bindings.Context, a uint32, b uint32) error {
-	req_ := &mainProtocolWithCtxOneWayAnonRequest{A: a, B: b}
+	req_ := &MainProtocolOneWayAnonRequest{A: a, B: b}
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOneWayAnonOrdinal, req_)
 	return err_
 }
 
 func (p *MainProtocolWithCtxInterface) TwoWayAnon(ctx_ _bindings.Context, a uint32, b uint32) (uint32, uint32, error) {
-	req_ := &mainProtocolWithCtxTwoWayAnonRequest{A: a, B: b}
-	resp_ := &mainProtocolWithCtxTwoWayAnonResponse{}
+	req_ := &MainProtocolTwoWayAnonRequest{A: a, B: b}
+	resp_ := &MainProtocolTwoWayAnonResponse{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(MainProtocolTwoWayAnonOrdinal, req_, resp_)
 	return (*resp_).A, (*resp_).B, err_
 }
 
 func (p *MainProtocolWithCtxInterface) TwoWayAnonWithError(ctx_ _bindings.Context, a uint32, b uint32) (MainProtocolTwoWayAnonWithErrorResult, error) {
-	req_ := &mainProtocolWithCtxTwoWayAnonWithErrorRequest{A: a, B: b}
+	req_ := &MainProtocolTwoWayAnonWithErrorRequest{A: a, B: b}
 	resp_ := &MainProtocolTwoWayAnonWithErrorResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(MainProtocolTwoWayAnonWithErrorOrdinal, req_, resp_)
 	return (*resp_), err_
 }
 
 func (p *MainProtocolWithCtxInterface) ExpectOnAnon(ctx_ _bindings.Context) (uint32, uint32, error) {
-	resp_ := &mainProtocolWithCtxOnAnonResponse{}
+	resp_ := &MainProtocolOnAnonRequest{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Recv(MainProtocolOnAnonOrdinal, resp_)
 	return (*resp_).A, (*resp_).B, err_
 }
@@ -769,7 +769,7 @@ func (s_ *MainProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bind
 		out_ := &payload
 		return out_, true, err_
 	case MainProtocolOneWayAnonOrdinal:
-		in_ := &mainProtocolWithCtxOneWayAnonRequest{}
+		in_ := &MainProtocolOneWayAnonRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -780,7 +780,7 @@ func (s_ *MainProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bind
 		err_ := s_.Impl.OneWayAnon(args_.Ctx, (*in_).A, (*in_).B)
 		return nil, false, err_
 	case MainProtocolTwoWayAnonOrdinal:
-		in_ := &mainProtocolWithCtxTwoWayAnonRequest{}
+		in_ := &MainProtocolTwoWayAnonRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -789,10 +789,10 @@ func (s_ *MainProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bind
 			return nil, false, err_
 		}
 		a, b, err_ := s_.Impl.TwoWayAnon(args_.Ctx, (*in_).A, (*in_).B)
-		out_ := &mainProtocolWithCtxTwoWayAnonResponse{A: a, B: b}
+		out_ := &MainProtocolTwoWayAnonResponse{A: a, B: b}
 		return out_, true, err_
 	case MainProtocolTwoWayAnonWithErrorOrdinal:
-		in_ := &mainProtocolWithCtxTwoWayAnonWithErrorRequest{}
+		in_ := &MainProtocolTwoWayAnonWithErrorRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -834,7 +834,7 @@ func (p *MainProtocolEventProxy) OnImportWithError(payload MainProtocolOnImportW
 	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnImportWithErrorOrdinal, event_)
 }
 func (p *MainProtocolEventProxy) OnAnon(a uint32, b uint32) error {
-	event_ := &mainProtocolWithCtxOnAnonResponse{A: a, B: b}
+	event_ := &MainProtocolOnAnonRequest{A: a, B: b}
 	return ((*_bindings.ChannelProxy)(p)).Send(MainProtocolOnAnonOrdinal, event_)
 }
 func (p *MainProtocolEventProxy) OnAnonWithError(payload MainProtocolOnAnonWithErrorResult) error {

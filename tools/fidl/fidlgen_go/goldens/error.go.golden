@@ -11,6 +11,17 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
+type ExampleFooRequest struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	S string   `fidl_offset_v2:"0" fidl_bounds:""`
+}
+
+var _mExampleFooRequest = _bindings.CreateLazyMarshaler(ExampleFooRequest{})
+
+func (msg *ExampleFooRequest) Marshaler() _bindings.Marshaler {
+	return _mExampleFooRequest
+}
+
 type ExampleFooResponse struct {
 	_ struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"8"`
 	Y int64    `fidl_offset_v2:"0"`
@@ -20,17 +31,6 @@ var _mExampleFooResponse = _bindings.CreateLazyMarshaler(ExampleFooResponse{})
 
 func (msg *ExampleFooResponse) Marshaler() _bindings.Marshaler {
 	return _mExampleFooResponse
-}
-
-type exampleWithCtxFooRequest struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	S string   `fidl_offset_v2:"0" fidl_bounds:""`
-}
-
-var _mexampleWithCtxFooRequest = _bindings.CreateLazyMarshaler(exampleWithCtxFooRequest{})
-
-func (msg *exampleWithCtxFooRequest) Marshaler() _bindings.Marshaler {
-	return _mexampleWithCtxFooRequest
 }
 
 type I_exampleFooResultTag uint64
@@ -102,7 +102,7 @@ const (
 type ExampleWithCtxInterface _bindings.ChannelProxy
 
 func (p *ExampleWithCtxInterface) Foo(ctx_ _bindings.Context, s string) (ExampleFooResult, error) {
-	req_ := &exampleWithCtxFooRequest{S: s}
+	req_ := &ExampleFooRequest{S: s}
 	resp_ := &ExampleFooResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ExampleFooOrdinal, req_, resp_)
 	return (*resp_), err_
@@ -128,7 +128,7 @@ type ExampleWithCtxStub struct {
 func (s_ *ExampleWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	case ExampleFooOrdinal:
-		in_ := &exampleWithCtxFooRequest{}
+		in_ := &ExampleFooRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext

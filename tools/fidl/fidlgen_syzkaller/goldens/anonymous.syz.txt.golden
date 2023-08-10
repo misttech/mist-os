@@ -24,6 +24,16 @@ test_anonymous_OverrideTestOutOfLine {
 test_anonymous_OverrideTestHandles {
     void void
 } [packed]
+test_anonymous_SomeProtocolSomeMethodRequestInLine {
+    union_memberInLine test_anonymous_UnionMemberInLine
+     
+} [packed]
+test_anonymous_SomeProtocolSomeMethodRequestOutOfLine {
+    void void
+} [packed]
+test_anonymous_SomeProtocolSomeMethodRequestHandles {
+    void void
+} [packed]
 test_anonymous_SomeProtocol_SomeMethod_ResponseInLine {
     bits_member flags[test_anonymous_BitsMember, int32]
 } [packed]

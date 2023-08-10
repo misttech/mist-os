@@ -477,13 +477,12 @@ func codingTableName(ident fidlgen.EncodedCompoundIdentifier) string {
 }
 
 type compiler struct {
-	symbolPrefix       string
-	decls              fidlgen.DeclInfoMap
-	library            fidlgen.LibraryIdentifier
-	handleTypes        map[fidlgen.HandleSubtype]struct{}
-	resultForUnion     map[fidlgen.EncodedCompoundIdentifier]*Result
-	messageBodyStructs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
-	messageBodyTypes   fidlgen.EncodedCompoundIdentifierSet
+	symbolPrefix   string
+	decls          fidlgen.DeclInfoMap
+	library        fidlgen.LibraryIdentifier
+	handleTypes    map[fidlgen.HandleSubtype]struct{}
+	resultForUnion map[fidlgen.EncodedCompoundIdentifier]*Result
+	structs        map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
 	// anonymousChildren maps a layout (defined by its naming context key) to the
 	// anonymous layouts defined directly within that layout. We opt to flatten
 	// the naming context and use a map rather than a trie like structure for
@@ -752,14 +751,13 @@ func compile(r fidlgen.Root) *Root {
 	}
 
 	c := compiler{
-		symbolPrefix:       formatLibraryPrefix(root.Library),
-		decls:              r.DeclInfo(),
-		library:            root.Library,
-		handleTypes:        make(map[fidlgen.HandleSubtype]struct{}),
-		resultForUnion:     make(map[fidlgen.EncodedCompoundIdentifier]*Result),
-		messageBodyStructs: make(map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct),
-		messageBodyTypes:   r.GetMessageBodyTypeNames(),
-		anonymousChildren:  make(map[namingContextKey][]ScopedLayout),
+		symbolPrefix:      formatLibraryPrefix(root.Library),
+		decls:             r.DeclInfo(),
+		library:           root.Library,
+		handleTypes:       make(map[fidlgen.HandleSubtype]struct{}),
+		resultForUnion:    make(map[fidlgen.EncodedCompoundIdentifier]*Result),
+		structs:           make(map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct),
+		anonymousChildren: make(map[namingContextKey][]ScopedLayout),
 	}
 
 	addAnonymousLayouts := func(layout fidlgen.LayoutDecl) {
@@ -820,16 +818,12 @@ func compile(r fidlgen.Root) *Root {
 	}
 
 	for _, v := range r.Structs {
-		if _, ok := c.messageBodyTypes[v.Name]; ok {
-			c.messageBodyStructs[v.Name] = v
-		}
+		c.structs[v.Name] = v
 		decls[v.Name] = c.compileStruct(v)
 	}
 
 	for _, v := range r.ExternalStructs {
-		if _, ok := c.messageBodyTypes[v.Name]; ok {
-			c.messageBodyStructs[v.Name] = v
-		}
+		c.structs[v.Name] = v
 		extDecls[v.Name] = c.compileStruct(v)
 	}
 

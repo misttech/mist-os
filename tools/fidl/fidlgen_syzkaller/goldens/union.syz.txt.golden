@@ -54,6 +54,24 @@ test_union_StructWithNullableUnionOutOfLine {
 test_union_StructWithNullableUnionHandles {
     void void
 } [packed]
+test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseInLine {
+    xuInLine test_union_OlderSimpleUnionInLine
+} [packed]
+test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseOutOfLine {
+    void void
+} [packed]
+test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseHandles {
+    void void
+} [packed]
+test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseInLine {
+    xuInLine test_union_StrictBoundedUnionInLine
+} [packed]
+test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseOutOfLine {
+    void void
+} [packed]
+test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseHandles {
+    void void
+} [packed]
 test_union_UnionSandwichInLine {
     a int32
     uInLine test_union_ExplicitFlexibleUnionInLine

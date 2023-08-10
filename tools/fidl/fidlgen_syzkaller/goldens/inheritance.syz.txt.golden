@@ -9,6 +9,24 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/inheritance/c/fidl.h>
+test_inheritance_SuperFooRequestInLine {
+    sInLine fidl_string
+} [packed]
+test_inheritance_SuperFooRequestOutOfLine {
+    sOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_inheritance_SuperFooRequestHandles {
+    void void
+} [packed]
+test_inheritance_SuperFooResponseInLine {
+    y int64
+} [packed]
+test_inheritance_SuperFooResponseOutOfLine {
+    void void
+} [packed]
+test_inheritance_SuperFooResponseHandles {
+    void void
+} [packed]
 
 
 test_inheritance_subfooRequest {

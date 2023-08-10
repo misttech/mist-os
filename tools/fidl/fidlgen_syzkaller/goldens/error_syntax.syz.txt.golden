@@ -9,6 +9,15 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/errorsyntax/c/fidl.h>
+test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestInLine {
+    sInLine fidl_string
+} [packed]
+test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestOutOfLine {
+    sOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestHandles {
+    void void
+} [packed]
 test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseInLine {
     value int64
 } [packed]

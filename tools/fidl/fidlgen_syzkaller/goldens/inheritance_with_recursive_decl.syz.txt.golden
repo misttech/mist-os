@@ -9,6 +9,24 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/inheritancewithrecursivedecl/c/fidl.h>
+test_inheritancewithrecursivedecl_ChildSecondRequestInLine {
+    request flags[fidl_handle_presence, int32]
+} [packed]
+test_inheritancewithrecursivedecl_ChildSecondRequestOutOfLine {
+    void void
+} [packed]
+test_inheritancewithrecursivedecl_ChildSecondRequestHandles {
+    request zx_chan_test_inheritancewithrecursivedecl_Parent_server
+} [packed]
+test_inheritancewithrecursivedecl_ParentFirstRequestInLine {
+    request flags[fidl_handle_presence, int32]
+} [packed]
+test_inheritancewithrecursivedecl_ParentFirstRequestOutOfLine {
+    void void
+} [packed]
+test_inheritancewithrecursivedecl_ParentFirstRequestHandles {
+    request zx_chan_test_inheritancewithrecursivedecl_Parent_server
+} [packed]
 
 
 test_inheritancewithrecursivedecl_ChildFirstRequest {

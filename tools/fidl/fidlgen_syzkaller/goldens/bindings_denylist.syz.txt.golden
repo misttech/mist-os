@@ -10,6 +10,51 @@
 
 include <test/bindingsdenylist/c/fidl.h>
 test_bindingsdenylist_OnlySyzkaller = test_bindingsdenylist_OnlySyzkaller_A
+test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestInLine {
+    a int8
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestOutOfLine {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestHandles {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestInLine {
+    a int8
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestOutOfLine {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestHandles {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestInLine {
+    a int8
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestOutOfLine {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestHandles {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestInLine {
+    a int8
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestOutOfLine {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestHandles {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestInLine {
+    a int8
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestOutOfLine {
+    void void
+} [packed]
+test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestHandles {
+    void void
+} [packed]
 test_bindingsdenylist_DenyEachBinding_OnlyDenyCpp_ResponseInLine {
     b int32
 } [packed]

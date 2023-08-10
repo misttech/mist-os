@@ -9,6 +9,15 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/driveroneway/c/fidl.h>
+test_driveroneway_OneWaySendRequestInLine {
+    payloadInLine test_driveroneway_PayloadInLine
+} [packed]
+test_driveroneway_OneWaySendRequestOutOfLine {
+    payloadOutOfLine test_driveroneway_PayloadOutOfLine
+} [packed]
+test_driveroneway_OneWaySendRequestHandles {
+    payload test_driveroneway_PayloadHandles
+} [packed]
 test_driveroneway_PayloadInLine {
     value int32
 } [packed]

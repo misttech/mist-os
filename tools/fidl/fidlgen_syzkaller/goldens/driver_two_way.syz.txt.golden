@@ -9,6 +9,25 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/drivertwoway/c/fidl.h>
+test_drivertwoway_TwoWayAddRequestInLine {
+    addend1 int16
+    addend2 int16
+} [packed]
+test_drivertwoway_TwoWayAddRequestOutOfLine {
+    void void
+} [packed]
+test_drivertwoway_TwoWayAddRequestHandles {
+    void void
+} [packed]
+test_drivertwoway_TwoWayAddResponseInLine {
+    sum int16
+} [packed]
+test_drivertwoway_TwoWayAddResponseOutOfLine {
+    void void
+} [packed]
+test_drivertwoway_TwoWayAddResponseHandles {
+    void void
+} [packed]
 
 
 test_drivertwoway_TwoWayAddRequest {

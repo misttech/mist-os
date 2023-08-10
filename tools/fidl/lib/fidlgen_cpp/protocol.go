@@ -1130,17 +1130,15 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		if v.RequestPayload != nil {
 			requestTypeShapeV1 = v.RequestPayload.TypeShapeV1
 			requestTypeShapeV2 = v.RequestPayload.TypeShapeV2
-			if _, ok := c.messageBodyTypes[v.RequestPayload.Identifier]; ok {
-				requestPayloadName = v.RequestPayload.Identifier
-				if val, ok := c.messageBodyStructs[v.RequestPayload.Identifier]; ok {
-					requestPayloadArgs = c.compileParameterArray(val)
-					requestChildren = c.anonymousChildren[toKey(val.NamingContext)]
-					requestIsResource = val.IsResourceType()
-				} else {
-					requestPayloadArgs = c.compileParameterSingleton(requestPayloadName, *v.RequestPayload)
-					requestFlattened = false
-					requestIsResource = requestPayloadArgs[0].Type.IsResource
-				}
+			requestPayloadName = v.RequestPayload.Identifier
+			if val, ok := c.structs[v.RequestPayload.Identifier]; ok {
+				requestPayloadArgs = c.compileParameterArray(val)
+				requestChildren = c.anonymousChildren[toKey(val.NamingContext)]
+				requestIsResource = val.IsResourceType()
+			} else {
+				requestPayloadArgs = c.compileParameterSingleton(requestPayloadName, *v.RequestPayload)
+				requestFlattened = false
+				requestIsResource = requestPayloadArgs[0].Type.IsResource
 			}
 		}
 
@@ -1154,17 +1152,15 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		if v.ResponsePayload != nil {
 			responseTypeShapeV1 = v.ResponsePayload.TypeShapeV1
 			responseTypeShapeV2 = v.ResponsePayload.TypeShapeV2
-			if _, ok := c.messageBodyTypes[v.ResponsePayload.Identifier]; ok {
-				responsePayloadName = v.ResponsePayload.Identifier
-				if val, ok := c.messageBodyStructs[v.ResponsePayload.Identifier]; ok {
-					responsePayloadArgs = c.compileParameterArray(val)
-					responseChildren = c.anonymousChildren[toKey(val.NamingContext)]
-					responseIsResource = val.IsResourceType()
-				} else {
-					responsePayloadArgs = c.compileParameterSingleton(responsePayloadName, *v.ResponsePayload)
-					responseFlattened = false
-					responseIsResource = responsePayloadArgs[0].Type.IsResource
-				}
+			responsePayloadName = v.ResponsePayload.Identifier
+			if val, ok := c.structs[v.ResponsePayload.Identifier]; ok {
+				responsePayloadArgs = c.compileParameterArray(val)
+				responseChildren = c.anonymousChildren[toKey(val.NamingContext)]
+				responseIsResource = val.IsResourceType()
+			} else {
+				responsePayloadArgs = c.compileParameterSingleton(responsePayloadName, *v.ResponsePayload)
+				responseFlattened = false
+				responseIsResource = responsePayloadArgs[0].Type.IsResource
 			}
 		}
 

@@ -10,6 +10,15 @@
 # fidl_experiment = unknown_interactions_new_defaults
 
 include <test/unknowninteractions/c/fidl.h>
+test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseHandles {
+    void void
+} [packed]
 test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResponseInLine {
     padding int8
 } [packed]
@@ -26,6 +35,33 @@ test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayField
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResponseHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseHandles {
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResponseInLine {
@@ -82,6 +118,15 @@ test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_R
 test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResponseHandles {
     void void
 } [packed]
+test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseHandles {
+    void void
+} [packed]
 test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResponseInLine {
     padding int8
 } [packed]
@@ -98,6 +143,24 @@ test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFie
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResponseHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseHandles {
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResponseInLine {
@@ -134,6 +197,15 @@ test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResponseHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseHandles {
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResponseInLine {
@@ -188,6 +260,33 @@ test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResponseHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestHandles {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseInLine {
+    some_field int32
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseOutOfLine {
+    void void
+} [packed]
+test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseHandles {
     void void
 } [packed]
 test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResponseInLine {

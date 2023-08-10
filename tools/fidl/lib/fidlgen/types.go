@@ -1849,28 +1849,11 @@ func (r *Root) DeclInfo() DeclInfoMap {
 
 type EncodedCompoundIdentifierSet map[EncodedCompoundIdentifier]struct{}
 
-// GetMessageBodyTypeNames calculates set of ECIs that refer to types used as
-// message bodies by this library.
-// TODO(fxbug.dev/123307): Remove this.
-func (r *Root) GetMessageBodyTypeNames() EncodedCompoundIdentifierSet {
-	mbtn := EncodedCompoundIdentifierSet{}
-	for _, protocol := range r.Protocols {
-		for _, method := range protocol.Methods {
-			if method.RequestPayload != nil {
-				mbtn[method.RequestPayload.Identifier] = struct{}{}
-			}
-			if method.ResponsePayload != nil {
-				mbtn[method.ResponsePayload.Identifier] = struct{}{}
-			}
-		}
-	}
-	return mbtn
-}
-
 // filter returns a new Root that excludes elements e where either keep(e) is
 // false or e is an anonymous layout nested inside an excluded declaration.
 func (r *Root) filter(keep func(Element) bool) Root {
 	var excluded []scopedNamingContext
+	excludedIfAnonymous := make(map[EncodedCompoundIdentifier]struct{})
 	r.ForEachDecl(func(decl Decl) {
 		switch decl := decl.(type) {
 		case LayoutDecl:
@@ -1889,6 +1872,12 @@ func (r *Root) filter(keep func(Element) bool) Root {
 						decl.Name.LibraryName(),
 						[]string{protocolName, string(m.Name)},
 					})
+					if id, ok := m.GetRequestPayloadIdentifier(); ok {
+						excludedIfAnonymous[id] = struct{}{}
+					}
+					if id, ok := m.GetResponsePayloadIdentifier(); ok {
+						excludedIfAnonymous[id] = struct{}{}
+					}
 				}
 			}
 		}
@@ -1906,7 +1895,13 @@ func (r *Root) filter(keep func(Element) bool) Root {
 			return
 		}
 		if layout, ok := decl.(LayoutDecl); ok {
-			scoped := scopedNamingContext{r.Name, layout.GetNamingContext()}
+			context := layout.GetNamingContext()
+			if context.IsAnonymous() {
+				if _, ok := excludedIfAnonymous[layout.GetName()]; ok {
+					return
+				}
+			}
+			scoped := scopedNamingContext{r.Name, context}
 			if scoped.nestedInAny(excluded) {
 				return
 			}

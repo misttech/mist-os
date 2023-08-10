@@ -13,17 +13,6 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
-type topWithCtxGetFooResponse struct {
-	_   struct{}       `fidl:"s" fidl_size_v2:"4" fidl_alignment_v2:"4"`
-	Foo testbottom.Foo `fidl_offset_v2:"0"`
-}
-
-var _mtopWithCtxGetFooResponse = _bindings.CreateLazyMarshaler(topWithCtxGetFooResponse{})
-
-func (msg *topWithCtxGetFooResponse) Marshaler() _bindings.Marshaler {
-	return _mtopWithCtxGetFooResponse
-}
-
 const (
 	TopGetFooOrdinal uint64 = 0x401a9ffa95a4c333
 )
@@ -32,7 +21,7 @@ type TopWithCtxInterface _bindings.ChannelProxy
 
 func (p *TopWithCtxInterface) GetFoo(ctx_ _bindings.Context) (testbottom.Foo, error) {
 	var req_ _bindings.Message
-	resp_ := &topWithCtxGetFooResponse{}
+	resp_ := &testmiddle.MiddleGetFooResponse{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(TopGetFooOrdinal, req_, resp_)
 	return (*resp_).Foo, err_
 }
@@ -58,7 +47,7 @@ func (s_ *TopWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Mess
 	switch args_.Ordinal {
 	case TopGetFooOrdinal:
 		foo, err_ := s_.Impl.GetFoo(args_.Ctx)
-		out_ := &topWithCtxGetFooResponse{Foo: foo}
+		out_ := &testmiddle.MiddleGetFooResponse{Foo: foo}
 		return out_, true, err_
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal

@@ -18,6 +18,15 @@ test_driverhandle_ClientEndWrapperOutOfLine {
 test_driverhandle_ClientEndWrapperHandles {
     value zx_chan_test_driverhandle_DriverProtocol_client
 } [packed]
+test_driverhandle_HandlesInProtocolSendHandlesRequestInLine {
+     
+} [packed]
+test_driverhandle_HandlesInProtocolSendHandlesRequestOutOfLine {
+    void void
+} [packed]
+test_driverhandle_HandlesInProtocolSendHandlesRequestHandles {
+    void void
+} [packed]
 test_driverhandle_ServerEndWrapperInLine {
     value flags[fidl_handle_presence, int32]
 } [packed]

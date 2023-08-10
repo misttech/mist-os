@@ -19,6 +19,56 @@ test_protocolpayloads_LocalStructPayloadOutOfLine {
 test_protocolpayloads_LocalStructPayloadHandles {
     void void
 } [packed]
+test_protocolpayloads_MainProtocolOnAnonRequestInLine {
+    a int32
+    b int32
+} [packed]
+test_protocolpayloads_MainProtocolOnAnonRequestOutOfLine {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolOnAnonRequestHandles {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolOneWayAnonRequestInLine {
+    a int32
+    b int32
+} [packed]
+test_protocolpayloads_MainProtocolOneWayAnonRequestOutOfLine {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolOneWayAnonRequestHandles {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonRequestInLine {
+    a int32
+    b int32
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonRequestOutOfLine {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonRequestHandles {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonResponseInLine {
+    a int32
+    b int32
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonResponseOutOfLine {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonResponseHandles {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestInLine {
+    a int32
+    b int32
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestOutOfLine {
+    void void
+} [packed]
+test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestHandles {
+    void void
+} [packed]
 test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseInLine {
     a int32
     b int32

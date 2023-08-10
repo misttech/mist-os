@@ -10,6 +10,149 @@
 
 include <test/protocols/c/fidl.h>
 test_protocols_ErrorEnum = test_protocols_ErrorEnum_ERR_FOO, test_protocols_ErrorEnum_ERR_BAR
+test_protocols_ChannelProtocolEventARequestInLine {
+    a int64
+    b int64
+} [packed]
+test_protocols_ChannelProtocolEventARequestOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolEventARequestHandles {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMethodARequestInLine {
+    a int64
+    b int64
+} [packed]
+test_protocols_ChannelProtocolMethodARequestOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMethodARequestHandles {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMethodBRequestInLine {
+    a int64
+    b int64
+} [packed]
+test_protocols_ChannelProtocolMethodBRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMethodBRequestHandles {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMethodBResponseInLine {
+    result int64
+} [packed]
+test_protocols_ChannelProtocolMethodBResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMethodBResponseHandles {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMutateSocketRequestInLine {
+    a flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_ChannelProtocolMutateSocketRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMutateSocketRequestHandles {
+    a zx_socket
+} [packed]
+test_protocols_ChannelProtocolMutateSocketResponseInLine {
+    b flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_ChannelProtocolMutateSocketResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolMutateSocketResponseHandles {
+    b zx_socket
+} [packed]
+test_protocols_ChannelProtocolTakeHandleRequestInLine {
+    h flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_ChannelProtocolTakeHandleRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_ChannelProtocolTakeHandleRequestHandles {
+    h zx_handle
+} [packed]
+test_protocols_HandleRightsProtocolAnEventRequestInLine {
+    h flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_HandleRightsProtocolAnEventRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_HandleRightsProtocolAnEventRequestHandles {
+    h zx_socket
+} [packed]
+test_protocols_HandleRightsProtocolNoResponseMethodRequestInLine {
+    h flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_HandleRightsProtocolNoResponseMethodRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_HandleRightsProtocolNoResponseMethodRequestHandles {
+    h zx_socket
+} [packed]
+test_protocols_HandleRightsProtocolResponseMethodRequestInLine {
+    h flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_HandleRightsProtocolResponseMethodRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_HandleRightsProtocolResponseMethodRequestHandles {
+    h zx_socket
+} [packed]
+test_protocols_HandleRightsProtocolResponseMethodResponseInLine {
+    h flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_HandleRightsProtocolResponseMethodResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_HandleRightsProtocolResponseMethodResponseHandles {
+    h zx_socket
+} [packed]
+test_protocols_ManyParametersFifteenRequestInLine {
+    p1 int8
+    p2 int8
+    p3 int8
+    p4 int8
+    p5 int8
+    p6 int8
+    p7 int8
+    p8 int8
+    p9 int8
+    p10 int8
+    p11 int8
+    p12 int8
+    p13 int8
+    p14 int8
+    p15 int8
+} [packed]
+test_protocols_ManyParametersFifteenRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_ManyParametersFifteenRequestHandles {
+    void void
+} [packed]
+test_protocols_MethodWithUnionUnionMethodRequestInLine {
+    uInLine test_protocols_TheUnionInLine
+} [packed]
+test_protocols_MethodWithUnionUnionMethodRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_MethodWithUnionUnionMethodRequestHandles {
+    void void
+} [packed]
+test_protocols_MethodWithUnionUnionMethodResponseInLine {
+    uInLine test_protocols_TheUnionInLine
+} [packed]
+test_protocols_MethodWithUnionUnionMethodResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_MethodWithUnionUnionMethodResponseHandles {
+    void void
+} [packed]
 test_protocols_ProtocolEndsInLine {
     client flags[fidl_handle_presence, int32]
     server flags[fidl_handle_presence, int32]
@@ -24,6 +167,106 @@ test_protocols_ProtocolEndsHandles {
     server zx_chan_test_protocols_DiscoverableProtocol_server
     client_opt zx_chan_test_protocols_DiscoverableProtocol_client
     server_opt zx_chan_test_protocols_DiscoverableProtocol_server
+} [packed]
+test_protocols_SyscallProtocolMethodCRequestInLine {
+    a int64
+    b int64
+} [packed]
+test_protocols_SyscallProtocolMethodCRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_SyscallProtocolMethodCRequestHandles {
+    void void
+} [packed]
+test_protocols_TransitionalEventRequestInLine {
+    x int64
+} [packed]
+test_protocols_TransitionalEventRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_TransitionalEventRequestHandles {
+    void void
+} [packed]
+test_protocols_TransitionalOneWayRequestInLine {
+    x int64
+} [packed]
+test_protocols_TransitionalOneWayRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_TransitionalOneWayRequestHandles {
+    void void
+} [packed]
+test_protocols_TransitionalRequestRequestInLine {
+    x int64
+} [packed]
+test_protocols_TransitionalRequestRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_TransitionalRequestRequestHandles {
+    void void
+} [packed]
+test_protocols_TransitionalRequestResponseInLine {
+    y int64
+} [packed]
+test_protocols_TransitionalRequestResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_TransitionalRequestResponseHandles {
+    void void
+} [packed]
+test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseInLine {
+    retInLine fidl_string
+} [packed]
+test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseOutOfLine {
+    retOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseHandles {
+    void void
+} [packed]
+test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestInLine {
+    retInLine fidl_string
+} [packed]
+test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestOutOfLine {
+    retOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestHandles {
+    void void
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestInLine {
+    argInLine fidl_string
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestOutOfLine {
+    argOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestHandles {
+    void void
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestInLine {
+    argInLine fidl_string
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestOutOfLine {
+    argOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestHandles {
+    void void
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestInLine {
+    argInLine fidl_string
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestOutOfLine {
+    argOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestHandles {
+    void void
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseInLine {
+    retInLine fidl_string
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseOutOfLine {
+    retOutOfLine fidl_aligned[stringnoz]
+} [packed]
+test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseHandles {
+    void void
 } [packed]
 test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseInLine {
     padding int8
@@ -62,6 +305,60 @@ test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseOutOfLine {
 } [packed]
 test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseHandles {
     void void
+} [packed]
+test_protocols_WithProtocolEndsClientEndsRequestInLine {
+    in_ flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_WithProtocolEndsClientEndsRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_WithProtocolEndsClientEndsRequestHandles {
+    in_ zx_chan_test_protocols_DiscoverableProtocol_client
+} [packed]
+test_protocols_WithProtocolEndsClientEndsResponseInLine {
+    out_ flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_WithProtocolEndsClientEndsResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_WithProtocolEndsClientEndsResponseHandles {
+    out_ zx_chan_test_protocols_DiscoverableProtocol_client
+} [packed]
+test_protocols_WithProtocolEndsServerEndsRequestInLine {
+    in_ flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_WithProtocolEndsServerEndsRequestOutOfLine {
+    void void
+} [packed]
+test_protocols_WithProtocolEndsServerEndsRequestHandles {
+    in_ zx_chan_test_protocols_DiscoverableProtocol_server
+} [packed]
+test_protocols_WithProtocolEndsServerEndsResponseInLine {
+    out_ flags[fidl_handle_presence, int32]
+} [packed]
+test_protocols_WithProtocolEndsServerEndsResponseOutOfLine {
+    void void
+} [packed]
+test_protocols_WithProtocolEndsServerEndsResponseHandles {
+    out_ zx_chan_test_protocols_DiscoverableProtocol_server
+} [packed]
+test_protocols_WithProtocolEndsStructContainingEndsRequestInLine {
+    inInLine test_protocols_ProtocolEndsInLine
+} [packed]
+test_protocols_WithProtocolEndsStructContainingEndsRequestOutOfLine {
+    inOutOfLine test_protocols_ProtocolEndsOutOfLine
+} [packed]
+test_protocols_WithProtocolEndsStructContainingEndsRequestHandles {
+    in_ test_protocols_ProtocolEndsHandles
+} [packed]
+test_protocols_WithProtocolEndsStructContainingEndsResponseInLine {
+    outInLine test_protocols_ProtocolEndsInLine
+} [packed]
+test_protocols_WithProtocolEndsStructContainingEndsResponseOutOfLine {
+    outOutOfLine test_protocols_ProtocolEndsOutOfLine
+} [packed]
+test_protocols_WithProtocolEndsStructContainingEndsResponseHandles {
+    out_ test_protocols_ProtocolEndsHandles
 } [packed]
 test_protocols_TheUnionInLine [
     v fidl_union_member[1, int32]

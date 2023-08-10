@@ -104,6 +104,17 @@ func (x ExampleBits) String() string {
 	return buf.String()
 }
 
+type ExampleProtocolMethodRequest struct {
+	_   struct{}               `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
+	Arg testexampleusing.Empty `fidl_offset_v2:"0"`
+}
+
+var _mExampleProtocolMethodRequest = _bindings.CreateLazyMarshaler(ExampleProtocolMethodRequest{})
+
+func (msg *ExampleProtocolMethodRequest) Marshaler() _bindings.Marshaler {
+	return _mExampleProtocolMethodRequest
+}
+
 type ExampleStruct struct {
 	_      struct{} `fidl:"s" fidl_size_v2:"4" fidl_alignment_v2:"4"`
 	Member uint32   `fidl_offset_v2:"0"`
@@ -113,17 +124,6 @@ var _mExampleStruct = _bindings.CreateLazyMarshaler(ExampleStruct{})
 
 func (msg *ExampleStruct) Marshaler() _bindings.Marshaler {
 	return _mExampleStruct
-}
-
-type exampleProtocolWithCtxMethodRequest struct {
-	_   struct{}               `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
-	Arg testexampleusing.Empty `fidl_offset_v2:"0"`
-}
-
-var _mexampleProtocolWithCtxMethodRequest = _bindings.CreateLazyMarshaler(exampleProtocolWithCtxMethodRequest{})
-
-func (msg *exampleProtocolWithCtxMethodRequest) Marshaler() _bindings.Marshaler {
-	return _mexampleProtocolWithCtxMethodRequest
 }
 
 type I_exampleUnionTag uint64
@@ -223,7 +223,7 @@ const (
 type ExampleProtocolWithCtxInterface _bindings.ChannelProxy
 
 func (p *ExampleProtocolWithCtxInterface) Method(ctx_ _bindings.Context, arg testexampleusing.Empty) error {
-	req_ := &exampleProtocolWithCtxMethodRequest{Arg: arg}
+	req_ := &ExampleProtocolMethodRequest{Arg: arg}
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(ExampleProtocolMethodOrdinal, req_)
 	return err_
 }
@@ -248,7 +248,7 @@ type ExampleProtocolWithCtxStub struct {
 func (s_ *ExampleProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	case ExampleProtocolMethodOrdinal:
-		in_ := &exampleProtocolWithCtxMethodRequest{}
+		in_ := &ExampleProtocolMethodRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext

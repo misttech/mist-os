@@ -62,7 +62,7 @@ func (p *{{ $.ProxyName }}) {{ if .IsEvent -}}
 	{{- end }}
 	{{- if .HasResponse }}
 	{{- if .Response }}
-	return {{ .Response.Destructure "(*resp_)" }}, err_
+	return {{ call .Response.Destructure "(*resp_)" }}, err_
 	{{- else }}
 	return err_
 	{{- end }}
@@ -162,7 +162,7 @@ func (s_ *{{ .StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Mes
 		{{- end }}
 		{{ if .Response }}{{- .Response.Names -}}, {{- end -}}
 		{{- if .Request -}}
-		err_ := s_.Impl.{{ .Name }}(args_.Ctx, {{ .Request.Destructure "(*in_)" -}})
+		err_ := s_.Impl.{{ .Name }}(args_.Ctx, {{ call .Request.Destructure "(*in_)" -}})
 		{{- else -}}
 		err_ := s_.Impl.{{ .Name }}(args_.Ctx)
 		{{- end -}}

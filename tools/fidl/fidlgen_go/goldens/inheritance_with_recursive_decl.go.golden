@@ -11,37 +11,26 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
-type childWithCtxFirstRequest struct {
+type ChildSecondRequest struct {
 	_       struct{}                      `fidl:"s" fidl_size_v2:"4" fidl_alignment_v2:"4"`
 	Request ParentWithCtxInterfaceRequest `fidl_offset_v2:"0" fidl_handle_subtype:"4" fidl_bounds:"0"`
 }
 
-var _mchildWithCtxFirstRequest = _bindings.CreateLazyMarshaler(childWithCtxFirstRequest{})
+var _mChildSecondRequest = _bindings.CreateLazyMarshaler(ChildSecondRequest{})
 
-func (msg *childWithCtxFirstRequest) Marshaler() _bindings.Marshaler {
-	return _mchildWithCtxFirstRequest
+func (msg *ChildSecondRequest) Marshaler() _bindings.Marshaler {
+	return _mChildSecondRequest
 }
 
-type childWithCtxSecondRequest struct {
+type ParentFirstRequest struct {
 	_       struct{}                      `fidl:"s" fidl_size_v2:"4" fidl_alignment_v2:"4"`
 	Request ParentWithCtxInterfaceRequest `fidl_offset_v2:"0" fidl_handle_subtype:"4" fidl_bounds:"0"`
 }
 
-var _mchildWithCtxSecondRequest = _bindings.CreateLazyMarshaler(childWithCtxSecondRequest{})
+var _mParentFirstRequest = _bindings.CreateLazyMarshaler(ParentFirstRequest{})
 
-func (msg *childWithCtxSecondRequest) Marshaler() _bindings.Marshaler {
-	return _mchildWithCtxSecondRequest
-}
-
-type parentWithCtxFirstRequest struct {
-	_       struct{}                      `fidl:"s" fidl_size_v2:"4" fidl_alignment_v2:"4"`
-	Request ParentWithCtxInterfaceRequest `fidl_offset_v2:"0" fidl_handle_subtype:"4" fidl_bounds:"0"`
-}
-
-var _mparentWithCtxFirstRequest = _bindings.CreateLazyMarshaler(parentWithCtxFirstRequest{})
-
-func (msg *parentWithCtxFirstRequest) Marshaler() _bindings.Marshaler {
-	return _mparentWithCtxFirstRequest
+func (msg *ParentFirstRequest) Marshaler() _bindings.Marshaler {
+	return _mParentFirstRequest
 }
 
 const (
@@ -52,13 +41,13 @@ const (
 type ChildWithCtxInterface _bindings.ChannelProxy
 
 func (p *ChildWithCtxInterface) First(ctx_ _bindings.Context, request ParentWithCtxInterfaceRequest) error {
-	req_ := &childWithCtxFirstRequest{Request: request}
+	req_ := &ParentFirstRequest{Request: request}
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(ChildFirstOrdinal, req_)
 	return err_
 }
 
 func (p *ChildWithCtxInterface) Second(ctx_ _bindings.Context, request ParentWithCtxInterfaceRequest) error {
-	req_ := &childWithCtxSecondRequest{Request: request}
+	req_ := &ChildSecondRequest{Request: request}
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(ChildSecondOrdinal, req_)
 	return err_
 }
@@ -84,7 +73,7 @@ type ChildWithCtxStub struct {
 func (s_ *ChildWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	case ChildFirstOrdinal:
-		in_ := &childWithCtxFirstRequest{}
+		in_ := &ParentFirstRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -95,7 +84,7 @@ func (s_ *ChildWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Me
 		err_ := s_.Impl.First(args_.Ctx, (*in_).Request)
 		return nil, false, err_
 	case ChildSecondOrdinal:
-		in_ := &childWithCtxSecondRequest{}
+		in_ := &ChildSecondRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -118,7 +107,7 @@ const (
 type ParentWithCtxInterface _bindings.ChannelProxy
 
 func (p *ParentWithCtxInterface) First(ctx_ _bindings.Context, request ParentWithCtxInterfaceRequest) error {
-	req_ := &parentWithCtxFirstRequest{Request: request}
+	req_ := &ParentFirstRequest{Request: request}
 	err_ := ((*_bindings.ChannelProxy)(p)).Send(ParentFirstOrdinal, req_)
 	return err_
 }
@@ -143,7 +132,7 @@ type ParentWithCtxStub struct {
 func (s_ *ParentWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	case ParentFirstOrdinal:
-		in_ := &parentWithCtxFirstRequest{}
+		in_ := &ParentFirstRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext

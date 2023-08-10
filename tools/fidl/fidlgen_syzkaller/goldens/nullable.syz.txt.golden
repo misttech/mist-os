@@ -18,6 +18,25 @@ test_nullable_Int32WrapperOutOfLine {
 test_nullable_Int32WrapperHandles {
     void void
 } [packed]
+test_nullable_SimpleProtocolAddRequestInLine {
+    a int32
+    b int32
+} [packed]
+test_nullable_SimpleProtocolAddRequestOutOfLine {
+    void void
+} [packed]
+test_nullable_SimpleProtocolAddRequestHandles {
+    void void
+} [packed]
+test_nullable_SimpleProtocolAddResponseInLine {
+    sum int32
+} [packed]
+test_nullable_SimpleProtocolAddResponseOutOfLine {
+    void void
+} [packed]
+test_nullable_SimpleProtocolAddResponseHandles {
+    void void
+} [packed]
 test_nullable_StructWithNullableHandleInLine {
     val flags[fidl_handle_presence, int32]
 } [packed]

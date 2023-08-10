@@ -11,6 +11,15 @@
 include <test/placementofattributes/c/fidl.h>
 test_placementofattributes_ExampleEnum = test_placementofattributes_ExampleEnum_MEMBER
 test_placementofattributes_ExampleBits = test_placementofattributes_ExampleBits_MEMBER
+test_placementofattributes_ExampleProtocolMethodRequestInLine {
+    argInLine test_exampleusing_EmptyInLine
+} [packed]
+test_placementofattributes_ExampleProtocolMethodRequestOutOfLine {
+    argOutOfLine test_exampleusing_EmptyOutOfLine
+} [packed]
+test_placementofattributes_ExampleProtocolMethodRequestHandles {
+    arg test_exampleusing_EmptyHandles
+} [packed]
 test_placementofattributes_ExampleStructInLine {
     member int32
 } [packed]

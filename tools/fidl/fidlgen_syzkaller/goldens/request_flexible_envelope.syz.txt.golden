@@ -9,6 +9,42 @@
 # fidl_experiment = unknown_interactions_mandate
 
 include <test/requestflexibleenvelope/c/fidl.h>
+test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestInLine {
+    sInLine test_requestflexibleenvelope_FlexibleFooInLine
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestOutOfLine {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestHandles {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseInLine {
+    fInLine test_requestflexibleenvelope_StrictFooInLine
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseOutOfLine {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseHandles {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestInLine {
+    sInLine test_requestflexibleenvelope_StrictFooInLine
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestOutOfLine {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestHandles {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseInLine {
+    fInLine test_requestflexibleenvelope_FlexibleFooInLine
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseOutOfLine {
+    void void
+} [packed]
+test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseHandles {
+    void void
+} [packed]
 test_requestflexibleenvelope_FlexibleFooInLine [
     sInLine fidl_union_member[1, fidl_string]
     i fidl_union_member[2, int32]

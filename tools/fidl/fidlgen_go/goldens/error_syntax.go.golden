@@ -12,6 +12,17 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
+type ExampleUseOfErrorSyntaxCallWhichMayFailRequest struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
+	S string   `fidl_offset_v2:"0" fidl_bounds:""`
+}
+
+var _mExampleUseOfErrorSyntaxCallWhichMayFailRequest = _bindings.CreateLazyMarshaler(ExampleUseOfErrorSyntaxCallWhichMayFailRequest{})
+
+func (msg *ExampleUseOfErrorSyntaxCallWhichMayFailRequest) Marshaler() _bindings.Marshaler {
+	return _mExampleUseOfErrorSyntaxCallWhichMayFailRequest
+}
+
 type ExampleUseOfErrorSyntaxCallWhichMayFailResponse struct {
 	_     struct{} `fidl:"s" fidl_size_v2:"8" fidl_alignment_v2:"8"`
 	Value int64    `fidl_offset_v2:"0"`
@@ -21,28 +32,6 @@ var _mExampleUseOfErrorSyntaxCallWhichMayFailResponse = _bindings.CreateLazyMars
 
 func (msg *ExampleUseOfErrorSyntaxCallWhichMayFailResponse) Marshaler() _bindings.Marshaler {
 	return _mExampleUseOfErrorSyntaxCallWhichMayFailResponse
-}
-
-type exampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	S string   `fidl_offset_v2:"0" fidl_bounds:""`
-}
-
-var _mexampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest = _bindings.CreateLazyMarshaler(exampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest{})
-
-func (msg *exampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest) Marshaler() _bindings.Marshaler {
-	return _mexampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest
-}
-
-type exampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest struct {
-	_ struct{} `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	S string   `fidl_offset_v2:"0" fidl_bounds:""`
-}
-
-var _mexampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest = _bindings.CreateLazyMarshaler(exampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest{})
-
-func (msg *exampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest) Marshaler() _bindings.Marshaler {
-	return _mexampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest
 }
 
 type I_exampleUseOfErrorSyntaxCallWhichMayFailResultTag uint64
@@ -115,14 +104,14 @@ const (
 type ExampleUseOfErrorSyntaxWithCtxInterface _bindings.ChannelProxy
 
 func (p *ExampleUseOfErrorSyntaxWithCtxInterface) ComposedCallWhichMayFail(ctx_ _bindings.Context, s string) (testerrorsyntaxparent.ParentUsesErrorSyntaxComposedCallWhichMayFailResult, error) {
-	req_ := &exampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest{S: s}
+	req_ := &testerrorsyntaxparent.ParentUsesErrorSyntaxComposedCallWhichMayFailRequest{S: s}
 	resp_ := &testerrorsyntaxparent.ParentUsesErrorSyntaxComposedCallWhichMayFailResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ExampleUseOfErrorSyntaxComposedCallWhichMayFailOrdinal, req_, resp_)
 	return (*resp_), err_
 }
 
 func (p *ExampleUseOfErrorSyntaxWithCtxInterface) CallWhichMayFail(ctx_ _bindings.Context, s string) (ExampleUseOfErrorSyntaxCallWhichMayFailResult, error) {
-	req_ := &exampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest{S: s}
+	req_ := &ExampleUseOfErrorSyntaxCallWhichMayFailRequest{S: s}
 	resp_ := &ExampleUseOfErrorSyntaxCallWhichMayFailResult{}
 	err_ := ((*_bindings.ChannelProxy)(p)).Call(ExampleUseOfErrorSyntaxCallWhichMayFailOrdinal, req_, resp_)
 	return (*resp_), err_
@@ -149,7 +138,7 @@ type ExampleUseOfErrorSyntaxWithCtxStub struct {
 func (s_ *ExampleUseOfErrorSyntaxWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	case ExampleUseOfErrorSyntaxComposedCallWhichMayFailOrdinal:
-		in_ := &exampleUseOfErrorSyntaxWithCtxComposedCallWhichMayFailRequest{}
+		in_ := &testerrorsyntaxparent.ParentUsesErrorSyntaxComposedCallWhichMayFailRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext
@@ -161,7 +150,7 @@ func (s_ *ExampleUseOfErrorSyntaxWithCtxStub) Dispatch(args_ _bindings.DispatchA
 		out_ := &payload
 		return out_, true, err_
 	case ExampleUseOfErrorSyntaxCallWhichMayFailOrdinal:
-		in_ := &exampleUseOfErrorSyntaxWithCtxCallWhichMayFailRequest{}
+		in_ := &ExampleUseOfErrorSyntaxCallWhichMayFailRequest{}
 		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
 		if !ok {
 			return nil, false, _bindings.ErrMissingMarshalerContext

@@ -145,8 +145,8 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 
 func (*runnerImpl) CheckAlive(_ fidl.Context) error { return nil }
 
-func (*runnerImpl) GetBindingsProperties(_ fidl.Context) (clientsuite.RunnerGetBindingsPropertiesResponse, error) {
-	var properties clientsuite.RunnerGetBindingsPropertiesResponse
+func (*runnerImpl) GetBindingsProperties(_ fidl.Context) (clientsuite.BindingsProperties, error) {
+	var properties clientsuite.BindingsProperties
 	properties.SetIoStyle(clientsuite.IoStyleSync)
 	return properties, nil
 }

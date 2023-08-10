@@ -147,9 +147,6 @@ type compiler struct {
 
 	// library is the identifier for the current library.
 	library fidlgen.LibraryIdentifier
-
-	// anonymous structs used only as method request/response messageBodyStructs
-	messageBodyStructs map[fidlgen.EncodedCompoundIdentifier]*fidlgen.Struct
 }
 
 var reservedWords = map[string]struct{}{
@@ -593,7 +590,9 @@ func (c *compiler) compileMethod(protocolName fidlgen.EncodedCompoundIdentifier,
 	if val.HasRequest {
 		var payload *fidlgen.Struct
 		if payloadID, ok := val.GetRequestPayloadIdentifier(); ok {
-			payload = c.messageBodyStructs[payloadID]
+			if s, ok := c.structs[payloadID]; ok {
+				payload = &s
+			}
 		}
 		request, requestHandles := c.compileParameters(r.Name+RequestSuffix, r.Ordinal, payload)
 		r.Request = &request
@@ -604,7 +603,9 @@ func (c *compiler) compileMethod(protocolName fidlgen.EncodedCompoundIdentifier,
 	if val.HasResponse {
 		var payload *fidlgen.Struct
 		if payloadID, ok := val.GetResponsePayloadIdentifier(); ok {
-			payload = c.messageBodyStructs[payloadID]
+			if s, ok := c.structs[payloadID]; ok {
+				payload = &s
+			}
 		}
 		suffix := ResponseSuffix
 		if !val.HasRequest {
@@ -636,18 +637,13 @@ func compile(fidlData fidlgen.Root) Root {
 	}
 	libraryName := fidlData.Name.Parse()
 	c := compiler{
-		decls:              fidlData.DeclInfo(),
-		structs:            make(StructMap),
-		unions:             make(UnionMap),
-		enums:              make(EnumMap),
-		bits:               make(BitsMap),
-		library:            libraryName,
-		messageBodyStructs: make(map[fidlgen.EncodedCompoundIdentifier]*fidlgen.Struct),
+		decls:   fidlData.DeclInfo(),
+		structs: make(StructMap),
+		unions:  make(UnionMap),
+		enums:   make(EnumMap),
+		bits:    make(BitsMap),
+		library: libraryName,
 	}
-
-	// Do a first pass of the protocols, creating a set of all names of types that are used as a
-	// transactional message bodies.
-	mbtn := fidlData.GetMessageBodyTypeNames()
 
 	root.HeaderPath = fmt.Sprintf("%s/c/fidl.h", formatLibraryPath(libraryName))
 
@@ -664,13 +660,6 @@ func compile(fidlData fidlgen.Root) Root {
 	}
 
 	for _, v := range fidlData.Structs {
-		if _, ok := mbtn[v.Name]; ok {
-			v := v
-			c.messageBodyStructs[v.Name] = &v
-			if v.IsAnonymous() {
-				continue
-			}
-		}
 		c.structs[v.Name] = v
 
 		result := c.compileStruct(v)
@@ -691,10 +680,7 @@ func compile(fidlData fidlgen.Root) Root {
 	}
 
 	for _, v := range fidlData.ExternalStructs {
-		if _, ok := mbtn[v.Name]; ok {
-			v := v
-			c.messageBodyStructs[v.Name] = &v
-		}
+		c.structs[v.Name] = v
 	}
 
 	for _, v := range fidlData.Unions {
