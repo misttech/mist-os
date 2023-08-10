@@ -223,13 +223,7 @@ pub fn sys_nanosleep(
 fn get_thread_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
     let weak_task = current_task.get_task(pid);
     let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
-    let thread = task.thread.read();
-    Ok(thread
-        .as_ref()
-        .ok_or_else(|| errno!(EINVAL))?
-        .get_runtime_info()
-        .map_err(|status| from_status_like_fdio!(status))?
-        .cpu_time)
+    Ok(task.thread_runtime_info()?.cpu_time)
 }
 
 /// Returns the cpu time for the process associated with the given `pid`. `pid`

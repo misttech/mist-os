@@ -257,6 +257,13 @@ To start a trace with an increased buffer size, run:
 ffx trace start --categories "kernel:meta,starnix" --buffer-size 64
 ```
 
+To include Zircon task runtime stats at each restricted enter/exit transition,
+include the `starnix:task_runtime` category:
+
+```
+ffx trace start --categories "kernel:meta,starnix,starnix:task_runtime" --buffer-size 64
+```
+
 Trace files can be visualized and queried with Perfetto. For example, to see the average
 time spent in starnix during a `clock_getres` syscall, run the query:
 
