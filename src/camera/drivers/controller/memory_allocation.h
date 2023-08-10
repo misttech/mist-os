@@ -5,7 +5,7 @@
 #ifndef SRC_CAMERA_DRIVERS_CONTROLLER_MEMORY_ALLOCATION_H_
 #define SRC_CAMERA_DRIVERS_CONTROLLER_MEMORY_ALLOCATION_H_
 
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 
 namespace camera {
@@ -17,7 +17,7 @@ struct BufferCollection {
 
 class ControllerMemoryAllocator {
  public:
-  explicit ControllerMemoryAllocator(const ddk::SysmemProtocolClient& sysmem);
+  explicit ControllerMemoryAllocator(fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator);
 
   // Takes in a set of constraints and allocates memory using sysmem based on those
   // constraints.
@@ -30,7 +30,6 @@ class ControllerMemoryAllocator {
       fuchsia::sysmem::BufferCollectionTokenHandle& token);
 
  private:
-  const ddk::SysmemProtocolClient& sysmem_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
 };
 

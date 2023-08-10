@@ -5,40 +5,41 @@
 #ifndef SRC_CAMERA_DRIVERS_CONTROLLER_TEST_FAKE_SYSMEM_H_
 #define SRC_CAMERA_DRIVERS_CONTROLLER_TEST_FAKE_SYSMEM_H_
 
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <lib/async/default.h>
 #include <lib/sys/cpp/component_context.h>
 
-class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
+#include "fidl/fuchsia.hardware.sysmem/cpp/markers.h"
+
+class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  using ConnectCallback =
-      fit::function<zx_status_t(fidl::InterfaceRequest<fuchsia::sysmem::Allocator>)>;
-  explicit FakeSysmem(ConnectCallback connect_callback = [](auto) { return ZX_OK; })
-      : sysmem_protocol_{&sysmem_protocol_ops_, this},
-        connect_callback_{std::move(connect_callback)} {}
+  void ConnectServer(ConnectServerRequestView request,
+                     ConnectServerCompleter::Sync& completer) override {}
 
-  ddk::SysmemProtocolClient client() { return ddk::SysmemProtocolClient(&sysmem_protocol_); }
-  sysmem_protocol_t proto() { return sysmem_protocol_; }
-
-  // |ZX_PROTOCOL_SYSMEM|
-  zx_status_t SysmemConnect(zx::channel allocator_request) {
-    fidl::InterfaceRequest<fuchsia::sysmem::Allocator> request(std::move(allocator_request));
-    return connect_callback_(std::move(request));
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_status_t SysmemRegisterHeap(uint64_t /*heap*/, zx::channel /*heap_connection*/) {
-    return ZX_ERR_NOT_SUPPORTED;
+  fuchsia_hardware_sysmem::Service::InstanceHandler CreateInstanceHandler() {
+    return fuchsia_hardware_sysmem::Service::InstanceHandler({
+        .sysmem = sysmem_bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                                 fidl::kIgnoreBindingClosure),
+        .allocator_v1 = [](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {},
+        .allocator = [](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {},
+    });
   }
 
-  zx_status_t SysmemRegisterSecureMem(zx::channel /*secure_mem_connection*/) {
-    return ZX_ERR_NOT_SUPPORTED;
+  fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem> Connect() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+    ZX_ASSERT(endpoints.is_ok());
+    sysmem_bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
+                                fidl::kIgnoreBindingClosure);
+    return std::move(endpoints->client);
   }
-
-  zx_status_t SysmemUnregisterSecureMem() { return ZX_ERR_NOT_SUPPORTED; }
 
  private:
-  sysmem_protocol_t sysmem_protocol_;
-  ConnectCallback connect_callback_;
+  fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> sysmem_bindings_;
 };
 
 #endif  // SRC_CAMERA_DRIVERS_CONTROLLER_TEST_FAKE_SYSMEM_H_

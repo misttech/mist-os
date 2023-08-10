@@ -6,6 +6,8 @@
 #include <fuchsia/hardware/camera/cpp/fidl.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include "src/camera/drivers/controller/controller_device.h"
 #include "src/camera/drivers/controller/controller_protocol.h"
@@ -20,10 +22,23 @@ namespace {
 class ControllerDeviceTest : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
+    ASSERT_EQ(ZX_OK, incoming_loop_.StartThread("incoming"));
     root_ = MockDevice::FakeRootParent();
 
-    root_->AddProtocol(ZX_PROTOCOL_SYSMEM, fake_sysmem_.proto().ops, fake_sysmem_.proto().ctx,
-                       "sysmem");
+    // Create sysmem fragment
+    auto sysmem_handler = sysmem_.SyncCall(&FakeSysmem::CreateInstanceHandler);
+    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(sysmem_endpoints.is_ok());
+    root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
+                          std::move(sysmem_endpoints->client), "sysmem");
+
+    outgoing_.SyncCall([sysmem_server = std::move(sysmem_endpoints->server),
+                        sysmem_handler = std::move(sysmem_handler)](
+                           component::OutgoingDirectory* outgoing) mutable {
+      ZX_ASSERT(outgoing->Serve(std::move(sysmem_server)).is_ok());
+      ZX_ASSERT(outgoing->AddService<fuchsia_hardware_sysmem::Service>(std::move(sysmem_handler))
+                    .is_ok());
+    });
 
     auto result = ControllerDevice::Create(root_.get());
     ASSERT_TRUE(result.is_ok());
@@ -91,7 +106,11 @@ class ControllerDeviceTest : public gtest::TestLoopFixture {
   MockDevice* controller_mock_ = nullptr;
   fuchsia::hardware::camera::DevicePtr camera_protocol_;
   fuchsia::camera2::hal::ControllerPtr controller_protocol_;
-  FakeSysmem fake_sysmem_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<FakeSysmem> sysmem_{incoming_loop_.dispatcher(),
+                                                          std::in_place};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> outgoing_{
+      incoming_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 

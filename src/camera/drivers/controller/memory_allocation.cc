@@ -16,10 +16,9 @@ namespace camera {
 
 constexpr auto kTag = "camera_controller";
 
-ControllerMemoryAllocator::ControllerMemoryAllocator(const ddk::SysmemProtocolClient& sysmem)
-    : sysmem_(sysmem) {
-  sysmem_.Connect(sysmem_allocator_.NewRequest().TakeChannel());
-}
+ControllerMemoryAllocator::ControllerMemoryAllocator(
+    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator)
+    : sysmem_allocator_(std::move(sysmem_allocator)) {}
 
 template <typename T>
 static std::string FormatMinMax(const T& v_min, const T& v_max) {
