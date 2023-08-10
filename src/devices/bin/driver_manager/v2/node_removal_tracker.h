@@ -7,7 +7,7 @@
 
 #include <lib/fit/function.h>
 
-#include <map>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "src/devices/bin/driver_manager/v2/node.h"
@@ -37,7 +37,7 @@ class NodeRemovalTracker {
 
   std::unordered_set<NodeId> remaining_pkg_nodes_;
   std::unordered_set<NodeId> remaining_non_pkg_nodes_;
-  std::map<NodeId, Node> nodes_;
+  std::unordered_map<NodeId, Node> nodes_;
 
   fit::callback<void()> pkg_callback_;
   fit::callback<void()> all_callback_;
