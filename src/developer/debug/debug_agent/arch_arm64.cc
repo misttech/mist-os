@@ -7,6 +7,8 @@
 #include <zircon/status.h>
 #include <zircon/syscalls/exception.h>
 
+#include <optional>
+
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/arch_types.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
@@ -182,27 +184,6 @@ zx_status_t ReadDebugRegs(const zx::thread& thread, std::vector<debug::RegisterV
 
   return ZX_OK;
 }
-
-// Adapter class to allow the exception decoder to get the debug registers if needed.
-class ExceptionInfo : public debug_ipc::Arm64ExceptionInfo {
- public:
-  explicit ExceptionInfo(const zx::thread& thread) : thread_(thread) {}
-
-  std::optional<uint32_t> FetchESR() const override {
-    zx_thread_state_debug_regs_t debug_regs;
-    zx_status_t status = thread_.read_state(ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
-                                            sizeof(zx_thread_state_debug_regs_t));
-    if (status != ZX_OK) {
-      DEBUG_LOG(ArchArm64) << "Could not get ESR: " << zx_status_get_string(status);
-      return std::nullopt;
-    }
-
-    return debug_regs.esr;
-  }
-
- private:
-  const zx::thread& thread_;
-};
 
 }  // namespace
 
@@ -391,8 +372,17 @@ zx_status_t WriteDebugRegisters(const std::vector<debug::RegisterValue>& updates
 }
 
 debug_ipc::ExceptionType DecodeExceptionType(const zx::thread& thread, uint32_t exception_type) {
-  ExceptionInfo info(thread);
-  return debug_ipc::DecodeException(exception_type, info);
+  return debug_ipc::DecodeArm64Exception(exception_type, [&thread]() -> std::optional<uint32_t> {
+    zx_thread_state_debug_regs_t debug_regs;
+    zx_status_t status = thread.read_state(ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                           sizeof(zx_thread_state_debug_regs_t));
+    if (status != ZX_OK) {
+      DEBUG_LOG(ArchArm64) << "Could not get ESR: " << zx_status_get_string(status);
+      return std::nullopt;
+    }
+
+    return debug_regs.esr;
+  });
 }
 
 debug_ipc::ExceptionRecord FillExceptionRecord(const zx_exception_report_t& in) {

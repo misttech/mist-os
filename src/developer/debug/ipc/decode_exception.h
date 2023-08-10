@@ -5,11 +5,12 @@
 #ifndef SRC_DEVELOPER_DEBUG_IPC_DECODE_EXCEPTION_H_
 #define SRC_DEVELOPER_DEBUG_IPC_DECODE_EXCEPTION_H_
 
+#include <lib/fit/function.h>
 #include <stdint.h>
 
 #include <optional>
 
-#include "src/developer/debug/ipc/protocol.h"
+#include "src/developer/debug/ipc/records.h"
 
 namespace debug_ipc {
 
@@ -17,29 +18,19 @@ namespace debug_ipc {
 // debug registers to disambiguate. Since getting the debug registers is uncommon, this API takes a
 // callback that will retrieve them if needed.
 
-class Arm64ExceptionInfo {
- public:
-  // Get the value of the ESR register. A nullopt indicates failure.
-  virtual std::optional<uint32_t> FetchESR() const = 0;
+struct X64DebugRegs {
+  uint64_t dr0 = 0;
+  uint64_t dr1 = 0;
+  uint64_t dr2 = 0;
+  uint64_t dr3 = 0;
+  uint64_t dr6 = 0;
+  uint64_t dr7 = 0;
 };
 
-class X64ExceptionInfo {
- public:
-  struct DebugRegs {
-    uint64_t dr0 = 0;
-    uint64_t dr1 = 0;
-    uint64_t dr2 = 0;
-    uint64_t dr3 = 0;
-    uint64_t dr6 = 0;
-    uint64_t dr7 = 0;
-  };
-
-  // Get the necessary debug registers for decoding exceptions. A nullopt indicates failure.
-  virtual std::optional<DebugRegs> FetchDebugRegs() const = 0;
-};
-
-ExceptionType DecodeException(uint32_t code, const X64ExceptionInfo& info);
-ExceptionType DecodeException(uint32_t code, const Arm64ExceptionInfo& info);
+ExceptionType DecodeX64Exception(uint32_t code,
+                                 fit::function<std::optional<X64DebugRegs>()> fetch_debug_regs);
+ExceptionType DecodeArm64Exception(uint32_t code,
+                                   fit::function<std::optional<uint32_t>()> fetch_esr);
 
 }  // namespace debug_ipc
 

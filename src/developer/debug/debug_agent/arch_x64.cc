@@ -147,36 +147,6 @@ zx_status_t ReadDebugRegs(const zx::thread& thread, std::vector<debug::RegisterV
   return ZX_OK;
 }
 
-// Adapter class to allow the exception decoder to get the debug registers if needed.
-class ExceptionInfo : public debug_ipc::X64ExceptionInfo {
- public:
-  explicit ExceptionInfo(const zx::thread& thread) : thread_(thread) {}
-
-  std::optional<debug_ipc::X64ExceptionInfo::DebugRegs> FetchDebugRegs() const override {
-    zx_thread_state_debug_regs_t debug_regs;
-    zx_status_t status =
-        thread_.read_state(ZX_THREAD_STATE_DEBUG_REGS, &debug_regs, sizeof(debug_regs));
-    if (status != ZX_OK) {
-      DEBUG_LOG(Archx64) << "Could not get debug regs: " << zx_status_get_string(status);
-      return std::nullopt;
-    }
-
-    debug_ipc::X64ExceptionInfo::DebugRegs ret;
-
-    ret.dr0 = debug_regs.dr[0];
-    ret.dr1 = debug_regs.dr[1];
-    ret.dr2 = debug_regs.dr[2];
-    ret.dr3 = debug_regs.dr[3];
-    ret.dr6 = debug_regs.dr6;
-    ret.dr7 = debug_regs.dr7;
-
-    return ret;
-  }
-
- private:
-  const zx::thread& thread_;
-};
-
 }  // namespace
 
 const BreakInstructionType kBreakInstruction = 0xCC;
@@ -403,8 +373,27 @@ zx_status_t WriteDebugRegisters(const std::vector<debug::RegisterValue>& updates
 }
 
 debug_ipc::ExceptionType DecodeExceptionType(const zx::thread& thread, uint32_t exception_type) {
-  ExceptionInfo info(thread);
-  return debug_ipc::DecodeException(exception_type, info);
+  return debug_ipc::DecodeX64Exception(
+      exception_type, [&thread]() -> std::optional<debug_ipc::X64DebugRegs> {
+        zx_thread_state_debug_regs_t debug_regs;
+        zx_status_t status =
+            thread.read_state(ZX_THREAD_STATE_DEBUG_REGS, &debug_regs, sizeof(debug_regs));
+        if (status != ZX_OK) {
+          DEBUG_LOG(Archx64) << "Could not get debug regs: " << zx_status_get_string(status);
+          return std::nullopt;
+        }
+
+        debug_ipc::X64DebugRegs ret;
+
+        ret.dr0 = debug_regs.dr[0];
+        ret.dr1 = debug_regs.dr[1];
+        ret.dr2 = debug_regs.dr[2];
+        ret.dr3 = debug_regs.dr[3];
+        ret.dr6 = debug_regs.dr6;
+        ret.dr7 = debug_regs.dr7;
+
+        return ret;
+      });
 }
 
 debug_ipc::ExceptionRecord FillExceptionRecord(const zx_exception_report_t& in) {

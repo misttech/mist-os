@@ -27,38 +27,6 @@ namespace zxdb {
 
 namespace {
 
-class X64ExceptionInfo : public debug_ipc::X64ExceptionInfo {
- public:
-  explicit X64ExceptionInfo(const crashpad::ExceptionSnapshot* snapshot) : snapshot_(snapshot) {}
-
-  std::optional<debug_ipc::X64ExceptionInfo::DebugRegs> FetchDebugRegs() const override {
-    debug_ipc::X64ExceptionInfo::DebugRegs ret;
-    auto context = snapshot_->Context()->x86_64;
-
-    ret.dr0 = context->dr0;
-    ret.dr1 = context->dr1;
-    ret.dr2 = context->dr2;
-    ret.dr3 = context->dr3;
-    ret.dr6 = context->dr6;
-    ret.dr7 = context->dr7;
-
-    return ret;
-  }
-
- private:
-  const crashpad::ExceptionSnapshot* snapshot_;
-};
-
-class Arm64ExceptionInfo : public debug_ipc::Arm64ExceptionInfo {
- public:
-  explicit Arm64ExceptionInfo(const crashpad::ExceptionSnapshot* snapshot) : snapshot_(snapshot) {}
-
-  std::optional<uint32_t> FetchESR() const override { return snapshot_->ExceptionInfo(); }
-
- private:
-  const crashpad::ExceptionSnapshot* snapshot_;
-};
-
 Err ErrNoLive() { return Err(ErrType::kNoConnection, "System is no longer live"); }
 
 Err ErrNoDump() { return Err("Core dump failed to open"); }
@@ -450,8 +418,8 @@ void MinidumpRemoteAPI::Attach(const debug_ipc::AttachRequest& request,
   if (auto exception = minidump_->Exception()) {
     switch (exception->Context()->architecture) {
       case crashpad::CPUArchitecture::kCPUArchitectureARM64: {
-        Arm64ExceptionInfo info(exception);
-        exception_notification.type = debug_ipc::DecodeException(exception->Exception(), info);
+        exception_notification.type = debug_ipc::DecodeArm64Exception(
+            exception->Exception(), [exception]() { return exception->ExceptionInfo(); });
 
         // The |codes| vector is populated in this order:
         //  [0] = zircon exception (this is the same as |ExceptionSnapshot.Exception()|)
@@ -465,8 +433,20 @@ void MinidumpRemoteAPI::Attach(const debug_ipc::AttachRequest& request,
         break;
       }
       case crashpad::CPUArchitecture::kCPUArchitectureX86_64: {
-        X64ExceptionInfo info(exception);
-        exception_notification.type = debug_ipc::DecodeException(exception->Exception(), info);
+        exception_notification.type =
+            debug_ipc::DecodeX64Exception(exception->Exception(), [exception]() {
+              debug_ipc::X64DebugRegs ret;
+              auto context = exception->Context()->x86_64;
+
+              ret.dr0 = context->dr0;
+              ret.dr1 = context->dr1;
+              ret.dr2 = context->dr2;
+              ret.dr3 = context->dr3;
+              ret.dr6 = context->dr6;
+              ret.dr7 = context->dr7;
+
+              return ret;
+            });
 
         // The |codes| vector is populated in this order:
         //  [0] = zircon exception (this is the same as |ExceptionSnapshot.Exception()|)
