@@ -220,6 +220,12 @@
             to: "#test_manager",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.mediacodec.CodecFactory",
+            from: "#codec_factory",
+            to: "#test_manager",
+            source_availability: "unknown",
+        },
 
         // Needed by some non-hermetic tests
         {

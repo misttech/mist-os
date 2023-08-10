@@ -42,15 +42,5 @@
             from: "parent",
             to: "#codec_factory",
         },
-
-        // needed for certain non-hermetic tests.
-        {
-            protocol: [ "fuchsia.mediacodec.CodecFactory" ],
-            from: "#codec_factory",
-            to: [
-                "#test_manager",
-                "#testing",
-            ],
-        },
     ],
 }

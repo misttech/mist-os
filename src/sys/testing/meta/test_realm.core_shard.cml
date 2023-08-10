@@ -186,6 +186,12 @@
             to: "#testing",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.mediacodec.CodecFactory",
+            from: "#codec_factory",
+            to: "#testing",
+            source_availability: "unknown",
+        },
 
         // Needed by some non-hermetic tests
         {
