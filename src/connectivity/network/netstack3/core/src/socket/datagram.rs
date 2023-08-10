@@ -2918,7 +2918,7 @@ mod test {
     type FakeSyncCtx<I, D> =
         Wrapped<FakeSocketsState<I, D>, Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>>;
 
-    impl<I: IpExt, D: FakeStrongDeviceId + 'static> FakeSyncCtx<I, D> {
+    impl<I: IpExt, D: FakeStrongDeviceId> FakeSyncCtx<I, D> {
         fn new_with_sockets(state: FakeSocketsState<I, D>, bound: FakeBoundSockets<D>) -> Self {
             Self {
                 outer: state,
@@ -2930,7 +2930,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
+    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId>
         DatagramStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec> for FakeSyncCtx<I, D>
     {
         type SocketsStateCtx<'a> = Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>;
@@ -2972,7 +2972,7 @@ mod test {
         }
     }
 
-    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
+    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
         DatagramBoundStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
     {
@@ -3033,7 +3033,7 @@ mod test {
         }
     }
 
-    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId + 'static>
+    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
         LocalIdentifierAllocator<
             I,
             FakeWeakDeviceId<D>,

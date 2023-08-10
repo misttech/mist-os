@@ -1251,7 +1251,7 @@ mod tests {
         ) -> FakeSocketsMutRefs<'_, Self::AnyDevice, Self::AllSockets, Self::Devices>;
     }
 
-    impl<D: FakeStrongDeviceId + 'static> AsFakeSocketsMutRefs for FakeSyncCtx<FakeSockets<D>, (), D> {
+    impl<D: FakeStrongDeviceId> AsFakeSocketsMutRefs for FakeSyncCtx<FakeSockets<D>, (), D> {
         type AnyDevice = AnyDeviceSockets<FakeStrongId>;
         type AllSockets = FakeAllSockets<D>;
         type Devices = HashMap<D, DeviceSockets<FakeStrongId>>;
@@ -1326,7 +1326,7 @@ mod tests {
 
     /// Simplified trait that provides a blanket impl of [`DeviceIdContext`].
     pub(crate) trait FakeDeviceIdContext {
-        type DeviceId: FakeStrongDeviceId + 'static;
+        type DeviceId: FakeStrongDeviceId;
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool;
     }
 
@@ -1344,9 +1344,7 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
-        for FakeSyncCtx<FakeSockets<D>, (), D>
-    {
+    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeSyncCtx<FakeSockets<D>, (), D> {
         type DeviceId = D;
         type WeakDeviceId = D::Weak;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -1362,7 +1360,7 @@ mod tests {
 
     impl<
             'm,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<AllSockets = FakeAllSockets<DeviceId>>
                 + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
                 + SyncContextTypes<SocketId = FakeStrongId>,
@@ -1409,7 +1407,7 @@ mod tests {
 
     impl<
             'm,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<
                     AllSockets = FakeAllSockets<DeviceId>,
                     Devices = HashMap<DeviceId, DeviceSockets<FakeStrongId>>,
@@ -1449,7 +1447,7 @@ mod tests {
 
     impl<
             'm,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<
                     AnyDevice = AnyDeviceSockets<FakeStrongId>,
                     AllSockets = FakeAllSockets<DeviceId>,
@@ -1517,14 +1515,14 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId + 'static> FakeDeviceIdContext for HashSet<D> {
+    impl<D: FakeStrongDeviceId> FakeDeviceIdContext for HashSet<D> {
         type DeviceId = D;
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
             self.contains(device_id)
         }
     }
 
-    impl<V, D: FakeStrongDeviceId + 'static> FakeDeviceIdContext for HashMap<D, V> {
+    impl<V, D: FakeStrongDeviceId> FakeDeviceIdContext for HashMap<D, V> {
         type DeviceId = D;
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
             self.contains_key(device_id)

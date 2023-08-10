@@ -2374,9 +2374,12 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> {}
+    pub(crate) trait FakeStrongDeviceId:
+        StrongId<Weak = FakeWeakDeviceId<Self>> + 'static
+    {
+    }
 
-    impl<D: StrongId<Weak = FakeWeakDeviceId<Self>>> FakeStrongDeviceId for D {}
+    impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static> FakeStrongDeviceId for D {}
 
     /// Calls [`receive_frame`], with a [`Ctx`].
     #[cfg(test)]

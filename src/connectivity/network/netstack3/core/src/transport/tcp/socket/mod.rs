@@ -3390,7 +3390,7 @@ mod tests {
         fn new_incoming_connections(&mut self, _: usize) {}
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId> DeviceIpSocketHandler<I, TcpNonSyncCtx>
         for FakeBufferIpTransportCtx<I, D>
     {
         fn get_mms<O: SendOptions<I>>(
@@ -3402,9 +3402,7 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongDeviceId + 'static> SyncContext<I, TcpNonSyncCtx>
-        for TcpSyncCtx<I, D>
-    {
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId> SyncContext<I, TcpNonSyncCtx> for TcpSyncCtx<I, D> {
         type IpTransportCtx<'a> = FakeBufferIpTransportCtx<I, D>;
 
         fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
@@ -3577,7 +3575,7 @@ mod tests {
         type Type = TcpCtx<NewIp, D>;
     }
 
-    fn handle_timer<I: Ip + TcpTestIpExt, D: FakeStrongDeviceId + 'static>(
+    fn handle_timer<I: Ip + TcpTestIpExt, D: FakeStrongDeviceId>(
         ctx: &mut TcpCtx<I, D>,
         _: &mut (),
         timer_id: TimerId,

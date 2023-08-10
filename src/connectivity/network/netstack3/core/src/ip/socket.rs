@@ -950,7 +950,7 @@ pub(crate) mod testutil {
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: CounterContext + InstantContext + TracingContext,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
@@ -970,7 +970,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
+    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice>
         for FakeIpSocketCtx<I, DeviceId>
     {
         type DeviceId = <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
@@ -993,11 +993,7 @@ pub(crate) mod testutil {
         }
     }
 
-    fn lookup_route<
-        I: IpDeviceStateIpExt,
-        D: FakeStrongDeviceId + 'static,
-        Instant: crate::Instant,
-    >(
+    fn lookup_route<I: IpDeviceStateIpExt, D: FakeStrongDeviceId, Instant: crate::Instant>(
         table: &ForwardingTable<I, D>,
         ip_forwarding_ctx: &mut FakeIpForwardingCtx<D>,
         device_state: &HashMap<D, impl AsRef<IpDeviceState<Instant, I>>>,
@@ -1039,7 +1035,7 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt,
             C: CounterContext + InstantContext + TracingContext,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn lookup_route(
@@ -1062,7 +1058,7 @@ pub(crate) mod testutil {
             Id,
             Meta,
             Event: Debug,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
             NonSyncCtxState,
         > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
         for FakeSyncCtx<S, Meta, DeviceId>
@@ -1196,7 +1192,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            D: FakeStrongDeviceId + 'static,
+            D: FakeStrongDeviceId,
             C: RngContext + InstantContext<Instant = FakeInstant>,
         > MulticastMembershipHandler<I, C> for FakeIpSocketCtx<I, D>
     {
@@ -1228,7 +1224,7 @@ pub(crate) mod testutil {
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: CounterContext + InstantContext + TracingContext,
-            D: FakeStrongDeviceId + 'static,
+            D: FakeStrongDeviceId,
             State: TransportIpContext<I, C, DeviceId = D>,
             Meta,
         > TransportIpContext<I, C> for FakeSyncCtx<State, Meta, D>
@@ -1360,7 +1356,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<DeviceId: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
+    impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice>
         for FakeDualStackIpSocketCtx<DeviceId>
     {
         type DeviceId = DeviceId;
@@ -1382,11 +1378,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<
-            I: IpDeviceStateIpExt,
-            DeviceId: FakeStrongDeviceId + 'static,
-            C: IpSocketNonSyncContext,
-        > IpSocketContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
+    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId, C: IpSocketNonSyncContext>
+        IpSocketContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn lookup_route(
             &mut self,
@@ -1412,7 +1405,7 @@ pub(crate) mod testutil {
             Id,
             Meta,
             Event: Debug,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
             NonSyncCtxState,
         > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
         for FakeSyncCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
@@ -1430,7 +1423,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            D: FakeStrongDeviceId + 'static,
+            D: FakeStrongDeviceId,
             C: RngContext + InstantContext<Instant = FakeInstant>,
         > MulticastMembershipHandler<I, C> for FakeDualStackIpSocketCtx<D>
     {
@@ -1466,7 +1459,7 @@ pub(crate) mod testutil {
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: CounterContext + InstantContext + TracingContext,
-            DeviceId: FakeStrongDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId,
         > TransportIpContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {

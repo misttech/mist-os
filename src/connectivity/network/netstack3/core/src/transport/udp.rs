@@ -2524,7 +2524,7 @@ mod tests {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            D: FakeStrongDeviceId + 'static,
+            D: FakeStrongDeviceId,
             Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
                 + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
             const DUAL_STACK_ENABLED: bool,
@@ -2568,11 +2568,8 @@ mod tests {
         }
     }
 
-    impl<
-            I: IpExt + IpDeviceStateIpExt,
-            D: FakeStrongDeviceId + 'static,
-            const DUAL_STACK_ENABLED: bool,
-        > BoundStateContext<I, FakeUdpNonSyncCtx> for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    impl<I: IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
+        BoundStateContext<I, FakeUdpNonSyncCtx> for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
         type DualStackContext = Self;
@@ -2615,11 +2612,8 @@ mod tests {
         }
     }
 
-    impl<
-            I: IpExt + IpDeviceStateIpExt,
-            D: FakeStrongDeviceId + 'static,
-            const DUAL_STACK_ENABLED: bool,
-        > DualStackDatagramBoundStateContext<I, FakeUdpNonSyncCtx, Udp>
+    impl<I: IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
+        DualStackDatagramBoundStateContext<I, FakeUdpNonSyncCtx, Udp>
         for Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>, FakeBufferSyncCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
@@ -2717,7 +2711,7 @@ mod tests {
 
     impl<
             I: TestIpExt,
-            D: FakeStrongDeviceId + 'static,
+            D: FakeStrongDeviceId,
             B: BufferMut,
             Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
                 + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
@@ -2734,12 +2728,8 @@ mod tests {
         type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
     }
 
-    impl<
-            I: TestIpExt,
-            D: FakeStrongDeviceId + 'static,
-            B: BufferMut,
-            const DUAL_STACK_ENABLED: bool,
-        > BufferBoundStateContext<I, FakeUdpNonSyncCtx, B>
+    impl<I: TestIpExt, D: FakeStrongDeviceId, B: BufferMut, const DUAL_STACK_ENABLED: bool>
+        BufferBoundStateContext<I, FakeUdpNonSyncCtx, B>
         for Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>, FakeBufferSyncCtx<D>>
     {
         type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
@@ -2749,11 +2739,8 @@ mod tests {
     ///
     /// Packets for IP version `I` are only delivered to sockets of version `I`.
     /// For cross-stack delivery, use the [`FakeUdpDualStackSyncCtx`].
-    impl<
-            I: IpExt + IpDeviceStateIpExt + TestIpExt,
-            D: FakeStrongDeviceId + 'static,
-            B: BufferMut,
-        > BufferIpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpSyncCtx<I, D>, B>
+    impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
+        BufferIpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpSyncCtx<I, D>, B>
         for UdpIpTransportContext
     {
         fn receive_ip_packet(
@@ -2835,11 +2822,8 @@ mod tests {
         Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpDualStackInnerSyncCtx<D>>;
 
     /// Dual-stack delivery for [`FakeUdpDualStackSyncCtx`].
-    impl<
-            I: IpExt + IpDeviceStateIpExt + TestIpExt,
-            D: FakeStrongDeviceId + 'static,
-            B: BufferMut,
-        > BufferIpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpDualStackSyncCtx<D>, B>
+    impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
+        BufferIpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpDualStackSyncCtx<D>, B>
         for UdpIpTransportContext
     {
         fn receive_ip_packet(
@@ -2951,7 +2935,7 @@ mod tests {
     /// Helper function to inject an UDP packet with the provided parameters.
     fn receive_udp_packet<
         A: IpAddress,
-        D: FakeStrongDeviceId + 'static,
+        D: FakeStrongDeviceId,
         SC: DeviceIdContext<AnyDevice, DeviceId = D>,
     >(
         sync_ctx: &mut SC,

@@ -3039,9 +3039,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<DeviceId: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
-        for FakeIpDeviceIdCtx<DeviceId>
-    {
+    impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpDeviceIdCtx<DeviceId> {
         type DeviceId = DeviceId;
         type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
 
@@ -3105,7 +3103,7 @@ pub(crate) mod testutil {
     impl<
             I: Ip,
             C: RngContext + InstantContext<Instant = FakeInstant>,
-            D: FakeStrongDeviceId + 'static,
+            D: FakeStrongDeviceId,
             State: MulticastMembershipHandler<I, C, DeviceId = D>,
             Meta,
         > MulticastMembershipHandler<I, C> for crate::context::testutil::FakeSyncCtx<State, Meta, D>
