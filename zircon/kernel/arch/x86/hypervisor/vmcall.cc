@@ -34,28 +34,22 @@ namespace {
 // syscall dispatch.
 class GuestHandle {
  public:
-  user_out_handle* out() { return &out_; }
-  void set_value(zx_handle_t* value) { value_ = value; }
-  zx_status_t begin_copyout(ProcessDispatcher* process) {
-    return out_.begin_copyout(process, user_out_ptr<zx_handle_t>(value_));
-  }
-  void finish_copyout(ProcessDispatcher* process) { out_.finish_copyout(process); }
+  zx_handle_t* arg_ptr() { return &arg_; }
+  void set_dst(zx_handle_t* dst) { dst_ = dst; }
+  zx_status_t copyout() { return user_out_ptr<zx_handle_t>(dst_).copy_to_user(arg_); }
 
  private:
-  user_out_handle out_;
-  zx_handle_t* value_;
+  zx_handle_t arg_;
+  zx_handle_t* dst_;
 };
 
 template <size_t NumHandles>
 zx_status_t CopyHandles(ProcessDispatcher* process, GuestHandle (&handles)[NumHandles]) {
   for (auto& handle : handles) {
-    zx_status_t status = handle.begin_copyout(process);
+    zx_status_t status = handle.copyout();
     if (status != ZX_OK) {
       return ZX_ERR_INVALID_ARGS;
     }
-  }
-  for (auto& handle : handles) {
-    handle.finish_copyout(process);
   }
   return ZX_OK;
 }
@@ -74,14 +68,14 @@ struct Abi<internal::user_ptr<T, Policy>> {
   }
 };
 
-// Casts a `uint64` to a `user_out_handle*`.
+// Casts a `uint64` to a `zx_handle_t*`.
 template <>
-struct Abi<user_out_handle*> {
-  static user_out_handle* Cast(uint64_t value, GuestHandle*& handle) {
-    handle->set_value(SafeSyscallArgument<zx_handle_t*>::Sanitize(value));
-    user_out_handle* out = handle->out();
+struct Abi<zx_handle_t*> {
+  static zx_handle_t* Cast(uint64_t value, GuestHandle*& handle) {
+    handle->set_dst(SafeSyscallArgument<zx_handle_t*>::Sanitize(value));
+    zx_handle_t* arg_ptr = handle->arg_ptr();
     ++handle;
-    return out;
+    return arg_ptr;
   }
 };
 
@@ -121,7 +115,7 @@ class Vmcall {
   // Dispatch a `syscall` using `guest_state`.
   template <typename R, typename... Args>
   static void Dispatch(GuestState& guest_state, R (*syscall)(Args...)) {
-    constexpr size_t kNumHandles = (ktl::is_same_v<user_out_handle*, Args> + ... + 0);
+    constexpr size_t kNumHandles = (ktl::is_same_v<zx_handle_t*, Args> + ... + 0);
     if constexpr (kNumHandles == 0) {
       DispatchWithResult(guest_state, nullptr, syscall);
     } else {
