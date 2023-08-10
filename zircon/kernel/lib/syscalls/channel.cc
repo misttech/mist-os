@@ -65,7 +65,7 @@ static void record_recv_msg_sz(uint32_t size) {
 }
 
 // zx_status_t zx_channel_create
-zx_status_t sys_channel_create(uint32_t options, user_out_handle* out0, user_out_handle* out1) {
+zx_status_t sys_channel_create(uint32_t options, zx_handle_t* out0, zx_handle_t* out1) {
   if (options != 0u)
     return ZX_ERR_INVALID_ARGS;
 
@@ -80,9 +80,9 @@ zx_status_t sys_channel_create(uint32_t options, user_out_handle* out0, user_out
   if (result != ZX_OK)
     return result;
 
-  result = out0->make(ktl::move(handle0), rights);
+  result = up->MakeAndAddHandle(ktl::move(handle0), rights, out0);
   if (result == ZX_OK)
-    result = out1->make(ktl::move(handle1), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle1), rights, out1);
   return result;
 }
 

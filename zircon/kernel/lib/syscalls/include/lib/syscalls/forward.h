@@ -14,12 +14,11 @@
 #include <object/handle.h>
 #include <object/process_dispatcher.h>
 
-// This is the type of handle result parameters in system call
-// implementation functions (sys_*).  zither recognizes return values of
-// type zx_handle_t and converts them into user_out_handle* instead of into
-// user_out_ptr<zx_handle_t>.  System call implementation functions use the
-// make, dup, or transfer method to turn a Dispatcher pointer or another
-// handle into a handle received by the user.
+// This is the type of handle result parameters formerly used in system call
+// implementation functions (sys_*). System call implementation functions used
+// the make, dup, or transfer method to turn a Dispatcher pointer or another
+// handle into a handle received by the user. It is now only used by
+// virtualization code.
 //
 // user_out_handle will generate a policy exception if destroyed while the
 // enclosed HandleOwner is non-null, as we expect all syscalls to successfully

@@ -23,8 +23,8 @@
 #define LOCAL_TRACE 0
 
 // zx_status_t zx_fifo_create
-zx_status_t sys_fifo_create(size_t count, size_t elemsize, uint32_t options, user_out_handle* out0,
-                            user_out_handle* out1) {
+zx_status_t sys_fifo_create(size_t count, size_t elemsize, uint32_t options, zx_handle_t* out0,
+                            zx_handle_t* out1) {
   auto up = ProcessDispatcher::GetCurrent();
   zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_FIFO);
   if (res != ZX_OK)
@@ -37,9 +37,9 @@ zx_status_t sys_fifo_create(size_t count, size_t elemsize, uint32_t options, use
       FifoDispatcher::Create(count, elemsize, options, &handle0, &handle1, &rights);
 
   if (result == ZX_OK)
-    result = out0->make(ktl::move(handle0), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle0), rights, out0);
   if (result == ZX_OK)
-    result = out1->make(ktl::move(handle1), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle1), rights, out1);
   return result;
 }
 

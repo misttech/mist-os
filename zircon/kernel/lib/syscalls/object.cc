@@ -1460,7 +1460,7 @@ zx_status_t sys_object_signal_peer(zx_handle_t handle_value, uint32_t clear_mask
 // child specified by the provided kernel object id.
 // zx_status_t zx_object_get_child
 zx_status_t sys_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t rights,
-                                 user_out_handle* out) {
+                                 zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   fbl::RefPtr<Dispatcher> dispatcher;
@@ -1489,17 +1489,17 @@ zx_status_t sys_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t 
     auto thread = process->LookupThreadById(koid);
     if (!thread)
       return ZX_ERR_NOT_FOUND;
-    return out->make(ktl::move(thread), rights);
+    return up->MakeAndAddHandle(ktl::move(thread), rights, out);
   }
 
   auto job = DownCastDispatcher<JobDispatcher>(&dispatcher);
   if (job) {
     auto child = job->LookupJobById(koid);
     if (child)
-      return out->make(ktl::move(child), rights);
+      return up->MakeAndAddHandle(ktl::move(child), rights, out);
     auto proc = job->LookupProcessById(koid);
     if (proc) {
-      return out->make(ktl::move(proc), rights);
+      return up->MakeAndAddHandle(ktl::move(proc), rights, out);
     }
     return ZX_ERR_NOT_FOUND;
   }

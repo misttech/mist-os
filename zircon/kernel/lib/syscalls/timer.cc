@@ -21,7 +21,7 @@
 #include <ktl/enforce.h>
 
 // zx_status_t zx_timer_create
-zx_status_t sys_timer_create(uint32_t options, zx_clock_t clock_id, user_out_handle* out) {
+zx_status_t sys_timer_create(uint32_t options, zx_clock_t clock_id, zx_handle_t* out) {
   if (clock_id != ZX_CLOCK_MONOTONIC)
     return ZX_ERR_INVALID_ARGS;
 
@@ -36,7 +36,7 @@ zx_status_t sys_timer_create(uint32_t options, zx_clock_t clock_id, user_out_han
   result = TimerDispatcher::Create(options, &handle, &rights);
 
   if (result == ZX_OK)
-    result = out->make(ktl::move(handle), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle), rights, out);
   return result;
 }
 

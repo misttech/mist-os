@@ -26,7 +26,7 @@
 
 // zx_status_t zx_stream_create
 zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t seek,
-                              user_out_handle* out_stream) {
+                              zx_handle_t* out_stream) {
   if ((options & ~ZX_STREAM_CREATE_MASK) != 0)
     return ZX_ERR_INVALID_ARGS;
 
@@ -60,7 +60,7 @@ zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t
   status = StreamDispatcher::Create(stream_options, ktl::move(vmo), seek, &new_handle, &rights);
   if (status != ZX_OK)
     return status;
-  return out_stream->make(ktl::move(new_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(new_handle), rights, out_stream);
 }
 
 // zx_status_t zx_stream_writev

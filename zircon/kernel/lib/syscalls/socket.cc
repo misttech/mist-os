@@ -25,7 +25,7 @@
 #define LOCAL_TRACE 0
 
 // zx_status_t zx_socket_create
-zx_status_t sys_socket_create(uint32_t options, user_out_handle* out0, user_out_handle* out1) {
+zx_status_t sys_socket_create(uint32_t options, zx_handle_t* out0, zx_handle_t* out1) {
   auto up = ProcessDispatcher::GetCurrent();
   zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_SOCKET);
   if (res != ZX_OK)
@@ -36,9 +36,9 @@ zx_status_t sys_socket_create(uint32_t options, user_out_handle* out0, user_out_
   zx_status_t result = SocketDispatcher::Create(options, &handle0, &handle1, &rights);
 
   if (result == ZX_OK)
-    result = out0->make(ktl::move(handle0), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle0), rights, out0);
   if (result == ZX_OK)
-    result = out1->make(ktl::move(handle1), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle1), rights, out1);
   return result;
 }
 

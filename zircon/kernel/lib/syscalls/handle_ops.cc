@@ -40,7 +40,7 @@ zx_status_t sys_handle_close_many(user_in_ptr<const zx_handle_t> handles, size_t
 }
 
 static zx_status_t handle_dup_replace(bool is_replace, zx_handle_t handle_value, zx_rights_t rights,
-                                      user_out_handle* out) {
+                                      zx_handle_t* out) {
   LTRACEF("handle %x\n", handle_value);
 
   auto up = ProcessDispatcher::GetCurrent();
@@ -64,21 +64,25 @@ static zx_status_t handle_dup_replace(bool is_replace, zx_handle_t handle_value,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  zx_status_t status = out->dup(source, rights);
+  HandleOwner handle = Handle::Dup(source, rights);
+  if (!handle) {
+    return ZX_ERR_NO_MEMORY;
+  }
 
   if (is_replace)
     up->handle_table().RemoveHandleLocked(source);
 
-  return status;
+  *out = up->handle_table().MapHandleToValue(handle);
+  up->handle_table().AddHandleLocked(ktl::move(handle));
+  return ZX_OK;
 }
 
 // zx_status_t zx_handle_duplicate
-zx_status_t sys_handle_duplicate(zx_handle_t handle_value, zx_rights_t rights,
-                                 user_out_handle* out) {
+zx_status_t sys_handle_duplicate(zx_handle_t handle_value, zx_rights_t rights, zx_handle_t* out) {
   return handle_dup_replace(false, handle_value, rights, out);
 }
 
 // zx_status_t zx_handle_replace
-zx_status_t sys_handle_replace(zx_handle_t handle_value, zx_rights_t rights, user_out_handle* out) {
+zx_status_t sys_handle_replace(zx_handle_t handle_value, zx_rights_t rights, zx_handle_t* out) {
   return handle_dup_replace(true, handle_value, rights, out);
 }

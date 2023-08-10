@@ -79,7 +79,7 @@ zx_ticks_t sys_ticks_get_via_kernel() {
 }
 
 // zx_status_t zx_event_create
-zx_status_t sys_event_create(uint32_t options, user_out_handle* event_out) {
+zx_status_t sys_event_create(uint32_t options, zx_handle_t* out) {
   LTRACEF("options 0x%x\n", options);
 
   if (options != 0u)
@@ -90,17 +90,18 @@ zx_status_t sys_event_create(uint32_t options, user_out_handle* event_out) {
   if (res != ZX_OK)
     return res;
 
-  KernelHandle<EventDispatcher> handle;
+  KernelHandle<EventDispatcher> kernel_handle;
   zx_rights_t rights;
 
-  zx_status_t result = EventDispatcher::Create(options, &handle, &rights);
-  if (result == ZX_OK)
-    result = event_out->make(ktl::move(handle), rights);
-  return result;
+  zx_status_t result = EventDispatcher::Create(options, &kernel_handle, &rights);
+  if (result != ZX_OK) {
+    return result;
+  }
+  return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
 }
 
 // zx_status_t zx_eventpair_create
-zx_status_t sys_eventpair_create(uint32_t options, user_out_handle* out0, user_out_handle* out1) {
+zx_status_t sys_eventpair_create(uint32_t options, zx_handle_t* out0, zx_handle_t* out1) {
   if (options != 0u)  // No options defined/supported yet.
     return ZX_ERR_NOT_SUPPORTED;
 
@@ -114,15 +115,15 @@ zx_status_t sys_eventpair_create(uint32_t options, user_out_handle* out0, user_o
   zx_status_t result = EventPairDispatcher::Create(&handle0, &handle1, &rights);
 
   if (result == ZX_OK)
-    result = out0->make(ktl::move(handle0), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle0), rights, out0);
   if (result == ZX_OK)
-    result = out1->make(ktl::move(handle1), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle1), rights, out1);
 
   return result;
 }
 
 // zx_status_t zx_debuglog_create
-zx_status_t sys_debuglog_create(zx_handle_t rsrc, uint32_t options, user_out_handle* out) {
+zx_status_t sys_debuglog_create(zx_handle_t rsrc, uint32_t options, zx_handle_t* out) {
   LTRACEF("options 0x%x\n", options);
 
   // To support allowing the libc dynamic linker to emit log messages even
@@ -158,7 +159,7 @@ zx_status_t sys_debuglog_create(zx_handle_t rsrc, uint32_t options, user_out_han
   }
 
   // create a handle and attach the dispatcher to it
-  return out->make(ktl::move(handle), rights);
+  return ProcessDispatcher::GetCurrent()->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 // zx_status_t zx_debuglog_write

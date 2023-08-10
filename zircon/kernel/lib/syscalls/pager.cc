@@ -36,7 +36,7 @@ void split_syscall_flags(uint32_t flags, uint32_t* source_flags, uint32_t* vmo_f
 }  // namespace
 
 // zx_status_t zx_pager_create
-zx_status_t sys_pager_create(uint32_t options, user_out_handle* out) {
+zx_status_t sys_pager_create(uint32_t options, zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   zx_status_t status = up->EnforceBasicPolicy(ZX_POL_NEW_PAGER);
@@ -55,12 +55,12 @@ zx_status_t sys_pager_create(uint32_t options, user_out_handle* out) {
     return status;
   }
 
-  return out->make(ktl::move(handle), rights);
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 // zx_status_t zx_pager_create_vmo
 zx_status_t sys_pager_create_vmo(zx_handle_t pager, uint32_t options, zx_handle_t port,
-                                 uint64_t key, uint64_t size, user_out_handle* out) {
+                                 uint64_t key, uint64_t size, zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   zx_status_t status = up->EnforceBasicPolicy(ZX_POL_NEW_VMO);
@@ -119,7 +119,7 @@ zx_status_t sys_pager_create_vmo(zx_handle_t pager, uint32_t options, zx_handle_
     return status;
   }
 
-  return out->make(ktl::move(kernel_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
 }
 
 // zx_status_t zx_pager_detach_vmo

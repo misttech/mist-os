@@ -34,7 +34,7 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
   return RestrictedEnter(options, vector_table_ptr, context);
 }
 
-zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
+zx_status_t sys_restricted_bind_state(uint32_t options, zx_handle_t* out) {
   LTRACEF("options 0x%x\n", options);
 
   // No options allowed.
@@ -74,15 +74,15 @@ zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
   }
 
   // Wrap the VmObjectDispatcher in a Handle.
-  status = out->make(ktl::move(kernel_handle), rights);
+  status = up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
   if (status != ZX_OK) {
     return ZX_OK;
   }
 
-  // Finally, set this thread's restricted state.  Note, it's possible the copy-out of the new
-  // handle will fail, but that's OK.  If that happens the handle will be destroyed along with the
-  // VmObjectDispatcher.  However, the VMO itself (VmObjectPaged) will persist until the thread is
-  // destroyed, the user calls unbind, or the user binds different VMO.
+  // Finally, set this thread's restricted state. Note, it's possible the copy-out of the new
+  // handle will fail, but that's OK. If that happens a ZX_EXCP_POLICY_CODE_HANDLE_LEAK will
+  // be generated, at which point the caller will either be terminated or will need to handle
+  // the exception (likely by retrying the operation with a valid out buffer).
   Thread::Current::Get()->set_restricted_state(ktl::move(rs));
 
   return ZX_OK;

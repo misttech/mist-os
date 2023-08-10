@@ -34,7 +34,7 @@
 // zx_status_t zx_resource_create
 zx_status_t sys_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint64_t base,
                                 size_t size, user_in_ptr<const char> user_name, size_t name_size,
-                                user_out_handle* resource_out) {
+                                zx_handle_t* resource_out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   // Obtain the parent Resource
@@ -85,5 +85,5 @@ zx_status_t sys_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint6
   }
 
   // Create a handle for the child
-  return resource_out->make(ktl::move(handle), rights);
+  return up->MakeAndAddHandle(ktl::move(handle), rights, resource_out);
 }

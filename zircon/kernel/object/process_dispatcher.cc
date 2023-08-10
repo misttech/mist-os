@@ -1029,3 +1029,25 @@ fbl::RefPtr<VmAspace> ProcessDispatcher::aspace_at(vaddr_t va) {
 
   return shareable_state_->aspace();
 }
+
+zx_status_t ProcessDispatcher::MakeAndAddHandle(fbl::RefPtr<Dispatcher> dispatcher,
+                                                zx_rights_t rights, zx_handle_t* out) {
+  HandleOwner handle = Handle::Make(ktl::move(dispatcher), rights);
+  if (!handle) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  *out = handle_table().MapHandleToValue(handle);
+  handle_table().AddHandle(ktl::move(handle));
+  return ZX_OK;
+}
+
+zx_status_t ProcessDispatcher::MakeAndAddHandle(KernelHandle<Dispatcher> kernel_handle,
+                                                zx_rights_t rights, zx_handle_t* out) {
+  HandleOwner handle = Handle::Make(ktl::move(kernel_handle), rights);
+  if (!handle) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  *out = handle_table().MapHandleToValue(handle);
+  handle_table().AddHandle(ktl::move(handle));
+  return ZX_OK;
+}

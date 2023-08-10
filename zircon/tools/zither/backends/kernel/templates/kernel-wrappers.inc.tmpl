@@ -34,7 +34,7 @@ uint64_t pc) {
         [&](ProcessDispatcher* current_process) -> uint64_t {
 {{/* Write out locals for the ouput handles */}}
 {{- range $userOutHandles }}
-    user_out_handle out_handle_{{ LowerCaseWithUnderscores . }};
+    zx_handle_t out_handle_{{ LowerCaseWithUnderscores . }} = ZX_HANDLE_INVALID;
 {{- end }}
 
 {{- if .NoReturn }} /*noreturn*/ {{ else }} auto result = {{ end }} sys_{{ $syscallName }} (
@@ -61,14 +61,11 @@ uint64_t pc) {
         return result;
 {{- end }}
 {{- range $userOutHandles }}
-    result = out_handle_{{ LowerCaseWithUnderscores . }}.begin_copyout(current_process, make_user_out_ptr(SafeSyscallArgument<{{ ParameterType . }}>::Sanitize({{ LowerCaseWithUnderscores . }})));
-    if (result != ZX_OK)
-        return result;
+    result = make_user_out_ptr(SafeSyscallArgument<{{ ParameterType . }}>::Sanitize({{ LowerCaseWithUnderscores . }})).copy_to_user(out_handle_{{ LowerCaseWithUnderscores . }});
+    if (result != ZX_OK) {
+        Thread::Current::SignalPolicyException(ZX_EXCP_POLICY_CODE_HANDLE_LEAK, 0u);
+    }
 {{- end }}
-{{- range $userOutHandles }}
-    out_handle_{{ LowerCaseWithUnderscores . }}.finish_copyout(current_process);
-{{- end }}
-
 {{- if .NoReturn }}
     /* NOTREACHED */
     return ZX_ERR_BAD_STATE;

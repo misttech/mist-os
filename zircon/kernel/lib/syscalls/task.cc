@@ -74,7 +74,7 @@ zx_status_t copy_user_string(const user_in_ptr<const char>& src, size_t src_len,
 
 // zx_status_t zx_thread_create
 zx_status_t sys_thread_create(zx_handle_t process_handle, user_in_ptr<const char> _name,
-                              size_t name_len, uint32_t options, user_out_handle* out) {
+                              size_t name_len, uint32_t options, zx_handle_t* out) {
   LTRACEF("process handle %x, options %#x\n", process_handle, options);
 
   // currently, the only valid option value is 0
@@ -119,7 +119,7 @@ zx_status_t sys_thread_create(zx_handle_t process_handle, user_in_ptr<const char
   KTRACE_KERNEL_OBJECT("kernel:meta", handle.dispatcher()->get_koid(), ZX_OBJ_TYPE_THREAD, buf,
                        ("process", ktrace::Koid(pid)));
 
-  return out->make(ktl::move(handle), thread_rights);
+  return up->MakeAndAddHandle(ktl::move(handle), thread_rights, out);
 }
 
 // zx_status_t zx_thread_start
@@ -195,7 +195,7 @@ zx_status_t sys_thread_legacy_yield(uint32_t options) {
 }
 
 // zx_status_t zx_task_suspend
-zx_status_t sys_task_suspend(zx_handle_t handle, user_out_handle* token) {
+zx_status_t sys_task_suspend(zx_handle_t handle, zx_handle_t* token) {
   LTRACE_ENTRY;
 
   auto up = ProcessDispatcher::GetCurrent();
@@ -212,20 +212,20 @@ zx_status_t sys_task_suspend(zx_handle_t handle, user_out_handle* token) {
   status = SuspendTokenDispatcher::Create(ktl::move(task), &new_token, &rights);
 
   if (status == ZX_OK)
-    status = token->make(ktl::move(new_token), rights);
+    status = up->MakeAndAddHandle(ktl::move(new_token), rights, token);
 
   return status;
 }
 
 // zx_status_t zx_task_suspend_token
-zx_status_t sys_task_suspend_token(zx_handle_t handle, user_out_handle* token) {
+zx_status_t sys_task_suspend_token(zx_handle_t handle, zx_handle_t* token) {
   return sys_task_suspend(handle, token);
 }
 
 // zx_status_t zx_process_create
 zx_status_t sys_process_create(zx_handle_t job_handle, user_in_ptr<const char> _name,
-                               size_t name_len, uint32_t options, user_out_handle* proc_handle,
-                               user_out_handle* vmar_handle) {
+                               size_t name_len, uint32_t options, zx_handle_t* proc_handle,
+                               zx_handle_t* vmar_handle) {
   LTRACEF("job handle %x, options %#x\n", job_handle, options);
 
   // currently, the only valid option values are 0 or ZX_PROCESS_SHARED
@@ -271,17 +271,17 @@ zx_status_t sys_process_create(zx_handle_t job_handle, user_in_ptr<const char> _
   KTRACE_KERNEL_OBJECT("kernel:meta", new_process_handle.dispatcher()->get_koid(),
                        ZX_OBJ_TYPE_PROCESS, buf);
 
-  result = proc_handle->make(ktl::move(new_process_handle), proc_rights);
+  result = up->MakeAndAddHandle(ktl::move(new_process_handle), proc_rights, proc_handle);
   if (result == ZX_OK)
-    result = vmar_handle->make(ktl::move(new_vmar_handle), vmar_rights);
+    result = up->MakeAndAddHandle(ktl::move(new_vmar_handle), vmar_rights, vmar_handle);
   return result;
 }
 
 // zx_status_t zx_process_create_shared
 zx_status_t sys_process_create_shared(zx_handle_t shared_proc_handle, uint32_t options,
                                       user_in_ptr<const char> _name, size_t name_len,
-                                      user_out_handle* proc_handle,
-                                      user_out_handle* restricted_vmar_handle) {
+                                      zx_handle_t* proc_handle,
+                                      zx_handle_t* restricted_vmar_handle) {
   // currently, the only valid option value is 0
   if (options != 0) {
     return ZX_ERR_INVALID_ARGS;
@@ -331,11 +331,11 @@ zx_status_t sys_process_create_shared(zx_handle_t shared_proc_handle, uint32_t o
   KTRACE_KERNEL_OBJECT("kernel:meta", new_process_handle.dispatcher()->get_koid(),
                        ZX_OBJ_TYPE_PROCESS, buf);
 
-  result = proc_handle->make(ktl::move(new_process_handle), proc_rights);
+  result = up->MakeAndAddHandle(ktl::move(new_process_handle), proc_rights, proc_handle);
 
   if (result == ZX_OK) {
-    result =
-        restricted_vmar_handle->make(ktl::move(new_restricted_vmar_handle), restricted_vmar_rights);
+    result = up->MakeAndAddHandle(ktl::move(new_restricted_vmar_handle), restricted_vmar_rights,
+                                  restricted_vmar_handle);
   }
 
   return result;
@@ -572,7 +572,7 @@ zx_status_t sys_task_kill(zx_handle_t task_handle) {
 }
 
 // zx_status_t zx_job_create
-zx_status_t sys_job_create(zx_handle_t parent_job, uint32_t options, user_out_handle* out) {
+zx_status_t sys_job_create(zx_handle_t parent_job, uint32_t options, zx_handle_t* out) {
   LTRACEF("parent: %x\n", parent_job);
 
   if (options != 0u)
@@ -591,7 +591,7 @@ zx_status_t sys_job_create(zx_handle_t parent_job, uint32_t options, user_out_ha
   zx_rights_t rights;
   status = JobDispatcher::Create(options, ktl::move(parent), &handle, &rights);
   if (status == ZX_OK)
-    status = out->make(ktl::move(handle), rights);
+    status = up->MakeAndAddHandle(ktl::move(handle), rights, out);
   return status;
 }
 

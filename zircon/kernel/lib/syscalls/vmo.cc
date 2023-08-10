@@ -35,7 +35,7 @@ static_assert(ZX_CACHE_POLICY_MASK == ARCH_MMU_FLAG_CACHE_MASK,
               "Cache policy constant mismatch - CACHE_MASK");
 
 // zx_status_t zx_vmo_create
-zx_status_t sys_vmo_create(uint64_t size, uint32_t options, user_out_handle* out) {
+zx_status_t sys_vmo_create(uint64_t size, uint32_t options, zx_handle_t* out) {
   LTRACEF("size %#" PRIx64 "\n", size);
 
   auto up = ProcessDispatcher::GetCurrent();
@@ -71,7 +71,7 @@ zx_status_t sys_vmo_create(uint64_t size, uint32_t options, user_out_handle* out
     return result;
 
   // create a handle and attach the dispatcher to it
-  return out->make(ktl::move(kernel_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
 }
 
 // zx_status_t zx_vmo_read
@@ -199,7 +199,7 @@ zx_status_t sys_vmo_set_cache_policy(zx_handle_t handle, uint32_t cache_policy) 
 
 // zx_status_t zx_vmo_create_child
 zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t offset,
-                                 uint64_t size, user_out_handle* out_handle) {
+                                 uint64_t size, zx_handle_t* out_handle) {
   LTRACEF("handle %x options %#x offset %#" PRIx64 " size %#" PRIx64 "\n", handle, options, offset,
           size);
 
@@ -297,16 +297,14 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
   DEBUG_ASSERT(((default_rights | ZX_RIGHT_EXECUTE) & rights) == rights);
 
   // create a handle and attach the dispatcher to it
-  return out_handle->make(ktl::move(kernel_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out_handle);
 }
 
 // zx_status_t zx_vmo_replace_as_executable
-zx_status_t sys_vmo_replace_as_executable(zx_handle_t handle, zx_handle_t vmex,
-                                          user_out_handle* out) {
+zx_status_t sys_vmo_replace_as_executable(zx_handle_t handle, zx_handle_t vmex, zx_handle_t* out) {
   LTRACEF("repexec %x %x\n", handle, vmex);
 
   auto up = ProcessDispatcher::GetCurrent();
-
   zx_status_t vmex_status = ZX_OK;
   if (vmex != ZX_HANDLE_INVALID) {
     vmex_status = validate_ranged_resource(vmex, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_VMEX_BASE, 1);
@@ -314,19 +312,15 @@ zx_status_t sys_vmo_replace_as_executable(zx_handle_t handle, zx_handle_t vmex,
     vmex_status = up->EnforceBasicPolicy(ZX_POL_AMBIENT_MARK_VMO_EXEC);
   }
 
-  Guard<BrwLockPi, BrwLockPi::Writer> guard{up->handle_table().get_lock()};
-  auto source = up->handle_table().GetHandleLocked(*up, handle);
-  if (!source)
+  HandleOwner orig_handle = up->handle_table().RemoveHandle(*up, handle);
+  if (!orig_handle)
     return ZX_ERR_BAD_HANDLE;
-
-  auto handle_cleanup = fit::defer([up, source]() TA_NO_THREAD_SAFETY_ANALYSIS {
-    up->handle_table().RemoveHandleLocked(source);
-  });
+  if (orig_handle->dispatcher()->get_type() != ZX_OBJ_TYPE_VMO)
+    return ZX_ERR_BAD_HANDLE;
 
   if (vmex_status != ZX_OK)
     return vmex_status;
-  if (source->dispatcher()->get_type() != ZX_OBJ_TYPE_VMO)
-    return ZX_ERR_BAD_HANDLE;
 
-  return out->dup(source, source->rights() | ZX_RIGHT_EXECUTE);
+  return up->MakeAndAddHandle(orig_handle->dispatcher(), orig_handle->rights() | ZX_RIGHT_EXECUTE,
+                              out);
 }

@@ -21,7 +21,7 @@
 #define LOCAL_TRACE 0
 
 // zx_status_t zx_port_create
-zx_status_t sys_port_create(uint32_t options, user_out_handle* out) {
+zx_status_t sys_port_create(uint32_t options, zx_handle_t* out) {
   LTRACEF("options %u\n", options);
   auto up = ProcessDispatcher::GetCurrent();
   zx_status_t result = up->EnforceBasicPolicy(ZX_POL_NEW_PORT);
@@ -37,9 +37,7 @@ zx_status_t sys_port_create(uint32_t options, user_out_handle* out) {
     return result;
   }
 
-  result = out->make(ktl::move(handle), rights);
-
-  return result;
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 // zx_status_t zx_port_queue

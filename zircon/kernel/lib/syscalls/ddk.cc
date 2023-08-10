@@ -61,7 +61,7 @@ zx_paddr_t gSmbiosPhys = 0;
 
 // zx_status_t zx_vmo_create_contiguous
 zx_status_t sys_vmo_create_contiguous(zx_handle_t bti, size_t size, uint32_t alignment_log2,
-                                      user_out_handle* out) {
+                                      zx_handle_t* out) {
   LTRACEF("size 0x%zu\n", size);
 
   if (size == 0) {
@@ -115,12 +115,12 @@ zx_status_t sys_vmo_create_contiguous(zx_handle_t bti, size_t size, uint32_t ali
   }
 
   // create a handle and attach the dispatcher to it
-  return out->make(ktl::move(kernel_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
 }
 
 // zx_status_t zx_vmo_create_physical
 zx_status_t sys_vmo_create_physical(zx_handle_t hrsrc, zx_paddr_t paddr, size_t size,
-                                    user_out_handle* out) {
+                                    zx_handle_t* out) {
   LTRACEF("size 0x%zu\n", size);
 
   auto up = ProcessDispatcher::GetCurrent();
@@ -162,7 +162,7 @@ zx_status_t sys_vmo_create_physical(zx_handle_t hrsrc, zx_paddr_t paddr, size_t 
   }
 
   // create a handle and attach the dispatcher to it
-  return out->make(ktl::move(kernel_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out);
 }
 
 // zx_status_t zx_framebuffer_get_info
@@ -241,7 +241,7 @@ zx_status_t sys_framebuffer_set_range(zx_handle_t hrsrc, zx_handle_t vmo_handle,
 
 // zx_status_t zx_iommu_create
 zx_status_t sys_iommu_create(zx_handle_t resource, uint32_t type, user_in_ptr<const void> desc,
-                             size_t desc_size, user_out_handle* out) {
+                             size_t desc_size, zx_handle_t* out) {
   // TODO: finer grained validation
   zx_status_t status;
   if ((status = validate_resource(resource, ZX_RSRC_KIND_ROOT)) < 0) {
@@ -274,7 +274,7 @@ zx_status_t sys_iommu_create(zx_handle_t resource, uint32_t type, user_in_ptr<co
     }
   }
 
-  return out->make(ktl::move(handle), rights);
+  return ProcessDispatcher::GetCurrent()->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 #if ARCH_X86
@@ -319,7 +319,7 @@ zx_status_t sys_ioports_release(zx_handle_t hrsrc, uint16_t io_addr, uint32_t le
 #endif
 
 // zx_status_t zx_msi_allocate
-zx_status_t sys_msi_allocate(zx_handle_t root, uint32_t count, user_out_handle* out) {
+zx_status_t sys_msi_allocate(zx_handle_t root, uint32_t count, zx_handle_t* out) {
   zx_status_t status;
   if ((status = validate_resource(root, ZX_RSRC_KIND_ROOT)) != ZX_OK) {
     return status;
@@ -336,12 +336,12 @@ zx_status_t sys_msi_allocate(zx_handle_t root, uint32_t count, user_out_handle* 
     return status;
   }
 
-  return out->make(ktl::move(alloc_handle), rights);
+  return ProcessDispatcher::GetCurrent()->MakeAndAddHandle(ktl::move(alloc_handle), rights, out);
 }
 
 // zx_status_t zx_msi_create
 zx_status_t sys_msi_create(zx_handle_t msi_alloc, uint32_t options, uint32_t msi_id,
-                           zx_handle_t vmo, size_t vmo_offset, user_out_handle* out) {
+                           zx_handle_t vmo, size_t vmo_offset, zx_handle_t* out) {
   auto* up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<MsiDispatcher> msi_alloc_disp;
 
@@ -363,8 +363,7 @@ zx_status_t sys_msi_create(zx_handle_t msi_alloc, uint32_t options, uint32_t msi
            /* cap_offset= */ vmo_offset, /* options= */ options, &rights, &msi_handle)) != ZX_OK) {
     return status;
   }
-
-  return out->make(ktl::move(msi_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(msi_handle), rights, out);
 }
 
 // TODO(fxbug.dev/91213): Remove zx_pc_firmware_tables().
@@ -388,8 +387,7 @@ zx_status_t sys_pc_firmware_tables(zx_handle_t hrsrc, user_out_ptr<zx_paddr_t> a
 }
 
 // zx_status_t zx_bti_create
-zx_status_t sys_bti_create(zx_handle_t iommu, uint32_t options, uint64_t bti_id,
-                           user_out_handle* out) {
+zx_status_t sys_bti_create(zx_handle_t iommu, uint32_t options, uint64_t bti_id, zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   if (options != 0) {
@@ -411,14 +409,13 @@ zx_status_t sys_bti_create(zx_handle_t iommu, uint32_t options, uint64_t bti_id,
   if (status != ZX_OK) {
     return status;
   }
-
-  return out->make(ktl::move(handle), rights);
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 // zx_status_t zx_bti_pin
 zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, uint64_t offset,
                         uint64_t size, user_out_ptr<zx_paddr_t> addrs, size_t addrs_count,
-                        user_out_handle* pmt) {
+                        zx_handle_t* pmt) {
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<BusTransactionInitiatorDispatcher> bti_dispatcher;
   zx_status_t status =
@@ -507,7 +504,7 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
   //
   // Notice that we're holding a RefPtr to the dispatcher rather than a
   // reference to the |new_pmt_handle|.  Just before we return, |new_pmt_handle|
-  // will be moved in order to make a user_out_handle.  |new_pmt_handle| will
+  // will be moved in order to make a zx_handle_t.  |new_pmt_handle| will
   // not be valid after the move so we keep a RefPtr to the dispatcher instead.
   auto cleanup = fit::defer([disp = new_pmt_handle.dispatcher()]() { disp->Unpin(); });
 
@@ -521,8 +518,7 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
   if ((status = addrs.copy_array_to_user(mapped_addrs.get(), addrs_count)) != ZX_OK) {
     return status;
   }
-
-  zx_status_t res = pmt->make(ktl::move(new_pmt_handle), new_pmt_rights);
+  zx_status_t res = up->MakeAndAddHandle(ktl::move(new_pmt_handle), new_pmt_rights, pmt);
   if (res == ZX_OK) {
     cleanup.cancel();
   }
@@ -573,7 +569,7 @@ zx_status_t sys_pmt_unpin(zx_handle_t handle) {
 
 // zx_status_t zx_interrupt_create
 zx_status_t sys_interrupt_create(zx_handle_t src_obj, uint32_t src_num, uint32_t options,
-                                 user_out_handle* out_handle) {
+                                 zx_handle_t* out_handle) {
   LTRACEF("options 0x%x\n", options);
 
   // resource not required for virtual interrupts
@@ -596,7 +592,7 @@ zx_status_t sys_interrupt_create(zx_handle_t src_obj, uint32_t src_num, uint32_t
     return result;
   }
 
-  return out_handle->make(ktl::move(handle), rights);
+  return ProcessDispatcher::GetCurrent()->MakeAndAddHandle(ktl::move(handle), rights, out_handle);
 }
 
 // zx_status_t zx_interrupt_bind

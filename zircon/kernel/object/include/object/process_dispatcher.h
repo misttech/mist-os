@@ -277,6 +277,15 @@ class ProcessDispatcher final
   // Retrieve the aggregated runtime of exited threads under this process.
   TaskRuntimeStats GetAggregatedRuntime() const TA_EXCL(get_lock());
 
+  // Allocates a handle with the given rights to the given dispatcher. The handle is added to the
+  // calling process' handle table, and its value is returned in out.
+  zx_status_t MakeAndAddHandle(fbl::RefPtr<Dispatcher> dispatcher, zx_rights_t rights,
+                               zx_handle_t* out);
+  // Allocates a handle with the given rights to the dispatcher enclosed in the given kernel handle.
+  // The handle is added to the calling process' handle table, and its value is returned in out.
+  zx_status_t MakeAndAddHandle(KernelHandle<Dispatcher> kernel_handle, zx_rights_t rights,
+                               zx_handle_t* out);
+
  private:
   // Returns the "normal" address space for a process.
   //

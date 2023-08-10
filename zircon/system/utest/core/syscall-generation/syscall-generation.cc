@@ -88,18 +88,12 @@ void CatchLeakedHandleException(zx::channel* exception_channel) {
 }
 
 TEST(SyscallGenerationTest, HandleCreateFailure) {
-  // Create an exception handler to swallow up leaked handle exceptions.
-  zx::channel exception_channel;
-  ASSERT_OK(zx::thread::self()->create_exception_channel(0, &exception_channel));
-  std::thread exception_handler(CatchLeakedHandleException, &exception_channel);
-
   zx_handle_t handle = ZX_HANDLE_INVALID;
   ASSERT_EQ(ZX_ERR_UNAVAILABLE, zx_syscall_test_handle_create(ZX_ERR_UNAVAILABLE, &handle));
 
   // Returning a non-OK status from the syscall should prevent the abigen
   // wrapper from copying handles out.
   EXPECT_EQ(ZX_HANDLE_INVALID, handle);
-  exception_handler.join();
 }
 
 TEST(SyscallGenerationTest, HandleCopyoutFailure) {
@@ -108,7 +102,8 @@ TEST(SyscallGenerationTest, HandleCopyoutFailure) {
   ASSERT_OK(zx::thread::self()->create_exception_channel(0, &exception_channel));
   std::thread exception_handler(CatchLeakedHandleException, &exception_channel);
 
-  ASSERT_EQ(ZX_ERR_UNAVAILABLE, zx_syscall_test_handle_create(ZX_ERR_UNAVAILABLE, nullptr));
+  // Attempting to copy out to nullptr will result in a ZX_ERR_INVALID_ARGS.
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_syscall_test_handle_create(ZX_OK, nullptr));
   exception_handler.join();
 }
 

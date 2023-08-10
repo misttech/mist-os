@@ -17,8 +17,8 @@
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 
-zx_status_t sys_guest_create(zx_handle_t resource, uint32_t options, user_out_handle* guest_handle,
-                             user_out_handle* vmar_handle) {
+zx_status_t sys_guest_create(zx_handle_t resource, uint32_t options, zx_handle_t* guest_handle,
+                             zx_handle_t* vmar_handle) {
   zx_status_t status =
       validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_HYPERVISOR_BASE, 1);
   if (status != ZX_OK) {
@@ -33,11 +33,12 @@ zx_status_t sys_guest_create(zx_handle_t resource, uint32_t options, user_out_ha
   if (status != ZX_OK) {
     return status;
   }
-  status = guest_handle->make(ktl::move(new_guest_handle), guest_rights);
+  auto up = ProcessDispatcher::GetCurrent();
+  status = up->MakeAndAddHandle(ktl::move(new_guest_handle), guest_rights, guest_handle);
   if (status != ZX_OK) {
     return status;
   }
-  return vmar_handle->make(ktl::move(new_vmar_handle), vmar_rights);
+  return up->MakeAndAddHandle(ktl::move(new_vmar_handle), vmar_rights, vmar_handle);
 }
 
 zx_status_t sys_guest_set_trap(zx_handle_t handle, uint32_t kind, zx_vaddr_t addr, size_t size,
@@ -63,7 +64,7 @@ zx_status_t sys_guest_set_trap(zx_handle_t handle, uint32_t kind, zx_vaddr_t add
 }
 
 zx_status_t sys_vcpu_create(zx_handle_t guest_handle, uint32_t options, zx_vaddr_t entry,
-                            user_out_handle* out) {
+                            zx_handle_t* out) {
   if (options != 0u) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -83,7 +84,7 @@ zx_status_t sys_vcpu_create(zx_handle_t guest_handle, uint32_t options, zx_vaddr
     return status;
   }
 
-  return out->make(ktl::move(handle), rights);
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 zx_status_t sys_vcpu_enter(zx_handle_t handle, user_out_ptr<zx_port_packet_t> user_packet) {

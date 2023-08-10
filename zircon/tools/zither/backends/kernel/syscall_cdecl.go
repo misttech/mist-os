@@ -129,7 +129,7 @@ func cDeclParameterType(param zither.SyscallParameter, ptrView PointerView, anno
 				typ = fmt.Sprintf("user_in_ptr<%s>", elementType)
 			case zither.ParameterOrientationOut:
 				if kind == zither.TypeKindHandle && !param.HasTag(zither.ParameterTagDecayedFromVector) {
-					typ = "user_out_handle*"
+					typ += "*"
 				} else {
 					typ = fmt.Sprintf("user_out_ptr<%s>", elementType)
 				}

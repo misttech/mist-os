@@ -15,7 +15,7 @@ constexpr uint64_t GetArgsVersion(uint64_t options) {
 }  // namespace
 
 zx_status_t sys_clock_create(uint64_t options, user_in_ptr<const void> user_args,
-                             user_out_handle* clock_out) {
+                             zx_handle_t* clock_out) {
   KernelHandle<ClockDispatcher> clock_handle;
   zx_clock_create_args_v1_t args{};
   zx_rights_t rights;
@@ -48,7 +48,8 @@ zx_status_t sys_clock_create(uint64_t options, user_in_ptr<const void> user_args
 
   result = ClockDispatcher::Create(options, args, &clock_handle, &rights);
   if (result == ZX_OK) {
-    result = clock_out->make(ktl::move(clock_handle), rights);
+    result = ProcessDispatcher::GetCurrent()->MakeAndAddHandle(ktl::move(clock_handle), rights,
+                                                               clock_out);
   }
 
   return result;

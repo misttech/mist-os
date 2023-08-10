@@ -444,7 +444,7 @@ zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t
 // zx_status_t zx_pci_get_nth_device
 zx_status_t sys_pci_get_nth_device(zx_handle_t hrsrc, uint32_t index,
                                    user_out_ptr<zx_pcie_device_info_t> out_info,
-                                   user_out_handle* out_handle) {
+                                   zx_handle_t* out_handle) {
   /**
    * Returns the pci config of a device.
    * @param index Device index
@@ -475,7 +475,7 @@ zx_status_t sys_pci_get_nth_device(zx_handle_t hrsrc, uint32_t index,
   if (status != ZX_OK)
     return status;
 
-  return out_handle->make(ktl::move(handle), rights);
+  return ProcessDispatcher::GetCurrent()->MakeAndAddHandle(ktl::move(handle), rights, out_handle);
 }
 
 // zx_status_t zx_pci_config_read
@@ -627,7 +627,7 @@ zx_status_t sys_pci_reset_device(zx_handle_t dev_handle) {
 
 // zx_status_t zx_pci_get_bar
 zx_status_t sys_pci_get_bar(zx_handle_t dev_handle, uint32_t bar_num,
-                            user_out_ptr<zx_pci_bar_t> out_bar, user_out_handle* out_handle) {
+                            user_out_ptr<zx_pci_bar_t> out_bar, zx_handle_t* out_handle) {
   if (dev_handle == ZX_HANDLE_INVALID || !out_bar || bar_num >= PCIE_MAX_BAR_REGS) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -704,7 +704,7 @@ zx_status_t sys_pci_get_bar(zx_handle_t dev_handle, uint32_t bar_num,
   }
 
   if (vmo) {
-    return out_handle->make(ktl::move(kernel_handle), rights);
+    return up->MakeAndAddHandle(ktl::move(kernel_handle), rights, out_handle);
   }
 
   return ZX_OK;
@@ -712,7 +712,7 @@ zx_status_t sys_pci_get_bar(zx_handle_t dev_handle, uint32_t bar_num,
 
 // zx_status_t zx_pci_map_interrupt
 zx_status_t sys_pci_map_interrupt(zx_handle_t dev_handle, int32_t which_irq,
-                                  user_out_handle* out_handle) {
+                                  zx_handle_t* out_handle) {
   /**
    * Returns a handle that can be waited on.
    * @param handle Handle associated with a PCI device
@@ -735,7 +735,7 @@ zx_status_t sys_pci_map_interrupt(zx_handle_t dev_handle, int32_t which_irq,
   if (result != ZX_OK)
     return result;
 
-  return out_handle->make(ktl::move(interrupt_handle), rights);
+  return up->MakeAndAddHandle(ktl::move(interrupt_handle), rights, out_handle);
 }
 
 /**
@@ -830,18 +830,18 @@ zx_status_t sys_pci_reset_device(zx_handle_t) { return ZX_ERR_NOT_SUPPORTED; }
 // zx_status_t zx_pci_get_nth_device
 zx_status_t sys_pci_get_nth_device(zx_handle_t hrsrc, uint32_t index,
                                    user_out_ptr<zx_pcie_device_info_t> out_info,
-                                   user_out_handle* out_handle) {
+                                   zx_handle_t* out_handle) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
 // zx_status_t zx_pci_get_bar
 zx_status_t sys_pci_get_bar(zx_handle_t dev_handle, uint32_t bar_num,
-                            user_out_ptr<zx_pci_bar_t> out_bar, user_out_handle* out_handle) {
+                            user_out_ptr<zx_pci_bar_t> out_bar, zx_handle_t* out_handle) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
 // zx_status_t zx_pci_map_interrupt
-zx_status_t sys_pci_map_interrupt(zx_handle_t, int32_t, user_out_handle*) {
+zx_status_t sys_pci_map_interrupt(zx_handle_t, int32_t, zx_handle_t*) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 

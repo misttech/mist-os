@@ -48,7 +48,7 @@ zx_status_t sys_syscall_test_wrapper(int a, int b, int c) {
 // Unconditionally create a valid handle. If we return a non-OK status, the
 // syscall wrappers should not copy the handle back to userspace and the
 // syscall should generate a ZX_EXCP_POLICY_CODE_HANDLE_LEAK exception.
-zx_status_t sys_syscall_test_handle_create(zx_status_t return_value, user_out_handle* handle_out) {
+zx_status_t sys_syscall_test_handle_create(zx_status_t return_value, zx_handle_t* handle_out) {
   if (sys_event_create(0, handle_out) != ZX_OK) {
     return ZX_ERR_INTERNAL;
   }

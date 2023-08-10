@@ -27,7 +27,7 @@
 
 // zx_status_t zx_vmar_allocate
 zx_status_t sys_vmar_allocate(zx_handle_t parent_vmar_handle, zx_vm_option_t options,
-                              uint64_t offset, uint64_t size, user_out_handle* child_vmar,
+                              uint64_t offset, uint64_t size, zx_handle_t* child_vmar,
                               user_out_ptr<zx_vaddr_t> child_addr) {
   auto* up = ProcessDispatcher::GetCurrent();
 
@@ -64,7 +64,7 @@ zx_status_t sys_vmar_allocate(zx_handle_t parent_vmar_handle, zx_vm_option_t opt
   auto cleanup_handler = fit::defer([&vmar_dispatcher]() { vmar_dispatcher->Destroy(); });
 
   // Create a handle and attach the dispatcher to it
-  status = child_vmar->make(ktl::move(handle), new_rights);
+  status = up->MakeAndAddHandle(ktl::move(handle), new_rights, child_vmar);
 
   if (status == ZX_OK) {
     status = child_addr.copy_to_user(vmar_dispatcher->vmar()->base());

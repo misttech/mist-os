@@ -24,7 +24,7 @@
 
 // zx_status_t zx_task_create_exception_channel
 zx_status_t sys_task_create_exception_channel(zx_handle_t handle, uint32_t options,
-                                              user_out_handle* out) {
+                                              zx_handle_t* out) {
   LTRACE_ENTRY;
 
   if (options & ~ZX_EXCEPTION_CHANNEL_DEBUGGER)
@@ -129,12 +129,12 @@ zx_status_t sys_task_create_exception_channel(zx_handle_t handle, uint32_t optio
   // We don't need to remove the task channel if this fails. Exception
   // channels are built to handle the userspace peer closing so it will just
   // follow that path if we fail to copy the userspace endpoint out.
-  return out->make(ktl::move(user_handle),
-                   rights & (ZX_RIGHT_TRANSFER | ZX_RIGHT_WAIT | ZX_RIGHT_READ));
+  return up->MakeAndAddHandle(ktl::move(user_handle),
+                              rights & (ZX_RIGHT_TRANSFER | ZX_RIGHT_WAIT | ZX_RIGHT_READ), out);
 }
 
 // zx_status_t zx_exception_get_thread
-zx_status_t sys_exception_get_thread(zx_handle_t handle, user_out_handle* thread) {
+zx_status_t sys_exception_get_thread(zx_handle_t handle, zx_handle_t* thread) {
   auto up = ProcessDispatcher::GetCurrent();
 
   fbl::RefPtr<ExceptionDispatcher> exception;
@@ -148,12 +148,13 @@ zx_status_t sys_exception_get_thread(zx_handle_t handle, user_out_handle* thread
   if (status != ZX_OK) {
     return status;
   }
-
-  return thread->transfer(ktl::move(thread_handle));
+  *thread = up->handle_table().MapHandleToValue(thread_handle);
+  up->handle_table().AddHandle(ktl::move(thread_handle));
+  return ZX_OK;
 }
 
 // zx_status_t zx_exception_get_process
-zx_status_t sys_exception_get_process(zx_handle_t handle, user_out_handle* process) {
+zx_status_t sys_exception_get_process(zx_handle_t handle, zx_handle_t* process) {
   auto up = ProcessDispatcher::GetCurrent();
 
   fbl::RefPtr<ExceptionDispatcher> exception;
@@ -167,6 +168,7 @@ zx_status_t sys_exception_get_process(zx_handle_t handle, user_out_handle* proce
   if (status != ZX_OK) {
     return status;
   }
-
-  return process->transfer(ktl::move(process_handle));
+  *process = up->handle_table().MapHandleToValue(process_handle);
+  up->handle_table().AddHandle(ktl::move(process_handle));
+  return ZX_OK;
 }

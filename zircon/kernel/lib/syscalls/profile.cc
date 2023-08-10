@@ -23,7 +23,7 @@ KCOUNTER(profile_set, "profile.set")
 // zx_status_t zx_profile_create
 zx_status_t sys_profile_create(zx_handle_t root_job, uint32_t options,
                                user_in_ptr<const zx_profile_info_t> user_profile_info,
-                               user_out_handle* out) {
+                               zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   zx_status_t status = up->EnforceBasicPolicy(ZX_POL_NEW_PROFILE);
@@ -61,7 +61,7 @@ zx_status_t sys_profile_create(zx_handle_t root_job, uint32_t options,
 
   kcounter_add(profile_create, 1);
 
-  return out->make(ktl::move(handle), rights);
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 // zx_status_t zx_object_set_profile

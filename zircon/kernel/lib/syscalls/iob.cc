@@ -22,7 +22,7 @@
 
 // zx_status_t zx_iob_create
 zx_status_t sys_iob_create(uint64_t options, user_in_ptr<const void> regions, uint64_t num_regions,
-                           user_out_handle* ep0_out, user_out_handle* ep1_out) {
+                           zx_handle_t* ep0_out, zx_handle_t* ep1_out) {
   if (options != 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -57,9 +57,9 @@ zx_status_t sys_iob_create(uint64_t options, user_in_ptr<const void> regions, ui
     return result;
   }
 
-  result = ep0_out->make(ktl::move(handle0), rights);
+  result = up->MakeAndAddHandle(ktl::move(handle0), rights, ep0_out);
   if (result == ZX_OK) {
-    result = ep1_out->make(ktl::move(handle1), rights);
+    result = up->MakeAndAddHandle(ktl::move(handle1), rights, ep1_out);
   }
   return result;
 }

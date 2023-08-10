@@ -527,7 +527,7 @@ zx_status_t sys_system_powerctl(zx_handle_t power_rsrc, uint32_t cmd,
 }
 
 // zx_status_t zx_system_get_event
-zx_status_t sys_system_get_event(zx_handle_t root_job, uint32_t kind, user_out_handle* out) {
+zx_status_t sys_system_get_event(zx_handle_t root_job, uint32_t kind, zx_handle_t* out) {
   auto up = ProcessDispatcher::GetCurrent();
 
   fbl::RefPtr<JobDispatcher> job;
@@ -556,7 +556,8 @@ zx_status_t sys_system_get_event(zx_handle_t root_job, uint32_t kind, user_out_h
     case ZX_SYSTEM_EVENT_MEMORY_PRESSURE_NORMAL:
       // Do not grant default event rights, as we don't want userspace to, for
       // example, be able to signal this event.
-      return out->make(GetMemPressureEvent(kind), ZX_DEFAULT_SYSTEM_EVENT_LOW_MEMORY_RIGHTS);
+      return up->MakeAndAddHandle(GetMemPressureEvent(kind),
+                                  ZX_DEFAULT_SYSTEM_EVENT_LOW_MEMORY_RIGHTS, out);
 
     default:
       return ZX_ERR_INVALID_ARGS;
