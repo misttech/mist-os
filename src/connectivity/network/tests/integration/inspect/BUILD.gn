@@ -40,4 +40,7 @@ rustc_test("inspect") {
   ]
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  # TODO(fxbug.dev/132041) Delete this line when clippy ICE is fixed upstream
+  disable_clippy = true
 }
