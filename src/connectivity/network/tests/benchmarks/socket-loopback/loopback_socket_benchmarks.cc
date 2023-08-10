@@ -41,6 +41,13 @@ namespace {
     }                                                    \
   } while (0)
 
+constexpr char kFakeNetstackEnvVar[] = "FAKE_NETSTACK";
+constexpr char kNetstack3EnvVar[] = "NETSTACK3";
+constexpr char kNetstack2EnvVar[] = "NETSTACK2";
+#if defined(__Fuchsia__)
+constexpr char kTracingEnvVar[] = "TRACING";
+#endif
+
 template <typename T>
 class AddrStorage {
  public:
@@ -92,6 +99,38 @@ class Ipv4 {
   }
 };
 
+int ExpectedGetBufferSize(int set_size) {
+  // The desired return value for getting SO_SNDBUF and SO_RCVBUF on Linux
+  // and Netstack2 is double the amount of payload bytes due to the fact
+  // that the value is doubled on set to account for overhead according
+  // to the [man page].
+  //
+  // [man page]: https://man7.org/linux/man-pages/man7/socket.7.html
+#ifdef __linux__
+  set_size *= 2;
+  // NB: This minimum is a magic number and seems to contradict the stated
+  // minimum in the Linux man page of 2048 for SNDBUF.
+  if (set_size < 4608) {
+    return 4608;
+  }
+  return set_size;
+#endif
+  if (std::getenv(kNetstack2EnvVar)) {
+    set_size *= 2;
+    // NB: Netstack 2 clamps the value on set within a certain range, and
+    // there are benchmark cases that set buffer sizes both above and below
+    // this range (when doubled) so the logic needs to be replicated here.
+    if (set_size < 4096) {
+      return 4096;
+    }
+    if (set_size > (4 << 20)) {
+      return 4 << 20;
+    }
+    return set_size;
+  }
+  return set_size;
+}
+
 // Helper no-op function to assert functions abstracted over IP version are properly parameterized.
 template <typename Ip>
 void TemplateIsIpVersion() {
@@ -128,17 +167,9 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
     CHECK_ZERO_ERRNO(
         getsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf_opt, &sndbuf_optlen));
 
-    int want_sndbuf = transfer;
-#ifdef __linux__
-    // The desired return value for SO_SNDBUF on Linux is double the amount of
-    // payload bytes due to the fact that Linux doubles the value when setting
-    // SO_SNDBUF to account for overhead according to the [man page].
-    //
-    // [man page]: https://man7.org/linux/man-pages/man7/socket.7.html
-    want_sndbuf *= 2;
-#endif
-    FX_CHECK(sndbuf_opt >= want_sndbuf)
-        << "sndbuf size (" << sndbuf_opt << ") < want (" << want_sndbuf << ")";
+    int want_sndbuf = ExpectedGetBufferSize(transfer);
+    FX_CHECK(sndbuf_opt == want_sndbuf)
+        << "sndbuf size (" << sndbuf_opt << ") != want (" << want_sndbuf << ")";
   }
   // Disable the Nagle algorithm, it introduces artificial latency that defeats this test.
   const int32_t no_delay = 1;
@@ -204,15 +235,7 @@ bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_co
   CHECK_ZERO_ERRNO(
       getsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcvbuf_opt, &rcvbuf_optlen));
 
-  int want_rcvbuf = message_size * message_count;
-  // The desired return value for SO_RCVBUF on Linux is double the amount of
-  // payload bytes due to the fact that Linux doubles the value when setting
-  // SO_RCVBUF to account for overhead according to the [man page].
-  //
-  // [man page]: https://man7.org/linux/man-pages/man7/socket.7.html
-#ifdef __linux__
-  want_rcvbuf *= 2;
-#endif
+  int want_rcvbuf = ExpectedGetBufferSize(message_size * message_count);
   // On Linux, payloads are stored with a fixed per-packet overhead. Linux
   // accounts for this overhead by setting the actual buffer size to double
   // the size set with SO_RCVBUF. This hack fails when SO_RCVBUF is small and
@@ -224,10 +247,10 @@ bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_co
         setsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcv_bufsize, sizeof(rcv_bufsize)));
     CHECK_ZERO_ERRNO(
         getsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcvbuf_opt, &rcvbuf_optlen));
-  }
 
-  FX_CHECK(rcvbuf_opt >= want_rcvbuf)
-      << "rcvbuf size (" << rcvbuf_opt << ") < want (" << want_rcvbuf << ")";
+    FX_CHECK(rcvbuf_opt == want_rcvbuf)
+        << "rcvbuf size (" << rcvbuf_opt << ") != want (" << want_rcvbuf << ")";
+  }
 
   socklen_t socklen = sockaddr.socklen();
   CHECK_ZERO_ERRNO(getsockname(server_sock.get(), sockaddr.as_sockaddr(), &socklen));
@@ -317,12 +340,6 @@ bool PingLatency(perftest::RepeatState* state) {
   return true;
 }
 
-constexpr char kFakeNetstackEnvVar[] = "FAKE_NETSTACK";
-constexpr char kNetstack3EnvVar[] = "NETSTACK3";
-#if defined(__Fuchsia__)
-constexpr char kTracingEnvVar[] = "TRACING";
-#endif
-
 void RegisterTests() {
   constexpr const char* kSingleReadTestNameFmt = "WriteRead/%s/%s/%ld%s";
   enum class Network { kIpv4, kIpv6 };
@@ -380,6 +397,10 @@ void RegisterTests() {
   // NB: Knowledge encoded at a distance: these datagrams avoid IP fragmentation
   // only because loopback has a very large MTU.
   constexpr int kMessageSizesForUdp[] = {1, 100, 1 << 10, 10 << 10, 60 << 10};
+  // NB: The message count of 50 is approximately as large as possible in
+  // conjunction with the 60 KiB message size as the total transfer size is
+  // about 3 MB and Netstack 2 enforces a maximum of 4 MiB for socket send/receive
+  // buffer sizes.
   constexpr int kMessageCountsForUdp[] = {1, 10, 50};
   for (int message_size : kMessageSizesForUdp) {
     for (int message_count : kMessageCountsForUdp) {
