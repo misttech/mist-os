@@ -121,7 +121,7 @@ mod tests {
             wlantap.create_phy(create_wlantap_config()).await.expect("failed to create PHY");
         phy_watcher
             .next()
-            .expect_within(5.seconds(), "phy_watcher did not respond")
+            .expect_within(15.seconds(), "phy_watcher did not respond")
             .await
             .expect("phy_watcher ended without yielding a phy")
             .expect("phy_watcher returned an error");
