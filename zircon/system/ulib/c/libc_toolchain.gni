@@ -31,7 +31,10 @@ _select_output_name = [ "libc.so" ]
 _select_label = [ "//zircon/system/ulib/c" ]
 _select_name = [ "libc" ]
 _select_dir = [ "//zircon/system/ulib/c" ]
-_select_exclude_toolchain_tags = [ "fuzzer" ]
+_select_exclude_toolchain_tags = [
+  "fuzzer",
+  "kernel-only",
+]
 
 # ======================================================================
 # START OF CODE TO KEEP IN SYNC WITH BUILDCONFIG.gn
