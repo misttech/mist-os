@@ -63,7 +63,6 @@ pub(crate) async fn serve_client_provider(
     udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
 ) -> Result<(), Error> {
     let provider = &provider;
-    let udp_socket_provider = udp_socket_provider;
     let interfaces_in_use = &InterfacesInUse::new();
 
     stream
