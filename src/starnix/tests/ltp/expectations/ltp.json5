@@ -230,8 +230,6 @@
                 "recvfrom01",
                 "recvmsg01",
                 "remap_file_pages02",
-                "renameat201",
-                "renameat202",
                 "request_key01",
                 "request_key02",
                 "request_key03",
