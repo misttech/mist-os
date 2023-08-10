@@ -5,6 +5,10 @@
     include: [ "//src/ui/scenic/tests/meta/scenic_integration_test_base.shard.cml" ],
     program: {
         binary: "bin/flatland_pixeltest_bin",
+
+        // Exclude the flip and orientation tests, so that this test component can
+        // run within the test timeout.
+        args: [ "--gtest_filter=-ParameterizedFlipAndOrientationTestWithParams/ParameterizedFlipAndOrientationTest.*" ],
     },
     use: [
         {

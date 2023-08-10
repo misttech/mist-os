@@ -488,9 +488,16 @@ executable("flatland_pixeltest_bin") {
   ]
 }
 
-fuchsia_test_component("flatland_pixeltest") {
-  component_name = "flatland_pixeltest"
-  manifest = "meta/flatland_pixeltest.cml"
+fuchsia_test_component("flatland_pixeltest_flip_and_orientation") {
+  component_name = "flatland_pixeltest_flip_and_orientation"
+  manifest = "meta/flatland_pixeltest_flip_and_orientation.cml"
+  deps = [ ":flatland_pixeltest_bin" ]
+  test_type = "vulkan"
+}
+
+fuchsia_test_component("flatland_pixeltest_general") {
+  component_name = "flatland_pixeltest_general"
+  manifest = "meta/flatland_pixeltest_general.cml"
   deps = [ ":flatland_pixeltest_bin" ]
   test_type = "vulkan"
 }
@@ -523,7 +530,8 @@ fuchsia_test_package("flatland_integration_tests") {
     ":screen_capture2_integration_test",
     ":flatland_view_ref_installed_integration_test",
     ":flatland_view_integration_test",
-    ":flatland_pixeltest",
+    ":flatland_pixeltest_flip_and_orientation",
+    ":flatland_pixeltest_general",
   ]
   test_specs = {
     environments = vulkan_envs
