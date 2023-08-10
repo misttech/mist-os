@@ -359,12 +359,15 @@ impl Daemon {
     pub async fn start(&mut self, hoist: &Hoist) -> Result<()> {
         let context =
             ffx_config::global_env_context().context("Discovering ffx environment context")?;
+
+        let ascendd = self.prime_ascendd(hoist).await?;
+
         let (quit_tx, quit_rx) = mpsc::channel(1);
         self.log_startup_info(&context).await.context("Logging startup info")?;
 
         self.start_protocols().await?;
         self.start_discovery(hoist).await?;
-        self.start_ascendd(hoist).await?;
+        self.start_ascendd(ascendd);
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
         self.start_signal_monitoring(quit_tx.clone());
@@ -444,12 +447,15 @@ impl Daemon {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn start_ascendd(&mut self, hoist: &Hoist) -> Result<()> {
-        // Start the ascendd socket only after we have registered our protocols.
-        tracing::debug!("Starting ascendd");
+    async fn prime_ascendd(
+        &self,
+        hoist: &Hoist,
+    ) -> Result<impl FnOnce() -> Ascendd, errors::FfxError> {
+        // Bind the ascendd socket but delay accepting connections until protocols are registered.
+        tracing::debug!("Priming ascendd");
 
         let client_routing = false; // Don't route between ffx clients
-        let ascendd = Ascendd::new(
+        Ascendd::prime(
             ascendd::Opt {
                 sockpath: Some(self.socket_path.clone()),
                 client_routing,
@@ -462,11 +468,17 @@ impl Daemon {
             blocking::Unblock::new(std::io::stdout()),
         )
         .await
-        .map_err(|e| ffx_error!("Error trying to start daemon socket: {e}"))?;
+        .map_err(|e| ffx_error!("Error trying to start daemon socket: {e}"))
+    }
+
+    #[tracing::instrument(skip(self, primed_ascendd))]
+    fn start_ascendd(&mut self, primed_ascendd: impl FnOnce() -> Ascendd) {
+        // Start the ascendd socket only after we have registered our protocols.
+        tracing::debug!("Starting ascendd");
+
+        let ascendd = primed_ascendd();
 
         self.ascendd.replace(Some(ascendd));
-
-        Ok(())
     }
 
     #[tracing::instrument(skip(self))]
