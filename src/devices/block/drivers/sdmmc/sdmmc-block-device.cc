@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <threads.h>
@@ -81,7 +82,8 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 
   st = DdkAdd(ddk::DeviceAddArgs(is_sd_ ? "sdmmc-sd" : "sdmmc-mmc")
                   .set_flags(DEVICE_ADD_NON_BINDABLE)
-                  .set_inspect_vmo(inspector_.DuplicateVmo()));
+                  .set_inspect_vmo(inspector_.DuplicateVmo())
+                  .forward_metadata(parent(), DEVICE_METADATA_GPT_INFO));
   if (st != ZX_OK) {
     zxlogf(ERROR, "Failed to add block device, retcode = %d", st);
     return st;

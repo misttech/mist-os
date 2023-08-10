@@ -4,6 +4,7 @@
 
 #include "sdmmc-partition-device.h"
 
+#include <lib/ddk/metadata.h>
 #include <string.h>
 #include <zircon/hw/gpt.h>
 
@@ -13,16 +14,23 @@
 namespace sdmmc {
 
 zx_status_t PartitionDevice::AddDevice() {
+  std::string device_name;
   switch (partition_) {
     case USER_DATA_PARTITION:
-      return DdkAdd("user");
+      device_name = "user";
+      break;
     case BOOT_PARTITION_1:
-      return DdkAdd("boot1");
+      device_name = "boot1";
+      break;
     case BOOT_PARTITION_2:
-      return DdkAdd("boot2");
+      device_name = "boot2";
+      break;
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
+
+  return DdkAdd(
+      ddk::DeviceAddArgs(device_name.c_str()).forward_metadata(parent(), DEVICE_METADATA_GPT_INFO));
 }
 
 zx_status_t PartitionDevice::DdkGetProtocol(uint32_t proto_id, void* out) {

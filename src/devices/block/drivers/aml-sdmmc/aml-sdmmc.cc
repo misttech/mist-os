@@ -1094,7 +1094,8 @@ zx_status_t AmlSdmmc::Bind() {
   // Note: This name can't be changed without migrating users in other repos.
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs("aml-sd-emmc")
                                   .set_inspect_vmo(GetInspectVmo())
-                                  .forward_metadata(parent(), DEVICE_METADATA_SDMMC));
+                                  .forward_metadata(parent(), DEVICE_METADATA_SDMMC)
+                                  .forward_metadata(parent(), DEVICE_METADATA_GPT_INFO));
   if (status != ZX_OK) {
     irq_.destroy();
     AML_SDMMC_ERROR("DdkAdd failed");

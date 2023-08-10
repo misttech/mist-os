@@ -29,7 +29,9 @@ zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
     zxlogf(ERROR, "Failed to allocate device");
     return ZX_ERR_NO_MEMORY;
   }
-  zx_status_t st = dev->DdkAdd("sdmmc", DEVICE_ADD_NON_BINDABLE);
+  zx_status_t st = dev->DdkAdd(ddk::DeviceAddArgs("sdmmc")
+                                   .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                   .forward_metadata(parent, DEVICE_METADATA_GPT_INFO));
   if (st != ZX_OK) {
     return st;
   }
