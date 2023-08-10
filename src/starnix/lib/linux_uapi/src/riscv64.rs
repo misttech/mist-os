@@ -11369,10 +11369,10 @@ pub struct seccomp_notif_addfd {
     pub newfd_flags: __u32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[repr(align(8))]
+#[derive(Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub union sigval {
-    pub sival_int: crate::types::c_int,
-    pub sival_ptr: uaddr,
+    pub _bindgen_opaque_blob: u64,
 }
 impl Default for sigval {
     fn default() -> Self {
@@ -11402,7 +11402,7 @@ pub struct __sifields__bindgen_ty_1 {
     pub _uid: __kernel_uid32_t,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct __sifields__bindgen_ty_2 {
     pub _tid: __kernel_timer_t,
     pub _overrun: crate::types::c_int,
@@ -11410,30 +11410,12 @@ pub struct __sifields__bindgen_ty_2 {
     pub _sys_private: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
 }
-impl Default for __sifields__bindgen_ty_2 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct __sifields__bindgen_ty_3 {
     pub _pid: __kernel_pid_t,
     pub _uid: __kernel_uid32_t,
     pub _sigval: sigval_t,
-}
-impl Default for __sifields__bindgen_ty_3 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
@@ -11588,20 +11570,22 @@ impl Default for siginfo {
 }
 pub type siginfo_t = siginfo;
 #[repr(C)]
-#[repr(align(8))]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub struct sigevent {
-    pub _bindgen_opaque_blob: [u64; 8usize],
+    pub sigev_value: sigval_t,
+    pub sigev_signo: crate::types::c_int,
+    pub sigev_notify: crate::types::c_int,
+    pub _sigev_un: sigevent__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub union sigevent__bindgen_ty_1 {
     pub _pad: [crate::types::c_int; 12usize],
     pub _tid: crate::types::c_int,
     pub _sigev_thread: sigevent__bindgen_ty_1__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeroes)]
 pub struct sigevent__bindgen_ty_1__bindgen_ty_1 {
     pub _function: uaddr,
     pub _attribute: uaddr,
@@ -11616,6 +11600,15 @@ impl Default for sigevent__bindgen_ty_1__bindgen_ty_1 {
     }
 }
 impl Default for sigevent__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for sigevent {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {

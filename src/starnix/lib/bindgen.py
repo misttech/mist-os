@@ -41,6 +41,7 @@ class Bindgen:
         self.function_allowlist = []
         self.var_allowlist = []
         self.type_allowlist = []
+        self.no_debug_types = []
 
     def set_auto_derive_traits(self, traits_map):
         self.auto_derive_traits = [(re.compile(x[0]), x[1]) for x in traits_map]
@@ -71,6 +72,7 @@ class Bindgen:
         args += ['--allowlist-var=' + x for x in self.var_allowlist]
         args += ['--allowlist-type=' + x for x in self.type_allowlist]
         args += ['--opaque-type=' + x for x in self.opaque_types]
+        args += ['--no-debug=' + x for x in self.no_debug_types]
 
         args += [input_file]
 
