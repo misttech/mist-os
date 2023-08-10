@@ -85,16 +85,6 @@ class MmioBuffer {
     return zx::ok(MmioBuffer(mmio));
   }
 
-  static zx::result<MmioBuffer> Create(zx_paddr_t base, size_t size, const zx::resource& resource,
-                                       uint32_t cache_policy) {
-    mmio_buffer_t mmio;
-    zx_status_t status = mmio_buffer_init_physical(&mmio, base, size, resource.get(), cache_policy);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(MmioBuffer(mmio));
-  }
-
   void reset() {
     mmio_buffer_release(&mmio_);
     memset(&mmio_, 0, sizeof(mmio_));

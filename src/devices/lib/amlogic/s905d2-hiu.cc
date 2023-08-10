@@ -4,8 +4,10 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/mmio/mmio-view.h>
 #include <string.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -14,8 +16,6 @@
 #include <soc/aml-s905d2/s905d2-hiu-regs.h>
 #include <soc/aml-s905d2/s905d2-hiu.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
-
-#include "lib/mmio/mmio-view.h"
 
 static inline uint32_t hiu_clk_get_reg(fdf::MmioBuffer* dev, uint32_t offset) {
   return dev->Read32(offset);
@@ -45,9 +45,15 @@ static inline uint32_t hiu_get_pll_offs(aml_pll_dev_t* pll_dev) {
 }
 
 zx_status_t s905d2_hiu_init(zx_handle_t root_resource, fdf::MmioBuffer* device) {
-  zx::result<fdf::MmioBuffer> mmio =
-      fdf::MmioBuffer::Create(S905D2_HIU_BASE, S905D2_HIU_LENGTH, zx::resource(root_resource),
-                              ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  zx::vmo vmo;
+  zx_status_t status = zx::vmo::create_physical(zx::resource(root_resource), S905D2_HIU_BASE,
+                                                S905D2_HIU_LENGTH, &vmo);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
+    return status;
+  }
+  zx::result<fdf::MmioBuffer> mmio = fdf::MmioBuffer::Create(0, S905D2_HIU_LENGTH, std::move(vmo),
+                                                             ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (mmio.is_error()) {
     zxlogf(ERROR, "mmio_buffer_init_physical failed %s", mmio.status_string());
     return mmio.status_value();
