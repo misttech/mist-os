@@ -178,7 +178,14 @@ pub struct Blobfs {
     #[serde(default)]
     pub size_checker_maximum_bytes: Option<u64>,
 
+    /// Maximum number of bytes blobfs can consume at build time.
+    /// This value is used by the fvm tool to preallocate space.
+    /// Most boards should avoid setting this value, and set maximum_bytes instead.
+    #[serde(default)]
+    pub build_time_maximum_bytes: Option<u64>,
+
     /// Maximum number of bytes blobfs can consume at runtime.
+    /// This value is placed in fshost config to enforce size budgets at runtime.
     #[serde(default)]
     pub maximum_bytes: Option<u64>,
 

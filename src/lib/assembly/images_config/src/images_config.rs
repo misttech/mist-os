@@ -525,6 +525,7 @@ mod tests {
                 truncate_to_length: None,
                 blobfs: bfc::Blobfs {
                     size_checker_maximum_bytes: Some(12),
+                    build_time_maximum_bytes: None,
                     maximum_bytes: Some(34),
                     minimum_inodes: Some(56),
                     minimum_data_bytes: Some(78),
@@ -560,6 +561,7 @@ mod tests {
                 truncate_to_length: None,
                 blobfs: bfc::Blobfs {
                     size_checker_maximum_bytes: Some(12),
+                    build_time_maximum_bytes: None,
                     maximum_bytes: Some(34),
                     minimum_inodes: Some(56),
                     minimum_data_bytes: Some(78),
