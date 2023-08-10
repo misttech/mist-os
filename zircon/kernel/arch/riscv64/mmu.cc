@@ -705,11 +705,17 @@ zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vadd
         return status;
       }
     } else if (riscv64_pte_is_valid(pte)) {
-      pte = (pte & ~RISCV64_PTE_PERM_MASK) | attrs;
-      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
-      update_pte(&page_table[index], pte);
+      const pte_t new_pte = (pte & ~RISCV64_PTE_PERM_MASK) | attrs;
 
-      cm.FlushEntry(vaddr, true);
+      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " was %#" PRIx64 "\n", page_table, index, new_pte,
+              pte);
+
+      // Skip updating the page table entry if the new value is the same as before.
+      if (new_pte != pte) {
+        update_pte(&page_table[index], new_pte);
+
+        cm.FlushEntry(vaddr, true);
+      }
     } else {
       LTRACEF("page table entry does not exist, index %#" PRIxPTR ", %#" PRIx64 "\n", index, pte);
     }
