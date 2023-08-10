@@ -251,9 +251,7 @@ ffx inspect show core/starnix_runner/bionic:root:syscall_stats
 
 ## Tracing
 
-Starnix is integrated with Fuchsia's tracing system but is disabled by default.
-Set the build argument `starnix_disable_tracing` to false to enable tracing. To
-start a trace with an increased buffer size, run:
+To start a trace with an increased buffer size, run:
 
 ```
 ffx trace start --categories "kernel:meta,starnix" --buffer-size 64
@@ -267,6 +265,9 @@ select avg(dur), count(*)
 from slice join args using (arg_set_id)
 where key='name' and display_value='clock_getres' and name='RunTaskLoop'
 ```
+
+Tracing can be compiled out by setting `starnix_disable_tracing=true` in your
+GN args.
 
 [adb.docs]: https://developer.android.com/studio/command-line/adb#copyfiles
 [local-args]: /docs/development/build/fx.md#defining_persistent_local_build_arguments

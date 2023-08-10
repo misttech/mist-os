@@ -13,7 +13,8 @@ declare_args() {
   starnix_disable_logging = false
 
   # Whether or not tracing is disabled globally.
-  starnix_disable_tracing = true
+  # NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
+  starnix_disable_tracing = false
 
   # Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
   starnix_use_fuchsia_mutex = false
