@@ -24,11 +24,20 @@
         "{{device.memory.quantity}}{{ua device.memory.units}}",
         "-smp",
         {{! These should probably be predicated on the host CPU. }}
-            "4,threads=2",
+        {{#if (eq device.cpu.architecture "riscv64")}}
+            "4",
+        {{else}}
+          "4,threads=2",
+        {{/if}}
         {{#if guest.disk_image}}
-            "-drive", "file={{di guest.disk_image}},format=raw,if=none,id=vdisk,cache=unsafe",
-            "-object", "iothread,id=iothread0",
-            "-device", "virtio-blk-pci,drive=vdisk,iothread=iothread0",
+            {{#if (eq device.cpu.architecture "riscv64")}}
+                "-drive", "file={{di guest.disk_image}},format=raw,if=none,id=vdisk",
+                "-device", "virtio-blk-pci,drive=vdisk",
+            {{else}}
+               "-drive", "file={{di guest.disk_image}},format=raw,if=none,id=vdisk,cache=unsafe",
+               "-object", "iothread,id=iothread0",
+               "-device", "virtio-blk-pci,drive=vdisk,iothread=iothread0",
+            {{/if}}
         {{/if}}
         {{! The QMP is an interface for issuing commands to the emulator. The
             commands are sent in JSON, as are the results. The syntax for this
@@ -58,7 +67,8 @@
             {{else}}
                 "-machine", "virtualization=true", "-cpu", "max",
             {{/if}}
-        {{else}} {{! architecture == x64 }}
+        {{/if}}
+        {{#if (eq device.cpu.architecture "x64")}}
             "q35",
             "-device",
             "isa-debug-exit,iobase=0xf4,iosize=0x04",
@@ -67,18 +77,29 @@
             "-fw_cfg",
             "name=etc/sercon-port,string=0",
         {{/if}}
+        {{#if (eq device.cpu.architecture "riscv64")}}
+            "virt",
+        {{/if}}
         {{#if (eq host.acceleration "none")}}
             {{! The QEMU system defaults to TCG for acceleration by default, but when Fuchsia is
                 run with the multi-threaded version it runs into clock-skew issues and crashes.
                 This tag makes it explicit that we always want the single-thread version, even if
                 it may be slower. }}
+            {{#if (eq device.cpu.architecture "riscv64")}}
+            {{else}}
             "-accel",
             "tcg,thread=single",
+            {{/if}}
             "-cpu",
             {{#if (eq device.cpu.architecture "arm64")}}
                 "cortex-a53",
-            {{else}}
+            {{/if}}
+            {{#if (eq device.cpu.architecture "x64")}}
                 "Haswell,+smap,-check,-fsgsbase",
+            {{/if}}
+
+            {{#if (eq device.cpu.architecture "riscv64")}}
+                "rv64",
             {{/if}}
         {{else}} {{! acceleration == "hyper" }}
             {{#if (eq host.os "linux")}}
@@ -114,8 +135,11 @@
         {{#if (eq device.audio.model "none")}}
             "-no-audio",
         {{else}}
+            {{#if (eq device.cpu.architecture "riscv64")}}
+            {{else}}
             "-soundhw",
             "{{device.audio.model}}",
+            {{/if}}
         {{/if}}
         {{! Networking goes here }}
         {{#if (eq host.networking "none")}}
@@ -127,7 +151,11 @@
                 "-netdev",
                 "type=tap,ifname=qemu,id=net0,script=no,downscript=no",
                 "-device",
+                {{#if (eq device.cpu.architecture "riscv64")}}
+                    "virtio-net-pci,vectors=8,romfile=,netdev=net0,mac={{runtime.mac_address}}",
+                {{else}}
                 "virtio-net-pci,vectors=8,netdev=net0,mac={{runtime.mac_address}}",
+                {{/if}}
             {{else}}
                 {{!-- host.networking must be "user"}}
                 "-netdev",
@@ -142,8 +170,11 @@
         {{#if runtime.headless}}
             "-nographic",
         {{/if}}
+          {{#if (eq device.cpu.architecture "riscv64")}}
+          {{else}}
         "-parallel",
         "none",
+        {{/if}}
         {{! TODO(fxbug.dev/90005): These last few items were hard-coded into
             device_launcher, but need to be reevaluated as part of the template
             here. }}
@@ -151,8 +182,15 @@
         "none",
         "-device",
         "virtio-keyboard-pci",
+        {{#if (eq device.cpu.architecture "riscv64")}}
+            "-device", "virtio-serial-pci",
+            "-device", "virtio-mouse-pci",
+            "-object", "rng-random,filename=/dev/urandom,id=rng0",
+            "-device", "virtio-rng-device,rng=rng0"
+        {{else}}
         "-device",
         "edu"
+        {{/if}}
     ],
     "features": [
         {{! We don't bother checking for "auto" here because the Rust code
@@ -183,7 +221,13 @@
         {{#if (eq runtime.log_level "verbose")}}
             "verbose",
         {{/if}}
+        {{#if (eq device.cpu.architecture "riscv64")}}
+        {{else}}
         "kernel.serial=legacy",
+        "kernel.lockup-detector.critical-section-fatal-threshold-ms=0",
+        "kernel.lockup-detector.critical-section-threshold-ms=5000",
+        "kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0",
+        {{/if}}
         {{#if (eq runtime.console "console")}}
             "TERM=xterm-256color",
         {{else}}
@@ -191,10 +235,7 @@
         {{/if}}
         "kernel.entropy-mixin=42ac2452e99c1c979ebfca03bce0cbb14126e4021a6199ccfeca217999c0aaa0",
         "kernel.halt-on-panic=true",
-        "zircon.nodename={{runtime.name}}",
-        "kernel.lockup-detector.critical-section-fatal-threshold-ms=0",
-        "kernel.lockup-detector.critical-section-threshold-ms=5000",
-        "kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0"
+        "zircon.nodename={{runtime.name}}"
         {{#each runtime.addl_kernel_args}}
             ,"{{this}}"
         {{/each}}

@@ -158,6 +158,7 @@ impl EmulatorEngine for QemuEngine {
     async fn load_emulator_binary(&mut self) -> Result<()> {
         let cli_name = match self.data.get_emulator_configuration().device.cpu.architecture {
             CpuArchitecture::Arm64 => Some("qemu-system-aarch64"),
+            CpuArchitecture::Riscv64 => Some("qemu-system-riscv64"),
             _ => None,
         };
 
