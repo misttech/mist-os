@@ -243,6 +243,16 @@ async fn run_index_server(
                         .or_else(ignore_peer_closed)
                         .context("error responding to AddCompositeNodeSpec")?;
                 }
+                DriverIndexRequest::RebindCompositeNodeSpec {
+                    spec,
+                    driver_url_suffix,
+                    responder,
+                } => {
+                    responder
+                        .send(indexer.rebind_composite(spec, driver_url_suffix))
+                        .or_else(ignore_peer_closed)
+                        .context("error responding to RebindCompositeNodeSpec")?;
+                }
             }
             Ok(())
         })

@@ -127,4 +127,12 @@ closed protocol DriverIndex {
         composite_driver MatchedCompositeInfo;
         node_names vector<string:MAX>:MAX;
     }) error zx.Status;
+
+    /// Rematch the composite node spec to a composite driver. If a driver url suffix is
+    /// provided, the composite node spec will only be matched against drivers with URLS that
+    /// end with the suffix.
+    strict RebindCompositeNodeSpec(struct {
+        spec string:MAX;
+        driver_url_suffix string:<MAX, optional>;
+    }) -> () error zx.Status;
 };

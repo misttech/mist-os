@@ -77,6 +77,11 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
                            fidl::ToWire(arena, names.value()));
   }
 
+  void RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView request,
+                               RebindCompositeNodeSpecCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   void AddCompositeNodeSpecMatch(std::string_view name,
                                  fuchsia_driver_index::MatchedCompositeNodeSpecInfo result) {
     spec_match_[std::string(name)] = result;

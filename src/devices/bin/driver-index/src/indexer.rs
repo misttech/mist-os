@@ -77,6 +77,38 @@ impl Indexer {
             }
     }
 
+    // Create a list of all drivers in the following priority:
+    // 1. Non-fallback boot drivers
+    // 2. Non-fallback base drivers
+    // 3. Fallback boot drivers
+    // 4. Fallback base drivers
+    fn list_drivers(&self) -> Vec<ResolvedDriver> {
+        let base_repo = self.base_repo.borrow();
+        let base_repo_iter = match base_repo.deref() {
+            BaseRepo::Resolved(drivers) => drivers.iter(),
+            BaseRepo::NotResolved(_) => [].iter(),
+        };
+        let (boot_drivers, base_drivers) = if self.include_fallback_drivers() {
+            (self.boot_repo.iter(), base_repo_iter.clone())
+        } else {
+            ([].iter(), [].iter())
+        };
+        let fallback_boot_drivers = boot_drivers.filter(|&driver| driver.fallback);
+        let fallback_base_drivers = base_drivers.filter(|&driver| driver.fallback);
+
+        let ephemeral = self.ephemeral_drivers.borrow();
+
+        self.boot_repo
+            .iter()
+            .filter(|&driver| !driver.fallback)
+            .chain(base_repo_iter.filter(|&driver| !driver.fallback))
+            .chain(ephemeral.values())
+            .chain(fallback_boot_drivers)
+            .chain(fallback_base_drivers)
+            .map(|driver| driver.clone())
+            .collect::<Vec<_>>()
+    }
+
     pub fn load_base_repo(&self, base_repo: BaseRepo) {
         if let BaseRepo::NotResolved(waiters) = self.base_repo.borrow_mut().deref_mut() {
             while let Some(waiter) = waiters.pop() {
@@ -106,34 +138,13 @@ impl Indexer {
             return Ok(spec);
         }
 
-        let base_repo = self.base_repo.borrow();
-        let base_repo_iter = match base_repo.deref() {
-            BaseRepo::Resolved(drivers) => drivers.iter(),
-            BaseRepo::NotResolved(_) => [].iter(),
-        };
-        let (boot_drivers, base_drivers) = if self.include_fallback_drivers() {
-            (self.boot_repo.iter(), base_repo_iter.clone())
-        } else {
-            ([].iter(), [].iter())
-        };
-        let fallback_boot_drivers = boot_drivers.filter(|&driver| driver.fallback);
-        let fallback_base_drivers = base_drivers.filter(|&driver| driver.fallback);
+        let driver_list = self.list_drivers();
 
-        let ephemeral = self.ephemeral_drivers.borrow();
-        // Iterate over all drivers. Match non-fallback boot drivers, then
-        // non-fallback base drivers, then fallback boot drivers, then fallback
-        // base drivers.
         let (mut fallback, mut non_fallback): (
             Vec<(bool, fdi::MatchedDriver)>,
             Vec<(bool, fdi::MatchedDriver)>,
-        ) = self
-            .boot_repo
+        ) = driver_list
             .iter()
-            .filter(|&driver| !driver.fallback)
-            .chain(base_repo_iter.filter(|&driver| !driver.fallback))
-            .chain(ephemeral.values())
-            .chain(fallback_boot_drivers)
-            .chain(fallback_base_drivers)
             .filter_map(|driver| {
                 if let Ok(Some(matched)) = driver.matches(&properties) {
                     if let Some(url_suffix) = &args.driver_url_suffix {
@@ -177,33 +188,34 @@ impl Indexer {
         &self,
         spec: fdf::CompositeNodeSpec,
     ) -> fdi::DriverIndexAddCompositeNodeSpecResult {
-        let base_repo = self.base_repo.borrow();
-        let base_repo_iter = match base_repo.deref() {
-            BaseRepo::Resolved(drivers) => drivers.iter(),
-            BaseRepo::NotResolved(_) => [].iter(),
-        };
-        let (boot_drivers, base_drivers) = if self.include_fallback_drivers() {
-            (self.boot_repo.iter(), base_repo_iter.clone())
-        } else {
-            ([].iter(), [].iter())
-        };
-        let fallback_boot_drivers = boot_drivers.filter(|&driver| driver.fallback);
-        let fallback_base_drivers = base_drivers.filter(|&driver| driver.fallback);
-
-        let ephemeral = self.ephemeral_drivers.borrow();
-        let composite_drivers = self
-            .boot_repo
+        let driver_list = self.list_drivers();
+        let composite_drivers = driver_list
             .iter()
-            .filter(|&driver| !driver.fallback)
-            .chain(base_repo_iter.filter(|&driver| !driver.fallback))
-            .chain(ephemeral.values())
-            .chain(fallback_boot_drivers)
-            .chain(fallback_base_drivers)
             .filter(|&driver| matches!(driver.bind_rules, DecodedRules::Composite(_)))
             .collect::<Vec<_>>();
 
         let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
         composite_node_spec_manager.add_composite_node_spec(spec, composite_drivers)
+    }
+
+    pub fn rebind_composite(
+        &self,
+        spec_name: String,
+        driver_url_suffix: Option<String>,
+    ) -> Result<(), i32> {
+        let driver_list = self.list_drivers();
+        let composite_drivers = driver_list
+            .iter()
+            .filter(|&driver| {
+                if let Some(url_suffix) = &driver_url_suffix {
+                    if !driver.component_url.as_str().ends_with(url_suffix.as_str()) {
+                        return false;
+                    }
+                }
+                matches!(driver.bind_rules, DecodedRules::Composite(_))
+            })
+            .collect::<Vec<_>>();
+        self.composite_node_spec_manager.borrow_mut().rebind(spec_name, composite_drivers)
     }
 
     pub fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdd::DriverInfo> {

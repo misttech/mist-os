@@ -46,6 +46,8 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   void WaitForBaseDrivers(WaitForBaseDriversCompleter::Sync& completer) override;
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
+  void RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView request,
+                               RebindCompositeNodeSpecCompleter::Sync& completer) override;
 
   zx::result<fidl::ClientEnd<fuchsia_driver_index::DriverIndex>> Connect();
 

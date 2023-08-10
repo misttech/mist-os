@@ -26,13 +26,15 @@ pub struct BindRuleCondition {
 
 type BindRules = BTreeMap<PropertyKey, BindRuleCondition>;
 
-struct MatchedComposite {
+#[derive(Debug, PartialEq)]
+pub struct MatchedComposite {
     pub info: fdi::MatchedCompositeInfo,
     pub names: Vec<String>,
     pub primary_index: u32,
 }
 
-struct CompositeNodeSpecInfo {
+#[derive(Debug)]
+pub struct CompositeNodeSpecInfo {
     pub nodes: Vec<fdf::ParentSpec>,
 
     // The composite driver matched to the spec.
@@ -48,7 +50,7 @@ pub struct CompositeNodeSpecManager {
 
     // Maps specs to the name. This list ensures that we don't add multiple specs with
     // the same name.
-    spec_list: HashMap<String, CompositeNodeSpecInfo>,
+    pub spec_list: HashMap<String, CompositeNodeSpecInfo>,
 }
 
 impl CompositeNodeSpecManager {
@@ -110,29 +112,22 @@ impl CompositeNodeSpecManager {
                 .or_insert(vec![spec_info]);
         }
 
-        for composite_driver in composite_drivers {
-            let matched_composite = match_composite_properties(composite_driver, &parents)?;
-            if let Some(matched_composite) = matched_composite {
-                // Found a match so we can set this in our map.
-                self.spec_list.insert(
-                    name.clone(),
-                    CompositeNodeSpecInfo {
-                        nodes: parents,
-                        matched: Some(MatchedComposite {
-                            info: matched_composite.info.clone(),
-                            names: matched_composite.names.clone(),
-                            primary_index: matched_composite.primary_index,
-                        }),
-                    },
-                );
-                tracing::info!(
-                    "Matched '{}' to composite node spec '{}'",
-                    get_driver_url(&matched_composite),
-                    name
-                );
-                return Ok((matched_composite.info, matched_composite.names));
-            }
-        }
+        let matched_composite_result =
+            self.find_composite_driver_match(&parents, &composite_drivers)?;
+        if let Some(matched_composite) = matched_composite_result {
+            tracing::info!(
+                "Matched '{}' to composite node spec '{}'",
+                get_driver_url(&matched_composite),
+                name
+            );
+
+            let result = (matched_composite.info.clone(), matched_composite.names.clone());
+            self.spec_list.insert(
+                name.clone(),
+                CompositeNodeSpecInfo { nodes: parents, matched: Some(matched_composite) },
+            );
+            return Ok(result);
+        };
 
         self.spec_list.insert(name, CompositeNodeSpecInfo { nodes: parents, matched: None });
         Err(Status::NOT_FOUND.into_raw())
@@ -196,6 +191,19 @@ impl CompositeNodeSpecManager {
         }
     }
 
+    pub fn rebind(
+        &mut self,
+        spec_name: String,
+        composite_drivers: Vec<&ResolvedDriver>,
+    ) -> Result<(), zx_status_t> {
+        let spec = self.spec_list.get(&spec_name).ok_or(Status::NOT_FOUND.into_raw())?;
+        let new_match = self.find_composite_driver_match(&spec.nodes, &composite_drivers)?;
+        self.spec_list.entry(spec_name).and_modify(|spec| {
+            spec.matched = new_match;
+        });
+        Ok(())
+    }
+
     pub fn get_specs(&self, name_filter: Option<String>) -> Vec<fdd::CompositeNodeSpecInfo> {
         if let Some(name) = name_filter {
             match self.spec_list.get(&name) {
@@ -234,6 +242,24 @@ impl CompositeNodeSpecManager {
         }
 
         return None;
+    }
+
+    fn find_composite_driver_match<'a>(
+        &self,
+        parents: &'a Vec<fdf::ParentSpec>,
+        composite_drivers: &Vec<&ResolvedDriver>,
+    ) -> Result<Option<MatchedComposite>, i32> {
+        for composite_driver in composite_drivers {
+            let matched_composite = match_composite_properties(composite_driver, parents)?;
+            if let Some(matched_composite) = matched_composite {
+                return Ok(Some(MatchedComposite {
+                    info: matched_composite.info.clone(),
+                    names: matched_composite.names.clone(),
+                    primary_index: matched_composite.primary_index,
+                }));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -612,7 +638,8 @@ mod tests {
         fdf::ParentSpec { bind_rules: bind_rules, properties: properties }
     }
 
-    fn create_driver_with_rules<'a>(
+    fn create_driver<'a>(
+        composite_name: String,
         primary_node: (&str, Vec<SymbolicInstructionInfo<'a>>),
         additionals: Vec<(&str, Vec<SymbolicInstructionInfo<'a>>)>,
         optionals: Vec<(&str, Vec<SymbolicInstructionInfo<'a>>)>,
@@ -628,7 +655,7 @@ mod tests {
                 .push(CompositeNode { name: optional.0.to_string(), instructions: optional.1 });
         }
         let bind_rules = CompositeBindRules {
-            device_name: TEST_DEVICE_NAME.to_string(),
+            device_name: composite_name,
             symbol_table: HashMap::new(),
             primary_node: CompositeNode {
                 name: primary_node.0.to_string(),
@@ -654,6 +681,14 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
         }
+    }
+
+    fn create_driver_with_rules<'a>(
+        primary_node: (&str, Vec<SymbolicInstructionInfo<'a>>),
+        additionals: Vec<(&str, Vec<SymbolicInstructionInfo<'a>>)>,
+        optionals: Vec<(&str, Vec<SymbolicInstructionInfo<'a>>)>,
+    ) -> ResolvedDriver {
+        create_driver(TEST_DEVICE_NAME.to_string(), primary_node, additionals, optionals)
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -2373,5 +2408,157 @@ mod tests {
                 vec![]
             )
         );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_rebind() {
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
+
+        let primary_key_1 = "whimbrel";
+        let primary_val_1 = "sanderling";
+
+        let primary_parent_spec = fdf::ParentSpec {
+            bind_rules: primary_bind_rules,
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
+        };
+
+        let primary_node_inst = vec![SymbolicInstructionInfo {
+            location: None,
+            instruction: SymbolicInstruction::AbortIfNotEqual {
+                lhs: Symbol::Key(primary_key_1.to_string(), ValueType::Str),
+                rhs: Symbol::StringValue(primary_val_1.to_string()),
+            },
+        }];
+
+        let composite_driver = create_driver_with_rules(
+            (TEST_PRIMARY_NAME, primary_node_inst.clone()),
+            vec![],
+            vec![],
+        );
+
+        let nodes = Some(vec![primary_parent_spec]);
+
+        let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
+        assert_eq!(
+            Ok((
+                fdi::MatchedCompositeInfo {
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
+                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
+                    ..Default::default()
+                },
+                vec![TEST_PRIMARY_NAME.to_string(),]
+            )),
+            composite_node_spec_manager.add_composite_node_spec(
+                fdf::CompositeNodeSpec {
+                    name: Some("test_spec".to_string()),
+                    parents: nodes.clone(),
+                    ..Default::default()
+                },
+                vec![&composite_driver]
+            )
+        );
+
+        let rebind_driver = create_driver(
+            "rebind_composite".to_string(),
+            (TEST_PRIMARY_NAME, primary_node_inst),
+            vec![],
+            vec![],
+        );
+        assert!(composite_node_spec_manager
+            .rebind("test_spec".to_string(), vec![&rebind_driver])
+            .is_ok());
+        assert_eq!(
+            fdi::MatchedCompositeInfo {
+                composite_name: Some("rebind_composite".to_string()),
+                driver_info: Some(rebind_driver.clone().create_matched_driver_info()),
+                ..Default::default()
+            },
+            composite_node_spec_manager
+                .spec_list
+                .get("test_spec")
+                .unwrap()
+                .matched
+                .as_ref()
+                .unwrap()
+                .info
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_rebind_no_match() {
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
+
+        let primary_key_1 = "whimbrel";
+        let primary_val_1 = "sanderling";
+
+        let primary_parent_spec = fdf::ParentSpec {
+            bind_rules: primary_bind_rules,
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
+        };
+
+        let primary_node_inst = vec![SymbolicInstructionInfo {
+            location: None,
+            instruction: SymbolicInstruction::AbortIfNotEqual {
+                lhs: Symbol::Key(primary_key_1.to_string(), ValueType::Str),
+                rhs: Symbol::StringValue(primary_val_1.to_string()),
+            },
+        }];
+
+        let composite_driver =
+            create_driver_with_rules((TEST_PRIMARY_NAME, primary_node_inst), vec![], vec![]);
+
+        let nodes = Some(vec![primary_parent_spec]);
+
+        let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
+        assert_eq!(
+            Ok((
+                fdi::MatchedCompositeInfo {
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
+                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
+                    ..Default::default()
+                },
+                vec![TEST_PRIMARY_NAME.to_string(),]
+            )),
+            composite_node_spec_manager.add_composite_node_spec(
+                fdf::CompositeNodeSpec {
+                    name: Some("test_spec".to_string()),
+                    parents: nodes.clone(),
+                    ..Default::default()
+                },
+                vec![&composite_driver]
+            )
+        );
+
+        // Create a composite driver for rebinding that won't match to the spec.
+        let rebind_primary_node_inst = vec![SymbolicInstructionInfo {
+            location: None,
+            instruction: SymbolicInstruction::AbortIfNotEqual {
+                lhs: Symbol::Key("unmatched".to_string(), ValueType::Bool),
+                rhs: Symbol::BoolValue(false),
+            },
+        }];
+
+        let rebind_driver = create_driver(
+            "rebind_composite".to_string(),
+            (TEST_PRIMARY_NAME, rebind_primary_node_inst),
+            vec![],
+            vec![],
+        );
+        assert!(composite_node_spec_manager
+            .rebind("test_spec".to_string(), vec![&rebind_driver])
+            .is_ok());
+        assert_eq!(None, composite_node_spec_manager.spec_list.get("test_spec").unwrap().matched);
     }
 }

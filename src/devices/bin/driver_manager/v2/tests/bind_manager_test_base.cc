@@ -38,6 +38,11 @@ void TestDriverIndex::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView reque
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
+void TestDriverIndex::RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView request,
+                                              RebindCompositeNodeSpecCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 zx::result<fidl::ClientEnd<fdi::DriverIndex>> TestDriverIndex::Connect() {
   auto endpoints = fidl::CreateEndpoints<fdi::DriverIndex>();
   if (endpoints.is_error()) {

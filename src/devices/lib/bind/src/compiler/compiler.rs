@@ -111,7 +111,7 @@ pub struct BindRules<'a> {
     pub enable_debug: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SymbolicInstruction {
     AbortIfEqual { lhs: Symbol, rhs: Symbol },
     AbortIfNotEqual { lhs: Symbol, rhs: Symbol },
@@ -152,7 +152,7 @@ impl SymbolicInstruction {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SymbolicInstructionInfo<'a> {
     pub location: Option<AstLocation<'a>>,
     pub instruction: SymbolicInstruction,

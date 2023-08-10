@@ -52,6 +52,11 @@ class FakeDriverLoaderIndex final : public fidl::WireServer<fdi::DriverIndex> {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
+  void RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView request,
+                               RebindCompositeNodeSpecCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   std::optional<fdi::wire::MatchedDriver> driver;
 };
 
