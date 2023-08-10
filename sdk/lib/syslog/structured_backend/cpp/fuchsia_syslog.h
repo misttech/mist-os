@@ -65,29 +65,6 @@ class LogBuffer final {
                    unsigned int line, cpp17::optional<cpp17::string_view> message,
                    zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
-  // Initializes a LogBuffer
-  //
-  // buffer -- The buffer to initialize
-  // severity -- The severity of the log
-  // file_name -- The name of the file that generated the log message
-  // line -- The line number that caused this message to be generated
-  // message -- The message to output.
-  // is_printf -- Whether or not this is a printf message. If true,
-  // the message should be interpreted as a C-style printf before being displayed to the
-  // user.
-  // socket -- The socket to write the message to.
-  // dropped_count -- Number of dropped messages
-  // pid -- The process ID that generated the message.
-  // tid -- The thread ID that generated the message.
-  //
-  // DEPRECATED: Removing. See fxbug.dev/131587
-  void BeginRecord(FuchsiaLogSeverity severity, cpp17::optional<cpp17::string_view> file_name,
-                   unsigned int line, cpp17::optional<cpp17::string_view> message, bool is_printf,
-                   zx::unowned_socket socket, uint32_t dropped_count, zx_koid_t pid,
-                   zx_koid_t tid) {
-    BeginRecord(severity, file_name, line, message, std::move(socket), dropped_count, pid, tid);
-  }
-
   // Writes a key/value pair to the buffer.
   void WriteKeyValue(cpp17::string_view key, const char* value) {
     WriteKeyValue(key, cpp17::string_view(value, strlen(value)));
