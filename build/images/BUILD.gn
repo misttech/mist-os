@@ -195,12 +195,20 @@ compiled_action("uefi-disk") {
     target_cpu,
     "--bootloader",
     bootloader_path,
-    "--resize",
-    "10000000000",  # 10GB
     "--depfile",
     "--host-arch",
     host_cpu,
+    "--resize",
   ]
+  if (is_coverage) {
+    # Images are larger due to coverage overheads, so leave more room.
+    #
+    # TODO(https://fxbug.dev/131960): Remove unnecessary packages from coverage
+    # builds and reduce image size.
+    args += [ "12000000000" ]  # 12GB
+  } else {
+    args += [ "10000000000" ]  # 10GB
+  }
   if (fxfs_blob) {
     args += [ "--use-fxfs" ]
   }
