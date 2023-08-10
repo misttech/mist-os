@@ -10,6 +10,9 @@ use std::{
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
+/// A serde_json::Map used for generic config values
+pub type ConfigMap = serde_json::Map<String, serde_json::Value>;
+
 /// Represents a path indirection through a file containing the location to
 /// actually look.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -127,7 +130,7 @@ pub struct FuchsiaConfig {
     /// similar effect to the current behavior of the “global” config
     /// level for projects that use it.
     #[serde(default)]
-    pub defaults: serde_json::Map<String, serde_json::Value>,
+    pub defaults: ConfigMap,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

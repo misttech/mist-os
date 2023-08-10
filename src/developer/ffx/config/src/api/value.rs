@@ -11,7 +11,7 @@ use crate::{
     nested::RecursiveMap,
 };
 use anyhow::anyhow;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::{
     convert::{From, TryFrom, TryInto},
     path::PathBuf,
@@ -305,14 +305,17 @@ impl TryFrom<ConfigValue> for Option<f64> {
     }
 }
 
+/// Merges [`Map`] b into [`Map`] a.
+pub fn merge_map(a: &mut Map<String, Value>, b: &Map<String, Value>) {
+    for (k, v) in b.iter() {
+        self::merge(a.entry(k.clone()).or_insert(Value::Null), v);
+    }
+}
+
 /// Merge's `Value` b into `Value` a.
 pub fn merge(a: &mut Value, b: &Value) {
     match (a, b) {
-        (&mut Value::Object(ref mut a), &Value::Object(ref b)) => {
-            for (k, v) in b.iter() {
-                self::merge(a.entry(k.clone()).or_insert(Value::Null), v);
-            }
-        }
+        (&mut Value::Object(ref mut a), &Value::Object(ref b)) => merge_map(a, b),
         (a, b) => *a = b.clone(),
     }
 }

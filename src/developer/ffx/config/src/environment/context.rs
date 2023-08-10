@@ -411,6 +411,14 @@ impl EnvironmentContext {
         }
     }
 
+    pub fn get_default_overrides(&self) -> ConfigMap {
+        use EnvironmentKind::*;
+        match &self.kind {
+            ConfigDomain { domain, .. } => domain.get_config_defaults().clone(),
+            _ => ConfigMap::default(),
+        }
+    }
+
     /// Gets the basic information about the sdk as configured, without diving deeper into the sdk's own configuration.
     async fn sdk_from_config(&self, sdk_root: Option<&Path>) -> Result<SdkRoot> {
         // All gets in this function should declare that they don't want the build directory searched, because

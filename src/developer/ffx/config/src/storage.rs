@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    api::query::SelectMode,
+    api::{query::SelectMode, value::merge_map},
     environment::Environment,
     nested::{nested_get, nested_remove, nested_set},
     ConfigLevel,
@@ -189,11 +189,14 @@ impl Config {
         build: Option<ConfigFile>,
         user: Option<ConfigFile>,
         runtime: ConfigMap,
+        default_override: ConfigMap,
     ) -> Self {
-        let default = match include_default!() {
+        let mut default = match include_default!() {
             Value::Object(obj) => obj,
             _ => panic!("Statically build default configuration was not an object"),
         };
+        merge_map(&mut default, &default_override);
+
         Self { user, build, global, runtime, default }
     }
 
@@ -205,7 +208,13 @@ impl Config {
         let build = build_conf.as_deref().map(ConfigFile::from_file).transpose()?;
         let global = env.get_global().map(ConfigFile::from_file).transpose()?;
 
-        Ok(Self::new(global, build, user, env.get_runtime_args().clone()))
+        Ok(Self::new(
+            global,
+            build,
+            user,
+            env.get_runtime_args().clone(),
+            env.context().get_default_overrides(),
+        ))
     }
 
     #[cfg(test)]
@@ -418,6 +427,7 @@ mod test {
             Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
             Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
             Some(ConfigFile::from_buf(None, BufReader::new(USER))),
+            Map::default(),
             Map::default(),
         );
 
@@ -714,7 +724,7 @@ mod test {
 
     #[test]
     fn test_default() {
-        let test = Config::new(None, None, None, Map::default());
+        let test = Config::new(None, None, None, Map::default(), Map::default());
         let default_value = test.get("log.enabled", SelectMode::First);
         assert_eq!(
             default_value.unwrap(),

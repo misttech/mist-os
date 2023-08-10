@@ -7,7 +7,7 @@ use std::{fs::File, io::ErrorKind};
 use camino::{Utf8Path, Utf8PathBuf};
 
 use crate::{
-    fuchsia_env::{FuchsiaEnv, ParseError},
+    fuchsia_env::{ConfigMap, FuchsiaEnv, ParseError},
     ConfigPath,
 };
 
@@ -136,6 +136,10 @@ impl ConfigDomain {
 
     pub fn get_explicit_sdk_root(&self) -> Option<&Utf8Path> {
         self.sdk_root.as_deref()
+    }
+
+    pub fn get_config_defaults(&self) -> &ConfigMap {
+        &self.contents.fuchsia.config.defaults
     }
 }
 
