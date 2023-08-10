@@ -134,11 +134,11 @@ class ConvertTest(unittest.TestCase):
                 file.write(json.dumps(manifest, indent=2))
 
             reference_path = os.path.join(
-                tmpdir, "golden_content_checklist.json")
+                tmpdir, "golden_content_checklist.api")
             with open(reference_path, "w") as file:
                 file.write(json.dumps(reference, indent=2))
 
-            output_path = os.path.join(tmpdir, "content_checklist.json")
+            output_path = os.path.join(tmpdir, "content_checklist.api")
             sys.argv = [
                 "", "--manifest", package_manifest_path, "--output",
                 output_path, "--reference", reference_path

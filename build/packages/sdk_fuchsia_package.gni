@@ -55,7 +55,7 @@ import("//tools/check-licenses/build/license_data.gni")
 #     List of paths, relative to the package's root, for all files that
 #     participate in that package's content checklist file. Their content hash will be
 #     compared to the ones in
-#     //sdk/packages/${distribution_name}/${target_cpu}/release/content_checklist.json.
+#     //sdk/packages/${distribution_name}/${target_cpu}/release/content_checklist.api.
 #     Any paths specified in this list that are not found, or do not have hashes that match
 #     their golden content checklist file equivalent, will cause an error during checklist
 #     file generation.
@@ -66,7 +66,7 @@ import("//tools/check-licenses/build/license_data.gni")
 #     do not participate in that package's content checklist file. Their content
 #     does not matter for verification, but these paths must appear in
 #     the golden
-#     //sdk/packages/${distribution_name}/${target_cpu}/release/content_checklist.json file
+#     //sdk/packages/${distribution_name}/${target_cpu}/release/content_checklist.api file
 #     and in the same order.
 #     Any paths specified in this list that are not found in the specified
 #     manifest will cause an error during checklist file generation.
@@ -125,9 +125,9 @@ template("sdk_fuchsia_package") {
     _distribution_name = invoker.distribution_name
 
     # Note: Golden file does not support multiple API level currently.
-    golden_content_checklist_file = "//sdk/packages/${_distribution_name}/${target_cpu}/release/content_checklist.json"
+    golden_content_checklist_file = "//sdk/packages/${_distribution_name}/${target_cpu}/release/content_checklist.api"
     computed_content_checklist_file =
-        "${_sdk_package_dir}/content_checklist.json"
+        "${_sdk_package_dir}/content_checklist.api"
     _content_checklist_target = "${target_name}.content_checklist"
     _content_checklist_depfile =
         "${target_gen_dir}/${_content_checklist_target}.d"
