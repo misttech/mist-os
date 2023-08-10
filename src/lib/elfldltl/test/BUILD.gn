@@ -366,6 +366,11 @@ cpp_fuzzer("dynamic-fuzzer") {
   deps = [ ".." ]
 }
 
+cpp_fuzzer("loadinfo-fuzzer") {
+  sources = [ "loadinfo-fuzzer.cc" ]
+  deps = [ ".." ]
+}
+
 cpp_fuzzer("note-fuzzer") {
   sources = [ "note-fuzzer.cc" ]
   deps = [ ".." ]
@@ -384,6 +389,11 @@ cpp_fuzzer("symbol-fuzzer") {
 fuchsia_fuzzer_component("dynamic-fuzzer-component") {
   manifest = "meta/dynamic-fuzzer.cml"
   deps = [ ":dynamic-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("loadinfo-fuzzer-component") {
+  manifest = "meta/loadinfo-fuzzer.cml"
+  deps = [ ":loadinfo-fuzzer" ]
 }
 
 fuchsia_fuzzer_component("note-fuzzer-component") {
@@ -405,6 +415,7 @@ if (is_fuchsia) {
   fuchsia_fuzzer_package("elfldltl-fuzzers") {
     cpp_fuzzer_components = [
       ":dynamic-fuzzer-component",
+      ":loadinfo-fuzzer-component",
       ":note-fuzzer-component",
       ":relocation-fuzzer-component",
       ":symbol-fuzzer-component",
@@ -415,12 +426,14 @@ if (is_fuchsia) {
     testonly = true
     deps = [
       ":dynamic-fuzzer",
+      ":loadinfo-fuzzer",
       ":note-fuzzer",
       ":relocation-fuzzer",
       ":symbol-fuzzer",
     ]
   }
 }
+
 group("tests") {
   testonly = true
 
