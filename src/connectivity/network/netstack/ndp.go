@@ -505,7 +505,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		// rt is added as a 'static' route because Netstack will remove dynamic
 		// routes on DHCPv4 changes. See
 		// staticRouteAvoidingLifeCycleHooks for more details.
-		if _, err := n.ns.addRouteWithPreference(rt, prf, metricNotSet, staticRouteAvoidingLifeCycleHooks, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
+		if _, err := n.ns.addRouteWithPreference(rt, prf, nil /* metric */, staticRouteAvoidingLifeCycleHooks, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 			_ = syslog.ErrorTf(ndpSyslogTagName, "failed to add the route [%s] with preference=%s for the discovered off-link route to [%s] through [%s] on nicID (%d): %s", rt, event.prf, event.dest, event.router, event.nicID, err)
 		}
 
@@ -523,7 +523,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 		// rt is added as a 'static' route because Netstack will remove dynamic
 		// routes on DHCPv4 changes. See
 		// staticRouteAvoidingLifeCycleHooks for more details.
-		if _, err := n.ns.AddRoute(rt, metricNotSet, staticRouteAvoidingLifeCycleHooks, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
+		if _, err := n.ns.AddRoute(rt, nil /* metric */, staticRouteAvoidingLifeCycleHooks, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 			_ = syslog.ErrorTf(ndpSyslogTagName, "failed to add the on-link route [%s] for the discovered on-link prefix (%s) on nicID (%d): %s", rt, prefix, nicID, err)
 		}
 

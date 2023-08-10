@@ -301,7 +301,7 @@ func TestInterfacesWatcher(t *testing.T) {
 	// Add a default route.
 	blockingWatcher.blockingWatch(t, ch)
 	r := defaultV4Route(ifs.nicid, util.Parse("1.2.3.5"))
-	if _, err := ns.AddRoute(r, metricNotSet, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
+	if _, err := ns.AddRoute(r, nil /* metric */, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		t.Fatalf("failed to add default route: %s", err)
 	}
 	defaultIpv4RouteAdded := id

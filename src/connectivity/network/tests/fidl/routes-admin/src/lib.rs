@@ -33,6 +33,9 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
+const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
+    fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty);
+
 struct TestSetup<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> {
     realm: netemul::TestRealm<'a>,
     network: netemul::TestNetwork<'a>,
@@ -57,7 +60,10 @@ impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
     }
 }
 
-fn test_route<I: Ip>(interface: &netemul::TestInterface<'_>) -> fnet_routes_ext::Route<I> {
+fn test_route<I: Ip>(
+    interface: &netemul::TestInterface<'_>,
+    metric: fnet_routes::SpecifiedMetric,
+) -> fnet_routes_ext::Route<I> {
     let destination = I::map_ip(
         (),
         |()| net_declare::net_subnet_v4!("192.0.2.0/24"),
@@ -76,22 +82,23 @@ fn test_route<I: Ip>(interface: &netemul::TestInterface<'_>) -> fnet_routes_ext:
             next_hop: Some(SpecifiedAddr::new(next_hop_addr).expect("is specified")),
         }),
         properties: fnet_routes_ext::RouteProperties {
-            specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
-                metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
-            },
+            specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
         },
     }
 }
 
 #[netstack_test]
-#[test_case(true ; "explicitly removing the route")]
-#[test_case(false ; "dropping the route set")]
+#[test_case(true, METRIC_TRACKS_INTERFACE; "explicitly removing the route")]
+#[test_case(false, METRIC_TRACKS_INTERFACE; "dropping the route set")]
+#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(0); "explicit zero metric")]
+#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(12345); "explicit non-zero metric")]
 async fn add_remove_route<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
     explicit_remove: bool,
+    metric: fnet_routes::SpecifiedMetric,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let TestSetup { realm: _realm, network: _network, interface, set_provider, state } =
@@ -110,7 +117,7 @@ async fn add_remove_route<
 
     let proxy = fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
 
-    let route_to_add = test_route(&interface);
+    let route_to_add = test_route(&interface, metric);
 
     let add_route_and_assert_added = |proxy| async {
         assert!(fnet_routes_ext::admin::add_route::<I>(
@@ -312,7 +319,7 @@ async fn add_route_twice_with_same_set<
 
     let proxy = fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
 
-    let route_to_add = test_route(&interface);
+    let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
 
     for expect_newly_added in [true, false] {
         assert_eq!(
@@ -383,7 +390,7 @@ async fn add_route_with_multiple_route_sets<
     let proxy_a = get_route_set();
     let proxy_b = get_route_set();
 
-    let route_to_add = test_route(&interface);
+    let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
 
     for proxy in [&proxy_a, &proxy_b] {
         assert!(fnet_routes_ext::admin::add_route::<I>(
@@ -463,7 +470,7 @@ async fn add_remove_system_route<
         .connect_to_protocol::<fnet_stack::StackMarker>()
         .expect("connect to fuchsia.net.stack.Stack");
 
-    let route_to_add = test_route::<I>(&interface);
+    let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
     // Add a "system route" with fuchsia.net.stack.
     fuchsia_net_stack
@@ -541,7 +548,7 @@ async fn system_removes_route_from_route_set<
         .connect_to_protocol::<fnet_stack::StackMarker>()
         .expect("connect to fuchsia.net.stack.Stack");
 
-    let route_to_add = test_route::<I>(&interface);
+    let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
     // Add a route with the RouteSet.
     assert!(fnet_routes_ext::admin::add_route::<I>(

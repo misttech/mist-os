@@ -26,6 +26,8 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip"
 )
 
+const metricNotSet uint32 = 0
+
 var _ stack.StackWithCtx = (*stackImpl)(nil)
 
 type stackImpl struct {
@@ -71,8 +73,17 @@ func (ns *Netstack) addForwardingEntry(entry stack.ForwardingEntry) stack.StackA
 		return result
 	}
 
+	metric := func() *routetypes.Metric {
+		if entry.Metric != metricNotSet {
+			metric := routetypes.Metric(entry.Metric)
+			return &metric
+		} else {
+			return nil
+		}
+	}()
+
 	route := fidlconv.ForwardingEntryToTCPIPRoute(entry)
-	if _, err := ns.AddRoute(route, routetypes.Metric(entry.Metric), false /* not dynamic */, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
+	if _, err := ns.AddRoute(route, metric, false /* not dynamic */, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		if errors.Is(err, routes.ErrNoSuchNIC) {
 			result.SetErr(stack.ErrorInvalidArgs)
 		} else {

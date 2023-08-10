@@ -46,8 +46,6 @@ import (
 const (
 	defaultInterfaceMetric routetypes.Metric = 100
 
-	metricNotSet routetypes.Metric = 0
-
 	lowPriorityRoute routetypes.Metric = 99999
 
 	dhcpAcquisition    = 60 * zxtime.Second
@@ -380,11 +378,11 @@ func (ns *Netstack) fillRouteNIC(r tcpip.Route) (tcpip.Route, error) {
 }
 
 // AddRoute adds a single route to the route table in a sorted fashion.
-func (ns *Netstack) AddRoute(r tcpip.Route, metric routetypes.Metric, dynamic, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) (routes.AddResult, error) {
+func (ns *Netstack) AddRoute(r tcpip.Route, metric *routetypes.Metric, dynamic, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) (routes.AddResult, error) {
 	return ns.addRouteWithPreference(r, routetypes.MediumPreference, metric, dynamic, replaceMatchingGvisorRoutes, addingSet)
 }
 
-func (ns *Netstack) addRouteWithPreference(r tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, dynamic, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) (routes.AddResult, error) {
+func (ns *Netstack) addRouteWithPreference(r tcpip.Route, prf routetypes.Preference, metric *routetypes.Metric, dynamic, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) (routes.AddResult, error) {
 	r, err := ns.fillRouteNIC(r)
 	if err != nil {
 		return routes.AddResult{}, err
@@ -396,7 +394,7 @@ func (ns *Netstack) addRouteWithPreference(r tcpip.Route, prf routetypes.Prefere
 // with a configurable preference value.
 //
 // All routes in `rs` will have their NICID rewritten to `nicid`.
-func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, dynamic, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) (routes.AddResult, error) {
+func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route, prf routetypes.Preference, metric *routetypes.Metric, dynamic, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) (routes.AddResult, error) {
 	nicInfo, ok := ns.stack.NICInfo()[nicid]
 	if !ok {
 		return routes.AddResult{}, fmt.Errorf("error getting nicInfo for NIC %d, not in map: %w", nicid, routes.ErrNoSuchNIC)
@@ -410,15 +408,16 @@ func (ns *Netstack) addRoutesWithPreference(nicid tcpip.NICID, rs []tcpip.Route,
 }
 
 // addRoutesWithPreferenceLocked returns an AddResult OR-ed across the AddResults for each individual route added.
-func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, dynamic, overwriteIfAlreadyExist bool, addingSet *routetypes.RouteSetId) routes.AddResult {
+// If metric is nil, the route's metric tracks its interface's metric.
+func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routetypes.Preference, metric *routetypes.Metric, dynamic, overwriteIfAlreadyExist bool, addingSet *routetypes.RouteSetId) routes.AddResult {
 	metricTracksInterface := false
-	if metric == metricNotSet {
+	if metric == nil {
 		metricTracksInterface = true
 	}
 
 	enabled := ifs.IsUpLocked()
 	if metricTracksInterface {
-		metric = ifs.metric
+		metric = &ifs.metric
 	}
 
 	ifs.ns.routeTable.Lock()
@@ -430,7 +429,7 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routetyp
 	for _, r := range rs {
 		r.NIC = ifs.nicid
 
-		addResult := ifs.ns.routeTable.AddRouteLocked(r, prf, metric, metricTracksInterface, dynamic, enabled, overwriteIfAlreadyExist, addingSet)
+		addResult := ifs.ns.routeTable.AddRouteLocked(r, prf, *metric, metricTracksInterface, dynamic, enabled, overwriteIfAlreadyExist, addingSet)
 		aggregateAddResult.NewlyAddedToSet = aggregateAddResult.NewlyAddedToSet || addResult.NewlyAddedToSet
 		aggregateAddResult.NewlyAddedToTable = aggregateAddResult.NewlyAddedToTable || addResult.NewlyAddedToTable
 		_ = syslog.Infof("adding route [%s] prf=%d metric=%d dynamic=%t", r, prf, metric, dynamic)
@@ -458,7 +457,8 @@ func (ifs *ifState) addRoutesWithPreferenceLocked(rs []tcpip.Route, prf routetyp
 
 // DelRouteExactMatch deletes a route from the routing table if there is an
 // extended route with the same tcpip.Route and metric, and default preference.
-func (ns *Netstack) DelRouteExactMatch(r tcpip.Route, metric routetypes.Metric, tracksInterface bool, set *routetypes.RouteSetId) (routes.DelResult, error) {
+// If metric is nil, the route's metric tracks its interface's metric.
+func (ns *Netstack) DelRouteExactMatch(r tcpip.Route, metric *routetypes.Metric, set *routetypes.RouteSetId) (routes.DelResult, error) {
 	if r.NIC == 0 {
 		return routes.DelResult{}, fmt.Errorf("unspecified NIC in route %#v", r)
 	}
@@ -469,13 +469,22 @@ func (ns *Netstack) DelRouteExactMatch(r tcpip.Route, metric routetypes.Metric, 
 	}
 
 	ifs := nicInfo.Context.(*ifState)
+
+	metricTracksInterface := false
+	if metric == nil {
+		metricTracksInterface = true
+	}
+	if metricTracksInterface {
+		metric = &ifs.metric
+	}
+
 	ifs.mu.Lock()
 	defer ifs.mu.Unlock()
 
 	ns.routeTable.Lock()
 	defer ns.routeTable.Unlock()
 
-	delResult := ns.routeTable.DelRouteExactMatchLocked(r, routetypes.MediumPreference, metric, tracksInterface, set)
+	delResult := ns.routeTable.DelRouteExactMatchLocked(r, routetypes.MediumPreference, *metric, metricTracksInterface, set)
 	if delResult.NewlyRemovedFromTable {
 		ns.routeTable.UpdateStackLocked(ns.stack, ns.resetDestinationCache)
 
@@ -876,7 +885,7 @@ func (ifs *ifState) dhcpAcquired(ctx context.Context, lost, acquired tcpip.Addre
 				_ = syslog.Infof("adding routes %s with metric=<not-set> dynamic=true", rs)
 
 				ifs.mu.Lock()
-				ifs.addRoutesWithPreferenceLocked(rs, routetypes.MediumPreference, metricNotSet, true /* dynamic */, true /* overwriteIfAlreadyExist */, routetypes.GlobalRouteSet())
+				ifs.addRoutesWithPreferenceLocked(rs, routetypes.MediumPreference, nil /* metric */, true /* dynamic */, true /* overwriteIfAlreadyExist */, routetypes.GlobalRouteSet())
 				ifs.mu.Unlock()
 			}
 		}
@@ -1279,9 +1288,9 @@ func (ns *Netstack) addLoopback() error {
 			},
 		},
 		routetypes.MediumPreference,
-		metricNotSet, /* use interface metric */
-		false,        /* dynamic */
-		true,         /* overwriteIfAlreadyExist */
+		nil,   /* metric */
+		false, /* dynamic */
+		true,  /* overwriteIfAlreadyExist */
 		routetypes.GlobalRouteSet(),
 	)
 	ifs.mu.Unlock()

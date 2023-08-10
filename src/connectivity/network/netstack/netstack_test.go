@@ -105,7 +105,7 @@ func TestDelRouteErrors(t *testing.T) {
 		t.Errorf("DelRoute(%s) = %#v not empty", rt, got)
 	}
 
-	if _, err := ns.AddRoute(rt, metricNotSet, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
+	if _, err := ns.AddRoute(rt, nil /* metric */, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		t.Fatalf("AddRoute(%s, metricNotSet, false): %s", rt, err)
 	}
 	// Deleting a route we added should not result in an error.
@@ -1170,7 +1170,7 @@ func addAddressAndRoute(t *testing.T, ns *Netstack, ifState *ifState, addr tcpip
 		t.Fatalf("ifState.addAddress(%s, {}): %s", addr.AddressWithPrefix, reason)
 	}
 	route := addressWithPrefixRoute(ifState.nicid, addr.AddressWithPrefix)
-	if _, err := ns.AddRoute(route, metricNotSet /* dynamic */, false, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
+	if _, err := ns.AddRoute(route, nil /* metric */, false /* dynamic */, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); err != nil {
 		t.Fatalf("ns.AddRoute(%s, 0, false): %s", route, err)
 	}
 }
@@ -1236,7 +1236,7 @@ func TestAddRouteParameterValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := ns.AddRoute(test.route, test.metric, test.dynamic, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); !errors.Is(err, test.err) {
+			if _, err := ns.AddRoute(test.route, &test.metric, test.dynamic, true /* replaceMatchingGvisorRoutes */, routetypes.GlobalRouteSet()); !errors.Is(err, test.err) {
 				t.Errorf("got ns.AddRoute(...) = %v, want %v", err, test.err)
 			}
 		})

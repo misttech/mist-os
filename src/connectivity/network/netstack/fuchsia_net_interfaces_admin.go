@@ -416,7 +416,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		// removed, guaranteeing we clean up the associated subnet route.
 		impl.ns.AddRoute(
 			addressWithPrefixRoute(ifs.nicid, protocolAddr.AddressWithPrefix),
-			metricNotSet,
+			nil,   /* metric*/
 			false, /* dynamic */
 			false, /* replaceMatchingGvisorRoutes */
 			&impl.subnetRouteSetId,

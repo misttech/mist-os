@@ -49,14 +49,15 @@ func (r *routeSet[A]) addRoute(route fidlconv.Route[A]) (bool, error) {
 		return false, err
 	}
 
-	metric, err := func() (routetypes.Metric, error) {
+	metric, err := func() (*routetypes.Metric, error) {
 		switch route.Properties.Metric.Which() {
 		case fnetRoutes.SpecifiedMetricExplicitMetric:
-			return routetypes.Metric(route.Properties.Metric.ExplicitMetric), nil
+			metric := routetypes.Metric(route.Properties.Metric.ExplicitMetric)
+			return &metric, nil
 		case fnetRoutes.SpecifiedMetricInheritedFromInterface:
-			return metricNotSet, nil
+			return nil, nil
 		default:
-			return metricNotSet, fmt.Errorf("unknown metric type: %+v", route.Properties.Metric)
+			return nil, fmt.Errorf("unknown metric type: %+v", route.Properties.Metric)
 		}
 	}()
 
@@ -76,14 +77,15 @@ func (r *routeSet[A]) removeRoute(route fidlconv.Route[A]) (bool, error) {
 		return false, err
 	}
 
-	metric, tracksInterface, err := func() (routetypes.Metric, bool, error) {
+	metric, err := func() (*routetypes.Metric, error) {
 		switch route.Properties.Metric.Which() {
 		case fnetRoutes.SpecifiedMetricExplicitMetric:
-			return routetypes.Metric(route.Properties.Metric.ExplicitMetric), false, nil
+			metric := routetypes.Metric(route.Properties.Metric.ExplicitMetric)
+			return &metric, nil
 		case fnetRoutes.SpecifiedMetricInheritedFromInterface:
-			return metricNotSet, true, nil
+			return nil, nil
 		default:
-			return metricNotSet, false, fmt.Errorf("unknown metric type: %+v", route.Properties.Metric)
+			return nil, fmt.Errorf("unknown metric type: %+v", route.Properties.Metric)
 		}
 	}()
 
@@ -91,7 +93,7 @@ func (r *routeSet[A]) removeRoute(route fidlconv.Route[A]) (bool, error) {
 		return false, err
 	}
 
-	removeResult, err := r.ns.DelRouteExactMatch(gvisorRoute, metric, tracksInterface, &r.id)
+	removeResult, err := r.ns.DelRouteExactMatch(gvisorRoute, metric, &r.id)
 	return removeResult.NewlyRemovedFromSet, err
 }
 
