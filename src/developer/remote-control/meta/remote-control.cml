@@ -26,8 +26,6 @@
                 "fuchsia.hwinfo.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.interfaces.State",
-                "fuchsia.overnet.Overnet",
-                "fuchsia.overnet.ServicePublisher",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",

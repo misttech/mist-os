@@ -29,14 +29,6 @@
         },
         {
             protocol: [
-                "fuchsia.overnet.Overnet",
-                "fuchsia.overnet.ServicePublisher",
-            ],
-            from: "#overnetstack",
-            to: "#remote-control",
-        },
-        {
-            protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.device.NameProvider",
                 "fuchsia.kernel.Stats",

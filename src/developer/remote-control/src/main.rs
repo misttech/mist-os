@@ -13,7 +13,6 @@ use {
     futures::channel::mpsc::unbounded,
     futures::join,
     futures::prelude::*,
-    hoist::{hoist, OvernetInstance},
     remote_control::RemoteControlService,
     std::rc::Rc,
     std::sync::Arc,
@@ -79,7 +78,7 @@ async fn exec_server() -> Result<(), Error> {
 
     let service = Rc::new(RemoteControlService::new(connector).await);
 
-    let onet_circuit_fut = {
+    let onet_fut = {
         let (s, p) = fidl::Channel::create();
         let chan = fidl::AsyncChannel::from_channel(s)
             .context("creating ServiceProvider async channel")?;
@@ -89,46 +88,6 @@ async fn exec_server() -> Result<(), Error> {
             .await?;
         let sc = service.clone();
         async move {
-            let fut = stream.for_each_concurrent(None, move |svc| {
-                let ServiceProviderRequest::ConnectToService {
-                    chan,
-                    info: _,
-                    control_handle: _control_handle,
-                } = svc.unwrap();
-                let chan = fidl::AsyncChannel::from_channel(chan)
-                    .context("failed to make async channel")
-                    .unwrap();
-
-                sc.clone().serve_stream(rcs::RemoteControlRequestStream::from_channel(chan))
-            });
-            info!("published remote control service to overnet");
-            let res = fut.await;
-            info!("connection to overnet lost: {:?}", res);
-        }
-    };
-
-    let sc = service.clone();
-    let onet_fut = async move {
-        loop {
-            let sc = sc.clone();
-            let stream = (|| -> Result<_, Error> {
-                let (s, p) = fidl::Channel::create();
-                let chan = fidl::AsyncChannel::from_channel(s)
-                    .context("creating ServiceProvider async channel")?;
-                let stream = ServiceProviderRequestStream::from_channel(chan);
-                hoist()
-                    .publish_service(rcs::RemoteControlMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
-                Ok(stream)
-            })();
-
-            let stream = match stream {
-                Ok(stream) => stream,
-                Err(err) => {
-                    error!("Could not connect to overnet: {:?}", err);
-                    break;
-                }
-            };
-
             let fut = stream.for_each_concurrent(None, move |svc| {
                 let ServiceProviderRequest::ConnectToService {
                     chan,
@@ -166,7 +125,7 @@ async fn exec_server() -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
     let fidl_fut = fs.collect::<()>();
 
-    join!(fidl_fut, onet_fut, onet_circuit_fut, usb_fut);
+    join!(fidl_fut, onet_fut, usb_fut);
     Ok(())
 }
 
