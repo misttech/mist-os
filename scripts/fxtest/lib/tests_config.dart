@@ -368,6 +368,13 @@ class TestsConfig {
       _maybeAddEnv(result, 'SL4F_HTTP_PORT');
       // Legacy key
       _maybeAddEnv(result, 'FUCHSIA_DEVICE_ADDR', 'FUCHSIA_IPV4_ADDR');
+
+      // If the user has a custom output directory set on the CLI then use it
+      // here too.
+      if (flags.ffxOutputDirectory != null) {
+        result['FUCHSIA_TEST_OUTDIR'] = flags.ffxOutputDirectory!;
+      }
+
       return result;
     } else {
       return const {};
