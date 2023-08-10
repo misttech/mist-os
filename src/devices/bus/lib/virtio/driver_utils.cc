@@ -20,7 +20,6 @@ namespace virtio {
 
 zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> GetBtiAndBackend(
     zx_device_t* bus_device) {
-  zx_status_t status;
   ddk::Pci pci(bus_device, "pci");
   if (!pci.is_valid()) {
     pci = ddk::Pci(bus_device);
@@ -28,6 +27,16 @@ zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> GetBtiAndBacken
 
   if (!pci.is_valid()) {
     zxlogf(ERROR, "virtio failed to find PciProtocol");
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  return GetBtiAndBackend(std::move(pci));
+}
+
+zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> GetBtiAndBackend(ddk::Pci pci) {
+  zx_status_t status;
+  if (!pci.is_valid()) {
+    zxlogf(ERROR, "ddk::Pci invalid");
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 

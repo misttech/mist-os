@@ -22,6 +22,8 @@ namespace virtio {
 zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> GetBtiAndBackend(
     zx_device_t* bus_device);
 
+zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> GetBtiAndBackend(ddk::Pci pci);
+
 // Creates a Virtio device by determining the backend and moving that into
 // |VirtioDevice|'s constructor, then call's the device's Init() method. The
 // device's Init() is expected to call DdkAdd. On success, ownership of the device
