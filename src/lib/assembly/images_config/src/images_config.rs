@@ -427,7 +427,7 @@ impl ImagesConfig {
                     filesystems.push(FvmFilesystem::BlobFS(BlobFS {
                         name: "blob".into(),
                         layout: blob_layout.clone(),
-                        maximum_bytes: board.fvm.blobfs.maximum_bytes,
+                        maximum_bytes: board.fvm.blobfs.build_time_maximum_bytes,
                         minimum_data_bytes: board.fvm.blobfs.minimum_data_bytes,
                         minimum_inodes: board.fvm.blobfs.minimum_inodes,
                         maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
@@ -525,8 +525,8 @@ mod tests {
                 truncate_to_length: None,
                 blobfs: bfc::Blobfs {
                     size_checker_maximum_bytes: Some(12),
-                    build_time_maximum_bytes: None,
-                    maximum_bytes: Some(34),
+                    build_time_maximum_bytes: Some(34),
+                    maximum_bytes: None,
                     minimum_inodes: Some(56),
                     minimum_data_bytes: Some(78),
                 },
@@ -561,8 +561,8 @@ mod tests {
                 truncate_to_length: None,
                 blobfs: bfc::Blobfs {
                     size_checker_maximum_bytes: Some(12),
-                    build_time_maximum_bytes: None,
-                    maximum_bytes: Some(34),
+                    build_time_maximum_bytes: Some(34),
+                    maximum_bytes: None,
                     minimum_inodes: Some(56),
                     minimum_data_bytes: Some(78),
                 },
