@@ -65,7 +65,7 @@ PhysbootHandoff = _start
     li      a1, KERNEL_ASPACE_BASE
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
-    li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
+    li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_R | RISCV64_PTE_W | RISCV64_PTE_V
     call    riscv64_boot_map
 
     // map the kernel to a fixed address
