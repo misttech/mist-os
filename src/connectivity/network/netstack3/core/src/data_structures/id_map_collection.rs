@@ -218,6 +218,16 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
             Entry::Vacant(e) => Entry::Vacant(e),
         }
     }
+
+    /// Removes the entry from the [`IdMapCollection`].
+    ///
+    /// Returns [`Some`] if the entry was occupied, otherwise [`None`].
+    pub fn remove(self) -> Option<T> {
+        match self {
+            Entry::Vacant(_) => None,
+            Entry::Occupied(e) => Some(e.remove()),
+        }
+    }
 }
 
 /// An iterator wrapper used to implement ExactSizeIterator.
