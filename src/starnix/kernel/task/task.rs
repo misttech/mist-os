@@ -906,6 +906,11 @@ impl Task {
             | CLONE_CHILD_CLEARTID
             | CLONE_CHILD_SETTID
             | CLONE_VFORK) as u64;
+        // A mask with all valid flags set, because we want to return a different error code for an
+        // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
+        // mask with all flags below it set. Shift up by one to make sure the largest flag is also
+        // set.
+        const VALID_FLAGS: u64 = (CLONE_INTO_CGROUP << 1) - 1;
 
         // CLONE_SETTLS is implemented by sys_clone.
 
@@ -920,6 +925,9 @@ impl Task {
             return error!(EINVAL);
         }
         if clone_thread && !clone_sighand {
+            return error!(EINVAL);
+        }
+        if flags & !VALID_FLAGS != 0 {
             return error!(EINVAL);
         }
 

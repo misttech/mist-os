@@ -99,9 +99,6 @@
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
 
-                // clone_test
-                "CloneTest.Clone3UnknownFlag",
-
                 // epoll_test - https://fxbug.dev/79261
                 "EpollTest.CloseFile",
 
