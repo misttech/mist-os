@@ -69,6 +69,140 @@ pub struct VolumesDirectory {
     pager_dirty_bytes_count: AtomicU64,
 }
 
+/// Operations on VolumesDirectory that cannot be performed concurrently (i.e. most
+/// volume creation/removal ops) should exist on this guard instead of VolumesDirectory.
+pub struct MountedVolumesGuard<'a> {
+    volumes_directory: Arc<VolumesDirectory>,
+    mounted_volumes: futures::lock::MutexGuard<'a, HashMap<u64, FxVolumeAndRoot>>,
+}
+
+impl MountedVolumesGuard<'_> {
+    /// Creates and mounts a new volume. If |crypt| is set, the volume will be encrypted. The
+    /// volume is mounted according to |as_blob|.
+    async fn create_and_mount_volume(
+        &mut self,
+        name: &str,
+        crypt: Option<Arc<dyn Crypt>>,
+        as_blob: bool,
+    ) -> Result<FxVolumeAndRoot, Error> {
+        self.volumes_directory
+            .root_volume
+            .new_volume(name, crypt)
+            .await
+            .context("failed to create new volume")?;
+        // The volume store is unlocked when created, so we don't pass `crypt` when mounting.
+        let volume =
+            self.mount_volume(name, None, as_blob).await.context("failed to mount volume")?;
+        let store_object_id = volume.volume().store().store_object_id();
+        self.volumes_directory.add_directory_entry(name, store_object_id);
+        Ok(volume)
+    }
+
+    /// Mounts an existing volume. `crypt` will be used to unlock the volume if provided.
+    /// If `as_blob` is `true`, the volume will be mounted as a blob filesystem, otherwise
+    /// it will be treated as a regular fxfs volume.
+    async fn mount_volume(
+        &mut self,
+        name: &str,
+        crypt: Option<Arc<dyn Crypt>>,
+        as_blob: bool,
+    ) -> Result<FxVolumeAndRoot, Error> {
+        let store = self.volumes_directory.root_volume.volume(name, crypt).await?;
+        ensure!(
+            !self.mounted_volumes.contains_key(&store.store_object_id()),
+            FxfsError::AlreadyBound
+        );
+        if as_blob {
+            self.mount_store::<BlobDirectory>(name, store, FlushTaskConfig::default()).await
+        } else {
+            self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await
+        }
+    }
+
+    // Mounts the given store.  A lock *must* be held on the volume directory.
+    async fn mount_store<T: From<Directory<FxVolume>> + RootDir>(
+        &mut self,
+        name: &str,
+        store: Arc<ObjectStore>,
+        flush_task_config: FlushTaskConfig,
+    ) -> Result<FxVolumeAndRoot, Error> {
+        store.track_statistics(&metrics::object_stores(), name);
+        let store_id = store.store_object_id();
+        let unique_id = zx::Event::create();
+        let volume = FxVolumeAndRoot::new::<T>(
+            Arc::downgrade(&self.volumes_directory),
+            store,
+            unique_id.get_koid().unwrap().raw_koid(),
+        )
+        .await?;
+        volume
+            .volume()
+            .start_flush_task(flush_task_config, self.volumes_directory.mem_monitor.as_ref());
+        self.mounted_volumes.insert(store_id, volume.clone());
+        if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
+            inspect.register_volume(
+                name.to_string(),
+                Arc::downgrade(volume.volume()) as Weak<dyn FsInspectVolume + Send + Sync>,
+            )
+        }
+        Ok(volume)
+    }
+
+    async fn remove_volume(&mut self, name: &str) -> Result<(), Error> {
+        let store = self.volumes_directory.root_volume.volume_directory().store();
+        let transaction = store
+            .filesystem()
+            .new_transaction(
+                &[LockKey::object(
+                    store.store_object_id(),
+                    self.volumes_directory.root_volume.volume_directory().object_id(),
+                )],
+                Options { borrow_metadata_space: true, ..Default::default() },
+            )
+            .await?;
+        let object_id = match self
+            .volumes_directory
+            .root_volume
+            .volume_directory()
+            .lookup(name)
+            .await?
+            .ok_or(FxfsError::NotFound)?
+        {
+            (object_id, ObjectDescriptor::Volume) => object_id,
+            _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
+        };
+        // Cowardly refuse to delete a mounted volume.
+        ensure!(!self.mounted_volumes.contains_key(&object_id), FxfsError::AlreadyBound);
+        if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
+            inspect.unregister_volume(name.to_string());
+        }
+        let directory_node = self.volumes_directory.directory_node.clone();
+        self.volumes_directory
+            .root_volume
+            .delete_volume(name, transaction, || {
+                // This shouldn't fail because the entry should exist.
+                directory_node.remove_entry(name, /* must_be_directory: */ false).unwrap();
+            })
+            .await?;
+        Ok(())
+    }
+
+    async fn terminate(&mut self) {
+        let volumes = std::mem::take(&mut *self.mounted_volumes);
+        for (_, volume) in volumes {
+            volume.volume().terminate().await;
+        }
+    }
+
+    // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
+    // necessary.
+    async fn unmount(&mut self, store_id: u64) -> Result<(), Error> {
+        let volume = self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
+        volume.volume().terminate().await;
+        Ok(())
+    }
+}
+
 impl VolumesDirectory {
     /// Fills the VolumesDirectory with all volumes in |root_volume|.  No volume is opened during
     /// this.
@@ -109,6 +243,14 @@ impl VolumesDirectory {
         &self.root_volume
     }
 
+    // This serves as an exclusive lock for operations that manipulate the set of mounted volumes.
+    async fn lock<'a>(self: &'a Arc<Self>) -> MountedVolumesGuard<'a> {
+        MountedVolumesGuard {
+            volumes_directory: self.clone(),
+            mounted_volumes: self.mounted_volumes.lock().await,
+        }
+    }
+
     fn add_directory_entry(self: &Arc<Self>, name: &str, store_id: u64) {
         let weak = Arc::downgrade(self);
         let name_owned = Arc::new(name.to_string());
@@ -137,13 +279,7 @@ impl VolumesDirectory {
         crypt: Option<Arc<dyn Crypt>>,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        self.root_volume.new_volume(name, crypt).await.context("failed to create new volume")?;
-        // The volume store is unlocked when created, so we don't pass `crypt` when mounting.
-        let volume =
-            self.mount_volume(name, None, as_blob).await.context("failed to mount volume")?;
-        let store_object_id = volume.volume().store().store_object_id();
-        self.add_directory_entry(name, store_object_id);
-        Ok(volume)
+        self.lock().await.create_and_mount_volume(name, crypt, as_blob).await
     }
 
     /// Mounts an existing volume. `crypt` will be used to unlock the volume if provided.
@@ -155,109 +291,17 @@ impl VolumesDirectory {
         crypt: Option<Arc<dyn Crypt>>,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        let root_store = self.root_volume.volume_directory().store();
-        let fs = root_store.filesystem();
-        let _guard = fs
-            .transaction_lock(&[LockKey::object(
-                root_store.store_object_id(),
-                self.root_volume.volume_directory().object_id(),
-            )])
-            .await;
-        let store = self.root_volume.volume(name, crypt).await?;
-        ensure!(
-            !self.mounted_volumes.lock().await.contains_key(&store.store_object_id()),
-            FxfsError::AlreadyBound
-        );
-        if as_blob {
-            self.mount_store::<BlobDirectory>(name, store, FlushTaskConfig::default()).await
-        } else {
-            self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await
-        }
-    }
-
-    // Mounts the given store.  A lock *must* be held on the volume directory.
-    async fn mount_store<T: From<Directory<FxVolume>> + RootDir>(
-        self: &Arc<Self>,
-        name: &str,
-        store: Arc<ObjectStore>,
-        flush_task_config: FlushTaskConfig,
-    ) -> Result<FxVolumeAndRoot, Error> {
-        store.track_statistics(&metrics::object_stores(), name);
-        let store_id = store.store_object_id();
-        let unique_id = zx::Event::create();
-        let volume = FxVolumeAndRoot::new::<T>(
-            Arc::downgrade(self),
-            store,
-            unique_id.get_koid().unwrap().raw_koid(),
-        )
-        .await?;
-        volume.volume().start_flush_task(flush_task_config, self.mem_monitor.as_ref());
-        self.mounted_volumes.lock().await.insert(store_id, volume.clone());
-        if let Some(inspect) = self.inspect_tree.upgrade() {
-            inspect.register_volume(
-                name.to_string(),
-                Arc::downgrade(volume.volume()) as Weak<dyn FsInspectVolume + Send + Sync>,
-            )
-        }
-        Ok(volume)
+        self.lock().await.mount_volume(name, crypt, as_blob).await
     }
 
     /// Removes a volume. The volume must exist but encrypted volume keys are not required.
-    pub async fn remove_volume(&self, name: &str) -> Result<(), Error> {
-        let store = self.root_volume.volume_directory().store();
-        let transaction = store
-            .filesystem()
-            .new_transaction(
-                &[LockKey::object(
-                    store.store_object_id(),
-                    self.root_volume.volume_directory().object_id(),
-                )],
-                Options { borrow_metadata_space: true, ..Default::default() },
-            )
-            .await?;
-        let object_id = match self
-            .root_volume
-            .volume_directory()
-            .lookup(name)
-            .await?
-            .ok_or(FxfsError::NotFound)?
-        {
-            (object_id, ObjectDescriptor::Volume) => object_id,
-            _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
-        };
-        // Cowardly refuse to delete a mounted volume.
-        ensure!(
-            !self.mounted_volumes.lock().await.contains_key(&object_id),
-            FxfsError::AlreadyBound
-        );
-        if let Some(inspect) = self.inspect_tree.upgrade() {
-            inspect.unregister_volume(name.to_string());
-        }
-        let directory_node = self.directory_node.clone();
-        self.root_volume
-            .delete_volume(name, transaction, || {
-                // This shouldn't fail because the entry should exist.
-                directory_node.remove_entry(name, /* must_be_directory: */ false).unwrap();
-            })
-            .await?;
-        Ok(())
+    pub async fn remove_volume(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+        self.lock().await.remove_volume(name).await
     }
 
     /// Terminates all opened volumes.
-    pub async fn terminate(&self) {
-        let root_store = self.root_volume.volume_directory().store();
-        let fs = root_store.filesystem();
-        let _guard = fs
-            .transaction_lock(&[LockKey::object(
-                root_store.store_object_id(),
-                self.root_volume.volume_directory().object_id(),
-            )])
-            .await;
-
-        let volumes = std::mem::take(&mut *self.mounted_volumes.lock().await);
-        for (_, volume) in volumes {
-            volume.volume().terminate().await;
-        }
+    pub async fn terminate(self: &Arc<Self>) {
+        self.lock().await.terminate().await
     }
 
     /// Serves the given volume on `outgoing_dir_server_end`.
@@ -329,6 +373,7 @@ impl VolumesDirectory {
             scope.wait().await;
             info!(store_id, "Last connection to volume closed, shutting down");
 
+            let mut mounted_volumes = me.mounted_volumes.lock().await;
             let root_store = me.root_volume.volume_directory().store();
             let fs = root_store.filesystem();
             let _guard = fs
@@ -339,7 +384,6 @@ impl VolumesDirectory {
                 .await;
 
             let volume = {
-                let mut mounted_volumes = me.mounted_volumes.lock().await;
                 let entry = mounted_volumes.entry(store_id);
                 if let Occupied(entry) = entry {
                     if entry.get().volume().scope() == &scope {
@@ -366,13 +410,14 @@ impl VolumesDirectory {
         outgoing_directory: ServerEnd<fio::DirectoryMarker>,
         mount_options: MountOptions,
     ) -> Result<(), Error> {
+        let mut guard = self.lock().await;
         let MountOptions { crypt, as_blob } = mount_options;
         let crypt = if let Some(crypt) = crypt {
             Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {
             None
         };
-        let volume = self.create_and_mount_volume(&name, crypt, as_blob).await?;
+        let volume = guard.create_and_mount_volume(&name, crypt, as_blob).await?;
         self.serve_volume(&volume, outgoing_directory, as_blob).context("failed to serve volume")
     }
 
@@ -556,7 +601,7 @@ impl VolumesDirectory {
                     fasync::Task::spawn(async move {
                         let _ = stream;
                         let _ = guard;
-                        let _ = me.unmount(store_id).await;
+                        let _ = me.lock().await.unmount(store_id).await;
                         responder
                             .send()
                             .unwrap_or_else(|e| warn!("Failed to send shutdown response: {}", e));
@@ -565,15 +610,6 @@ impl VolumesDirectory {
                 }
             }
         }
-        Ok(())
-    }
-
-    // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
-    // necessary.
-    async fn unmount(&self, store_id: u64) -> Result<(), Error> {
-        let volume =
-            self.mounted_volumes.lock().await.remove(&store_id).ok_or(FxfsError::NotFound)?;
-        volume.volume().terminate().await;
         Ok(())
     }
 }
@@ -925,7 +961,7 @@ mod tests {
                 .expect("create encrypted volume failed");
             vol.volume().store().store_object_id()
         };
-        volumes_directory.unmount(store_id).await.expect("unmount failed");
+        volumes_directory.lock().await.unmount(store_id).await.expect("unmount failed");
 
         let (volume_proxy, volume_server_end) =
             fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
@@ -1041,7 +1077,7 @@ mod tests {
                 .expect("create encrypted volume failed");
             vol.volume().store().store_object_id()
         };
-        volumes_directory.unmount(store_id).await.expect("unmount failed");
+        volumes_directory.lock().await.unmount(store_id).await.expect("unmount failed");
 
         let (volume_proxy, volume_server_end) =
             fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
@@ -1139,14 +1175,12 @@ mod tests {
                 let volumes_directory = volumes_directory.clone();
                 let wait_time = rand::thread_rng().gen_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
-                match volumes_directory
-                    .create_and_mount_volume("encrypted", Some(crypt.clone()), false)
-                    .await
-                {
+                let mut guard = volumes_directory.lock().await;
+                match guard.create_and_mount_volume("encrypted", Some(crypt.clone()), false).await {
                     Ok(vol) => {
                         let store_id = vol.volume().store().store_object_id();
                         std::mem::drop(vol);
-                        volumes_directory.unmount(store_id).await.expect("unmount failed");
+                        guard.unmount(store_id).await.expect("unmount failed");
                     }
                     Err(err) => {
                         assert!(
