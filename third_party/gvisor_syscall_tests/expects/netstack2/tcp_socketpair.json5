@@ -1,0 +1,48 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // https://fxbug.dev/73028
+                "AllTCPSockets/TCPSocketPairTest.RSTCausesPollHUP/*",
+
+                // https://fxbug.dev/73031
+                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadDataAllowsReadBuffered/*",
+
+                // https://fxbug.dev/70837
+                // Skip this test as it flakes often because of reaching file descriptor
+                // resource limits on Fuchsia. Bumping up the resource limit in Fuchsia might
+                // be more involved.
+                "AllTCPSockets/TCPSocketPairTest.TCPResetDuringClose/*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // third_party/gvisor/test/syscalls/linux/socket_ip_tcp_generic.cc:125
+                // Value of: RetryEINTR(read)(sockets->first_fd(), buf, sizeof(buf))
+                // Expected: -1 (failure), with errno PosixError(errno=104 0)
+                //   Actual: 0 (of type long)
+                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadData/*",
+
+                // https://fxbug.dev/73032
+                "AllTCPSockets/TCPSocketPairTest.ShutdownRdUnreadDataShouldCauseNoPacketsUnlessClosed/*",
+
+                // https://fxbug.dev/20628
+                "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
+
+                // https://fxbug.dev/20628
+                "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
+            ],
+        },
+    ],
+}
