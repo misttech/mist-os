@@ -2356,9 +2356,6 @@ pub struct Use {
     /// - `weak`: a weak dependency, which is ignored during shutdown. When component manager
     ///     stops the parent realm, the source may stop before the clients. Clients of weak
     ///     dependencies must be able to handle these dependencies becoming unavailable.
-    /// - `weak_for_migration`: this has the same runtime consequences as `weak`,
-    ///     but also implies this capability will be made strong after completion of the v2
-    ///     component migration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency: Option<DependencyType>,
 
@@ -2521,7 +2518,7 @@ impl Expose {
 ///         protocol: "fuchsia.logger.LogSink",
 ///         from: "#logger",
 ///         to: [ "#fshost", "#pkg_cache" ],
-///         dependency: "weak_for_migration",
+///         dependency: "weak",
 ///     },
 ///     {
 ///         protocol: [

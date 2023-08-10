@@ -570,7 +570,7 @@ to run your test in the correct test realm.",
                     &AnyRef::Named(name),
                 )?;
             }
-            (_, Some(DependencyType::Weak) | Some(DependencyType::WeakForMigration)) => {
+            (_, Some(DependencyType::Weak)) => {
                 return Err(Error::validate(format!(
                     "Only `use` from children can have dependency: \"weak\""
                 )));
@@ -3482,7 +3482,7 @@ mod tests {
                         "protocol": "fuchsia.fonts.LegacyProvider",
                         "from": "parent",
                         "to": [ "#echo_server" ],
-                        "dependency": "weak_for_migration"
+                        "dependency": "weak"
                     },
                     {
                         "protocol": "fuchsia.sys2.StorageAdmin",
@@ -3509,7 +3509,7 @@ mod tests {
                         "subdir": "files",
                         "from": "parent",
                         "to": [ "#modular" ],
-                        "dependency": "weak_for_migration"
+                        "dependency": "weak"
                     },
                     {
                         "directory": "config",
@@ -3603,7 +3603,7 @@ mod tests {
                         "protocol": "fuchsia.fonts.LegacyProvider",
                         "from": "parent",
                         "to": "#echo_server",
-                        "dependency": "weak_for_migration"
+                        "dependency": "weak"
                     },
                 ],
                 "children": [
@@ -4319,7 +4319,7 @@ mod tests {
                             "protocol": "fuchsia.logger.Log",
                             "from": "#child_a",
                             "to": [ "#child_b" ],
-                            "dependency": "weak_for_migration"
+                            "dependency": "weak"
                         },
                         {
                             "directory": "data",

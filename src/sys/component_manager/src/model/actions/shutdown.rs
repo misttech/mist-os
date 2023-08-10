@@ -454,9 +454,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
             UseDecl::Protocol(UseProtocolDecl { dependency_type, .. })
             | UseDecl::Service(UseServiceDecl { dependency_type, .. })
             | UseDecl::Directory(UseDirectoryDecl { dependency_type, .. }) => {
-                if dependency_type == &DependencyType::Weak
-                    || dependency_type == &DependencyType::WeakForMigration
-                {
+                if dependency_type == &DependencyType::Weak {
                     // Weak dependencies are ignored when determining shutdown ordering
                     continue;
                 }
@@ -536,12 +534,10 @@ fn get_dependency_from_offer(
         )),
 
         OfferDecl::Protocol(OfferProtocolDecl {
-            dependency_type: DependencyType::Weak | DependencyType::WeakForMigration,
-            ..
+            dependency_type: DependencyType::Weak, ..
         })
         | OfferDecl::Directory(OfferDirectoryDecl {
-            dependency_type: DependencyType::Weak | DependencyType::WeakForMigration,
-            ..
+            dependency_type: DependencyType::Weak, ..
         }) => {
             // weak dependencies are ignored by this algorithm, because weak
             // dependencies can be broken arbitrarily.
@@ -918,7 +914,6 @@ mod tests {
     }
 
     #[test_case(DependencyType::Weak)]
-    #[test_case(DependencyType::WeakForMigration)]
     fn test_weak_service_from_self(weak_dep: DependencyType) {
         let decl = ComponentDecl {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
@@ -1704,7 +1699,6 @@ mod tests {
     }
 
     #[test_case(DependencyType::Weak)]
-    #[test_case(DependencyType::WeakForMigration)]
     fn test_single_weak_dependency(weak_dep: DependencyType) {
         let child_a = ChildDecl {
             name: "childA".to_string(),
@@ -1880,7 +1874,6 @@ mod tests {
     }
 
     #[test_case(DependencyType::Weak)]
-    #[test_case(DependencyType::WeakForMigration)]
     fn test_multiple_dependencies(weak_dep: DependencyType) {
         let child_a = ChildDecl {
             name: "childA".to_string(),

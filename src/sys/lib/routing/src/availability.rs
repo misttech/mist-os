@@ -214,7 +214,7 @@ mod tests {
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("echo".to_string()),
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
-            dependency_type: DependencyType::WeakForMigration,
+            dependency_type: DependencyType::Weak,
             availability,
         })
     }
@@ -225,7 +225,7 @@ mod tests {
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("echo".to_string()),
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
-            dependency_type: DependencyType::WeakForMigration,
+            dependency_type: DependencyType::Weak,
             availability: Availability::Optional,
         })
     }

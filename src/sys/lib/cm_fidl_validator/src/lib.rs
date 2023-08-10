@@ -860,10 +860,7 @@ impl<'a> ValidationContext<'a> {
             _ => false,
         };
         match (is_use_from_child, dependency_type) {
-            (
-                false,
-                Some(fdecl::DependencyType::Weak) | Some(fdecl::DependencyType::WeakForMigration),
-            ) => {
+            (false, Some(fdecl::DependencyType::Weak)) => {
                 self.errors.push(Error::invalid_field(decl, "dependency_type"));
             }
             _ => {}
@@ -2487,7 +2484,6 @@ mod tests {
         ) => {
             $(
                 #[test_case(fdecl::DependencyType::Weak)]
-                #[test_case(fdecl::DependencyType::WeakForMigration)]
                 fn $test_name(weak_dep: fdecl::DependencyType) {
                     let mut decl = new_component_decl();
                     let offers = vec![
@@ -3679,7 +3675,7 @@ mod tests {
                             ..Default::default()
                         }),
                         fdecl::Use::Directory(fdecl::UseDirectory {
-                            dependency_type: Some(fdecl::DependencyType::WeakForMigration),
+                            dependency_type: Some(fdecl::DependencyType::Weak),
                             source: Some(fdecl::Ref::Child(fdecl::ChildRef{ name: "child".to_string(), collection: None})),
                             source_name: Some("DirectoryName".to_string()),
                             target_path: Some("/data/DirectoryName".to_string()),

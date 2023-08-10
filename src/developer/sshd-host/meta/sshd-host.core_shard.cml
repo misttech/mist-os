@@ -667,7 +667,7 @@
             ],
             from: "#ui",
             to: "#sshd-host",
-            dependency: "weak_for_migration",
+            dependency: "weak",
             source_availability: "unknown",
         },
         {

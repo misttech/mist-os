@@ -3231,7 +3231,7 @@ mod tests {
                         "directory": "assets",
                         "from": "parent",
                         "to": [ "#netstack" ],
-                        "dependency": "weak_for_migration",
+                        "dependency": "weak",
                         "availability": "same_as_target"
                     },
                     {
@@ -3429,7 +3429,7 @@ mod tests {
                             target_name: Some("assets".to_string()),
                             rights: None,
                             subdir: None,
-                            dependency_type: Some(fdecl::DependencyType::WeakForMigration),
+                            dependency_type: Some(fdecl::DependencyType::Weak),
                             availability: Some(fdecl::Availability::SameAsTarget),
                             ..Default::default()
                         }

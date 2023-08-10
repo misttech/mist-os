@@ -515,9 +515,6 @@ this component and the capability's source.
     - `weak`: a weak dependency, which is ignored during shutdown. When component manager
         stops the parent realm, the source may stop before the clients. Clients of weak
         dependencies must be able to handle these dependencies becoming unavailable.
-    - `weak_for_migration`: this has the same runtime consequences as `weak`,
-        but also implies this capability will be made strong after completion of the v2
-        component migration.
 - `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
     of:
     - `required` (default): a required dependency, the component is unable to perform its
@@ -717,7 +714,7 @@ offer: [
         protocol: "fuchsia.logger.LogSink",
         from: "#logger",
         to: [ "#fshost", "#pkg_cache" ],
-        dependency: "weak_for_migration",
+        dependency: "weak",
     },
     {
         protocol: [
