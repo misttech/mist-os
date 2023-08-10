@@ -5,12 +5,12 @@
 library fuchsia.nxp.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  NXP = 9,
+  NXP = 0x09,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
-  SD8987 = 1,
-  IMX8MMEVK = 2,
+  SD8987 = 0x01,
+  IMX8MMEVK = 0x02,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {

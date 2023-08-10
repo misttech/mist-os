@@ -5,14 +5,14 @@
 library fuchsia.sony.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  SONY = 14,
+  SONY = 0x0E,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
-  CAMERA_SENSOR = 18,
+  CAMERA_SENSOR = 0x12,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
-  IMX227 = 1,
-  IMX355 = 2,
+  IMX227 = 0x01,
+  IMX355 = 0x02,
 };

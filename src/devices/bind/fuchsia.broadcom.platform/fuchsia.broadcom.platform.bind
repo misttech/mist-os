@@ -5,15 +5,15 @@
 library fuchsia.broadcom.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  BROADCOM = 6,
+  BROADCOM = 0x06,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
-  BCM4356 = 1,
-  BCM43458 = 2,
-  BCM4359 = 3,
+  BCM4356 = 0x01,
+  BCM43458 = 0x02,
+  BCM4359 = 0x03,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
-  WIFI = 1,
+  WIFI = 0x01,
 };

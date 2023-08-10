@@ -4,7 +4,7 @@
 
 import("//build/bind/bind.gni")
 
-# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.verisilicon.platform") {
   source = "fuchsia.verisilicon.platform.bind"
+  sdk_category = "partner"
 }

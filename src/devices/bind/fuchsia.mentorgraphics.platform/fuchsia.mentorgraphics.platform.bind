@@ -5,6 +5,6 @@
 library fuchsia.mentorgraphics.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
-  MUSB_PERIPHERAL = 20,
-  MUSB_HOST = 21,
+  MUSB_PERIPHERAL = 0x14,
+  MUSB_HOST = 0x15,
 };

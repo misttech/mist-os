@@ -5,7 +5,7 @@
 library fuchsia.sensirion.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  SENSIRION = 27,
+  SENSIRION = 0x1B,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {

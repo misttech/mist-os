@@ -5,11 +5,11 @@
 library fuchsia.designware.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  DESIGNWARE = 12,
+  DESIGNWARE = 0x0C,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
-  DWC3 = 1,
-  DWC2 = 5,
+  DWC3 = 0x01,
+  DWC2 = 0x05,
   ETH_MAC = 0x10,
 };

@@ -5,5 +5,5 @@
 library fuchsia.marvell.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  MARVELL = 23,
+  MARVELL = 0x17,
 };

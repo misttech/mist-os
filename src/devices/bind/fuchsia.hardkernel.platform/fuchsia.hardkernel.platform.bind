@@ -5,5 +5,5 @@
 library fuchsia.hardkernel.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  HARDKERNEL = 7,
+  HARDKERNEL = 0x07,
 };

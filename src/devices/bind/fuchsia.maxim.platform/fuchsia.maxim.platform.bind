@@ -5,10 +5,10 @@
 library fuchsia.maxim.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  MAXIM = 21,
+  MAXIM = 0x15,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
-  MAX98373 = 1,
-  MAX98927 = 2,
+  MAX98373 = 0x01,
+  MAX98927 = 0x02,
 };

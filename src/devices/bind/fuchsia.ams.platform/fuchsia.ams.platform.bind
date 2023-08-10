@@ -5,9 +5,8 @@
 library fuchsia.ams.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  AMS = 10,
+  AMS = 0x0A,
 };
-
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   TCS3400 = 0x01,

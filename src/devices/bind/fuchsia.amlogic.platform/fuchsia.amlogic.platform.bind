@@ -5,7 +5,7 @@
 library fuchsia.amlogic.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  AMLOGIC = 5,
+  AMLOGIC = 0x05,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {

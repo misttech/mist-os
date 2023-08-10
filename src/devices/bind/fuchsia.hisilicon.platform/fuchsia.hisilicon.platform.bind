@@ -5,5 +5,5 @@
 library fuchsia.hisilicon.platform;
 
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
-  HISILICON = 15,
+  HISILICON = 0x0F,
 };
