@@ -11,12 +11,9 @@ use crate::error::Error;
 use crate::header::{
     ConnectionIdentifier, Header, HeaderIdentifier, HeaderSet, SingleResponseMode,
 };
-use crate::operation::{
-    OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags, MAX_PACKET_SIZE,
-    MIN_MAX_PACKET_SIZE,
-};
-use crate::transport::ObexTransportManager;
+use crate::operation::{OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags};
 pub use crate::transport::TransportType;
+use crate::transport::{max_packet_size_from_transport, ObexTransportManager};
 
 /// Implements the OBEX PUT operation.
 mod put;
@@ -70,13 +67,6 @@ pub(crate) trait SrmOperation {
         }
         trace!(status = ?self.get_srm(), operation = ?Self::OPERATION_TYPE, "SRM status");
     }
-}
-
-/// Returns the maximum packet size that will be used for the OBEX session.
-/// `transport_max` is the maximum size that the underlying transport (e.g. L2CAP, RFCOMM) supports.
-fn max_packet_size_from_transport(transport_max: usize) -> u16 {
-    let bounded = transport_max.clamp(MIN_MAX_PACKET_SIZE, MAX_PACKET_SIZE);
-    bounded.try_into().expect("bounded by u16 max")
 }
 
 /// The Client role for an OBEX session.

@@ -395,6 +395,17 @@ impl ResponsePacket {
         Self::new(code, vec![], headers)
     }
 
+    pub fn new_connect(code: ResponseCode, max_packet_size: u16, headers: HeaderSet) -> Self {
+        // The CONNECT response contains optional data - Version Number, Flags, Max Packet Size.
+
+        // Only Bit0 is defined for the CONNECT response. We currently do not support multiple
+        // lrMP connections.
+        const OBEX_CONNECT_RESPONSE_FLAGS: u8 = 0;
+        let mut data = vec![OBEX_PROTOCOL_VERSION_NUMBER, OBEX_CONNECT_RESPONSE_FLAGS];
+        data.extend_from_slice(&max_packet_size.to_be_bytes());
+        Self::new(code, data, headers)
+    }
+
     pub fn expect_code(self, request: OpCode, expected: ResponseCode) -> Result<Self, Error> {
         if *self.code() == expected {
             return Ok(self);

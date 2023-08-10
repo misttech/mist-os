@@ -6,6 +6,10 @@
 /// OBEX Client functionality should use this module.
 pub mod client;
 
+/// Contains the implementation of the Server role for OBEX. Services & Profiles that require
+/// OBEX Server functionality should use this module.
+pub mod server;
+
 /// The error type used throughout this library.
 mod error;
 pub use error::Error as ObexError;

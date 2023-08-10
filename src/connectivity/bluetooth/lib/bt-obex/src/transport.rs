@@ -9,7 +9,14 @@ use std::cell::{RefCell, RefMut};
 use tracing::{info, trace};
 
 use crate::error::{Error, PacketError};
-use crate::operation::{OpCode, ResponsePacket};
+use crate::operation::{OpCode, ResponsePacket, MAX_PACKET_SIZE, MIN_MAX_PACKET_SIZE};
+
+/// Returns the maximum packet size that will be used for the OBEX session.
+/// `transport_max` is the maximum size that the underlying transport (e.g. L2CAP, RFCOMM) supports.
+pub fn max_packet_size_from_transport(transport_max: usize) -> u16 {
+    let bounded = transport_max.clamp(MIN_MAX_PACKET_SIZE, MAX_PACKET_SIZE);
+    bounded.try_into().expect("bounded by u16 max")
+}
 
 /// The underlying communication protocol used for the OBEX transport.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -159,6 +166,18 @@ pub(crate) mod test_utils {
         let _ = channel.as_ref().write(&response_buf[..]).expect("write to channel success");
     }
 
+    /// Sends the `packet` over the provided `channel`.
+    #[track_caller]
+    pub fn send_packet<T>(channel: &mut Channel, packet: T)
+    where
+        T: Encodable,
+        <T as Encodable>::Error: std::fmt::Debug,
+    {
+        let mut buf = vec![0; packet.encoded_len()];
+        packet.encode(&mut buf[..]).expect("can encode packet");
+        let _ = channel.as_ref().write(&buf[..]).expect("write to channel success");
+    }
+
     #[track_caller]
     pub fn expect_request<F>(exec: &mut fasync::TestExecutor, channel: &mut Channel, expectation: F)
     where
@@ -166,6 +185,20 @@ pub(crate) mod test_utils {
     {
         let request_raw = expect_stream_item(exec, channel).expect("request");
         let request = RequestPacket::decode(&request_raw[..]).expect("can decode request");
+        expectation(request);
+    }
+
+    #[track_caller]
+    pub fn expect_response<F>(
+        exec: &mut fasync::TestExecutor,
+        channel: &mut Channel,
+        expectation: F,
+        opcode: OpCode,
+    ) where
+        F: FnOnce(ResponsePacket),
+    {
+        let request_raw = expect_stream_item(exec, channel).expect("request");
+        let request = ResponsePacket::decode(&request_raw[..], opcode).expect("can decode request");
         expectation(request);
     }
 
