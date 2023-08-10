@@ -246,7 +246,7 @@ TEST_fx-list-build-artifacts-pave-zedboot() {
 }
 
 TEST_fx-list-build-artifacts-flash() {
-  BT_EXPECT_EQ "$(${fx} list-build-artifacts flash)" "flash.sh flash.json fuchsia.zbi fuchsia.vbmeta obj/build/images/fvm.sparse.blk unlock_creds/unlock_creds.zip gpt.fuchsia.bin"
+  BT_EXPECT_EQ "$(${fx} list-build-artifacts flash)" "flash.sh fuchsia.zbi fuchsia.vbmeta obj/build/images/fvm.sparse.blk unlock_creds/unlock_creds.zip gpt.fuchsia.bin"
 }
 
 TEST_fx-list-build-artifacts-boot-tests() {
