@@ -38,6 +38,8 @@ rustc_library("pkg") {
   deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/protocols:lib",
@@ -46,7 +48,10 @@ rustc_library("pkg") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-hyper",
+    "//src/lib/fuchsia-url",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
@@ -55,6 +60,7 @@ rustc_library("pkg") {
     "//third_party/rust_crates:percent-encoding",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tuf",
   ]
 
   test_deps = [

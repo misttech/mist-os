@@ -16,25 +16,25 @@ use {
     },
     fidl_fuchsia_net_ext::SocketAddress,
     fidl_fuchsia_pkg::RepositoryManagerMarker,
-    fidl_fuchsia_pkg_rewrite::EngineMarker as RewriteEngineMarker,
-    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule, RuleConfig},
+    fidl_fuchsia_pkg_rewrite::{EngineMarker as RewriteEngineMarker, EngineProxy},
+    fidl_fuchsia_pkg_rewrite_ext::RuleConfig,
     fuchsia_async as fasync,
     fuchsia_repo::{
         repo_client::RepoClient,
         repository::{self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider},
     },
-    fuchsia_url::RepositoryUrl,
-    fuchsia_zircon_status::Status,
     fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::{FutureExt as _, StreamExt as _},
     measure_fuchsia_developer_ffx::Measurable,
     pkg::config as pkg_config,
     pkg::metrics,
-    pkg::repo::{Registrar, RepoInner, SaveConfig, ServerState},
+    pkg::repo::{
+        aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, update_repository,
+        Registrar, RepoInner, SaveConfig, ServerState,
+    },
     protocols::prelude::*,
     shared_child::SharedChild,
     std::{
-        collections::{BTreeSet, HashSet},
         convert::{TryFrom, TryInto},
         net::SocketAddr,
         rc::Rc,
@@ -172,50 +172,67 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
     async fn register_target_with_fidl(
         &self,
         cx: &Context,
-        mut target_info: RepositoryTarget,
+        mut repo_target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
         alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError> {
-        let repo_name = &target_info.repo_name;
-
-        tracing::info!(
-            "Registering repository {:?} for target {:?}",
-            repo_name,
-            target_info.target_identifier
-        );
-
-        let repo = inner
-            .read()
-            .await
-            .manager
-            .get(repo_name)
-            .ok_or_else(|| ffx::RepositoryError::NoMatchingRepository)?;
-
         let (target, proxy) = futures::select! {
             res = cx.open_target_proxy_with_info::<RepositoryManagerMarker>(
-                target_info.target_identifier.clone(),
+                repo_target_info.target_identifier.clone(),
                 PKG_RESOLVER_MONIKER,
             ).fuse() => {
                 res.map_err(|err| {
                     tracing::error!(
                         "failed to open target proxy with target name {:?}: {:#?}",
-                        target_info.target_identifier,
+                        repo_target_info.target_identifier,
                         err
                     );
                     ffx::RepositoryError::TargetCommunicationFailure
                 })?
             }
             _ = fasync::Timer::new(TARGET_CONNECT_TIMEOUT).fuse() => {
-                tracing::error!("Timed out connecting to target name {:?}", target_info.target_identifier);
+                tracing::error!("Timed out connecting to target name {:?}", repo_target_info.target_identifier);
                 return Err(ffx::RepositoryError::TargetCommunicationFailure);
             }
         };
 
-        let target_nodename = target.nodename.ok_or_else(|| {
-            tracing::error!("target {:?} does not have a nodename", target_info.target_identifier);
+        let target_nodename = target.nodename.clone().ok_or_else(|| {
+            tracing::error!(
+                "target {:?} does not have a nodename",
+                repo_target_info.target_identifier
+            );
             ffx::RepositoryError::TargetCommunicationFailure
         })?;
+
+        let rewrite_engine_proxy: EngineProxy = match cx
+            .open_target_proxy::<RewriteEngineMarker>(
+                Some(target_nodename.to_string()),
+                PKG_RESOLVER_MONIKER,
+            )
+            .await
+        {
+            Ok(p) => p,
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to open Rewrite Engine target proxy with target name {:?}: {:#?}",
+                    target_nodename,
+                    err
+                );
+                return Err(ffx::RepositoryError::TargetCommunicationFailure);
+            }
+        };
+
+        register_target_with_fidl_proxies(
+            proxy,
+            rewrite_engine_proxy,
+            &repo_target_info,
+            &target,
+            &target_nodename,
+            &inner,
+            alias_conflict_mode,
+        )
+        .await?;
 
         let listen_addr = match inner.read().await.server.listen_addr() {
             Some(listen_addr) => listen_addr,
@@ -229,88 +246,16 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         // target device should use to reach the repository. If the server is
         // running on a loopback device, then we need to create a tunnel for the
         // device to access the server.
-        let (should_make_tunnel, repo_host) = create_repo_host(
+        let (should_make_tunnel, _) = create_repo_host(
             listen_addr,
             target.ssh_host_address.ok_or_else(|| {
                 tracing::error!(
                     "target {:?} does not have a host address",
-                    target_info.target_identifier
+                    repo_target_info.target_identifier
                 );
                 ffx::RepositoryError::TargetCommunicationFailure
             })?,
         );
-
-        // Make sure the repository is up to date.
-        update_repository(repo_name, &repo).await?;
-
-        let repo_url = RepositoryUrl::parse_host(repo_name.to_owned()).map_err(|err| {
-            tracing::error!("failed to parse repository name {}: {:#}", repo_name, err);
-            ffx::RepositoryError::InvalidUrl
-        })?;
-
-        let mirror_url = format!("http://{}/{}", repo_host, repo_name);
-        let mirror_url = mirror_url.parse().map_err(|err| {
-            tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
-            ffx::RepositoryError::InvalidUrl
-        })?;
-
-        let (config, aliases) = {
-            let repo = repo.read().await;
-
-            let config = repo
-                .get_config(
-                    repo_url,
-                    mirror_url,
-                    target_info
-                        .storage_type
-                        .as_ref()
-                        .map(|storage_type| storage_type.clone().into()),
-                )
-                .map_err(|e| {
-                    tracing::error!("failed to get config: {}", e);
-                    return ffx::RepositoryError::RepositoryManagerError;
-                })?;
-
-            // Use the repository aliases if the registration doesn't have any.
-            let aliases = if let Some(aliases) = &target_info.aliases {
-                aliases.clone()
-            } else {
-                repo.aliases().clone()
-            };
-
-            // Checking for registration alias conflicts.
-            let check_alias_conflict = pkg::config::check_registration_alias_conflict(
-                repo_name.as_str(),
-                target_nodename.as_str(),
-                aliases.clone().into_iter().collect(),
-            )
-            .await
-            .map_err(|e| {
-                tracing::error!("{e}");
-                ffx::RepositoryError::ConflictingRegistration
-            });
-            if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
-                check_alias_conflict?
-            }
-
-            (config, aliases)
-        };
-
-        match proxy.add(&config.into()).await {
-            Ok(Ok(())) => {}
-            Ok(Err(err)) => {
-                tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
-                return Err(ffx::RepositoryError::RepositoryManagerError);
-            }
-            Err(err) => {
-                tracing::error!("failed to add config: {:#?}", err);
-                return Err(ffx::RepositoryError::TargetCommunicationFailure);
-            }
-        }
-
-        if !aliases.is_empty() {
-            let () = create_aliases_fidl(cx, repo_name, &target_nodename, &aliases).await?;
-        }
 
         if should_make_tunnel {
             // Start the tunnel to the device if one isn't running already.
@@ -326,12 +271,14 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
 
         if save_config == SaveConfig::Save {
             // Make sure we update the target info with the real nodename.
-            target_info.target_identifier = Some(target_nodename.clone());
+            repo_target_info.target_identifier = Some(target_nodename.clone());
 
-            pkg::config::set_registration(&target_nodename, &target_info).await.map_err(|err| {
-                tracing::error!("Failed to save registration to config: {:#?}", err);
-                ffx::RepositoryError::InternalError
-            })?;
+            pkg::config::set_registration(&target_nodename, &repo_target_info).await.map_err(
+                |err| {
+                    tracing::error!("Failed to save registration to config: {:#?}", err);
+                    ffx::RepositoryError::InternalError
+                },
+            )?;
         }
 
         Ok(())
@@ -549,68 +496,6 @@ async fn add_repository(
     Ok(())
 }
 
-/// Decide which repo host we should use when creating a repository config, and
-/// whether or not we need to create a tunnel in order for the device to talk to
-/// the repository.
-fn create_repo_host(listen_addr: SocketAddr, host_address: ffx::SshHostAddrInfo) -> (bool, String) {
-    // We need to decide which address the target device should use to reach the
-    // repository. If the server is running on a loopback device, then we need
-    // to create a tunnel for the device to access the server.
-    if listen_addr.ip().is_loopback() {
-        return (true, listen_addr.to_string());
-    }
-
-    // However, if it's not a loopback address, then configure the device to
-    // communicate by way of the ssh host's address. This is helpful when the
-    // device can access the repository only through a specific interface.
-
-    // FIXME(fxbug.dev/87439): Once the tunnel bug is fixed, we may
-    // want to default all traffic going through the tunnel. Consider
-    // creating an ffx config variable to decide if we want to always
-    // tunnel, or only tunnel if the server is on a loopback address.
-
-    // IPv6 addresses can contain a ':', IPv4 cannot.
-    let repo_host = if host_address.address.contains(':') {
-        if let Some(pos) = host_address.address.rfind('%') {
-            let ip = &host_address.address[..pos];
-            let scope_id = &host_address.address[pos + 1..];
-            format!("[{}%25{}]:{}", ip, scope_id, listen_addr.port())
-        } else {
-            format!("[{}]:{}", host_address.address, listen_addr.port())
-        }
-    } else {
-        format!("{}:{}", host_address.address, listen_addr.port())
-    };
-
-    (false, repo_host)
-}
-
-fn aliases_to_rules(
-    repo_name: &str,
-    aliases: &BTreeSet<String>,
-) -> Result<Vec<Rule>, ffx::RepositoryError> {
-    let rules = aliases
-        .iter()
-        .map(|alias| {
-            let mut split_alias = alias.split("/").collect::<Vec<&str>>();
-            let host_match = split_alias.remove(0);
-            let path_prefix = split_alias.join("/");
-            Rule::new(
-                host_match.to_string(),
-                repo_name.to_string(),
-                format!("/{path_prefix}"),
-                format!("/{path_prefix}"),
-            )
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|err| {
-            tracing::warn!("failed to construct rule: {:#?}", err);
-            ffx::RepositoryError::RewriteEngineError
-        })?;
-
-    Ok(rules)
-}
-
 fn rules_config_to_json_string(rule_config: RuleConfig) -> Result<String, ffx::RepositoryError> {
     let rule_config_string = serde_json::to_string(&rule_config).map_err(|err| {
         tracing::error!("Failed to convert RulesConfig to json String: {:#?}", err);
@@ -619,65 +504,6 @@ fn rules_config_to_json_string(rule_config: RuleConfig) -> Result<String, ffx::R
 
     // Must wrap json string as '{}'.
     Ok(format!("'{}'", rule_config_string))
-}
-
-async fn create_aliases_fidl(
-    cx: &Context,
-    repo_name: &str,
-    target_nodename: &str,
-    aliases: &BTreeSet<String>,
-) -> Result<(), ffx::RepositoryError> {
-    let alias_rules = aliases_to_rules(repo_name, &aliases)?;
-
-    let rewrite_proxy = match cx
-        .open_target_proxy::<RewriteEngineMarker>(
-            Some(target_nodename.to_string()),
-            PKG_RESOLVER_MONIKER,
-        )
-        .await
-    {
-        Ok(p) => p,
-        Err(err) => {
-            tracing::warn!(
-                "Failed to open Rewrite Engine target proxy with target name {:?}: {:#?}",
-                target_nodename,
-                err
-            );
-            return Err(ffx::RepositoryError::TargetCommunicationFailure);
-        }
-    };
-
-    // Check flag here for "overwrite" style
-    do_transaction(&rewrite_proxy, |transaction| async {
-        // Prepend the alias rules to the front so they take priority.
-        let mut rules = alias_rules.iter().cloned().rev().collect::<Vec<_>>();
-
-        // These are rules to re-evaluate...
-        let repo_rules_state = transaction.list_dynamic().await?;
-        rules.extend(repo_rules_state);
-
-        // Clear the list, since we'll be adding it back later.
-        transaction.reset_all()?;
-
-        // Remove duplicated rules while preserving order.
-        let mut unique_rules = HashSet::new();
-        rules.retain(|r| unique_rules.insert(r.clone()));
-
-        // Add the rules back into the transaction. We do it in reverse, because `.add()`
-        // always inserts rules into the front of the list.
-        for rule in rules.into_iter().rev() {
-            transaction.add(rule).await?
-        }
-
-        Ok(transaction)
-    })
-    .await
-    .map_err(|err| {
-        tracing::warn!("failed to create transactions: {:#?}", err);
-        ffx::RepositoryError::RewriteEngineError
-    })?;
-
-    Ok(())
 }
 
 impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
@@ -1325,22 +1151,6 @@ async fn load_registrations_from_config<R: Registrar>(
     }
 }
 
-async fn update_repository(
-    repo_name: &str,
-    repo: &RwLock<RepoClient<Box<dyn RepoProvider>>>,
-) -> Result<bool, ffx::RepositoryError> {
-    repo.write().await.update().await.map_err(|err| {
-        tracing::error!("Unable to update repository {}: {:#?}", repo_name, err);
-
-        match err {
-            repository::Error::Tuf(tuf::Error::ExpiredMetadata(_)) => {
-                ffx::RepositoryError::ExpiredRepositoryMetadata
-            }
-            _ => ffx::RepositoryError::IoError,
-        }
-    })
-}
-
 #[derive(Clone)]
 struct DaemonEventHandler<R: Registrar> {
     cx: Context,
@@ -1522,12 +1332,14 @@ mod tests {
             EditTransactionRequest, EngineMarker as RewriteEngineMarker,
             EngineRequest as RewriteEngineRequest, RuleIteratorRequest,
         },
+        fidl_fuchsia_pkg_rewrite_ext::Rule,
         fuchsia_repo::{manager::RepositoryManager, server::RepositoryServer},
         futures::TryStreamExt,
         pretty_assertions::assert_eq,
         protocols::testing::FakeDaemonBuilder,
         std::{
             cell::RefCell,
+            collections::BTreeSet,
             convert::TryInto,
             fs,
             future::Future,
