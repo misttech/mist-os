@@ -1810,7 +1810,9 @@ mod fuzz {
             let device = fs.take_device().await;
             device.reopen(false);
             if let Ok(fs) = FxFilesystem::open(device).await {
-                fs.close().await.expect("close failed");
+                // `close()` can fail if there were objects to be tombstoned. If the said object is
+                // corrupted, there will be an error when we compact the journal.
+                let _ = fs.close().await;
             }
         });
     }
@@ -1836,7 +1838,9 @@ mod fuzz {
             let device = fs.take_device().await;
             device.reopen(false);
             if let Ok(fs) = FxFilesystem::open(device).await {
-                fs.close().await.expect("close failed");
+                // `close()` can fail if there were objects to be tombstoned. If the said object is
+                // corrupted, there will be an error when we compact the journal.
+                let _ = fs.close().await;
             }
         });
     }

@@ -340,7 +340,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 );
             }
         } else {
-            panic!("Unexpected object value");
+            // This can occur when the object mutation is created from an object in the tree which
+            // was corrupt.
+            bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
         }
         transaction.add(self.store().store_object_id, Mutation::ObjectStore(mutation));
         Ok(())
