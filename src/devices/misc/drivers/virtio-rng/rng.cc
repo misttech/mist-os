@@ -19,8 +19,7 @@
 namespace virtio {
 
 RngDevice::RngDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(bus_device, std::move(bti), std::move(backend)),
-      ddk::Device<RngDevice>(bus_device) {}
+    : virtio::Device(std::move(bti), std::move(backend)), ddk::Device<RngDevice>(bus_device) {}
 
 RngDevice::~RngDevice() {
   // TODO: clean up allocated physical memory
@@ -73,7 +72,6 @@ zx_status_t RngDevice::Init() {
     zxlogf(ERROR, "%s: failed to add device: %s", tag(), zx_status_get_string(status));
     return status;
   }
-  device_ = zxdev();
 
   // TODO(fxbug.dev/24760): The kernel should trigger entropy requests, instead of relying on this
   // userspace thread to push entropy whenever it wants to. As a temporary hack, this thread

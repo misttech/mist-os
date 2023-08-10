@@ -413,7 +413,7 @@ zx_status_t GpuDevice::DisplayControllerImplSetDisplayPower(uint64_t display_id,
 }
 
 GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(bus_device, std::move(bti), std::move(backend)), DeviceType(bus_device) {
+    : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {
   sem_init(&request_sem_, 0, 1);
   sem_init(&response_sem_, 0, 0);
 }
@@ -807,7 +807,6 @@ zx_status_t GpuDevice::Init() {
   DriverStatusOk();
 
   status = DdkAdd("virtio-gpu-display");
-  device_ = zxdev();
 
   return status;
 }

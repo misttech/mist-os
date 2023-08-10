@@ -28,7 +28,7 @@ namespace virtio {
 
 class Device {
  public:
-  Device(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend);
+  Device(zx::bti bti, std::unique_ptr<Backend> backend);
   virtual ~Device();
 
   virtual zx_status_t Init() = 0;
@@ -55,7 +55,6 @@ class Device {
   void RingKick(uint16_t ring_index) { backend_->RingKick(ring_index); }
 
   // It is expected that each derived device will implement tag().
-  zx_device_t* device() { return device_; }
   virtual const char* tag() const = 0;  // Implemented by derived devices
 
   // Accessor for bti so that Rings can map IO buffers
@@ -85,7 +84,6 @@ class Device {
     backend_->WriteDeviceConfig(offset, val);
   }
 
-  zx_device_t* bus_device() const { return bus_device_; }
   static int IrqThreadEntry(void* arg);
   void IrqWorker();
 
@@ -95,9 +93,6 @@ class Device {
   std::unique_ptr<Backend> backend_;
   // irq thread object
   thrd_t irq_thread_ = {};
-  // Bus device is the parent device on the bus, device is this driver's device node.
-  zx_device_t* bus_device_ = nullptr;
-  zx_device_t* device_ = nullptr;
 
   // DDK device
   // TODO: It might make sense for the base device class to be the one

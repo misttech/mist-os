@@ -80,7 +80,7 @@ zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
 }
 
 BlockDevice::BlockDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(bus_device, std::move(bti), std::move(backend)), DeviceType(bus_device) {
+    : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {
   sync_completion_reset(&txn_signal_);
   sync_completion_reset(&worker_signal_);
 
@@ -162,10 +162,8 @@ zx_status_t BlockDevice::Init() {
 
   // Initialize and publish the zx_device.
   status = DdkAdd("virtio-block");
-  device_ = zxdev();
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to run DdkAdd: %s", zx_status_get_string(status));
-    device_ = nullptr;
     return status;
   }
 

@@ -58,7 +58,7 @@ uint16_t MaxVirtqueuePairs(const virtio_net_config& config, bool is_mq_supported
 
 NetworkDevice::NetworkDevice(zx_device_t* bus_device, zx::bti bti_handle,
                              std::unique_ptr<Backend> backend)
-    : virtio::Device(bus_device, std::move(bti_handle), std::move(backend)),
+    : virtio::Device(std::move(bti_handle), std::move(backend)),
       DeviceType(bus_device),
       rx_(this),
       tx_(this),
@@ -119,7 +119,7 @@ zx_status_t NetworkDevice::Init() {
     zxlogf(ERROR, "failed to add device: %s", zx_status_get_string(status));
     return status;
   }
-  device_ = zxdev();
+
   tx_depth_ = std::min(GetRingSize(kTxId), kMaxDepth);
   rx_depth_ = std::min(GetRingSize(kRxId), kMaxDepth);
 

@@ -37,8 +37,9 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   };
 
   ScsiDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend)
-      : virtio::Device(device, std::move(bti), std::move(backend)),
-        ddk::Device<ScsiDevice>(device) {}
+      : virtio::Device(std::move(bti), std::move(backend)),
+        ddk::Device<ScsiDevice>(device),
+        device_(device) {}
 
   // virtio::Device overrides
   zx_status_t Init() override;
@@ -92,6 +93,8 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   void FreeIO(scsi_io_slot* io_slot) TA_REQ(lock_);
   size_t request_buffers_size_;
   scsi_io_slot scsi_io_slot_table_[MAX_IOS] TA_GUARDED(lock_) = {};
+
+  zx_device_t* device_ = nullptr;
 
   Ring control_ring_ TA_GUARDED(lock_) = {this};
   Ring request_queue_ = {this};

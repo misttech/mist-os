@@ -270,7 +270,7 @@ class TestVirtioDevice : public virtio::Device, public DeviceType {
 
   explicit TestVirtioDevice(zx_device_t* bus_device, zx::bti bti,
                             std::unique_ptr<virtio::Backend> backend)
-      : virtio::Device(bus_device, std::move(bti), std::move(backend)), DeviceType(bus_device) {}
+      : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {}
 
   zx_status_t Init() final {
     // Initialize the first virtqueue.

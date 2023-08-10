@@ -24,8 +24,8 @@ namespace virtio {
 
 namespace fpci = fuchsia_hardware_pci;
 
-Device::Device(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : bti_(std::move(bti)), backend_(std::move(backend)), bus_device_(bus_device) {
+Device::Device(zx::bti bti, std::unique_ptr<Backend> backend)
+    : bti_(std::move(bti)), backend_(std::move(backend)) {
   device_ops_.version = DEVICE_OPS_VERSION;
 }
 

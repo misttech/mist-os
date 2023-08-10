@@ -113,7 +113,7 @@ TransferDescriptor* TransferQueue::Dequeue() {
 bool TransferQueue::IsEmpty() const { return queue_.is_empty(); }
 
 ConsoleDevice::ConsoleDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(bus_device, std::move(bti), std::move(backend)), DeviceType(bus_device) {}
+    : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {}
 
 ConsoleDevice::~ConsoleDevice() = default;
 
@@ -182,10 +182,8 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
 
   {
     zx_status_t status = DdkAdd("virtio-console");
-    device_ = zxdev();
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to register device: %s", zx_status_get_string(status));
-      device_ = nullptr;
       return status;
     }
   }

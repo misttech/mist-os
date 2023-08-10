@@ -54,8 +54,7 @@ zx_status_t InputDevice::HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NO
 zx_status_t InputDevice::HidbusSetProtocol(uint8_t protocol) { return ZX_OK; }
 
 InputDevice::InputDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
-    : virtio::Device(bus_device, std::move(bti), std::move(backend)),
-      ddk::Device<InputDevice>(bus_device) {}
+    : virtio::Device(std::move(bti), std::move(backend)), ddk::Device<InputDevice>(bus_device) {}
 
 InputDevice::~InputDevice() {}
 
@@ -172,7 +171,6 @@ zx_status_t InputDevice::Init() {
     zxlogf(ERROR, "%s: failed to add device: %s", tag(), zx_status_get_string(status));
     return status;
   }
-  device_ = zxdev();
 
   vring_.Kick();
   cleanup.cancel();
