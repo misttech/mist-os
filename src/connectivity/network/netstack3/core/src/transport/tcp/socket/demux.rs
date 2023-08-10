@@ -31,8 +31,7 @@ use crate::{
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
-        AddrVec, Connection as BoundConnection, ConvertSocketTypeState as _,
-        SocketState as BoundSocketState,
+        AddrVec, SocketState as BoundSocketState,
     },
     trace_duration,
     transport::tcp::{
@@ -603,9 +602,7 @@ where
                         |index| {
                             SocketId::Connection(ConnectionId(index, IpVersionMarker::default()))
                         },
-                        SocketState::Bound(BoundConnection::to_socket_state((
-                            state, sharing, addr,
-                        ))),
+                        SocketState::Bound(BoundSocketState::Connected((state, sharing, addr))),
                     );
                     assert_matches!(entry.key(), SocketId::Connection(conn_id) => (*conn_id).into())
                 },

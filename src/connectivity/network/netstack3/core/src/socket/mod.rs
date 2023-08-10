@@ -883,25 +883,6 @@ pub(crate) trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: Socket
     fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id;
 }
 
-/// Helper trait for converting between [`SocketState`] and its variants.
-pub(crate) trait ConvertSocketTypeState<I: Ip, D, A: SocketMapAddrSpec, S: SocketStateSpec>:
-    ConvertSocketMapState<I, D, A, S>
-{
-    type State;
-    fn from_socket_state_ref(
-        socket_state: &SocketState<I, D, A, S>,
-    ) -> &(Self::State, Self::SharingState, Self::Addr);
-    fn from_socket_state_mut(
-        socket_state: &mut SocketState<I, D, A, S>,
-    ) -> &mut (Self::State, Self::SharingState, Self::Addr);
-    fn to_socket_state(
-        state: (Self::State, Self::SharingState, Self::Addr),
-    ) -> SocketState<I, D, A, S>;
-    fn from_socket_state(
-        socket_state: SocketState<I, D, A, S>,
-    ) -> (Self::State, Self::SharingState, Self::Addr);
-}
-
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMapState<I, D, A, S>
     for Listener
 {
@@ -945,50 +926,6 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMap
     }
     fn to_socket_id(id: Self::Id) -> SocketId<S> {
         SocketId::Listener(id)
-    }
-}
-
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketStateSpec> ConvertSocketTypeState<I, D, A, S>
-    for Listener
-{
-    type State = S::ListenerState;
-    fn from_socket_state(
-        socket_state: SocketState<I, D, A, S>,
-    ) -> (Self::State, Self::SharingState, Self::Addr) {
-        match socket_state {
-            SocketState::Listener(state) => state,
-            SocketState::Connected(state) => {
-                unreachable!("connection state for listener: {state:?}")
-            }
-        }
-    }
-
-    fn from_socket_state_mut(
-        socket_state: &mut SocketState<I, D, A, S>,
-    ) -> &mut (Self::State, Self::SharingState, Self::Addr) {
-        match socket_state {
-            SocketState::Listener(state) => state,
-            SocketState::Connected(state) => {
-                unreachable!("connection state for listener: {state:?}")
-            }
-        }
-    }
-
-    fn from_socket_state_ref(
-        socket_state: &SocketState<I, D, A, S>,
-    ) -> &(Self::State, Self::SharingState, Self::Addr) {
-        match socket_state {
-            SocketState::Listener(state) => state,
-            SocketState::Connected(state) => {
-                unreachable!("connection state for listener: {state:?}")
-            }
-        }
-    }
-
-    fn to_socket_state(
-        state: (Self::State, Self::SharingState, Self::Addr),
-    ) -> SocketState<I, D, A, S> {
-        SocketState::Listener(state)
     }
 }
 
@@ -1036,50 +973,6 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMap
     }
     fn to_socket_id(id: Self::Id) -> SocketId<S> {
         SocketId::Connection(id)
-    }
-}
-
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketStateSpec> ConvertSocketTypeState<I, D, A, S>
-    for Connection
-{
-    type State = S::ConnState;
-    fn from_socket_state(
-        socket_state: SocketState<I, D, A, S>,
-    ) -> (Self::State, Self::SharingState, Self::Addr) {
-        match socket_state {
-            SocketState::Connected(state) => state,
-            SocketState::Listener(state) => {
-                unreachable!("listener state for connection: {state:?}")
-            }
-        }
-    }
-
-    fn from_socket_state_mut(
-        socket_state: &mut SocketState<I, D, A, S>,
-    ) -> &mut (Self::State, Self::SharingState, Self::Addr) {
-        match socket_state {
-            SocketState::Connected(state) => state,
-            SocketState::Listener(state) => {
-                unreachable!("listener state for connection: {state:?}")
-            }
-        }
-    }
-
-    fn from_socket_state_ref(
-        socket_state: &SocketState<I, D, A, S>,
-    ) -> &(Self::State, Self::SharingState, Self::Addr) {
-        match socket_state {
-            SocketState::Connected(state) => state,
-            SocketState::Listener(state) => {
-                unreachable!("listener state for connection: {state:?}")
-            }
-        }
-    }
-
-    fn to_socket_state(
-        state: (Self::State, Self::SharingState, Self::Addr),
-    ) -> SocketState<I, D, A, S> {
-        SocketState::Connected(state)
     }
 }
 

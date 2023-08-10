@@ -70,8 +70,7 @@ use crate::{
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
-        AddrVec, Bound, BoundSocketMap, Connection as BoundConnection, ConvertSocketTypeState,
-        IncompatibleError, InsertError, Inserter, Listener as BoundListener, ListenerAddrInfo,
+        AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
         RemoveResult, Shutdown, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
         SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
         SocketState as BoundSocketState, SocketStateSpec, UpdateSharingError,
@@ -1273,7 +1272,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         |addr, sharing| {
                             let entry = socket_state.push_entry(
                                 |index| SocketId::Bound(BoundId(index, IpVersionMarker::default())),
-                                SocketState::Bound(BoundListener::to_socket_state((
+                                SocketState::Bound(BoundSocketState::Listener((
                                     MaybeListener::Bound(bound_state),
                                     sharing,
                                     addr,
@@ -1493,9 +1492,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                                     IpVersionMarker::default(),
                                 ))
                             },
-                            SocketState::Bound(BoundConnection::to_socket_state((
-                                state, sharing, addr,
-                            ))),
+                            SocketState::Bound(BoundSocketState::Connected((state, sharing, addr))),
                         );
                         assert_matches!(entry.key(), SocketId::Connection(conn_id) => *conn_id)
                     },
