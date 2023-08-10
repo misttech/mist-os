@@ -4,7 +4,7 @@
 {
     actions: [
         {
-            include: "udp_common.json5",
+            include: "udp_all_socketpair_common.json5",
         },
     ],
 }

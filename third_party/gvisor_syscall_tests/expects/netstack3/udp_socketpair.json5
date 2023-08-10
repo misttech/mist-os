@@ -1,0 +1,65 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // Netstack3 does not support SO_REUSEADDR and only partially supports
+                // SO_REUSEPORT for UDP sockets.
+                "AllUDPSockets/UDPSocketPairTest.ReuseAddrDefault/*",
+                "AllUDPSockets/UDPSocketPairTest.SetReuseAddr/*",
+                "AllUDPSockets/UDPSocketPairTest.SetReuseAddrReusePort/*",
+                "AllUDPSockets/UDPSocketPairTest.SetReusePort/*",
+
+                // Netstack3 does not support many UDP socket options or operations
+                "AllUDPSockets/UDPSocketPairTest.GetSocketAcceptConn/*",
+                "AllUDPSockets/UDPSocketPairTest.IPPKTINFODefault/*",
+                "AllUDPSockets/UDPSocketPairTest.RecvTosDefault/*",
+                "AllUDPSockets/UDPSocketPairTest.TOSRecvMismatch/*",
+
+                // Expect failure for dual-stack UDP sockets.
+                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLAboveMax/[25]",
+                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLBelowMin/[25]",
+                "AllUDPSockets/UDPSocketPairTest.ReusePortDefault/[25]",
+
+                // Expect failure for setting TTL on non-IPv4 sockets.
+                "AllUDPSockets/UDPSocketPairTest.MulticastTTLDefault/[0235]",
+                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLNegativeOne/[0235]",
+                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLChar/[0235]",
+                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLMax/[0235]",
+
+                // Netstack3 does not have complete support for multicast UDP sockets.
+                "AllUDPSockets/UDPSocketPairTest.MulticastLoopDefault/*",
+                "AllUDPSockets/UDPSocketPairTest.SetMulticastLoop/*",
+                "AllUDPSockets/UDPSocketPairTest.SetMulticastLoopChar/*",
+                "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLMin/*",
+                "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/0",
+                "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/2",
+                "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/3",
+                "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/5",
+
+                // Uncategorized
+                "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/*",
+                "AllUDPSockets/UDPSocketPairTest.SetAndGetIPPKTINFO/*",
+                "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
+                "AllUDPSockets/UDPSocketPairTest.SetAndGetSocketLinger/*",
+                "AllUDPSockets/UDPSocketPairTest.SetRecvTos/*",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                "*NonStreamSocketPairTest*",
+                "*AllSocketPairTest*",
+            ],
+        },
+    ],
+}
