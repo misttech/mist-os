@@ -64,13 +64,18 @@ struct JsonCollectorImpl {
 
 impl JsonCollector for JsonCollectorImpl {
     fn collect_json_stats(&self, tx: Socket, include_starnix: bool) -> Result<()> {
-        self.collector_proxy.collect_json_stats_with_options(
-            CollectorCollectJsonStatsWithOptionsRequest {
-                socket: Some(tx),
-                include_starnix_processes: Some(include_starnix),
-                ..Default::default()
-            },
-        )?;
+        // Use the old/deprecated call when `include_starnix` is not present to ensure compatibility with the old Fuchsia releases.
+        if include_starnix {
+            self.collector_proxy.collect_json_stats_with_options(
+                CollectorCollectJsonStatsWithOptionsRequest {
+                    socket: Some(tx),
+                    include_starnix_processes: Some(include_starnix),
+                    ..Default::default()
+                },
+            )?;
+        } else {
+            self.collector_proxy.collect_json_stats(tx)?;
+        }
         Ok(())
     }
 }

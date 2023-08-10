@@ -312,7 +312,7 @@ void Monitor::WriteJsonCaptureAndBuckets(zx::socket socket) { CollectJsonStats(s
 void Monitor::CollectJsonStats(zx::socket socket) {
   // We set |include_starnix_processes| to true to avoid any change of behavior to the current
   // clients.
-  CollectJsonStatsWithOptions(std::move(socket), true);
+  CollectJsonStatsWithOptions(std::move(socket), false);
 }
 
 void Monitor::CollectJsonStatsWithOptions(
