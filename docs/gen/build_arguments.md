@@ -7812,10 +7812,11 @@ From //src/starnix/kernel/BUILD.gn:13
 ### starnix_disable_tracing
 
 Whether or not tracing is disabled globally.
+NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:16
+From //src/starnix/kernel/BUILD.gn:17
 
 ### starnix_use_fuchsia_mutex
 
@@ -7823,7 +7824,7 @@ Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:19
+From //src/starnix/kernel/BUILD.gn:20
 
 ### starnix_use_fuchsia_rwlock
 
@@ -7831,7 +7832,7 @@ Wheher to use fuchsia_sync::RwLock instead of parking_lot::RwLock.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:22
+From //src/starnix/kernel/BUILD.gn:23
 
 ### target_cpu
 
