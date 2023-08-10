@@ -1706,7 +1706,7 @@ pub mod tests {
         let sb = create_test_sandbox(vec![String::from("fuchsia.test.service")]);
         let cms = create_test_cmx_map(vec![(PathBuf::from("meta/bar.cmx"), sb)]);
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-        let pkg_urls = vec![pkg.url.clone()];
+        let pkg_urls = vec![pkg.url.clone().pinned().unwrap()];
         mock_pkg_reader.append_update_package(pkg_urls, empty_update_pkg());
         mock_pkg_reader.append_pkg_def(pkg);
 
@@ -1774,7 +1774,7 @@ pub mod tests {
         let pkg_1_url = pkg_1.url.clone();
         mock_pkg_reader.append_pkg_def(pkg_1);
 
-        let pkg_urls = vec![pkg_0_url, pkg_1_url];
+        let pkg_urls = vec![pkg_0_url.pinned().unwrap(), pkg_1_url.pinned().unwrap()];
         mock_pkg_reader.append_update_package(pkg_urls, empty_update_pkg());
 
         let mock_artifact_reader = MockArtifactReader::new();
@@ -1830,7 +1830,7 @@ pub mod tests {
             cvfs: hashmap! {},
         });
 
-        let pkg_urls = vec![pkg_url_one, pkg_url_two];
+        let pkg_urls = vec![pkg_url_one.pinned().unwrap(), pkg_url_two.pinned().unwrap()];
         mock_pkg_reader.append_update_package(pkg_urls, empty_update_pkg());
 
         // Append a dep to both package and artifact readers.

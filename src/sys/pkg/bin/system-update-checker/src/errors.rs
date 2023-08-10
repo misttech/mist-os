@@ -49,9 +49,6 @@ pub enum UpdatePackage {
     #[error("could not find system_image/0 in 'packages' manifest")]
     MissingSystemImage,
 
-    #[error("system_image/0 pkg url was not merkle pinned: {0}")]
-    UnPinnedSystemImage(fuchsia_url::AbsolutePackageUrl),
-
     #[error("extracting package hash")]
     Hash(#[source] update_package::HashError),
 }

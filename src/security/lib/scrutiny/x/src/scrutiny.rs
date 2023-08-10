@@ -10,7 +10,6 @@ use super::package::Package;
 use super::product_bundle as pb;
 use super::system::Error as SystemError;
 use super::system::System;
-use fuchsia_url::AbsolutePackageUrl;
 use std::rc::Rc;
 use thiserror::Error;
 
@@ -64,23 +63,16 @@ impl api::Scrutiny for Scrutiny {
     ) -> Box<dyn Iterator<Item = Result<Box<dyn api::Package>, api::ScrutinyPackagesError>>> {
         let scrutiny_data = self.0.clone();
         Box::new(scrutiny_data.system.update_package().packages().clone().into_iter().map(
-            move |url| match url {
-                AbsolutePackageUrl::Unpinned(unpinned) => {
-                    Err(api::ScrutinyPackagesError::Ambiguous(unpinned.clone()))
-                }
-                AbsolutePackageUrl::Pinned(pinned) => {
-                    let meta_far_blob: Box<dyn api::Blob> =
-                        scrutiny_data
-                            .product_bundle_blob_set
-                            .blob(Box::new(Hash::from(pinned.hash())))?;
-                    let package: Box<dyn api::Package> = Box::new(Package::new(
-                        Some(scrutiny_data.product_bundle.data_source().clone()),
-                        api::PackageResolverUrl::Url,
-                        meta_far_blob,
-                        scrutiny_data.product_bundle_blob_set.clone(),
-                    )?);
-                    Ok(package)
-                }
+            move |url| {
+                let meta_far_blob: Box<dyn api::Blob> =
+                    scrutiny_data.product_bundle_blob_set.blob(Box::new(Hash::from(url.hash())))?;
+                let package: Box<dyn api::Package> = Box::new(Package::new(
+                    Some(scrutiny_data.product_bundle.data_source().clone()),
+                    api::PackageResolverUrl::Url,
+                    meta_far_blob,
+                    scrutiny_data.product_bundle_blob_set.clone(),
+                )?);
+                Ok(package)
             },
         ))
     }

@@ -7,7 +7,7 @@ use super::blob::BlobOpenError;
 use super::package::Error as PackageError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
-use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_url::PinnedAbsolutePackageUrl;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use std::cmp;
 use std::collections::HashMap;
@@ -570,7 +570,7 @@ impl Debug for dyn MetaContents {
 
 pub trait UpdatePackage: Package {
     /// Returns a borrowed listing of package URLs described by this update package.
-    fn packages(&self) -> &Vec<AbsolutePackageUrl>;
+    fn packages(&self) -> &Vec<PinnedAbsolutePackageUrl>;
 }
 
 clone_trait_object!(UpdatePackage);

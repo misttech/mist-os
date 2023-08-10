@@ -13,7 +13,7 @@ use super::blob::BlobSet;
 use super::data_source::DataSource;
 use super::package::Error as PackageError;
 use super::package::Package;
-use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_url::PinnedAbsolutePackageUrl;
 use std::io;
 use std::io::Read as _;
 use thiserror::Error;
@@ -43,7 +43,7 @@ pub enum Error {
 #[derive(Clone)]
 pub(crate) struct UpdatePackage {
     package: Box<dyn api::Package>,
-    packages_json: Vec<AbsolutePackageUrl>,
+    packages_json: Vec<PinnedAbsolutePackageUrl>,
 }
 
 impl UpdatePackage {
@@ -113,7 +113,7 @@ impl api::Package for UpdatePackage {
 }
 
 impl api::UpdatePackage for UpdatePackage {
-    fn packages(&self) -> &Vec<AbsolutePackageUrl> {
+    fn packages(&self) -> &Vec<PinnedAbsolutePackageUrl> {
         &self.packages_json
     }
 }

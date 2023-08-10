@@ -19,7 +19,7 @@ use {
     },
     fuchsia_async::{Task, TimeoutExt as _},
     fuchsia_hash::Hash,
-    fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl},
+    fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl},
     futures::{channel::oneshot, prelude::*, stream::FusedStream},
     parking_lot::Mutex,
     sha2::{Digest, Sha256},
@@ -718,7 +718,7 @@ impl<'a> Attempt<'a> {
         (
             UpdatePackage,
             UpdateMode,
-            Vec<AbsolutePackageUrl>,
+            Vec<PinnedAbsolutePackageUrl>,
             Option<ImagesToWrite>,
             paver::CurrentConfiguration,
         ),
@@ -908,7 +908,7 @@ impl<'a> Attempt<'a> {
         mode: UpdateMode,
         current_configuration: paver::CurrentConfiguration,
         images_to_write: Option<ImagesToWrite>,
-        packages_to_fetch: &[AbsolutePackageUrl],
+        packages_to_fetch: &[PinnedAbsolutePackageUrl],
     ) -> Result<(), StageError> {
         if let Some(images_to_write) = images_to_write {
             if images_to_write.is_empty() {
@@ -931,7 +931,7 @@ impl<'a> Attempt<'a> {
             let () = replace_retained_packages(
                 packages_to_fetch
                     .iter()
-                    .filter_map(|url| url.hash())
+                    .map(|url| url.hash())
                     .chain(images_to_write.get_url_hashes())
                     .chain(self.config.update_url.hash()),
                 &self.env.retained_packages,
@@ -1013,21 +1013,18 @@ impl<'a> Attempt<'a> {
         Ok(())
     }
 
-    /// Fetch all base packages needed by the target OS.
+    /// Fetch all packages needed by the target OS.
     async fn fetch_packages(
         &mut self,
         co: &mut async_generator::Yield<State>,
         state: &mut state::Fetch,
-        packages_to_fetch: Vec<AbsolutePackageUrl>,
+        packages_to_fetch: Vec<PinnedAbsolutePackageUrl>,
         mode: UpdateMode,
     ) -> Result<Vec<fio::DirectoryProxy>, FetchError> {
         // Remove ImagesToWrite from the retained_index.
         // GC to remove the ImagesToWrite from blobfs.
         let () = replace_retained_packages(
-            packages_to_fetch
-                .iter()
-                .filter_map(|url| url.hash())
-                .chain(self.config.update_url.hash()),
+            packages_to_fetch.iter().map(|url| url.hash()).chain(self.config.update_url.hash()),
             &self.env.retained_packages,
         )
         .await

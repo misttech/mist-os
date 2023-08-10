@@ -4,7 +4,7 @@
 
 use {
     crate::update::{paver, BuildInfo, SystemInfo},
-    anyhow::{anyhow, Error},
+    anyhow::anyhow,
     epoch::EpochFile,
     fidl_fuchsia_mem::Buffer,
     fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy},
@@ -218,20 +218,19 @@ impl Version {
 
 async fn get_system_image_hash_from_update_package(
     update_package: &UpdatePackage,
-) -> Result<String, Error> {
+) -> Result<String, anyhow::Error> {
     let packages = update_package.packages().await?;
     let system_image = packages
         .into_iter()
         .find(|url| url.path() == "/system_image/0")
         .ok_or_else(|| anyhow!("system image not found"))?;
-    let hash = system_image.hash().ok_or_else(|| anyhow!("system image package has no hash"))?;
-    Ok(hash.to_string())
+    Ok(system_image.hash().to_string())
 }
 
 async fn get_image_hash_from_update_package(
     update_package: &UpdatePackage,
     image: ImageType,
-) -> Result<String, Error> {
+) -> Result<String, anyhow::Error> {
     let buffer = update_package.open_image(&update_package::Image::new(image, None)).await?;
     sha256_hash_with_no_trailing_zeros(buffer)
 }
@@ -239,7 +238,7 @@ async fn get_image_hash_from_update_package(
 async fn get_vbmeta_and_zbi_hash_from_environment(
     data_sink: &DataSinkProxy,
     boot_manager: &BootManagerProxy,
-) -> Result<(String, String), Error> {
+) -> Result<(String, String), anyhow::Error> {
     let current_configuration = paver::query_current_configuration(boot_manager).await?;
     let configuration = current_configuration
         .to_configuration()
@@ -253,7 +252,7 @@ async fn get_vbmeta_and_zbi_hash_from_environment(
 }
 
 // Compute the SHA256 hash of the buffer with trailing zeros stripped.
-fn sha256_hash_with_no_trailing_zeros(buffer: Buffer) -> Result<String, Error> {
+fn sha256_hash_with_no_trailing_zeros(buffer: Buffer) -> Result<String, anyhow::Error> {
     let mut size = buffer.size.try_into()?;
     let mut data = vec![0u8; size];
     buffer.vmo.read(&mut data, 0)?;

@@ -14,7 +14,7 @@ use {
     },
     anyhow::{anyhow, Result},
     fuchsia_merkle::{Hash, HASH_SIZE},
-    fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant},
+    fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant, PinnedAbsolutePackageUrl},
     scrutiny::model::model::DataModel,
     scrutiny_testing::{artifact::AppendResult, fake::fake_model_config, TEST_REPO_URL},
     std::{
@@ -25,7 +25,7 @@ use {
 };
 
 pub struct MockPackageReader {
-    pkg_urls: Option<Vec<AbsolutePackageUrl>>,
+    pkg_urls: Option<Vec<PinnedAbsolutePackageUrl>>,
     update_pkg_def: Option<PartialPackageDefinition>,
     pkg_defs: HashMap<AbsolutePackageUrl, PackageDefinition>,
     deps: HashSet<PathBuf>,
@@ -43,7 +43,7 @@ impl MockPackageReader {
 
     pub fn append_update_package(
         &mut self,
-        pkg_urls: Vec<AbsolutePackageUrl>,
+        pkg_urls: Vec<PinnedAbsolutePackageUrl>,
         update_pkg_def: PartialPackageDefinition,
     ) -> AppendResult {
         let result = if self.pkg_urls.is_some() || self.update_pkg_def.is_some() {
@@ -76,17 +76,17 @@ impl MockPackageReader {
 }
 
 impl PackageReader for MockPackageReader {
-    fn read_package_urls(&mut self) -> Result<Vec<AbsolutePackageUrl>> {
-        self.pkg_urls.as_ref().map(|pkg_urls| pkg_urls.clone()).ok_or(anyhow!(
+    fn read_package_urls(&mut self) -> Result<Vec<PinnedAbsolutePackageUrl>> {
+        self.pkg_urls.clone().ok_or(anyhow!(
             "Attempt to read package URLs from mock package reader with no package URLs set"
         ))
     }
 
     fn read_package_definition(
         &mut self,
-        pkg_url: &AbsolutePackageUrl,
+        pkg_url: &PinnedAbsolutePackageUrl,
     ) -> Result<PackageDefinition> {
-        self.pkg_defs.get(pkg_url).map(|pkg_def| pkg_def.clone()).ok_or_else(|| {
+        self.pkg_defs.get(&pkg_url.clone().into()).map(|pkg_def| pkg_def.clone()).ok_or_else(|| {
             anyhow!("Mock package reader contains no package definition for {:?}", pkg_url)
         })
     }

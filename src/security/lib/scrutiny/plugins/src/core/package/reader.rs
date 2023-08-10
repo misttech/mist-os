@@ -10,10 +10,10 @@ use {
             types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
         },
     },
-    anyhow::{anyhow, Context, Result},
+    anyhow::{Context, Result},
     fuchsia_archive::Utf8Reader as FarReader,
     fuchsia_hash::Hash,
-    fuchsia_url::AbsolutePackageUrl,
+    fuchsia_url::PinnedAbsolutePackageUrl,
     scrutiny_utils::{
         artifact::ArtifactReader,
         io::ReadSeek,
@@ -36,7 +36,7 @@ use {
 pub trait PackageReader: Send + Sync {
     /// Returns the fully-qualified URLs of packages expected to be reachable
     /// via this reader.
-    fn read_package_urls(&mut self) -> Result<Vec<AbsolutePackageUrl>>;
+    fn read_package_urls(&mut self) -> Result<Vec<PinnedAbsolutePackageUrl>>;
     /// Takes a package name and a merkle hash and returns the package definition
     /// for the specified merkle hash. All valid CF files specified by the FAR
     /// archive pointed to by the merkle hash are parsed and returned.
@@ -45,7 +45,7 @@ pub trait PackageReader: Send + Sync {
     /// Currently only CFv1 is supported, CFv2 support is tracked here (fxbug.dev/53347).
     fn read_package_definition(
         &mut self,
-        pkg_url: &AbsolutePackageUrl,
+        pkg_url: &PinnedAbsolutePackageUrl,
     ) -> Result<PackageDefinition>;
     /// Identical to `read_package_definition`, except read the update package bound to this reader.
     /// If reader is not bound to an update package or an error occurs reading the update package,
@@ -77,7 +77,7 @@ impl PackagesFromUpdateReader {
 }
 
 impl PackageReader for PackagesFromUpdateReader {
-    fn read_package_urls(&mut self) -> Result<Vec<AbsolutePackageUrl>> {
+    fn read_package_urls(&mut self) -> Result<Vec<PinnedAbsolutePackageUrl>> {
         self.deps.insert(self.update_package_path.clone());
         let mut far_reader = open_update_package(&self.update_package_path, &mut self.blob_reader)
             .context("Failed to open update meta.far for package reader")?;
@@ -94,14 +94,11 @@ impl PackageReader for PackagesFromUpdateReader {
 
     fn read_package_definition(
         &mut self,
-        pkg_url: &AbsolutePackageUrl,
+        pkg_url: &PinnedAbsolutePackageUrl,
     ) -> Result<PackageDefinition> {
-        let pkg_hash = pkg_url
-            .hash()
-            .ok_or_else(|| anyhow!("Cannot read package definition without package hash"))?;
         let meta_far = self
             .blob_reader
-            .open(&Path::new(&format!("{}", pkg_hash)))
+            .open(&Path::new(&pkg_url.hash().to_string()))
             .with_context(|| format!("Failed to open meta.far blob for package {}", pkg_url))?;
         read_package_definition(pkg_url, meta_far)
     }
@@ -126,12 +123,12 @@ impl PackageReader for PackagesFromUpdateReader {
 }
 
 pub fn read_package_definition(
-    pkg_url: &AbsolutePackageUrl,
+    pkg_url: &PinnedAbsolutePackageUrl,
     data: impl ReadSeek,
 ) -> Result<PackageDefinition> {
     let partial = read_partial_package_definition(data)
         .with_context(|| format!("Failed to construct package definition for {:?}", pkg_url))?;
-    Ok(PackageDefinition::new(pkg_url.clone(), partial))
+    Ok(PackageDefinition::new(pkg_url.clone().into(), partial))
 }
 
 pub fn read_partial_package_definition(rs: impl ReadSeek) -> Result<PartialPackageDefinition> {
@@ -262,7 +259,7 @@ mod tests {
         crate::core::util::types::ComponentManifest,
         fuchsia_archive::write,
         fuchsia_merkle::MerkleTree,
-        fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant},
+        fuchsia_url::{PackageName, PackageVariant, PinnedAbsolutePackageUrl},
         scrutiny_testing::{artifact::MockArtifactReader, TEST_REPO_URL},
         scrutiny_utils::package::META_CONTENTS_PATH,
         std::collections::BTreeMap,
@@ -278,7 +275,7 @@ mod tests {
 
     fn fake_update_package<P: AsRef<Path>>(
         path: P,
-        pkg_urls: &[AbsolutePackageUrl],
+        pkg_urls: &[PinnedAbsolutePackageUrl],
     ) -> MockArtifactReader {
         let packages_json_contents = serialize_packages_json(pkg_urls).unwrap();
         let packages_json_merkle =
@@ -395,11 +392,11 @@ mod tests {
         write(&mut target, path_content_map).unwrap();
         let pkg_contents = target.get_ref();
         let pkg_merkle = MerkleTree::from_reader(pkg_contents.as_slice()).unwrap().root();
-        let pkg_url = AbsolutePackageUrl::new(
+        let pkg_url = PinnedAbsolutePackageUrl::new(
             TEST_REPO_URL.clone(),
             PackageName::from_str("foo").unwrap(),
             Some(PackageVariant::zero()),
-            Some(pkg_merkle),
+            pkg_merkle,
         );
 
         // Fake update package designates `foo` package defined above.

@@ -83,6 +83,14 @@ impl AbsolutePackageUrl {
             Self::Pinned(pinned) => pinned.as_unpinned(),
         }
     }
+
+    /// The pinned URL, if the URL is pinned.
+    pub fn pinned(self) -> Option<PinnedAbsolutePackageUrl> {
+        match self {
+            Self::Unpinned(_) => None,
+            Self::Pinned(pinned) => Some(pinned),
+        }
+    }
 }
 
 // AbsolutePackageUrl does not maintain any invariants in addition to those already maintained by
