@@ -45,10 +45,8 @@ pub async fn explore_over_socket(
     ns_layout: DashNamespaceLayout,
     launcher_proxy: &fdash::LauncherProxy,
 ) -> Result<()> {
-    // TODO(fxbug.dev/127374) Use explore_component_over_socket once server support has rolled out
-    // to local dev devices.
     launcher_proxy
-        .launch_with_socket(
+        .explore_component_over_socket(
             &moniker.to_string(),
             pty_server,
             &tools_urls,
