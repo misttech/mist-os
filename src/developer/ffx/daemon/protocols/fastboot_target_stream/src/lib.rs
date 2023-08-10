@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ffx_daemon_target::{fastboot::find_devices, FASTBOOT_CHECK_INTERVAL};
+use ffx_daemon_target::FASTBOOT_CHECK_INTERVAL;
+use ffx_fastboot::common::find::find_devices;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
@@ -12,6 +13,9 @@ use fuchsia_async::Task;
 use futures::TryStreamExt;
 use protocols::prelude::*;
 use std::rc::Rc;
+
+/// Disables fastboot usb discovery if set to true.
+const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
 
 struct Inner {
     events_in: async_channel::Receiver<ffx::FastbootTarget>,
@@ -51,9 +55,11 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::new(Inner { events_in: receiver, events_out: sender });
         self.inner.replace(inner.clone());
         let inner = Rc::downgrade(&inner);
+        let is_disabled: bool =
+            ffx_config::get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false);
         self.fastboot_task.replace(Task::local(async move {
             loop {
-                let fastboot_devices = find_devices().await;
+                let fastboot_devices = if is_disabled { vec![] } else { find_devices().await };
                 if let Some(inner) = inner.upgrade() {
                     for dev in fastboot_devices {
                         let _ = inner

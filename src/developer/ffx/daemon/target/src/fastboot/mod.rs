@@ -23,6 +23,7 @@ use fastboot::{
 };
 use ffx_config::get;
 use ffx_daemon_events::FastbootInterface;
+use ffx_fastboot::common::find::global_serials_update;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_developer_ffx::{
     FastbootRequestStream, UploadProgressListenerMarker, UploadProgressListenerProxy,
@@ -30,35 +31,18 @@ use fidl_fuchsia_developer_ffx::{
 };
 use futures::{
     io::{AsyncRead, AsyncWrite},
-    lock::Mutex,
     TryStreamExt,
 };
-use lazy_static::lazy_static;
-use std::{collections::HashSet, convert::TryInto, fs::read, rc::Rc};
-use usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open};
+use std::{convert::TryInto, fs::read, rc::Rc};
+use usb_bulk::AsyncInterface as Interface;
 
 pub mod client;
 pub mod network;
 
-lazy_static! {
-    /// This is used to lock serial numbers that are in use from being interrupted by the discovery
-    /// loop.  Otherwise, it's possible to read the REPLY for the discovery code in the flashing
-    /// workflow.
-    static ref SERIALS_IN_USE: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
-}
-
-/// Disables fastboot usb discovery if set to true.
-const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
 /// The timeout rate in mb/s when communicating with the target device
 const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
 /// The minimum flash timeout (in seconds) for flashing to a target device
 const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
-
-// USB fastboot interface IDs
-const FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT: u16 = 0xa027;
-const FASTBOOT_USB_INTERFACE_CLASS: u8 = 0xff;
-const FASTBOOT_USB_INTERFACE_SUBCLASS: u8 = 0x42;
-const FASTBOOT_USB_INTERFACE_PROTOCOL: u8 = 0x03;
 
 /// Fastboot Service that handles communicating with a target over the Fastboot protocol.
 ///
@@ -138,18 +122,22 @@ impl InterfaceFactory<Interface> for UsbFactory {
     async fn open(&mut self, target: &Target) -> Result<Interface> {
         let (s, iface) =
             target.usb().context("TargetFactory cannot open target's usb interface")?;
-        let mut in_use = SERIALS_IN_USE.lock().await;
-        let _ = in_use.insert(s.clone());
-        self.serial.replace(s.clone());
-        tracing::debug!("serial now in use: {}", s);
+        global_serials_update(|in_use| {
+            let _ = in_use.insert(s.clone());
+            self.serial.replace(s.clone());
+            tracing::debug!("serial now in use: {}", s);
+        })
+        .await;
         Ok(iface)
     }
 
     async fn close(&self) {
-        let mut in_use = SERIALS_IN_USE.lock().await;
         if let Some(s) = &self.serial {
-            tracing::debug!("dropping in use serial: {}", s);
-            let _ = in_use.remove(s);
+            global_serials_update(|in_use| {
+                tracing::debug!("dropping in use serial: {}", s);
+                let _ = in_use.remove(s);
+            })
+            .await;
         }
     }
 }
@@ -210,106 +198,6 @@ impl fastboot::UploadProgressListener for UploadProgressListener {
     fn on_finished(&self) -> Result<()> {
         self.0.on_finished().map_err(|e| anyhow!(e))
     }
-}
-
-fn is_fastboot_match(info: &InterfaceInfo) -> bool {
-    (info.dev_vendor == 0x18d1)
-        && ((info.dev_product == 0x4ee0)
-            || (info.dev_product == 0x0d02)
-            || (info.dev_product == FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT))
-        && (info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS)
-        && (info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS)
-        && (info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL)
-}
-
-fn extract_serial_number(info: &InterfaceInfo) -> String {
-    let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
-        Some(p) => p,
-        None => {
-            return "".to_string();
-        }
-    };
-    (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string()
-}
-
-fn open_interface<F>(mut cb: F) -> Result<Interface>
-where
-    F: FnMut(&InterfaceInfo) -> bool,
-{
-    tracing::debug!("Selecting USB fastboot interface to open");
-
-    let mut open_cb = |info: &InterfaceInfo| -> bool {
-        if is_fastboot_match(info) {
-            cb(info)
-        } else {
-            // Do not open.
-            false
-        }
-    };
-    Interface::open(&mut open_cb).map_err(Into::into)
-}
-
-fn enumerate_interfaces<F>(mut cb: F)
-where
-    F: FnMut(&InterfaceInfo),
-{
-    tracing::debug!("Enumerating USB fastboot interfaces");
-    let mut cb = |info: &InterfaceInfo| -> bool {
-        if is_fastboot_match(info) {
-            cb(info)
-        }
-        // Do not open anything.
-        false
-    };
-    let _result = Interface::open(&mut cb);
-}
-
-fn find_serial_numbers() -> Vec<String> {
-    let mut serials = Vec::new();
-    let cb = |info: &InterfaceInfo| serials.push(extract_serial_number(info));
-    enumerate_interfaces(cb);
-    serials
-}
-
-pub async fn find_devices() -> Vec<FastbootDevice> {
-    let mut products = Vec::new();
-    let is_disabled: bool = get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false);
-    if is_disabled {
-        return products;
-    }
-
-    tracing::debug!("Discovering fastboot devices via usb");
-
-    let serials = find_serial_numbers();
-    let in_use = SERIALS_IN_USE.lock().await;
-    // Don't probe in-use clients
-    let serials_to_probe = serials.into_iter().filter(|s| !in_use.contains(s));
-    for serial in serials_to_probe {
-        match open_interface_with_serial(&serial) {
-            Ok(mut usb_interface) => {
-                if let Ok(Reply::Okay(version)) =
-                    send(Command::GetVar(ClientVariable::Version), &mut usb_interface).await
-                {
-                    // Only support 0.4 right now.
-                    if version == "0.4".to_string() {
-                        if let Ok(Reply::Okay(product)) =
-                            send(Command::GetVar(ClientVariable::Product), &mut usb_interface).await
-                        {
-                            products.push(FastbootDevice { product, serial: serial.to_string() })
-                        }
-                    }
-                }
-            }
-            Err(e) => tracing::error!("Error opening USB interface: {}", e),
-        }
-    }
-    products
-}
-
-#[tracing::instrument]
-pub fn open_interface_with_serial(serial: &String) -> Result<Interface> {
-    tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
-    open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
 }
 
 pub async fn get_all_vars<T: AsyncRead + AsyncWrite + Unpin>(
