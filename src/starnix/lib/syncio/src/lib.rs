@@ -18,6 +18,7 @@ use std::{
     os::raw::{c_char, c_int, c_uint, c_void},
     pin::Pin,
 };
+use tracing::error;
 use zerocopy::{AsBytes, FromBytes};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
@@ -282,30 +283,37 @@ fn parse_control_messages(data: &[u8]) -> Vec<ControlMessage> {
         let msg_data = &data[pos + CMSG_HEADER_SIZE..pos + header.cmsg_len as usize];
         let msg = match (header.cmsg_level as u32, header.cmsg_type as u32) {
             (zxio::SOL_IP, zxio::IP_TOS) => {
-                ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap())
+                Some(ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap()))
             }
             (zxio::SOL_IP, zxio::IP_TTL) => {
-                ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8)
+                Some(ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8))
             }
             (zxio::SOL_IPV6, zxio::IPV6_TCLASS) => {
-                ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8)
+                Some(ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8))
             }
             (zxio::SOL_IPV6, zxio::IPV6_HOPLIMIT) => {
-                ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap() as u8)
+                Some(ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap() as u8))
             }
             (zxio::SOL_IPV6, zxio::IPV6_PKTINFO) => {
                 let pkt_info = zxio::in6_pktinfo::read_from_prefix(msg_data).unwrap();
-                ControlMessage::Ipv6PacketInfo {
+                Some(ControlMessage::Ipv6PacketInfo {
                     local_addr: unsafe { pkt_info.ipi6_addr.__in6_union.__s6_addr },
                     iface: pkt_info.ipi6_ifindex,
-                }
+                })
             }
-            _ => panic!(
-                "ZXIO produced unexpected cmsg level={}, type={}",
-                header.cmsg_level, header.cmsg_type
-            ),
+            _ => {
+                error!(
+                    tag = "syncio",
+                    "ZXIO produced unexpected cmsg level={}, type={}",
+                    header.cmsg_level,
+                    header.cmsg_type
+                );
+                None
+            }
         };
-        result.push(msg);
+        if let Some(msg) = msg {
+            result.push(msg);
+        }
 
         pos += align_cmsg_size(header.cmsg_len as usize);
     }

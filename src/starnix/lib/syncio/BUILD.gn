@@ -23,6 +23,7 @@ rustc_library("syncio") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
 
