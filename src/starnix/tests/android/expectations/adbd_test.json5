@@ -10,10 +10,27 @@
             ],
         },
         {
+            type: "expect_failure",
+            matchers: [
+                "io.ReadFd*",
+                "adb_utils.mkdirs*",
+                "sysdeps.stat*",
+                "io.WriteFdExactly_whole",
+                "io.WriteFdExactly_partial",
+                "io.WriteFdExactly_string",
+                "io.WriteFdFmt",
+                "LocalSocketTest.read_from_closing_socket",
+            ],
+        },
+        {
             type: "skip",
             matchers: [
-                // This test hangs.
-                "FdeventTest.run_on_looper_thread_queued",
+                // These tests currently time out.
+                "PropertyMonitor*",
+                "sysdeps_fd.*",
+
+                // This test fails but sometimes times out.
+                "LocalSocketTest.close_socket_in_CLOSE_WAIT_state",
             ],
         },
     ],

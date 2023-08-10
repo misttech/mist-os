@@ -15,6 +15,13 @@ group("tests") {
   }
 }
 
+fuchsia_test_component_with_expectations("adbd_test") {
+  manifest = "meta/adbd_test.cml"
+  expectations = "expectations/adbd_test.json5"
+  deps = [ "//src/starnix/tests:starnix_test_with_expectations" ]
+  test_type = "starnix"
+}
+
 fuchsia_test_component_with_expectations("libutils_test") {
   manifest = "meta/libutils_test.cml"
   expectations = "expectations/libutils_test.json5"
@@ -50,6 +57,7 @@ group("container_resources") {
 
 fuchsia_test_package("android") {
   test_components = [
+    ":adbd_test",
     ":boringssl_self_test64",
     ":sh_test",
     ":libutils_test",
