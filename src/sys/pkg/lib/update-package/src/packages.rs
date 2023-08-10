@@ -6,73 +6,18 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_url::PinnedAbsolutePackageUrl,
     serde::{Deserialize, Serialize},
-    thiserror::Error,
 };
 
-// In order to support packages.json with version as a string or int, we define a
-// custom deserializer to parse a value as an int or string.
-//
-// TODO(fxbug.dev/50754) Remove this once we remove support for version as an int.
-fn deserialize_string_or_int<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    struct MyVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for MyVisitor {
-        type Value = String;
-
-        fn expecting(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            fmt.write_str("integer or string")
-        }
-
-        fn visit_u64<E>(self, val: u64) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            self.visit_string(val.to_string())
-        }
-
-        fn visit_str<E>(self, val: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            self.visit_string(val.to_string())
-        }
-
-        fn visit_string<E>(self, val: String) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(val)
-        }
-    }
-
-    deserializer.deserialize_any(MyVisitor)
-}
-
-// While traditionally this should be represented as an enum, instead we
-// use a struct so that we can use a custom deserializer for version.
-// We enforce that version must be 1 in the parse_packages_json fn.
-//
-// TODO(fxbug.dev/50754) Once we remove support for version as an int, we can replace
-// this with something like:
-// #[serde(tag = "version", content = "content", deny_unknown_fields)]
-// enum Packages {
-//     #[serde(rename = "1")]
-//     V1(Vec<PinnedAbsolutePackageUrl>),
-// }
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(deny_unknown_fields)]
-struct Packages {
-    #[serde(deserialize_with = "deserialize_string_or_int")]
-    version: String,
-    content: Vec<PinnedAbsolutePackageUrl>,
+#[serde(tag = "version", content = "content", deny_unknown_fields)]
+enum Packages {
+    #[serde(rename = "1")]
+    V1(Vec<PinnedAbsolutePackageUrl>),
 }
 
 /// ParsePackageError represents any error which might occur while reading
 /// `packages.json` from an update package.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum ParsePackageError {
     #[error("could not open `packages.json`")]
@@ -86,16 +31,11 @@ pub enum ParsePackageError {
 
     #[error("json parsing error while reading `packages.json`")]
     JsonError(#[source] serde_json::error::Error),
-
-    // TODO(fxbug.dev/50754) Remove this error once we remove support for version as an int.
-    // At that point, unsupported versions will surface as Json errors.
-    #[error("packages.json version not supported: '{0}'")]
-    VersionNotSupported(String),
 }
 
 /// SerializePackageError represents any error which might occur while writing
 /// `packages.json` for an update package.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum SerializePackageError {
     #[error("serialization error while constructing `packages.json`")]
@@ -107,8 +47,7 @@ pub fn parse_packages_json(
     contents: &[u8],
 ) -> Result<Vec<PinnedAbsolutePackageUrl>, ParsePackageError> {
     match serde_json::from_slice(contents).map_err(ParsePackageError::JsonError)? {
-        Packages { ref version, content } if version == "1" => Ok(content),
-        Packages { version, .. } => Err(ParsePackageError::VersionNotSupported(version)),
+        Packages::V1(packages) => Ok(packages),
     }
 }
 
@@ -116,8 +55,7 @@ pub fn parse_packages_json(
 pub fn serialize_packages_json(
     pkg_urls: &[PinnedAbsolutePackageUrl],
 ) -> Result<Vec<u8>, SerializePackageError> {
-    serde_json::to_vec(&Packages { version: "1".to_string(), content: pkg_urls.into() })
-        .map_err(SerializePackageError::JsonError)
+    serde_json::to_vec(&Packages::V1(pkg_urls.into())).map_err(SerializePackageError::JsonError)
 }
 
 /// Returns the list of package urls that go in the universe of this update package.
@@ -137,27 +75,24 @@ pub(crate) async fn packages(
 mod tests {
     use {super::*, crate::TestUpdatePackage, assert_matches::assert_matches, serde_json::json};
 
-    fn pkg_urls(v: Vec<&str>) -> Vec<PinnedAbsolutePackageUrl> {
-        v.into_iter().map(|s| PinnedAbsolutePackageUrl::parse(s).unwrap()).collect()
+    fn pkg_urls<'a>(v: impl IntoIterator<Item = &'a str>) -> Vec<PinnedAbsolutePackageUrl> {
+        v.into_iter().map(|s| s.parse().unwrap()).collect()
     }
 
-    // TODO(fxbug.dev/50754) Use the new Packages implementation, which only supports version as a string.
     #[test]
     fn smoke_test_parse_packages_json() {
-        let packages = Packages {
-            version: "1".to_string(),
-            content: pkg_urls(vec![
+        let pkg_urls = pkg_urls([
             "fuchsia-pkg://fuchsia.com/ls/0?hash=71bad1a35b87a073f72f582065f6b6efec7b6a4a129868f37f6131f02107f1ea",
             "fuchsia-pkg://fuchsia.com/pkg-resolver/0?hash=26d43a3fc32eaa65e6981791874b6ab80fae31fbfca1ce8c31ab64275fd4e8c0",
-        ])
-        };
+        ]);
+        let packages = Packages::V1(pkg_urls.clone());
         let packages_json = serde_json::to_vec(&packages).unwrap();
-        assert_eq!(parse_packages_json(&packages_json).unwrap(), packages.content);
+        assert_eq!(parse_packages_json(&packages_json).unwrap(), pkg_urls);
     }
 
     #[test]
     fn smoke_test_serialize_packages_json() {
-        let input = pkg_urls(vec![
+        let input = pkg_urls([
             "fuchsia-pkg://fuchsia.com/ls/0?hash=71bad1a35b87a073f72f582065f6b6efec7b6a4a129868f37f6131f02107f1ea",
             "fuchsia-pkg://fuchsia.com/pkg-resolver/0?hash=26d43a3fc32eaa65e6981791874b6ab80fae31fbfca1ce8c31ab64275fd4e8c0",
         ]);
@@ -174,8 +109,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn smoke_test_packages_json_version_string() {
-        let update_pkg = TestUpdatePackage::new();
-        let pkg_list = vec![
+        let pkg_list = [
             "fuchsia-pkg://fuchsia.com/ls/0?hash=71bad1a35b87a073f72f582065f6b6efec7b6a4a129868f37f6131f02107f1ea",
             "fuchsia-pkg://fuchsia.com/pkg-resolver/0?hash=26d43a3fc32eaa65e6981791874b6ab80fae31fbfca1ce8c31ab64275fd4e8c0",
         ];
@@ -184,24 +118,7 @@ mod tests {
             "content": pkg_list,
         })
         .to_string();
-        let update_pkg = update_pkg.add_file("packages.json", packages).await;
-        assert_eq!(update_pkg.packages().await.unwrap(), pkg_urls(pkg_list));
-    }
-
-    // TODO(fxbug.dev/50754) Remove once we remove support for version as an int.
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn smoke_test_packages_json_version_int() {
-        let update_pkg = TestUpdatePackage::new();
-        let pkg_list = vec![
-            "fuchsia-pkg://fuchsia.com/ls/0?hash=71bad1a35b87a073f72f582065f6b6efec7b6a4a129868f37f6131f02107f1ea",
-            "fuchsia-pkg://fuchsia.com/pkg-resolver/0?hash=26d43a3fc32eaa65e6981791874b6ab80fae31fbfca1ce8c31ab64275fd4e8c0",
-        ];
-        let packages = json!({
-            "version": 1,
-            "content": pkg_list,
-        })
-        .to_string();
-        let update_pkg = update_pkg.add_file("packages.json", packages).await;
+        let update_pkg = TestUpdatePackage::new().add_file("packages.json", packages).await;
         assert_eq!(update_pkg.packages().await.unwrap(), pkg_urls(pkg_list));
     }
 
@@ -213,11 +130,8 @@ mod tests {
         assert_matches!(update_pkg.packages().await, Err(ParsePackageError::JsonError(_)))
     }
 
-    // TODO(fxbug.dev/50754) Once we remove support for packages.json as an int, this should
-    // instead surface as a Json error (rather than a VersionNotSupported error).
     #[fuchsia_async::run_singlethreaded(test)]
     async fn expect_failure_version_not_supported() {
-        let update_pkg = TestUpdatePackage::new();
         let pkg_list = vec![
             "fuchsia-pkg://fuchsia.com/ls/0?hash=71bad1a35b87a073f72f582065f6b6efec7b6a4a129868f37f6131f02107f1ea",
         ];
@@ -226,8 +140,12 @@ mod tests {
             "content": pkg_list,
         })
         .to_string();
-        let update_pkg = update_pkg.add_file("packages.json", packages).await;
-        assert_matches!(update_pkg.packages().await, Err(ParsePackageError::VersionNotSupported(_)))
+        let update_pkg = TestUpdatePackage::new().add_file("packages.json", packages).await;
+        assert_matches!(
+            update_pkg.packages().await,
+            Err(ParsePackageError::JsonError(e))
+                if e.to_string().contains("unknown variant `2`, expected `1`")
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

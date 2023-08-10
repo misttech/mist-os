@@ -104,9 +104,37 @@ func untarNext(dst string, tr *tar.Reader, header *tar.Header) error {
 	return nil
 }
 
+// A StringOr1 is a string that can be unmarshalled from a JSON field that is
+// either a string or the number 1. If the field is the number 1 it will be
+// converted to the string "1".
+type StringOr1 string
+
+func (fi *StringOr1) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] != '"' {
+		var i int
+		if err := json.Unmarshal(b, &i); err != nil {
+			return err
+		}
+		if i == 1 {
+			*fi = StringOr1("1")
+			return nil
+		}
+		return fmt.Errorf("if version is an int it must be 1, but was %v", i)
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*fi = StringOr1(s)
+	return nil
+}
+
 type PackageJSON struct {
-	Version json.Number `json:"version"`
-	Content []string    `json:"content"`
+	// The update package initially used an int instead of a string for the
+	// version, and we test that we are still able to update from a build
+	// from that era, so we need to be able to read both formats.
+	Version StringOr1 `json:"version"`
+	Content []string  `json:"content"`
 }
 
 func DecodePackagesJSON(rd io.Reader) (*PackageJSON, error) {

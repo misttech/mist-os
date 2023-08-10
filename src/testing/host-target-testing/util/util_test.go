@@ -39,29 +39,39 @@ func TestParsePackagesJSON(t *testing.T) {
 		},
 		{
 			id:        "invalid version fails",
-			json:      []byte(`{"version":"42"}`),
+			json:      []byte(`{"version":"42","content":[]}`),
 			expectErr: true,
 		},
 		{
-			id:        "numeric, contentless version succeeds",
-			json:      []byte(`{"version":1}`),
+			id:        "numeric 1 succeeds",
+			json:      []byte(`{"version":1,"content":[]}`),
+			expectErr: false,
+		},
+		{
+			id:        "numeric 2 fails",
+			json:      []byte(`{"version":2,"content":[]}`),
+			expectErr: true,
+		},
+		{
+			id:        "contentless version succeeds",
+			json:      []byte(`{"version":"1"}`),
 			expectErr: false,
 		},
 		{
 			id:        "variant-less package succeeds",
-			json:      []byte(fmt.Sprintf(`{"version":1,"content":["%s"]}`, pkgURL("pkg", "abc"))),
+			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s"]}`, pkgURL("pkg", "abc"))),
 			pkgs:      []pkgMerkle{{"pkg", "abc"}},
 			expectErr: false,
 		},
 		{
 			id:        "variant package succeeds",
-			json:      []byte(fmt.Sprintf(`{"version":1,"content":["%s"]}`, pkgURL("pkg/0", "abc"))),
+			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s"]}`, pkgURL("pkg/0", "abc"))),
 			pkgs:      []pkgMerkle{{"pkg/0", "abc"}},
 			expectErr: false,
 		},
 		{
 			id:        "multiple packages succeed",
-			json:      []byte(fmt.Sprintf(`{"version":1,"content":["%s","%s"]}`, pkgURL("pkg/0", "abc"), pkgURL("another/0", "def"))),
+			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s","%s"]}`, pkgURL("pkg/0", "abc"), pkgURL("another/0", "def"))),
 			pkgs:      []pkgMerkle{{"pkg/0", "abc"}, {"another/0", "def"}},
 			expectErr: false,
 		},
@@ -97,16 +107,33 @@ func TestParsePackagesJSON(t *testing.T) {
 }
 
 func TestRehostPackagesJSON(t *testing.T) {
-	json := []byte(fmt.Sprintf(`{"version":1,"content":["%s","%s"]}`, pkgURL("pkg/0", "abc"), pkgURL("another/0", "def")))
-	r := bytes.NewBuffer(json)
-	var b bytes.Buffer
-	err := RehostPackagesJSON(r, &b, "new")
-	if err != nil {
-		t.Errorf("RehostPackagesJSON failed: %v", err)
+	tests := []struct {
+		id       string
+		json     []byte
+		expected string
+	}{
+		{
+			id:       "regular update package",
+			json:     []byte(fmt.Sprintf(`{"version":"1","content":["%s","%s"]}`, pkgURL("pkg/0", "abc"), pkgURL("another/0", "def"))),
+			expected: `{"version":"1","content":["fuchsia-pkg://new/pkg/0?hash=abc","fuchsia-pkg://new/another/0?hash=def"]}`,
+		},
+		{
+			id:       "numeric version 1 converted to string",
+			json:     []byte(`{"version":1,"content":[]}`),
+			expected: `{"version":"1","content":[]}`,
+		},
 	}
-	expected := `{"version":1,"content":["fuchsia-pkg://new/pkg/0?hash=abc","fuchsia-pkg://new/another/0?hash=def"]}`
-	actual := strings.TrimSpace(b.String())
-	if actual != expected {
-		t.Errorf("packages.json does not match, expected '%s', got '%s'", expected, actual)
+
+	for _, test := range tests {
+		r := bytes.NewBuffer(test.json)
+		var b bytes.Buffer
+		err := RehostPackagesJSON(r, &b, "new")
+		if err != nil {
+			t.Errorf("test %s: RehostPackagesJSON failed: %v", test.id, err)
+		}
+		actual := strings.TrimSpace(b.String())
+		if actual != test.expected {
+			t.Errorf("test %s: packages.json does not match, expected '%s', got '%s'", test.id, test.expected, actual)
+		}
 	}
 }
