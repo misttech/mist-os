@@ -4,6 +4,7 @@
 
 import("//build/bind/bind.gni")
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.realtek.platform") {
   source = "fuchsia.realtek.platform.bind"
 }

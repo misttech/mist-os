@@ -4,6 +4,7 @@
 
 import("//build/bind/bind.gni")
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.amlogic.platform.s912") {
   source = "fuchsia.amlogic.platform.s912.bind"
 }

@@ -4,6 +4,7 @@
 
 import("//build/bind/bind.gni")
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.ninety_six_boards.platform") {
   source = "fuchsia.ninety_six_boards.platform.bind"
 }

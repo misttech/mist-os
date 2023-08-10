@@ -4,6 +4,7 @@
 
 import("//build/bind/bind.gni")
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.hardware.goldfish.sync") {
   source = "fuchsia.hardware.goldfish.sync.bind"
 }

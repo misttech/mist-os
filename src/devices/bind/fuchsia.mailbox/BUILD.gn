@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.mailbox") {
   source = "fuchsia.mailbox.bind"
 }

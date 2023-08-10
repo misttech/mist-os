@@ -4,11 +4,13 @@
 
 import("//build/bind/bind.gni")
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.pci") {
   sdk_category = "experimental"
   source = "fuchsia.pci.bind"
 }
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.pci.serial") {
   source = "fuchsia.pci.serial.bind"
 }
@@ -17,6 +19,7 @@ group("serial") {
   public_deps = [ ":fuchsia.pci.serial" ]
 }
 
+# TODO(fxb/131608): Move sdk category to partner.
 bind_library("fuchsia.pci.serial.usb") {
   source = "fuchsia.pci.serial.usb.bind"
 }
