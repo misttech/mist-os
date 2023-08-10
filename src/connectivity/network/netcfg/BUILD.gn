@@ -140,18 +140,6 @@ config_data("config-default") {
   outputs = [ "default.json" ]
 }
 
-config_data("config-no-ssh-over-wlan") {
-  for_pkg = "netcfg"
-  sources = [ "config/no_ssh_over_wlan.json" ]
-  outputs = [ "default.json" ]
-}
-
-config_data("config-prefer-wired") {
-  for_pkg = "netcfg"
-  sources = [ "config/prefer_wired.json" ]
-  outputs = [ "default.json" ]
-}
-
 fuchsia_unittest_package("netcfg-tests") {
   deps = [ ":lib_test" ]
   manifest = "meta/netcfg_lib_test.cml"

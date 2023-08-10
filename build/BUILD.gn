@@ -364,8 +364,6 @@ group("config_data_template_allowlist") {
     "//src/cobalt/bin/app:*",
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:config-default",
     "//src/connectivity/network/netcfg:config-default",
-    "//src/connectivity/network/netcfg:config-no-ssh-over-wlan",
-    "//src/connectivity/network/netcfg:config-prefer-wired",
     "//src/connectivity/weave/weavestack:config",
     "//src/connectivity/wlan/wlancfg:config",
     "//src/developer/forensics:exceptions_enable_jitd_on_startup",
