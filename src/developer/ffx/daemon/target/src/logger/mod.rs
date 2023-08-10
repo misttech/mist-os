@@ -55,7 +55,7 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
         streamer
             .append_logs(vec![LogEntry {
                 data: LogData::FfxEvent(EventType::LoggingStarted),
-                version: 1,
+                version: Some(1),
                 timestamp: get_timestamp()?,
             }])
             .await?;
@@ -179,7 +179,7 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
                                 Err(_) => LogData::MalformedTargetLog(inline.data),
                             };
 
-                            vec![LogEntry { data, timestamp: ts, version: 1 }]
+                            vec![LogEntry { data, timestamp: ts, version: Some(1) }]
                         }
                         DiagnosticsData::Socket(socket) => {
                             // This is the long log side,
@@ -191,7 +191,11 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
                                 Err(data) => vec![LogData::MalformedTargetLog(data)],
                             };
                             data.into_iter()
-                                .map(|data: LogData| LogEntry { data, timestamp: ts, version: 1 })
+                                .map(|data: LogData| LogEntry {
+                                    data,
+                                    timestamp: ts,
+                                    version: Some(1),
+                                })
                                 .collect()
                         }
                     }
@@ -706,7 +710,7 @@ mod test {
         LogEntry {
             data: LogData::FfxEvent(EventType::LoggingStarted),
             timestamp: Timestamp::from(0),
-            version: 1,
+            version: Some(1),
         }
     }
 
@@ -714,7 +718,7 @@ mod test {
         LogEntry {
             data: LogData::FfxEvent(EventType::TargetDisconnected),
             timestamp: Timestamp::from(0),
-            version: 1,
+            version: Some(1),
         }
     }
 
@@ -722,19 +726,19 @@ mod test {
         LogEntry {
             data: LogData::MalformedTargetLog(s.to_string()),
             timestamp: Timestamp::from(0),
-            version: 1,
+            version: Some(1),
         }
     }
 
     fn valid_log(data: LogsData) -> LogEntry {
-        LogEntry { data: LogData::TargetLog(data), timestamp: Timestamp::from(0), version: 1 }
+        LogEntry { data: LogData::TargetLog(data), timestamp: Timestamp::from(0), version: Some(1) }
     }
 
     fn symbolized_log(data: LogsData, msg: &str) -> LogEntry {
         LogEntry {
             data: LogData::SymbolizedTargetLog(data, msg.to_string()),
             timestamp: Timestamp::from(0),
-            version: 1,
+            version: Some(1),
         }
     }
 

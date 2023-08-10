@@ -854,7 +854,7 @@ mod test {
 
     fn make_log_entry(log_data: LogData) -> LogEntry {
         LogEntry {
-            version: 1,
+            version: Some(1),
             timestamp: Timestamp::from(default_ts().as_nanos() as i64),
             data: log_data,
         }
@@ -883,7 +883,7 @@ mod test {
     fn log_entry() -> LogEntry {
         LogEntry {
             timestamp: 0.into(),
-            version: 1,
+            version: Some(1),
             data: LogData::TargetLog(
                 logs_data_builder().add_tag("tag1").add_tag("tag2").set_message("message").build(),
             ),
@@ -2224,7 +2224,7 @@ mod test {
                 LogEntry {
                     data: LogData::TargetLog(logs_data_builder().build()),
                     timestamp: 0.into(),
-                    version: 0,
+                    version: Some(0),
                 },
                 formatter.has_previous_log
             )
@@ -2252,7 +2252,7 @@ mod test {
                         logs_data_builder().set_message("multi\nline\nmessage").build()
                     ),
                     timestamp: 0.into(),
-                    version: 0
+                    version: Some(0)
                 },
                 formatter.has_previous_log,
             )
@@ -2288,7 +2288,7 @@ mod test {
                             .build()
                     ),
                     timestamp: 0.into(),
-                    version: 0,
+                    version: Some(0),
                 },
                 formatter.has_previous_log,
             )
@@ -2321,7 +2321,7 @@ mod test {
                 LogEntry {
                     data: LogData::TargetLog(message_with_file_and_line.clone()),
                     timestamp: 0.into(),
-                    version: 0
+                    version: Some(0)
                 },
                 formatter.has_previous_log,
             )
@@ -2341,7 +2341,7 @@ mod test {
                             .build()
                     ),
                     timestamp: 0.into(),
-                    version: 0,
+                    version: Some(0),
                 },
                 formatter.has_previous_log,
             )
@@ -2363,7 +2363,7 @@ mod test {
                 LogEntry {
                     data: LogData::TargetLog(message_with_file_and_line),
                     timestamp: 0.into(),
-                    version: 0
+                    version: Some(0)
                 },
                 formatter.has_previous_log,
             )
@@ -2418,7 +2418,7 @@ mod test {
                 LogEntry {
                     data: LogData::TargetLog(message_with_file_and_line),
                     timestamp: 0.into(),
-                    version: 0
+                    version: Some(0)
                 },
                 formatter.has_previous_log
             )

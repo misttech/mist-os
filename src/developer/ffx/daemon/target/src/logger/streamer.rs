@@ -995,7 +995,7 @@ mod test {
     fn make_malformed_log(ts: i64) -> LogEntry {
         LogEntry {
             data: LogData::MalformedTargetLog("fake log data".to_string()),
-            version: 1,
+            version: Some(1),
             timestamp: ts.into(),
         }
     }
@@ -1003,7 +1003,7 @@ mod test {
     fn make_valid_log(ts: i64, msg: String) -> LogEntry {
         LogEntry {
             data: LogData::TargetLog(make_target_log(ts, msg)),
-            version: 1,
+            version: Some(1),
             timestamp: Timestamp::from(ts),
         }
     }

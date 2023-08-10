@@ -1179,7 +1179,7 @@ mod test {
 
     fn make_log_entry(log_data: LogData) -> LogEntry {
         LogEntry {
-            version: 1,
+            version: Some(1),
             timestamp: Timestamp::from(default_ts().as_nanos() as i64),
             data: log_data,
         }

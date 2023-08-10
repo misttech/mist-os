@@ -30,14 +30,14 @@ pub enum LogData {
 pub struct LogEntry {
     pub data: LogData,
     pub timestamp: Timestamp,
-    pub version: u64,
+    pub version: Option<u64>,
 }
 
 impl LogEntry {
     pub fn new(data: LogData) -> Result<Self> {
         Ok(LogEntry {
             data: data,
-            version: 1,
+            version: Some(1),
             timestamp: Timestamp::from(
                 SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -185,7 +185,7 @@ mod test {
     fn symbolized_entry() -> LogEntry {
         LogEntry {
             data: LogData::SymbolizedTargetLog(expected_log_data(), "symbolized".to_string()),
-            version: 1,
+            version: Some(1),
             timestamp: Timestamp::from(1623435958093957000i64),
         }
     }
@@ -207,7 +207,7 @@ mod test {
     fn expected_log_entry() -> LogEntry {
         LogEntry {
             data: LogData::TargetLog(expected_log_data()),
-            version: 1,
+            version: Some(1),
             timestamp: Timestamp::from(1623435958093957000i64),
         }
     }
