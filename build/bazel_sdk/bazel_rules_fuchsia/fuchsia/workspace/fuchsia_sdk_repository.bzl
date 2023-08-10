@@ -65,6 +65,11 @@ def _merge_rules_fuchsia(ctx):
     rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
     ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
+    # LINT.IfChange
+    # Link the common directory so that we can later use it as its own repo.
+    ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
+    # LINT.ThenChange(rules_fuchsia_deps.bzl)
+
     rules_fuchsia_build = ctx.read(rules_fuchsia_root.get_child("BUILD.bazel")).split("\n")
     start, end = [
         i

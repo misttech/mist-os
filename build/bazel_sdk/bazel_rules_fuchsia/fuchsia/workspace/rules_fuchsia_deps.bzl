@@ -11,9 +11,28 @@ load(
     "assert_bazel_version",
 )
 
+#TODO(b/295359013) uncomment when we are ready to use these.
+# def _fuchsia_sdk_common_repository_impl(ctx):
+#     root = ctx.path(ctx.attr._fuchsia_sdk_workspace)
+#     ctx.symlink(root.dirname.get_child("common"), ".")
+
+# _fuchsia_sdk_common_repository = repository_rule(
+#     implementation = _fuchsia_sdk_common_repository_impl,
+#     attrs = {
+#         "_fuchsia_sdk_workspace": attr.label(allow_single_file = True, default = "@fuchsia_sdk//:WORKSPACE.bazel")
+#     }
+# )
+
 # buildifier: disable=function-docstring
 def rules_fuchsia_deps():
     assert_bazel_version(min = "6.0.0")
+
+    #TODO(b/295359013) Make bazel_sdk_common available to be used by fuchsia_clang_repository
+    #once b/295358711 is finished.
+    # _fuchsia_sdk_common_repository(
+    #     name = "fuchsia_sdk_common",
+    # )
+
     maybe(
         name = "rules_python",
         repo_rule = http_archive,

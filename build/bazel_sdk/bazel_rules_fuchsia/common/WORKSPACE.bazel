@@ -1,1 +1,1 @@
-workspace(name = "bazel_sdk_common")
+workspace(name = "fuchsia_sdk_common")

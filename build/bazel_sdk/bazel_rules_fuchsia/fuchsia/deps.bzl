@@ -24,9 +24,12 @@ load(
 )
 
 # See corresponding `.bzl` files in fuchsia/private for documentation.
-fuchsia_clang_repository = _fuchsia_clang_repository
-fuchsia_clang_ext = _fuchsia_clang_ext
 fuchsia_sdk_repository = _fuchsia_sdk_repository
 fuchsia_sdk_ext = _fuchsia_sdk_ext
 rules_fuchsia_deps = _rules_fuchsia_deps
 python_runtime_repository = _python_runtime_repository
+
+#TODO(b/295358711) Remove these definitions from here once users have move to loading
+#them from clang.bzl.
+fuchsia_clang_repository = _fuchsia_clang_repository
+fuchsia_clang_ext = _fuchsia_clang_ext
