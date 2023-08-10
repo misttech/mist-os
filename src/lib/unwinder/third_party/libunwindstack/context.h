@@ -136,7 +136,13 @@ constexpr auto kCurrentArch = Registers::Arch::kRiscv64;
   AsmGetRegs(regs);
 
   Registers res(kCurrentArch);
-  for (uint8_t i = 0; i < kRegLast; i++) {
+  uint8_t i = 0;
+  if constexpr (kCurrentArch == Registers::Arch::kRiscv64) {
+    // RegisterID::kRiscv64_pc is not 0.
+    res.SetPC(regs[0]);
+    i = 1;
+  }
+  for (; i < kRegLast; i++) {
     res.Set(static_cast<RegisterID>(i), regs[i]);
   }
   return res;

@@ -38,7 +38,9 @@ unwinder::Registers FromFuchsiaRegisters(const zx_thread_state_general_regs_t& r
   }
 #elif defined(__riscv)
   unwinder::Registers res(unwinder::Registers::Arch::kRiscv64);
-  for (int i = 0; i < static_cast<int>(unwinder::RegisterID::kRiscv64_last); i++) {
+  // RegisterID::kRiscv64_pc is not 0.
+  res.SetPC(regs.pc);
+  for (int i = 1; i < static_cast<int>(unwinder::RegisterID::kRiscv64_last); i++) {
     res.Set(static_cast<unwinder::RegisterID>(i), reinterpret_cast<const uint64_t*>(&regs)[i]);
   }
 #else

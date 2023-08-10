@@ -40,18 +40,18 @@ namespace {
 
 using debug::RegisterID;
 
-RegisterID GetRegisterID(const ParsedIdentifier& ident) {
+RegisterID GetRegisterID(debug::Arch arch, const ParsedIdentifier& ident) {
   // Check for explicit register identifier annotation.
   if (ident.components().size() == 1 &&
       ident.components()[0].special() == SpecialIdentifier::kRegister) {
-    return debug::StringToRegisterID(ident.components()[0].name());
+    return debug::StringToRegisterID(arch, ident.components()[0].name());
   }
 
   // Try to convert the identifier string to a register name.
   auto str = GetSingleComponentIdentifierName(ident);
   if (!str)
     return debug::RegisterID::kUnknown;
-  return debug::StringToRegisterID(*str);
+  return debug::StringToRegisterID(arch, *str);
 }
 
 Err GetUnavailableRegisterErr(RegisterID id) {
@@ -180,7 +180,7 @@ void EvalContextImpl::GetNamedValue(const ParsedIdentifier& identifier, EvalCall
     }
   }
 
-  auto reg = GetRegisterID(identifier);
+  auto reg = GetRegisterID(data_provider_->GetArch(), identifier);
   if (reg == RegisterID::kUnknown || debug::GetArchForRegisterID(reg) != data_provider_->GetArch())
     return cb(Err("No variable '%s' found.", identifier.GetFullName().c_str()));
 

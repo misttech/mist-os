@@ -113,6 +113,8 @@ ErrOr<TargetPointer> UnsafeStackPointerAddress(Thread* thread) {
       thread_reg = debug::RegisterID::kARMv8_tpidr;
       safe_stack_offset = -0x8;
       break;
+    case debug::Arch::kRiscv64:
+      return Err("Not implemented on RISC-V 64 yet.");
   }
 
   Stack& stack = thread->GetStack();

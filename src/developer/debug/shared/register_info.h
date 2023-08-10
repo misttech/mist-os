@@ -69,7 +69,7 @@ const RegisterInfo* InfoForRegister(RegisterID id);
 const RegisterInfo* InfoForRegister(Arch arch, const std::string& name);
 
 const char* RegisterIDToString(RegisterID);
-RegisterID StringToRegisterID(const std::string&);
+RegisterID StringToRegisterID(Arch arch, const std::string&);
 
 // Returns the register ID for the given special register.
 RegisterID GetSpecialRegisterID(Arch, SpecialRegisterType);
@@ -118,6 +118,15 @@ constexpr uint32_t kX64VectorBegin = 2200;
 constexpr uint32_t kX64VectorEnd = 2599;
 constexpr uint32_t kX64DebugBegin = 2600;
 constexpr uint32_t kX64DebugEnd = 2699;
+
+constexpr uint32_t kRiscv64GeneralBegin = 3000;
+constexpr uint32_t kRiscv64GeneralEnd = 3099;
+constexpr uint32_t kRiscv64FPBegin = 3100;
+constexpr uint32_t kRiscv64FPEnd = 3299;
+constexpr uint32_t kRiscv64VectorBegin = 3300;
+constexpr uint32_t kRiscv64VectorEnd = 3599;
+constexpr uint32_t kRiscv64DebugBegin = 3600;
+constexpr uint32_t kRiscv64DebugEnd = 3699;
 
 // Categories --------------------------------------------------------------------------------------
 

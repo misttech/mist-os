@@ -52,7 +52,7 @@ std::string X64PageFaultToString(const debug_ipc::ExceptionRecord& record) {
 
 std::string X64ExceptionRecordToString(const debug_ipc::ExceptionRecord& record) {
   switch (record.arch.x64.vector) {
-    // clang-format off
+      // clang-format off
     case  0: return "Divide-by-zero exception";
     case  1: return "Debug exception";
     case  2: return "Non-maskable interrupt";
@@ -99,7 +99,7 @@ std::string Arm64DataAbortToString(const debug_ipc::ExceptionRecord& record) {
   uint32_t dfsc = record.arch.arm64.esr & 0b111111;
   const char* status = nullptr;
   switch (dfsc) {
-    // clang-format off
+      // clang-format off
     case 0b000000: status = "address size fault level 0"; break;
     case 0b000001: status = "address size fault level 1"; break;
     case 0b000010: status = "address size fault level 2"; break;
@@ -151,7 +151,7 @@ std::string Arm64ExceptionRecordToString(const debug_ipc::ExceptionRecord& recor
   // https://developer.arm.com/docs/ddi0595/e/aarch64-system-registers/esr_el1
   // Many of these we will never encounter at the user level but it's safer to be exhaustive.
   switch (ec) {
-    // clang-format off
+      // clang-format off
     case 0b000000: return "Unknown exception";
     case 0b000001: return "Trapped WFI or WFE execution";
     case 0b000011: return "Wrapped MCR or MRC access";
@@ -252,9 +252,9 @@ std::string ExceptionRecordToString(debug::Arch arch, const debug_ipc::Exception
       return X64ExceptionRecordToString(record) + suffix;
     case debug::Arch::kArm64:
       return Arm64ExceptionRecordToString(record) + suffix;
+    case debug::Arch::kRiscv64:
+      return "Not implemented on RISC-V 64 yet";
   }
-  FX_NOTREACHED();
-  return std::string();
 }
 
 }  // namespace zxdb

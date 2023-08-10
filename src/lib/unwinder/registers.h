@@ -80,9 +80,7 @@ enum class RegisterID : uint8_t {
 
   // riscv64. https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-dwarf.adoc
   // The name is chosen to keep consistency with zx_riscv64_thread_state_general_regs_t.
-  // Use 0 to store pc instead of zero as riscv64 spec doesn't specify the dwarf id for pc, and we
-  // want some consistency across different arches and with zircon.
-  kRiscv64_pc = 0,
+  kRiscv64_zero = 0,
   kRiscv64_ra = 1,
   kRiscv64_sp = 2,
   kRiscv64_gp = 3,
@@ -115,6 +113,12 @@ enum class RegisterID : uint8_t {
   kRiscv64_t5 = 30,
   kRiscv64_t6 = 31,
   kRiscv64_last,
+
+  // RISC-V DWARF Specification doesn't allocate a DWARF number for PC but do have a virtual
+  // register "Alternate Frame Return Column". We use this for PC so that
+  //  1) It matches the behavior on x64, where we use Return Address to represent RIP.
+  //  2) The same logic to unwind from an async frame can be reused.
+  kRiscv64_pc = 64,
 
   kInvalid = static_cast<uint8_t>(-1),
 };

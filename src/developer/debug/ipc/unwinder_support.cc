@@ -30,7 +30,8 @@ std::vector<debug_ipc::StackFrame> ConvertFrames(const std::vector<unwinder::Fra
         arch = debug::Arch::kArm64;
         break;
       case unwinder::Registers::Arch::kRiscv64:
-        FX_NOTIMPLEMENTED();
+        arch = debug::Arch::kRiscv64;
+        break;
     }
     frame_regs.reserve(frame.regs.size());
     for (auto& [reg_id, val] : frame.regs) {

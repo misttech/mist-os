@@ -32,6 +32,14 @@ TEST(RegisterDesc, DWARFToRegisterInfo_x64) {
   EXPECT_EQ(RegisterID::kX64_xmm31, DWARFToRegisterInfo(Arch::kX64, 82)->id);
 }
 
+TEST(RegisterDesc, DWARFToRegisterInfo_Riscv) {
+  EXPECT_EQ(RegisterID::kRiscv64_ra, DWARFToRegisterInfo(Arch::kRiscv64, 1)->id);
+  EXPECT_EQ(RegisterID::kRiscv64_tp, DWARFToRegisterInfo(Arch::kRiscv64, 4)->id);
+  EXPECT_EQ(RegisterID::kRiscv64_a0, DWARFToRegisterInfo(Arch::kRiscv64, 10)->id);
+  EXPECT_EQ(RegisterID::kRiscv64_s10, DWARFToRegisterInfo(Arch::kRiscv64, 26)->id);
+  EXPECT_EQ(RegisterID::kRiscv64_pc, DWARFToRegisterInfo(Arch::kRiscv64, 64)->id);
+}
+
 TEST(RegisterIDToCategory, Border) {
   auto IDToCat = RegisterIDToCategory;
   EXPECT_EQ(IDToCat(RegisterID::kUnknown), RegisterCategory::kNone);
@@ -216,6 +224,15 @@ TEST(RegisterIDToCategory, x64) {
   EXPECT_EQ(IDToCat(RegisterID::kX64_dr3), RegisterCategory::kDebug);
   EXPECT_EQ(IDToCat(RegisterID::kX64_dr6), RegisterCategory::kDebug);
   EXPECT_EQ(IDToCat(RegisterID::kX64_dr7), RegisterCategory::kDebug);
+}
+
+TEST(RegisterIDToCategory, Riscv64) {
+  auto IDToCat = RegisterIDToCategory;
+
+  // General.
+  EXPECT_EQ(IDToCat(RegisterID::kRiscv64_ra), RegisterCategory::kGeneral);
+  EXPECT_EQ(IDToCat(RegisterID::kRiscv64_x1), RegisterCategory::kGeneral);
+  EXPECT_EQ(IDToCat(RegisterID::kRiscv64_pc), RegisterCategory::kGeneral);
 }
 
 TEST(RegisterIDToString, Registers) {
@@ -406,6 +423,45 @@ TEST(RegisterIDToString, Registers) {
   EXPECT_STREQ("dr3", RegisterIDToString(RegisterID::kX64_dr3));
   EXPECT_STREQ("dr6", RegisterIDToString(RegisterID::kX64_dr6));
   EXPECT_STREQ("dr7", RegisterIDToString(RegisterID::kX64_dr7));
+
+  EXPECT_STREQ("zero", RegisterIDToString(RegisterID::kRiscv64_zero));
+  EXPECT_STREQ("ra", RegisterIDToString(RegisterID::kRiscv64_ra));
+  EXPECT_STREQ("sp", RegisterIDToString(RegisterID::kRiscv64_sp));
+  EXPECT_STREQ("gp", RegisterIDToString(RegisterID::kRiscv64_gp));
+  EXPECT_STREQ("tp", RegisterIDToString(RegisterID::kRiscv64_tp));
+  EXPECT_STREQ("t0", RegisterIDToString(RegisterID::kRiscv64_t0));
+  EXPECT_STREQ("t1", RegisterIDToString(RegisterID::kRiscv64_t1));
+  EXPECT_STREQ("t2", RegisterIDToString(RegisterID::kRiscv64_t2));
+  EXPECT_STREQ("s0", RegisterIDToString(RegisterID::kRiscv64_s0));
+  EXPECT_STREQ("s1", RegisterIDToString(RegisterID::kRiscv64_s1));
+  EXPECT_STREQ("a0", RegisterIDToString(RegisterID::kRiscv64_a0));
+  EXPECT_STREQ("a1", RegisterIDToString(RegisterID::kRiscv64_a1));
+  EXPECT_STREQ("a2", RegisterIDToString(RegisterID::kRiscv64_a2));
+  EXPECT_STREQ("a3", RegisterIDToString(RegisterID::kRiscv64_a3));
+  EXPECT_STREQ("a4", RegisterIDToString(RegisterID::kRiscv64_a4));
+  EXPECT_STREQ("a5", RegisterIDToString(RegisterID::kRiscv64_a5));
+  EXPECT_STREQ("a6", RegisterIDToString(RegisterID::kRiscv64_a6));
+  EXPECT_STREQ("a7", RegisterIDToString(RegisterID::kRiscv64_a7));
+  EXPECT_STREQ("s2", RegisterIDToString(RegisterID::kRiscv64_s2));
+  EXPECT_STREQ("s3", RegisterIDToString(RegisterID::kRiscv64_s3));
+  EXPECT_STREQ("s4", RegisterIDToString(RegisterID::kRiscv64_s4));
+  EXPECT_STREQ("s5", RegisterIDToString(RegisterID::kRiscv64_s5));
+  EXPECT_STREQ("s6", RegisterIDToString(RegisterID::kRiscv64_s6));
+  EXPECT_STREQ("s7", RegisterIDToString(RegisterID::kRiscv64_s7));
+  EXPECT_STREQ("s8", RegisterIDToString(RegisterID::kRiscv64_s8));
+  EXPECT_STREQ("s9", RegisterIDToString(RegisterID::kRiscv64_s9));
+  EXPECT_STREQ("s10", RegisterIDToString(RegisterID::kRiscv64_s10));
+  EXPECT_STREQ("s11", RegisterIDToString(RegisterID::kRiscv64_s11));
+  EXPECT_STREQ("t3", RegisterIDToString(RegisterID::kRiscv64_t3));
+  EXPECT_STREQ("t4", RegisterIDToString(RegisterID::kRiscv64_t4));
+  EXPECT_STREQ("t5", RegisterIDToString(RegisterID::kRiscv64_t5));
+  EXPECT_STREQ("t6", RegisterIDToString(RegisterID::kRiscv64_t6));
+
+  EXPECT_STREQ("x3", RegisterIDToString(RegisterID::kRiscv64_x3));
+  EXPECT_STREQ("x4", RegisterIDToString(RegisterID::kRiscv64_x4));
+  EXPECT_STREQ("x5", RegisterIDToString(RegisterID::kRiscv64_x5));
+  EXPECT_STREQ("x6", RegisterIDToString(RegisterID::kRiscv64_x6));
+  EXPECT_STREQ("pc", RegisterIDToString(RegisterID::kRiscv64_pc));
 }
 
 TEST(RegisterDesc, GetRegisterData) {

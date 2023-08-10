@@ -52,9 +52,9 @@ const RegisterInfo kRegisterInfo[] = {
     {.id = RegisterID::kARMv8_x27, .name = "x27", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x27, .bits = 64, .dwarf_id = 27},
     {.id = RegisterID::kARMv8_x28, .name = "x28", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x28, .bits = 64, .dwarf_id = 28},
     {.id = RegisterID::kARMv8_x29, .name = "x29", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x29, .bits = 64, .dwarf_id = 29},
-    {.id = RegisterID::kARMv8_lr,  .name = "lr",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_lr,  .bits = 64, .dwarf_id = 30, .format = RegisterFormat::kVoidAddress},
+    {.id = RegisterID::kARMv8_lr,  .name = "lr",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_lr,  .bits = 64, .dwarf_id = 30, .format = RegisterFormat::kWordAddress},
     {.id = RegisterID::kARMv8_sp,  .name = "sp",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_sp,  .bits = 64, .dwarf_id = 31, .format = RegisterFormat::kWordAddress},
-    {.id = RegisterID::kARMv8_pc,  .name = "pc",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_pc,  .bits = 64, .dwarf_id = 32, .format = RegisterFormat::kVoidAddress},
+    {.id = RegisterID::kARMv8_pc,  .name = "pc",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_pc,  .bits = 64, .dwarf_id = 32, .format = RegisterFormat::kWordAddress},
     {.id = RegisterID::kARMv8_tpidr, .name = "tpidr", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_tpidr, .bits = 64, .dwarf_id = 36},
 
     {.id = RegisterID::kARMv8_cpsr, .name = "cpsr", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_cpsr, .bits = 64, .format = RegisterFormat::kSpecial},
@@ -483,6 +483,82 @@ const RegisterInfo kRegisterInfo[] = {
     {.id = RegisterID::kX64_dr3, .name = "dr3", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_dr3, .bits = 64, .format = RegisterFormat::kVoidAddress},
     {.id = RegisterID::kX64_dr6, .name = "dr6", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_dr6, .bits = 64, .format = RegisterFormat::kSpecial},
     {.id = RegisterID::kX64_dr7, .name = "dr7", .arch = Arch::kX64, .canonical_id = RegisterID::kX64_dr7, .bits = 64, .format = RegisterFormat::kSpecial},
+
+    // RISC-V 64
+    // ---------------------------------------------------------------------------------------------
+
+    // General purpose.
+
+    {.id = RegisterID::kRiscv64_zero, .name = "zero", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_zero, .bits = 64, .dwarf_id = 0},
+    {.id = RegisterID::kRiscv64_ra,  .name = "ra",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_ra,  .bits = 64, .dwarf_id = 1, .format = RegisterFormat::kWordAddress},
+    {.id = RegisterID::kRiscv64_sp,  .name = "sp",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_sp,  .bits = 64, .dwarf_id = 2, .format = RegisterFormat::kWordAddress},
+    {.id = RegisterID::kRiscv64_gp,  .name = "gp",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_gp,  .bits = 64, .dwarf_id = 3, .format = RegisterFormat::kWordAddress},
+    {.id = RegisterID::kRiscv64_tp,  .name = "tp",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_tp,  .bits = 64, .dwarf_id = 4, .format = RegisterFormat::kWordAddress},
+    {.id = RegisterID::kRiscv64_t0,  .name = "t0",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t0,  .bits = 64, .dwarf_id = 5},
+    {.id = RegisterID::kRiscv64_t1,  .name = "t1",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t1,  .bits = 64, .dwarf_id = 6},
+    {.id = RegisterID::kRiscv64_t2,  .name = "t2",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t2,  .bits = 64, .dwarf_id = 7},
+    {.id = RegisterID::kRiscv64_s0,  .name = "s0",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s0,  .bits = 64, .dwarf_id = 8},
+    {.id = RegisterID::kRiscv64_s1,  .name = "s1",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s1,  .bits = 64, .dwarf_id = 9},
+    {.id = RegisterID::kRiscv64_a0,  .name = "a0",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a0,  .bits = 64, .dwarf_id = 10},
+    {.id = RegisterID::kRiscv64_a1,  .name = "a1",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a1,  .bits = 64, .dwarf_id = 11},
+    {.id = RegisterID::kRiscv64_a2,  .name = "a2",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a2,  .bits = 64, .dwarf_id = 12},
+    {.id = RegisterID::kRiscv64_a3,  .name = "a3",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a3,  .bits = 64, .dwarf_id = 13},
+    {.id = RegisterID::kRiscv64_a4,  .name = "a4",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a4,  .bits = 64, .dwarf_id = 14},
+    {.id = RegisterID::kRiscv64_a5,  .name = "a5",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a5,  .bits = 64, .dwarf_id = 15},
+    {.id = RegisterID::kRiscv64_a6,  .name = "a6",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a6,  .bits = 64, .dwarf_id = 16},
+    {.id = RegisterID::kRiscv64_a7,  .name = "a7",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a7,  .bits = 64, .dwarf_id = 17},
+    {.id = RegisterID::kRiscv64_s2,  .name = "s2",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s2,  .bits = 64, .dwarf_id = 18},
+    {.id = RegisterID::kRiscv64_s3,  .name = "s3",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s3,  .bits = 64, .dwarf_id = 19},
+    {.id = RegisterID::kRiscv64_s4,  .name = "s4",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s4,  .bits = 64, .dwarf_id = 20},
+    {.id = RegisterID::kRiscv64_s5,  .name = "s5",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s5,  .bits = 64, .dwarf_id = 21},
+    {.id = RegisterID::kRiscv64_s6,  .name = "s6",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s6,  .bits = 64, .dwarf_id = 22},
+    {.id = RegisterID::kRiscv64_s7,  .name = "s7",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s7,  .bits = 64, .dwarf_id = 23},
+    {.id = RegisterID::kRiscv64_s8,  .name = "s8",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s8,  .bits = 64, .dwarf_id = 24},
+    {.id = RegisterID::kRiscv64_s9,  .name = "s9",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s9,  .bits = 64, .dwarf_id = 25},
+    {.id = RegisterID::kRiscv64_s10, .name = "s10", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s10, .bits = 64, .dwarf_id = 26},
+    {.id = RegisterID::kRiscv64_s11, .name = "s11", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s11, .bits = 64, .dwarf_id = 27},
+    {.id = RegisterID::kRiscv64_t3,  .name = "t3",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t3,  .bits = 64, .dwarf_id = 28},
+    {.id = RegisterID::kRiscv64_t4,  .name = "t4",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t4,  .bits = 64, .dwarf_id = 29},
+    {.id = RegisterID::kRiscv64_t5,  .name = "t5",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t5,  .bits = 64, .dwarf_id = 30},
+    {.id = RegisterID::kRiscv64_t6,  .name = "t6",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t6,  .bits = 64, .dwarf_id = 31},
+
+    // General-purpose aliases.
+
+    {.id = RegisterID::kRiscv64_x0,  .name = "x0",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_zero, .bits = 64},
+    {.id = RegisterID::kRiscv64_x1,  .name = "x1",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_ra,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x2,  .name = "x2",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_sp,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x3,  .name = "x3",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_gp,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x4,  .name = "x4",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_tp,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x5,  .name = "x5",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t0,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x6,  .name = "x6",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t1,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x7,  .name = "x7",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t2,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x8,  .name = "x8",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s0,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x9,  .name = "x9",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s1,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x10, .name = "x10", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a0,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x11, .name = "x11", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a1,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x12, .name = "x12", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a2,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x13, .name = "x13", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a3,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x14, .name = "x14", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a4,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x15, .name = "x15", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a5,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x16, .name = "x16", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a6,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x17, .name = "x17", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_a7,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x18, .name = "x18", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s2,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x19, .name = "x19", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s3,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x20, .name = "x20", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s4,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x21, .name = "x21", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s5,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x22, .name = "x22", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s6,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x23, .name = "x23", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s7,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x24, .name = "x24", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s8,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x25, .name = "x25", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s9,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x26, .name = "x26", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s10, .bits = 64},
+    {.id = RegisterID::kRiscv64_x27, .name = "x27", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_s11, .bits = 64},
+    {.id = RegisterID::kRiscv64_x28, .name = "x28", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t3,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x29, .name = "x29", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t4,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x30, .name = "x30", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t5,  .bits = 64},
+    {.id = RegisterID::kRiscv64_x31, .name = "x31", .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_t6,  .bits = 64},
+
+    // PC
+    {.id = RegisterID::kRiscv64_pc,  .name = "pc",  .arch = Arch::kRiscv64, .canonical_id = RegisterID::kRiscv64_pc,  .bits = 64, .dwarf_id = 64, .format = RegisterFormat::kWordAddress},
 };
 
 // clang-format on
@@ -518,6 +594,9 @@ const RegisterInfo kRegisterInfo[] = {
 //   47 -> FFR VG´8-bit SVE first fault register
 //   48-63 -> P0-P15 VG´8-bit SVE predicate registers
 //   96-127 -> Z0-Z31 VG´64-bit SVE vector registers
+//
+// On RISC-V, we use 64 (Alternate Frame Return Column) to represent PC so that it's consistent with
+// the unwinder.
 
 }  // namespace
 
@@ -583,6 +662,19 @@ RegisterID GetSpecialRegisterID(Arch arch, SpecialRegisterType type) {
       }
       break;
 
+    case Arch::kRiscv64:
+      switch (type) {
+        case SpecialRegisterType::kNone:
+          break;
+        case SpecialRegisterType::kIP:
+          return RegisterID::kRiscv64_pc;
+        case SpecialRegisterType::kSP:
+          return RegisterID::kRiscv64_sp;
+        case SpecialRegisterType::kTP:
+          return RegisterID::kRiscv64_tp;
+      }
+      break;
+
     case Arch::kUnknown:
       break;
   }
@@ -602,24 +694,11 @@ const char* RegisterIDToString(RegisterID id) {
   return info->name.c_str();
 }
 
-RegisterID StringToRegisterID(const std::string& reg) {
-  static std::map<std::string, RegisterID> id_map;
-
-  if (id_map.empty()) {
-    // We populate the whole map at once, otherwise any time we try to look up
-    // an invalid register ID (fairly often) we have to search the whole list.
-    for (size_t i = 0; i < std::size(kRegisterInfo); i++) {
-      id_map[kRegisterInfo[i].name] = kRegisterInfo[i].id;
-    }
+RegisterID StringToRegisterID(Arch arch, const std::string& name) {
+  if (auto info = InfoForRegister(arch, name)) {
+    return info->id;
   }
-
-  auto iter = id_map.find(reg);
-
-  if (iter == id_map.end()) {
-    return RegisterID::kUnknown;
-  }
-
-  return iter->second;
+  return RegisterID::kUnknown;
 }
 
 Arch GetArchForRegisterID(RegisterID id) {
@@ -713,6 +792,17 @@ RegisterCategory RegisterIDToCategory(RegisterID id) {
   } else if (val >= kX64VectorBegin && val <= kX64VectorEnd) {
     return RegisterCategory::kVector;
   } else if (val >= kX64DebugBegin && val <= kX64DebugEnd) {
+    return RegisterCategory::kDebug;
+  }
+
+  // RISC-V 64.
+  if (val >= kRiscv64GeneralBegin && val <= kRiscv64GeneralEnd) {
+    return RegisterCategory::kGeneral;
+  } else if (val >= kRiscv64FPBegin && val <= kRiscv64FPEnd) {
+    return RegisterCategory::kFloatingPoint;
+  } else if (val >= kRiscv64VectorBegin && val <= kRiscv64VectorEnd) {
+    return RegisterCategory::kVector;
+  } else if (val >= kRiscv64DebugBegin && val <= kRiscv64DebugEnd) {
     return RegisterCategory::kDebug;
   }
 
