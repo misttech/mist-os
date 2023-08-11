@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/compat-hash.h>
-#include <lib/elfldltl/fuzzer.h>
 #include <lib/elfldltl/gnu-hash.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/elfldltl/testing/fuzzer.h>
 #include <zircon/assert.h>
 
 namespace {
@@ -22,7 +22,7 @@ template <class Elf>
 struct SymbolFuzzer {
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
 
-  using FuzzerInputs = elfldltl::FuzzerInput<
+  using FuzzerInputs = elfldltl::testing::FuzzerInput<
       // There are five separate inputs.  Only DT_SYMTAB and DT_GNU_HASH really
       // need the Addr alignment.  DT_STRTAB needs no alignment at all and
       // DT_HASH needs only Word alignment.
@@ -86,7 +86,7 @@ struct SymbolFuzzer {
   }
 };
 
-using Fuzzer = elfldltl::ElfFuzzer<SymbolFuzzer>;
+using Fuzzer = elfldltl::testing::ElfFuzzer<SymbolFuzzer>;
 
 }  // namespace
 

@@ -14,6 +14,7 @@ library_headers("headers") {
 
   headers = [
     "lib/elfldltl/testing/diagnostics.h",
+    "lib/elfldltl/testing/fuzzer.h",
     "lib/elfldltl/testing/get-test-data.h",
     "lib/elfldltl/testing/loader.h",
     "lib/elfldltl/testing/test-pipe-reader.h",

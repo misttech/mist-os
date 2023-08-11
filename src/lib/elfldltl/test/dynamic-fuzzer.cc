@@ -4,10 +4,10 @@
 
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/dynamic.h>
-#include <lib/elfldltl/fuzzer.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/elfldltl/testing/fuzzer.h>
 #include <zircon/assert.h>
 
 #include <string>
@@ -19,7 +19,7 @@ constexpr elfldltl::DiagnosticsFlags kDiagFlags = {.multiple_errors = true};
 
 template <class Elf>
 struct DynamicFuzzer {
-  using FuzzerInputs = elfldltl::FuzzerInput<
+  using FuzzerInputs = elfldltl::testing::FuzzerInput<
       // The fuzzer has uses two input blobs, aligned to address size.
       sizeof(typename Elf::Addr),  // Alignment
       typename Elf::Dyn,           // PT_DYNAMIC
@@ -53,7 +53,7 @@ struct DynamicFuzzer {
   }
 };
 
-using Fuzzer = elfldltl::ElfFuzzer<DynamicFuzzer>;
+using Fuzzer = elfldltl::testing::ElfFuzzer<DynamicFuzzer>;
 
 }  // namespace
 

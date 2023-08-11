@@ -363,27 +363,42 @@ fuchsia_unittest_package("elfldltl-tests") {
 
 cpp_fuzzer("dynamic-fuzzer") {
   sources = [ "dynamic-fuzzer.cc" ]
-  deps = [ ".." ]
+  deps = [
+    "..",
+    "../testing",
+  ]
 }
 
 cpp_fuzzer("loadinfo-fuzzer") {
   sources = [ "loadinfo-fuzzer.cc" ]
-  deps = [ ".." ]
+  deps = [
+    "..",
+    "../testing",
+  ]
 }
 
 cpp_fuzzer("note-fuzzer") {
   sources = [ "note-fuzzer.cc" ]
-  deps = [ ".." ]
+  deps = [
+    "..",
+    "../testing",
+  ]
 }
 
 cpp_fuzzer("relocation-fuzzer") {
   sources = [ "relocation-fuzzer.cc" ]
-  deps = [ ".." ]
+  deps = [
+    "..",
+    "../testing",
+  ]
 }
 
 cpp_fuzzer("symbol-fuzzer") {
   sources = [ "symbol-fuzzer.cc" ]
-  deps = [ ".." ]
+  deps = [
+    "..",
+    "../testing",
+  ]
 }
 
 fuchsia_fuzzer_component("dynamic-fuzzer-component") {

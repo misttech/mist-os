@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/elfldltl/fuzzer.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/relocation.h>
+#include <lib/elfldltl/testing/fuzzer.h>
 
 namespace {
 
@@ -14,12 +14,13 @@ struct RelocationFuzzer {
   using size_type = typename RelocInfo::size_type;
 
   template <typename Jmprel>
-  using FuzzerInputs = elfldltl::FuzzerInput<  // Four separate inputs,
-      sizeof(typename RelocInfo::Addr),        // each aligned to address size:
-      typename RelocInfo::Rel,                 // 1. DT_REL
-      typename RelocInfo::Rela,                // 2. DT_RELA
-      typename RelocInfo::Addr,                // 3. DT_RELR
-      Jmprel>;                                 // 4. DT_JMPREL
+  using FuzzerInputs = elfldltl::testing::FuzzerInput<
+      // Four separate inputs, ...
+      sizeof(typename RelocInfo::Addr),  // ... each aligned to address size:
+      typename RelocInfo::Rel,           // 1. DT_REL
+      typename RelocInfo::Rela,          // 2. DT_RELA
+      typename RelocInfo::Addr,          // 3. DT_RELR
+      Jmprel>;                           // 4. DT_JMPREL
 
   using InputsRela = FuzzerInputs<typename RelocInfo::Rela>;
   using InputsRel = FuzzerInputs<typename RelocInfo::Rel>;
@@ -47,7 +48,7 @@ struct RelocationFuzzer {
   }
 };
 
-using Fuzzer = elfldltl::ElfFuzzer<RelocationFuzzer>;
+using Fuzzer = elfldltl::testing::ElfFuzzer<RelocationFuzzer>;
 
 }  // namespace
 

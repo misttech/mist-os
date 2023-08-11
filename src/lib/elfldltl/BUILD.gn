@@ -47,7 +47,6 @@ library_headers("headers") {
     "lib/elfldltl/fd.h",
     "lib/elfldltl/field.h",
     "lib/elfldltl/file.h",
-    "lib/elfldltl/fuzzer.h",
     "lib/elfldltl/gnu-hash.h",
     "lib/elfldltl/init-fini.h",
     "lib/elfldltl/internal/const-string.h",

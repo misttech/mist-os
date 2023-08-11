@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FUZZER_H_
-#define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FUZZER_H_
+#ifndef SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_FUZZER_H_
+#define SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_FUZZER_H_
 
 // This provides some helpers for writing fuzzers for ELF data using
 // -fsanitize=fuzzer (see https://llvm.org/docs/LibFuzzer.html and
@@ -19,7 +19,7 @@
 
 #include <fuzzer/FuzzedDataProvider.h>
 
-namespace elfldltl {
+namespace elfldltl::testing {
 
 // Randomly delegate to either of the two instantiations of Fuzzer, which are
 // default-constructible classes of objects callable with FuzzedDataProvider&.
@@ -124,6 +124,6 @@ class FuzzerInput {
   Inputs inputs_;
 };
 
-}  // namespace elfldltl
+}  // namespace elfldltl::testing
 
-#endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FUZZER_H_
+#endif  // SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_FUZZER_H_

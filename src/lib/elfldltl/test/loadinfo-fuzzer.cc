@@ -4,9 +4,9 @@
 
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
-#include <lib/elfldltl/fuzzer.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/elfldltl/testing/fuzzer.h>
 
 #include <vector>
 
@@ -30,7 +30,7 @@ struct LoadInfoFuzzer {
   using Phdr = typename Elf::Phdr;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container>;
 
-  using FuzzerInputs = elfldltl::FuzzerInput<alignof(Phdr), Phdr, uint8_t>;
+  using FuzzerInputs = elfldltl::testing::FuzzerInput<alignof(Phdr), Phdr, uint8_t>;
 
   int operator()(FuzzedDataProvider& provider) const {
     FuzzerInputs inputs(provider);
@@ -77,7 +77,7 @@ struct LoadInfoFuzzer {
   }
 };
 
-using Fuzzer = elfldltl::ElfFuzzer<LoadInfoFuzzer>;
+using Fuzzer = elfldltl::testing::ElfFuzzer<LoadInfoFuzzer>;
 
 }  // namespace
 

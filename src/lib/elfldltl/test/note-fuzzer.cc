@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/elfldltl/fuzzer.h>
 #include <lib/elfldltl/note.h>
+#include <lib/elfldltl/testing/fuzzer.h>
 #include <zircon/assert.h>
 
 #include <string_view>
@@ -16,7 +16,7 @@ using namespace std::literals;
 template <elfldltl::ElfData Data>
 struct NoteFuzzer {
   int operator()(FuzzedDataProvider& provider) const {
-    elfldltl::FuzzerInput<sizeof(uint32_t), std::byte> input(provider);
+    elfldltl::testing::FuzzerInput<sizeof(uint32_t), std::byte> input(provider);
     auto [bytes] = input.as_bytes();
     elfldltl::ElfNote::Bytes data{bytes.data(), bytes.size()};
 
@@ -53,7 +53,7 @@ struct NoteFuzzer {
   }
 };
 
-using Fuzzer = elfldltl::ElfDataFuzzer<NoteFuzzer>;
+using Fuzzer = elfldltl::testing::ElfDataFuzzer<NoteFuzzer>;
 
 }  // namespace
 
