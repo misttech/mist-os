@@ -4,6 +4,8 @@
 
 import("//products/common/core.gni")
 
+assembly_fshost = true
+
 product_bootfs_labels += [
   "//bundles/drivers:usb-peripheral-stack",
   "//src/sys/component_manager:component_manager_bootfs_config",
@@ -20,6 +22,7 @@ legacy_base_package_labels += [
 #
 # NOTE: This should be overridden by products which inherit from core.
 fuchsia_product_assembly_config_label = "//products/core"
+zedboot_product_assembly_config_label = "//products/zedboot"
 
 # Set to empty so that products which inherit from core don't automatically get minimal's no-op
 # policy. Necessary to ensure that the check for policy on non-eng builds will actually discover

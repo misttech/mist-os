@@ -9,9 +9,84 @@ product_assembly_configuration("zedboot") {
     build_type = "eng"
     feature_set_level = "bootstrap"
     storage = {
+      configure_fshost = true
       filesystems = {
         image_name = "zedboot"
-        volume = "none"
+        image_mode = "no_image"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
+  }
+  product = {
+  }
+}
+
+# TODO(b/295034062): Delete once all assemblies use the fshost from Assembly.
+product_assembly_configuration("zedboot_no_fshost") {
+  platform = {
+    build_type = "eng"
+    feature_set_level = "bootstrap"
+    storage = {
+      filesystems = {
+        image_name = "zedboot"
+        image_mode = "no_image"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
+  }
+  product = {
+  }
+}
+
+product_assembly_configuration("zedboot_with_minfs") {
+  platform = {
+    build_type = "eng"
+    feature_set_level = "bootstrap"
+    storage = {
+      configure_fshost = true
+      filesystems = {
+        image_name = "zedboot"
+        image_mode = "no_image"
+        volume = {
+          fvm = {
+            data = {
+              data_filesystem_format = "minfs"
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
+  }
+  product = {
+  }
+}
+
+product_assembly_configuration("zedboot_with_fxfs") {
+  platform = {
+    build_type = "eng"
+    feature_set_level = "bootstrap"
+    storage = {
+      configure_fshost = true
+      filesystems = {
+        image_name = "zedboot"
+        image_mode = "no_image"
+        volume = "fxfs"
       }
     }
   }

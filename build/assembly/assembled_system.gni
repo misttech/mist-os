@@ -115,6 +115,10 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   use_assembly_fshost (default: false)
 #     [boolean] Whether to build the fshost component
 #
+#   skip_fshost_validator (default: false)
+#     [boolean] Whether to skip the comparison of the GN fshost to the assembly
+#     fshost. This is only valid when use_assembly_fshost=true.
+#
 #   cmdline (optional)
 #     [list of strings] Kernel command line text.
 #
@@ -506,6 +510,11 @@ template("assembled_system") {
   _use_assembly_fshost =
       defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
 
+  _skip_fshost_validator = !_use_assembly_fshost
+  if (_use_assembly_fshost && defined(invoker.skip_fshost_validator)) {
+    _skip_fshost_validator = invoker.skip_fshost_validator
+  }
+
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
   _include_shell_commands = _supports_blobs
   if (defined(invoker.include_shell_commands)) {
@@ -707,7 +716,7 @@ template("assembled_system") {
     output = files.image_assembly_inputs
   }
 
-  if (_use_assembly_fshost) {
+  if (!_skip_fshost_validator) {
     python_action("${labels.fshost_validator}") {
       forward_variables_from(invoker,
                              [
@@ -811,7 +820,7 @@ template("assembled_system") {
 
     # Validate that the Assembly-built fshost is identical to the GN-built
     # fshost until the latter is removed.
-    if (_use_assembly_fshost) {
+    if (!_skip_fshost_validator) {
       deps += [ ":${labels.fshost_validator}" ]
     }
 
@@ -1165,7 +1174,7 @@ template("assembled_system") {
     dest_dir = rebase_path("${files.outdir}/${labels.bazel_legacy_aib}",
                            root_build_dir)
     deps = [ ":${labels.legacy_assembly_input_bundle}" ]
-    if (_use_assembly_fshost) {
+    if (!_skip_fshost_validator) {
       # TODO(b/287558873) Remove once fshost is migrated
       deps += [ ":${labels.fshost_validator}" ]
     }

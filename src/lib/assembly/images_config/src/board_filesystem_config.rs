@@ -31,6 +31,10 @@ pub struct BoardFilesystemConfig {
     /// request a fvm, then these values are ignored.
     #[serde(default)]
     pub fvm: Fvm,
+
+    /// Permit multiple GPT devices to be matched.
+    #[serde(default)]
+    pub gpt_all: bool,
 }
 
 /// Parameters describing how to generate the ZBI.

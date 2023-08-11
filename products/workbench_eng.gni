@@ -40,6 +40,7 @@ bazel_product_bundle_prefix = "//products/workbench:workbench_eng"
 # TODO(issuetracker.google.com/290788730): Remove the need to specify this
 # config as well as bazel_product_bundle_prefix
 fuchsia_product_assembly_config_label = "//products/minimal"
+zedboot_product_assembly_config_label = "//products/zedboot"
 
 # Kernel command line arguments.
 product_bootfs_labels += [

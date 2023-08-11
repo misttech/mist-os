@@ -20,6 +20,7 @@ product_assembly_configuration("terminal") {
     }
 
     storage = {
+      configure_fshost = true
       filesystems = {
         volume = {
           fvm = {

@@ -23,9 +23,18 @@ product_assembly_configuration("product_assembly_config") {
     feature_set_level = "bootstrap"
     build_type = "eng"
     storage = {
+      configure_fshost = true
       filesystems = {
         image_name = "bringup"
-        volume = "none"
+        image_mode = "no_image"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
       }
     }
   }
@@ -52,6 +61,9 @@ bringup_base = {
   product_assembly_config_label = ":product_assembly_config"
   board_config = board_information_for_assembly
   use_bringup_platform_bundles_only = true
+
+  use_assembly_fshost = true
+  fshost_config = board_fshost_config
 
   include_component_id_index = true
   include_shell_commands = false

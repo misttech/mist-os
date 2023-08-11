@@ -4,6 +4,8 @@
 
 import("//products/common/core.gni")
 
+assembly_fshost = true
+
 product_bootfs_labels += [
   "//bundles/drivers:usb-peripheral-stack",
   "//src/sys/component_manager:component_manager_bootfs_config",
@@ -90,6 +92,7 @@ legacy_cache_package_labels += [
 
 # Use the product assembly config target to specify the product configuration.
 fuchsia_product_assembly_config_label = "//products/terminal"
+zedboot_product_assembly_config_label = "//products/zedboot"
 
 fuchsia_structured_config_policy =
     "//products/terminal/terminal_user_structured_config_policy.json5"

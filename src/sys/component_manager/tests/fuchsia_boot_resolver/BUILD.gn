@@ -49,9 +49,18 @@ if (current_toolchain == default_toolchain) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
+        configure_fshost = true
         filesystems = {
           image_name = "test_zbi"
-          volume = "none"
+          image_mode = "no_image"
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
         }
       }
     }
@@ -66,6 +75,11 @@ if (current_toolchain == default_toolchain) {
     board_config = files.board_config
     deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true
+    use_assembly_fshost = true
+
+    # This test uses an explicit board, therefore the arguments should not be
+    # compared with the arguments from the global GN args.
+    skip_fshost_validator = true
     bootfs_labels = [ ":config" ]
     bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
     base_packages = []

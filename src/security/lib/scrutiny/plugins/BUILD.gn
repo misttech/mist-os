@@ -62,9 +62,11 @@ if (is_fuchsia) {
       feature_set_level = "empty"
       build_type = "eng"
       storage = {
+        configure_fshost = true
         filesystems = {
           image_name = "assembly"
-          volume = "none"
+          image_mode = "no_image"
+          volume = "fxfs"
         }
       }
     }
@@ -72,6 +74,11 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     allow_eng_platform_bundle_use = true
+    use_assembly_fshost = true
+
+    # We must skip validation because we are using the "empty" feature set level
+    # and are not generating a fshost in assembly.
+    skip_fshost_validator = true
     testonly = true
     bootfs_labels = [ ":bootfs" ]
     base_packages = []

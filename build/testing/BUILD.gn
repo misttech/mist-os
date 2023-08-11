@@ -19,12 +19,13 @@ core_realm_definition("cuckoo-core-realm") {
   deps += [ "//src/intl/intl_services:intl_services_shard" ]
 }
 
-product_assembly_configuration("cuckoo-product-configuration") {
+product_assembly_configuration("cuckoo-product-configuration-fxfs") {
   testonly = true
   platform = {
     #feature_set_level = "minimal"
     build_type = "eng"
     storage = {
+      configure_fshost = true
       filesystems = {
         volume = {
           fvm = {
@@ -41,12 +42,37 @@ product_assembly_configuration("cuckoo-product-configuration") {
   }
 }
 
-product_assembly_configuration("cuckoo-product-configuration-fxfs") {
+product_assembly_configuration("cuckoo-product-configuration-minfs") {
   testonly = true
   platform = {
     #feature_set_level = "minimal"
     build_type = "eng"
     storage = {
+      configure_fshost = true
+      filesystems = {
+        volume = {
+          fvm = {
+            data = {
+              data_filesystem_format = "minfs"
+            }
+            blob = {
+            }
+          }
+        }
+      }
+    }
+  }
+  product = {
+  }
+}
+
+product_assembly_configuration("cuckoo-product-configuration-fxblob") {
+  testonly = true
+  platform = {
+    #feature_set_level = "minimal"
+    build_type = "eng"
+    storage = {
+      configure_fshost = true
       filesystems = {
         volume = "fxfs"
       }
