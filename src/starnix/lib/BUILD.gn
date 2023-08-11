@@ -4,9 +4,9 @@
 
 group("lib") {
   deps = [
-    "kernel_config",
     "linux_uapi",
     "magma",
+    "starnix-sync",
     "syncio",
   ]
 }
@@ -16,8 +16,11 @@ group("tests") {
 
   deps = [
     "extended_pstate:tests",
-    "kill_job_on_panic:tests",
+    "starnix-sync:tests",
     "syncio:tests",
     "ubpf:tests",
+
+    # TODO(fxbug.dev/132040): Disabled due to flakiness.
+    # "kill_job_on_panic:tests",
   ]
 }
