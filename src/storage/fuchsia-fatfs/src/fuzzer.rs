@@ -5,6 +5,7 @@ use {
     crate::{
         directory::FatDirectory,
         node::{Closer, FatNode, Node},
+        types::Disk,
         FatFs,
     },
     anyhow::Error,
@@ -24,6 +25,12 @@ use {
         node::Node as _,
     },
 };
+
+impl Disk for std::io::Cursor<Box<[u8]>> {
+    fn is_present(&self) -> bool {
+        true
+    }
+}
 
 fn fuzz_node(fs: &FatFs, node: FatNode, depth: u32) -> BoxFuture<'_, Result<(), Status>> {
     async move {
@@ -100,7 +107,7 @@ impl Sealed for FuzzSink {
     }
 }
 
-async fn do_fuzz(disk: Cursor<Vec<u8>>) -> Result<(), Error> {
+async fn do_fuzz(disk: Cursor<Box<[u8]>>) -> Result<(), Error> {
     let fs = FatFs::new(Box::new(disk))?;
     let root: Arc<FatDirectory> = fs.get_fatfs_root();
 
@@ -117,8 +124,9 @@ pub fn fuzz_fatfs(fs: &[u8]) {
         let mut vec = fs.to_vec();
         // Make sure the "disk" is always a length that's a multiple of 512.
         let rounded = ((vec.len() / 512) + 1) * 512;
-        vec.resize(rounded, 0);
-        let cursor = std::io::Cursor::new(vec);
+        // Add an additional 4MiB to the disk size so fatfs has space to write to.
+        vec.resize(rounded + 4 * 1024 * 1024, 0);
+        let cursor = std::io::Cursor::new(vec.into_boxed_slice());
 
         let _ = do_fuzz(cursor).await;
     });
