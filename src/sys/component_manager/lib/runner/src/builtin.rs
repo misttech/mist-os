@@ -101,6 +101,7 @@ impl Runner for RemoteRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Namespace;
     use fidl::endpoints::{self, create_endpoints, Proxy};
     use fidl_fuchsia_data as fdata;
     use fidl_fuchsia_io as fio;
@@ -115,7 +116,7 @@ mod tests {
                 StartInfo {
                     resolved_url: "".to_string(),
                     program: fdata::Dictionary::default(),
-                    namespace: vec![],
+                    namespace: Namespace::default(),
                     outgoing_dir: None,
                     runtime_dir: Some(runtime_dir),
                     numbered_handles: vec![],

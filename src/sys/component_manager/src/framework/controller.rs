@@ -8,8 +8,7 @@ use {
         component::{StartReason, WeakComponentInstance},
     },
     fidl::endpoints::RequestStream,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::TryStreamExt,
     tracing::{error, warn},
 };
@@ -53,23 +52,14 @@ pub async fn serve_controller(
                     stop_payload: None,
                 };
                 let numbered_handles = args.numbered_handles.take().unwrap_or_default();
-                let namespace_entries = args
-                    .namespace_entries
-                    .take()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|e| fcrunner::ComponentNamespaceEntry {
-                        path: e.path,
-                        directory: e.directory,
-                        ..Default::default()
-                    })
-                    .collect::<Vec<_>>();
+                let namespace: cm_runner::Namespace =
+                    args.namespace_entries.take().unwrap_or_default().try_into().unwrap();
                 if let Err(err) = component
                     .start(
                         &StartReason::Controller,
                         Some(execution_controller),
                         numbered_handles,
-                        namespace_entries,
+                        namespace.into(),
                     )
                     .await
                 {

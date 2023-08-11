@@ -19,7 +19,6 @@ use {
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
-        namespace::IncomingNamespace,
         ns_dir::NamespaceDir,
         routing::{
             self, route_and_open_capability,
@@ -44,10 +43,11 @@ use {
     },
     async_trait::async_trait,
     cm_fidl_validator::error::DeclType,
+    cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_runner::{
         builtin::NullRunner, builtin::RemoteRunner, component_controller::ComponentController,
-        Runner,
+        NamespaceEntry, Runner,
     },
     cm_rust::{
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
@@ -933,7 +933,7 @@ impl ComponentInstance {
         reason: &StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         numbered_handles: Vec<fprocess::HandleInfo>,
-        additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+        additional_namespace_entries: Vec<NamespaceEntry>,
     ) -> Result<fsys::StartResult, StartActionError> {
         // Skip starting a component instance that was already started. It's important to bail out
         // here so we don't waste time starting eager children more than once.
@@ -1018,18 +1018,19 @@ impl ComponentInstance {
         self.context.component_id_index().look_up_moniker(&self.moniker).cloned()
     }
 
-    /// Run the provided closure with this component's logger (if any) as the default. If the
-    /// component does not have a logger, fall back to the global default.
+    /// Runs the provided closure with this component's logger (if any) set as the default
+    /// tracing subscriber for the duration of the closure.
+    ///
+    /// If the component is not running or does not have a logger, the tracing subscriber
+    /// is unchanged, so logs will be attributed to component_manager.
     pub async fn with_logger_as_default<T>(&self, op: impl FnOnce() -> T) -> T {
         let execution = self.lock_execution().await;
-        if let Some(Runtime { namespace: Some(ns), .. }) = &execution.runtime {
-            if let Some(logger) = ns.get_attributed_logger() {
+        match &execution.runtime {
+            Some(Runtime { logger: Some(ref logger), .. }) => {
+                let logger = logger.clone() as Arc<dyn tracing::Subscriber + Send + Sync>;
                 tracing::subscriber::with_default(logger, op)
-            } else {
-                op()
             }
-        } else {
-            op()
+            _ => op(),
         }
     }
 
@@ -1716,9 +1717,6 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
 
 /// The execution state for a component instance that has started running.
 pub struct Runtime {
-    /// Holder for objects related to the component's incoming namespace.
-    pub namespace: Option<IncomingNamespace>,
-
     /// A client handle to the component instance's outgoing directory.
     pub outgoing_dir: Option<fio::DirectoryProxy>,
 
@@ -1746,6 +1744,11 @@ pub struct Runtime {
     /// This stores the hook for notifying an ExecutionController about stop events for this
     /// component.
     execution_controller_task: Option<controller::ExecutionControllerTask>,
+
+    /// Logger attributed to this component.
+    ///
+    /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
+    logger: Option<Arc<ScopedLogger>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1783,16 +1786,15 @@ pub enum StopRequestSuccess {
 
 impl Runtime {
     pub fn start_from(
-        namespace: Option<IncomingNamespace>,
         outgoing_dir: Option<fio::DirectoryProxy>,
         runtime_dir: Option<fio::DirectoryProxy>,
         controller: Option<fcrunner::ComponentControllerProxy>,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
+        logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Runtime {
-            namespace,
             outgoing_dir,
             runtime_dir,
             controller: controller.map(ComponentController::new),
@@ -1801,6 +1803,7 @@ impl Runtime {
             binder_server_ends: vec![],
             start_reason,
             execution_controller_task,
+            logger: logger.map(Arc::new),
         }
     }
 

@@ -16,7 +16,7 @@ use {
     anyhow::format_err,
     assert_matches::assert_matches,
     async_trait::async_trait,
-    cm_runner::Runner,
+    cm_runner::{Namespace, Runner},
     cm_rust::{CapabilityTypeName, ComponentDecl, ConfigValuesData},
     fidl::prelude::*,
     fidl::{
@@ -269,7 +269,7 @@ impl Resolver for MockResolver {
 
 pub type HostFn = Box<dyn Fn(ServerEnd<fio::DirectoryMarker>) + Send + Sync>;
 
-pub type ManagedNamespace = Mutex<Vec<fcrunner::ComponentNamespaceEntry>>;
+pub type ManagedNamespace = Mutex<Namespace>;
 
 struct MockRunnerInner {
     /// List of URLs started by this runner instance.
@@ -279,7 +279,7 @@ struct MockRunnerInner {
     url_waiters: Vec<futures::channel::oneshot::Sender<()>>,
 
     /// Namespace for each component, mapping resolved URL to the component's namespace.
-    namespaces: HashMap<String, Arc<Mutex<Vec<fcrunner::ComponentNamespaceEntry>>>>,
+    namespaces: HashMap<String, Arc<Mutex<Namespace>>>,
 
     /// Functions for serving the `outgoing` and `runtime` directories
     /// of a given compoment. When a component is started, these

@@ -7,7 +7,7 @@ use {
         constants::PKG_PATH,
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
-            error::NamespacePopulateError,
+            error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
     },
@@ -16,20 +16,19 @@ use {
         mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
         verify_instance_in_component_id_index, RouteRequest,
     },
-    clonable_error::ClonableError,
     cm_logger::scoped::ScopedLogger,
+    cm_runner::{namespace::Entry as NamespaceEntry, Namespace},
     cm_rust::{self, ComponentDecl, UseDecl, UseProtocolDecl},
-    cm_task_scope::TaskScope,
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
         prelude::*,
     },
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::BoxFuture,
     std::{collections::HashMap, sync::Arc},
-    tracing::{error, info, warn, Subscriber},
+    tracing::{error, info, warn},
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
         directory::immutable::simple as pfs, execution_scope::ExecutionScope, path::Path,
@@ -39,60 +38,39 @@ use {
 
 type Directory = Arc<pfs::Simple>;
 
-pub struct IncomingNamespace {
-    pub package_dir: Option<fio::DirectoryProxy>,
-    logger: Option<Arc<ScopedLogger>>,
-}
-
-impl IncomingNamespace {
-    pub fn new(package: Option<Package>) -> Self {
-        let package_dir = package.map(|p| p.package_dir);
-        Self { package_dir, logger: None }
-    }
-
-    /// Returns a Logger whose output is attributed to this component's
-    /// namespace.
-    pub fn get_attributed_logger(&self) -> Option<Arc<dyn Subscriber + Send + Sync>> {
-        self.logger.as_ref().map(|l| l.clone() as Arc<dyn Subscriber + Send + Sync>)
-    }
-
-    /// In addition to populating a Vec<fcrunner::ComponentNamespaceEntry>, `populate` will start
-    /// serving and install handles to pseudo directories.
-    pub async fn populate<'a>(
-        &mut self,
-        component: &Arc<ComponentInstance>,
-        decl: &'a ComponentDecl,
-    ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, NamespacePopulateError> {
-        let (mut ns, log_sink_decl) =
-            populate_and_get_logsink_decl(self.package_dir.as_ref(), component, decl).await?;
-
-        if let Some(log_decl) = &log_sink_decl {
-            let (ns_, logger) = get_logger_from_ns(ns, log_decl).await;
-            ns = ns_;
-            self.logger = logger.map(Arc::new);
-        }
-
-        Ok(ns)
-    }
-}
-
-/// Populates a Vec<fcrunner::ComponentNamespaceEntry>, starts serving the directories,
-/// installs handles to pseudo directories and returns the LogSink use declaration, if any.
-///
-/// The LogSink use declaration is used by `IncomingNamespace` to create an attributed logger.
-pub async fn populate_and_get_logsink_decl<'a>(
-    package_dir: Option<&fio::DirectoryProxy>,
+/// Creates a component's namespace.
+pub async fn create_namespace(
+    package: Option<&Package>,
     component: &Arc<ComponentInstance>,
-    decl: &'a ComponentDecl,
-) -> Result<(Vec<fcrunner::ComponentNamespaceEntry>, Option<UseProtocolDecl>), NamespacePopulateError>
-{
-    let mut ns: Vec<fcrunner::ComponentNamespaceEntry> = vec![];
-
-    // Populate the /pkg namespace.
-    if let Some(package_dir) = &package_dir {
-        add_pkg_directory(&mut ns, package_dir)?;
+    decl: &ComponentDecl,
+    additional_entries: Vec<NamespaceEntry>,
+) -> Result<(Namespace, Option<ScopedLogger>), CreateNamespaceError> {
+    let mut namespace = Namespace::new();
+    if let Some(package) = package {
+        let pkg_dir = fuchsia_fs::directory::clone_no_describe(&package.package_dir, None)
+            .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
+        add_pkg_directory(&mut namespace, pkg_dir);
     }
+    let logger = add_use_decls(&mut namespace, component, decl).await?;
+    namespace.merge(additional_entries).map_err(CreateNamespaceError::InvalidAdditionalEntries)?;
+    Ok((namespace, logger))
+}
 
+/// Adds the package directory to the namespace under the path "/pkg".
+fn add_pkg_directory(namespace: &mut Namespace, pkg_dir: fio::DirectoryProxy) {
+    // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
+    let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
+    namespace.add(PKG_PATH.to_str().unwrap().to_string(), client_end);
+}
+
+/// Adds namespace entries for a component's use declarations.
+///
+/// This also serves all service directories.
+async fn add_use_decls(
+    namespace: &mut Namespace,
+    component: &Arc<ComponentInstance>,
+    decl: &ComponentDecl,
+) -> Result<Option<ScopedLogger>, CreateNamespaceError> {
     // Populate the namespace from uses, using the component manager's namespace.
     // svc_dirs will hold (path,directory) pairs. Each pair holds a path in the
     // component's namespace and a directory that ComponentMgr will host for the component.
@@ -106,7 +84,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
     for use_ in &decl.uses {
         match use_ {
             cm_rust::UseDecl::Directory(_) => {
-                add_directory_helper(&mut ns, &mut directory_waiters, use_, component.as_weak());
+                add_directory_helper(namespace, &mut directory_waiters, &use_, component.as_weak());
             }
             cm_rust::UseDecl::Protocol(s) => {
                 add_service_or_protocol_use(
@@ -128,7 +106,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
                 );
             }
             cm_rust::UseDecl::Storage(_) => {
-                add_storage_use(&mut ns, &mut directory_waiters, use_, component).await?;
+                add_storage_use(namespace, &mut directory_waiters, &use_, component).await?;
             }
             cm_rust::UseDecl::EventStream(s) => {
                 add_service_or_protocol_use(
@@ -142,84 +120,73 @@ pub async fn populate_and_get_logsink_decl<'a>(
     }
 
     // Start hosting the services directories and add them to the namespace
-    serve_and_install_svc_dirs(&mut ns, svc_dirs);
+    serve_and_add_svc_dirs(namespace, svc_dirs);
+
     // The directory waiter will run in the component's nonblocking task scope, but
     // when it gets a readable signal it will spawn the routing task in the blocking scope as
     // that it blocks destruction, like service and protocol routing.
     //
     // TODO(fxbug.dev/76579): It would probably be more correct to run this in an execution_scope
     // attached to the namespace (but that requires a bigger refactor)
-    start_directory_waiters(directory_waiters, &component.nonblocking_task_scope()).await;
+    let task_scope = component.nonblocking_task_scope();
+    for waiter in directory_waiters {
+        // The future for a directory waiter will only terminate once the directory channel is
+        // first used. Run the future in a task bound to the component's scope instead of
+        // calling await on it directly.
+        task_scope.add_task(waiter).await;
+    }
 
-    Ok((ns, log_sink_decl))
+    let logger = log_sink_decl
+        .map(|decl| {
+            let ns = std::mem::replace(&mut namespace.entries, Vec::new());
+            let (ns_, logger) = get_logger_from_ns(ns, &decl);
+            let _ = std::mem::replace(&mut namespace.entries, ns_);
+            logger
+        })
+        .flatten();
+
+    Ok(logger)
 }
 
 /// Given the set of namespace entries and a LogSink protocol's
 /// `UseProtocolDecl`, look through the namespace for where to connect
 /// to the LogSink protocol. The log connection, if any, is stored in the
 /// IncomingNamespace.
-async fn get_logger_from_ns(
-    ns: Vec<fcrunner::ComponentNamespaceEntry>,
+fn get_logger_from_ns(
+    ns: Vec<NamespaceEntry>,
     log_sink_decl: &UseProtocolDecl,
-) -> (Vec<fcrunner::ComponentNamespaceEntry>, Option<ScopedLogger>) {
+) -> (Vec<NamespaceEntry>, Option<ScopedLogger>) {
     // A new set of namespace entries is returned because when the entry
     // used to connect to LogSink is found, that entry is consumed. A
     // matching entry is created and placed in the set of entries returned
     // by this function. `self` is taken as mutable so the
     // logger connection can be stored when found.
     let mut new_ns = vec![];
-    let mut log_ns_dir: Option<(fcrunner::ComponentNamespaceEntry, String)> = None;
+    let mut log_entry: Option<(NamespaceEntry, String)> = None;
     let mut logger = None;
     // Find namespace directory specified in the log_sink_decl
-    for ns_dir in ns {
-        if let Some(path) = &ns_dir.path.clone() {
-            // Check if this namespace path is a stem of the decl's path
-            if log_ns_dir.is_none() {
-                if let Ok(path_remainder) =
-                    is_subpath_of(log_sink_decl.target_path.to_string(), path.to_string())
-                {
-                    log_ns_dir = Some((ns_dir, path_remainder));
-                    continue;
-                }
+    for entry in ns {
+        // Check if this namespace path is a stem of the decl's path
+        if log_entry.is_none() {
+            if let Ok(path_remainder) =
+                is_subpath_of(log_sink_decl.target_path.to_string(), entry.path.to_string())
+            {
+                log_entry = Some((entry, path_remainder));
+                continue;
             }
-        }
-        new_ns.push(ns_dir);
-    }
-
-    // If we found a matching namespace entry, try to open the log proxy
-    if let Some((mut entry, remaining_path)) = log_ns_dir {
-        if let Some(dir) = entry.directory {
-            let _str = log_sink_decl.target_path.to_string();
-            let (restored_dir, logger_) = get_logger_from_dir(dir, &remaining_path).await;
-            entry.directory = restored_dir;
-            logger = logger_;
         }
         new_ns.push(entry);
     }
-    (new_ns, logger)
-}
 
-/// add_pkg_directory will add a handle to the component's package under /pkg in the namespace.
-fn add_pkg_directory(
-    ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
-    package_dir: &fio::DirectoryProxy,
-) -> Result<(), NamespacePopulateError> {
-    let clone_dir_proxy =
-        fuchsia_fs::directory::clone_no_describe(package_dir, None).map_err(|e| {
-            NamespacePopulateError::ClonePkgDirFailed(ClonableError::from(anyhow::Error::from(e)))
-        })?;
-    let cloned_dir = ClientEnd::new(
-        clone_dir_proxy
-            .into_channel()
-            .expect("could not convert directory to channel")
-            .into_zx_channel(),
-    );
-    ns.push(fcrunner::ComponentNamespaceEntry {
-        path: Some(PKG_PATH.to_str().unwrap().to_string()),
-        directory: Some(cloned_dir),
-        ..Default::default()
-    });
-    Ok(())
+    // If we found a matching namespace entry, try to open the log proxy
+    if let Some((mut entry, remaining_path)) = log_entry {
+        let _str = log_sink_decl.target_path.to_string();
+        let (restored_dir, logger_) = get_logger_from_dir(entry.directory, &remaining_path);
+        entry.directory = restored_dir;
+        logger = logger_;
+        new_ns.push(entry);
+    }
+    (new_ns, logger)
 }
 
 /// Adds a directory waiter to `waiters` and updates `ns` to contain a handle for the
@@ -227,11 +194,11 @@ fn add_pkg_directory(
 /// `route_storage` to forward the channel to the source component's outgoing directory and
 /// terminates.
 async fn add_storage_use(
-    ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
+    namespace: &mut Namespace,
     waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
     component: &Arc<ComponentInstance>,
-) -> Result<(), NamespacePopulateError> {
+) -> Result<(), CreateNamespaceError> {
     // Prevent component from using storage capability if it is restricted to the component ID
     // index, and the component isn't in the index.
     match use_ {
@@ -247,13 +214,14 @@ async fn add_storage_use(
                     .await
             {
                 verify_instance_in_component_id_index(&source, &component)
-                    .map_err(|e| NamespacePopulateError::InstanceNotInInstanceIdIndex(e))?;
+                    .map_err(CreateNamespaceError::InstanceNotInInstanceIdIndex)?;
             }
         }
         _ => unreachable!("unexpected storage decl"),
     }
 
-    add_directory_helper(ns, waiters, use_, component.as_weak());
+    add_directory_helper(namespace, waiters, use_, component.as_weak());
+
     Ok(())
 }
 
@@ -265,7 +233,7 @@ async fn add_storage_use(
 /// `component` is a weak pointer, which is important because we don't want the directory waiter
 /// closure to hold a strong pointer to this component lest it create a reference cycle.
 fn add_directory_helper(
-    ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
+    namespace: &mut Namespace,
     waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
     component: WeakComponentInstance,
@@ -312,11 +280,7 @@ fn add_directory_helper(
     };
 
     waiters.push(Box::pin(route_on_usage));
-    ns.push(fcrunner::ComponentNamespaceEntry {
-        path: Some(target_path.clone()),
-        directory: Some(client_end),
-        ..Default::default()
-    });
+    namespace.add(target_path.clone(), client_end);
 }
 
 async fn route_directory(
@@ -355,19 +319,6 @@ async fn route_directory(
     }
 }
 
-/// start_directory_waiters will spawn the futures in directory_waiters
-async fn start_directory_waiters(
-    directory_waiters: Vec<BoxFuture<'static, ()>>,
-    scope: &TaskScope,
-) {
-    for waiter in directory_waiters {
-        // The future for a directory waiter will only terminate once the directory channel is
-        // first used. Run the future in a task bound to the component's scope instead of
-        // calling await on it directly.
-        scope.add_task(waiter).await;
-    }
-}
-
 /// Adds a service broker in `svc_dirs` for service described by `use_`. The service will be
 /// proxied to the outgoing directory of the source component.
 ///
@@ -403,35 +354,35 @@ fn add_service_or_protocol_use(
             let mut server_end = server_end.into_channel();
             let (route_request, open_options) = {
                 match &use_ {
-                            UseDecl::Service(use_service_decl) => {
-                                (RouteRequest::UseService(use_service_decl.clone()),
-                                     OpenOptions{
-                                         flags,
-                                         relative_path: relative_path.into_string(),
-                                         server_chan: &mut server_end
-                                     }
-                                 )
-                            },
-                            UseDecl::Protocol(use_protocol_decl) => {
-                                (RouteRequest::UseProtocol(use_protocol_decl.clone()),
-                                     OpenOptions{
-                                         flags,
-                                         relative_path: relative_path.into_string(),
-                                         server_chan: &mut server_end
-                                     }
-                                 )
-                            },
-                            UseDecl::EventStream(stream)=> {
-                                (RouteRequest::UseEventStream(stream.clone()),
-                                     OpenOptions{
-                                         flags,
-                                         relative_path: stream.target_path.to_string(),
-                                         server_chan: &mut server_end,
-                                     }
-                                 )
-                            },
-                            _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),
-                        }
+                    UseDecl::Service(use_service_decl) => {
+                        (RouteRequest::UseService(use_service_decl.clone()),
+                             OpenOptions{
+                                 flags,
+                                 relative_path: relative_path.into_string(),
+                                 server_chan: &mut server_end
+                             }
+                         )
+                    },
+                    UseDecl::Protocol(use_protocol_decl) => {
+                        (RouteRequest::UseProtocol(use_protocol_decl.clone()),
+                             OpenOptions{
+                                 flags,
+                                 relative_path: relative_path.into_string(),
+                                 server_chan: &mut server_end
+                             }
+                         )
+                    },
+                    UseDecl::EventStream(stream)=> {
+                        (RouteRequest::UseEventStream(stream.clone()),
+                             OpenOptions{
+                                 flags,
+                                 relative_path: stream.target_path.to_string(),
+                                 server_chan: &mut server_end,
+                             }
+                         )
+                    },
+                    _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),
+                }
             };
 
             let res =
@@ -491,14 +442,8 @@ fn is_subpath_of(full: String, stem: String) -> Result<String, ()> {
     }
 }
 
-/// serve_and_install_svc_dirs will take all of the pseudo directories collected in
-/// svc_dirs (as populated by add_service_use calls), start them and install them in the
-/// namespace. The abortable handles are saved in the IncomingNamespace, to
-/// be called when the IncomingNamespace is dropped.
-fn serve_and_install_svc_dirs(
-    ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
-    svc_dirs: HashMap<String, Directory>,
-) {
+/// Serves the pseudo-directories in `svc_dirs` and adds their client ends to the namespace.
+fn serve_and_add_svc_dirs(namespace: &mut Namespace, svc_dirs: HashMap<String, Directory>) {
     for (target_dir_path, pseudo_dir) in svc_dirs {
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         pseudo_dir.clone().open(
@@ -510,20 +455,16 @@ fn serve_and_install_svc_dirs(
             server_end.into_channel().into(),
         );
 
-        ns.push(fcrunner::ComponentNamespaceEntry {
-            path: Some(target_dir_path),
-            directory: Some(client_end),
-            ..Default::default()
-        });
+        namespace.add(target_dir_path, client_end);
     }
 }
 
 /// Given a Directory, connect to the LogSink protocol at the default
 /// location.
-async fn get_logger_from_dir(
+fn get_logger_from_dir(
     dir: ClientEnd<fio::DirectoryMarker>,
     at_path: &str,
-) -> (Option<ClientEnd<fio::DirectoryMarker>>, Option<ScopedLogger>) {
+) -> (ClientEnd<fio::DirectoryMarker>, Option<ScopedLogger>) {
     let mut logger = None;
     match dir.into_proxy() {
         Ok(dir_proxy) => {
@@ -542,16 +483,18 @@ async fn get_logger_from_dir(
                 dir_proxy.into_channel().map_or_else(
                     |error| {
                         error!(?error, "LogSink proxy could not be converted back to channel");
-                        None
+                        let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
+                        client
                     },
-                    |chan| Some(ClientEnd::<fio::DirectoryMarker>::new(chan.into())),
+                    |chan| ClientEnd::<fio::DirectoryMarker>::new(chan.into()),
                 ),
                 logger,
             )
         }
         Err(error) => {
             info!(%error, "Directory client channel could not be turned into proxy");
-            (None, logger)
+            let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
+            (client, logger)
         }
     }
 }
@@ -594,15 +537,12 @@ fn make_dir_with_not_found_logging(
 
 #[cfg(test)]
 pub mod test {
-
     use {
         super::*,
         crate::model::testing::test_helpers::MockServiceRequest,
         cm_rust::{Availability, DependencyType, UseProtocolDecl, UseSource},
         fidl::endpoints,
-        fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest},
-        fuchsia_async,
         fuchsia_component::server::ServiceFs,
         futures::StreamExt,
         std::sync::{
@@ -652,11 +592,7 @@ pub mod test {
         let _sub_dir = root_dir.dir("subdir");
         root_dir.serve_connection(dir_server).expect("failed to add serving channel");
 
-        let ns_entries = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some("/".to_string()),
-            directory: Some(dir_client),
-            ..Default::default()
-        }];
+        let ns_entries = vec![NamespaceEntry { path: "/".to_string(), directory: dir_client }];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
     }
@@ -680,11 +616,7 @@ pub mod test {
         let _sub_dir = root_dir.dir("subdir");
         root_dir.serve_connection(dir_server).expect("failed to add serving channel");
 
-        let ns_entries = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some("/".to_string()),
-            directory: Some(dir_client),
-            ..Default::default()
-        }];
+        let ns_entries = vec![NamespaceEntry { path: "/".to_string(), directory: dir_client }];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
     }
@@ -714,16 +646,8 @@ pub mod test {
         extra_dir.serve_connection(extra_dir_server).expect("serving channel failed");
 
         let ns_entries = vec![
-            fcrunner::ComponentNamespaceEntry {
-                path: Some("/svc".to_string()),
-                directory: Some(dir_client),
-                ..Default::default()
-            },
-            fcrunner::ComponentNamespaceEntry {
-                path: Some("/sv".to_string()),
-                directory: Some(extra_dir_client),
-                ..Default::default()
-            },
+            NamespaceEntry { path: "/svc".to_string(), directory: dir_client },
+            NamespaceEntry { path: "/sv".to_string(), directory: extra_dir_client },
         ];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
@@ -767,11 +691,8 @@ pub mod test {
         root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
         root_dir.serve_connection(dir_server).expect("failed to add serving channel");
 
-        let ns_entries = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some("/not-the-svc-dir".to_string()),
-            directory: Some(dir_client),
-            ..Default::default()
-        }];
+        let ns_entries =
+            vec![NamespaceEntry { path: "/not-the-svc-dir".to_string(), directory: dir_client }];
 
         verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, false).await;
     }
@@ -782,20 +703,21 @@ pub mod test {
         T: fuchsia_component::server::ServiceObjTrait<Output = MockServiceRequest>,
     >(
         root_dir: Option<&mut ServiceFs<T>>,
-        ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+        ns_entries: Vec<NamespaceEntry>,
         proto_decl: UseProtocolDecl,
         connects: bool,
     ) {
         let connection_count = if connects { 1u8 } else { 0u8 };
+
         // Create a task that will access the namespace by calling
         // `get_logger_from_ns`. This task won't complete until the VFS backing
         // the namespace starts responding to requests. This VFS is served by
         // code in the next stanza.
         fuchsia_async::Task::spawn(async move {
             let ns_size = ns_entries.len();
-            let (procesed_ns, logger) = get_logger_from_ns(ns_entries, &proto_decl).await;
+            let (procesed_ns, logger) = get_logger_from_ns(ns_entries, &proto_decl);
             assert_eq!(logger.is_some(), connects);
-            assert_eq!(ns_size, procesed_ns.len())
+            assert_eq!(ns_size, procesed_ns.len());
         })
         .detach();
 

@@ -1274,10 +1274,10 @@ mod tests {
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let mut ns = ns.lock().await;
             // /pkg and /svc
-            assert_eq!(ns.len(), 2);
-            let ns = ns.remove(1);
-            assert_eq!(ns.path.as_ref().unwrap(), "/svc");
-            let svc_dir = ns.directory.unwrap().into_proxy().unwrap();
+            assert_eq!(ns.entries.len(), 2);
+            let ns = ns.entries.remove(1);
+            assert_eq!(ns.path, "/svc");
+            let svc_dir = ns.directory.into_proxy().unwrap();
             fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::OpenFlags::empty())
                 .await
                 .unwrap();

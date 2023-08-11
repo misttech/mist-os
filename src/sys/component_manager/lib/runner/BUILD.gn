@@ -42,6 +42,7 @@ rustc_library("runner") {
     "src/builtin.rs",
     "src/component_controller.rs",
     "src/lib.rs",
+    "src/namespace.rs",
   ]
 }
 

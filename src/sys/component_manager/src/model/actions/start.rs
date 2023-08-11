@@ -9,22 +9,21 @@ use {
         component::{
             ComponentInstance, ExecutionState, InstanceState, Package, Runtime, StartReason,
         },
-        error::{NamespacePopulateError, StartActionError, StructuredConfigError},
+        error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
-        namespace::IncomingNamespace,
+        namespace::create_namespace,
     },
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
-    cm_runner::{Runner, StartInfo},
+    cm_runner::{NamespaceEntry, Runner, StartInfo},
     config_encoder::ConfigFields,
     fidl::{
-        endpoints::{self, Proxy, ServerEnd},
+        endpoints::{create_proxy, ServerEnd},
         Vmo,
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::Moniker,
     std::sync::Arc,
     tracing::warn,
@@ -35,7 +34,7 @@ pub struct StartAction {
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
-    additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+    additional_namespace_entries: Vec<NamespaceEntry>,
 }
 
 impl StartAction {
@@ -43,7 +42,7 @@ impl StartAction {
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         numbered_handles: Vec<fprocess::HandleInfo>,
-        additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+        additional_namespace_entries: Vec<NamespaceEntry>,
     ) -> Self {
         Self {
             start_reason,
@@ -84,7 +83,7 @@ async fn do_start(
     start_reason: &StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
-    additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+    additional_namespace_entries: Vec<NamespaceEntry>,
 ) -> Result<fsys::StartResult, StartActionError> {
     // Pre-flight check: if the component is already started, or was shut down, return now. Note
     // that `start` also performs this check before scheduling the action here. We do it again
@@ -116,7 +115,7 @@ async fn do_start(
                 &component,
                 &checker,
                 component_info.resolved_url.clone(),
-                component_info.package,
+                component_info.package.as_ref(),
                 &component_info.decl,
                 component_info.config,
                 start_reason.clone(),
@@ -247,13 +246,13 @@ async fn make_execution_runtime(
     component: &Arc<ComponentInstance>,
     checker: &GlobalPolicyChecker,
     url: String,
-    package: Option<Package>,
+    package: Option<&Package>,
     decl: &cm_rust::ComponentDecl,
     config: Option<ConfigFields>,
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
-    additional_namespace_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+    additional_namespace_entries: Vec<NamespaceEntry>,
 ) -> Result<
     (Runtime, StartInfo, ServerEnd<fcrunner::ComponentControllerMarker>, zx::EventPair),
     StartActionError,
@@ -271,33 +270,30 @@ async fn make_execution_runtime(
         fdecl::OnTerminate::None => {}
     }
 
-    // Create incoming/outgoing directories, and populate them.
-    let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create();
-    let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
-    let mut namespace = IncomingNamespace::new(package);
-    let original_ns = namespace.populate(component, decl).await.map_err(|err| {
-        StartActionError::NamespacePopulateError { moniker: component.moniker.clone(), err }
-    })?;
-    let ns = merge_namespace_entries(original_ns, additional_namespace_entries).map_err(|err| {
-        StartActionError::NamespacePopulateError { moniker: component.moniker.clone(), err }
-    })?;
+    // Create the component's namespace.
+    let (namespace, logger) =
+        create_namespace(package, component, decl, additional_namespace_entries).await.map_err(
+            |err| StartActionError::CreateNamespaceError {
+                moniker: component.moniker.clone(),
+                err,
+            },
+        )?;
 
-    let (controller_client, controller_server) =
-        endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-    let controller =
-        controller_client.into_proxy().expect("failed to create ComponentControllerProxy");
     // Set up channels into/out of the new component. These are absent from non-executable
     // components.
-    let outgoing_dir_client = decl.get_runner().map(|_| {
-        fio::DirectoryProxy::from_channel(
-            fasync::Channel::from_channel(outgoing_dir_client).unwrap(),
-        )
-    });
-    let runtime_dir_client = decl.get_runner().map(|_| {
-        fio::DirectoryProxy::from_channel(
-            fasync::Channel::from_channel(runtime_dir_client).unwrap(),
-        )
-    });
+    let (outgoing_dir, outgoing_dir_server) = if decl.get_runner().is_some() {
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        (Some(proxy), Some(server_end))
+    } else {
+        (None, None)
+    };
+
+    let (runtime_dir, runtime_dir_server) = if decl.get_runner().is_some() {
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        (Some(proxy), Some(server_end))
+    } else {
+        (None, None)
+    };
 
     let encoded_config = if let Some(config) = config {
         let (vmo, size) = (|| {
@@ -316,15 +312,19 @@ async fn make_execution_runtime(
         None
     };
 
+    let (controller, controller_server) =
+        create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
+
     let runtime = Runtime::start_from(
-        Some(namespace),
-        outgoing_dir_client,
-        runtime_dir_client,
+        outgoing_dir,
+        runtime_dir,
         Some(controller),
         start_reason,
         execution_controller_task,
+        logger,
     );
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
+
     let start_info = StartInfo {
         resolved_url: url,
         program: decl
@@ -332,42 +332,15 @@ async fn make_execution_runtime(
             .as_ref()
             .map(|p| p.info.clone())
             .unwrap_or_else(|| fdata::Dictionary::default()),
-        namespace: ns,
-        outgoing_dir: Some(ServerEnd::new(outgoing_dir_server)),
-        runtime_dir: Some(ServerEnd::new(runtime_dir_server)),
+        namespace,
+        outgoing_dir: outgoing_dir_server,
+        runtime_dir: runtime_dir_server,
         numbered_handles,
         encoded_config,
         break_on_start: Some(break_on_start_left),
     };
 
     Ok((runtime, start_info, controller_server, break_on_start_right))
-}
-
-fn merge_namespace_entries(
-    original_entries: Vec<fcrunner::ComponentNamespaceEntry>,
-    mut additional_entries: Vec<fcrunner::ComponentNamespaceEntry>,
-) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, NamespacePopulateError> {
-    let mut output = vec![];
-    for original_entry in original_entries {
-        let mut conflicts_exist = false;
-        for additional_entry in &additional_entries {
-            conflicts_exist |=
-                namespace_paths_conflict(&original_entry.path, &additional_entry.path);
-        }
-        if conflicts_exist {
-            return Err(NamespacePopulateError::ConflictBetweenUsesAndAdditionalEntries);
-        }
-        output.push(original_entry);
-    }
-    output.append(&mut additional_entries);
-    Ok(output)
-}
-
-fn namespace_paths_conflict(path_1: &Option<String>, path_2: &Option<String>) -> bool {
-    match (path_1.as_ref(), path_2.as_ref()) {
-        (Some(p1), Some(p2)) => p1.starts_with(p2) || p2.starts_with(p1),
-        _ => false,
-    }
 }
 
 #[cfg(test)]
@@ -598,7 +571,7 @@ mod tests {
         {
             let mut es = ExecutionState::new();
             es.runtime =
-                Some(Runtime::start_from(None, None, None, None, StartReason::Debug, None));
+                Some(Runtime::start_from(None, None, None, StartReason::Debug, None, None));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),

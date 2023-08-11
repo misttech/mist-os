@@ -251,7 +251,9 @@ impl ElfRunner {
         .map_err(StartComponentError::ExceptionRegistrationFailed)?;
 
         // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
-        let namespace = runner::component::ComponentNamespace::try_from(start_info.namespace)
+        // TODO(fxbug.dev/131717): Runner lib should accept cm_runner::Namespace directly
+        let entries: Vec<fcrunner::ComponentNamespaceEntry> = start_info.namespace.into();
+        let namespace = runner::component::ComponentNamespace::try_from(entries)
             .map_err(StartComponentError::ComponentNamespaceError)?;
 
         let config_vmo = start_info
@@ -560,6 +562,7 @@ mod tests {
         },
         anyhow::{Context, Error},
         assert_matches::assert_matches,
+        cm_runner::{Namespace, NamespaceEntry},
         fidl::endpoints::{
             create_endpoints, create_proxy, spawn_stream_handler, ClientEnd,
             DiscoverableProtocolMarker, Proxy, ServerEnd,
@@ -592,19 +595,19 @@ mod tests {
 
     /// Create a new local fs and install a mock LogSink service into.
     /// Returns the created directory and corresponding namespace entries.
-    pub fn create_fs_with_mock_logsink(
-    ) -> Result<(MockServiceFs<'static>, Vec<fcrunner::ComponentNamespaceEntry>), Error> {
-        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
+    pub fn create_fs_with_mock_logsink() -> Result<(MockServiceFs<'static>, Namespace), Error> {
+        let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
+
         let mut dir = ServiceFs::new_local();
         dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
-        dir.serve_connection(server).context("Failed to add serving channel.")?;
-        let entries = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some("/svc".to_string()),
-            directory: Some(client),
-            ..Default::default()
-        }];
+        dir.serve_connection(dir_server).context("Failed to add serving channel.")?;
 
-        Ok((dir, entries))
+        let namespace = Namespace::from(vec![NamespaceEntry {
+            path: "/svc".to_string(),
+            directory: dir_client,
+        }]);
+
+        Ok((dir, namespace))
     }
 
     fn new_elf_runner_for_test() -> Arc<ElfRunner> {
@@ -615,24 +618,23 @@ mod tests {
         ))
     }
 
-    fn hello_world_startinfo(runtime_dir: ServerEnd<fio::DirectoryMarker>) -> cm_runner::StartInfo {
+    fn pkg_dir_namespace_entry() -> NamespaceEntry {
         // Get a handle to /pkg
         let pkg_path = "/pkg".to_string();
-        let pkg_chan = fuchsia_fs::directory::open_in_namespace(
+        let pkg_dir = fuchsia_fs::directory::open_in_namespace(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )
-        .unwrap()
-        .into_channel()
-        .unwrap()
-        .into_zx_channel();
-        let pkg_handle = ClientEnd::new(pkg_chan);
+        .unwrap();
+        // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
+        let pkg_client_end = ClientEnd::new(
+            pkg_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
+        );
+        NamespaceEntry { path: pkg_path, directory: pkg_client_end }
+    }
 
-        let namespace = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some(pkg_path),
-            directory: Some(pkg_handle),
-            ..Default::default()
-        }];
+    fn hello_world_startinfo(runtime_dir: ServerEnd<fio::DirectoryMarker>) -> cm_runner::StartInfo {
+        let namespace = Namespace::from(vec![pkg_dir_namespace_entry()]);
 
         cm_runner::StartInfo {
             resolved_url: "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/hello-world-rust.cm"
@@ -668,23 +670,7 @@ mod tests {
     fn invalid_binary_startinfo(
         runtime_dir: ServerEnd<fio::DirectoryMarker>,
     ) -> cm_runner::StartInfo {
-        // Get a handle to /pkg
-        let pkg_path = "/pkg".to_string();
-        let pkg_chan = fuchsia_fs::directory::open_in_namespace(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap()
-        .into_channel()
-        .unwrap()
-        .into_zx_channel();
-        let pkg_handle = ClientEnd::new(pkg_chan);
-
-        let namespace = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some(pkg_path),
-            directory: Some(pkg_handle),
-            ..Default::default()
-        }];
+        let namespace = Namespace::from(vec![pkg_dir_namespace_entry()]);
 
         cm_runner::StartInfo {
             resolved_url: "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/does-not-exist.cm"
@@ -711,23 +697,7 @@ mod tests {
     /// ComponentController protocol can be used to stop the component when the
     /// test is done inspecting the launched component.
     fn lifecycle_startinfo(runtime_dir: ServerEnd<fio::DirectoryMarker>) -> cm_runner::StartInfo {
-        // Get a handle to /pkg
-        let pkg_path = "/pkg".to_string();
-        let pkg_chan = fuchsia_fs::directory::open_in_namespace(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap()
-        .into_channel()
-        .unwrap()
-        .into_zx_channel();
-        let pkg_handle = ClientEnd::new(pkg_chan);
-
-        let namespace = vec![fcrunner::ComponentNamespaceEntry {
-            path: Some(pkg_path),
-            directory: Some(pkg_handle),
-            ..Default::default()
-        }];
+        let namespace = Namespace::from(vec![pkg_dir_namespace_entry()]);
 
         cm_runner::StartInfo {
             resolved_url: "fuchsia-pkg://fuchsia.com/lifecycle-example#meta/lifecycle.cm"
@@ -1194,24 +1164,10 @@ mod tests {
 
     fn hello_world_startinfo_forward_stdout_to_log(
         runtime_dir: ServerEnd<fio::DirectoryMarker>,
-        mut namespace: Vec<fcrunner::ComponentNamespaceEntry>,
+        mut namespace: Namespace,
     ) -> cm_runner::StartInfo {
-        let pkg_path = "/pkg".to_string();
-        let pkg_chan = fuchsia_fs::directory::open_in_namespace(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap()
-        .into_channel()
-        .unwrap()
-        .into_zx_channel();
-        let pkg_handle = ClientEnd::new(pkg_chan);
-
-        namespace.push(fcrunner::ComponentNamespaceEntry {
-            path: Some(pkg_path),
-            directory: Some(pkg_handle),
-            ..Default::default()
-        });
+        let pkg_dir_entry = pkg_dir_namespace_entry();
+        namespace.add(pkg_dir_entry.path, pkg_dir_entry.directory);
 
         cm_runner::StartInfo {
             resolved_url: "fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm"

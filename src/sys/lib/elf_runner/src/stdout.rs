@@ -7,8 +7,8 @@ use {
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
     fidl::prelude::*,
-    fidl_fuchsia_logger::LogSinkMarker,
-    fidl_fuchsia_process as fproc, fuchsia_async as fasync,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
     futures::StreamExt,
@@ -22,8 +22,7 @@ use {
 
 const STDOUT_FD: i32 = 1;
 const STDERR_FD: i32 = 2;
-const SVC_DIRECTORY_NAME: &str = "/svc";
-const SYSLOG_PROTOCOL_NAME: &str = LogSinkMarker::PROTOCOL_NAME;
+const SVC_DIRECTORY_PATH: &str = "/svc";
 
 /// Max size for message when draining input stream socket. This number is
 /// slightly smaller than size allowed by Archivist (LogSink service implementation).
@@ -73,10 +72,14 @@ pub fn bind_streams_to_syslog(
 }
 
 fn create_namespace_logger(ns: &ComponentNamespace) -> Option<ScopedLogger> {
-    ns.items()
-        .iter()
-        .find(|(path, _)| path == SVC_DIRECTORY_NAME)
-        .and_then(|(_, dir)| ScopedLogger::from_directory(&dir, SYSLOG_PROTOCOL_NAME).ok())
+    let svc_dir =
+        ns.items().iter().find_map(|(path, dir)| (path == SVC_DIRECTORY_PATH).then_some(dir))?;
+    let logsink = connect_to_named_protocol_at_dir_root::<flogger::LogSinkMarker>(
+        svc_dir,
+        flogger::LogSinkMarker::PROTOCOL_NAME,
+    )
+    .ok()?;
+    ScopedLogger::create(logsink).ok()
 }
 
 fn forward_socket_to_syslog(
@@ -335,9 +338,11 @@ mod tests {
     }
 
     async fn write_to_syslog_or_panic(
-        ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
+        namespace: cm_runner::Namespace,
         message: &[u8],
     ) -> Result<(), Error> {
+        // TODO(fxbug.dev/131717): Runner lib should accept cm_runner::Namespace directly
+        let ns_entries: Vec<fcrunner::ComponentNamespaceEntry> = namespace.into();
         let ns = ComponentNamespace::try_from(ns_entries)
             .context("Failed to create ComponentNamespace")?;
         let logger = create_namespace_logger(&ns).context("Failed to create ScopedLogger")?;

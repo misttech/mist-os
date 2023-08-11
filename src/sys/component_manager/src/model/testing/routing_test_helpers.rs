@@ -34,7 +34,7 @@ use {
     },
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
@@ -478,8 +478,9 @@ impl RoutingTest {
             .expect("component not in namespace")
             .lock()
             .await
+            .entries
             .iter()
-            .map(|entry| entry.path.as_ref().unwrap().clone())
+            .map(|entry| entry.path.clone())
             .collect();
 
         expected_paths.sort_unstable();
@@ -1483,11 +1484,12 @@ pub mod capability_util {
         // Find the index of our directory in the namespace, and remove the directory and path. The
         // path is removed so that the paths/dirs aren't shuffled in the namespace.
         let index = ns
+            .entries
             .iter()
-            .position(|entry| entry.path.as_ref().unwrap() == dir_path)
+            .position(|entry| entry.path == dir_path)
             .unwrap_or_else(|| panic!("didn't find dir {}", dir_path));
-        let entry = ns.remove(index);
-        let dir_proxy = entry.directory.unwrap().into_proxy().unwrap();
+        let entry = ns.entries.remove(index);
+        let dir_proxy = entry.directory.into_proxy().unwrap();
         dir_proxy
     }
 
@@ -1499,11 +1501,9 @@ pub mod capability_util {
         dir_proxy: fio::DirectoryProxy,
     ) {
         let mut ns = namespace.lock().await;
-        ns.push(fcrunner::ComponentNamespaceEntry {
-            path: Some(dir_path.to_string()),
-            directory: Some(ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel())),
-            ..Default::default()
-        });
+        // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
+        let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
+        ns.add(dir_path.to_string(), client_end);
     }
 
     /// Open the exposed dir for `moniker`.

@@ -640,11 +640,11 @@ pub enum StartActionError {
         #[source]
         err: PolicyError,
     },
-    #[error("Couldn't start `{moniker}` because we failed to populate its namespace: {err}")]
-    NamespacePopulateError {
+    #[error("Couldn't start `{moniker}` because we failed to create its namespace: {err}")]
+    CreateNamespaceError {
         moniker: Moniker,
         #[source]
-        err: NamespacePopulateError,
+        err: CreateNamespaceError,
     },
     #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
     StructuredConfigError {
@@ -666,7 +666,7 @@ impl StartActionError {
             Self::RebootOnTerminateForbidden { err, .. } => err.as_zx_status(),
             Self::ResolveRunnerError { err, .. } => err.as_zx_status(),
             Self::InstanceDestroyed { .. } | Self::InstanceShutDown { .. } => zx::Status::NOT_FOUND,
-            Self::NamespacePopulateError { err, .. } => err.as_zx_status(),
+            Self::CreateNamespaceError { err, .. } => err.as_zx_status(),
             _ => zx::Status::INTERNAL,
         }
     }
@@ -831,23 +831,23 @@ impl Into<fsys::UnresolveError> for UnresolveActionError {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum NamespacePopulateError {
+pub enum CreateNamespaceError {
     #[error("failed to clone pkg dir: {0}")]
-    ClonePkgDirFailed(#[source] ClonableError),
+    ClonePkgDirFailed(#[source] fuchsia_fs::node::CloneError),
 
     #[error("{0}")]
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 
-    #[error("failed to add additional namespace entries because they conflict with paths for used capabilities")]
-    ConflictBetweenUsesAndAdditionalEntries,
+    #[error("invalid additional namespace entries")]
+    InvalidAdditionalEntries(#[source] cm_runner::NamespaceError),
 }
 
-impl NamespacePopulateError {
+impl CreateNamespaceError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::ClonePkgDirFailed(_) => zx::Status::IO,
             Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
-            Self::ConflictBetweenUsesAndAdditionalEntries { .. } => zx::Status::INVALID_ARGS,
+            Self::InvalidAdditionalEntries(_) => zx::Status::INVALID_ARGS,
         }
     }
 }

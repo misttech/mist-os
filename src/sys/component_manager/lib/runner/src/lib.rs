@@ -4,6 +4,10 @@
 
 pub mod builtin;
 pub mod component_controller;
+pub mod namespace;
+
+pub use namespace::Entry as NamespaceEntry;
+pub use namespace::{Namespace, NamespaceError};
 
 use {
     async_trait::async_trait, fidl::endpoints::ServerEnd,
@@ -29,6 +33,9 @@ pub trait Runner: Sync + Send {
 pub enum StartInfoError {
     #[error("resolved_url is not set")]
     MissingResolvedUrl,
+
+    #[error("invalid namespace")]
+    NamespaceError(#[source] NamespaceError),
 }
 
 pub struct StartInfo {
@@ -62,7 +69,7 @@ pub struct StartInfo {
     /// The mount points specified in each entry must be unique and
     /// non-overlapping. For example, [{"/foo", ..}, {"/foo/bar", ..}] is
     /// invalid.
-    pub namespace: Vec<fcrunner::ComponentNamespaceEntry>,
+    pub namespace: Namespace,
 
     /// The directory this component serves.
     pub outgoing_dir: Option<ServerEnd<fio::DirectoryMarker>>,
@@ -107,11 +114,15 @@ impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
     fn try_from(start_info: fcrunner::ComponentStartInfo) -> Result<Self, Self::Error> {
         let resolved_url =
             start_info.resolved_url.ok_or_else(|| StartInfoError::MissingResolvedUrl)?;
+        let namespace = start_info.ns.map_or_else(
+            || Ok(Namespace::default()),
+            |ns| Namespace::try_from(ns).map_err(StartInfoError::NamespaceError),
+        )?;
 
         Ok(Self {
             resolved_url,
             program: start_info.program.unwrap_or_else(|| fdata::Dictionary::default()),
-            namespace: start_info.ns.unwrap_or_else(|| Vec::new()),
+            namespace,
             outgoing_dir: start_info.outgoing_dir,
             runtime_dir: start_info.runtime_dir,
             numbered_handles: start_info.numbered_handles.unwrap_or_else(|| Vec::new()),
@@ -126,7 +137,7 @@ impl From<StartInfo> for fcrunner::ComponentStartInfo {
         Self {
             resolved_url: Some(start_info.resolved_url),
             program: Some(start_info.program),
-            ns: Some(start_info.namespace),
+            ns: Some(start_info.namespace.into()),
             outgoing_dir: start_info.outgoing_dir,
             runtime_dir: start_info.runtime_dir,
             numbered_handles: Some(start_info.numbered_handles),
