@@ -5,7 +5,7 @@
 use crate::pbm::make_configs;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use emulator_instance::{EmulatorConfiguration, EngineType, NetworkingMode};
+use emulator_instance::{clean_up_instance_dir, EmulatorConfiguration, EngineType, NetworkingMode};
 use errors::ffx_bail;
 use ffx_config::Sdk;
 use ffx_emulator_common::get_file_hash;
@@ -16,7 +16,6 @@ use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter, TryFromEn
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use pbms::{ListingMode, LoadedProductBundle};
 use std::{marker::PhantomData, str::FromStr};
-
 mod editor;
 mod pbm;
 
@@ -46,6 +45,8 @@ pub trait EngineOperations: Default + 'static {
         product_bundle: &Option<String>,
         mode: ListingMode,
     ) -> Result<LoadedProductBundle>;
+
+    async fn clean_up_instance_dir(&self, instance_name: &str) -> Result<()>;
 }
 
 #[derive(Default)]
@@ -93,6 +94,10 @@ impl EngineOperations for EngineOperationsData {
         mode: ListingMode,
     ) -> Result<LoadedProductBundle> {
         pbms::load_product_bundle(sdk, product_bundle, mode).await
+    }
+
+    async fn clean_up_instance_dir(&self, instance_name: &str) -> Result<()> {
+        clean_up_instance_dir(instance_name).await
     }
 }
 
@@ -145,7 +150,22 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
                 .context("Reading engine type from ffx config.")?;
 
         // Get the staged instance, if any
-        let existing = self.engine_operations.get_engine_by_name(&mut self.cmd.name).await?;
+        let mut existing = self.engine_operations.get_engine_by_name(&mut self.cmd.name).await?;
+
+        // Check that it is not running.
+        if let Some(ref mut existing_instance) = existing {
+            let name = self.cmd.name.as_ref().unwrap();
+            if existing_instance.is_running().await {
+                ffx_bail!("An existing emulator instance named {name} is already running");
+            } else if !self.cmd.reuse && !self.cmd.reuse_with_check {
+                if let Some(cleanup_err) =
+                    self.engine_operations.clean_up_instance_dir(&name).await.err()
+                {
+                    ffx_bail!("Cleanup of '{name}' failed with the following error: {cleanup_err}");
+                }
+                existing = None;
+            }
+        }
 
         let mut engine = self.get_engine(&emulator_configuration, engine_type, existing).await?;
 
@@ -422,6 +442,7 @@ mod tests {
         stage_test_fn: fn(&mut EmulatorConfiguration) -> Result<()>,
         start_test_fn: fn(Command) -> Result<()>,
         config: EmulatorConfiguration,
+        running: bool,
     }
 
     impl Default for TestEngine {
@@ -434,6 +455,7 @@ mod tests {
                 did_stage: false,
                 did_start: false,
                 config: EmulatorConfiguration::default(),
+                running: false,
             }
         }
     }
@@ -472,6 +494,10 @@ mod tests {
 
         fn emu_config(&self) -> &EmulatorConfiguration {
             &self.config
+        }
+
+        async fn is_running(&mut self) -> bool {
+            self.running
         }
     }
 
@@ -574,6 +600,87 @@ mod tests {
             target_collection: proxy,
             sdk,
         }
+    }
+
+    // Check that a running instance is an error
+    #[fuchsia::test]
+    async fn test_start_with_running_instance() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let cmd = StartCommand::default();
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        tool.engine_operations
+            .expect_get_engine_by_name()
+            .returning(|_| {
+                Ok(Some(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: false,
+                    running: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
+            })
+            .times(1);
+
+        let pb =
+            ProductBundle::V2(make_test_product_bundle(env.isolate_root.path()).expect("test pb"));
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        let result = tool.main(SimpleWriter::new()).await;
+        assert!(result.is_err())
+    }
+
+    // Check that an existing instance that is not running is cleaned up.
+    #[fuchsia::test]
+    async fn test_start_with_instance_dir() {
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        let cmd = StartCommand::default();
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        tool.engine_operations
+            .expect_get_engine_by_name()
+            .returning(|_| {
+                Ok(Some(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: false,
+                    running: false,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
+            })
+            .times(1);
+
+        tool.engine_operations.expect_new_engine().returning(|_, _| {
+            Ok(Box::new(TestEngine {
+                do_stage: true,
+                do_start: true,
+                config: EmulatorConfiguration::default(),
+                ..Default::default()
+            }) as Box<dyn EmulatorEngine>)
+        });
+
+        tool.engine_operations.expect_clean_up_instance_dir().returning(|_| Ok(())).times(1);
+
+        let pb =
+            ProductBundle::V2(make_test_product_bundle(env.isolate_root.path()).expect("test pb"));
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_, _, _| Ok(loaded_pb.clone()))
+            .times(1);
+
+        let result = tool.main(SimpleWriter::new()).await;
+        assert!(result.is_ok())
     }
 
     // Check that new_engine gets called by default and get_engine_by_name doesn't
