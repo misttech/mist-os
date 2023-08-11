@@ -2580,30 +2580,22 @@ template("variant_target") {
         visibility += [ ":${target_name}" ]
       }
     }
-  } else if (current_toolchain == shlib_toolchain ||
-             target_type == "shared_library" ||
+  } else if (target_type == "shared_library" ||
              builder_toolchain == toolchain_variant.base) {
     # This corresponds to the following cases, which don't require a
     # copy from the builder_toolchain to the current one:
     #
-    # - current_toolchain == shlib_toolchain:
-    #
-    #    Already in an shlib toolchain, but needs to be built in a
-    #    different (variant-specific) shlib toolchain. This happens
-    #    when the shared_library("foo") target depends on another
-    #    loadable_module("bar") target that must be built with a
-    #    different variant. E.g.:
-    #
-    #      //src:prog -->
-    #          //src:foo -->
-    #              //src:foo(x64-shared) -->
-    #                 //src:bar(x64-shared) --> HERE!
-    #                    //src:bar(x64-asan-shared)
-    #
     # - target_type == "shared_library":
     #
-    #    Should only happen when in the default toolchain instance
+    #    Should only happen when in the base toolchain instance
     #    to redirect to the variant-specific builder toolchain.
+    #
+    #    Note that a loadable_module() target does require a copy from its
+    #    variant-shlib_toolchain location to the base shlib_toolchain location
+    #    because its output file might be used as in the input to another
+    #    target like an action() or copy() (e.g. via host_test_data()); these
+    #    expect to use the shlib_toolchain for their deps since it's known to
+    #    be a loadable_module() target, but they don't know about the variant.
     #
     # - builder_toolchain == toolchain_variant.base
     #
@@ -2669,9 +2661,14 @@ template("variant_target") {
       deps = [ ":${target_name}(${builder_toolchain})" ]
 
       full_output_name = target_invoker.output_name
-      if (defined(target_invoker.output_extension) &&
-          target_invoker.output_extension != "") {
-        full_output_name += ".${target_invoker.output_extension}"
+      output_extension = ""
+      if (defined(target_invoker.output_extension)) {
+        output_extension = target_invoker.output_extension
+      } else if (target_type == "loadable_module") {
+        output_extension = ".so"
+      }
+      if (output_extension != "") {
+        full_output_name += ".$output_extension"
       }
 
       local_out_dir = root_out_dir
