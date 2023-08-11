@@ -55,18 +55,11 @@ impl<T: Instances> TryFromEnvWith for WithInstances<T> {
     }
 }
 
-fn instance_getter<P: Instances>() -> WithInstances<P> {
-    WithInstances(PhantomData::<P>::default())
-}
-
 /// Sub-sub tool for `emu list`
 #[derive(FfxTool)]
 pub struct EmuListTool<T: Instances> {
     #[command]
     cmd: ListCommand,
-    // TODO(http://fxbug.dev/125356): FfxTool derive macro should handle generics
-    // using #with is a workaround.
-    #[with(instance_getter())]
     instances: T,
 }
 

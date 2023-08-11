@@ -12,10 +12,11 @@ use ffx_emulator_common::get_file_hash;
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
-use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter, TryFromEnvWith};
+use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter, TryFromEnv};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use pbms::{ListingMode, LoadedProductBundle};
-use std::{marker::PhantomData, str::FromStr};
+use std::str::FromStr;
+
 mod editor;
 mod pbm;
 
@@ -25,7 +26,7 @@ pub(crate) const DEFAULT_NAME: &str = "fuchsia-emulator";
 /// these methods.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
-pub trait EngineOperations: Default + 'static {
+pub trait EngineOperations: TryFromEnv + 'static {
     async fn get_engine_by_name(
         &self,
         name: &mut Option<String>,
@@ -52,14 +53,10 @@ pub trait EngineOperations: Default + 'static {
 #[derive(Default)]
 pub struct EngineOperationsData;
 
-#[derive(Debug, Clone, Default)]
-pub struct WithEngineOperations<P: EngineOperations>(PhantomData<P>);
-
 #[async_trait(?Send)]
-impl<T: EngineOperations> TryFromEnvWith for WithEngineOperations<T> {
-    type Output = T;
-    async fn try_from_env_with(self, _env: &fho::FhoEnvironment) -> Result<T, fho::Error> {
-        Ok(T::default())
+impl TryFromEnv for EngineOperationsData {
+    async fn try_from_env(_env: &fho::FhoEnvironment) -> Result<Self, fho::Error> {
+        Ok(Self::default())
     }
 }
 
@@ -101,18 +98,11 @@ impl EngineOperations for EngineOperationsData {
     }
 }
 
-fn engine_operations_getter<P: EngineOperations>() -> WithEngineOperations<P> {
-    WithEngineOperations(PhantomData::<P>::default())
-}
-
 /// Sub-sub tool for `emu start`
 #[derive(FfxTool)]
 pub struct EmuStartTool<T: EngineOperations> {
     #[command]
     cmd: StartCommand,
-    // TODO(http://fxbug.dev/125356): FfxTool derive macro should handle generics
-    // using #with is a workaround.
-    #[with(engine_operations_getter())]
     engine_operations: T,
     #[with(daemon_protocol())]
     target_collection: TargetCollectionProxy,
@@ -515,6 +505,13 @@ mod tests {
                     "The start() function was supposed to be called but never was."
                 );
             }
+        }
+    }
+
+    #[async_trait(?Send)]
+    impl TryFromEnv for MockEngineOperations {
+        async fn try_from_env(_env: &fho::FhoEnvironment) -> fho::Result<Self> {
+            Ok(Self::default())
         }
     }
 

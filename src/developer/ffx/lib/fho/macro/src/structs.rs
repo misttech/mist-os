@@ -7,28 +7,8 @@ use crate::{
     types::{FfxFlag, FromEnvAttributes, NamedField, NamedFieldTy},
 };
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{self, spanned::Spanned, ExprCall};
-
-/// Creates an assert to ensure that a type implements TryFromEnv.
-struct TryFromEnvTypeAssertion<'a> {
-    /// Used to create a unique generic assert struct name. It's the caller's
-    /// responsibility to ensure this is unique.
-    id: usize,
-    field: NamedField<'a>,
-}
-
-impl ToTokens for TryFromEnvTypeAssertion<'_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let name = self.field.field_name;
-        let assert_name = format_ident!("{}{}", "_AssertTryFrom", self.id, span = name.span());
-        let ty = self.field.field_ty;
-        let ty_span = ty.span();
-        tokens.extend(quote_spanned! {ty_span=>
-            struct #assert_name where #ty: fho::TryFromEnv;
-        })
-    }
-}
 
 /// Creates the top-level struct declaration before any brackets are used.
 ///
@@ -135,7 +115,6 @@ impl ToTokens for CommandFieldTypeDecl<'_> {
 /// field names).
 #[derive(Default)]
 struct VariableCreationCollection<'a> {
-    try_from_env_type_assertions: Vec<TryFromEnvTypeAssertion<'a>>,
     join_results_names: Vec<&'a syn::Ident>,
     try_from_env_invocations: Vec<TryFromEnvInvocation<'a>>,
 }
@@ -151,14 +130,10 @@ impl<'a> VariableCreationCollection<'a> {
             Blank(field) => {
                 self.try_from_env_invocations.push(TryFromEnvInvocation::Normal(field.field_ty));
                 self.join_results_names.push(field.field_name);
-                let id = self.try_from_env_type_assertions.len() + 1;
-                self.try_from_env_type_assertions.push(TryFromEnvTypeAssertion { id, field });
             }
             With(expr, field) => {
                 self.try_from_env_invocations.push(TryFromEnvInvocation::Decorated(expr));
                 self.join_results_names.push(field.field_name);
-                // since output types don't necessarily match for decorated try_from_envs we
-                // won't emit a type assertion here.
             }
             Command(field) => {
                 return Err(ParseError::UnexpectedAttr(
@@ -245,11 +220,9 @@ impl ToTokens for NamedFieldStruct<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let Self { forces_stdout_logs, command_field_decl, struct_decl, checks, vcc } = self;
         let command_field_name = command_field_decl.0.field_name;
-        let try_from_env_type_assertions = &vcc.try_from_env_type_assertions;
         let join_results_names = &vcc.join_results_names;
         let span = Span::call_site();
         let res = quote_spanned! {span=>
-            #(#try_from_env_type_assertions)*
             #struct_decl {
                 #command_field_decl
                 async fn from_env(
