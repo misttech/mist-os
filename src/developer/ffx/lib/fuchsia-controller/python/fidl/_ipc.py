@@ -14,11 +14,14 @@ class _QueueWrapper(object):
 
     def __init__(self):
         self.queue = asyncio.Queue()
-        self.loop = asyncio.get_running_loop()
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = None
 
     def _precheck(self):
         """Checks if this queue is being used across loops. If it is, then this will reset state."""
-        if self.loop.is_closed():
+        if self.loop is None or self.loop.is_closed():
             self.loop = asyncio.get_running_loop()
             self.queue = asyncio.Queue()
 
@@ -60,14 +63,20 @@ class GlobalChannelWaker(object):
         if channel_number not in self.handle_ready_queues:
             self.handle_ready_queues[channel_number] = _QueueWrapper()
         notification_fd = fc.connect_handle_notifier()
-        # Calling this multiple times only overwrites the reader.
-        # In the event that the loop is destroyed this will be removed automatically.
-        asyncio.get_running_loop().add_reader(
-            notification_fd,
-            enqueue_ready_zx_handle_from_fd,
-            notification_fd,
-            self.handle_ready_queues,
-        )
+        # This try call is simply here in the event that this registration has happened in a
+        # synchronous context (which only happens now when _send_two_way_fidl_request is called
+        # inside asyncio.run(...)).
+        try:
+            # Calling this multiple times only overwrites the reader.
+            # In the event that the loop is destroyed this will be removed automatically.
+            asyncio.get_running_loop().add_reader(
+                notification_fd,
+                enqueue_ready_zx_handle_from_fd,
+                notification_fd,
+                self.handle_ready_queues,
+            )
+        except RuntimeError:
+            pass
 
     def unregister(self, channel: fc.FidlChannel):
         logging.debug(f"Unregistering channel: {channel.as_int()}")

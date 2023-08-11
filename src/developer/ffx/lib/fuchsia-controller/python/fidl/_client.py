@@ -284,7 +284,7 @@ class FidlClient(object):
             if type(msg) != int:  # Not a FIDL channel response
                 return self._decode(txid, msg)
 
-    async def _send_two_way_fidl_request(
+    def _send_two_way_fidl_request(
             self, ordinal, library, msg_obj, response_ident):
         """Sends a two-way asynchronous FIDL request.
 
@@ -302,11 +302,18 @@ class FidlClient(object):
         self.channel_waker.register(self.channel)
         self.pending_txids.add(TXID)
         self._send_one_way_fidl_request(TXID, ordinal, library, msg_obj)
-        res = await self._read_and_decode(TXID)
-        result_obj = make_default_obj_from_ident(response_ident)
-        if result_obj is not None:
-            construct_result(result_obj, res)
-        return result_obj
+
+        async def result(txid):
+            # This is called a second time because the first attempt may have been in a sync context
+            # and would not have added a reader.
+            self.channel_waker.register(self.channel)
+            res = await self._read_and_decode(txid)
+            result_obj = make_default_obj_from_ident(response_ident)
+            if result_obj is not None:
+                construct_result(result_obj, res)
+            return result_obj
+
+        return result(TXID)
 
     def _send_one_way_fidl_request(
             self, txid: int, ordinal: int, library: str, msg_obj):
