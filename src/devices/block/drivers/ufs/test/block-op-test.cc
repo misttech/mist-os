@@ -17,7 +17,7 @@ TEST_F(BlockOpTest, ReadTest) {
   zx_device* lu_dev = device_->GetLatestChild();
 
   char buf[ufs_mock_device::kMockBlockSize];
-  std::strcpy(buf, "test");
+  std::strncpy(buf, "test", sizeof(buf));
   ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, 1, 0));
 
   ddk::BlockImplProtocolClient client(lu_dev);
@@ -86,7 +86,7 @@ TEST_F(BlockOpTest, WriteTest) {
   ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
                                        ufs_mock_device::kMockBlockSize, &vaddr));
   char* mapped_vaddr = reinterpret_cast<char*>(vaddr);
-  std::strcpy(mapped_vaddr, "test");
+  std::strncpy(mapped_vaddr, "test", ufs_mock_device::kMockBlockSize);
 
   auto block_op = std::make_unique<uint8_t[]>(op_size);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());

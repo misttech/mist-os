@@ -173,7 +173,7 @@ TEST_F(BootPartitionTest, BlockImplOpsPassedThrough) {
     ASSERT_OK(zx::vmo::create(10, 0, &vmo));
 
     char buffer[10];
-    strcpy(buffer, "Test data");
+    strncpy(buffer, "Test data", sizeof(buffer));
     EXPECT_OK(vmo.write(buffer, 0, sizeof(buffer)));
 
     block_op_t txn{

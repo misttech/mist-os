@@ -18,6 +18,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice>,
   FakeBlockDevice() { memset(data_, 0xff, sizeof(data_)); }
 
   char* data() { return data_; }
+  size_t data_size() { return sizeof(data_); }
   bool flushed() const { return flushed_; }
 
   const block_impl_protocol_ops_t* BlockOps() const { return &block_impl_protocol_ops_; }
@@ -132,7 +133,7 @@ TEST_F(AbrShimTest, BlockOpsPassedThrough) {
   ASSERT_OK(zx::vmo::create(512, 0, &vmo));
 
   char buffer[512];
-  strcpy(buffer, "Write to block device");
+  strncpy(buffer, "Write to block device", sizeof(buffer));
   EXPECT_OK(vmo.write(buffer, 0, sizeof(buffer)));
 
   block_op_t txn{
@@ -178,7 +179,8 @@ TEST_F(AbrShimTest, BlockOpsPassedThrough) {
 }
 
 TEST_F(AbrShimTest, OneShotRecovery) {
-  strcpy(fake_block_device_.data() + 256, "This should be preserved");
+  strncpy(fake_block_device_.data() + 256, "This should be preserved",
+          fake_block_device_.data_size() - 256);
 
   parent_->GetLatestChild()->SuspendNewOp(0, false, DEVICE_SUSPEND_REASON_REBOOT_RECOVERY);
   EXPECT_TRUE(parent_->GetLatestChild()->SuspendReplyCalled());
@@ -211,7 +213,7 @@ TEST_F(AbrShimTest, OneShotRecovery) {
 }
 
 TEST_F(AbrShimTest, NoOneShotRecoveryOnNormalReboot) {
-  strcpy(fake_block_device_.data(), "This should be preserved");
+  strncpy(fake_block_device_.data(), "This should be preserved", fake_block_device_.data_size());
 
   parent_->GetLatestChild()->SuspendNewOp(0, false, DEVICE_SUSPEND_REASON_REBOOT);
   EXPECT_TRUE(parent_->GetLatestChild()->SuspendReplyCalled());

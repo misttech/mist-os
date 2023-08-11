@@ -491,7 +491,7 @@ TEST(RamdiskTests, RamdiskTestFilesystem) {
   // Be slightly more lenient with errors during this section, since we might be poking
   // block devices that don't belong to us.
   char blockpath[PATH_MAX];
-  strcpy(blockpath, "/dev/class/block/");
+  strncpy(blockpath, "/dev/class/block/", sizeof(blockpath));
   DIR* dir = opendir(blockpath);
   ASSERT_NE(dir, nullptr);
   const auto closer = fit::defer([dir]() { closedir(dir); });
