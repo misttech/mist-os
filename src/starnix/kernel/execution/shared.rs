@@ -62,6 +62,11 @@ pub fn execute_syscall(
 ) -> Option<ErrorContext> {
     #[cfg(feature = "syscall_stats")]
     SyscallDecl::stats_property(syscall_decl.number).add(1);
+    trace_duration!(
+        trace_category_starnix!(),
+        trace_name_execute_syscall!(),
+        trace_arg_name!() => syscall_decl.name
+    );
 
     let syscall = Syscall::new(syscall_decl, current_task);
 

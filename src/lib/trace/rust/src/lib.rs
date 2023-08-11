@@ -295,19 +295,6 @@ impl<'a> Drop for DurationScope<'a> {
     }
 }
 
-/// Write a "duration complete" record representing both the beginning and end of a duration.
-pub fn complete_duration(
-    category: &'static CStr,
-    name: &'static CStr,
-    start_time: sys::trace_ticks_t,
-    args: &[Arg<'_>],
-) {
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_duration(name_ref, start_time, args);
-    }
-}
-
 /// Convenience macro for the `duration` function that can be used to trace
 /// the duration of a scope. If you need finer grained control over when a
 /// duration starts and stops, see `duration_begin` and `duration_end`.

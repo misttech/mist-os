@@ -83,14 +83,12 @@ impl RestrictedState {
     }
 
     pub fn write_state(&mut self, state: &zx::sys::zx_restricted_state_t) {
-        trace_duration!(trace_category_starnix!(), trace_name_write_restricted_state!());
         debug_assert!(self.state_size >= std::mem::size_of::<zx::sys::zx_restricted_state_t>());
         self.bound_state[0..std::mem::size_of::<zx::sys::zx_restricted_state_t>()]
             .copy_from_slice(Self::restricted_state_as_bytes(state));
     }
 
     pub fn read_state(&self, state: &mut zx::sys::zx_restricted_state_t) {
-        trace_duration!(trace_category_starnix!(), trace_name_read_restricted_state!());
         debug_assert!(self.state_size >= std::mem::size_of::<zx::sys::zx_restricted_state_t>());
         Self::restricted_state_as_bytes_mut(state).copy_from_slice(
             &self.bound_state[0..std::mem::size_of::<zx::sys::zx_restricted_state_t>()],
@@ -175,17 +173,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
     set_current_task_info(current_task);
 
-    trace_duration!(trace_category_starnix!(), trace_name_run_task!());
-
-    // We want to measure the task runtime in restricted mode ("user mode") separately from
-    // normal mode ("kernel mode"), so we'll measure it once on each transition to/from user code
-    // and record that delta.
-    let mut task_info_scope = trace_duration_begin_with_task_info!(
-        current_task,
-        trace_category_starnix!(),
-        trace_name_normal_mode!()
-    );
-
     // This is the pointer that is passed to `restricted_enter`.
     let restricted_return_ptr = restricted_return as *const ();
 
@@ -215,26 +202,20 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
     // Map the restricted state VMO and arrange for it to be unmapped later.
     let mut restricted_state = RestrictedState::from_vmo(state_vmo)?;
+
+    let mut syscall_decl = SyscallDecl::from_number(u64::MAX);
     loop {
         let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.registers);
 
         // Copy the register state into the mapped VMO.
         restricted_state.write_state(&state);
 
-        // We're about to hand control back to userspace, and traces should transition directly from
-        // the task loop. Compute the task runtime delta here if enabled.
-        trace_duration_end_with_task_info!(task_info_scope);
-        task_info_scope = trace_duration_begin_with_task_info!(
-            current_task,
-            trace_category_starnix!(),
-            trace_name_restricted_mode!()
-        );
-
         let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
+        trace_duration_begin!(trace_category_starnix!(), trace_name_user_space!());
         let status = zx::Status::from_raw(unsafe {
-            // The closure provided to run_with_saved_state must be minimal to avoid using
-            // floating point or vector state. In particular, the zx::Status conversion compiles
-            // to a vector register operation by default and must happen outside this closure.
+            // The closure provided to run_with_saved_state must be minimal to avoid using floating point
+            // or vector state. In particular, the zx::Status conversion compiles to a vector register operation
+            // by default and must happen outside this closure.
             current_task.extended_pstate.run_with_saved_state(|| {
                 restricted_enter(
                     RESTRICTED_ENTER_OPTIONS,
@@ -243,6 +224,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 )
             })
         });
+        trace_duration_end!(trace_category_starnix!(), trace_name_user_space!());
         match { status } {
             zx::Status::OK => {
                 // Successfully entered and exited restricted mode. At this point the task has
@@ -252,27 +234,21 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
         }
 
-        // We just received control back from userspace and traces should transition directly to
-        // the task loop. Compute the task runtime delta here if enabled.
-        trace_duration_end_with_task_info!(task_info_scope);
-        task_info_scope = trace_duration_begin_with_task_info!(
-            current_task,
-            trace_category_starnix!(),
-            trace_name_normal_mode!()
-        );
-
         // Copy the register state out of the VMO.
         restricted_state.read_state(&mut state);
 
         match reason_code {
             zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
-                trace_duration_begin!(trace_category_starnix!(), trace_name_execute_syscall!());
+                trace_duration!(
+                    trace_category_starnix!(),
+                    trace_name_run_task_loop!(),
+                    trace_arg_name!() => syscall_decl.name
+                );
 
                 // Store the new register state in the current task before dispatching the system call.
                 current_task.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&state).into();
-                let syscall_decl =
-                    SyscallDecl::from_number(current_task.registers.syscall_register());
+                syscall_decl = SyscallDecl::from_number(current_task.registers.syscall_register());
 
                 // Generate CFI directives so the unwinder will be redirected to unwind the restricted
                 // stack.
@@ -284,15 +260,8 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
                 // Restore the CFI directives before continuing.
                 restore_cfi_directives!();
-
-                trace_duration_end!(
-                    trace_category_starnix!(),
-                    trace_name_execute_syscall!(),
-                    trace_arg_name!() => syscall_decl.name
-                );
             }
             zx::sys::ZX_RESTRICTED_REASON_EXCEPTION => {
-                trace_duration!(trace_category_starnix!(), trace_name_handle_exception!());
                 let restricted_exception = restricted_state.read_exception();
 
                 current_task.registers =
@@ -303,12 +272,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 process_completed_exception(current_task, exception_result);
             }
             zx::sys::ZX_RESTRICTED_REASON_KICK => {
-                trace_instant!(
-                    trace_category_starnix!(),
-                    trace_name_restricted_kick!(),
-                    fuchsia_trace::Scope::Thread
-                );
-
                 // Update the task's register state.
                 current_task.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&state).into();
@@ -320,11 +283,10 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 return Err(format_err!(
                     "Received unexpected restricted reason code: {}",
                     reason_code
-                ));
+                ))
             }
         }
 
-        trace_duration!(trace_category_starnix!(), trace_name_check_task_exit!());
         if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
         {
             let dump_on_exit = current_task.read().dump_on_exit;

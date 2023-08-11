@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use extended_pstate::ExtendedPstateState;
-use fuchsia_zircon::{
-    self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals, Task as _,
-};
+use fuchsia_zircon::{self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals};
 use once_cell::sync::OnceCell;
 use std::{
     cmp,
@@ -1194,15 +1192,6 @@ impl Task {
         };
 
         self.mm.read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
-    }
-
-    pub fn thread_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, Errno> {
-        self.thread
-            .read()
-            .as_ref()
-            .ok_or_else(|| errno!(EINVAL))?
-            .get_runtime_info()
-            .map_err(|status| from_status_like_fdio!(status))
     }
 
     pub fn as_ucred(&self) -> ucred {
