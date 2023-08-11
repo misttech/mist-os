@@ -47,6 +47,11 @@ fuchsia_driver_component("usb-cdc-function") {
   manifest = "meta/usb-cdc-function.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "usb-cdc-function"
+  driver_components = [ ":usb-cdc-function" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":usb_cdc_bind_test" ]

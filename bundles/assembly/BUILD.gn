@@ -87,6 +87,8 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
+
+    "//src/devices/usb/bin/usbctl",
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
@@ -250,6 +252,26 @@ assembly_input_bundle("bootstrap") {
     {
       package_target = "//src/ui/input/drivers/usb-hid:package"
       driver_components = [ "meta/usb-hid.cm" ]
+    },
+
+    # TODO(fxb/131976): Carve out usb-peripheral-stack drivers for specific products/boards.
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/rndis-function:package"
+      driver_components = [ "meta/rndis-function.cm" ]
+    },
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/usb-cdc-function:package"
+      driver_components = [ "meta/usb-cdc-function.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/ums-function:package"
+      driver_components = [ "meta/ums-function.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/usb-peripheral:package"
+      driver_components = [ "meta/usb-peripheral.cm" ]
     },
   ]
 }

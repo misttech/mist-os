@@ -64,6 +64,11 @@ fuchsia_driver_component("rndis-function") {
   manifest = "meta/rndis-function.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "rndis-function"
+  driver_components = [ ":rndis-function" ]
+}
+
 test("rndis-function-test") {
   if (is_fuchsia) {
     testonly = true

@@ -65,6 +65,11 @@ fuchsia_driver_component("usb-peripheral") {
   manifest = "meta/usb-peripheral.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "usb-peripheral"
+  driver_components = [ ":usb-peripheral" ]
+}
+
 test("usb-peripheral-unittest-bin") {
   sources = [
     "usb-function.cc",

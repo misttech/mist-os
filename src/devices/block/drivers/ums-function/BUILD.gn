@@ -50,3 +50,8 @@ fuchsia_driver_component("ums-function") {
   info = "ums-function-info.json"
   manifest = "meta/ums-function.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "ums-function"
+  driver_components = [ ":ums-function" ]
+}
