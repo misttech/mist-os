@@ -13,7 +13,7 @@ load("//:build/bazel/toolchains/linux_sysroot.bzl", "linux_sysroot")
 # This exclude is needed as there are files in the folder that have space
 # in the filename. Bazel does not support spaces in filename.
 _python_prebuilt_files = glob(
-    ["prebuilt/third_party/python3/%s/**/*" % build_config.host_tag],
+    ["prebuilt/third_party/python3.11/%s/**/*" % build_config.host_tag],
     exclude = ["**/* *"],
 )
 
