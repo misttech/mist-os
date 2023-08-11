@@ -2,39 +2,55 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod realm_factory_impl;
-mod realm_factory_server;
-use crate::realm_factory_impl::*;
-use crate::realm_factory_server::*;
+mod realm_factory;
+use crate::realm_factory::*;
 
 use {
     anyhow::{Error, Result},
-    fidl_server::*,
-    fidl_test_wlan_realm::RealmFactoryRequestStream,
+    fidl_test_wlan_realm::*,
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-    tracing::*,
+    futures::{StreamExt, TryStreamExt},
 };
 
-enum IncomingService {
-    RealmFactory(RealmFactoryRequestStream),
+#[fuchsia::main]
+async fn main() -> Result<(), Error> {
+    let mut fs = ServiceFs::new();
+    fs.dir("svc").add_fidl_service(|stream: RealmFactoryRequestStream| stream);
+    fs.take_and_serve_directory_handle()?;
+    fs.for_each_concurrent(0, serve_realm_factory).await;
+    Ok(())
 }
 
-#[fuchsia::main(logging = true)]
-async fn main() -> Result<(), Error> {
-    info!("starting");
+async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
+    let mut task_group = fasync::TaskGroup::new();
+    let mut factory = WlanTestRealmFactory::new();
+    let result: Result<(), Error> = async move {
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                RealmFactoryRequest::SetRealmOptions { options, responder } => {
+                    factory.set_realm_options(options)?;
+                    responder.send(Ok(()))?;
+                }
 
-    let mut fs = ServiceFs::new();
-    fs.dir("svc").add_fidl_service(IncomingService::RealmFactory);
-    fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(0, |service: IncomingService| async {
-        match service {
-            IncomingService::RealmFactory(stream) => {
-                let server = RealmFactoryServer::new(RealmFactoryImpl::new());
-                serve_async(stream, server).await.expect("serve RealmFactory");
+                RealmFactoryRequest::CreateRealm { realm_server, responder } => {
+                    let realm = factory.create_realm().await?;
+                    let request_stream = realm_server.into_stream()?;
+                    task_group.spawn(async move {
+                        realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                    });
+                    responder.send(Ok(()))?;
+                }
             }
-        };
-    })
+        }
+
+        task_group.join().await;
+        Ok(())
+    }
     .await;
-    Ok(())
+
+    if let Err(err) = result {
+        // hw-sim tests allow error logs so we panic to ensure test failure.
+        panic!("{:?}", err);
+    }
 }

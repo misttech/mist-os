@@ -13,11 +13,11 @@ use {
     tracing::info,
 };
 
-pub(crate) struct RealmFactoryImpl {
+pub(crate) struct WlanTestRealmFactory {
     realm_options: Option<fidl_realm::RealmOptions>,
 }
 
-impl RealmFactoryImpl {
+impl WlanTestRealmFactory {
     pub fn new() -> Self {
         Self { realm_options: Some(fidl_realm::RealmOptions { ..Default::default() }) }
     }
