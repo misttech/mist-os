@@ -2776,8 +2776,7 @@ pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u
         return Err(Error::OutOfRange);
     }
     let (header_bytes, body_bytes) = bytes.split_at(header_len);
-    let handles = &mut [];
-    Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, handles, &mut header)
+    Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, &mut [], &mut header)
         .map_err(|_| Error::InvalidHeader)?;
     header.validate_magic_number()?;
     Ok((header, body_bytes))

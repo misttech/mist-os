@@ -4,26 +4,9 @@
 
 //! This file tests FIDL's persistent encoding/decoding API.
 
+use assert_matches::assert_matches;
 use fidl::{persist, standalone_decode_value, standalone_encode_value, unpersist};
 use fidl_test_external::{Coordinate, FlexibleValueThing, ValueRecord};
-
-// TODO(fxbug.dev/99738): Remove this.
-fn transform_new_to_old_header(buf: &mut Vec<u8>) {
-    //       disambiguator
-    //            | magic
-    //            |  | flags
-    //            |  |  / \  ( reserved )
-    //     new:  00 MA FL FL  00 00 00 00
-    //     idx:  0  1  2  3   4  5  6  7
-    //     old:  00 00 00 00  FL FL FL MA  00 00 00 00  00 00 00 00
-    //          ( txid gap )   \ | /   |  (      ordinal gap      )
-    //                         flags  magic
-    let magic = buf[1];
-    let flag1 = buf[2];
-    let flag2 = buf[3];
-    let new_header: [u8; 16] = [0, 0, 0, 0, flag1, flag2, 0, magic, 0, 0, 0, 0, 0, 0, 0, 0];
-    buf.splice(0..8, new_header);
-}
 
 #[test]
 fn persist_unpersist() {
@@ -42,12 +25,18 @@ fn persist_unpersist_presence() {
 }
 
 #[test]
-fn persist_unpersist_with_old_header() {
-    let body = Coordinate { x: 1, y: 2 };
-    let mut buf = persist(&body).expect("encoding failed");
-    transform_new_to_old_header(&mut buf);
-    let body_out = unpersist(&buf).expect("decoding failed");
-    assert_eq!(body, body_out);
+fn unpersist_with_old_16_byte_header_fails() {
+    let bytes = &[
+        0, 0, 0, 0, // txid (unused)
+        0, 2, // at rest flags (0x0002 = v2 wire format)
+        0, // dynamic flags
+        1, // magic number
+        0, 0, 0, 0, 0, 0, 0, 0, // ordinal (unused)
+    ];
+    assert_eq!(bytes.len(), 16);
+    // Reading an old header under the new format leads to a magic number of 0.
+    // This is good because it fails rather than misinterpreting the message.
+    assert_matches!(unpersist::<Coordinate>(bytes), Err(fidl::Error::IncompatibleMagicNumber(0)));
 }
 
 #[test]

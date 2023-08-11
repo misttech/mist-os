@@ -6,8 +6,8 @@
 
 use crate::encoding::{
     AtRestFlags, Context, Decode, Decoder, Depth, Encode, Encoder, GenericMessage,
-    GenericMessageType, ResourceTypeMarker, TransactionHeader, TypeMarker, ValueTypeMarker,
-    WireFormatVersion, MAGIC_NUMBER_INITIAL,
+    GenericMessageType, ResourceTypeMarker, TypeMarker, ValueTypeMarker, WireFormatVersion,
+    MAGIC_NUMBER_INITIAL,
 };
 use crate::handle::{HandleDisposition, HandleInfo};
 use crate::{Error, Result};
@@ -116,35 +116,7 @@ pub fn persist_with_context<T: ValueTypeMarker>(
 /// Decodes a FIDL object from bytes following RFC-0120. Must be a non-resource
 /// struct, table, or union. See `persist` for the reverse.
 pub fn unpersist<T: Persistable>(bytes: &[u8]) -> Result<T> {
-    // TODO(fxbug.dev/99738): Only accept the new header format.
-    //
-    // To soft-transition component manager's use of persistent FIDL, we
-    // temporarily need to accept the old 16-byte header.
-    //
-    //       disambiguator
-    //            | magic
-    //            |  | flags
-    //            |  |  / \  ( reserved )
-    //     new:  00 MA FL FL  00 00 00 00
-    //     idx:  0  1  2  3   4  5  6  7
-    //     old:  00 00 00 00  FL FL FL MA  00 00 00 00  00 00 00 00
-    //          ( txid gap )   \ | /   |  (      ordinal gap      )
-    //                         flags  magic
-    //
-    // So bytes[7] is 0 for the new format and 1 for the old format.
-    if bytes.len() < 8 {
-        return Err(Error::InvalidHeader);
-    }
-    let header_len = match bytes[7] {
-        0 => 8,
-        MAGIC_NUMBER_INITIAL => 16,
-        _ => return Err(Error::InvalidHeader),
-    };
-    if bytes.len() < header_len {
-        return Err(Error::OutOfRange);
-    }
-    let (header_bytes, body_bytes) = bytes.split_at(header_len);
-    let header = decode_wire_metadata(header_bytes)?;
+    let (header, body_bytes) = decode_wire_metadata(bytes)?;
     let mut output = T::new_empty();
     Decoder::decode_with_context::<T>(header.decoding_context(), body_bytes, &mut [], &mut output)?;
     Ok(output)
@@ -207,33 +179,18 @@ pub fn standalone_decode_resource<T: Standalone>(
 
 /// Decodes the persistently stored header from a message.
 /// Returns the header and a reference to the tail of the message.
-fn decode_wire_metadata(bytes: &[u8]) -> Result<WireMetadata> {
+fn decode_wire_metadata(bytes: &[u8]) -> Result<(WireMetadata, &[u8])> {
+    let mut header = new_empty!(WireMetadata);
     let context = Context { wire_format_version: WireFormatVersion::V2 };
-    let metadata = match bytes.len() {
-        8 => {
-            // New 8-byte format.
-            let mut header = new_empty!(WireMetadata);
-            Decoder::decode_with_context::<WireMetadata>(context, bytes, &mut [], &mut header)
-                .map_err(|_| Error::InvalidHeader)?;
-            header
-        }
-        // TODO(fxbug.dev/99738): Remove this.
-        16 => {
-            // Old 16-byte format that matches TransactionHeader.
-            let mut header = new_empty!(TransactionHeader);
-            Decoder::decode_with_context::<TransactionHeader>(context, bytes, &mut [], &mut header)
-                .map_err(|_| Error::InvalidHeader)?;
-            WireMetadata {
-                disambiguator: 0,
-                magic_number: header.magic_number,
-                at_rest_flags: header.at_rest_flags,
-                reserved: [0; 4],
-            }
-        }
-        _ => return Err(Error::InvalidHeader),
-    };
-    metadata.validate_magic_number()?;
-    Ok(metadata)
+    let header_len = <WireMetadata as TypeMarker>::inline_size(context);
+    if bytes.len() < header_len {
+        return Err(Error::OutOfRange);
+    }
+    let (header_bytes, body_bytes) = bytes.split_at(header_len);
+    Decoder::decode_with_context::<WireMetadata>(context, header_bytes, &mut [], &mut header)
+        .map_err(|_| Error::InvalidHeader)?;
+    header.validate_magic_number()?;
+    Ok((header, body_bytes))
 }
 
 unsafe impl TypeMarker for WireMetadata {
