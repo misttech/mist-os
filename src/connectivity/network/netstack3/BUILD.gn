@@ -74,6 +74,7 @@ common_sources = [
   "src/bindings/debug_fidl_worker.rs",
   "src/bindings/devices.rs",
   "src/bindings/filter_worker.rs",
+  "src/bindings/inspect.rs",
   "src/bindings/integration_tests.rs",
   "src/bindings/interfaces_admin.rs",
   "src/bindings/interfaces_watcher.rs",

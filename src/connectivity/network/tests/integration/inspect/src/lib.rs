@@ -1467,7 +1467,7 @@ async fn inspect_socket_stats<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_ns3_socket_stats(name: &str) {
+async fn inspect_ns3_sockets(name: &str) {
     type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
@@ -1485,7 +1485,7 @@ async fn inspect_ns3_socket_stats(name: &str) {
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
     fuchsia_inspect::assert_data_tree!(data, "root": contains {
-        "Socket Info": {
+        "Sockets": {
             "0": {
                 LocalAddress: "[NOT BOUND]",
                 RemoteAddress: "[NOT CONNECTED]",
@@ -1497,7 +1497,7 @@ async fn inspect_ns3_socket_stats(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_ns3_routes_stats(name: &str) {
+async fn inspect_ns3_routes(name: &str) {
     type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
@@ -1514,24 +1514,24 @@ async fn inspect_ns3_routes_stats(name: &str) {
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
     fuchsia_inspect::assert_data_tree!(data, "root": contains {
-        "Routes Info": {
+        "Routes": {
             "0": {
                 Destination: "255.255.255.255/32",
-                NIC: "Loopback",
+                InterfaceId: 1u64,
                 Gateway: "[NONE]",
                 Metric: 99999u64,
                 MetricTracksInterface: false,
             },
             "1": {
                 Destination: "127.0.0.0/8",
-                NIC: "Loopback",
+                InterfaceId: 1u64,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,
             },
             "2": {
                 Destination: "224.0.0.0/4",
-                NIC: "Loopback",
+                InterfaceId: 1u64,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,

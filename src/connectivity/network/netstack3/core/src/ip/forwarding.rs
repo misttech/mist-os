@@ -16,6 +16,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
+    device::DeviceLayerTypes,
     error::NotFoundError,
     ip::{
         types::{
@@ -25,7 +26,7 @@ use crate::{
         AnyDevice, DeviceIdContext, IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
         IpStateContext,
     },
-    NonSyncContext, SyncCtx,
+    DeviceId, NonSyncContext, SyncCtx,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -197,39 +198,37 @@ fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
 }
 
 /// Visitor for route table state.
-pub trait RoutesVisitor {
+pub trait RoutesVisitor<'a, C: DeviceLayerTypes + 'a> {
     /// The result of [`RoutesVisitor::visit`].
     type VisitResult;
 
     /// Consumes `self` and an Entry iterator to produce a `VisitResult`.
-    fn visit<'a, I: Ip, D: 'a + std::fmt::Display>(
+    fn visit<'b, I: Ip>(
         self,
-        stats: impl Iterator<Item = &'a Entry<I::Addr, D>>,
-    ) -> Self::VisitResult;
+        stats: impl Iterator<Item = &'b Entry<I::Addr, DeviceId<C>>> + 'b,
+    ) -> Self::VisitResult
+    where
+        'a: 'b;
 }
 
 /// Provides access to the state of the route table via a visitor.
-pub fn with_routes<I, C, D, V>(sync_ctx: &SyncCtx<C>, cb: V) -> V::VisitResult
+pub fn with_routes<'a, I, C, V>(sync_ctx: &SyncCtx<C>, cb: V) -> V::VisitResult
 where
     I: IpExt,
-    C: NonSyncContext,
-    V: RoutesVisitor,
+    C: NonSyncContext + 'a,
+    V: RoutesVisitor<'a, C>,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(r) = I::map_ip(
         IpInvariant((&mut sync_ctx, cb)),
         |IpInvariant((sync_ctx, cb))| {
             IpInvariant(sync_ctx.with_ip_routing_table(
-                |_sync_ctx, table: &ForwardingTable<Ipv4, _>| {
-                    cb.visit::<Ipv4, _>(table.iter_table())
-                },
+                |_sync_ctx, table: &ForwardingTable<Ipv4, _>| cb.visit::<Ipv4>(table.iter_table()),
             ))
         },
         |IpInvariant((sync_ctx, cb))| {
             IpInvariant(sync_ctx.with_ip_routing_table(
-                |_sync_ctx, table: &ForwardingTable<Ipv6, _>| {
-                    cb.visit::<Ipv6, _>(table.iter_table())
-                },
+                |_sync_ctx, table: &ForwardingTable<Ipv6, _>| cb.visit::<Ipv6>(table.iter_table()),
             ))
         },
     );
