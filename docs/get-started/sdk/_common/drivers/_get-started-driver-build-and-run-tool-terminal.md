@@ -1,83 +1,67 @@
-The `qemu_edu` driver sample includes [tools][eductl_tools] for interacting with the
-`qemu_edu` driver. Developers often include binary executables in a Fuchsia package and
-run those executables as a component for testing and debugging drivers running in a
-Fuchsia system.
+The `qemu_edu` driver sample includes "tools" component named [`eductl_tools`][eductl_tools],
+which can interact with the sample driver. Developers create these tools components for
+testing and debugging drivers during development.
 
-In this driver sample, an executable named `eductl_tool` provides two options: `live` and
-`fact`. The `live` command checks for the liveness of the `qemu_edu` driver in the system.
-The `fact` command takes an integer as an additional argument. The value of the integer is
-passed to the `qemu_edu` driver to be used as input for computing the factorial. The
-driver computes the factorial and returns the result to the `fact` command, which then
-prints the result on the terminal.
+In this case, the `eductl_tool` component contacts the `qemu_edu` driver and passes
+an integer as input. The driver (using the resource of the `edu` virtual device) computes
+the factorial of the integer and returns the result to the eductl component. The component
+then prints the result in the log.
 
 The tasks include:
 
-*   Build and run `eductl_tool`.
+*   Build and run the `eductl_tool` component.
 *   Verify that this tool can interact with the `qemu_edu` driver.
 
 Do the following:
 
-1. Build and run `eductl_tool` (and run the `live` command):
+1. Run the `eductl_tool` component with `live` as input:
 
    ```posix-terminal
    tools/bazel run //src/qemu_edu/tools:pkg.eductl_tool -- live
    ```
+
+   Because the `eductl_tool` component isn’t built yet, the command first builds
+   the component and then runs the component. The input argument `live` is passed to
+   the `eductl_tool` component, which runs a simple test that checks whether the
+   target driver (`qemu_edu`) is running in the system.
 
    This command prints output similar to the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/bazel run //src/qemu_edu/tools:pkg.eductl_tool -- live
    ...
-   INFO: Build completed successfully, 38 total actions
-   Running workflow: pkg.eductl_tool_base
-   Running task: pkg.debug_symbols_base (step 1/2)
-   Running task: pkg.eductl_tool.run_base (step 2/2)
-   added repository bazel.pkg.eductl.tool.runnable
+   Publishing packages: [PosixPath('src/qemu_edu/tools/eductl.far')]
+   Published 1 packages
+   Running task: pkg.eductl_tool.run_only (step 3/4)
    {{ '<strong>' }}Liveness check passed!{{ '</strong>' }}
+   ...
    ```
 
-   Verify that the line `Liveness check passed!` is printed in the end.
+   Verify that the line `Liveness check passed!` is printed in the output.
 
-1. Run `eductl_tool` using `fact` and `12` as input:
+1. Run the `eductl_tool` component with `fact 12` as input:
 
    ```posix-terminal
    tools/bazel run //src/qemu_edu/tools:pkg.eductl_tool -- fact 12
    ```
+
+   The input argument `fact 12` is passed to the `eductl_tool` component, which then
+   requests the driver to compute the factorial of 12.
 
    This command prints output similar to the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/bazel run //src/qemu_edu/tools:pkg.eductl_tool -- fact 12
    ...
-   INFO: Build completed successfully, 1 total action
-   Running workflow: pkg.eductl_tool_base
-   Running task: pkg.debug_symbols_base (step 1/2)
-   Running task: pkg.eductl_tool.run_base (step 2/2)
-   added repository bazel.pkg.eductl.tool.runnable
+   Publishing packages: [PosixPath('src/qemu_edu/tools/eductl.far')]
+   Published 1 packages
+   Running task: pkg.eductl_tool.run_only (step 3/4)
    {{ '<strong>' }}Factorial(12) = 479001600{{ '</strong>' }}
+   ...
    ```
 
-   The last line shows that the driver replied `479001600` as the result of
-   the factorial to `eductl_tool`, which passed 12 as input to the driver.
-
-1. View the device logs of the `qemu-edu` driver:
-
-   ```posix-terminal
-   tools/ffx log --tags qemu-edu dump
-   ```
-
-   This command prints output similar to the following:
-
-   ```none {:.devsite-disable-click-to-copy}
-   $ tools/ffx log --tags qemu-edu dump
-   [2022-10-27 21:19:30.189][<ffx>]: logger started.
-   [184.040][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:65] edu device version major=1 minor=0
-   [184.073][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:117] Exported devfs_path=sys/platform/pt/PCI0/bus/00:06.0_/qemu-edu service_path=examples.qemuedu.Service/default/device
-   [248.087][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/edu_server.cc:59] Replying with result=true
-   [255.504][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/edu_device.cc:124] Replying with factorial=479001600
-   ```
-
-   Notice that more messages are now logged from the `qemu-edu` driver.
+   The output shows that the driver replied the result of
+   `Factoria(12) = 479001600` to the `eductl_tool` component.
 
 <!-- Reference links -->
 

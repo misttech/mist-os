@@ -4,7 +4,7 @@ emulator instance to use Fuchsia’s new [driver framework][driver-framework]
 
 The tasks include:
 
-*   Download Fuchsia's Workstation prebuilt image from Google Cloud Storage.
+*   Download a Fuchsia prebuilt image from Google Cloud Storage.
 *   Start the Fuchsia emulator.
 *   Set the emulator instance as your host machine’s default target device.
 *   Start the Fuchsia package server.
@@ -12,19 +12,43 @@ The tasks include:
 
 Do the following:
 
-1. Download the latest Workstation image for the emulator:
+1. Look up the manifest URL of the latest `core` prebuilt image on Google Cloud
+   Storage:
 
    ```posix-terminal
-   tools/ffx product-bundle get workstation_eng.qemu-x64 --force-repo --repository workstation-packages
+   tools/ffx product lookup core.x64 14.20230811.2.1 --base-url gs://fuchsia/development/14.20230811.2.1
    ```
 
-   This command may take a few minutes to download the image and product
-   metadata.
+   This command prints output similar to the following:
 
-   Once the download is finished, the `ffx product-bundle get` command creates
-   a local Fuchsia package repository named `workstation-packages` on your host machine.
-   This package repository hosts additional system packages for this Workstation prebuilt image.
-   Later in step 8 you’ll register this package repository to the emulator instance.
+   ```none {:.devsite-disable-click-to-copy}
+   $ tools/ffx product lookup core.x64 14.20230811.2.1 --base-url gs://fuchsia/development/14.20230811.2.1
+   Progress for "Getting product descriptions"
+     development/14.20230811.2.1/product_bundles.json
+       766 of 766 bytes (100.00%)
+   {{ '<strong>' }}gs://fuchsia-public-artifacts-release/builds/8773051783254971601/transfer.json{{'</strong>' }}
+   ```
+
+1. Download the latest `core` prebuilt image using the manifest URL from step 1:
+
+   ```posix-terminal
+   tools/ffx product download gs://fuchsia-public-artifacts-release/builds/8773051783254971601/transfer.json ~/local_pb --force
+   ```
+
+   This command may take a few minutes to download the product image and metadata. These
+   artifacts are downloaded to the `~/local_pb` directory on the host machine.
+
+1. Inform the package repository of the new packages:
+
+   ```posix-terminal
+   tools/ffx repository add ~/local_pb
+   ```
+
+   This command creates a local Fuchsia package repository (named `devhost.fuchsia.com`)
+   on the host machine. This local package repository is used to host additional system
+   packages stored  in the `~/local_pb` directory (which are needed to run the `core`
+   prebuilt image). Later in step 10, you’ll manually register this package repository
+   to the emulator instance.
 
 1. Stop all emulator instances:
 
@@ -35,25 +59,19 @@ Do the following:
 1. Start the Fuchsia emulator:
 
    ```posix-terminal
-   tools/ffx emu start workstation_eng.qemu-x64 --headless \
-     --kernel-args "driver_manager.use_driver_framework_v2=true" \
-     --kernel-args "driver_manager.root-driver=fuchsia-boot:///#meta/platform-bus.cm" \
-     --kernel-args "devmgr.enable-ephemeral=true"
+   tools/ffx emu start ~/local_pb --headless
    ```
 
-   This command starts a headless emulator instance running the Workstation prebuilt image.
+   This command starts a headless emulator instance running the `core` prebuilt image.
 
    When the instance is up and running, the command prints output similar to
    the following:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ tools/ffx emu start workstation_eng.qemu-x64 --headless \
-     --kernel-args "driver_manager.use_driver_framework_v2=true" \
-     --kernel-args "driver_manager.root-driver=fuchsia-boot:///#meta/platform-bus.cm" \
-     --kernel-args "devmgr.enable-ephemeral=true"
-   ...
+   $ tools/ffx emu start ~/local_pb --headless
+   Auto resolving networking to user-mode. For more information see https://fuchsia.dev/fuchsia-src/development/build/emulator#networking
    Logging to "/home/alice/.local/share/Fuchsia/ffx/emu/instances/fuchsia-emulator/emulator.log"
-   Waiting for Fuchsia to start (up to 60 seconds).
+   Waiting for Fuchsia to start (up to 60 seconds)...........
    Emulator is ready.
    ```
 
@@ -67,7 +85,7 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx emu list
-   [Active]  fuchsia-emulator
+   [running]  fuchsia-emulator
    ```
 
 1. Set the default target device:
@@ -88,7 +106,7 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx repository server start
-   ffx repository server is listening on [::]:8083
+   Repository server is listening on [::]:8083
    ```
 
 1. Check the list of Fuchsia package repositories available on
@@ -102,20 +120,24 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx repository list
-   +-----------------------+------+-------------------------------------------------------------------------------------------------+
-   | NAME                  | TYPE | EXTRA                                                                                           |
-   +=======================+======+=================================================================================================+
-   | workstation-packages* | pm   | /home/alice/.local/share/Fuchsia/ffx/pbms/4751486831982119909/workstation_eng.qemu-x64/packages |
-   +-----------------------+------+-------------------------------------------------------------------------------------------------+
+   +----------------------+------------+-----------------+------------------------------------------------+
+   | NAME                 | TYPE       | ALIASES         | EXTRA                                          |
+   +======================+============+=================+================================================+
+   | devhost.fuchsia.com* | filesystem | +-------------+ | +----------+---------------------------------+ |
+   |                      |            | | fuchsia.com | | | metadata | /home/alice/local_pb/repository | |
+   |                      |            | +-------------+ | +----------+---------------------------------+ |
+   |                      |            |                 | | blobs    | /home/alice/local_pb/blobs      | |
+   |                      |            |                 | +----------+---------------------------------+ |
+   +----------------------+------------+-----------------+------------------------------------------------+
    ```
 
-   Notice a package repository named `workstation-packages` is created
-   for the Workstation prebuilt image.
+   Notice that a package repository (`devhost.fuchsia.com`) is created for the
+   `core` prebuilt image.
 
-1. Register the `workstation-packages` package repository to the target device:
+1. Register the `devhost.fuchsia.com` package repository to the target device:
 
    ```posix-terminal
-   tools/ffx target repository register -r workstation-packages --alias fuchsia.com --alias chromium.org
+   tools/ffx target repository register -r devhost.fuchsia.com --alias fuchsia.com --alias chromium.org
    ```
 
    This command exits silently without output.

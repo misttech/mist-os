@@ -170,7 +170,7 @@ downloaded files, symlinks, configuration settings, and more).
 Remove the package repositories created in this guide:
 
 ```posix-terminal
-tools/ffx repository remove workstation-packages
+tools/ffx repository remove devhost.fuchsia.com
 ```
 
 ```posix-terminal

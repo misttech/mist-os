@@ -1,6 +1,6 @@
-The Fuchsia emulator (launched in the [Start the emulator](#start-the-emulator)
+The `core` image (launched in the [Start the emulator](#start-the-emulator)
 section above) is configured to create a virtual device named
-[`edu`][edu-device]{:.external}, which  is an educational device for writing
+[`edu`][edu-device]{:.external}, which is an educational device for writing
 drivers. In the previous section, when the emulator started, Fuchsia’s driver
 framework detected this `edu` device in the system, but it wasn’t able to find
 a driver that could serve the `edu` device. So the `edu` device was left unmatched.
@@ -32,33 +32,33 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx driver list --loaded
-   fuchsia-boot:///#meta/block.core.cm
-   fuchsia-boot:///#meta/bus-pci.cm
-   fuchsia-boot:///#meta/display-coordinator.cm
-   fuchsia-boot:///#meta/fvm.cm
+   fuchsia-boot:///hid#meta/hid.cm
+   fuchsia-boot:///hid-input-report#meta/hid-input-report.cm
+   fuchsia-boot:///network-device#meta/network-device.cm
+   fuchsia-boot:///platform-bus#meta/platform-bus.cm
+   fuchsia-boot:///ramdisk#meta/ramdisk.cm
+   fuchsia-boot:///sysmem#meta/sysmem.cm
+   fuchsia-boot:///#meta/pc-ps2.cm
    fuchsia-boot:///#meta/goldfish-display.cm
+   fuchsia-boot:///#meta/bus-pci.cm
+   fuchsia-boot:///#meta/platform-bus-x86.cm
    fuchsia-boot:///#meta/goldfish.cm
+   fuchsia-boot:///#meta/qemu-audio-codec.cm
+   fuchsia-boot:///#meta/goldfish_sync.cm
+   fuchsia-boot:///#meta/virtio_block.cm
+   fuchsia-boot:///#meta/intel-hda.cm
    fuchsia-boot:///#meta/goldfish_address_space.cm
    fuchsia-boot:///#meta/goldfish_control.cm
-   fuchsia-boot:///#meta/goldfish_sensor.cm
-   fuchsia-boot:///#meta/goldfish_sync.cm
-   fuchsia-boot:///#meta/hid-input-report.cm
-   fuchsia-boot:///#meta/hid.cm
-   fuchsia-boot:///#meta/intel-hda.cm
+   fuchsia-boot:///#meta/virtio_netdevice.cm
    fuchsia-boot:///#meta/intel-rtc.cm
-   fuchsia-boot:///#meta/netdevice-migration.cm
-   fuchsia-boot:///#meta/network-device.cm
-   fuchsia-boot:///#meta/pc-ps2.cm
-   fuchsia-boot:///#meta/platform-bus-x86.cm
-   fuchsia-boot:///#meta/platform-bus.cm
-   fuchsia-boot:///#meta/qemu-audio-codec.cm
-   fuchsia-boot:///#meta/ramdisk.cm
-   fuchsia-boot:///#meta/sysmem.cm
-   fuchsia-boot:///#meta/virtio_block.cm
-   fuchsia-boot:///#meta/virtio_ethernet.cm
-   fuchsia-boot:///#meta/virtio_input.cm
-   fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
    fuchsia-boot:///#meta/ahci.cm
+   fuchsia-boot:///#meta/virtio_input.cm
+   fuchsia-boot:///#meta/goldfish_sensor.cm
+   fuchsia-pkg://fuchsia.com/fake-battery#meta/fake_battery.cm
+   fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
+   fuchsia-boot:///block-core#meta/block.core.cm
+   fuchsia-boot:///display-coordinator#meta/display-coordinator.cm
+   fuchsia-boot:///fvm#meta/fvm.cm
    ```
 
 2. Build and publish the `qemu_edu` driver component:
@@ -72,14 +72,17 @@ Do the following:
    ```none {:.devsite-disable-click-to-copy}
    $ tools/bazel run //src/qemu_edu/drivers:pkg.component
    ...
-   INFO: Build completed successfully, 1045 total actions
-   Running workflow: pkg.component_base
-   Running task: pkg.debug_symbols_base (step 1/2)
-   Running task: pkg.component.run_base (step 2/2)
-   added repository bazel.pkg.component.runnable
-   Registering fuchsia-pkg://bazel.pkg.component.runnable/qemu_edu#meta/qemu_edu.cm
+   Registering bazel.pkg.publish.anonymous to target device fuchsia-emulator
+   Publishing packages: [PosixPath('src/qemu_edu/drivers/qemu_edu.far')]
+   Published 1 packages
+   Running task: pkg.component.run_only (step 3/4)
+   Registering fuchsia-pkg://bazel.pkg.publish.anonymous/qemu_edu#meta/qemu_edu.cm, restarting driver hosts, and attempting to bind to unbound nodes
    Successfully bound:
-   Node 'root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl', Driver 'fuchsia-pkg://bazel.pkg.component.runnable/qemu_edu#meta/qemu_edu.cm'.
+   Node 'dev.sys.platform.pt.PCI0.bus.00_06.0.00_06.0':
+   Driver 'Some(
+       "fuchsia-pkg://bazel.pkg.publish.anonymous/qemu_edu#meta/qemu_edu.cm",
+   )'
+   ...
    ```
 
 3. Verify that the `qemu_edu` driver is now loaded to the Fuchsia emulator
@@ -93,34 +96,34 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx driver list --loaded
-   fuchsia-boot:///#meta/bus-pci.cm
-   fuchsia-boot:///#meta/display-coordinator.cm
-   fuchsia-boot:///#meta/fvm.cm
+   fuchsia-boot:///hid-input-report#meta/hid-input-report.cm
+   fuchsia-boot:///network-device#meta/network-device.cm
+   fuchsia-boot:///platform-bus#meta/platform-bus.cm
+   fuchsia-boot:///ramdisk#meta/ramdisk.cm
+   fuchsia-boot:///sysmem#meta/sysmem.cm
+   fuchsia-boot:///#meta/pc-ps2.cm
    fuchsia-boot:///#meta/goldfish-display.cm
+   fuchsia-boot:///#meta/bus-pci.cm
+   fuchsia-boot:///#meta/platform-bus-x86.cm
    fuchsia-boot:///#meta/goldfish.cm
+   fuchsia-boot:///#meta/qemu-audio-codec.cm
+   fuchsia-boot:///#meta/goldfish_sync.cm
+   fuchsia-boot:///#meta/virtio_block.cm
+   fuchsia-boot:///#meta/intel-hda.cm
    fuchsia-boot:///#meta/goldfish_address_space.cm
    fuchsia-boot:///#meta/goldfish_control.cm
-   fuchsia-boot:///#meta/goldfish_sensor.cm
-   fuchsia-boot:///#meta/goldfish_sync.cm
-   fuchsia-boot:///#meta/hid-input-report.cm
-   fuchsia-boot:///#meta/hid.cm
-   fuchsia-boot:///#meta/intel-hda.cm
+   fuchsia-boot:///#meta/virtio_netdevice.cm
    fuchsia-boot:///#meta/intel-rtc.cm
-   fuchsia-boot:///#meta/netdevice-migration.cm
-   fuchsia-boot:///#meta/network-device.cm
-   fuchsia-boot:///#meta/pc-ps2.cm
-   fuchsia-boot:///#meta/platform-bus-x86.cm
-   fuchsia-boot:///#meta/platform-bus.cm
-   fuchsia-boot:///#meta/qemu-audio-codec.cm
-   fuchsia-boot:///#meta/ramdisk.cm
-   fuchsia-boot:///#meta/sysmem.cm
-   fuchsia-boot:///#meta/virtio_block.cm
-   fuchsia-boot:///#meta/virtio_ethernet.cm
+   fuchsia-boot:///#meta/ahci.cm
    fuchsia-boot:///#meta/virtio_input.cm
+   fuchsia-boot:///#meta/goldfish_sensor.cm
+   fuchsia-pkg://fuchsia.com/fake-battery#meta/fake_battery.cm
    fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
    {{ '<strong>' }}fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm{{ '</strong>' }}
-   fuchsia-boot:///#meta/ahci.cm
-   fuchsia-boot:///#meta/block.core.cm
+   fuchsia-boot:///block-core#meta/block.core.cm
+   fuchsia-boot:///display-coordinator#meta/display-coordinator.cm
+   fuchsia-boot:///fvm#meta/fvm.cm
+   fuchsia-boot:///hid#meta/hid.cm
    ```
 
    Notice that the `qemu_edu` driver is shown in the loaded drivers list.
@@ -135,18 +138,23 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx component show qemu_edu.cm
-                  Moniker:  /bootstrap/full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl
-                      URL:  fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm
-              Instance ID:  None
-                     Type:  CML Component
-          Component State:  Resolved
-    Incoming Capabilities:  /svc/fuchsia.driver.compat.Service
-                            /svc/fuchsia.logger.LogSink
-     Exposed Capabilities:  examples.qemuedu.Service
-              Merkle root:  ca337aa579388a7335c8fa53e47ba111b6a58c0b9af7519731e9942dec31f7ef
-          Execution State:  Running
-             Start reason:  Instance is in a single_run collection
-    Outgoing Capabilities:  examples.qemuedu.Service
+                    Moniker:  bootstrap/full-pkg-drivers:dev.sys.platform.pt.PCI0.bus.00_06.0.00_06.0
+                        URL:  fuchsia-pkg://bazel.pkg.publish.anonymous/qemu_edu#meta/qemu_edu.cm
+                Environment:  full-pkg-driver-env
+                Instance ID:  None
+            Component State:  Resolved
+               Resolved URL:  fuchsia-pkg://bazel.pkg.publish.anonymous/qemu_edu#meta/qemu_edu.cm
+     Namespace Capabilities:  /svc/fuchsia.logger.LogSink
+                              /svc/fuchsia.hardware.pci.Service
+       Exposed Capabilities:  examples.qemuedu.Service
+                Merkle root:  2a1d06a05f31b98837a7760f0d227942813ff375dce873a846ae8153600e7bb6
+            Execution State:  Running
+               Start reason:  Instance is in a single_run collection
+      Outgoing Capabilities:  examples.qemuedu.Service
+                    Runtime:  ELF
+              Running since:  169224187887 ticks
+                     Job ID:  58210
+                 Process ID:  58240
    ```
 
 5. View the device logs of the `qemu-edu` driver:
@@ -159,9 +167,8 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx log --tags qemu-edu dump
-   2022-10-27 21:19:30.189][<ffx>]: logger started.
-   [184.040][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:65] edu device version major=1 minor=0
-   [184.073][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:117] Exported devfs_path=sys/platform/pt/PCI0/bus/00:06.0_/qemu-edu service_path=examples.qemuedu.Service/default/device
+   ...
+   [00331.380217][full-pkg-drivers:dev.sys.platform.pt.PCI0.bus.00_06.0.00_06.0][driver,qemu-edu] INFO: [src/qemu_edu/drivers/qemu_edu.cc(45)] edu device version minor=0 major=1
    ```
 
 <!-- Reference links -->
