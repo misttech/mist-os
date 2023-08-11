@@ -3,20 +3,53 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/vboot/vboot.gni")
+import("//build/sdk/product_bundle.gni")
+import("//build/security.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
+files = {
+  partitions_config = "$target_out_dir/partitions_config.json"
+
+  # Outputs of assembly.
+  outdir = target_out_dir + "/bringup"
+  zbi = "${outdir}/bringup.zbi"
+  zbi_signed = "${outdir}/bringup.zbi.signed"
+  vbmeta = "${outdir}/bringup.vbmeta"
+  images_json = "${outdir}/images.json"
+
+  # Outputs of recovery.
+  recovery_name = get_label_info(recovery_label, "name")
+  recovery_outdir =
+      get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
+  recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
+  recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
+  recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
+  recovery_images_json = "${recovery_outdir}/images.json"
+
+  qemu_kernel = qemu_boot_shim.path
+}
+
+_partitions_config = "//boards/partitions:default"
 if (has_board) {
   assert(board_information_for_assembly != false,
          "board_information_for_assembly must be defined for the build")
+  assert(partitions_config_label != false,
+         "Need to define partitions_config_label")
+  _partitions_config = partitions_config_label
 }
+_partitions_config_file =
+    get_label_info(_partitions_config, "target_out_dir") + "/" +
+    get_label_info(_partitions_config, "name") + ".json"
 
 product_assembly_configuration("product_assembly_config") {
   platform = {
@@ -85,7 +118,50 @@ bringup_base = {
   }
 }
 
-assembled_system("bringup") {
+assembled_system("bringup_assembly") {
   forward_variables_from(bringup_base, "*")
+  image_name = "bringup"
   image_metadata_overrides = legacy_bringup_image_metadata_overrides
+}
+
+product_bundle("product_bundle") {
+  testonly = true
+  deps = [
+    ":bringup_assembly",
+    _partitions_config,
+    recovery_label,
+  ]
+  partitions = _partitions_config_file
+  system_a = files.images_json
+  system_r = files.recovery_images_json
+
+  # Create lists of the files that are referenced by the assembly manifests.
+  _assembly_contents = [ files.qemu_kernel ]
+  _recovery_contents = [ files.qemu_kernel ]
+
+  if (custom_signing_script != "" || use_vboot) {
+    _assembly_contents += [ files.zbi_signed ]
+    _recovery_contents += [ files.recovery_zbi_signed ]
+  } else {
+    _assembly_contents += [ files.zbi ]
+    _recovery_contents += [ files.recovery_zbi ]
+  }
+  if (use_vbmeta) {
+    _assembly_contents += [ files.vbmeta ]
+    _recovery_contents += [ files.recovery_vbmeta ]
+  }
+
+  # List the contents of each input so that the outputs can be calculated.
+  partitions_contents = partitions_config_contents
+  system_a_contents = _assembly_contents
+  system_r_contents = _recovery_contents
+
+  # Skip scrutiny.
+  skip_scrutiny = true
+  skip_scrutiny_recovery = true
+}
+
+group("bringup") {
+  testonly = true
+  public_deps = [ ":product_bundle" ]
 }
