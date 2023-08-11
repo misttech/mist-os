@@ -553,7 +553,7 @@ mod tests {
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
             },
-            BufferNudHandler, DynamicNeighborState,
+            BufferNudHandler, DynamicNeighborState, Reachable, Stale,
         },
         testutil::assert_empty,
     };
@@ -1160,9 +1160,9 @@ mod tests {
         // If the confirmation was interpreted as solicited, the entry should be
         // marked as REACHABLE; otherwise, it should have transitioned to STALE.
         let expected_state = if expect_solicited {
-            DynamicNeighborState::Reachable { link_address: TEST_REMOTE_MAC }
+            DynamicNeighborState::Reachable(Reachable { link_address: TEST_REMOTE_MAC })
         } else {
-            DynamicNeighborState::Stale { link_address: TEST_REMOTE_MAC }
+            DynamicNeighborState::Stale(Stale { link_address: TEST_REMOTE_MAC })
         };
         assert_dynamic_neighbor_state(
             &mut sync_ctx,
