@@ -222,7 +222,7 @@ pub struct LogCommand {
     #[argh(switch)]
     pub kernel: bool,
 
-    /// show only logs after a certain time
+    /// show only logs after a certain time (exclusive)
     #[argh(option, from_str_fn(parse_time))]
     pub since: Option<DetailedDateTime>,
 
@@ -231,7 +231,7 @@ pub struct LogCommand {
     #[argh(option, from_str_fn(parse_seconds_string_as_duration))]
     pub since_monotonic: Option<Duration>,
 
-    /// show only logs until a certain time
+    /// show only logs until a certain time (exclusive)
     #[argh(option, from_str_fn(parse_time))]
     pub until: Option<DetailedDateTime>,
 

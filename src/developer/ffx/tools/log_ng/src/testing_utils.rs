@@ -5,7 +5,7 @@
 // TODO(https://fxbug.dev/129623): Move this somewhere else and
 // make the logic more generic.
 
-use std::{future::Future, pin::Pin, rc::Rc};
+use std::{cell::Cell, future::Future, pin::Pin, rc::Rc};
 
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream, ServerEnd};
@@ -33,6 +33,8 @@ const NODENAME: &str = "Rust";
 /// Test configuration
 pub struct Configuration {
     pub messages: Vec<LogsData>,
+    pub send_mode_event: bool,
+    pub boot_timestamp: Cell<u64>,
 }
 
 impl Default for Configuration {
@@ -48,6 +50,8 @@ impl Default for Configuration {
             .set_tid(2)
             .set_message("Hello world!")
             .build()],
+            send_mode_event: false,
+            boot_timestamp: Cell::new(1),
         }
     }
 }
@@ -141,6 +145,8 @@ pub enum TestEvent {
     SeverityChanged(Vec<LogInterestSelector>),
     /// Log settings connection closed
     LogSettingsConnectionClosed,
+    /// Log stream started with a specific mode.
+    Connected(fidl_fuchsia_diagnostics::StreamMode),
 }
 
 /// A task scheduler that spawns tasks onto the task manager
@@ -175,14 +181,17 @@ impl TaskScheduler {
 
 async fn handle_archive_accessor(
     mut stream: ArchiveAccessorRequestStream,
-    scheduler: TaskScheduler,
+    mut scheduler: TaskScheduler,
 ) {
     while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
-        parameters: _,
+        parameters,
         stream,
         responder,
     })) = stream.next().await
     {
+        if scheduler.config.send_mode_event {
+            scheduler.send_event(TestEvent::Connected(parameters.stream_mode.unwrap()));
+        }
         // Ignore the result, because the client may choose to close the channel.
         let _ = responder.send();
         stream
@@ -235,7 +244,7 @@ pub async fn handle_rcs_connection(
                 responder
                     .send(Ok(&IdentifyHostResponse {
                         nodename: Some(NODENAME.into()),
-                        boot_timestamp_nanos: Some(1),
+                        boot_timestamp_nanos: Some(scheduler.config.boot_timestamp.get()),
                         ..Default::default()
                     }))
                     .unwrap();
