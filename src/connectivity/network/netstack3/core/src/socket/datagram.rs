@@ -66,7 +66,7 @@ impl<I: crate::ip::IpExt + DualStackIpExt> IpExt for I {}
 #[derive(Derivative, GenericOverIp)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) enum SocketState<I: Ip + IpExt, D: device::WeakId, S: DatagramSocketSpec> {
-    Unbound(UnboundSocketState<I::Addr, D, S::UnboundSharingState<I>>),
+    Unbound(UnboundSocketState<I, D, S>),
     Bound(BoundSocketState<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>),
 }
 
@@ -152,22 +152,24 @@ pub(crate) enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateS
     Conn(&'a S::ConnAddrState, ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>),
 }
 
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = "S: Default"))]
-pub(crate) struct UnboundSocketState<A: IpAddress, D, S> {
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"), Default(bound = ""))]
+pub(crate) struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
     pub(crate) device: Option<D>,
-    pub(crate) sharing: S,
-    pub(crate) ip_options: IpOptions<A, D>,
+    pub(crate) sharing: S::UnboundSharingState<I>,
+    pub(crate) ip_options: IpOptions<I, D, S>,
 }
 
-#[derive(Debug)]
-pub(crate) struct ListenerState<A: Eq + Hash, D: Hash + Eq> {
-    pub(crate) ip_options: IpOptions<A, D>,
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"))]
+pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec + ?Sized> {
+    pub(crate) ip_options: IpOptions<I, D, S>,
 }
 
-#[derive(Debug)]
-pub(crate) struct ConnState<I: IpExt, D: Eq + Hash> {
-    pub(crate) socket: IpSock<I, D, IpOptions<I::Addr, D>>,
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"))]
+pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized> {
+    pub(crate) socket: IpSock<I, D, IpOptions<I, D, S>>,
     pub(crate) shutdown: Shutdown,
     /// Determines whether a call to disconnect this socket should also clear
     /// the device on the socket address.
@@ -186,11 +188,12 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash> {
     pub(crate) clear_device_on_disconnect: bool,
 }
 
-#[derive(Clone, Debug, Derivative)]
-#[derivative(Default(bound = ""))]
-pub(crate) struct IpOptions<A, D> {
-    multicast_memberships: MulticastMemberships<A, D>,
+#[derive(Derivative, GenericOverIp)]
+#[derivative(Clone(bound = "D: Clone"), Debug(bound = "D: Debug"), Default(bound = ""))]
+pub(crate) struct IpOptions<I: Ip + IpExt, D, S: DatagramSocketSpec + ?Sized> {
+    multicast_memberships: MulticastMemberships<I::Addr, D>,
     hop_limits: SocketHopLimits,
+    _marker: PhantomData<S>,
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -219,8 +222,8 @@ impl SocketHopLimits {
     }
 }
 
-impl<A: IpAddress, D> SendOptions<A::Version> for IpOptions<A, D> {
-    fn hop_limit(&self, destination: &SpecifiedAddr<A>) -> Option<NonZeroU8> {
+impl<I: IpExt, D, S: DatagramSocketSpec> SendOptions<I> for IpOptions<I, D, S> {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         if destination.is_multicast() {
             self.hop_limits.multicast
         } else {
@@ -942,8 +945,10 @@ pub(crate) trait DatagramSocketSpec {
     ///
     /// Describes the per-address and per-socket values held in the
     /// demultiplexing map for a given IP version.
-    type SocketMapSpec<I: IpExt + DualStackIpExt, D: device::WeakId>: SocketStateSpec<ListenerState = ListenerState<I::Addr, D>, ConnState = ConnState<I, D>>
-        + DatagramSocketMapSpec<
+    type SocketMapSpec<I: IpExt + DualStackIpExt, D: device::WeakId>: SocketStateSpec<
+            ListenerState = ListenerState<I, D, Self>,
+            ConnState = ConnState<I, D, Self>,
+        > + DatagramSocketMapSpec<
             I,
             D,
             Self::AddrSpec,
@@ -1051,7 +1056,7 @@ where
             }
         };
 
-        let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
+        let IpOptions { multicast_memberships, hop_limits: _, _marker } = ip_options;
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
             leave_all_joined_groups(sync_ctx, ctx, multicast_memberships)
         });
@@ -1669,7 +1674,7 @@ where
                             ip: ListenerIpAddr { addr, identifier },
                             device,
                         },
-                    ): &(ListenerState<_, _>, _, _) = state;
+                    ): &(ListenerState<_, _, _>, _, _) = state;
                     (
                         addr.as_ref(),
                         Some(identifier),
@@ -1691,7 +1696,7 @@ where
                             ip: ConnIpAddr { local: (ip, identifier), remote: _ },
                             device,
                         },
-                    ): &(ConnState<_, _>, _, _) = state;
+                    ): &(ConnState<_, _, _>, _, _) = state;
                     (
                         Some(ip),
                         Some(identifier),
@@ -2127,7 +2132,7 @@ fn send_oneshot<
     remote_ip: ZonedAddr<I::Addr, SC::DeviceId>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &Option<SC::WeakDeviceId>,
-    ip_options: &IpOptions<I::Addr, SC::WeakDeviceId>,
+    ip_options: &IpOptions<I, SC::WeakDeviceId, S>,
     proto: <I as IpProtoExt>::Proto,
     body: B,
 ) -> Result<(), SendToError<B, S::Serializer<I, B>>> {
@@ -2259,7 +2264,7 @@ pub(crate) fn set_device<
                                         socket.proto(),
                                         Default::default(),
                                     )
-                                    .map_err(|_: (IpSockCreationError, IpOptions<_, _>)| {
+                                    .map_err(|_: (IpSockCreationError, IpOptions<_, _, _>)| {
                                         SocketError::Remote(RemoteAddressError::NoRoute)
                                     })?;
 
@@ -2291,7 +2296,7 @@ pub(crate) fn set_device<
                         _,
                     ) = bound_state;
                     let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = state;
-                    let _: IpOptions<_, _> = new_socket.replace_options(socket.take_options());
+                    let _: IpOptions<_, _, _> = new_socket.replace_options(socket.take_options());
                     *socket = new_socket;
                     *addr = new_addr;
 
@@ -2318,7 +2323,7 @@ pub(crate) fn get_bound_device<
     id: S::SocketId<I>,
 ) -> Option<SC::WeakDeviceId> {
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
-        let (_, device): (&IpOptions<_, _>, _) = get_options_device(state, id);
+        let (_, device): (&IpOptions<_, _, _>, _) = get_options_device(state, id);
         device.clone()
     })
 }
@@ -2425,7 +2430,7 @@ pub(crate) fn set_multicast_membership<
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
     sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
-        let (_, bound_device): (&IpOptions<_, _>, _) = get_options_device(state, id.clone());
+        let (_, bound_device): (&IpOptions<_, _, _>, _) = get_options_device(state, id.clone());
 
         let interface = match interface {
             MulticastMembershipInterfaceSelector::Specified(selector) => match selector {
@@ -2459,7 +2464,7 @@ pub(crate) fn set_multicast_membership<
             return Err(SetMulticastMembershipError::DeviceDoesNotExist);
         };
 
-        let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
+        let IpOptions { multicast_memberships, hop_limits: _, _marker } = ip_options;
         let change = multicast_memberships
             .apply_membership_change(multicast_group, &interface.as_weak(sync_ctx), want_membership)
             .ok_or(SetMulticastMembershipError::NoMembershipChange)?;
@@ -2492,7 +2497,7 @@ pub(crate) fn set_multicast_membership<
 fn get_options_device<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
     state: &SocketsState<I, D, S>,
     id: S::SocketId<I>,
-) -> (&IpOptions<I::Addr, D>, &Option<D>) {
+) -> (&IpOptions<I, D, S>, &Option<D>) {
     match state.get(id.get_key_index()).expect("socket not found") {
         SocketState::Unbound(state) => {
             let UnboundSocketState { ip_options, device, sharing: _ } = state;
@@ -2524,7 +2529,7 @@ fn get_options_device<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
 fn get_options_mut<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
     state: &mut SocketsState<I, D, S>,
     id: S::SocketId<I>,
-) -> &mut IpOptions<I::Addr, D>
+) -> &mut IpOptions<I, D, S>
 where
     S::SocketId<I>: EntryKey,
 {
@@ -2582,7 +2587,7 @@ pub(crate) fn get_ip_hop_limits<
 ) -> HopLimits {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let (options, device) = get_options_device(state, id);
-        let IpOptions { hop_limits, multicast_memberships: _ } = options;
+        let IpOptions { hop_limits, multicast_memberships: _, _marker } = options;
         let device = device.as_ref().and_then(|d| sync_ctx.upgrade_weak_device_id(d));
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
             hop_limits.get_limits_with_defaults(
@@ -2642,11 +2647,12 @@ where
             }
             SocketState::Bound(state) => match state {
                 BoundSocketState::Listener(state) => {
-                    let (_, sharing, _): &(ListenerState<_, _>, _, ListenerAddr<_, _, _>) = state;
+                    let (_, sharing, _): &(ListenerState<_, _, _>, _, ListenerAddr<_, _, _>) =
+                        state;
                     sharing
                 }
                 BoundSocketState::Connected(state) => {
-                    let (_, sharing, _): &(ConnState<_, _>, _, ConnAddr<_, _, _, _>) = state;
+                    let (_, sharing, _): &(ConnState<_, _, _>, _, ConnAddr<_, _, _, _>) = state;
                     sharing
                 }
             },
@@ -2740,8 +2746,8 @@ mod test {
     }
 
     impl<I: IpExt, D: crate::device::Id> SocketStateSpec for (FakeStateSpec, I, D) {
-        type ConnState = ConnState<I, D>;
-        type ListenerState = ListenerState<I::Addr, D>;
+        type ConnState = ConnState<I, D, FakeStateSpec>;
+        type ListenerState = ListenerState<I, D, FakeStateSpec>;
     }
 
     impl DatagramSocketSpec for FakeStateSpec {

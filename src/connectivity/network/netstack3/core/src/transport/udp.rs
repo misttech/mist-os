@@ -390,8 +390,8 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for (Udp, I, D) {
 }
 
 impl<I: IpExt, D: WeakId> SocketStateSpec for (Udp, I, D) {
-    type ListenerState = ListenerState<I::Addr, D>;
-    type ConnState = ConnState<I, D>;
+    type ListenerState = ListenerState<I, D, Udp>;
+    type ConnState = ConnState<I, D, Udp>;
 }
 
 impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, I, D, IpPortSpec> for (Udp, I, D)
