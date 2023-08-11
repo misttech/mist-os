@@ -29,9 +29,11 @@ protocol Example {
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
   ASSERT_NOT_NULL(result_union);
-  ASSERT_NOT_NULL(result_union->attributes);
-  ASSERT_TRUE(result_union->attributes->Get("result") != nullptr);
   ASSERT_EQ(result_union->members.size(), 2);
+
+  auto anonymous = result_union->name.as_anonymous();
+  ASSERT_NOT_NULL(anonymous);
+  ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
   ASSERT_NOT_NULL(success.maybe_used);
@@ -82,6 +84,12 @@ protocol MyProtocol {
   auto response = static_cast<const fidl::flat::Union*>(id->type_decl);
   EXPECT_TRUE(response->kind == fidl::flat::Decl::Kind::kUnion);
   ASSERT_EQ(response->members.size(), 2);
+
+  auto empty_struct_name = response->members[0].maybe_used->type_ctor->type->name.decl_name();
+  auto empty_struct = library.LookupStruct(empty_struct_name);
+  ASSERT_NOT_NULL(empty_struct);
+  auto anonymous = empty_struct->name.as_anonymous();
+  ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedEmptySuccessStruct);
 }
 
 TEST(ErrorsTests, GoodErrorEnum) {

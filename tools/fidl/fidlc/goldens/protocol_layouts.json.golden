@@ -2440,18 +2440,6 @@
         "column": 30,
         "length": 36
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 40,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -2484,7 +2472,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 37,
+            "line": 28,
             "column": 1,
             "length": 8
           }
@@ -2519,7 +2507,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 38,
+            "line": 29,
             "column": 1,
             "length": 3
           }
@@ -2562,18 +2550,6 @@
         "column": 32,
         "length": 24
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 24,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -2606,7 +2582,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 21,
+            "line": 16,
             "column": 1,
             "length": 8
           }
@@ -2641,7 +2617,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 22,
+            "line": 17,
             "column": 1,
             "length": 3
           }
@@ -2684,18 +2660,6 @@
         "column": 31,
         "length": 19
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 32,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -2728,7 +2692,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 29,
+            "line": 22,
             "column": 1,
             "length": 8
           }
@@ -2763,7 +2727,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 30,
+            "line": 23,
             "column": 1,
             "length": 3
           }
@@ -2881,18 +2845,6 @@
         "column": 11,
         "length": 43
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 36,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -2901,250 +2853,6 @@
           "type": {
             "kind": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayAnonWithError_Response",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": true
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 33,
-            "column": 1,
-            "length": 8
-          }
-        },
-        {
-          "ordinal": 2,
-          "reserved": false,
-          "name": "err",
-          "type": {
-            "kind": "primitive",
-            "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 34,
-            "column": 1,
-            "length": 3
-          }
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "is_result": true,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 32,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 16,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": true
-      }
-    },
-    {
-      "name": "test.protocollayouts/MainProtocol_TwoWayImportWithError_Result",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayImportWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts/example.test.fidl",
-        "line": 20,
-        "column": 61,
-        "length": 24
-      },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 20,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
-      "members": [
-        {
-          "ordinal": 1,
-          "reserved": false,
-          "name": "response",
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts.imported/ImportUnionPayload",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 24,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 8,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": true,
-              "has_envelope": true,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 17,
-            "column": 1,
-            "length": 8
-          }
-        },
-        {
-          "ordinal": 2,
-          "reserved": false,
-          "name": "err",
-          "type": {
-            "kind": "primitive",
-            "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 18,
-            "column": 1,
-            "length": 3
-          }
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "is_result": true,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 32,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 2,
-        "max_handles": 0,
-        "max_out_of_line": 16,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.protocollayouts/MainProtocol_TwoWayLocalWithError_Result",
-      "naming_context": [
-        "MainProtocol",
-        "TwoWayLocalWithError",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts/example.test.fidl",
-        "line": 27,
-        "column": 55,
-        "length": 19
-      },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 28,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
-      "members": [
-        {
-          "ordinal": 1,
-          "reserved": false,
-          "name": "response",
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.protocollayouts/LocalUnionPayload",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 24,
@@ -3205,6 +2913,226 @@
           "location": {
             "filename": "generated",
             "line": 26,
+            "column": 1,
+            "length": 3
+          }
+        }
+      ],
+      "strict": true,
+      "resource": false,
+      "is_result": true,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 32,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 16,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      }
+    },
+    {
+      "name": "test.protocollayouts/MainProtocol_TwoWayImportWithError_Result",
+      "naming_context": [
+        "MainProtocol",
+        "TwoWayImportWithError",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts/example.test.fidl",
+        "line": 20,
+        "column": 61,
+        "length": 24
+      },
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "response",
+          "type": {
+            "kind": "identifier",
+            "identifier": "test.protocollayouts.imported/ImportUnionPayload",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 8,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 13,
+            "column": 1,
+            "length": 8
+          }
+        },
+        {
+          "ordinal": 2,
+          "reserved": false,
+          "name": "err",
+          "type": {
+            "kind": "primitive",
+            "subtype": "uint32",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 14,
+            "column": 1,
+            "length": 3
+          }
+        }
+      ],
+      "strict": true,
+      "resource": false,
+      "is_result": true,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 32,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 16,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocollayouts/MainProtocol_TwoWayLocalWithError_Result",
+      "naming_context": [
+        "MainProtocol",
+        "TwoWayLocalWithError",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocol_layouts/example.test.fidl",
+        "line": 27,
+        "column": 55,
+        "length": 19
+      },
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "response",
+          "type": {
+            "kind": "identifier",
+            "identifier": "test.protocollayouts/LocalUnionPayload",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 8,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 19,
+            "column": 1,
+            "length": 8
+          }
+        },
+        {
+          "ordinal": 2,
+          "reserved": false,
+          "name": "err",
+          "type": {
+            "kind": "primitive",
+            "subtype": "uint32",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 20,
             "column": 1,
             "length": 3
           }

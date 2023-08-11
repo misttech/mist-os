@@ -4033,18 +4033,6 @@
         "column": 24,
         "length": 284
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 30,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4077,7 +4065,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 27,
+            "line": 21,
             "column": 1,
             "length": 8
           }
@@ -4112,7 +4100,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 28,
+            "line": 22,
             "column": 1,
             "length": 3
           }
@@ -4155,18 +4143,6 @@
         "column": 11,
         "length": 33
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 6,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4277,18 +4253,6 @@
         "column": 11,
         "length": 33
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 10,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4321,7 +4285,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 7,
+            "line": 6,
             "column": 1,
             "length": 8
           }
@@ -4356,7 +4320,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 8,
+            "line": 7,
             "column": 1,
             "length": 3
           }
@@ -4399,18 +4363,6 @@
         "column": 11,
         "length": 33
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 14,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4443,7 +4395,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 11,
+            "line": 9,
             "column": 1,
             "length": 8
           }
@@ -4478,7 +4430,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 12,
+            "line": 10,
             "column": 1,
             "length": 3
           }
@@ -4521,18 +4473,6 @@
         "column": 11,
         "length": 33
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 18,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4541,6 +4481,116 @@
           "type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 12,
+            "column": 1,
+            "length": 8
+          }
+        },
+        {
+          "ordinal": 2,
+          "reserved": false,
+          "name": "err",
+          "type": {
+            "kind": "primitive",
+            "subtype": "uint32",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 13,
+            "column": 1,
+            "length": 3
+          }
+        }
+      ],
+      "strict": true,
+      "resource": false,
+      "is_result": true,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 8,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
+      "naming_context": [
+        "DenyEachBinding",
+        "OnlyDenyRust",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
+        "line": 83,
+        "column": 11,
+        "length": 33
+      },
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "response",
+          "type": {
+            "kind": "identifier",
+            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
             "nullable": false,
             "type_shape_v1": {
               "inline_size": 4,
@@ -4631,128 +4681,6 @@
       }
     },
     {
-      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
-      "naming_context": [
-        "DenyEachBinding",
-        "OnlyDenyRust",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 83,
-        "column": 11,
-        "length": 33
-      },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 22,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
-      "members": [
-        {
-          "ordinal": 1,
-          "reserved": false,
-          "name": "response",
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
-            "nullable": false,
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 19,
-            "column": 1,
-            "length": 8
-          }
-        },
-        {
-          "ordinal": 2,
-          "reserved": false,
-          "name": "err",
-          "type": {
-            "kind": "primitive",
-            "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 20,
-            "column": 1,
-            "length": 3
-          }
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "is_result": true,
-      "type_shape_v1": {
-        "inline_size": 24,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 8,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      },
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": true,
-        "has_flexible_envelope": false
-      }
-    },
-    {
       "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
       "naming_context": [
         "DenyEachBinding",
@@ -4765,18 +4693,6 @@
         "column": 11,
         "length": 33
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 26,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4809,7 +4725,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 23,
+            "line": 18,
             "column": 1,
             "length": 8
           }
@@ -4844,7 +4760,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 24,
+            "line": 19,
             "column": 1,
             "length": 3
           }

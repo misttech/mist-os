@@ -22,7 +22,7 @@ class Sourced {
 };
 
 // Similar to |Sourced|, but slightly modified for cases where some instances of the derived class
-// may be compiler generated, like a named |TypeConstructor| or a "result" |Attribute|.
+// may be compiler generated, like a named |TypeConstructor|.
 class MaybeSourced {
  public:
   explicit MaybeSourced(std::optional<raw::SourceElement::Signature> maybe_signature)

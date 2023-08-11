@@ -8202,18 +8202,6 @@
         "column": 33,
         "length": 12
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 12,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8246,7 +8234,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 9,
+            "line": 7,
             "column": 1,
             "length": 8
           }
@@ -8281,7 +8269,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 10,
+            "line": 8,
             "column": 1,
             "length": 3
           }
@@ -8324,18 +8312,6 @@
         "column": 36,
         "length": 15
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 16,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8368,7 +8344,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 13,
+            "line": 10,
             "column": 1,
             "length": 8
           }
@@ -8403,7 +8379,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 14,
+            "line": 11,
             "column": 1,
             "length": 3
           }
@@ -8446,18 +8422,6 @@
         "column": 40,
         "length": 19
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 32,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8490,7 +8454,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 29,
+            "line": 22,
             "column": 1,
             "length": 8
           }
@@ -8525,7 +8489,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 30,
+            "line": 23,
             "column": 1,
             "length": 3
           }
@@ -8568,18 +8532,6 @@
         "column": 28,
         "length": 7
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 4,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8690,18 +8642,6 @@
         "column": 31,
         "length": 10
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 8,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8734,7 +8674,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 5,
+            "line": 4,
             "column": 1,
             "length": 8
           }
@@ -8769,7 +8709,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 6,
+            "line": 5,
             "column": 1,
             "length": 3
           }
@@ -8812,18 +8752,6 @@
         "column": 31,
         "length": 10
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 36,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8856,7 +8784,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 33,
+            "line": 25,
             "column": 1,
             "length": 8
           }
@@ -8891,7 +8819,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 34,
+            "line": 26,
             "column": 1,
             "length": 3
           }
@@ -8934,18 +8862,6 @@
         "column": 34,
         "length": 13
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 20,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -8978,7 +8894,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 17,
+            "line": 13,
             "column": 1,
             "length": 8
           }
@@ -9013,7 +8929,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 18,
+            "line": 14,
             "column": 1,
             "length": 3
           }
@@ -9056,18 +8972,6 @@
         "column": 37,
         "length": 16
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 24,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -9100,7 +9004,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 21,
+            "line": 16,
             "column": 1,
             "length": 8
           }
@@ -9135,7 +9039,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 22,
+            "line": 17,
             "column": 1,
             "length": 3
           }
@@ -9178,18 +9082,6 @@
         "column": 37,
         "length": 16
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 28,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -9222,7 +9114,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 25,
+            "line": 19,
             "column": 1,
             "length": 8
           }
@@ -9257,7 +9149,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 26,
+            "line": 20,
             "column": 1,
             "length": 3
           }

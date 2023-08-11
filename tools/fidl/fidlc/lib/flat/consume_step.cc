@@ -331,18 +331,12 @@ bool ConsumeStep::CreateMethodResult(
   }
   // transport_err is not defined if the method is not flexible.
 
-  std::vector<std::unique_ptr<Attribute>> result_attributes;
-  // TODO(fxbug.dev/131859): Remove @result once migrated to the "is_result" IR field.
-  auto result_span = generated_source_file()->AddLine("result");
-  result_attributes.emplace_back(std::make_unique<Attribute>(
-      std::nullopt, result_span, std::vector<std::unique_ptr<AttributeArg>>(), result_span));
   auto result_context = err_variant_context->parent();
   auto result_name = Name::CreateAnonymous(library(), response_span, result_context,
                                            Name::Provenance::kGeneratedResultUnion);
   auto union_decl = std::make_unique<Union>(
-      method->source_signature(), std::make_unique<AttributeList>(std::move(result_attributes)),
-      std::move(result_name), std::move(result_members), types::Strictness::kStrict,
-      std::nullopt /* resourceness */);
+      method->source_signature(), std::make_unique<AttributeList>(), std::move(result_name),
+      std::move(result_members), types::Strictness::kStrict, std::nullopt /* resourceness */);
   auto result_decl = union_decl.get();
   if (!RegisterDecl(std::move(union_decl)))
     return false;

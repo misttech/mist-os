@@ -1157,9 +1157,11 @@ open protocol Example {
   ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
   ASSERT_NOT_NULL(result_union);
-  ASSERT_NOT_NULL(result_union->attributes);
-  ASSERT_NOT_NULL(result_union->attributes->Get("result"));
   ASSERT_EQ(result_union->members.size(), 3);
+
+  auto anonymous = result_union->name.as_anonymous();
+  ASSERT_NOT_NULL(anonymous);
+  ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
   ASSERT_NOT_NULL(success.maybe_used);
@@ -1204,9 +1206,11 @@ open protocol Example {
   ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
   ASSERT_NOT_NULL(result_union);
-  ASSERT_NOT_NULL(result_union->attributes);
-  ASSERT_NOT_NULL(result_union->attributes->Get("result"));
   ASSERT_EQ(result_union->members.size(), 3);
+
+  auto anonymous = result_union->name.as_anonymous();
+  ASSERT_NOT_NULL(anonymous);
+  ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
   ASSERT_NOT_NULL(success.maybe_used);

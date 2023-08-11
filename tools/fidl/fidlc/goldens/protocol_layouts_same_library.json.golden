@@ -2961,18 +2961,6 @@
         "column": 38,
         "length": 36
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 8,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -3005,7 +2993,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 5,
+            "line": 4,
             "column": 1,
             "length": 8
           }
@@ -3040,7 +3028,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 6,
+            "line": 5,
             "column": 1,
             "length": 3
           }
@@ -3083,18 +3071,6 @@
         "column": 39,
         "length": 14
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 16,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -3127,7 +3103,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 13,
+            "line": 10,
             "column": 1,
             "length": 8
           }
@@ -3162,7 +3138,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 14,
+            "line": 11,
             "column": 1,
             "length": 3
           }
@@ -3280,18 +3256,6 @@
         "column": 11,
         "length": 41
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 4,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -3402,18 +3366,6 @@
         "column": 58,
         "length": 14
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 12,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -3446,7 +3398,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 9,
+            "line": 7,
             "column": 1,
             "length": 8
           }
@@ -3481,7 +3433,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 10,
+            "line": 8,
             "column": 1,
             "length": 3
           }
@@ -3672,18 +3624,6 @@
         "column": 30,
         "length": 36
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 32,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -3716,7 +3656,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 29,
+            "line": 22,
             "column": 1,
             "length": 8
           }
@@ -3751,7 +3691,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 30,
+            "line": 23,
             "column": 1,
             "length": 3
           }
@@ -3794,18 +3734,6 @@
         "column": 31,
         "length": 14
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 24,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -3838,7 +3766,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 21,
+            "line": 16,
             "column": 1,
             "length": 8
           }
@@ -3873,7 +3801,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 22,
+            "line": 17,
             "column": 1,
             "length": 3
           }
@@ -3991,18 +3919,6 @@
         "column": 11,
         "length": 43
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 28,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4035,7 +3951,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 25,
+            "line": 19,
             "column": 1,
             "length": 8
           }
@@ -4070,7 +3986,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 26,
+            "line": 20,
             "column": 1,
             "length": 3
           }
@@ -4113,18 +4029,6 @@
         "column": 50,
         "length": 14
       },
-      "maybe_attributes": [
-        {
-          "name": "result",
-          "arguments": [],
-          "location": {
-            "filename": "generated",
-            "line": 20,
-            "column": 1,
-            "length": 6
-          }
-        }
-      ],
       "members": [
         {
           "ordinal": 1,
@@ -4157,7 +4061,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 17,
+            "line": 13,
             "column": 1,
             "length": 8
           }
@@ -4192,7 +4096,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 18,
+            "line": 14,
             "column": 1,
             "length": 3
           }
