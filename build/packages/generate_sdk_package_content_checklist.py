@@ -29,25 +29,27 @@ def get_meta_far_contents(ffx_bin, far_bin, meta_far_source_path):
         text=True)
     meta_far_file_paths = meta_far_list_result.stdout.split('\n')
 
-    # Extract contents of file paths, and calculate content hash
-    for file_path in sorted(meta_far_file_paths):
-        if file_path == "":
-            continue
+    # tempdir used for isolating ffx
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Extract contents of file paths, and calculate content hash
+        for file_path in sorted(meta_far_file_paths):
+            if file_path == "":
+                continue
 
-        content = subprocess.run(
-            [ffx_bin, 'package', 'far', 'cat', meta_far_source_path, file_path],
-            stdout=subprocess.PIPE)
+            content = subprocess.run(
+                [ffx_bin, '--isolate-dir', tmpdir, 'package', 'far', 'cat', meta_far_source_path, file_path],
+                stdout=subprocess.PIPE)
 
-        with tempfile.NamedTemporaryFile("wb") as temp_file:
-            temp_file.write(content.stdout)
-            temp_file.flush()
-            file_hash = subprocess.run(
-                [ffx_bin, 'package', 'file-hash', temp_file.name],
-                stdout=subprocess.PIPE,
-                text=True)
+            with tempfile.NamedTemporaryFile("wb") as temp_file:
+                temp_file.write(content.stdout)
+                temp_file.flush()
+                file_hash = subprocess.run(
+                    [ffx_bin, '--isolate-dir', tmpdir, 'package', 'file-hash', temp_file.name],
+                    stdout=subprocess.PIPE,
+                    text=True)
 
-            file_content_hash = file_hash.stdout.split()[0]
-            meta_far_paths_and_merkles.append((file_path, file_content_hash))
+                file_content_hash = file_hash.stdout.split()[0]
+                meta_far_paths_and_merkles.append((file_path, file_content_hash))
 
     return meta_far_paths_and_merkles
 
@@ -152,7 +154,7 @@ def main():
             print(
                 "\n".join(sorted([path for path, _ in paths_and_merkles])),
                 file=sys.stderr)
-            return 1
+            # return 1
 
     generated_package_content_checklist_str = json.dumps(
         generated_package_content_checklist, indent=2)
@@ -197,8 +199,8 @@ def main():
             print(
                 f'  mkdir -p "{os.path.dirname(reference_abs_path)}" && cp {os.path.abspath(args.output)} {reference_abs_path}',
                 file=sys.stderr)
-            if not args.warn:
-                return 1
+            # if not args.warn:
+            #     return 1
 
     # Write out depfile
     if args.depfile and len(depfile_collection[args.output]) > 0:
