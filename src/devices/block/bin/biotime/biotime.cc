@@ -25,69 +25,70 @@
 
 namespace {
 
-constexpr uint64_t kibi = 1024;
+constexpr uint64_t kKibi = 1024;
+constexpr uint64_t kKilo = 1000;
 
-uint64_t number(const char* str) {
+uint64_t HumanReadableStringToNumber(const char* string, bool use_kibi) {
   char* end;
-  uint64_t n = strtoull(str, &end, 10);
+  const uint64_t number = strtoull(string, &end, 10);
+  const uint64_t thousand = use_kibi ? kKibi : kKilo;
 
-  uint64_t m = 1;
+  uint64_t multiplier = 1;
   switch (*end) {
     case 'G':
     case 'g':
-      m = kibi * kibi * kibi;
+      multiplier = thousand * thousand * thousand;
       break;
     case 'M':
     case 'm':
-      m = kibi * kibi;
+      multiplier = thousand * thousand;
       break;
     case 'K':
     case 'k':
-      m = kibi;
+      multiplier = thousand;
+      break;
+    default:
+      // TODO(hanbinyoon): Handle error.
       break;
   }
-  return m * n;
+  return multiplier * number;
 }
 
-void bytes_per_second(uint64_t bytes, uint64_t nanos) {
-  double s = (static_cast<double>(nanos)) / (static_cast<double>(1000000000));
-  double rate = (static_cast<double>(bytes)) / s;
+void PrintRate(uint64_t count, uint64_t nanos, const char* unit, bool use_kibi) {
+  const double seconds =
+      (static_cast<double>(nanos)) / (static_cast<double>(kKilo * kKilo * kKilo));
+  double rate = (static_cast<double>(count)) / seconds;
+  const double thousand = use_kibi ? kKibi : kKilo;
 
-  const char* unit = "B";
-  if (rate > 1024 * 1024) {
-    unit = "MB";
-    rate /= 1024 * 1024;
-  } else if (rate > 1024) {
-    unit = "KB";
-    rate /= 1024;
+  const char* order = "";
+  if (rate > thousand * thousand) {
+    order = use_kibi ? "Mi" : "M";
+    rate /= thousand * thousand;
+  } else if (rate > thousand) {
+    order = use_kibi ? "Ki" : "K";
+    rate /= thousand;
   }
-  fprintf(stderr, "%g %s/s\n", rate, unit);
+  fprintf(stderr, "%g %s%s/s\n", rate, order, unit);
 }
 
-void ops_per_second(uint64_t count, uint64_t nanos) {
-  double s = (static_cast<double>(nanos)) / (static_cast<double>(1000000000));
-  double rate = (static_cast<double>(count)) / s;
-  fprintf(stderr, "%g %s/s\n", rate, "ops");
-}
-
-using blkdev_t = struct {
+struct BlockDevice {
   zx::vmo vmo;
   zx::fifo fifo;
   fidl::ClientEnd<fuchsia_hardware_block::Session> session;
   reqid_t reqid;
   fuchsia_hardware_block::wire::VmoId vmoid;
-  size_t bufsz;
+  size_t buffer_size;
   fuchsia_hardware_block::wire::BlockInfo info;
 };
 
-zx::result<blkdev_t> blkdev_open(const char* dev, size_t bufsz) {
+zx::result<BlockDevice> OpenBlockDevice(const char* dev, size_t buffer_size) {
   zx::result channel = component::Connect<fuchsia_hardware_block::Block>(dev);
   if (channel.is_error()) {
     fprintf(stderr, "error: cannot open '%s': %s\n", dev, channel.status_string());
     return channel.take_error();
   }
-  blkdev_t blk = {
-      .bufsz = bufsz,
+  BlockDevice block_device = {
+      .buffer_size = buffer_size,
   };
 
   {
@@ -103,11 +104,11 @@ zx::result<blkdev_t> blkdev_open(const char* dev, size_t bufsz) {
               zx_status_get_string(response.error_value()));
       return zx::error(response.error_value());
     }
-    blk.info = response.value()->info;
+    block_device.info = response.value()->info;
   }
 
   {
-    zx::result server = fidl::CreateEndpoints(&blk.session);
+    zx::result server = fidl::CreateEndpoints(&block_device.session);
     if (server.is_error()) {
       fprintf(stderr, "error: cannot create server for '%s': %s\n", dev, server.status_string());
       return zx::error(server.status_value());
@@ -122,7 +123,7 @@ zx::result<blkdev_t> blkdev_open(const char* dev, size_t bufsz) {
   }
 
   {
-    const fidl::WireResult result = fidl::WireCall(blk.session)->GetFifo();
+    const fidl::WireResult result = fidl::WireCall(block_device.session)->GetFifo();
     if (!result.ok()) {
       fprintf(stderr, "error: cannot get fifo for '%s':%s\n", dev,
               result.FormatDescription().c_str());
@@ -134,22 +135,23 @@ zx::result<blkdev_t> blkdev_open(const char* dev, size_t bufsz) {
               zx_status_get_string(response.error_value()));
       return zx::error(response.error_value());
     }
-    blk.fifo = std::move(response.value()->fifo);
+    block_device.fifo = std::move(response.value()->fifo);
   }
 
-  if (zx_status_t status = zx::vmo::create(bufsz, 0, &blk.vmo); status != ZX_OK) {
+  if (zx_status_t status = zx::vmo::create(buffer_size, 0, &block_device.vmo); status != ZX_OK) {
     fprintf(stderr, "error: out of memory: %s\n", zx_status_get_string(status));
     return zx::error(status);
   }
 
   zx::vmo dup;
-  if (zx_status_t status = blk.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
+  if (zx_status_t status = block_device.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+      status != ZX_OK) {
     fprintf(stderr, "error: cannot duplicate handle: %s\n", zx_status_get_string(status));
     return zx::error(status);
   }
 
   {
-    const fidl::WireResult result = fidl::WireCall(blk.session)->AttachVmo(std::move(dup));
+    const fidl::WireResult result = fidl::WireCall(block_device.session)->AttachVmo(std::move(dup));
     if (!result.ok()) {
       fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev,
               result.FormatDescription().c_str());
@@ -161,73 +163,69 @@ zx::result<blkdev_t> blkdev_open(const char* dev, size_t bufsz) {
               zx_status_get_string(response.error_value()));
       return zx::error(response.error_value());
     }
-    blk.vmoid = response.value()->vmoid;
+    block_device.vmoid = response.value()->vmoid;
   }
 
-  return zx::ok(std::move(blk));
+  return zx::ok(std::move(block_device));
 }
 
-using bio_random_args_t = struct {
-  blkdev_t& blk;
-  size_t count;
-  size_t xfer;
-  uint64_t seed;
-  bool write;
-  bool linear;
+struct BioReadWriteArgs {
+  BlockDevice& block_device;
+  size_t total_xfer_ops;
+  size_t xfer_size_bytes;
+  uint64_t random_seed;
+  bool is_write;
+  bool is_linear_access;
 
-  mutable std::counting_semaphore<> sem;
+  mutable std::counting_semaphore<> max_pending_ops;
 };
 
-std::atomic<reqid_t> next_reqid(0);
+zx_status_t BioReadWrite(const BioReadWriteArgs& rw_args, zx_duration_t* xfer_duration) {
+  const zx_time_t before_xfer = zx_clock_get_monotonic();
 
-zx_status_t bio_random(const bio_random_args_t& a, uint64_t* _total, zx_duration_t* _res) {
-  size_t count = a.count;
-  zx::fifo& fifo = a.blk.fifo;
+  std::thread t([&rw_args]() {
+    size_t total_xfer_ops = rw_args.total_xfer_ops;
+    const size_t xfer_size_bytes = rw_args.xfer_size_bytes;
+    const size_t block_size = rw_args.block_device.info.block_size;
+    const size_t max_block_offset = ((total_xfer_ops - 1) * xfer_size_bytes) / block_size;
 
-  zx_time_t t0 = zx_clock_get_monotonic();
+    reqid_t next_reqid(0);
+    size_t vmo_offset = 0;
+    size_t linear_dev_offset = 0;
+    rand64_t r64 = RAND63SEED(rw_args.random_seed);
+    zx::fifo& fifo = rw_args.block_device.fifo;
 
-  std::thread t([&a]() {
-    size_t off = 0;
-    size_t count = a.count;
-    size_t xfer = a.xfer;
-
-    size_t blksize = a.blk.info.block_size;
-    size_t blkcount = ((count * xfer) / blksize) - (xfer / blksize);
-
-    rand64_t r64 = RAND63SEED(a.seed);
-
-    zx::fifo& fifo = a.blk.fifo;
-    size_t dev_off = 0;
-
-    while (count > 0) {
-      a.sem.acquire();
+    while (total_xfer_ops > 0) {
+      rw_args.max_pending_ops.acquire();
 
       block_fifo_request_t req = {
           .command =
               {
-                  .opcode = static_cast<uint8_t>(a.write ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ),
+                  .opcode = static_cast<uint8_t>(rw_args.is_write ? BLOCK_OPCODE_WRITE
+                                                                  : BLOCK_OPCODE_READ),
                   .flags = 0,
               },
-          .reqid = next_reqid.fetch_add(1),
-          .vmoid = a.blk.vmoid.id,
-          .length = static_cast<uint32_t>(xfer),
-          .vmo_offset = off,
+          .reqid = next_reqid++,
+          .vmoid = rw_args.block_device.vmoid.id,
+          .length = static_cast<uint32_t>(xfer_size_bytes),
+          .vmo_offset = vmo_offset,
       };
 
-      if (a.linear) {
-        req.dev_offset = dev_off;
-        dev_off += xfer;
+      if (rw_args.is_linear_access) {
+        req.dev_offset = linear_dev_offset;
+        linear_dev_offset += xfer_size_bytes;
       } else {
-        req.dev_offset = (rand64(&r64) % blkcount) * blksize;
+        req.dev_offset = (rand64(&r64) % max_block_offset) * block_size;
       }
-      off += xfer;
-      if ((off + xfer) > a.blk.bufsz) {
-        off = 0;
+      vmo_offset += xfer_size_bytes;
+      if ((vmo_offset + xfer_size_bytes) > rw_args.block_device.buffer_size) {
+        vmo_offset = 0;
       }
 
-      req.length /= static_cast<uint32_t>(blksize);
-      req.dev_offset /= blksize;
-      req.vmo_offset /= blksize;
+      // TODO(hanbinyoon): Consider using units of block_size above instead.
+      req.length /= static_cast<uint32_t>(block_size);
+      req.dev_offset /= block_size;
+      req.vmo_offset /= block_size;
 
 #if 0
         fprintf(stderr, "IO tid=%u vid=%u op=%x len=%zu vof=%zu dof=%zu\n",
@@ -249,17 +247,19 @@ zx_status_t bio_random(const bio_random_args_t& a, uint64_t* _total, zx_duration
         return -1;
       }
 
-      count--;
+      total_xfer_ops--;
     }
     return 0;
   });
 
+  zx::fifo& fifo = rw_args.block_device.fifo;
   auto cleanup = fit::defer([&fifo, &t]() {
     fifo.reset();
     t.join();
   });
 
-  while (count > 0) {
+  size_t total_xfer_ops = rw_args.total_xfer_ops;
+  while (total_xfer_ops > 0) {
     block_fifo_response_t resp;
     if (zx_status_t status = fifo.read(sizeof(resp), &resp, 1, nullptr); status != ZX_OK) {
       if (status == ZX_ERR_SHOULD_WAIT) {
@@ -276,22 +276,21 @@ zx_status_t bio_random(const bio_random_args_t& a, uint64_t* _total, zx_duration
     }
     if (resp.status != ZX_OK) {
       fprintf(stderr, "error: io txn failed %s (%zu remaining)\n",
-              zx_status_get_string(resp.status), count);
+              zx_status_get_string(resp.status), total_xfer_ops);
       return resp.status;
     }
-    count--;
-    a.sem.release();
+    total_xfer_ops--;
+    rw_args.max_pending_ops.release();
   }
 
   cleanup.cancel();
 
-  zx_time_t t1 = zx_clock_get_monotonic();
+  const zx_time_t after_xfer = zx_clock_get_monotonic();
 
   fprintf(stderr, "waiting for thread to exit...\n");
   t.join();
 
-  *_res = zx_time_sub_time(t1, t0);
-  *_total = a.count * a.xfer;
+  *xfer_duration = zx_time_sub_time(after_xfer, before_xfer);
   return ZX_OK;
 }
 
@@ -299,17 +298,20 @@ void usage() {
   fprintf(stderr,
           "usage: biotime <option>* <device>\n"
           "\n"
-          "args:  -bs <num>     transfer block size (multiple of 4K)\n"
-          "       -total-bytes-to-transfer <num>  total amount to read or write\n"
-          "       -iter <num-iterations> total number of iterations (0 stands for infinite)\n"
-          "       -mo <num>     maximum outstanding ops (1..128)\n"
+          "args:  -bs <num>     transfer block size (multiple of 4K, default is 32K)\n"
+          "       -total-bytes-to-transfer <num>  total amount to read or write (per\n"
+          "                                       iteration, default is entire device)\n"
+          "       -iter <num>   total number of iterations (0 stands for infinite, default\n"
+          "                     is 1). results are reported for each iteration\n"
+          "       -mo <num>     maximum outstanding ops (1..128, default is 128)\n"
           "       -read         test reading from the block device (default)\n"
           "       -write        test writing to the block device\n"
           "       -live-dangerously  required if using \"-write\"\n"
-          "       -linear       transfers in linear order (default)\n"
-          "       -random       random transfers across total range\n"
-          "       -output-file <filename>  destination file for "
-          "writing results in JSON format\n");
+          "       -linear       transfers to linearly increasing block addresses (default)\n"
+          "       -random       transfers to random addresses across a span of\n"
+          "                     -total-bytes-to-transfer bytes\n"
+          "       -output-file <filename>  destination file for writing results in JSON\n"
+          "                                format\n");
 }
 
 #define needparam()                                                      \
@@ -337,16 +339,16 @@ void usage() {
 
 int main(int argc, char** argv) {
   bool live_dangerously = false;
-  bool opt_write = false;
-  bool opt_linear = true;
-  int opt_max_pending = 128;
-  size_t opt_xfer_size = 32768;
+  std::optional<bool> opt_is_write;
+  std::optional<bool> opt_is_linear_access;
+  int opt_max_pending_ops = 128;
+  size_t opt_xfer_size_bytes = 32768;
   uint64_t opt_num_iter = 1;
   bool loop_forever = false;
 
   const char* output_file = nullptr;
 
-  size_t total = 0;
+  size_t total_xfer_bytes = 0;
 
   nextarg();
   while (argc > 0) {
@@ -355,30 +357,42 @@ int main(int argc, char** argv) {
     }
     if (!strcmp(argv[0], "-bs")) {
       needparam();
-      opt_xfer_size = number(argv[0]);
-      if ((opt_xfer_size == 0) || (opt_xfer_size % 4096)) {
+      opt_xfer_size_bytes = HumanReadableStringToNumber(argv[0], /*use_kibi=*/true);
+      if ((opt_xfer_size_bytes == 0) || (opt_xfer_size_bytes % 4096)) {
         error("error: block size must be multiple of 4K\n");
       }
     } else if (!strcmp(argv[0], "-total-bytes-to-transfer")) {
       needparam();
-      total = number(argv[0]);
+      total_xfer_bytes = HumanReadableStringToNumber(argv[0], /*use_kibi=*/true);
     } else if (!strcmp(argv[0], "-mo")) {
       needparam();
-      size_t n = number(argv[0]);
+      size_t n = HumanReadableStringToNumber(argv[0], /*use_kibi=*/false);
       if ((n < 1) || (n > 128)) {
         error("error: max pending must be between 1 and 128\n");
       }
-      opt_max_pending = static_cast<int>(n);
+      opt_max_pending_ops = static_cast<int>(n);
     } else if (!strcmp(argv[0], "-read")) {
-      opt_write = false;
+      if (opt_is_write.has_value() && opt_is_write.value()) {
+        error("error: cannot specify both \"-read\" and \"-write\"\n");
+      }
+      opt_is_write = false;
     } else if (!strcmp(argv[0], "-write")) {
-      opt_write = true;
+      if (opt_is_write.has_value() && !opt_is_write.value()) {
+        error("error: cannot specify both \"-read\" and \"-write\"\n");
+      }
+      opt_is_write = true;
     } else if (!strcmp(argv[0], "-live-dangerously")) {
       live_dangerously = true;
     } else if (!strcmp(argv[0], "-linear")) {
-      opt_linear = true;
+      if (opt_is_linear_access.has_value() && !opt_is_linear_access.value()) {
+        error("error: cannot specify both \"-linear\" and \"-random\"\n");
+      }
+      opt_is_linear_access = true;
     } else if (!strcmp(argv[0], "-random")) {
-      opt_linear = false;
+      if (opt_is_linear_access.has_value() && opt_is_linear_access.value()) {
+        error("error: cannot specify both \"-linear\" and \"-random\"\n");
+      }
+      opt_is_linear_access = false;
     } else if (!strcmp(argv[0], "-output-file")) {
       needparam();
       output_file = argv[0];
@@ -401,7 +415,7 @@ int main(int argc, char** argv) {
   if (argc > 1) {
     error("error: unexpected arguments\n");
   }
-  if (opt_write && !live_dangerously) {
+  if (opt_is_write.has_value() && opt_is_write.value() && !live_dangerously) {
     error(
         "error: the option \"-live-dangerously\" is required when using"
         " \"-write\"\n");
@@ -409,47 +423,48 @@ int main(int argc, char** argv) {
   const char* device_filename = argv[0];
 
   do {
-    zx::result dev = blkdev_open(device_filename, kibi * kibi * 8);
+    const size_t buffer_size = opt_max_pending_ops * opt_xfer_size_bytes;
+    zx::result dev = OpenBlockDevice(device_filename, buffer_size);
     if (dev.is_error()) {
       fprintf(stderr, "error: cannot open '%s': %s\n", device_filename, dev.status_string());
       return -1;
     }
-    bio_random_args_t a = {
-        .blk = dev.value(),
-        .xfer = opt_xfer_size,
-        .seed = 7891263897612ULL,
-        .write = opt_write,
-        .linear = opt_linear,
-        .sem = std::counting_semaphore<>(opt_max_pending),
+    BioReadWriteArgs rw_args = {
+        .block_device = dev.value(),
+        .xfer_size_bytes = opt_xfer_size_bytes,
+        .random_seed = 7891263897612ULL,
+        .is_write = opt_is_write.has_value() ? opt_is_write.value() : false,
+        .is_linear_access = opt_is_linear_access.has_value() ? opt_is_linear_access.value() : true,
+        .max_pending_ops = std::counting_semaphore<>(opt_max_pending_ops),
     };
 
-    size_t devtotal = a.blk.info.block_count * a.blk.info.block_size;
+    const size_t device_size_bytes =
+        rw_args.block_device.info.block_count * rw_args.block_device.info.block_size;
 
     // default to entire device
-    if ((total == 0) || (total > devtotal)) {
-      total = devtotal;
+    if ((total_xfer_bytes == 0) || (total_xfer_bytes > device_size_bytes)) {
+      total_xfer_bytes = device_size_bytes;
     }
-    a.count = total / a.xfer;
+    rw_args.total_xfer_ops = total_xfer_bytes / rw_args.xfer_size_bytes;
 
-    zx_duration_t res = 0;
-    total = 0;
-    if (zx_status_t status = bio_random(a, &total, &res); status != ZX_OK) {
-      fprintf(stderr, "error: bio_random on '%s': %s\n", device_filename,
+    zx_duration_t xfer_duration = 0;
+    if (zx_status_t status = BioReadWrite(rw_args, &xfer_duration); status != ZX_OK) {
+      fprintf(stderr, "error: BioReadWrite on '%s': %s\n", device_filename,
               zx_status_get_string(status));
       return -1;
     }
 
-    fprintf(stderr, "%zu bytes in %zu ns: ", total, res);
-    bytes_per_second(total, res);
-    fprintf(stderr, "%zu ops in %zu ns: ", a.count, res);
-    ops_per_second(a.count, res);
+    fprintf(stderr, "%zu bytes in %zu ns: ", total_xfer_bytes, xfer_duration);
+    PrintRate(total_xfer_bytes, xfer_duration, "B", /*use_kibi=*/true);
+    fprintf(stderr, "%zu ops in %zu ns: ", rw_args.total_xfer_ops, xfer_duration);
+    PrintRate(rw_args.total_xfer_ops, xfer_duration, "ops", /*use_kibi=*/false);
 
     if (output_file) {
       perftest::ResultsSet results;
       auto* test_case =
           results.AddTestCase("fuchsia.zircon", "BlockDeviceThroughput", "bytes/second");
-      double time_in_seconds = static_cast<double>(res) / 1e9;
-      test_case->AppendValue(static_cast<double>(total) / time_in_seconds);
+      double time_in_seconds = static_cast<double>(xfer_duration) / 1e9;
+      test_case->AppendValue(static_cast<double>(total_xfer_bytes) / time_in_seconds);
       if (!results.WriteJSONFile(output_file)) {
         return 1;
       }
