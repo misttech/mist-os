@@ -154,7 +154,7 @@ def main():
             print(
                 "\n".join(sorted([path for path, _ in paths_and_merkles])),
                 file=sys.stderr)
-            # return 1
+            return 1
 
     generated_package_content_checklist_str = json.dumps(
         generated_package_content_checklist, indent=2)
@@ -199,8 +199,8 @@ def main():
             print(
                 f'  mkdir -p "{os.path.dirname(reference_abs_path)}" && cp {os.path.abspath(args.output)} {reference_abs_path}',
                 file=sys.stderr)
-            # if not args.warn:
-            #     return 1
+            if not args.warn:
+                return 1
 
     # Write out depfile
     if args.depfile and len(depfile_collection[args.output]) > 0:
