@@ -26,6 +26,9 @@ zx_status_t WriteEthernetFrame(cpp20::span<uint8_t> out, common::MacAddr dst, co
 std::vector<uint8_t> CreateEthernetFrame(common::MacAddr dst, common::MacAddr src, uint16_t type,
                                          cpp20::span<const uint8_t> body);
 
+// Derive SNR from RSSI & Noise. Restrict it to int8_t.
+int8_t SnrDbFromSignalStrength(double signal_strength, double noise_level);
+
 }  // namespace wlan::brcmfmac::sim_utils
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SIM_SIM_UTILS_H_

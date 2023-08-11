@@ -30,6 +30,7 @@ class StationIfc;
 typedef struct WlanRxInfo {
   wlan_common::WlanChannel channel;
   double signal_strength;
+  double noise_level;
 } WlanRxInfo;
 
 typedef struct WlanTxInfo {

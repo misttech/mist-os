@@ -51,6 +51,8 @@ namespace wlan::simulation {
 
 // To simulate the physical environment.
 //
+constexpr double kNoiseLevel = -91;  // Hard-code this for now
+
 class Environment {
  public:
   Environment();

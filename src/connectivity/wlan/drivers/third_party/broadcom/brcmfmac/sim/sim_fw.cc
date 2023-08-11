@@ -41,6 +41,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil_types.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
 #include "third_party/bcmdhd/crossdriver/include/proto/802.11.h"
 #include "wifi/wifi-config.h"
 #include "zircon/errors.h"
@@ -2915,13 +2916,13 @@ void SimFirmware::RxMgmtFrame(std::shared_ptr<const simulation::SimManagementFra
   switch (mgmt_frame->MgmtFrameType()) {
     case simulation::SimManagementFrame::FRAME_TYPE_BEACON: {
       auto beacon = std::static_pointer_cast<const simulation::SimBeaconFrame>(mgmt_frame);
-      RxBeacon(info->channel, beacon, info->signal_strength);
+      RxBeacon(info->channel, beacon, info->signal_strength, info->noise_level);
       break;
     }
 
     case simulation::SimManagementFrame::FRAME_TYPE_PROBE_RESP: {
       auto probe_resp = std::static_pointer_cast<const simulation::SimProbeRespFrame>(mgmt_frame);
-      RxProbeResp(info->channel, probe_resp, info->signal_strength);
+      RxProbeResp(info->channel, probe_resp, info->signal_strength, info->noise_level);
       break;
     }
 
@@ -3089,11 +3090,15 @@ int8_t SimFirmware::RssiDbmFromSignalStrength(double signal_strength) {
 
 void SimFirmware::RxBeacon(const wlan_common::WlanChannel& channel,
                            std::shared_ptr<const simulation::SimBeaconFrame> frame,
-                           double signal_strength) {
+                           double signal_strength, double noise_level) {
   if (scan_state_.state == ScanState::SCANNING && !scan_state_.opts->is_active) {
     int8_t rssi_dbm = RssiDbmFromSignalStrength(signal_strength);
-    ScanResult scan_result = {
-        .channel = channel, .bssid = frame->bssid_, .rssi_dbm = rssi_dbm, .ies = frame->IEs_};
+    int8_t snr = sim_utils::SnrDbFromSignalStrength(rssi_dbm, noise_level);
+    ScanResult scan_result = {.channel = channel,
+                              .bssid = frame->bssid_,
+                              .rssi_dbm = rssi_dbm,
+                              .snr = snr,
+                              .ies = frame->IEs_};
 
     scan_result.bss_capability.set_val(frame->capability_info_.val());
     scan_state_.opts->on_result_fn(scan_result);
@@ -3153,14 +3158,18 @@ void SimFirmware::RxBeacon(const wlan_common::WlanChannel& channel,
 
 void SimFirmware::RxProbeResp(const wlan_common::WlanChannel& channel,
                               std::shared_ptr<const simulation::SimProbeRespFrame> frame,
-                              double signal_strength) {
+                              double signal_strength, double noise_level) {
   if (scan_state_.state != ScanState::SCANNING || !scan_state_.opts->is_active) {
     return;
   }
 
   int8_t rssi_dbm = SimFirmware::RssiDbmFromSignalStrength(signal_strength);
-  ScanResult scan_result = {
-      .channel = channel, .bssid = frame->src_addr_, .rssi_dbm = rssi_dbm, .ies = frame->IEs_};
+  int8_t snr = sim_utils::SnrDbFromSignalStrength(rssi_dbm, noise_level);
+  ScanResult scan_result = {.channel = channel,
+                            .bssid = frame->src_addr_,
+                            .rssi_dbm = rssi_dbm,
+                            .snr = snr,
+                            .ies = frame->IEs_};
 
   scan_result.bss_capability.set_val(frame->capability_info_.val());
   scan_state_.opts->on_result_fn(scan_result);
@@ -3230,6 +3239,7 @@ void SimFirmware::EscanResultSeen(const ScanResult& result_in) {
 
   // RSSI
   bss_info->RSSI = result_in.rssi_dbm;
+  bss_info->SNR = result_in.snr;
 
   // IEs
   bss_info->ie_offset = sizeof(brcmf_bss_info_le);

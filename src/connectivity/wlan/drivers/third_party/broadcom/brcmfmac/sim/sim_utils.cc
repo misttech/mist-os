@@ -30,4 +30,14 @@ std::vector<uint8_t> CreateEthernetFrame(common::MacAddr dst, common::MacAddr sr
   return out;
 }
 
+int8_t SnrDbFromSignalStrength(double signal_strength, double noise_level) {
+  double snr = signal_strength - noise_level;
+  if (snr > INT8_MAX) {
+    return INT8_MAX;
+  } else if (snr < INT8_MIN) {
+    return INT8_MIN;
+  }
+  return static_cast<int8_t>(snr);
+}
+
 }  // namespace wlan::brcmfmac::sim_utils

@@ -74,6 +74,7 @@ void Environment::Tx(const SimFrame& frame, const WlanTxInfo& tx_info, StationIf
       auto rx_info = std::make_shared<WlanRxInfo>();
       rx_info->channel = tx_info.channel;
       rx_info->signal_strength = signal_strength;
+      rx_info->noise_level = kNoiseLevel;
       // Only deliver frame if the station is sensitive enough to pick it up
       if (signal_strength >= sta->rx_sensitivity_) {
         zx::duration trans_delay = CalcTransTime(sender, sta);

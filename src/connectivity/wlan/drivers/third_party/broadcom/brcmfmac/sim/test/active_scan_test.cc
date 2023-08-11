@@ -19,6 +19,7 @@
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 
@@ -200,6 +201,8 @@ void ActiveScanTest::VerifyScanResults() {
 
         // Verify has RSSI value
         ASSERT_LT(result.bss.rssi_dbm, 0);
+        ASSERT_EQ(result.bss.snr_db,
+                  sim_utils::SnrDbFromSignalStrength(result.bss.rssi_dbm, simulation::kNoiseLevel));
       }
     }
 

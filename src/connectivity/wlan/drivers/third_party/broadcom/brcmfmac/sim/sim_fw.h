@@ -102,6 +102,7 @@ class SimFirmware {
     common::MacAddr bssid;
     wlan::CapabilityInfo bss_capability;
     int8_t rssi_dbm;
+    int8_t snr;
     // Note: SSID appears in an IE.
     std::list<std::shared_ptr<wlan::simulation::InformationElement>> ies;
   };
@@ -446,7 +447,8 @@ class SimFirmware {
                    std::shared_ptr<const simulation::WlanRxInfo> info);
   static int8_t RssiDbmFromSignalStrength(double signal_strength);
   void RxBeacon(const wlan_common::WlanChannel& channel,
-                std::shared_ptr<const simulation::SimBeaconFrame> frame, double signal_strength);
+                std::shared_ptr<const simulation::SimBeaconFrame> frame, double signal_strength,
+                double noise_level);
   void RxAssocResp(std::shared_ptr<const simulation::SimAssocRespFrame> frame);
   void RxDisassocReq(std::shared_ptr<const simulation::SimDisassocReqFrame> frame);
   void RxAssocReq(std::shared_ptr<const simulation::SimAssocReqFrame> frame);
@@ -456,7 +458,7 @@ class SimFirmware {
   void RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame> btm_req_frame);
   void RxProbeResp(const wlan_common::WlanChannel& channel,
                    std::shared_ptr<const simulation::SimProbeRespFrame> frame,
-                   double signal_strength);
+                   double signal_strength, double noise_level);
   void RxAuthFrame(std::shared_ptr<const simulation::SimAuthFrame> frame);
 
   // Handler for channel switch.

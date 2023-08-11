@@ -2648,7 +2648,8 @@ static void brcmf_iedump(uint8_t* ies, size_t total_len) {
 
 static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel, uint32_t chn_bw,
                                      const uint8_t* bssid, uint16_t capability, uint16_t interval,
-                                     uint8_t* ie, size_t ie_len, int16_t rssi_dbm) {
+                                     uint8_t* ie, size_t ie_len, int16_t rssi_dbm,
+                                     uint16_t snr_db) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_cfg80211_info* cfg = ndev_to_if(ndev)->drvr->config;
   if (ndev->if_proto == nullptr) {
@@ -2678,6 +2679,7 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel, 
   result.bss.channel.primary = (uint8_t)channel;
   result.bss.channel.cbw = chn_bw;
   result.bss.rssi_dbm = std::min<int16_t>(0, std::max<int16_t>(-255, rssi_dbm));
+  result.bss.snr_db = static_cast<int8_t>(snr_db);
   result.bss.ies_list = ie;
   result.bss.ies_count = ie_len;
 
@@ -2702,6 +2704,7 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   size_t notify_ielen;
   int16_t notify_rssi_dbm;
   uint32_t notify_chn_bw;
+  uint16_t notify_snr_db;
 
   if (bi->length > WL_BSS_INFO_MAX) {
     BRCMF_ERR("Bss info is larger than buffer. Discarding");
@@ -2721,6 +2724,7 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
   notify_ie = (uint8_t*)bi + bi->ie_offset;
   notify_ielen = bi->ie_length;
   notify_rssi_dbm = (int16_t)bi->RSSI;
+  notify_snr_db = bi->SNR;
   switch (bi->chanspec & WL_CHANSPEC_BW_MASK) {
     case WL_CHANSPEC_BW_20:
       notify_chn_bw = CHANNEL_BANDWIDTH_CBW20;
@@ -2745,16 +2749,17 @@ static zx_status_t brcmf_inform_single_bss(struct net_device* ndev, struct brcmf
 
   BRCMF_DBG(CONN,
             "Scan result received  BSS: " FMT_MAC
-            "  Channel: %3d  chanspec: 0x%x Capability: %#6x  Beacon interval: %5d  Signal: %4d",
+            "  Channel: %3d  chanspec: 0x%x Capability: %#6x  Beacon interval: %5d  Signal: %4d"
+            " SNR: %d",
             FMT_MAC_ARGS(bi->BSSID), channel, bi->chanspec, notify_capability, notify_interval,
-            notify_rssi_dbm);
+            notify_rssi_dbm, notify_snr_db);
   if (BRCMF_IS_ON(CONN) && BRCMF_IS_ON(BYTES)) {
     brcmf_iedump(notify_ie, notify_ielen);
   }
 
   brcmf_return_scan_result(ndev, (uint8_t)channel, notify_chn_bw, (const uint8_t*)bi->BSSID,
                            notify_capability, notify_interval, notify_ie, notify_ielen,
-                           notify_rssi_dbm);
+                           notify_rssi_dbm, notify_snr_db);
 
   return ZX_OK;
 }
