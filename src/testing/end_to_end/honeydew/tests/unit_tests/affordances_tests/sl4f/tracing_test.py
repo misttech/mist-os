@@ -14,6 +14,7 @@ from parameterized import parameterized
 
 from honeydew import errors
 from honeydew.affordances.sl4f import tracing as sl4f_tracing
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 
 
@@ -34,8 +35,12 @@ class TracingSL4FTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
+        self.reboot_affordance_obj = mock.MagicMock(
+            spec=affordances_capable.RebootCapableDevice)
         self.tracing_obj = sl4f_tracing.Tracing(
-            device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
+            device_name="fuchsia-emulator",
+            sl4f=self.sl4f_obj,
+            reboot_affordance=self.reboot_affordance_obj)
         self.sl4f_obj.reset_mock()
 
     @parameterized.expand(

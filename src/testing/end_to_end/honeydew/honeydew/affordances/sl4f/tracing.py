@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from honeydew import errors
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -32,11 +33,25 @@ class Tracing(tracing.Tracing):
         sl4f: SL4F transport.
     """
 
-    def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
+    def __init__(
+            self, device_name: str, sl4f: sl4f_transport.SL4F,
+            reboot_affordance: affordances_capable.RebootCapableDevice) -> None:
         self._name: str = device_name
         self._sl4f: sl4f_transport.SL4F = sl4f
+        self._reboot_affordance: affordances_capable.RebootCapableDevice = \
+            reboot_affordance
         self._session_initialized: bool = False
         self._tracing_active: bool = False
+
+        # `_reset_state` need to be called on every device bootup
+        self._reboot_affordance.register_for_on_device_boot(
+            fn=self._reset_state)
+
+    def _reset_state(self) -> None:
+        """Resets the session_initialized and tracing_active parameters.
+        """
+        self._session_initialized = False
+        self._tracing_active = False
 
     # List all the public methods in alphabetical order
     def initialize(

@@ -116,7 +116,9 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             tracing.Tracing object
         """
         return tracing_sl4f.Tracing(
-            device_name=self.device_name, sl4f=self.sl4f)
+            device_name=self.device_name,
+            sl4f=self.sl4f,
+            reboot_affordance=self)
 
     # List all the public methods in alphabetical order
     def close(self) -> None:
