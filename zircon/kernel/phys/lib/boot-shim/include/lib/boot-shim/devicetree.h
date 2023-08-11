@@ -579,6 +579,81 @@ class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
  private:
   std::optional<uint64_t> boot_hart_id_;
 };
+class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
+ public:
+  template <typename Shim>
+  void Init(Shim& shim) {
+    DevictreeCpuTopologyItem::Init(
+        shim, [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
+          node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64;
+          devicetree::PropertyDecoder decoder(cpu_entry.properties);
+
+          auto reg_prop = decoder.FindProperty("reg");
+          if (!reg_prop) {
+            OnError("Could not find 'reg' property in 'cpu' node.");
+            return;
+          }
+
+          auto reg = devicetree::RegProperty::Create(1, 0, reg_prop->AsBytes());
+          if (!reg) {
+            OnError("Could not parse 'reg' property in 'cpu' node.");
+            return;
+          }
+
+          auto set_affs = [&node](uint64_t cell) {
+            // AFF 0
+            node.architecture_info.arm64.cpu_id = cell & 0xff;
+            // AFF 1
+            node.architecture_info.arm64.cluster_1_id = (cell >> 8) & 0xff;
+            // AFF 2
+            node.architecture_info.arm64.cluster_2_id = (cell >> 16) & 0xff;
+          };
+
+          auto set_boot_cpu = [&node]() {
+            // Look for MPIDR 0.
+            const auto& arch_info = node.architecture_info.arm64;
+            if (arch_info.cpu_id == 0 && arch_info.cluster_1_id == 0 &&
+                arch_info.cluster_2_id == 0 && arch_info.cluster_3_id == 0) {
+              node.flags |= ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
+            } else {
+              node.flags &= ~ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
+            }
+          };
+
+          if (reg->size() == 0 || reg->size() > 2) {
+            OnError("'reg' property in 'cpu' node contains an unexpected number of cells.");
+            return;
+          }
+
+          auto cell_0 = (*reg)[0].address();
+          if (!cell_0) {
+            OnError("Could not parse first cell of 'reg' property in 'cpu' node.");
+            return;
+          }
+
+          // One cell.
+          // The reg cell bits [23:0] must be set to bits [23:0] of MPIDR_EL1.
+          if (reg->size() == 1) {
+            set_affs(*cell_0);
+            node.architecture_info.arm64.cluster_3_id = 0;
+            set_boot_cpu();
+            return;
+          }
+
+          // Two cells.
+          // The first reg cell bits [7:0] must be set to  bits [39:32] of MPIDR_EL1.
+          // The second reg cell bits [23:0] must be set to bits [23:0] of MPIDR_EL1.
+          auto cell_1 = (*reg)[1].address();
+          if (!cell_1) {
+            OnError("Could not parse second cell of 'reg' property in 'cpu' node.");
+            return;
+          }
+          set_affs(*cell_1);
+          node.architecture_info.arm64.cluster_3_id = *cell_0 & 0xFF;
+          set_boot_cpu();
+        });
+  }
+};
 
 // A flat Devicetree ZBI Item.
 using DevicetreeDtbItem = SingleItem<ZBI_TYPE_DEVICETREE>;
