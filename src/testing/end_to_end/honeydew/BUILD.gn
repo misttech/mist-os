@@ -72,7 +72,11 @@ python_library("honeydew") {
 host_test_data("honeydew_fidl_ir_and_deps") {
   sources = []
   deps = [
+    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_host_test_data",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_host_test_data",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }
