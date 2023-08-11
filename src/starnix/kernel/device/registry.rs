@@ -86,6 +86,16 @@ pub fn simple_device_ops<T: Default + FileOps + 'static>(
     Ok(Box::new(T::default()))
 }
 
+// TODO(fxb/128798): It's ideal to support all registered device nodes.
+pub fn create_unknown_device(
+    _current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    error!(ENODEV)
+}
+
 /// Keys returned by the registration method for `DeviceListener`s that allows to unregister a
 /// listener.
 pub type DeviceListenerKey = u64;
@@ -184,6 +194,16 @@ impl DeviceRegistry {
         ops: impl DeviceOps,
     ) -> Result<(), Errno> {
         self.state.lock().char_devices.register(major, base_minor, minor_count, ops)
+    }
+
+    pub fn register_blkdev(
+        &self,
+        major: u32,
+        base_minor: u32,
+        minor_count: u32,
+        ops: impl DeviceOps,
+    ) -> Result<(), Errno> {
+        self.state.lock().block_devices.register(major, base_minor, minor_count, ops)
     }
 
     pub fn register_chrdev_major(&self, major: u32, device: impl DeviceOps) -> Result<(), Errno> {

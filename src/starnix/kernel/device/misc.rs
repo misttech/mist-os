@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{loop_device::LoopControlDevice, mem::DevRandom, DeviceMode},
+    device::{
+        create_unknown_device, loop_device::create_loop_control_device, mem::DevRandom,
+        simple_device_ops, DeviceMode,
+    },
     fs::{
         fuse::DevFuse,
         kobject::{KObjectDeviceAttribute, KType},
         sysfs::SysFsDirectory,
-        *,
     },
     task::*,
     types::*,
@@ -16,41 +18,50 @@ use crate::{
 
 use std::sync::Arc;
 
-fn create_misc_device(
-    current_task: &CurrentTask,
-    id: DeviceType,
-    _node: &FsNode,
-    _flags: OpenFlags,
-) -> Result<Box<dyn FileOps>, Errno> {
-    Ok(match id {
-        DeviceType::HW_RANDOM => Box::new(DevRandom),
-        DeviceType::FUSE => Box::<DevFuse>::default(),
-        DeviceType::LOOP_CONTROL => {
-            Box::new(LoopControlDevice::new(current_task.kernel().loop_device_registry.clone()))
-        }
-        _ => return error!(ENODEV),
-    })
-}
-
 pub fn misc_device_init(kernel: &Arc<Kernel>) {
-    kernel
-        .device_registry
-        .register_chrdev_major(MISC_MAJOR, create_misc_device)
-        .expect("misc device register failed.");
-
-    let device_attrs = KObjectDeviceAttribute::new_from_vec(
-        vec![
-            (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
-            (b"fuse", b"fuse", DeviceType::FUSE),
-            (b"device-mapper", b"mapper/control", DeviceType::DEVICE_MAPPER),
-            (b"loop-control", b"loop-control", DeviceType::LOOP_CONTROL),
-        ],
-        DeviceMode::Char,
-    );
     let misc_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"misc",
         KType::Class,
         SysFsDirectory::new,
     );
-    kernel.add_chr_devices(misc_class, device_attrs);
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(misc_class.clone()),
+            b"hwrng",
+            b"hwrng",
+            DeviceType::HW_RANDOM,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevRandom>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(misc_class.clone()),
+            b"fuse",
+            b"fuse",
+            DeviceType::FUSE,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevFuse>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(misc_class.clone()),
+            b"device-mapper",
+            b"mapper/control",
+            DeviceType::DEVICE_MAPPER,
+            DeviceMode::Char,
+        ),
+        create_unknown_device,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(misc_class.clone()),
+            b"loop-control",
+            b"loop-control",
+            DeviceType::LOOP_CONTROL,
+            DeviceMode::Char,
+        ),
+        create_loop_control_device,
+    );
 }

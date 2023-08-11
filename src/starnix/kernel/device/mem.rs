@@ -4,7 +4,7 @@
 
 use crate::{
     auth::FsCred,
-    device::{simple_device_ops, DeviceMode, DeviceOps},
+    device::{simple_device_ops, DeviceMode},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::{KObjectDeviceAttribute, KType},
@@ -238,30 +238,70 @@ impl FileOps for DevKmsg {
     }
 }
 
-fn create_mem_device(
-    kernel: &Arc<Kernel>,
-    name: &FsStr,
-    device_type: DeviceType,
-    device_ops: impl DeviceOps,
-) {
+pub fn mem_device_init(kernel: &Arc<Kernel>) {
     let mem_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"mem",
         KType::Class,
         SysFsDirectory::new,
     );
-    let device_attr = KObjectDeviceAttribute::new(name, name, device_type, DeviceMode::Char);
-    kernel.add_chr_device(mem_class, device_attr);
-    kernel
-        .device_registry
-        .register_chrdev(MEM_MAJOR, device_type.minor(), 1, device_ops)
-        .expect("mem device register failed.");
-}
-
-pub fn mem_device_init(kernel: &Arc<Kernel>) {
-    create_mem_device(kernel, b"null", DeviceType::NULL, simple_device_ops::<DevNull>);
-    create_mem_device(kernel, b"zero", DeviceType::ZERO, simple_device_ops::<DevZero>);
-    create_mem_device(kernel, b"full", DeviceType::FULL, simple_device_ops::<DevFull>);
-    create_mem_device(kernel, b"random", DeviceType::RANDOM, simple_device_ops::<DevRandom>);
-    create_mem_device(kernel, b"urandom", DeviceType::URANDOM, simple_device_ops::<DevRandom>);
-    create_mem_device(kernel, b"kmsg", DeviceType::KMSG, simple_device_ops::<DevKmsg>);
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(mem_class.clone()),
+            b"null",
+            b"null",
+            DeviceType::NULL,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevNull>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(mem_class.clone()),
+            b"zero",
+            b"zero",
+            DeviceType::ZERO,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevZero>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(mem_class.clone()),
+            b"full",
+            b"full",
+            DeviceType::FULL,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevFull>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(mem_class.clone()),
+            b"random",
+            b"random",
+            DeviceType::RANDOM,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevRandom>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(mem_class.clone()),
+            b"urandom",
+            b"urandom",
+            DeviceType::URANDOM,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevRandom>,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(mem_class),
+            b"kmsg",
+            b"kmsg",
+            DeviceType::KMSG,
+            DeviceMode::Char,
+        ),
+        simple_device_ops::<DevKmsg>,
+    );
 }

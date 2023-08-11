@@ -238,16 +238,17 @@ impl FileOps for Arc<Framebuffer> {
 }
 
 pub fn fb_device_init(kernel: &Arc<Kernel>) {
-    kernel
-        .device_registry
-        .register_chrdev_major(FB_MAJOR, kernel.framebuffer.clone())
-        .expect("fb device register failed.");
-
     let graphics_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"graphics",
         KType::Class,
         SysFsDirectory::new,
     );
-    let fb_attr = KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0, DeviceMode::Char);
-    kernel.add_chr_device(graphics_class, fb_attr);
+    let fb_attr = KObjectDeviceAttribute::new(
+        Some(graphics_class),
+        b"fb0",
+        b"fb0",
+        DeviceType::FB0,
+        DeviceMode::Char,
+    );
+    kernel.add_and_register_device(fb_attr, kernel.framebuffer.clone());
 }

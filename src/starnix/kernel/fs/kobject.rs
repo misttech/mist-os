@@ -50,39 +50,32 @@ impl DeviceMetadata {
 /// Attributes that are used to create a KType::Device kobject.
 #[derive(Clone, Debug)]
 pub struct KObjectDeviceAttribute {
-    pub kobject_name: FsString,
+    /// Class kobject that the device belongs to.
+    ///
+    /// `None` when it's a Block device.
+    pub class: Option<KObjectHandle>,
+    /// Name in /sys.
+    pub name: FsString,
     pub device: DeviceMetadata,
 }
 
 impl KObjectDeviceAttribute {
     pub fn new(
+        class: Option<KObjectHandle>,
         kobject_name: &FsStr,
         device_name: &FsStr,
         device_type: DeviceType,
         mode: DeviceMode,
     ) -> Self {
+        assert!(
+            mode != DeviceMode::Block || class.is_none(),
+            "class should be None if it is a Block device"
+        );
         Self {
-            kobject_name: kobject_name.to_vec(),
+            class,
+            name: kobject_name.to_vec(),
             device: DeviceMetadata::new(device_name, device_type, mode),
         }
-    }
-
-    /// Create a list of `KObjectDeviceAttribute`s.
-    ///
-    /// # Arguments
-    /// * `attributes` - A list of tuples that represent the attributes of a kobject device.
-    ///                  Each attribute tuple formats as:
-    ///                    (kobject_name: &FsStr, device_name: &FsStr, device_type: DeviceType).
-    pub fn new_from_vec(
-        attributes: Vec<(&FsStr, &FsStr, DeviceType)>,
-        mode: DeviceMode,
-    ) -> Vec<Self> {
-        attributes
-            .into_iter()
-            .map(|(kobject_name, device_name, device_type)| {
-                KObjectDeviceAttribute::new(kobject_name, device_name, device_type, mode)
-            })
-            .collect()
     }
 }
 

@@ -18,7 +18,7 @@ use std::{
 use crate::{
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
-        BinderDriver, DeviceMode, DeviceRegistry,
+        BinderDriver, DeviceMode, DeviceOps, DeviceRegistry,
     },
     diagnostics::CoreDumpList,
     fs::{
@@ -280,59 +280,64 @@ impl Kernel {
     }
 
     /// Add a device in the hierarchy tree.
-    pub fn add_chr_device(
+    ///
+    /// If it's a Block device, the device will be added under "block" class.
+    pub fn add_device(self: &Arc<Self>, dev_attr: KObjectDeviceAttribute) {
+        let kobj_device = match dev_attr.device.mode {
+            DeviceMode::Char => {
+                assert!(dev_attr.class.is_some(), "no class is associated with the device.");
+                dev_attr.class.unwrap().get_or_create_child(
+                    &dev_attr.name,
+                    KType::Device(dev_attr.device.clone()),
+                    DeviceDirectory::new,
+                )
+            }
+            DeviceMode::Block => {
+                let block_class = self.device_registry.virtual_bus().get_or_create_child(
+                    b"block",
+                    KType::Class,
+                    SysFsDirectory::new,
+                );
+                block_class.get_or_create_child(
+                    &dev_attr.name,
+                    KType::Device(dev_attr.device.clone()),
+                    BlockDeviceDirectory::new,
+                )
+            }
+        };
+        self.device_registry.dispatch_uevent(UEventAction::Add, kobj_device);
+        match devtmpfs_create_device(self, dev_attr.device.clone()) {
+            Ok(_) => (),
+            Err(err) => {
+                log_error!("Cannot add block device {:?} in devtmpfs ({:?})", dev_attr.device, err)
+            }
+        };
+    }
+
+    /// Add a device in the hierarchy tree and register its DeviceOps.
+    pub fn add_and_register_device(
         self: &Arc<Self>,
-        class: KObjectHandle,
         dev_attr: KObjectDeviceAttribute,
+        dev_ops: impl DeviceOps,
     ) {
-        let kobj_device = class.get_or_create_child(
-            &dev_attr.kobject_name,
-            KType::Device(dev_attr.device.clone()),
-            DeviceDirectory::new,
-        );
-        self.device_registry.dispatch_uevent(UEventAction::Add, kobj_device);
-        match devtmpfs_create_device(self, dev_attr.device.clone()) {
-            Ok(_) => (),
-            Err(err) => log_error!(
-                "Cannot add char device {} in devtmpfs ({})",
-                String::from_utf8(dev_attr.device.name).unwrap(),
-                err.code
+        match match dev_attr.device.mode {
+            DeviceMode::Char => self.device_registry.register_chrdev(
+                dev_attr.device.device_type.major(),
+                dev_attr.device.device_type.minor(),
+                1,
+                dev_ops,
             ),
-        };
-    }
-
-    pub fn add_chr_devices(
-        self: &Arc<Self>,
-        class: KObjectHandle,
-        dev_attrs: Vec<KObjectDeviceAttribute>,
-    ) {
-        for attr in dev_attrs {
-            self.add_chr_device(class.clone(), attr);
+            DeviceMode::Block => self.device_registry.register_blkdev(
+                dev_attr.device.device_type.major(),
+                dev_attr.device.device_type.minor(),
+                1,
+                dev_ops,
+            ),
+        } {
+            Ok(_) => (),
+            Err(err) => log_error!("Cannot register device {:?} ({:?})", dev_attr.device, err),
         }
-    }
-
-    /// Add a block device in the hierarchy tree.
-    pub fn add_blk_device(self: &Arc<Self>, dev_attr: KObjectDeviceAttribute) {
-        assert!(dev_attr.device.mode == DeviceMode::Block, "{:?} is not a block device.", dev_attr);
-        let block_class = self.device_registry.virtual_bus().get_or_create_child(
-            b"block",
-            KType::Class,
-            SysFsDirectory::new,
-        );
-        let kobj_device = block_class.get_or_create_child(
-            &dev_attr.kobject_name,
-            KType::Device(dev_attr.device.clone()),
-            BlockDeviceDirectory::new,
-        );
-        self.device_registry.dispatch_uevent(UEventAction::Add, kobj_device);
-        match devtmpfs_create_device(self, dev_attr.device.clone()) {
-            Ok(_) => (),
-            Err(err) => log_error!(
-                "Cannot add block device {} in devtmpfs ({})",
-                String::from_utf8(dev_attr.device.name).unwrap(),
-                err.code
-            ),
-        };
+        self.add_device(dev_attr);
     }
 
     /// Opens a device file (driver) identified by `dev`.

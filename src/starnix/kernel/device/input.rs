@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{framebuffer::Framebuffer, DeviceMode, DeviceOps},
+    device::{framebuffer::Framebuffer, DeviceMode},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::{KObjectDeviceAttribute, KType},
@@ -39,9 +39,9 @@ use zerocopy::AsBytes as _; // for `as_bytes()`
 pub struct InputDevice {
     // Right now the input device assumes that there is only one input file, and that it represents
     // a touch input device. This structure will soon change to support multiple input files.
-    touch_input_file: Arc<InputFile>,
+    pub touch_input_file: Arc<InputFile>,
 
-    keyboard_input_file: Arc<InputFile>,
+    pub keyboard_input_file: Arc<InputFile>,
 }
 
 impl InputDevice {
@@ -69,23 +69,22 @@ impl InputDevice {
     }
 }
 
-impl DeviceOps for Arc<InputDevice> {
-    fn open(
-        &self,
-        _current_task: &CurrentTask,
-        dev: DeviceType,
-        _node: &FsNode,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        match dev.minor() {
-            // Because all open input files share the same underlying input file, the clients
-            // may race for events. This does not matter right now, since there is only ever
-            // one client, but eventually each open should get its own sequence of events.
-            TOUCH_INPUT_MINOR => Ok(Box::new(self.touch_input_file.clone())),
-            KEYBOARD_INPUT_MINOR => Ok(Box::new(self.keyboard_input_file.clone())),
-            _ => error!(EINVAL),
-        }
-    }
+fn create_touch_device(
+    current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    Ok(Box::new(current_task.kernel().input_device.touch_input_file.clone()))
+}
+
+fn create_keyboard_device(
+    current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    Ok(Box::new(current_task.kernel().input_device.keyboard_input_file.clone()))
 }
 
 pub struct InspectStatus {
@@ -725,31 +724,28 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
 }
 
 pub fn init_input_devices(kernel: &Arc<Kernel>) {
-    kernel
-        .device_registry
-        .register_chrdev_major(INPUT_MAJOR, kernel.input_device.clone())
-        .expect("input device register failed.");
-
     let input_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"input",
         KType::Class,
         SysFsDirectory::new,
     );
     let touch_attr = KObjectDeviceAttribute::new(
+        Some(input_class.clone()),
         b"event0",
         b"input/event0",
         DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR),
         DeviceMode::Char,
     );
-    kernel.add_chr_device(input_class.clone(), touch_attr);
+    kernel.add_and_register_device(touch_attr, create_touch_device);
 
     let keyboard_attr = KObjectDeviceAttribute::new(
+        Some(input_class.clone()),
         b"event1",
         b"input/event1",
         DeviceType::new(INPUT_MAJOR, KEYBOARD_INPUT_MINOR),
         DeviceMode::Char,
     );
-    kernel.add_chr_device(input_class, keyboard_attr);
+    kernel.add_and_register_device(keyboard_attr, create_keyboard_device);
 }
 
 #[cfg(test)]

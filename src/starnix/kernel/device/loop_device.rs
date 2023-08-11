@@ -117,7 +117,8 @@ struct LoopDevice {
 impl LoopDevice {
     fn new(kernel: &Arc<Kernel>, minor: u32) -> Arc<Self> {
         let loop_device_name = format!("loop{minor}");
-        kernel.add_blk_device(KObjectDeviceAttribute::new(
+        kernel.add_device(KObjectDeviceAttribute::new(
+            None,
             loop_device_name.as_bytes(),
             loop_device_name.as_bytes(),
             DeviceType::new(LOOP_MAJOR, minor),
@@ -478,7 +479,16 @@ impl LoopDeviceRegistry {
     }
 }
 
-pub struct LoopControlDevice {
+pub fn create_loop_control_device(
+    current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    Ok(Box::new(LoopControlDevice::new(current_task.kernel().loop_device_registry.clone())))
+}
+
+struct LoopControlDevice {
     registry: Arc<LoopDeviceRegistry>,
 }
 

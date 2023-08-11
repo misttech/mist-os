@@ -36,8 +36,11 @@ pub fn magma_device_init(kernel: &Arc<Kernel>) {
         .register_dyn_chrdev(create_magma_device)
         .expect("magma device register failed.");
 
-    kernel.add_chr_device(
-        starnix_class,
-        KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type, DeviceMode::Char),
-    );
+    kernel.add_device(KObjectDeviceAttribute::new(
+        Some(starnix_class),
+        b"magma0",
+        b"magma0",
+        magma_type,
+        DeviceMode::Char,
+    ));
 }

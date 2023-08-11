@@ -84,16 +84,27 @@ fn init_devpts(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHa
 }
 
 pub fn tty_device_init(kernel: &Arc<Kernel>) {
-    let tty = KObjectDeviceAttribute::new(b"tty", b"tty", DeviceType::TTY, DeviceMode::Char);
-    let ptmx = KObjectDeviceAttribute::new(b"ptmx", b"ptmx", DeviceType::PTMX, DeviceMode::Char);
-
     let tty_class = kernel.device_registry.virtual_bus().get_or_create_child(
         b"tty",
         KType::Class,
         SysFsDirectory::new,
     );
-    kernel.add_chr_device(tty_class.clone(), tty);
-    kernel.add_chr_device(tty_class, ptmx);
+    let tty = KObjectDeviceAttribute::new(
+        Some(tty_class.clone()),
+        b"tty",
+        b"tty",
+        DeviceType::TTY,
+        DeviceMode::Char,
+    );
+    let ptmx = KObjectDeviceAttribute::new(
+        Some(tty_class),
+        b"ptmx",
+        b"ptmx",
+        DeviceType::PTMX,
+        DeviceMode::Char,
+    );
+    kernel.add_device(tty);
+    kernel.add_device(ptmx);
 
     devtmpfs_mkdir(kernel, b"pts").unwrap();
 
