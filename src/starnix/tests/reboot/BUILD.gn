@@ -66,4 +66,11 @@ fuchsia_test_package("starnix_reboot_integration_tests") {
     "//src/starnix/tests/android:container_resources",
   ]
   subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+
+  # TODO(b/295073633): remove when starnix can gracefully shutdown
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
