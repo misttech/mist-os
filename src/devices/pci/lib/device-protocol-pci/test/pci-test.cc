@@ -54,15 +54,6 @@ TEST_F(PciTest, MapMmio) {
   EXPECT_OK(pci.MapMmio(bar_id_, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio));
 }
 
-TEST_F(PciTest, MapMmioWithRawBuffer) {
-  ddk::Pci pci(std::move(client_));
-  mmio_buffer_t mmio;
-  EXPECT_OK(pci.MapMmio(bar_id_, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio));
-
-  // Make sure the VMO is valid.
-  EXPECT_OK(zx_object_get_info(mmio.vmo, ZX_INFO_HANDLE_VALID, nullptr, 0, 0u, nullptr));
-}
-
 TEST(PciConversionTest, DeviceInfo) {
   fuchsia_hardware_pci::wire::DeviceInfo fidl_info = {
       .vendor_id = 1,

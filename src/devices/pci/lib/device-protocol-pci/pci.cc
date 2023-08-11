@@ -258,43 +258,6 @@ zx_status_t Pci::GetBti(uint32_t index, zx::bti* out_bti) const {
 
 zx_status_t Pci::MapMmio(uint32_t index, uint32_t cache_policy,
                          std::optional<fdf::MmioBuffer>* mmio) const {
-  zx::vmo vmo;
-  zx_status_t status = MapMmioInternal(index, cache_policy, &vmo);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  size_t vmo_size;
-  status = vmo.get_size(&vmo_size);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  zx::result<fdf::MmioBuffer> result =
-      fdf::MmioBuffer::Create(0, vmo_size, std::move(vmo), cache_policy);
-  if (result.is_ok()) {
-    *mmio = std::move(result.value());
-  }
-  return result.status_value();
-}
-
-zx_status_t Pci::MapMmio(uint32_t index, uint32_t cache_policy, mmio_buffer_t* mmio) const {
-  zx::vmo vmo;
-  zx_status_t status = MapMmioInternal(index, cache_policy, &vmo);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  size_t vmo_size;
-  status = vmo.get_size(&vmo_size);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  return mmio_buffer_init(mmio, 0, vmo_size, vmo.release(), cache_policy);
-}
-
-zx_status_t Pci::MapMmioInternal(uint32_t index, uint32_t cache_policy, zx::vmo* out_vmo) const {
   fidl::Arena arena;
   fpci::wire::Bar bar;
   zx_status_t status = GetBar(arena, index, &bar);
@@ -302,13 +265,21 @@ zx_status_t Pci::MapMmioInternal(uint32_t index, uint32_t cache_policy, zx::vmo*
     return status;
   }
 
-  // TODO(cja): PIO may be mappable on non-x86 architectures
-  if (bar.result.is_io()) {
+  if (!bar.result.is_vmo()) {
     return ZX_ERR_WRONG_TYPE;
   }
+  size_t vmo_size;
+  status = bar.result.vmo().get_size(&vmo_size);
+  if (status != ZX_OK) {
+    return status;
+  }
 
-  *out_vmo = std::move(bar.result.vmo());
-  return ZX_OK;
+  zx::result<fdf::MmioBuffer> result =
+      fdf::MmioBuffer::Create(0, vmo_size, std::move(bar.result.vmo()), cache_policy);
+  if (result.is_ok()) {
+    *mmio = std::move(result.value());
+  }
+  return result.status_value();
 }
 
 zx_status_t Pci::ConfigureInterruptMode(uint32_t requested_irq_count,
