@@ -24,25 +24,20 @@ rustc_test("integration_test_bin") {
   source_root = "integration_test.rs"
   name = "detect_integration_test"
   deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/diagnostics/testing/fake-archive-accessor",
-    "//src/lib/fidl_server",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/diagnostics/detect/testing/fidl/fuchsia.diagnostics.test:fuchsia.diagnostics.test_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-component-test",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/sys/lib/component-events",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing",
   ]
 
   sources = [
-    "fake_crash_reporter.rs",
-    "fake_crash_reporting_product_register.rs",
     "integration_test.rs",
     "test_filing_enable.rs",
     "test_snapshot_sanitizing.rs",
@@ -51,17 +46,29 @@ rustc_test("integration_test_bin") {
   ]
 }
 
-fuchsia_component("integration-test-component") {
+fuchsia_component("test-suite-component") {
   testonly = true
+  component_name = "test-suite"
   manifest = "meta/integration-test.cml"
+  deps = [ ":integration_test_bin" ]
+}
+
+fuchsia_package("test-suite") {
+  testonly = true
+  deps = [ ":test-suite-component" ]
+}
+
+fuchsia_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
   deps = [ ":integration_test_bin" ]
 }
 
 # Run with `fx test detect-integration-test`.
 fuchsia_test_package("detect-integration-test") {
-  test_components = [ ":integration-test-component" ]
-  deps = [
-    "//src/diagnostics/detect:triage-detect-component",
-    "//src/diagnostics/detect:triage-detect-test-config",
+  test_components = [ ":test-root" ]
+  subpackages = [
+    "//src/diagnostics/detect/testing/realm-factory:triage-detect-realm-factory",
+    ":test-suite",
   ]
 }

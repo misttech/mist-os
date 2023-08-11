@@ -11,6 +11,9 @@
         binary: "bin/detect_integration_test",
     },
     use: [
+        { protocol: "fuchsia.diagnostics.test.RealmFactory" },
+
+        // TODO(124589): Remove this capability when all tests are migrated to use the test realm factory.
         {
             event_stream: [ "stopped" ],
             from: "parent",

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{ConfigFile, TestData};
+use super::{TestData, TestEvent};
 
 // If we don't include at least a {} then the reader library re-fetches instantly
 // and spoils the test.
 const INSPECT_EMPTY: &str = "[ {} ]";
 
-const CONFIG: &str = r#"
+const TRIAGE_CONFIG: &str = r#"
 {
     select: {
         // Need a selector or it won't try to get Inspect data and the test won't terminate.
@@ -25,73 +25,48 @@ const CONFIG: &str = r#"
 }
 "#;
 
-pub fn test_with_enable() -> TestData {
-    let config = ConfigFile { name: "file.triage".to_string(), contents: CONFIG.to_string() };
-    let enable = ConfigFile {
-        name: "config.json".to_string(),
-        contents: "{enable_filing: true}".to_string(),
-    };
-    TestData {
-        name: "With Enable".to_string(),
-        inspect_data: vec![INSPECT_EMPTY.to_string()],
-        config_files: vec![config, enable],
-        snapshots: vec![vec!["fuchsia-detect-yes".to_string()]],
-        bails: false,
-    }
+pub(crate) fn test_with_enable() -> TestData {
+    TestData::new("With Enable")
+        .set_program_config("{enable_filing: true}")
+        .add_inspect_data(INSPECT_EMPTY)
+        .add_triage_config(TRIAGE_CONFIG)
+        .expect_events(vec![
+            TestEvent::OnDiagnosticFetch,
+            TestEvent::OnCrashReport {
+                crash_signature: "fuchsia-detect-yes".to_string(),
+                crash_program_name: "triage_detect".to_string(),
+            },
+            TestEvent::OnDiagnosticFetch,
+        ])
 }
 
-pub fn test_bad_enable() -> TestData {
-    let config = ConfigFile { name: "file.triage".to_string(), contents: CONFIG.to_string() };
-    let disable =
-        ConfigFile { name: "config.json".to_string(), contents: "{enable_filing: 1}".to_string() };
-    TestData {
-        name: "Bad Format Enable".to_string(),
-        // Detect should never try to fetch Inspect data. If it does, providing
-        // data will ensure that the test fails.
-        inspect_data: vec![INSPECT_EMPTY.to_string()],
-        config_files: vec![config, disable],
-        snapshots: vec![],
-        bails: true,
-    }
+pub(crate) fn test_bad_enable() -> TestData {
+    TestData::new("Bad Program Config Format")
+        .set_program_config("{enable_filing: 1}")
+        .add_inspect_data(INSPECT_EMPTY)
+        .add_triage_config(TRIAGE_CONFIG)
+        .expect_events(vec![TestEvent::OnBail])
 }
 
-pub fn test_false_enable() -> TestData {
-    let config = ConfigFile { name: "file.triage".to_string(), contents: CONFIG.to_string() };
-    let disable = ConfigFile {
-        name: "config.json".to_string(),
-        contents: "{enable_filing: false}".to_string(),
-    };
-    TestData {
-        name: "Bad Format Enable".to_string(),
-        // Detect will fetch data and decide that it would have filed, but will not file.
-        inspect_data: vec![INSPECT_EMPTY.to_string()],
-        config_files: vec![config, disable],
-        snapshots: vec![vec![]],
-        bails: false,
-    }
+pub(crate) fn test_false_enable() -> TestData {
+    TestData::new("With False Enable")
+        .set_program_config("{enable_filing: false}")
+        .add_inspect_data(INSPECT_EMPTY)
+        .add_triage_config(TRIAGE_CONFIG)
+        .expect_events(vec![TestEvent::OnDiagnosticFetch, TestEvent::OnDiagnosticFetch])
 }
 
-pub fn test_no_enable() -> TestData {
-    let config = ConfigFile { name: "file.triage".to_string(), contents: CONFIG.to_string() };
-    let disable = ConfigFile { name: "config.json".to_string(), contents: "{}".to_string() };
-    TestData {
-        name: "Without Enable".to_string(),
-        // Detect will fetch data and decide that it would have filed, but will not file.
-        inspect_data: vec![INSPECT_EMPTY.to_string()],
-        config_files: vec![config, disable],
-        snapshots: vec![vec![]],
-        bails: false,
-    }
+pub(crate) fn test_no_enable() -> TestData {
+    TestData::new("Empty Program Config")
+        .set_program_config("{}")
+        .add_inspect_data(INSPECT_EMPTY)
+        .add_triage_config(TRIAGE_CONFIG)
+        .expect_events(vec![TestEvent::OnDiagnosticFetch, TestEvent::OnDiagnosticFetch])
 }
 
-pub fn test_without_file() -> TestData {
-    let config = ConfigFile { name: "file.triage".to_string(), contents: CONFIG.to_string() };
-    TestData {
-        name: "Without Program Config File".to_string(),
-        // Detect will fetch data and decide that it would have filed, but will not file.
-        inspect_data: vec![INSPECT_EMPTY.to_string()],
-        config_files: vec![config],
-        snapshots: vec![vec![]],
-        bails: false,
-    }
+pub(crate) fn test_without_file() -> TestData {
+    TestData::new("Without Program Config File")
+        .add_inspect_data(INSPECT_EMPTY)
+        .add_triage_config(TRIAGE_CONFIG)
+        .expect_events(vec![TestEvent::OnDiagnosticFetch, TestEvent::OnDiagnosticFetch])
 }

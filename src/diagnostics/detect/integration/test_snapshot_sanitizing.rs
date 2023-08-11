@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{ConfigFile, TestData};
+use super::{TestData, TestEvent};
 
 const INSPECT: &str = r#"
 [
@@ -27,7 +27,7 @@ const INSPECT: &str = r#"
 "#;
 
 // Ensure that the "repeat" lines here are consistent with CHECK_PERIOD_SECONDS.
-const CONFIG: &str = r#"
+const TRIAGE_CONFIG: &str = r#"
 {
     select: {
         widgets: "INSPECT:foo/bar:root:widgets",
@@ -49,20 +49,21 @@ const CONFIG: &str = r#"
 }
 "#;
 
-pub fn test() -> TestData {
-    let config = ConfigFile { name: "file.triage".to_string(), contents: CONFIG.to_string() };
-    let enable = ConfigFile {
-        name: "config.json".to_string(),
-        contents: "{enable_filing: true}".to_string(),
-    };
-    TestData {
-        name: "Snapshot sanitizing".to_string(),
-        inspect_data: vec![INSPECT.to_string()],
-        config_files: vec![config, enable],
-        snapshots: vec![vec![
-            "fuchsia-detect-this-is--illy---b-b-b".to_string(),
-            "fuchsia-detect-there-was-an-error".to_string(),
-        ]],
-        bails: false,
-    }
+pub(crate) fn test() -> TestData {
+    TestData::new("Snapshot sanitizing")
+        .add_inspect_data(INSPECT)
+        .set_program_config("{enable_filing: true}")
+        .add_triage_config(TRIAGE_CONFIG)
+        .expect_events(vec![
+            TestEvent::OnDiagnosticFetch,
+            TestEvent::OnCrashReport {
+                crash_signature: "fuchsia-detect-there-was-an-error".to_string(),
+                crash_program_name: "triage_detect".to_string(),
+            },
+            TestEvent::OnCrashReport {
+                crash_signature: "fuchsia-detect-this-is--illy---b-b-b".to_string(),
+                crash_program_name: "triage_detect".to_string(),
+            },
+            TestEvent::OnDiagnosticFetch,
+        ])
 }

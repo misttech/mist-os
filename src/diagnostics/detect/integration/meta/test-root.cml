@@ -1,0 +1,42 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "test_realm_factory",
+            url: "triage-detect-realm-factory#meta/realm-factory.cm",
+        },
+        {
+            name: "test_suite",
+            url: "test-suite#meta/test-suite.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.diagnostics.test.RealmFactory",
+            from: "#test_realm_factory",
+            to: "#test_suite",
+        },
+        {
+            event_stream: [ "stopped" ],
+            from: "parent",
+            to: [
+                "#test_realm_factory",
+
+                // TODO(124589): Remove when all tests are migrated to use the test realm factory.
+                "#test_suite",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
+        },
+    ],
+}
