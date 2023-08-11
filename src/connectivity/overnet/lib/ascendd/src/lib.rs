@@ -71,19 +71,17 @@ pub struct Ascendd {
 }
 
 impl Ascendd {
-    // Initializes and binds ascendd socket, but does not accept connections yet.
-    pub async fn prime(
+    pub async fn new(
         mut opt: Opt,
         hoist: &Hoist,
         stdout: impl AsyncWrite + Unpin + Send + 'static,
-    ) -> Result<impl FnOnce() -> Self, Error> {
+    ) -> Result<Self, Error> {
         let usb = opt.usb;
         let link = std::mem::replace(&mut opt.link, vec![]);
         let (sockpath, serial, client_routing, incoming) = bind_listener(opt, hoist).await?;
-        let hoist = hoist.clone();
-        Ok(move || Self {
+        Ok(Self {
             task: Task::spawn(run_ascendd(
-                hoist,
+                hoist.clone(),
                 sockpath,
                 serial,
                 incoming,
@@ -93,14 +91,6 @@ impl Ascendd {
                 link,
             )),
         })
-    }
-
-    pub async fn new(
-        opt: Opt,
-        hoist: &Hoist,
-        stdout: impl AsyncWrite + Unpin + Send + 'static,
-    ) -> Result<Self, Error> {
-        Self::prime(opt, hoist, stdout).await.map(|f| f())
     }
 }
 

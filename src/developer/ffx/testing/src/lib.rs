@@ -8,16 +8,9 @@ use fuchsia_async as fasync;
 use once_cell::sync::Lazy;
 use tempfile::TempDir;
 
-#[cfg(target_os = "linux")]
 mod emu;
-#[cfg(target_os = "linux")]
-pub use emu::Emu;
 
-#[cfg(not(target_os = "linux"))]
-mod emu {
-    use anyhow as _;
-    use async_io as _;
-}
+pub use emu::Emu;
 
 pub struct TestContext {
     isolate: ffx_isolate::Isolate,
@@ -30,7 +23,6 @@ impl TestContext {
 }
 
 // Matches `gn` terminology (for host toolchain)
-#[allow(dead_code)]
 static ROOT_OUT_DIR: Lazy<PathBuf> = Lazy::new(|| {
     let mut dir = std::env::current_exe().expect("get path").canonicalize().unwrap();
     assert!(dir.pop());
@@ -38,7 +30,6 @@ static ROOT_OUT_DIR: Lazy<PathBuf> = Lazy::new(|| {
 });
 
 // Matches `gn` terminology
-#[allow(dead_code)]
 static ROOT_BUILD_DIR: Lazy<PathBuf> = Lazy::new(|| {
     let mut dir = ROOT_OUT_DIR.clone();
     assert!(dir.pop());
@@ -46,10 +37,8 @@ static ROOT_BUILD_DIR: Lazy<PathBuf> = Lazy::new(|| {
 });
 
 // Matches `out_dir` var in `BUILD.gn`
-#[allow(dead_code)]
 static OUT_DIR: Lazy<PathBuf> = Lazy::new(|| ROOT_OUT_DIR.join("src/developer/ffx/testing"));
 
-#[allow(dead_code)]
 static TEMP_DIR: Lazy<TempDir> =
     Lazy::new(|| TempDir::new().expect("could not create test harness temp dir"));
 
@@ -67,15 +56,6 @@ where
     let isolate = ffx_isolate::Isolate::new_in_test(case_name, ssh_path, &test_env.context)
         .await
         .expect("create isolate");
-
-    isolate
-        .env_context()
-        .query("log.level")
-        .level(Some(ffx_config::ConfigLevel::User))
-        .set("debug".into())
-        .await
-        .expect("Failed to set log level");
-
     let config = TestContext { isolate };
 
     // Spawn a new thread so that we can catch panics from the test. To avoid blocking this thread's
