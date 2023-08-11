@@ -1229,6 +1229,12 @@ foreach(_target_type,
       no_output_dir_leaks = true
       if (defined(invoker.no_output_dir_leaks)) {
         no_output_dir_leaks = invoker.no_output_dir_leaks
+      } else if (string_replace("##${current_toolchain}",
+                                "##//third_party/",
+                                "") != "##${current_toolchain}") {
+        # Disable build-time leak checks when running actions that belong to
+        # toolchain() instances defined by //third_party/ build files.
+        no_output_dir_leaks = false
       }
 
       if (!no_output_dir_leaks) {
