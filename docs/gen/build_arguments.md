@@ -6885,7 +6885,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_unit_test/BUILD.gn:28
+From //third_party/pigweed/src/pw_unit_test/BUILD.gn:29
 
 ### pw_unit_test_EXECUTABLE_TARGET_TYPE
 
