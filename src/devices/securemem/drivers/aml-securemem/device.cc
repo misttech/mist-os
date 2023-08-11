@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.tee/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
+#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async/default.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -45,13 +46,11 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
     return status;
   }
 
-  zx::result sysmem =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(parent(), "sysmem");
-  if (sysmem.is_error()) {
-    LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem.status_string());
-    return sysmem.status_value();
+  status = ddk::SysmemProtocolClient::CreateFromDevice(parent(), "sysmem", &sysmem_proto_client_);
+  if (status != ZX_OK) {
+    LOG(ERROR, "Unable to get sysmem protocol - status: %d", status);
+    return status;
   }
-  sysmem_.Bind(std::move(sysmem.value()));
 
   zx::result client_end =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_tee::Service::DeviceConnector>("tee");
@@ -113,17 +112,14 @@ void AmlogicSecureMemDevice::DdkSuspend(ddk::SuspendTxn txn) {
     // We are shutting down the sysmem_secure_mem_server_ intentionally before any channel close. In
     // this case, tell sysmem that all is well, before the sysmem_secure_mem_server_ closes the
     // channel (which sysmem would otherwise intentionally interpret as justifying a hard reboot).
-    LOG(DEBUG, "Sending UnregisterSecureMem request");
-    fidl::WireResult result = sysmem_->UnregisterSecureMem();
-    LOG(DEBUG, "Received UnregisterSecureMem response");
-    if (!result.ok()) {
-      LOG(ERROR, "Failed to send UnregisterSecureMem request: %s", result.status_string());
-      txn.Reply(result.status(), txn.requested_state());
-      return;
-    }
-    if (result->is_error()) {
-      LOG(ERROR, "Failed to unregister secure mem: %s",
-          zx_status_get_string(result->error_value()));
+    LOG(DEBUG, "calling sysmem_proto_client_.UnregisterSecureMem()...");
+    zx_status_t status = sysmem_proto_client_.UnregisterSecureMem();
+    LOG(DEBUG, "sysmem_proto_client_.UnregisterSecureMem() returned");
+    if (status != ZX_OK) {
+      // Ignore this failure here, but sysmem may panic if sysmem sees
+      // sysmem_secure_mem_server_ channel close without seeing UnregisterSecureMem() first.
+      LOG(ERROR, "sysmem_proto_client_.UnregisterSecureMem() failed (ignoring here) - status: %d",
+          status);
     }
 
     sysmem_secure_mem_server_.AsyncCall(&SysmemSecureMemServer::Unbind);
@@ -250,13 +246,11 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
   const fuchsia_tee::wire::Uuid kSecmemUuid = {
       0x2c1a33c0, 0x44cc, 0x11e5, {0xbc, 0x3b, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
 
-  {
-    fidl::OneWayStatus result = tee_proto_client_->ConnectToApplication(
-        kSecmemUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(), std::move(tee_server));
-    if (!result.ok()) {
-      LOG(ERROR, "optee: tee_client_.ConnectToApplication() failed - status: %d", result.status());
-      return result.status();
-    }
+  fidl::OneWayStatus result = tee_proto_client_->ConnectToApplication(
+      kSecmemUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(), std::move(tee_server));
+  if (!result.ok()) {
+    LOG(ERROR, "optee: tee_client_.ConnectToApplication() failed - status: %d", result.status());
+    return result.status();
   }
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::SecureMem>();
@@ -272,16 +266,15 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
 
   // Tell sysmem about the fidl::sysmem::Tee channel that sysmem will use (async) to configure
   // secure memory ranges.  Sysmem won't fidl call back during this banjo call.
-  {
-    LOG(DEBUG, "Sending RegisterSecureMem request");
-    fidl::OneWayStatus result = sysmem_->RegisterSecureMem(std::move(sysmem_secure_mem_client));
-    LOG(DEBUG, "Received RegisterSecureMem response");
-    if (!result.ok()) {
-      LOG(ERROR, "Failed to send RegisterSecureMem request: %s", result.status_string());
-      return result.status();
-    }
+  LOG(DEBUG, "calling sysmem_proto_client_.RegisterSecureMem()...");
+  zx_status_t status =
+      sysmem_proto_client_.RegisterSecureMem(sysmem_secure_mem_client.TakeChannel());
+  if (status != ZX_OK) {
+    // In this case sysmem_secure_mem_server_ will get cleaned up when the channel close is noticed
+    // soon.
+    LOG(ERROR, "optee: Failed to RegisterSecureMem()");
+    return status;
   }
-
   return ZX_OK;
 }
 
