@@ -23,7 +23,7 @@ use {
     },
     thiserror::Error,
     tracing::warn,
-    version_history::{version_from_abi_revision, AbiRevision, SUPPORTED_API_LEVELS},
+    version_history::{check_abi_revision, AbiRevision, AbiRevisionError},
 };
 
 /// Runtime configuration options.
@@ -279,82 +279,6 @@ pub enum CapabilityAllowlistSource {
     Capability,
 }
 
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum AbiRevisionError {
-    /// A component tried to run, but it presented no ABI revision.
-    Absent,
-
-    /// A component tried to run, but its ABI revision was not recognized.
-    Unknown { abi_revision: AbiRevision, supported_versions: Vec<version_history::Version> },
-
-    /// A component tried to run, but the ABI revision it presented is not
-    /// supported by this system.
-    Unsupported {
-        version: version_history::Version,
-        supported_versions: Vec<version_history::Version>,
-    },
-}
-
-impl AbiRevisionError {
-    fn check_abi_revision(abi_revision: Option<AbiRevision>) -> Result<(), Self> {
-        let abi_revision = abi_revision.ok_or(AbiRevisionError::Absent)?;
-
-        if let Some(version) = version_from_abi_revision(abi_revision) {
-            if version.is_supported() {
-                Ok(())
-            } else {
-                Err(AbiRevisionError::Unsupported {
-                    version,
-                    supported_versions: SUPPORTED_API_LEVELS.to_vec(),
-                })
-            }
-        } else {
-            Err(AbiRevisionError::Unknown {
-                abi_revision,
-                supported_versions: SUPPORTED_API_LEVELS.to_vec(),
-            })
-        }
-    }
-}
-
-impl std::fmt::Display for AbiRevisionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let write_supported_versions = |f: &mut std::fmt::Formatter<'_>,
-                                        supported_versions: &[version_history::Version]|
-         -> std::fmt::Result {
-            write!(f, "The following API levels are supported: ")?;
-
-            for (idx, version) in supported_versions.iter().enumerate() {
-                write!(f, "{} ({})", version.api_level, version.abi_revision)?;
-                if idx != supported_versions.len() - 1 {
-                    write!(f, ", ")?;
-                }
-            }
-            Ok(())
-        };
-
-        match self {
-            AbiRevisionError::Absent => write!(f, "Missing a component target ABI revision."),
-            AbiRevisionError::Unknown { abi_revision, supported_versions } => {
-                write!(
-                    f,
-                    "Unknown component target ABI revision: {}. The OS may be too old to run it? ",
-                    abi_revision
-                )?;
-                write_supported_versions(f, supported_versions)
-            }
-            AbiRevisionError::Unsupported { version, supported_versions } => {
-                write!(
-                    f,
-                    "Component targets API {} ({}), which is no longer supported. ",
-                    version.api_level, version.abi_revision
-                )?;
-                write_supported_versions(f, supported_versions)
-            }
-        }
-    }
-}
-
 /// The enforcement and validation policy to apply to component target ABI revisions.
 /// Defaults to `AllowAll`
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -387,7 +311,7 @@ impl AbiRevisionPolicy {
         moniker: &Moniker,
         abi_revision: Option<AbiRevision>,
     ) -> Result<(), AbiRevisionError> {
-        let Err(abi_error) = AbiRevisionError::check_abi_revision(abi_revision) else { return Ok(()) };
+        let Err(abi_error) = check_abi_revision(abi_revision) else { return Ok(()) };
 
         match self {
             AbiRevisionPolicy::AllowAll => {

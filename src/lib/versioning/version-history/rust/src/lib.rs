@@ -163,6 +163,78 @@ pub fn get_latest_abi_revision() -> u64 {
     return LATEST_VERSION.abi_revision.0;
 }
 
+pub fn check_abi_revision(abi_revision: Option<AbiRevision>) -> Result<(), AbiRevisionError> {
+    let abi_revision = abi_revision.ok_or(AbiRevisionError::Absent)?;
+
+    if let Some(version) = version_from_abi_revision(abi_revision) {
+        if version.is_supported() {
+            Ok(())
+        } else {
+            Err(AbiRevisionError::Unsupported {
+                version,
+                supported_versions: SUPPORTED_API_LEVELS.to_vec(),
+            })
+        }
+    } else {
+        Err(AbiRevisionError::Unknown {
+            abi_revision,
+            supported_versions: SUPPORTED_API_LEVELS.to_vec(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AbiRevisionError {
+    /// A component tried to run, but it presented no ABI revision.
+    Absent,
+
+    /// A component tried to run, but its ABI revision was not recognized.
+    Unknown { abi_revision: AbiRevision, supported_versions: Vec<Version> },
+
+    /// A component tried to run, but the ABI revision it presented is not
+    /// supported by this system.
+    Unsupported { version: Version, supported_versions: Vec<Version> },
+}
+
+impl std::error::Error for AbiRevisionError {}
+
+impl std::fmt::Display for AbiRevisionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let write_supported_versions =
+            |f: &mut std::fmt::Formatter<'_>, supported_versions: &[Version]| -> std::fmt::Result {
+                write!(f, "The following API levels are supported: ")?;
+
+                for (idx, version) in supported_versions.iter().enumerate() {
+                    write!(f, "{} ({})", version.api_level, version.abi_revision)?;
+                    if idx != supported_versions.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                Ok(())
+            };
+
+        match self {
+            AbiRevisionError::Absent => write!(f, "Missing target ABI revision."),
+            AbiRevisionError::Unknown { abi_revision, supported_versions } => {
+                write!(
+                    f,
+                    "Unknown target ABI revision: {}. The OS may be too old to support it? ",
+                    abi_revision
+                )?;
+                write_supported_versions(f, supported_versions)
+            }
+            AbiRevisionError::Unsupported { version, supported_versions } => {
+                write!(
+                    f,
+                    "This ABI targets API {} ({}), which is no longer supported. ",
+                    version.api_level, version.abi_revision
+                )?;
+                write_supported_versions(f, supported_versions)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

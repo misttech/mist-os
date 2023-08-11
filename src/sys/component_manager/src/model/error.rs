@@ -9,7 +9,6 @@ use {
     },
     ::routing::{
         component_id_index::ComponentIdIndexError,
-        config::AbiRevisionError,
         error::{ComponentInstanceError, RoutingError},
         policy::PolicyError,
         resolving::ResolverError,
@@ -21,6 +20,7 @@ use {
     moniker::{ChildName, Moniker, MonikerError},
     std::path::PathBuf,
     thiserror::Error,
+    version_history::AbiRevisionError,
 };
 
 /// Errors produced by `Model`.
