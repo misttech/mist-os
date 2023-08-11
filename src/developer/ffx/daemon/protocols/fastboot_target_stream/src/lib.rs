@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_daemon_target::FASTBOOT_CHECK_INTERVAL;
-use ffx_fastboot::common::find::find_devices;
+use ffx_fastboot::common::find::find_serial_numbers;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
@@ -57,15 +57,19 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::downgrade(&inner);
         let is_disabled: bool =
             ffx_config::get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false);
+        // Probably could avoid creating the entire inner object but that refactoring can wait
+        if is_disabled {
+            return Ok(());
+        }
         self.fastboot_task.replace(Task::local(async move {
             loop {
-                let fastboot_devices = if is_disabled { vec![] } else { find_devices().await };
+                let fastboot_serials = find_serial_numbers();
                 if let Some(inner) = inner.upgrade() {
-                    for dev in fastboot_devices {
+                    for serial in fastboot_serials {
                         let _ = inner
                             .events_out
                             .send(ffx::FastbootTarget {
-                                serial: Some(dev.serial),
+                                serial: Some(serial),
                                 ..Default::default()
                             })
                             .await;
@@ -80,11 +84,9 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
     }
 
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
-        self.fastboot_task
-            .take()
-            .ok_or(anyhow!("fuchsia_target_stream task never started"))?
-            .cancel()
-            .await;
+        if let Some(task) = self.fastboot_task.take() {
+            task.cancel().await;
+        }
         Ok(())
     }
 

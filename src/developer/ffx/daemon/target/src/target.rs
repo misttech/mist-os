@@ -679,12 +679,13 @@ impl Target {
         }
     }
 
-    pub fn usb(&self) -> Result<(String, Interface)> {
+    pub async fn usb(&self) -> Result<(String, Interface)> {
         match self.serial.borrow().as_ref() {
             Some(s) => Ok((
                 s.to_string(),
-                open_interface_with_serial(s)
-                    .context("Failed to open target usb interface by serial")?,
+                open_interface_with_serial(s).await.with_context(|| {
+                    format!("Failed to open target usb interface by serial {s}")
+                })?,
             )),
             None => Err(anyhow!("No usb serial available to connect to")),
         }

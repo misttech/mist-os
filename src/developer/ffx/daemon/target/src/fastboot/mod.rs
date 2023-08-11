@@ -23,7 +23,6 @@ use fastboot::{
 };
 use ffx_config::get;
 use ffx_daemon_events::FastbootInterface;
-use ffx_fastboot::common::find::global_serials_update;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_developer_ffx::{
     FastbootRequestStream, UploadProgressListenerMarker, UploadProgressListenerProxy,
@@ -121,23 +120,15 @@ struct UsbFactory {
 impl InterfaceFactory<Interface> for UsbFactory {
     async fn open(&mut self, target: &Target) -> Result<Interface> {
         let (s, iface) =
-            target.usb().context("TargetFactory cannot open target's usb interface")?;
-        global_serials_update(|in_use| {
-            let _ = in_use.insert(s.clone());
-            self.serial.replace(s.clone());
-            tracing::debug!("serial now in use: {}", s);
-        })
-        .await;
+            target.usb().await.context("UsbFactory cannot open target's usb interface")?;
+        self.serial.replace(s.clone());
+        tracing::debug!("serial now in use: {s}");
         Ok(iface)
     }
 
     async fn close(&self) {
         if let Some(s) = &self.serial {
-            global_serials_update(|in_use| {
-                tracing::debug!("dropping in use serial: {}", s);
-                let _ = in_use.remove(s);
-            })
-            .await;
+            tracing::debug!("dropping in use serial: {s}");
         }
     }
 }
