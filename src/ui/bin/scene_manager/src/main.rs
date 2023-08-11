@@ -9,10 +9,7 @@ use {
     },
     anyhow::{Context, Error},
     fidl::prelude::*,
-    fidl_fuchsia_accessibility::{
-        ColorTransformHandlerMarker, ColorTransformMarker, MagnificationHandlerMarker,
-        MagnifierMarker,
-    },
+    fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker},
     fidl_fuchsia_accessibility_scene as a11y_view,
     fidl_fuchsia_element::{
         GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
@@ -37,8 +34,7 @@ use {
         DeviceListenerRegistryRequestStream as MediaButtonsListenerRegistryRequestStream,
         DisplayBacklightRequestStream,
     },
-    fidl_fuchsia_ui_scenic::ScenicMarker,
-    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
@@ -168,12 +164,10 @@ async fn inner_main() -> Result<(), Error> {
     // Unicode data is kept in memory.
     let icu_data_loader = icu_data::Loader::new().unwrap();
 
-    let scenic = connect_to_protocol::<ScenicMarker>()?;
-    let use_flatland = scenic.uses_flatland().await.expect("Failed to get flatland info.");
     let ownership_proxy = connect_to_protocol::<fcomp::DisplayOwnershipMarker>()?;
     let display_ownership =
         ownership_proxy.get_event().await.expect("Failed to get display ownership.");
-    info!(use_flatland, "Instantiating SceneManager");
+    info!("Instantiating SceneManager");
 
     // Read config files to discover display attributes.
     let display_rotation = match std::fs::read_to_string("/config/data/display_rotation") {
@@ -222,46 +216,27 @@ async fn inner_main() -> Result<(), Error> {
         }
     };
 
-    let scene_manager: Arc<Mutex<dyn SceneManager>> = if use_flatland {
-        // TODO(fxbug.dev/86379): Support for insertion of accessibility view.  Pass ViewRefInstalled
-        // to the SceneManager, the same way we do for the Gfx branch.
-        let flatland_display = connect_to_protocol::<flatland::FlatlandDisplayMarker>()?;
-        let singleton_display_info = connect_to_protocol::<singleton_display::InfoMarker>()?;
-        let root_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
-        let pointerinjector_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
-        let scene_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
-        let a11y_view_provider = connect_to_protocol::<a11y_view::ProviderMarker>()?;
-        Arc::new(Mutex::new(
-            scene_management::FlatlandSceneManager::new(
-                flatland_display,
-                singleton_display_info,
-                root_flatland,
-                pointerinjector_flatland,
-                scene_flatland,
-                a11y_view_provider,
-                display_rotation,
-                display_pixel_density,
-                viewing_distance,
-            )
-            .await?,
-        ))
-    } else {
-        let view_ref_installed = connect_to_protocol::<ui_views::ViewRefInstalledMarker>()?;
-        let gfx_scene_manager: Arc<Mutex<dyn SceneManager>> = Arc::new(Mutex::new(
-            scene_management::GfxSceneManager::new(
-                scenic,
-                view_ref_installed,
-                display_rotation,
-                display_pixel_density,
-                viewing_distance,
-            )
-            .await?,
-        ));
-        if let Err(e) = register_gfx_as_magnifier(Arc::clone(&gfx_scene_manager)) {
-            warn!("failed to register as the magnification handler: {:?}", e);
-        }
-        gfx_scene_manager
-    };
+    let flatland_display = connect_to_protocol::<flatland::FlatlandDisplayMarker>()?;
+    let singleton_display_info = connect_to_protocol::<singleton_display::InfoMarker>()?;
+    let root_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
+    let pointerinjector_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
+    let scene_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
+    let a11y_view_provider = connect_to_protocol::<a11y_view::ProviderMarker>()?;
+    let scene_manager: Arc<Mutex<dyn SceneManager>> = Arc::new(Mutex::new(
+        scene_management::FlatlandSceneManager::new(
+            flatland_display,
+            singleton_display_info,
+            root_flatland,
+            pointerinjector_flatland,
+            scene_flatland,
+            a11y_view_provider,
+            display_rotation,
+            display_pixel_density,
+            viewing_distance,
+        )
+        .await?,
+    ));
+
     let (focus_chain_publisher, focus_chain_stream_handler) =
         focus_chain_provider::make_publisher_and_stream_handler();
 
@@ -272,7 +247,6 @@ async fn inner_main() -> Result<(), Error> {
     let Config { supported_input_devices } = Config::take_from_startup_handle();
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
     if let Ok(input_pipeline) = input_pipeline::handle_input(
-        use_flatland,
         scene_manager.clone(),
         input_device_registry_request_stream_receiver,
         light_sensor_request_stream_receiver,
@@ -581,20 +555,6 @@ pub async fn handle_graphical_presenter_request_stream(
         };
         info!("No longer processing fuchsia.element.GraphicalPresenter request stream.");
     }
-}
-
-fn register_gfx_as_magnifier(
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
-) -> Result<(), anyhow::Error> {
-    let (magnification_handler_client, magnification_handler_server) =
-        fidl::endpoints::create_request_stream::<MagnificationHandlerMarker>()?;
-    scene_management::GfxSceneManager::handle_magnification_handler_request_stream(
-        magnification_handler_server,
-        scene_manager,
-    );
-    let magnifier_proxy = connect_to_protocol::<MagnifierMarker>()?;
-    magnifier_proxy.register_handler(magnification_handler_client)?;
-    Ok(())
 }
 
 #[cfg(test)]

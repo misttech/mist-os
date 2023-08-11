@@ -28,18 +28,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
     std::vector<int> display_rotations) {
   std::vector<ui_testing::UITestRealm::Config> configs;
 
-  // GFX x scene manager
-  {
-    ui_testing::UITestRealm::Config config;
-    config.use_scene_owner = true;
-    config.device_pixel_ratio = ui_testing::kDefaultDevicePixelRatio;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-    for (const auto rotation : display_rotations) {
-      config.display_rotation = rotation;
-      configs.push_back(config);
-    }
-  }
-
   // Flatland x scene manager
   {
     ui_testing::UITestRealm::Config config;
