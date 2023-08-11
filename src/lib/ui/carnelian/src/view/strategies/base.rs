@@ -9,7 +9,6 @@ use crate::{
 };
 use anyhow::Error;
 use async_trait::async_trait;
-use fidl_fuchsia_ui_views::{ViewRef, ViewRefControl, ViewToken};
 
 #[async_trait(?Send)]
 pub(crate) trait ViewStrategy {
@@ -39,13 +38,6 @@ pub(crate) trait ViewStrategy {
         _view_details: &ViewDetails,
         _view_assistant: &mut ViewAssistantPtr,
         _info: fidl_fuchsia_scenic_scheduling::FramePresentedInfo,
-    ) {
-    }
-    fn present_submitted(
-        &mut self,
-        _view_details: &ViewDetails,
-        _view_assistant: &mut ViewAssistantPtr,
-        _info: fidl_fuchsia_scenic_scheduling::FuturePresentationTimes,
     ) {
     }
 
@@ -101,13 +93,6 @@ pub(crate) struct DisplayDirectParams {
 }
 
 #[derive(Debug)]
-pub(crate) struct ScenicParams {
-    pub view_token: ViewToken,
-    pub control_ref: ViewRefControl,
-    pub view_ref: ViewRef,
-}
-
-#[derive(Debug)]
 pub(crate) struct FlatlandParams {
     pub args: fidl_fuchsia_ui_app::CreateView2Args,
     pub debug_name: Option<String>,
@@ -115,7 +100,6 @@ pub(crate) struct FlatlandParams {
 
 #[derive(Debug)]
 pub(crate) enum ViewStrategyParams {
-    Scenic(ScenicParams),
     Flatland(FlatlandParams),
     DisplayDirect(DisplayDirectParams),
 }

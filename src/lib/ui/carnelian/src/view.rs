@@ -15,7 +15,6 @@ use crate::{
 use anyhow::{ensure, Error};
 use euclid::size2;
 use fuchsia_framebuffer::ImageId;
-use fuchsia_scenic::View;
 use fuchsia_trace::instant;
 use fuchsia_zircon::{Event, Time};
 use futures::channel::mpsc::{unbounded, UnboundedSender};
@@ -537,13 +536,6 @@ impl ViewController {
             }
             self.present();
         }
-    }
-
-    pub fn present_submitted(
-        &mut self,
-        info: fidl_fuchsia_scenic_scheduling::FuturePresentationTimes,
-    ) {
-        self.strategy.present_submitted(&self.make_view_details(), &mut self.assistant, info);
     }
 
     pub fn present_done(&mut self, info: fidl_fuchsia_scenic_scheduling::FramePresentedInfo) {

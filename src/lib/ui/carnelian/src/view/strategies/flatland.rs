@@ -20,7 +20,7 @@ use crate::{
     },
     Size,
 };
-use anyhow::{bail, ensure, Context, Error, Result};
+use anyhow::{ensure, Context, Error, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::client::HangingGetStream;
 use display_utils::BufferCollectionId as DisplayBufferCollectionId;
@@ -833,10 +833,6 @@ impl ViewStrategy for FlatlandViewStrategy {
             UserInputMessage::FlatlandTouchEvents(touch_events) => {
                 Ok(self.flatland_touch_input_handler.handle_events(&touch_events))
             }
-            _ => bail!(
-                "FlatlandViewStrategy::convert_user_input_message does not support {:?}.",
-                message
-            ),
         }
     }
 

@@ -25,8 +25,6 @@ When starting up, Carnelian attempts to open the [display
 coordinator](./glossary.md#display-coordinator) to decide whether it should use the display
 coordinator or Scenic.
 
-Support for the GFX flavor of Scenic should be removed as soon as possible.
-
 ## Concerns
 
 ### AppSender

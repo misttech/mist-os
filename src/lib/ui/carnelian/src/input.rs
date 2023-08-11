@@ -22,11 +22,9 @@ use std::{
     hash::{Hash, Hasher},
     path::{Path, PathBuf},
 };
-use tracing::warn;
 
 #[derive(Debug)]
 pub(crate) enum UserInputMessage {
-    ScenicInputEvent(fidl_fuchsia_ui_input::InputEvent),
     ScenicKeyEvent(fidl_fuchsia_ui_input3::KeyEvent),
     FlatlandMouseEvents(Vec<fidl_fuchsia_ui_pointer::MouseEvent>),
     FlatlandTouchEvents(Vec<fidl_fuchsia_ui_pointer::TouchEvent>),
@@ -405,23 +403,6 @@ pub struct Event {
     pub event_type: EventType,
 }
 
-fn device_id_for_event(event: &fidl_fuchsia_ui_input::PointerEvent) -> DeviceId {
-    #[allow(unreachable_patterns)]
-    let id_string = match event.type_ {
-        fidl_fuchsia_ui_input::PointerEventType::Touch => "touch",
-        fidl_fuchsia_ui_input::PointerEventType::Mouse => "mouse",
-        fidl_fuchsia_ui_input::PointerEventType::Stylus => "stylus",
-        fidl_fuchsia_ui_input::PointerEventType::InvertedStylus => "inverted-stylus",
-        _ => {
-            // If you see this log line, it means that the list of pointer event
-            // types has been expanded and needs to be added above.
-            warn!("unknown pointer event type");
-            "unknown"
-        }
-    };
-    DeviceId(format!("{}-{}", id_string, event.device_id))
-}
-
 async fn listen_to_path(device_path: &Path, internal_sender: &InternalSender) -> Result<(), Error> {
     let (client, server) = zx::Channel::create();
     fdio::service_connect(device_path.to_str().expect("bad path"), server)?;
@@ -517,7 +498,6 @@ pub(crate) async fn listen_for_user_input(internal_sender: InternalSender) -> Re
 pub(crate) mod flatland;
 pub(crate) mod key3;
 pub(crate) mod report;
-pub(crate) mod scenic;
 
 #[cfg(test)]
 mod tests;

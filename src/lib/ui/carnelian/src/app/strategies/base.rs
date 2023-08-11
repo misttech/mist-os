@@ -5,10 +5,10 @@
 use crate::{
     app::{
         strategies::{
+            flatland::FlatlandAppStrategy,
             framebuffer::{
                 first_display_device_path, DisplayCoordinator, DisplayDirectAppStrategy, DisplayId,
             },
-            scenic::ScenicAppStrategy,
         },
         Config, InternalSender, MessageInternal, ViewMode,
     },
@@ -22,12 +22,7 @@ use anyhow::Error;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_display::VirtconMode;
 use fidl_fuchsia_input_report as hid_input_report;
-use fidl_fuchsia_ui_scenic::ScenicMarker;
-use fidl_fuchsia_ui_scenic::ScenicProxy;
-use fuchsia_component::{
-    client::connect_to_protocol,
-    server::{ServiceFs, ServiceObjLocal},
-};
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::channel::mpsc::UnboundedSender;
 use keymaps::select_keymap;
 use std::path::PathBuf;
@@ -59,7 +54,6 @@ pub(crate) trait AppStrategy {
     ) -> Result<(), Error> {
         Ok(())
     }
-    fn get_scenic_proxy(&self) -> Option<&ScenicProxy>;
     async fn post_setup(&mut self, _internal_sender: &InternalSender) -> Result<(), Error>;
     fn handle_input_report(
         &mut self,
@@ -95,9 +89,8 @@ pub(crate) trait AppStrategy {
 
 pub(crate) type AppStrategyPtr = Box<dyn AppStrategy>;
 
-fn make_scenic_app_strategy() -> Result<AppStrategyPtr, Error> {
-    let scenic = connect_to_protocol::<ScenicMarker>()?;
-    Ok::<AppStrategyPtr, Error>(Box::new(ScenicAppStrategy { scenic }))
+fn make_flatland_app_strategy() -> Result<AppStrategyPtr, Error> {
+    Ok::<AppStrategyPtr, Error>(Box::new(FlatlandAppStrategy {}))
 }
 
 fn make_direct_app_strategy(
@@ -134,7 +127,7 @@ pub(crate) async fn create_app_strategy(
                 None
             };
             if display_coordinator.is_none() {
-                make_scenic_app_strategy()
+                make_flatland_app_strategy()
             } else {
                 make_direct_app_strategy(display_coordinator, app_config, internal_sender.clone())
             }
@@ -143,6 +136,6 @@ pub(crate) async fn create_app_strategy(
             DisplayCoordinator::watch_displays(internal_sender.clone()).await;
             make_direct_app_strategy(None, app_config, internal_sender.clone())
         }
-        ViewMode::Hosted => make_scenic_app_strategy(),
+        ViewMode::Hosted => make_flatland_app_strategy(),
     }
 }

@@ -23,7 +23,6 @@ use fidl_fuchsia_hardware_display::{
     CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ProviderMarker, VirtconMode,
 };
 use fidl_fuchsia_input_report as hid_input_report;
-use fidl_fuchsia_ui_scenic::ScenicProxy;
 use fuchsia_async::{self as fasync};
 use fuchsia_fs::directory as vfs_watcher;
 use fuchsia_fs::OpenFlags;
@@ -320,10 +319,6 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
 
     fn supports_scenic(&self) -> bool {
         return false;
-    }
-
-    fn get_scenic_proxy(&self) -> Option<&ScenicProxy> {
-        return None;
     }
 
     async fn post_setup(&mut self, internal_sender: &InternalSender) -> Result<(), Error> {

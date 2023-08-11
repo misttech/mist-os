@@ -4,4 +4,3 @@
 pub(crate) mod base;
 pub(crate) mod display_direct;
 pub(crate) mod flatland;
-pub(crate) mod scenic;

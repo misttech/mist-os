@@ -409,8 +409,6 @@ pub(crate) enum MessageInternal {
     CloseAdditionalView(ViewKey),
     MetricsChanged(ViewKey, Size),
     SizeChanged(ViewKey, Size),
-    ScenicPresentSubmitted(ViewKey, fidl_fuchsia_scenic_scheduling::FuturePresentationTimes),
-    ScenicPresentDone(ViewKey, fidl_fuchsia_scenic_scheduling::FramePresentedInfo),
     Focus(ViewKey, bool),
     CloseViewsOnDisplay(DisplayId),
     RequestRender(ViewKey),
@@ -506,16 +504,6 @@ impl App {
             MessageInternal::SizeChanged(view_id, new_size) => {
                 if let Ok(view) = self.get_view(view_id) {
                     view.handle_size_changed(new_size);
-                }
-            }
-            MessageInternal::ScenicPresentSubmitted(view_id, info) => {
-                if let Ok(view) = self.get_view(view_id) {
-                    view.present_submitted(info);
-                }
-            }
-            MessageInternal::ScenicPresentDone(view_id, info) => {
-                if let Ok(view) = self.get_view(view_id) {
-                    view.present_done(info);
                 }
             }
             MessageInternal::Focus(view_id, focused) => {

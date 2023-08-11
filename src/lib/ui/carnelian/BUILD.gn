@@ -45,10 +45,8 @@ rustc_library("carnelian") {
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_rust",
-    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_rust",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/graphics/display/lib/rust/display-utils",
     "//src/graphics/lib/compute/forma",
@@ -78,7 +76,6 @@ rustc_library("carnelian") {
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:toml",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:ttf-parser",
   ]
 
@@ -88,8 +85,8 @@ rustc_library("carnelian") {
     "src/app.rs",
     "src/app/strategies.rs",
     "src/app/strategies/base.rs",
+    "src/app/strategies/flatland.rs",
     "src/app/strategies/framebuffer.rs",
-    "src/app/strategies/scenic.rs",
     "src/color.rs",
     "src/drawing.rs",
     "src/geometry.rs",
@@ -97,7 +94,6 @@ rustc_library("carnelian") {
     "src/input/flatland.rs",
     "src/input/key3.rs",
     "src/input/report.rs",
-    "src/input/scenic.rs",
     "src/input/tests.rs",
     "src/input_ext.rs",
     "src/lib.rs",
@@ -123,7 +119,6 @@ rustc_library("carnelian") {
     "src/view/strategies/base.rs",
     "src/view/strategies/display_direct.rs",
     "src/view/strategies/flatland.rs",
-    "src/view/strategies/scenic.rs",
   ]
 
   inputs = [ "//prebuilt/third_party/fonts/robotoslab/RobotoSlab-Regular.ttf" ]
