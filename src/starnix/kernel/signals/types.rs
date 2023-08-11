@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    lock::RwLock,
-    task::{WaitQueue, Waiter, WaiterRef},
-    types::*,
-};
+use starnix_sync::InterruptibleEvent;
 use std::{collections::VecDeque, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
+
+use crate::{
+    lock::RwLock,
+    task::{WaitQueue, WaiterRef},
+    types::*,
+};
 
 /// `SignalActions` contains a `sigaction_t` for each valid signal.
 #[derive(Debug)]
@@ -53,7 +55,7 @@ impl SignalActions {
 
 /// Whether, and how, this task is blocked. This enum can be extended with new
 /// variants to optimize different kinds of waiting.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RunState {
     /// This task is not blocked.
     ///
@@ -62,7 +64,9 @@ pub enum RunState {
 
     /// This thread is blocked in a `Waiter`.
     Waiter(WaiterRef),
-    // As we optimize blocking primitives, we will add more variants to this enum.
+
+    /// This thread is blocked in an `InterruptibleEvent`.
+    Event(Arc<InterruptibleEvent>),
 }
 
 impl Default for RunState {
@@ -79,6 +83,7 @@ impl RunState {
         match self {
             RunState::Running => false,
             RunState::Waiter(waiter) => waiter.is_valid(),
+            RunState::Event(_) => true,
         }
     }
 
@@ -93,14 +98,17 @@ impl RunState {
                     }
                 });
             }
+            RunState::Event(event) => event.interrupt(),
         }
     }
 }
 
-impl PartialEq<Waiter> for RunState {
-    fn eq(&self, other: &Waiter) -> bool {
-        match self {
-            RunState::Waiter(waiter) => waiter.access(|waiter| waiter == Some(other)),
+impl PartialEq<RunState> for RunState {
+    fn eq(&self, other: &RunState) -> bool {
+        match (self, other) {
+            (RunState::Running, RunState::Running) => true,
+            (RunState::Waiter(lhs), RunState::Waiter(rhs)) => lhs == rhs,
+            (RunState::Event(lhs), RunState::Event(rhs)) => Arc::ptr_eq(lhs, rhs),
             _ => false,
         }
     }

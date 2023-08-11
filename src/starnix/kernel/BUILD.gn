@@ -112,6 +112,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/lib/kill_job_on_panic",
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/magma",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/syncio",
     "//src/starnix/lib/ubpf",
     "//src/storage/ext4/lib/metadata",

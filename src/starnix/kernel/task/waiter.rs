@@ -225,43 +225,32 @@ impl Waiter {
     pub fn wait_until(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
         let is_waiting = deadline.into_nanos() > 0;
 
-        if is_waiting {
-            let mut state = current_task.write();
-            assert!(!state.signals.run_state.is_blocked());
-            if state.signals.is_any_pending() {
-                return error!(EINTR);
-            }
-            state.signals.run_state = RunState::Waiter(self.weak());
-        }
-
-        scopeguard::defer! {
-            if is_waiting {
-                let mut state = current_task.write();
-                assert_eq!(&state.signals.run_state, self,
-                    "SignalState run state changed while waiting!"
-                );
-                state.signals.run_state = RunState::Running;
+        let callback = || {
+            // We are susceptible to spurious wakeups because interrupt() posts a message to the port
+            // queue. In addition to more subtle races, there could already be valid messages in the
+            // port queue that will immediately wake us up, leaving the interrupt message in the queue
+            // for subsequent waits (which by then may not have any signals pending) to read.
+            //
+            // It's impossible to non-racily guarantee that a signal is pending so there might always
+            // be an EINTR result here with no signal. But any signal we get when !is_waiting we know is
+            // leftover from before: the top of this function only sets ourself as the
+            // current_task.signals.run_state when there's a nonzero timeout, and that waiter reference
+            // is what is used to signal the interrupt().
+            loop {
+                let wait_result = self.wait_internal(deadline);
+                if let Err(errno) = &wait_result {
+                    if errno.code == EINTR && !is_waiting {
+                        continue; // Spurious wakeup.
+                    }
+                }
+                return wait_result;
             }
         };
 
-        // We are susceptible to spurious wakeups because interrupt() posts a message to the port
-        // queue. In addition to more subtle races, there could already be valid messages in the
-        // port queue that will immediately wake us up, leaving the interrupt message in the queue
-        // for subsequent waits (which by then may not have any signals pending) to read.
-        //
-        // It's impossible to non-racily guarantee that a signal is pending so there might always
-        // be an EINTR result here with no signal. But any signal we get when !is_waiting we know is
-        // leftover from before: the top of this function only sets ourself as the
-        // current_task.signals.run_state when there's a nonzero timeout, and that waiter reference
-        // is what is used to signal the interrupt().
-        loop {
-            let wait_result = self.wait_internal(deadline);
-            if let Err(errno) = &wait_result {
-                if errno.code == EINTR && !is_waiting {
-                    continue; // Spurious wakeup.
-                }
-            }
-            return wait_result;
+        if is_waiting {
+            current_task.run_in_state(RunState::Waiter(self.weak()), callback)
+        } else {
+            callback()
         }
     }
 
@@ -435,7 +424,7 @@ impl Default for Waiter {
 
 /// A weak reference to a Waiter. Intended for holding in wait queues or stashing elsewhere for
 /// calling queue_events later.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct WaiterRef(Weak<WaiterImpl>);
 
 impl WaiterRef {
@@ -457,6 +446,12 @@ impl WaiterRef {
 impl std::fmt::Debug for WaiterRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.access(|waiter| f.debug_tuple("WaiterRef").field(&waiter).finish())
+    }
+}
+
+impl PartialEq for WaiterRef {
+    fn eq(&self, other: &WaiterRef) -> bool {
+        Weak::ptr_eq(&self.0, &other.0)
     }
 }
 

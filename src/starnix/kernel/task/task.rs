@@ -1352,6 +1352,45 @@ impl CurrentTask {
         wait_function(self)
     }
 
+    /// Set the RunState for the current task to the given value and then call the given callback.
+    ///
+    /// When the callback is done, the run_state is restored to `RunState::Running`.
+    ///
+    /// This function is typically used just before blocking the current task on some operation.
+    /// The given `run_state` registers the mechasim for interrupting the blocking operation with
+    /// the task and the given `callback` actually blocks the task.
+    ///
+    /// This function can only be called in the `RunState::Running` state and cannot set the
+    /// run state to `RunState::Running`. For this reason, this function cannot be reentered.
+    pub fn run_in_state<F, T>(&self, run_state: RunState, callback: F) -> Result<T, Errno>
+    where
+        F: FnOnce() -> Result<T, Errno>,
+    {
+        assert_ne!(run_state, RunState::Running);
+
+        {
+            let mut state = self.write();
+            assert!(!state.signals.run_state.is_blocked());
+            if state.signals.is_any_pending() {
+                return error!(EINTR);
+            }
+            state.signals.run_state = run_state.clone();
+        }
+
+        let result = callback();
+
+        {
+            let mut state = self.write();
+            assert_eq!(
+                state.signals.run_state, run_state,
+                "SignalState run state changed while waiting!"
+            );
+            state.signals.run_state = RunState::Running;
+        };
+
+        result
+    }
+
     /// Determine namespace node indicated by the dir_fd.
     ///
     /// Returns the namespace node and the path to use relative to that node.

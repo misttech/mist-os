@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, Task};
+use starnix_sync::{InterruptibleEvent, WakeReason};
 
-use crate::{mm::MemoryAccessorExt, syscalls::*, task::*, time::utc::*};
+use crate::{mm::MemoryAccessorExt, signals::RunState, syscalls::*, task::*, time::utc::*};
 
 pub fn sys_clock_getres(
     current_task: &CurrentTask,
@@ -175,8 +176,14 @@ fn clock_nanosleep_monotonic_with_deadline(
     original_utc_deadline: Option<zx::Time>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
-    match Waiter::new().wait_until(current_task, deadline) {
-        Err(err) if err == ETIMEDOUT => Ok(()),
+    let event = InterruptibleEvent::new();
+    let guard = event.begin_wait();
+    match current_task.run_in_state(RunState::Event(event.clone()), || {
+        match guard.block_until(deadline) {
+            Err(WakeReason::Interrupted) => error!(EINTR),
+            _ => Ok(()),
+        }
+    }) {
         Err(err) if err == EINTR && is_absolute => error!(ERESTARTNOHAND),
         Err(err) if err == EINTR => {
             if !user_remaining.is_null() {

@@ -4,6 +4,7 @@
 
 use fuchsia_zircon::{self as zx, sys};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use crate::zx::{zx_futex_wait, zx_futex_wake};
 
@@ -77,6 +78,10 @@ pub enum WakeReason {
 }
 
 impl InterruptibleEvent {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
     /// Called to initiate a wait.
     ///
     /// Calls to `notify` or `interrupt` after this function returns will cause the event to wake
@@ -189,7 +194,7 @@ mod test {
 
     #[test]
     fn test_wait_block_and_notify() {
-        let event = Arc::new(InterruptibleEvent::default());
+        let event = InterruptibleEvent::new();
 
         let guard = event.begin_wait();
 
@@ -204,7 +209,7 @@ mod test {
 
     #[test]
     fn test_wait_block_and_interrupt() {
-        let event = Arc::new(InterruptibleEvent::default());
+        let event = InterruptibleEvent::new();
 
         let guard = event.begin_wait();
 
@@ -220,7 +225,7 @@ mod test {
 
     #[test]
     fn test_wait_block_and_timeout() {
-        let event = Arc::new(InterruptibleEvent::default());
+        let event = InterruptibleEvent::new();
 
         let guard = event.begin_wait();
         let result = guard.block_until(zx::Time::after(zx::Duration::from_millis(20)));
