@@ -39,12 +39,12 @@ use netstack3_core::{
         },
         segment::Payload,
         socket::{
-            accept, bind, close_conn, connect, create_socket, get_info, get_socket_error, listen,
-            receive_buffer_size, remove_bound, remove_unbound, reuseaddr, send_buffer_size,
-            set_device, set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown,
+            accept, bind, close, close_conn, connect, create_socket, get_info, get_socket_error,
+            listen, receive_buffer_size, reuseaddr, send_buffer_size, set_device,
+            set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown,
             with_socket_options, with_socket_options_mut, AcceptError, BoundInfo, ConnectError,
-            ConnectionId, ConnectionInfo, ListenError, ListenerNotifier, NoConnection,
-            SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
+            ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
+            SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -455,11 +455,11 @@ impl<I: IpExt> BindingData<I> {
         let SocketWorkerProperties {} = properties;
         let notifier = NeedsDataNotifier::default();
         let watcher = notifier.watcher();
-        let id = SocketId::Unbound(create_socket::<I, _>(
+        let id = create_socket::<I, _>(
             sync_ctx,
             non_sync_ctx,
             LocalZirconSocketAndNotifier(Arc::clone(&local), notifier),
-        ));
+        );
         Self { id, peer, local_socket_and_watcher: Some((local, watcher)) }
     }
 }
@@ -496,10 +496,10 @@ where
     ) {
         let Self { id, peer: _, local_socket_and_watcher: _ } = self;
         match id {
-            SocketId::Unbound(unbound) => remove_unbound::<I, _>(sync_ctx, unbound),
-            SocketId::Bound(bound) => remove_bound::<I, _>(sync_ctx, bound),
+            SocketId::Unbound(unbound) => close::<I, _>(sync_ctx, unbound.into()),
+            SocketId::Bound(bound) => close::<I, _>(sync_ctx, bound.into()),
             SocketId::Connection(conn) => {
-                close_conn::<I, _>(sync_ctx, non_sync_ctx, conn);
+                close_conn::<I, _>(sync_ctx, non_sync_ctx, conn.into());
             }
             SocketId::Listener(listener) => {
                 let mut id = listener.into();
@@ -512,10 +512,7 @@ where
                     ),
                     Ok(false)
                 );
-                remove_bound::<I, _>(
-                    sync_ctx,
-                    assert_matches::assert_matches!(id, SocketId::Bound(bound) => bound),
-                );
+                close::<I, _>(sync_ctx, id);
             }
         }
     }
@@ -619,7 +616,7 @@ fn spawn_send_task<I: IpExt>(
     ctx: crate::bindings::Ctx,
     socket: Arc<zx::Socket>,
     watcher: NeedsDataWatcher,
-    id: ConnectionId<I>,
+    id: SocketId<I>,
 ) {
     fasync::Task::spawn(async move {
         let watcher = watcher.peekable();
@@ -671,10 +668,15 @@ where
                 let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
                 let (addr, port) =
                     addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
-                let bound =
-                    bind::<I, _>(sync_ctx, non_sync_ctx, unbound, addr, NonZeroU16::new(port))
-                        .map_err(IntoErrno::into_errno)?;
-                *id = SocketId::Bound(bound);
+                let bound = bind::<I, _>(
+                    sync_ctx,
+                    non_sync_ctx,
+                    unbound.into(),
+                    addr,
+                    NonZeroU16::new(port),
+                )
+                .map_err(IntoErrno::into_errno)?;
+                *id = bound;
                 Ok(())
             }
             SocketId::Bound(_) | SocketId::Connection(_) | SocketId::Listener(_) => {
@@ -697,7 +699,7 @@ where
             .map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
             spawn_send_task::<I>(ns_ctx.clone(), local, watcher, connection);
-            *id = SocketId::Connection(connection);
+            *id = connection;
             Err(fposix::Errno::Einprogress)
         } else {
             Ok(())
@@ -737,9 +739,9 @@ where
                     )
                 });
 
-                let listener =
-                    listen::<I, _>(sync_ctx, bound, backlog).map_err(IntoErrno::into_errno)?;
-                *id = SocketId::Listener(listener);
+                let listener = listen::<I, _>(sync_ctx, bound.into(), backlog)
+                    .map_err(IntoErrno::into_errno)?;
+                *id = listener;
                 Ok(())
             }
             SocketId::Unbound(_) | SocketId::Connection(_) | SocketId::Listener(_) => {
@@ -793,8 +795,9 @@ where
             SocketId::Listener(listener) => {
                 let mut ctx = ns_ctx.clone();
                 let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                let (accepted, addr, peer) = accept::<I, _>(sync_ctx, non_sync_ctx, listener)
-                    .map_err(IntoErrno::into_errno)?;
+                let (accepted, addr, peer) =
+                    accept::<I, _>(sync_ctx, non_sync_ctx, listener.into())
+                        .map_err(IntoErrno::into_errno)?;
                 let addr = addr
                     .try_into_fidl_with_ctx(&non_sync_ctx)
                     .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
@@ -1601,7 +1604,7 @@ where
 
 fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     ctx: Ctx,
-    accepted: ConnectionId<I>,
+    accepted: SocketId<I>,
     peer: zx::Socket,
     request_stream: fposix_socket::StreamSocketRequestStream,
 ) where
@@ -1613,7 +1616,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     fasync::Task::spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
         move |_: &SyncCtx<_>, _: &mut BindingsNonSyncCtxImpl, SocketWorkerProperties {}| {
-            BindingData { id: SocketId::Connection(accepted), peer, local_socket_and_watcher: None }
+            BindingData { id: accepted, peer, local_socket_and_watcher: None }
         },
         SocketWorkerProperties {},
         request_stream,
