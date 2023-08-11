@@ -26,12 +26,8 @@ kernel_cmdline("userboot.next-component-manager") {
 
 assembly_input_groups("bootstrap") {
   visibility = [ "*" ]
-  bootfs_labels = [
-    "//bundles/drivers:bootstrap",
-    "//bundles/drivers:usb-host-stack",
-    "//bundles/drivers:usb-peripheral-stack",
-    "//src/sys/component_manager:component_manager_bootfs_config",
-  ]
+  bootfs_labels =
+      [ "//src/sys/component_manager:component_manager_bootfs_config" ]
   cmdline_deps = [ ":userboot.next-component-manager" ]
 }
 

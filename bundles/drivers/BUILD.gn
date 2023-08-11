@@ -2,20 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zbi/kernel_cmdline.gni")
-
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("utils") {
-}
-group("bootstrap") {
-}
-group("bootstrap-eng") {
-}
-group("usb-host-stack") {
-}
-group("usb-peripheral-stack") {
-}
-
 group("pci") {
   deps = [
     "//src/connectivity/ethernet/drivers/third_party/igc",

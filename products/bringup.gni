@@ -18,7 +18,6 @@ sdk_archive_labels = []
 product_bootfs_labels += [
   "//products/kernel_cmdline:kernel.oom.behavior--jobkill",
   "//products/kernel_cmdline:oom.reboot-timeout--low",
-  "//bundles/drivers:usb-peripheral-stack",
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 

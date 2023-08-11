@@ -4,10 +4,8 @@
 
 import("//products/common/core.gni")
 
-product_bootfs_labels += [
-  "//bundles/drivers:usb-peripheral-stack",
-  "//src/sys/component_manager:component_manager_bootfs_config",
-]
+product_bootfs_labels +=
+    [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
 legacy_base_package_labels +=
     [ "//src/connectivity/network/netcfg:config-default" ]

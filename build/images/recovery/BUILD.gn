@@ -62,12 +62,7 @@ if (is_fuchsia) {
     additional_boot_args =
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
 
-    bootfs_labels = [
-      "//build/input:recovery_bootfs",
-      "//bundles/drivers:bootstrap",
-      "//bundles/drivers:usb-host-stack",
-      "//bundles/drivers:usb-peripheral-stack",
-    ]
+    bootfs_labels = [ "//build/input:recovery_bootfs" ]
     bootfs_labels +=
         [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
@@ -314,9 +309,6 @@ if (is_fuchsia) {
     bootfs_labels = []
     bootfs_labels = [
       "//build/input:recovery_bootfs",
-      "//bundles/drivers:bootstrap",
-      "//bundles/drivers:usb-host-stack",
-      "//bundles/drivers:usb-peripheral-stack",
       "//src/sys/component_manager:component_manager_bootfs_config",
     ]
 
@@ -389,12 +381,7 @@ if (is_fuchsia) {
     product_assembly_config_label = ":for-fdr"
     board_config = board_information_for_assembly
 
-    bootfs_labels = [
-      "//build/input:recovery_bootfs",
-      "//bundles/drivers:bootstrap",
-      "//bundles/drivers:usb-host-stack",
-      "//bundles/drivers:usb-peripheral-stack",
-    ]
+    bootfs_labels = [ "//build/input:recovery_bootfs" ]
     bootfs_labels +=
         [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 

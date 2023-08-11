@@ -4,10 +4,8 @@
 
 import("//products/common/core.gni")
 
-product_bootfs_labels += [
-  "//bundles/drivers:usb-peripheral-stack",
-  "//src/sys/component_manager:component_manager_bootfs_config",
-]
+product_bootfs_labels +=
+    [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
 core_realm_shards += [ "//src/intl/intl_services:intl_services_small_shard" ]
 
