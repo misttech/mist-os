@@ -17,6 +17,8 @@ use futures::{
 /// The fastboot implementation used by this emulator is Gigaboot (//src/firmware/gigaboot).
 #[fixture(base_fixture)]
 #[fuchsia::test]
+// TODO(fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+#[cfg_attr(feature = "big_zircon_kernel", ignore)]
 async fn test_target_flash_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
     isolate.start_daemon().await.unwrap();
@@ -72,6 +74,8 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
 
 #[fixture(base_fixture)]
 #[fuchsia::test]
+// TODO(fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+#[cfg_attr(feature = "big_zircon_kernel", ignore)]
 async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
     isolate.start_daemon().await.unwrap();

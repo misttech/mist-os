@@ -142,6 +142,8 @@ def find_direct_inputs(command: Iterable[str]) -> Iterable[RustcInput]:
     for tok in command:
         if tok.endswith('.rs'):
             yield RustcInput(file=Path(tok), type=InputType.SOURCE)
+        elif tok.startswith('@'):
+            yield RustcInput(file=Path(tok[1:]), type=InputType.SOURCE)
         elif is_linkable(tok):
             yield RustcInput(file=Path(tok), type=InputType.LINKABLE)
 

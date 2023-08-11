@@ -694,6 +694,13 @@ if (is_kernel) {
     deps = [ ":image" ]
 
     output_extension = "zbi"
+
+    metadata = {
+      # See zbizircon.rsp, below.
+      zbi_kernel_file =
+          [ rebase_path("$target_out_dir/$target_name.$output_extension",
+                        root_build_dir) ]
+    }
   }
 
   # Then that gets compressed to become part of the ZBI_TYPE_KERNEL_STORAGE
@@ -791,6 +798,55 @@ if (is_kernel) {
     metadata = {
       zbi_input_barrier = []
     }
+  }
+
+  # TODO(fxbug.dev/130252): The x86 kernel gets loaded at a fixed physical
+  # address of 1MiB. The UEFI environment under QEMU has some memory reserved
+  # at about 8MiB. This limits the total kernel image size that can be loaded.
+  # A larger kernel image size will get a panic in early boot (physboot).
+  # Until the kernel's internal fixed-location constraint is removed, kernel
+  # images that are too big just can't be loaded. Some instrumented kernels
+  # like asan/ubsan builds can wind up too big. So this collects the file name
+  # of the internal kernel image and feeds that into a script that examines
+  # the image to determine the memory size it will require.
+  generated_file("zbizircon.rsp") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    outputs = [ "$target_gen_dir/$target_name" ]
+    output_conversion = "list lines"
+    data_keys = [ "zbi_kernel_file" ]
+    deps = [ ":kernel" ]
+  }
+
+  action("big-kernel.rsp") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    script = "big-kernel.py"
+    outputs = [ "$target_gen_dir/$target_name" ]
+    depfile = "${outputs[0]}.d"
+    deps = [ ":zbizircon.rsp" ]
+    sources = get_target_outputs(deps[0])
+    assert(sources == [ sources[0] ])
+    args = [
+      "--depfile=" + rebase_path(depfile, root_build_dir),
+      "--rust-cfg-rspfile=" + rebase_path(outputs[0], root_build_dir),
+      rebase_path(sources[0], root_build_dir),
+    ]
+  }
+
+  group("rust-cfg-big-zircon-kernel") {
+    testonly = true
+    public_deps = [ ":big-kernel.rsp" ]
+    public_configs = [ ":rust-big-kernel.config" ]
+  }
+
+  config("rust-big-kernel.config") {
+    visibility = [ ":*" ]
+    inputs = get_target_outputs(":big-kernel.rsp")
+    assert(inputs == [ inputs[0] ])
+    rustflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
   }
 }
 
