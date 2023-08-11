@@ -501,7 +501,6 @@ this component and the capability's source.
     the directory in the component's namespace.
 - `subdir`: (_optional `string`_) (`directory` only) A subdirectory within the directory capability to provide in the
     component's namespace.
-- `as`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
 - `scope`: (_optional `string or array of strings`_) (`event_stream` only) When defined the event stream will contain events about only the
     components defined in the scope.
 - `filter`: (_optional `object`_) (`event_stream` only) Capability requested event streams require specifying a filter
@@ -684,7 +683,6 @@ instance or a [child collection][doc-collections].
     the offered directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
     capability to route.
-- `filter`: (_optional `object`_) Deprecated and unusable. In the process of being removed.
 - `event_stream`: (_optional `string or array of strings`_) (`event_stream` only) the name(s) of the event streams being offered.
 - `scope`: (_optional `string or array of strings`_) (`event_stream` only) When defined the event stream will contain events about only the
     components defined in the scope.

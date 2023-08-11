@@ -809,12 +809,6 @@ fn translate_offer(
                     source_name: Some(source_name.into()),
                     target: Some(target),
                     target_name: Some(target_name.into()),
-                    // We have already validated that none will be present if we were using many
-                    // events.
-                    filter: match offer.filter.clone() {
-                        Some(dict) => Some(dictionary_from_map(dict)?),
-                        None => None,
-                    },
                     scope: match scopes {
                         Some(values) => {
                             let mut output = vec![];
@@ -1378,7 +1372,7 @@ fn extract_offer_sources_and_targets(
 fn all_target_use_paths<T, U>(in_obj: &T, to_obj: &U) -> Option<OneOrMany<Path>>
 where
     T: CapabilityClause,
-    U: AsClause + PathClause,
+    U: PathClause,
 {
     if let Some(n) = in_obj.service() {
         Some(svc_paths_from_names(n, to_obj))
@@ -1424,7 +1418,7 @@ where
 fn one_target_use_path<T, U>(in_obj: &T, to_obj: &U) -> Result<Path, Error>
 where
     T: CapabilityClause,
-    U: AsClause + PathClause,
+    U: PathClause,
 {
     match all_target_use_paths(in_obj, to_obj) {
         Some(OneOrMany::One(target_name)) => Ok(target_name),
@@ -3301,7 +3295,6 @@ mod tests {
                         "from": "parent",
                         "to": "#netstack",
                         "as": "some_other_event",
-                        "filter": { "name": "diagnostics" }
                     },
                 ],
                 "children": [
@@ -3681,21 +3674,6 @@ mod tests {
                                 name: "netstack".to_string(),
                                 collection: None,
                             })),
-                            filter: Some(fdata::Dictionary {
-                                entries: Some(vec![
-                                    fdata::DictionaryEntry {
-                                        key: "name".to_string(),
-                                        value: Some(
-                                            Box::new(
-                                                fdata::DictionaryValue::Str(
-                                                    "diagnostics".to_string()
-                                                )
-                                            )
-                                        ),
-                                    },
-                                ]),
-                                ..Default::default()
-                            }),
                             target_name: Some("some_other_event".to_string()),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()

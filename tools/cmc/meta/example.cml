@@ -113,7 +113,6 @@
             event_stream: "directory_ready",
             from: "parent",
             to: "#logger",
-            filter: { name: "diagnostics" },
             availability: "same_as_target",
         },
         {

@@ -299,7 +299,7 @@ impl CapabilityId {
     /// source names.
     pub fn from_offer_expose<T>(clause: &T) -> Result<Vec<CapabilityId>, Error>
     where
-        T: CapabilityClause + AsClause + FilterClause + fmt::Debug,
+        T: CapabilityClause + AsClause + fmt::Debug,
     {
         // TODO: Validate that exactly one of these is set.
         let alias = clause.r#as();
@@ -2332,11 +2332,6 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subdir: Option<RelativePath>,
 
-    // TODO(fxbug.dev/81980): remove.
-    /// Deprecated and unusable. In the process of being removed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub r#as: Option<Name>,
-
     /// (`event_stream` only) When defined the event stream will contain events about only the
     /// components defined in the scope.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2636,11 +2631,6 @@ pub struct Offer {
     /// capability to route.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subdir: Option<RelativePath>,
-
-    // TODO(fxbug.dev/81980): remove.
-    /// Deprecated and unusable. In the process of being removed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filter: Option<Map<String, Value>>,
 
     /// (`event_stream` only) the name(s) of the event streams being offered.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3201,12 +3191,6 @@ impl FilterClause for Use {
     }
 }
 
-impl AsClause for Use {
-    fn r#as(&self) -> Option<&Name> {
-        self.r#as.as_ref()
-    }
-}
-
 impl PathClause for Use {
     fn path(&self) -> Option<&Path> {
         self.path.as_ref()
@@ -3473,12 +3457,6 @@ impl PathClause for Offer {
     }
 }
 
-impl FilterClause for Offer {
-    fn filter(&self) -> Option<&Map<String, Value>> {
-        self.filter.as_ref()
-    }
-}
-
 impl RightsClause for Offer {
     fn rights(&self) -> Option<&Rights> {
         self.rights.as_ref()
@@ -3699,7 +3677,6 @@ impl Offer {
             dependency: None,
             rights: None,
             subdir: None,
-            filter: None,
             event_stream: None,
             scope: None,
             availability: None,
@@ -3938,7 +3915,6 @@ mod tests {
             rights: None,
             subdir: None,
             dependency: None,
-            filter: None,
             event_stream: None,
             scope: None,
             availability: None,
@@ -3955,7 +3931,6 @@ mod tests {
             storage: None,
             from: None,
             path: None,
-            r#as: None,
             rights: None,
             subdir: None,
             event_stream: None,

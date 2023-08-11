@@ -133,7 +133,6 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source: OfferSource::Parent,
                             source_name: "started".parse().unwrap(),
                             scope: None,
-                            filter: None,
                             target: OfferTarget::Child(ChildRef {
                                 name: "c".into(),
                                 collection: None,

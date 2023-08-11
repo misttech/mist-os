@@ -1506,14 +1506,11 @@ fn create_offer_decl(
         ftest::Capability::EventStream(event_stream) => {
             let source_name = try_into_source_name(&event_stream.name)?;
             let target_name = try_into_target_name(&event_stream.name, &event_stream.as_)?;
-            let filter =
-                event_stream.filter.as_ref().cloned().map(FidlIntoNative::fidl_into_native);
             cm_rust::OfferDecl::EventStream(cm_rust::OfferEventStreamDecl {
                 source,
                 source_name,
                 target,
                 target_name,
-                filter,
                 scope: event_stream.scope.as_ref().cloned().map(FidlIntoNative::fidl_into_native),
                 availability: cm_rust::Availability::Required,
             })
@@ -3350,7 +3347,6 @@ mod tests {
                     cm_rust::OfferDecl::EventStream(cm_rust::OfferEventStreamDecl {
                         source: cm_rust::OfferSource::Parent,
                         source_name: "started".parse().unwrap(),
-                        filter: None,
                         scope: None,
                         target: cm_rust::OfferTarget::static_child("a".to_string()),
                         target_name: "started_event".parse().unwrap(),

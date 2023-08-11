@@ -334,6 +334,7 @@ type OfferEventStream = table {
 
     /// (Optional) Filter for the event stream. Only present for DirectoryReady
     /// events and CapabilityRequested events
+    @available(removed=14)
     6: filter fuchsia.data.Dictionary;
 
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.

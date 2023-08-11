@@ -434,19 +434,8 @@ to run your test in the correct test realm.",
         used_ids: &mut HashMap<String, CapabilityId>,
         strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     ) -> Result<(), Error> {
-        if use_.service.is_some() {
-            if use_.r#as.is_some() {
-                return Err(Error::validate("\"as\" cannot be used with \"service\""));
-            }
-        }
         if use_.from == Some(UseFromRef::Debug) && use_.protocol.is_none() {
             return Err(Error::validate("only \"protocol\" supports source from \"debug\""));
-        }
-        if use_.protocol.is_some() && use_.r#as.is_some() {
-            return Err(Error::validate("\"as\" cannot be used with \"protocol\""));
-        }
-        if use_.directory.is_some() && use_.r#as.is_some() {
-            return Err(Error::validate("\"as\" cannot be used with \"directory\""));
         }
         if use_.event_stream.is_some() && use_.availability.is_some() {
             return Err(Error::validate("\"availability\" cannot be used with \"event_stream\""));
@@ -456,9 +445,6 @@ to run your test in the correct test realm.",
         }
         if use_.storage.is_some() && use_.from.is_some() {
             return Err(Error::validate("\"from\" cannot be used with \"storage\""));
-        }
-        if use_.storage.is_some() && use_.r#as.is_some() {
-            return Err(Error::validate("\"as\" cannot be used with \"storage\""));
         }
         if use_.from == Some(UseFromRef::Self_) && use_.event_stream.is_some() {
             return Err(Error::validate("\"from: self\" cannot be used with \"event_stream\""));
@@ -880,47 +866,6 @@ to run your test in the correct test realm.",
             return Err(Error::validate(
                 "Dependency can only be provided for protocol and directory capabilities",
             ));
-        }
-
-        // Ensure that only events can have filter.
-        match (&offer.event_stream, &offer.filter) {
-            (None, Some(_)) => {
-                Err(Error::validate("\"filter\" can only be used with \"event_stream\""))
-            }
-            (Some(OneOrMany::Many(_)), Some(_)) => {
-                Err(Error::validate("\"filter\" cannot be used with multiple event streams"))
-            }
-
-            _ => Ok(()),
-        }?;
-
-        if let Some(event_stream) = &offer.event_stream {
-            for from in &offer.from {
-                match (from, &offer.filter) {
-                    (OfferFromRef::Framework, Some(_)) => {
-                        for event in event_stream {
-                            match event.as_str() {
-                                "capability_requested"=>{},
-                                "directory_ready"=>{},
-                                _=>{
-                                   return Err(Error::validate("\"filter\" can only be used when offering \"capability_requested\" or \"directory_ready\" from framework."))
-                                }
-                            }
-                        }
-                    }
-                    (OfferFromRef::Framework, None) => {
-                        for event in event_stream {
-                            match event.as_str() {
-                                "capability_requested" | "directory_ready"=>{
-                                    return Err(Error::validate("\"filter\" must be specified if \"capability_requested\" or \"directory_ready\" are offered from framework"))
-                                },
-                                _=>{},
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
         }
 
         // Validate every target of this offer.
@@ -2483,7 +2428,6 @@ mod tests {
                    "event_stream": ["started", "stopped", "running"],
                    "scope":["#test"],
                    "path":"/svc/testpath",
-                   "as": "my_cool_stream",
                    "from":"parent",
                   },
                 ],
@@ -2510,19 +2454,6 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "as cannot be used with multiple event streams"
         ),
-        test_cml_offer_event_stream_multiple_filter(
-            json!({
-                "offer": [
-                    {
-                        "event_stream": ["started", "stopped"],
-                        "from" : "framework",
-                        "filter": {"data": "something"},
-                        "to": "#something"
-                    },
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"filter\" cannot be used with multiple event streams"
-        ),
         test_cml_offer_event_stream_capability_requested_not_from_framework(
             json!({
                 "offer": [
@@ -2535,45 +2466,6 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"parent\" but it does not appear in \"children\" or \"collections\""
         ),
-        test_cml_offer_event_stream_capability_requested_no_filter(
-            json!({
-                "offer": [
-                    {
-                        "event_stream": ["capability_requested", "stopped"],
-                        "from" : "framework",
-                        "to": "#something"
-                     },
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"filter\" must be specified if \"capability_requested\" or \"directory_ready\" are offered from framework"
-        ),
-        test_cml_offer_event_stream_directory_ready_no_filter(
-            json!({
-                "offer": [
-                    {
-                        "event_stream": ["directory_ready", "stopped"],
-                        "from" : "framework",
-                        "to": "#something"
-                    },
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"filter\" must be specified if \"capability_requested\" or \"directory_ready\" are offered from framework"
-        ),
-        test_cml_offer_event_stream_capability_requested_bad_filter(
-            json!({
-                "offer": [
-                    {
-                        "event_stream": "stopped",
-                        "from" : "framework",
-                        "to": "#something",
-                        "filter": {
-                            "data": "something"
-                        }
-                    },
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"filter\" can only be used when offering \"capability_requested\" or \"directory_ready\" from framework."
-        ),
         test_cml_offer_event_stream_capability_requested_with_filter(
             json!({
                 "offer": [
@@ -2581,7 +2473,6 @@ mod tests {
                         "event_stream": "capability_requested",
                         "from" : "framework",
                         "to": "#something",
-                        "filter": {"data": "something"}
                     },
                 ]
             }),
@@ -2594,7 +2485,6 @@ mod tests {
                         "event_stream": "directory_ready",
                         "from" : "framework",
                         "to": "#something",
-                        "filter": {"data": "something"}
                     },
                 ]
             }),
@@ -2718,30 +2608,6 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\""
         ),
-        test_cml_use_as_with_protocol(
-            json!({
-                "use": [ { "protocol": "foo", "as": "xxx" } ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"protocol\""
-        ),
-        test_cml_use_invalid_from_with_directory(
-            json!({
-                "use": [ { "directory": "foo", "from": "debug" } ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
-        ),
-        test_cml_use_as_with_directory(
-            json!({
-                "use": [ { "directory": "foo", "as": "xxx" } ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"directory\""
-        ),
-        test_cml_use_as_with_storage(
-            json!({
-                "use": [ { "storage": "cache", "as": "mystorage" } ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"storage\""
-        ),
         test_cml_use_from_with_storage(
             json!({
                 "use": [ { "storage": "cache", "from": "parent" } ]
@@ -2816,7 +2682,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `from`, `path`, `rights`, `subdir`, `as`, `scope`, `filter`, `dependency`, `availability`"
+            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `from`, `path`, `rights`, `subdir`, `scope`, `filter`, `dependency`, `availability`"
         ),
 
         test_cml_use_disallows_nested_dirs_directory(
@@ -4339,26 +4205,6 @@ mod tests {
                     ]
                 }),
             Ok(())
-        ),
-        test_cml_offer_disallows_filter_on_non_events(
-            json!({
-                "offer": [
-                    {
-                        "directory": "mydir",
-                        "rights": [ "r*" ],
-                        "from": "parent",
-                        "to": [ "#logger" ],
-                        "filter": {"path": "/diagnostics"}
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
         ),
 
         // children
@@ -6026,12 +5872,6 @@ mod tests {
                 ],
             }),
             Ok(())
-        ),
-        test_cml_use_as_with_service(
-            json!({
-                "use": [ { "service": "foo", "as": "xxx" } ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "\"as\" cannot be used with \"service\""
         ),
         test_cml_use_invalid_from_with_service(
             json!({

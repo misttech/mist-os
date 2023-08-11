@@ -380,7 +380,6 @@ pub enum OfferDecl {
 pub struct OfferEventStreamDecl {
     pub source: OfferSource,
     pub scope: Option<Vec<EventScope>>,
-    pub filter: Option<HashMap<String, DictionaryValue>>,
     pub source_name: Name,
     pub target: OfferTarget,
     pub target_name: Name,
@@ -2836,7 +2835,6 @@ mod tests {
                                 target: OfferTarget::Child(ChildRef{name: "netstack".into(), collection: None}),
                                 scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".into(), collection: None})]),
                                 target_name: "diagnostics_ready".parse().unwrap(),
-                                filter: None,
                                 availability: Availability::Optional,
                             }
                         )

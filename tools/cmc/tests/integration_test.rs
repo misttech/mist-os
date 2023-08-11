@@ -4,7 +4,6 @@
 
 use anyhow::Error;
 use difference::Changeset;
-use fdata::{Dictionary, DictionaryEntry, DictionaryValue};
 use fidl::unpersist;
 use fidl_fuchsia_component_decl::*;
 use fidl_fuchsia_data as fdata;
@@ -223,13 +222,6 @@ fn example_cml_integration_test() {
             source_name: Some("directory_ready".to_string()),
             source: Some(Ref::Parent(ParentRef {})),
             target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-            filter: Some(Dictionary {
-                entries: Some(vec![DictionaryEntry {
-                    key: "name".to_string(),
-                    value: Some(Box::new(DictionaryValue::Str("diagnostics".to_string()))),
-                }]),
-                ..Default::default()
-            }),
             target_name: Some("directory_ready".to_string()),
             availability: Some(Availability::SameAsTarget),
             ..Default::default()
