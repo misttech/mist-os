@@ -55,12 +55,6 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.component.decl/Capability.event",
-        "ordinal": "7",
-        "type": "fuchsia.component.decl/Event"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.component.decl/Capability.event_stream",
         "ordinal": "8",
         "type": "fuchsia.component.decl/EventStream"
@@ -783,16 +777,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.component.decl/Event.name",
-        "ordinal": "1",
-        "type": "string:100"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.component.decl/Event"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.component.decl/EventStream.name",
         "ordinal": "1",
         "type": "string:100"
@@ -1102,12 +1086,6 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.component.decl/Offer.event",
-        "ordinal": "7",
-        "type": "fuchsia.component.decl/OfferEvent"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.component.decl/Offer.event_stream",
         "ordinal": "8",
         "type": "fuchsia.component.decl/OfferEventStream"
@@ -1198,46 +1176,6 @@
     {
         "kind": "table",
         "name": "fuchsia.component.decl/OfferDirectory"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/OfferEvent.availability",
-        "ordinal": "6",
-        "type": "fuchsia.component.decl/Availability"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/OfferEvent.filter",
-        "ordinal": "5",
-        "type": "fuchsia.data/Dictionary"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/OfferEvent.source",
-        "ordinal": "1",
-        "type": "fuchsia.component.decl/Ref"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/OfferEvent.source_name",
-        "ordinal": "2",
-        "type": "string:100"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/OfferEvent.target",
-        "ordinal": "3",
-        "type": "fuchsia.component.decl/Ref"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/OfferEvent.target_name",
-        "ordinal": "4",
-        "type": "string:100"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.component.decl/OfferEvent"
     },
     {
         "kind": "table/member",
@@ -1768,21 +1706,9 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.component.decl/Use.event",
-        "ordinal": "5",
-        "type": "fuchsia.component.decl/UseEvent"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.component.decl/Use.event_stream",
         "ordinal": "7",
         "type": "fuchsia.component.decl/UseEventStream"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.component.decl/Use.event_stream_deprecated",
-        "ordinal": "6",
-        "type": "fuchsia.component.decl/UseEventStreamDeprecated"
     },
     {
         "kind": "union/member",
@@ -1855,46 +1781,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEvent.availability",
-        "ordinal": "6",
-        "type": "fuchsia.component.decl/Availability"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEvent.dependency_type",
-        "ordinal": "5",
-        "type": "fuchsia.component.decl/DependencyType"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEvent.filter",
-        "ordinal": "4",
-        "type": "fuchsia.data/Dictionary"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEvent.source",
-        "ordinal": "1",
-        "type": "fuchsia.component.decl/Ref"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEvent.source_name",
-        "ordinal": "2",
-        "type": "string:100"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEvent.target_name",
-        "ordinal": "3",
-        "type": "string:100"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.component.decl/UseEvent"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.component.decl/UseEventStream.availability",
         "ordinal": "5",
         "type": "fuchsia.component.decl/Availability"
@@ -1932,28 +1818,6 @@
     {
         "kind": "table",
         "name": "fuchsia.component.decl/UseEventStream"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEventStreamDeprecated.availability",
-        "ordinal": "3",
-        "type": "fuchsia.component.decl/Availability"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEventStreamDeprecated.name",
-        "ordinal": "1",
-        "type": "string:100"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.component.decl/UseEventStreamDeprecated.subscriptions",
-        "ordinal": "2",
-        "type": "vector<fuchsia.component.decl/EventSubscription>:100"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.component.decl/UseEventStreamDeprecated"
     },
     {
         "kind": "table/member",

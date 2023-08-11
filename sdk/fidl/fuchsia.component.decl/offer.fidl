@@ -16,7 +16,7 @@ type Offer = flexible union {
     4: storage OfferStorage;
     5: runner OfferRunner;
     6: resolver OfferResolver;
-    @available(removed=HEAD)
+    @available(removed=14)
     7: event OfferEvent;
     8: event_stream OfferEventStream;
 };
@@ -278,7 +278,7 @@ type OfferResolver = table {
 };
 
 /// Declares an event offered by a component.
-@available(removed=HEAD)
+@available(removed=14)
 type OfferEvent = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent` or `void`. If set to `void`, then the target

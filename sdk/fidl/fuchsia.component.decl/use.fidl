@@ -12,9 +12,9 @@ type Use = flexible union {
     2: protocol UseProtocol;
     3: directory UseDirectory;
     4: storage UseStorage;
-    @available(removed=HEAD)
+    @available(removed=14)
     5: event UseEvent;
-    @available(removed=HEAD)
+    @available(removed=14)
     6: event_stream_deprecated UseEventStreamDeprecated;
     7: event_stream UseEventStream;
 };
@@ -155,7 +155,7 @@ type UseStorage = table {
 };
 
 /// Declares an event used by a component, which was offered to it.
-@available(removed=HEAD)
+@available(removed=14)
 type UseEvent = table {
     /// (Required) The provider of the event. Must be `realm` or `framework`. If
     /// the availability is set to `optional`, then this must be set to
@@ -191,7 +191,7 @@ type UseEvent = table {
 };
 
 /// Declares a static EventStream used by a component.
-@available(removed=HEAD)
+@available(removed=14)
 type UseEventStreamDeprecated = table {
     /// (Required) The name of the event stream.
     1: name name;
