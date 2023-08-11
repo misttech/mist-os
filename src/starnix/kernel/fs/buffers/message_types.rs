@@ -170,6 +170,14 @@ impl AncillaryData {
                 };
                 Ok(ControlMsg::new(SOL_IPV6, IPV6_PKTINFO, pktinfo.as_bytes().to_vec()))
             }
+            AncillaryData::Ip(syncio::ControlMessage::Timestamp { sec, usec }) => {
+                let time = timeval { tv_sec: sec, tv_usec: usec };
+                Ok(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMP, time.as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::TimestampNs { sec, nsec }) => {
+                let time = timespec { tv_sec: sec, tv_nsec: nsec };
+                Ok(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMPNS, time.as_bytes().to_vec()))
+            }
         }
     }
 

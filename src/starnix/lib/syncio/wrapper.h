@@ -10,6 +10,7 @@
 #include <lib/zxio/posix_mode.h>
 #include <lib/zxio/zxio.h>
 #include <netinet/in.h>
+#include <sys/time.h>
 
 #include "stub/missing_includes.h"
 

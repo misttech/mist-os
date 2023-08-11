@@ -28,13 +28,15 @@ bindgen.var_allowlist = [
     'ZXIO_SHUTDOWN.*', 'ZXIO_NODE_PROTOCOL.*', 'ZXIO_SEEK_ORIGIN.*', 'E[A-Z]*',
     'AF_.*', 'SO.*', 'IP.*', 'MSG_.*'
 ]
-bindgen.type_allowlist = ['cmsghdr.*', 'in6_.*', 'sockaddr.*']
+bindgen.type_allowlist = ['cmsghdr.*', 'in6_.*', 'sockaddr.*', 'timespec', 'timeval']
 
 bindgen.set_auto_derive_traits(
     [
         (r'cmsghdr', ['AsBytes, FromBytes', 'FromZeroes']),
         (r'in6_pktinfo', ['AsBytes, FromBytes', 'FromZeroes']),
         (r'in6_addr*', ['AsBytes, FromBytes', 'FromZeroes']),
+        (r'timespec', ['AsBytes, FromBytes', 'FromZeroes']),
+        (r'timeval', ['AsBytes, FromBytes', 'FromZeroes']),
     ])
 
 bindgen.run(

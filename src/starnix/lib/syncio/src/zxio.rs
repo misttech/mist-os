@@ -462,6 +462,13 @@ pub const IPV6_RTHDR_LOOSE: u32 = 0;
 pub const IPV6_RTHDR_STRICT: u32 = 1;
 pub const IPV6_RTHDR_TYPE_0: u32 = 0;
 pub type zx_rights_t = u32;
+pub type time_t = ::std::os::raw::c_long;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct timespec {
+    pub tv_sec: time_t,
+    pub tv_nsec: ::std::os::raw::c_long,
+}
 pub type zx_time_t = i64;
 pub type zx_handle_t = u32;
 pub type zx_status_t = i32;
@@ -1269,6 +1276,13 @@ impl Default for in6_pktinfo {
             s.assume_init()
         }
     }
+}
+pub type suseconds_t = ::std::os::raw::c_long;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct timeval {
+    pub tv_sec: time_t,
+    pub tv_usec: suseconds_t,
 }
 pub const ZXIO_SHUTDOWN_OPTIONS_READ: zxio_shutdown_options_t = 2;
 pub const ZXIO_SHUTDOWN_OPTIONS_WRITE: zxio_shutdown_options_t = 1;

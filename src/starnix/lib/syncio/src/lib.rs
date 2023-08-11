@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::convert::From;
-
 use crate::zxio::{
     zxio_dirent_iterator_next, zxio_dirent_iterator_t, ZXIO_NODE_PROTOCOL_CONNECTOR,
     ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
@@ -18,7 +16,6 @@ use std::{
     os::raw::{c_char, c_int, c_uint, c_void},
     pin::Pin,
 };
-use tracing::error;
 use zerocopy::{AsBytes, FromBytes};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
@@ -187,6 +184,8 @@ pub enum ControlMessage {
     Ipv6Tclass(u8),
     Ipv6HopLimit(u8),
     Ipv6PacketInfo { iface: u32, local_addr: [u8; size_of::<zxio::in6_addr>()] },
+    Timestamp { sec: i64, usec: i64 },
+    TimestampNs { sec: i64, nsec: i64 },
 }
 
 const fn align_cmsg_size(len: usize) -> usize {
@@ -208,6 +207,8 @@ impl ControlMessage {
             ControlMessage::Ipv6Tclass(_) => size_of::<c_int>(),
             ControlMessage::Ipv6HopLimit(_) => size_of::<c_int>(),
             ControlMessage::Ipv6PacketInfo { .. } => size_of::<zxio::in6_pktinfo>(),
+            ControlMessage::Timestamp { .. } => size_of::<zxio::timeval>(),
+            ControlMessage::TimestampNs { .. } => size_of::<zxio::timespec>(),
         }
     }
 
@@ -240,6 +241,16 @@ impl ControlMessage {
                 };
                 pktinfo.write_to_prefix(data).unwrap();
                 (size_of_val(&pktinfo), zxio::SOL_IPV6, zxio::IPV6_PKTINFO)
+            }
+            ControlMessage::Timestamp { sec, usec } => {
+                let timeval = zxio::timeval { tv_sec: *sec, tv_usec: *usec };
+                timeval.write_to_prefix(data).unwrap();
+                (size_of_val(&timeval), zxio::SOL_SOCKET, zxio::SO_TIMESTAMP)
+            }
+            ControlMessage::TimestampNs { sec, nsec } => {
+                let timespec = zxio::timespec { tv_sec: *sec, tv_nsec: *nsec };
+                timespec.write_to_prefix(data).unwrap();
+                (size_of_val(&timespec), zxio::SOL_SOCKET, zxio::SO_TIMESTAMPNS)
             }
         };
         let total_size = CMSG_HEADER_SIZE + size;
@@ -283,37 +294,38 @@ fn parse_control_messages(data: &[u8]) -> Vec<ControlMessage> {
         let msg_data = &data[pos + CMSG_HEADER_SIZE..pos + header.cmsg_len as usize];
         let msg = match (header.cmsg_level as u32, header.cmsg_type as u32) {
             (zxio::SOL_IP, zxio::IP_TOS) => {
-                Some(ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap()))
+                ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap())
             }
             (zxio::SOL_IP, zxio::IP_TTL) => {
-                Some(ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8))
+                ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8)
             }
             (zxio::SOL_IPV6, zxio::IPV6_TCLASS) => {
-                Some(ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8))
+                ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8)
             }
             (zxio::SOL_IPV6, zxio::IPV6_HOPLIMIT) => {
-                Some(ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap() as u8))
+                ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap() as u8)
             }
             (zxio::SOL_IPV6, zxio::IPV6_PKTINFO) => {
                 let pkt_info = zxio::in6_pktinfo::read_from_prefix(msg_data).unwrap();
-                Some(ControlMessage::Ipv6PacketInfo {
+                ControlMessage::Ipv6PacketInfo {
                     local_addr: unsafe { pkt_info.ipi6_addr.__in6_union.__s6_addr },
                     iface: pkt_info.ipi6_ifindex,
-                })
+                }
             }
-            _ => {
-                error!(
-                    tag = "syncio",
-                    "ZXIO produced unexpected cmsg level={}, type={}",
-                    header.cmsg_level,
-                    header.cmsg_type
-                );
-                None
+            (zxio::SOL_SOCKET, zxio::SO_TIMESTAMP) => {
+                let timeval = zxio::timeval::read_from_prefix(msg_data).unwrap();
+                ControlMessage::Timestamp { sec: timeval.tv_sec, usec: timeval.tv_usec }
             }
+            (zxio::SOL_SOCKET, zxio::SO_TIMESTAMPNS) => {
+                let timespec = zxio::timespec::read_from_prefix(msg_data).unwrap();
+                ControlMessage::TimestampNs { sec: timespec.tv_sec, nsec: timespec.tv_nsec }
+            }
+            _ => panic!(
+                "ZXIO produced unexpected cmsg level={}, type={}",
+                header.cmsg_level, header.cmsg_type
+            ),
         };
-        if let Some(msg) = msg {
-            result.push(msg);
-        }
+        result.push(msg);
 
         pos += align_cmsg_size(header.cmsg_len as usize);
     }
