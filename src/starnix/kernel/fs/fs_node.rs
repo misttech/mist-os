@@ -18,6 +18,7 @@ use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::{Arc, Weak};
+use syncio::zxio_node_attr_has_t;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsNodeLinkBehavior {
@@ -574,6 +575,15 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         Ok(info.read())
+    }
+
+    /// Update node attributes persistently.
+    fn update_attributes(
+        &self,
+        _info: &FsNodeInfo,
+        _has: zxio_node_attr_has_t,
+    ) -> Result<(), Errno> {
+        Ok(())
     }
 
     /// Get an extended attribute on the node.
@@ -1188,7 +1198,7 @@ impl FsNode {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
-        self.clear_suid_and_sgid_bits(current_task);
+        self.clear_suid_and_sgid_bits(current_task)?;
         // We have to take the append lock since otherwise it would be possible to truncate and for
         // an append to continue using the old size.
         let _guard = self.append_lock.read(current_task);
@@ -1279,11 +1289,31 @@ impl FsNode {
         self.socket.get()
     }
 
+    fn update_attributes<F>(&self, mutator: F) -> Result<(), Errno>
+    where
+        F: FnOnce(&mut FsNodeInfo) -> Result<(), Errno>,
+    {
+        let mut info = self.info.write();
+        let mut new_info = info.clone();
+        mutator(&mut new_info)?;
+        let mut has = zxio_node_attr_has_t { ..Default::default() };
+        has.modification_time = info.time_status_change != new_info.time_status_change;
+        has.mode = info.mode != new_info.mode;
+        has.uid = info.uid != new_info.uid;
+        has.gid = info.gid != new_info.gid;
+        has.rdev = info.rdev != new_info.rdev;
+        if has.modification_time || has.mode || has.uid || has.gid || has.rdev {
+            self.ops().update_attributes(&new_info, has)?;
+            *info = new_info;
+        }
+        Ok(())
+    }
+
     /// Set the permissions on this FsNode to the given values.
     ///
     /// Does not change the IFMT of the node.
     pub fn chmod(&self, current_task: &CurrentTask, mut mode: FileMode) -> Result<(), Errno> {
-        self.update_info(|info| {
+        self.update_attributes(|info| {
             let creds = current_task.creds();
             if !creds.has_capability(CAP_FOWNER) {
                 if info.uid != creds.euid {
@@ -1305,7 +1335,7 @@ impl FsNode {
         owner: Option<uid_t>,
         group: Option<gid_t>,
     ) -> Result<(), Errno> {
-        self.update_info(|info| {
+        self.update_attributes(|info| {
             if !current_task.creds().has_capability(CAP_CHOWN) {
                 let creds = current_task.creds();
                 if info.uid != creds.euid {
@@ -1544,12 +1574,14 @@ impl FsNode {
     }
 
     /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
-    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) {
+    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         if !current_task.creds().has_capability(CAP_FSETID) {
-            self.update_info(|info| {
+            self.update_attributes(|info| {
                 info.clear_suid_and_sgid_bits();
-            });
+                Ok(())
+            })?;
         }
+        Ok(())
     }
 
     /// Update the ctime and mtime of a file to now.

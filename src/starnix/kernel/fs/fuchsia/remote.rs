@@ -606,6 +606,22 @@ impl FsNodeOps for RemoteNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
+    fn update_attributes(&self, info: &FsNodeInfo, has: zxio_node_attr_has_t) -> Result<(), Errno> {
+        // Omit updating creation_time. By definition, there shouldn't be a change in creation_time.
+        let mutable_node_attributes = zxio_node_attributes_t {
+            modification_time: info.time_modify.into_nanos() as u64,
+            mode: info.mode.bits(),
+            uid: info.uid,
+            gid: info.gid,
+            rdev: info.rdev.bits(),
+            has,
+            ..Default::default()
+        };
+        self.zxio
+            .attr_set(&mutable_node_attributes)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
+
     fn unlink(
         &self,
         _node: &FsNode,
@@ -1809,6 +1825,78 @@ mod test {
                 .lookup_child(&current_task, &mut context, b"file2")
                 .expect("lookup_child failed");
             assert!(Arc::ptr_eq(&child1.entry.node, &child2.entry.node));
+        })
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_update_attributes_persists() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let file = ns
+                .root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            // Change the mode, this change should persist
+            file.entry.node.chmod(&current_task, MODE | FileMode::ALLOW_ALL).expect("chmod failed");
+        })
+        .await;
+
+        // Tear down the kernel and open the file again. Check that changes persisted.
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let child = ns
+                .root()
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+            assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
         })
         .await;
 

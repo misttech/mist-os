@@ -625,12 +625,71 @@ zx_status_t AttrSetCommon(const fidl::WireSyncClient<Protocol>& client, ToIo1Mod
 }
 
 template <typename Protocol>
+zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
+                                const zxio_node_attributes_t* attr) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  fidl::WireTableFrame<fio::wire::MutableNodeAttributes> create_attributes_frame;
+  fio::wire::MutableNodeAttributes mutable_node_attributes;
+
+  auto builder = fio::wire::MutableNodeAttributes::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<fio::wire::MutableNodeAttributes>>::FromExternal(
+          &create_attributes_frame));
+  // These attributes are immutable
+  if (attr->has.protocols || attr->has.abilities || attr->has.id || attr->has.content_size ||
+      attr->has.storage_size || attr->has.link_count) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (attr->has.creation_time) {
+    builder.creation_time(
+        fidl::ObjectView<uint64_t>::FromExternal(const_cast<uint64_t*>(&attr->creation_time)));
+  }
+  if (attr->has.modification_time) {
+    builder.modification_time(
+        fidl::ObjectView<uint64_t>::FromExternal(const_cast<uint64_t*>(&attr->modification_time)));
+  }
+  if (attr->has.mode) {
+    builder.mode(attr->mode);
+  }
+  if (attr->has.uid) {
+    builder.uid(attr->uid);
+  }
+  if (attr->has.gid) {
+    builder.gid(attr->gid);
+  }
+  if (attr->has.rdev) {
+    builder.rdev(fidl::ObjectView<uint64_t>::FromExternal(const_cast<uint64_t*>(&attr->rdev)));
+  }
+
+  mutable_node_attributes = builder.Build();
+  const fidl::WireResult result = client->UpdateAttributes(mutable_node_attributes);
+  if (!result.ok()) {
+    return result.status();
+  }
+  const auto& response = result.value();
+  if (response.is_error()) {
+    return response.error_value();
+  }
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
+template <typename Protocol>
 zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* out_attr) {
   return AttrGetCommon(client(), ToZxioAbilitiesForFile(), out_attr);
 }
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::AttrSet(const zxio_node_attributes_t* attr) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
+  // `SetAttr` to only update creation and modification time.
+  if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev) {
+    return AttributesSetCommon(client(), attr);
+  }
+#endif
   return AttrSetCommon(client(), ToIo1ModePermissionsForFile(), attr);
 }
 
@@ -1490,7 +1549,14 @@ class Directory : public Remote<fio::Directory> {
   }
 
   zx_status_t AttrSet(const zxio_node_attributes_t* attr) {
-    return AttrSetCommon(client(), ToIo1ModePermissionsForDirectory(), attr);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
+    // `SetAttr` to only update creation and modification time.
+    if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev) {
+      return AttributesSetCommon(client(), attr);
+    }
+#endif
+    return AttrSetCommon(client(), ToIo1ModePermissionsForFile(), attr);
   }
 
   zx_status_t WatchDirectory(zxio_watch_directory_cb cb, zx_time_t deadline, void* context) {
