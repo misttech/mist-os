@@ -16,30 +16,12 @@
 
 namespace {
 
-bool ContainsEnvelope(const fidl_type_t* type) {
-  switch (type->type_tag()) {
-    case kFidlTypeTable:
-    case kFidlTypeXUnion:
-      return true;
-    case kFidlTypeStruct:
-      return type->coded_struct().contains_envelope;
-    default:
-      ZX_PANIC("unexpected top-level type");
-  }
-}
-
 zx_status_t CheckWireFormatVersion(fidl::internal::WireFormatVersion wire_format,
                                    const fidl_type_t* type, const char** out_error_msg) {
   switch (wire_format) {
     case fidl::internal::WireFormatVersion::kV1:
-      // Old versions of the C bindings will send wire format V1 payloads that are compatible
-      // with wire format V2 (they don't contain envelopes). Confirm that V1 payloads don't
-      // contain envelopes and are compatible with V2.
-      if (ContainsEnvelope(type)) {
-        *out_error_msg = "wire format v1 message received, but it is unsupported";
-        return ZX_ERR_INVALID_ARGS;
-      }
-      return ZX_OK;
+      *out_error_msg = "wire format v1 message received, but it is unsupported";
+      return ZX_ERR_INVALID_ARGS;
     case fidl::internal::WireFormatVersion::kV2:
       return ZX_OK;
     default:

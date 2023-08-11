@@ -363,9 +363,8 @@ class RunnerServer : public fidl::serversuite::Runner {
         callback(false);
         return;
 
+      // TODO(fxbug.dev/132059): HLCPP should validate header even when there's no payload.
       case fidl::serversuite::Test::V1_TWO_WAY_NO_PAYLOAD:
-      case fidl::serversuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
-        // TODO(fxbug.dev/99738): HLCPP bindings should reject V1 wire format.
         callback(false);
         return;
 

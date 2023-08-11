@@ -104,9 +104,8 @@ class RunnerServer : public fidl::clientsuite::Runner {
 
   void IsTestEnabled(fidl::clientsuite::Test test, IsTestEnabledCallback callback) override {
     switch (test) {
-      // TODO(fxbug.dev/99738): HLCPP bindings should reject V1 wire format.
+      // TODO(fxbug.dev/132059): HLCPP should validate header even when there's no payload.
       case fidl::clientsuite::Test::V1_TWO_WAY_NO_PAYLOAD:
-      case fidl::clientsuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
       // TODO(fxbug.dev/116294): HLCPP bindings should reject responses with the
       // wrong ordinal.
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN:

@@ -50,9 +50,8 @@ class RunnerServer : public fidl::clientsuite::Runner {
       // wrong ordinal.
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN:
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_UNKNOWN:
-      // TODO(fxbug.dev/99738): HLCPP bindings should reject V1 wire format.
+      // TODO(fxbug.dev/132059): HLCPP should validate header even when there's no payload.
       case fidl::clientsuite::Test::V1_TWO_WAY_NO_PAYLOAD:
-      case fidl::clientsuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
       // TODO(fxbug.dev/113160): Peer-closed errors should be
       // hidden from one-way calls.
       case fidl::clientsuite::Test::ONE_WAY_CALL_DO_NOT_REPORT_PEER_CLOSED:

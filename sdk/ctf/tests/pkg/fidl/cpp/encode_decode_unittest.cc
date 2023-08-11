@@ -20,6 +20,7 @@
 #include "test/test_util.h"
 #include "testing/fidl/async_loop_for_test.h"
 #include "testing/fidl/frobinator_impl.h"
+#include "tools/fidl/fidlc/tests/error_test.h"
 
 namespace fidl {
 namespace {
@@ -71,10 +72,7 @@ TEST(EncodeTest, RequestMagicNumber) {
   ASSERT_TRUE(handler.is_supported);
 }
 
-TEST(DecodeTest, V1HeaderCompatibilityTest) {
-  // Old versions of the C bindings do not set the V2 wire format bit.
-  // This test verifies that HLCPP will successfully decode messages as V2 that lack the
-  // V2 wire format bit.
+TEST(DecodeTest, V1HeaderIsRejected) {
   constexpr fidl_message_header_t kV1Header = {
       .magic_number = kFidlWireFormatMagicNumberInitial,
   };
@@ -88,8 +86,8 @@ TEST(DecodeTest, V1HeaderCompatibilityTest) {
   fidl::HLCPPIncomingMessage msg(BytePart(bytes.data(), static_cast<uint32_t>(bytes.size()),
                                           static_cast<uint32_t>(bytes.size())),
                                  HandleInfoPart());
-  ASSERT_OK(msg.Decode(fidl::test::misc::Int64Struct::FidlType, &error));
-  ASSERT_EQ(2, msg.GetBodyViewAs<fidl::test::misc::Int64Struct>()->x);
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, msg.Decode(fidl::test::misc::Int64Struct::FidlType, &error));
+  EXPECT_STREQ("wire format v1 message received, but it is unsupported", error);
 }
 
 }  // namespace
