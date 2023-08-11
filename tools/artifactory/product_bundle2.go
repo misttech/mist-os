@@ -60,7 +60,13 @@ func uploadProductBundle(mods productBundlesModules, transferManifestPath string
 
 	data, err := os.ReadFile(path.Join(mods.BuildDir(), transferManifestPath))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read product bundle transfer manifest: %w", err)
+		// Return an empty list to upload if the build did not produce a
+		// transfer manifest.
+		if os.IsNotExist(err) {
+			return []Upload{}, nil
+		} else {
+			return nil, fmt.Errorf("failed to read product bundle transfer manifest: %w", err)
+		}
 	}
 
 	var transferManifest TransferManifest
