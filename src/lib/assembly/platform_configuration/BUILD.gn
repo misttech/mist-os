@@ -43,7 +43,6 @@ rustc_library("platform_configuration") {
   deps = [
     "//src/developer/ffx/config:lib",
     "//src/lib/assembly/config_schema",
-    "//src/lib/assembly/images_config",
     "//src/lib/assembly/util",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

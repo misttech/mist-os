@@ -23,6 +23,5 @@
                 truncate_to_length: 17179869184,
             },
         },
-        gpt_all: true,
     },
 }

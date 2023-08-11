@@ -46,7 +46,6 @@ if (is_fuchsia) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = _assemble_system_target_name
           volume = {
@@ -69,7 +68,6 @@ if (is_fuchsia) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = _assemble_system_recovery_target_name
           volume = {
@@ -95,11 +93,6 @@ if (is_fuchsia) {
     board_config = _board_config
     deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     bootfs_labels = []
     base_packages = [
       ":empty-pkg",
@@ -117,11 +110,6 @@ if (is_fuchsia) {
     board_config = _board_config
     deps = [ ":board_config" ]
     use_bringup_platform_bundles_only = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     bootfs_labels = []
     ramdisk_in_zbi = true
     base_packages = [

@@ -146,7 +146,9 @@ if (is_fuchsia) {
 
     # Use the GN arg for skipping the fshost configuration in GN
     use_assembly_fshost = assembly_fshost
-    fshost_config = board_fshost_config
+    if (!assembly_fshost) {
+      fshost_config = board_fshost_config
+    }
 
     product_assembly_config_label = fuchsia_product_assembly_config_label
     board_config = board_information_for_assembly

@@ -253,7 +253,6 @@ template("assemble_security_pkg_test_system") {
       # code from the "main" assembly.
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = labels.assembly
           volume = {
@@ -282,7 +281,6 @@ template("assemble_security_pkg_test_system") {
       # code from the "main" assembly.
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = labels.assembly
           volume = "fxfs"
@@ -310,9 +308,6 @@ template("assemble_security_pkg_test_system") {
     contents = {
       name = "test"
       filesystems = {
-        zbi = {
-          compression = "zstd.max"
-        }
         fvm = {
           slice_size = 1048576
           sparse_output = {
@@ -346,11 +341,6 @@ template("assemble_security_pkg_test_system") {
     board_config = files.board_config
     deps = [ ":${labels.board_config}" ]
     use_bringup_platform_bundles_only = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     bootfs_labels = []
     base_packages = packages_for_assembly
   }

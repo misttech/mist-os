@@ -51,10 +51,8 @@ template("assemble_network_conformance_system") {
       build_type = "eng"
       feature_set_level = "utility"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = _image_name
-          image_mode = "ramdisk"
           volume = {
             fvm = {
               data = {
@@ -73,10 +71,8 @@ template("assemble_network_conformance_system") {
       build_type = "eng"
       feature_set_level = "utility"
       storage = {
-        configure_fshost = true
         filesystems = {
           image_name = _image_name
-          image_mode = "ramdisk"
           volume = "fxfs"
         }
       }
@@ -98,11 +94,7 @@ template("assemble_network_conformance_system") {
     board_config = files.board_config
     deps = [ ":${labels.board_config}" ]
     allow_eng_platform_bundle_use = true
-    use_assembly_fshost = true
 
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     base_packages = [
       "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/netcfg:config-default",

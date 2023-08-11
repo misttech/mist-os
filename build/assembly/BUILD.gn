@@ -31,7 +31,6 @@ if (is_fuchsia) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
-        configure_fshost = true
         filesystems = {
           volume = {
             fvm = {

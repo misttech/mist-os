@@ -53,7 +53,6 @@ _platform_configuration_base = {
 
 _storage_default = {
   storage = {
-    configure_fshost = true
     filesystems = {
       volume = {
         fvm = {
@@ -69,12 +68,10 @@ _storage_default = {
 
 _storage_minfs = {
   storage = {
-    configure_fshost = true
     filesystems = {
       volume = {
         fvm = {
           data = {
-            data_filesystem_format = "minfs"
           }
           blob = {
           }
@@ -86,7 +83,6 @@ _storage_minfs = {
 
 _storage_fxfs = {
   storage = {
-    configure_fshost = true
     filesystems = {
       volume = "fxfs"
     }

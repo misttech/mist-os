@@ -16,5 +16,8 @@ pub struct StorageConfig {
     pub configure_fshost: bool,
 
     #[serde(default)]
+    pub gpt_all: bool,
+
+    #[serde(default)]
     pub filesystems: ProductFilesystemConfig,
 }

@@ -23,7 +23,6 @@ fuchsia_board_configuration(
                 "truncate_to_length": 17179869184,
             },
         },
-        "gpt_all": True,
     },
     provided_features = [
         "fuchsia::driver_framework_v2_support",
