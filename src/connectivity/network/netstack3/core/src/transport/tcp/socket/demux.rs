@@ -31,7 +31,7 @@ use crate::{
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
-        AddrVec, SocketState as BoundSocketState,
+        AddrVec,
     },
     trace_duration,
     transport::tcp::{
@@ -39,10 +39,10 @@ use crate::{
         segment::{Options, Segment},
         seqnum::UnscaledWindowSize,
         socket::{
-            do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, HandshakeStatus,
-            Listener, ListenerAddrState, ListenerNotifier as _, ListenerSharingState,
-            MaybeListener, NonSyncContext, SocketId, SocketState, Sockets, SyncContext,
-            TcpIpTransportContext, TimerId,
+            do_send_inner, isn::IsnGenerator, Acceptor, BoundSocketState, Connection, ConnectionId,
+            HandshakeStatus, Listener, ListenerAddrState, ListenerNotifier as _,
+            ListenerSharingState, MaybeListener, NonSyncContext, SocketId, SocketState, Sockets,
+            SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,

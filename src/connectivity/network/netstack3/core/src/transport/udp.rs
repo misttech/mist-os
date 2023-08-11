@@ -53,10 +53,11 @@ use crate::{
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         datagram::{
-            self, AddrEntry, BoundSockets as DatagramBoundSockets, ConnState, ConnectError,
+            self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
+            BoundSockets as DatagramBoundSockets, ConnState, ConnectError,
             DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec,
             DatagramStateContext, DualStackDatagramBoundStateContext, EitherIpSocket,
-            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, ListenerState,
+            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError,
             LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
             SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
             SocketHopLimits, SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
@@ -64,7 +65,6 @@ use crate::{
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult, Shutdown,
         SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketState as DatagramBoundSocketState, SocketStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -387,11 +387,6 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for (Udp, I, D) {
             sharing: state.to_sharing_options(),
         }
     }
-}
-
-impl<I: IpExt, D: WeakId> SocketStateSpec for (Udp, I, D) {
-    type ListenerState = ListenerState<I, D, Udp>;
-    type ConnState = ConnState<I, D, Udp>;
 }
 
 impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, I, D, IpPortSpec> for (Udp, I, D)
@@ -2508,8 +2503,9 @@ mod tests {
         },
         socket::{
             self,
-            datagram::{MulticastInterfaceSelector, UninstantiableDualStackContext},
-            SocketState,
+            datagram::{
+                BoundSocketState, MulticastInterfaceSelector, UninstantiableDualStackContext,
+            },
         },
         testutil::{set_logger_for_test, TestIpExt as _},
     };
@@ -5003,25 +4999,25 @@ mod tests {
         let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
         let valid_range = &UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE;
         let port_a = assert_matches!(sockets_state.get_socket_state(&conn_a),
-            Some(DatagramSocketState::Bound(SocketState::Connected(
+            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert!(valid_range.contains(&port_a));
         let port_b = assert_matches!(sockets_state.get_socket_state(&conn_b),
-            Some(DatagramSocketState::Bound(SocketState::Connected(
+            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert_ne!(port_a, port_b);
         let port_c = assert_matches!(sockets_state.get_socket_state(&conn_c),
-            Some(DatagramSocketState::Bound(SocketState::Connected(
+            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
         assert_ne!(port_a, port_c);
         let port_d = assert_matches!(sockets_state.get_socket_state(&conn_d),
-            Some(DatagramSocketState::Bound(SocketState::Connected(
+            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
                 (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
             ))) => local_identifier)
         .get();
@@ -5095,14 +5091,14 @@ mod tests {
         let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
         let wildcard_port = assert_matches!(
             sockets_state.get_socket_state(&wildcard_list),
-            Some(DatagramSocketState::Bound(SocketState::Listener((
+            Some(DatagramSocketState::Bound(BoundSocketState::Listener((
                 _,
                 _,
                 ListenerAddr{ ip: ListenerIpAddr {identifier, addr: None}, device: None}
             )))) => identifier);
         let specified_port = assert_matches!(
             sockets_state.get_socket_state(&specified_list),
-            Some(DatagramSocketState::Bound(SocketState::Listener((
+            Some(DatagramSocketState::Bound(BoundSocketState::Listener((
                 _,
                 _,
                 ListenerAddr{ ip: ListenerIpAddr {identifier, addr: _}, device: None}
@@ -5143,7 +5139,7 @@ mod tests {
         for listener in listeners {
             assert_matches!(
                 sockets_state.get_socket_state(&listener),
-                Some(DatagramSocketState::Bound(SocketState::Listener((_, _, addr))))
+                Some(DatagramSocketState::Bound(BoundSocketState::Listener((_, _, addr))))
                 => assert_eq!(addr, &expected_addr));
         }
     }

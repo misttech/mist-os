@@ -186,13 +186,6 @@ pub(crate) trait SocketMapStateSpec {
         + Debug;
 }
 
-pub(crate) trait SocketStateSpec: SocketMapStateSpec {
-    /// The state stored for a listening socket.
-    type ListenerState: Debug;
-    /// The state stored for a connected socket.
-    type ConnState: Debug;
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct IncompatibleError;
 
@@ -311,21 +304,6 @@ where
 pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
     Listen(S::ListenerAddrState),
     Conn(S::ConnAddrState),
-}
-
-#[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum SocketState<I: Ip, D, A: SocketMapAddrSpec, S: SocketStateSpec> {
-    Listener(
-        (S::ListenerState, S::ListenerSharingState, ListenerAddr<I::Addr, D, A::LocalIdentifier>),
-    ),
-    Connected(
-        (
-            S::ConnState,
-            S::ConnSharingState,
-            ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>,
-        ),
-    ),
 }
 
 /// An "address vector" type that can hold any address in a [`SocketMap`].

@@ -73,7 +73,7 @@ use crate::{
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
         RemoveResult, Shutdown, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
         SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        SocketState as BoundSocketState, SocketStateSpec, UpdateSharingError,
+        UpdateSharingError,
     },
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
@@ -287,23 +287,6 @@ impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I,
     }
 }
 
-impl<I: IpExt, D: Id, C: NonSyncContext> SocketStateSpec for TcpSocketSpec<I, D, C> {
-    type ListenerState = MaybeListener<
-        I,
-        C::ReturnedBuffers,
-        C::ListenerNotifierOrProvidedBuffers,
-        C::ListenerNotifierOrProvidedBuffers,
-    >;
-    type ConnState = Connection<
-        I,
-        D,
-        C::Instant,
-        C::ReceiveBuffer,
-        C::SendBuffer,
-        C::ListenerNotifierOrProvidedBuffers,
-    >;
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct AddrVecTag {
     sharing: SharingState,
@@ -344,6 +327,37 @@ impl<'a, I: Ip> Inserter<SocketId<I>> for ListenerAddrInserter<'a, I> {
             Self::Bound(b) => b.push(id),
         }
     }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"))]
+enum BoundSocketState<I: IpExt, D: Id, C: NonSyncContext> {
+    Listener(
+        (
+            MaybeListener<
+                I,
+                C::ReturnedBuffers,
+                C::ListenerNotifierOrProvidedBuffers,
+                C::ListenerNotifierOrProvidedBuffers,
+            >,
+            ListenerSharingState,
+            ListenerAddr<I::Addr, D, NonZeroU16>,
+        ),
+    ),
+    Connected(
+        (
+            Connection<
+                I,
+                D,
+                C::Instant,
+                C::ReceiveBuffer,
+                C::SendBuffer,
+                C::ListenerNotifierOrProvidedBuffers,
+            >,
+            SharingState,
+            ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
+        ),
+    ),
 }
 
 impl<I: Ip> SocketMapAddrStateSpec for ListenerAddrState<I> {
@@ -811,7 +825,7 @@ pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
 #[derivative(Debug(bound = "D: Debug"))]
 enum SocketState<I: IpExt, D: WeakId, C: NonSyncContext> {
     Unbound(Unbound<D, C::ListenerNotifierOrProvidedBuffers>),
-    Bound(BoundSocketState<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>),
+    Bound(BoundSocketState<I, D, C>),
 }
 
 impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
@@ -2485,7 +2499,14 @@ fn connect_inner<I, SC, C>(
     >,
     make_connection: impl FnOnce(
         ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
-        <TcpSocketSpec<I, SC::WeakDeviceId, C> as SocketStateSpec>::ConnState,
+        Connection<
+            I,
+            SC::WeakDeviceId,
+            C::Instant,
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            C::ListenerNotifierOrProvidedBuffers,
+        >,
     ) -> ConnectionId<I>,
     ip_transport_ctx: &mut SC,
     ctx: &mut C,

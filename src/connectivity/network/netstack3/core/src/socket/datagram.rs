@@ -44,7 +44,6 @@ use crate::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerIpAddr},
         AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
         SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketState as BoundSocketState, SocketStateSpec,
     },
 };
 
@@ -67,7 +66,31 @@ impl<I: crate::ip::IpExt + DualStackIpExt> IpExt for I {}
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) enum SocketState<I: Ip + IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     Unbound(UnboundSocketState<I, D, S>),
-    Bound(BoundSocketState<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>),
+    Bound(BoundSocketState<I, D, S>),
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"))]
+pub(crate) enum BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+    Listener(
+        (
+            ListenerState<I, D, S>,
+            S::ListenerSharingState,
+            ListenerAddr<I::Addr, D, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+        ),
+    ),
+    Connected(
+        (
+            ConnState<I, D, S>,
+            <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ConnSharingState,
+            ConnAddr<
+                I::Addr,
+                D,
+                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+            >,
+        ),
+    ),
 }
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
@@ -964,15 +987,12 @@ pub(crate) trait DatagramSocketSpec {
     ///
     /// Describes the per-address and per-socket values held in the
     /// demultiplexing map for a given IP version.
-    type SocketMapSpec<I: IpExt + DualStackIpExt, D: device::WeakId>: SocketStateSpec<
-            ListenerState = ListenerState<I, D, Self>,
-            ConnState = ConnState<I, D, Self>,
-        > + DatagramSocketMapSpec<
-            I,
-            D,
-            Self::AddrSpec,
-            ListenerSharingState = Self::ListenerSharingState,
-        >;
+    type SocketMapSpec<I: IpExt + DualStackIpExt, D: device::WeakId>: DatagramSocketMapSpec<
+        I,
+        D,
+        Self::AddrSpec,
+        ListenerSharingState = Self::ListenerSharingState,
+    >;
 
     /// The sharing state for a socket that hasn't yet been bound.
     type UnboundSharingState<I: IpExt>: Clone + Debug + Default;
@@ -2202,11 +2222,7 @@ pub(crate) fn set_device<
                 BoundSocketState::Listener(state) => {
                     // Don't allow changing the device if one of the IP addresses in the socket
                     // address vector requires a zone (scope ID).
-                    let (_, _, addr): &(
-                        <S::SocketMapSpec<I, _> as SocketStateSpec>::ListenerState,
-                        S::ListenerSharingState,
-                        _,
-                    ) = state;
+                    let (_, _, addr): &(ListenerState<_, _, _>, S::ListenerSharingState, _) = state;
                     let ListenerAddr {
                         device: old_device,
                         ip: ListenerIpAddr { addr: ip_addr, identifier: _ },
@@ -2240,11 +2256,8 @@ pub(crate) fn set_device<
                         },
                     )?;
 
-                    let (_, _, addr): &mut (
-                        <S::SocketMapSpec<I, _> as SocketStateSpec>::ListenerState,
-                        S::ListenerSharingState,
-                        _,
-                    ) = state;
+                    let (_, _, addr): &mut (ListenerState<_, _, _>, S::ListenerSharingState, _) =
+                        state;
                     *addr = new_addr;
                     Ok(())
                 }
@@ -2684,20 +2697,15 @@ pub(crate) fn get_sharing<
     I: IpExt,
     SC: DatagramStateContext<I, C, S>,
     C: DatagramStateNonSyncContext<I, S>,
-    S: DatagramSocketSpec<UnboundSharingState<I> = Sharing>,
+    S: DatagramSocketSpec<UnboundSharingState<I> = Sharing, ListenerSharingState = Sharing>,
     Sharing: Clone,
 >(
     sync_ctx: &mut SC,
     id: S::SocketId<I>,
 ) -> Sharing
 where
-    S::SocketMapSpec<I, SC::WeakDeviceId>: DatagramSocketMapSpec<
-        I,
-        SC::WeakDeviceId,
-        S::AddrSpec,
-        ListenerSharingState = Sharing,
-        ConnSharingState = Sharing,
-    >,
+    S::SocketMapSpec<I, SC::WeakDeviceId>:
+        DatagramSocketMapSpec<I, SC::WeakDeviceId, S::AddrSpec, ConnSharingState = Sharing>,
 {
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
         match state.get(id.get_key_index()).expect("socket not found") {
@@ -2803,11 +2811,6 @@ mod test {
         fn connected_tag(_has_device: bool, _state: &Self::ConnAddrState) -> Self::AddrVecTag {
             Tag
         }
-    }
-
-    impl<I: IpExt, D: crate::device::Id> SocketStateSpec for (FakeStateSpec, I, D) {
-        type ConnState = ConnState<I, D, FakeStateSpec>;
-        type ListenerState = ListenerState<I, D, FakeStateSpec>;
     }
 
     impl DatagramSocketSpec for FakeStateSpec {
