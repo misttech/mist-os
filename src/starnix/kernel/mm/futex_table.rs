@@ -3,9 +3,17 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use std::{collections::HashMap, sync::Arc};
+use starnix_sync::{InterruptibleEvent, WakeReason};
+use std::{
+    collections::HashMap,
+    ops::DerefMut,
+    sync::{Arc, Weak},
+};
 
-use crate::{lock::Mutex, logging::impossible_error, mm::ProtectionFlags, task::*, types::*};
+use crate::{
+    lock::Mutex, logging::impossible_error, mm::ProtectionFlags, signals::RunState, task::*,
+    types::*,
+};
 
 /// A table of futexes.
 ///
@@ -17,7 +25,7 @@ pub struct FutexTable {
     /// The futexes associated with each address in each VMO.
     ///
     /// This HashMap is populated on-demand when futexes are used.
-    state: Mutex<HashMap<FutexKey, Arc<WaitQueue>>>,
+    state: Mutex<HashMap<FutexKey, Arc<FutexWaitQueue>>>,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -43,8 +51,9 @@ impl FutexTable {
         let (vmo, key) = self.get_vmo_and_key(current_task, addr)?;
         let offset = key.offset;
 
-        let waiter = Waiter::new();
-        self.get_waiters(key).wait_async_mask(&waiter, mask as u64);
+        let event = InterruptibleEvent::new();
+        let guard = event.begin_wait();
+        self.wait_queue_for_key(key).add(Arc::downgrade(&event), mask as u64);
         // TODO: This read should be atomic.
         let mut buf = [0u8; 4];
         vmo.read(&mut buf, offset).map_err(impossible_error)?;
@@ -53,7 +62,12 @@ impl FutexTable {
         }
         // TODO(tbodt): Delete the wait queue from the hashmap when it becomes empty. Not doing
         // this is a memory leak.
-        waiter.wait_until(current_task, deadline)
+        current_task.run_in_state(RunState::Event(event.clone()), move || {
+            guard.block_until(deadline).map_err(|e| match e {
+                WakeReason::Interrupted => errno!(EINTR),
+                WakeReason::DeadlineExpired => errno!(ETIMEDOUT),
+            })
+        })
     }
 
     /// Wake the given number of waiters on futex at the given address. Returns the number of
@@ -68,7 +82,7 @@ impl FutexTable {
         mask: u32,
     ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(task, addr)?;
-        Ok(self.get_waiters(key).notify_mask_count(mask as u64, count))
+        Ok(self.wait_queue_for_key(key).notify(mask as u64, count))
     }
 
     /// Requeue the waiters to another address.
@@ -83,12 +97,12 @@ impl FutexTable {
     ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(current_task, addr)?;
         let (_, new_key) = self.get_vmo_and_key(current_task, new_addr)?;
-        let waiters = WaitQueue::default();
+        let waiters = FutexWaitQueue::default();
         if let Some(old_waiters) = self.state.lock().remove(&key) {
-            waiters.transfer(&old_waiters);
+            waiters.take_waiters(&old_waiters);
         }
-        let woken = waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY as u64, count);
-        self.get_waiters(new_key).transfer(&waiters);
+        let woken = waiters.notify(FUTEX_BITSET_MATCH_ANY as u64, count);
+        self.wait_queue_for_key(new_key).take_waiters(&waiters);
         Ok(woken)
     }
 
@@ -103,9 +117,51 @@ impl FutexTable {
     }
 
     /// Returns the WaitQueue for a given address.
-    fn get_waiters(&self, key: FutexKey) -> Arc<WaitQueue> {
+    fn wait_queue_for_key(&self, key: FutexKey) -> Arc<FutexWaitQueue> {
         let mut state = self.state.lock();
         let waiters = state.entry(key).or_default();
         Arc::clone(waiters)
+    }
+}
+
+struct FutexWaiter {
+    event: Weak<InterruptibleEvent>,
+    mask: u64,
+}
+
+#[derive(Default)]
+struct FutexWaitQueue {
+    waiters: Mutex<Vec<FutexWaiter>>,
+}
+
+impl FutexWaitQueue {
+    fn add(&self, event: Weak<InterruptibleEvent>, mask: u64) {
+        let mut waiters = self.waiters.lock();
+        waiters.push(FutexWaiter { event, mask });
+    }
+
+    fn notify(&self, mask: u64, limit: usize) -> usize {
+        let mut woken = 0;
+        // Using `retain` means we end up walking more than `limit` entries in this list, but that
+        // lets us remove the stale waiters.
+        self.waiters.lock().retain(|waiter| {
+            if let Some(event) = waiter.event.upgrade() {
+                if woken < limit && waiter.mask & mask != 0 {
+                    event.notify();
+                    woken += 1;
+                    false
+                } else {
+                    true
+                }
+            } else {
+                false
+            }
+        });
+        woken
+    }
+
+    fn take_waiters(&self, other: &FutexWaitQueue) {
+        let mut other_entries = std::mem::take(other.waiters.lock().deref_mut());
+        self.waiters.lock().append(&mut other_entries);
     }
 }
