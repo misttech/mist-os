@@ -102,6 +102,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.migration:fuchsia.migration",
   "//sdk/fidl/fuchsia.modular:fuchsia.modular",
   "//sdk/fidl/fuchsia.net:fuchsia.net",
+  "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated",
   "//sdk/fidl/fuchsia.net.http:fuchsia.net.http",
   "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces",
   "//sdk/fidl/fuchsia.net.mdns:fuchsia.net.mdns",

@@ -111,6 +111,7 @@ sdk://fidl/fuchsia.net.interfaces
 sdk://fidl/fuchsia.net.mdns
 sdk://fidl/fuchsia.net.reachability
 sdk://fidl/fuchsia.net.routes
+sdk://fidl/fuchsia.net.stackmigrationdeprecated
 sdk://fidl/fuchsia.power.clientlevel
 sdk://fidl/fuchsia.power.profile
 sdk://fidl/fuchsia.power.systemmode
