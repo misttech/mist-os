@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "amlogic-video.h"
+#include "src/devices/lib/mmio/test-helper.h"
 #include "src/media/drivers/amlogic_decoder/decoder_core.h"
 #include "tests/test_support.h"
 #include "vdec1.h"
@@ -78,32 +79,10 @@ constexpr uint32_t kHiuBusMemorySize = 0x10000;
 class Vdec1UnitTest : public testing::Test {
  public:
   void SetUp() override {
-    dosbus_memory_ = std::unique_ptr<uint32_t[]>(new uint32_t[kDosbusMemorySize]);
-    memset(dosbus_memory_.get(), 0, kDosbusMemorySize);
-    mmio_buffer_t dosbus_mmio = {.vaddr = FakeMmioPtr(dosbus_memory_.get()),
-                                 .size = kDosbusMemorySize,
-                                 .vmo = ZX_HANDLE_INVALID};
-    dosbus_.emplace(dosbus_mmio);
-
-    aobus_memory_ = std::unique_ptr<uint32_t[]>(new uint32_t[kAobusMemorySize]);
-    memset(aobus_memory_.get(), 0, kAobusMemorySize);
-    mmio_buffer_t aobus_mmio = {.vaddr = FakeMmioPtr(aobus_memory_.get()),
-                                .size = kAobusMemorySize,
-                                .vmo = ZX_HANDLE_INVALID};
-    aobus_.emplace(aobus_mmio);
-
-    dmc_memory_ = std::unique_ptr<uint32_t[]>(new uint32_t[kDmcMemorySize]);
-    memset(dmc_memory_.get(), 0, kDmcMemorySize);
-    mmio_buffer_t dmc_mmio = {
-        .vaddr = FakeMmioPtr(dmc_memory_.get()), .size = kDmcMemorySize, .vmo = ZX_HANDLE_INVALID};
-    dmc_.emplace(dmc_mmio);
-
-    hiubus_memory_ = std::unique_ptr<uint32_t[]>(new uint32_t[kHiuBusMemorySize]);
-    memset(hiubus_memory_.get(), 0, kHiuBusMemorySize);
-    mmio_buffer_t hiubus_mmio = {.vaddr = FakeMmioPtr(hiubus_memory_.get()),
-                                 .size = kHiuBusMemorySize,
-                                 .vmo = ZX_HANDLE_INVALID};
-    hiubus_.emplace(hiubus_mmio);
+    dosbus_ = fdf_testing::CreateMmioBuffer(kDosbusMemorySize, ZX_CACHE_POLICY_UNCACHED);
+    aobus_ = fdf_testing::CreateMmioBuffer(kAobusMemorySize, ZX_CACHE_POLICY_UNCACHED);
+    dmc_ = fdf_testing::CreateMmioBuffer(kDmcMemorySize, ZX_CACHE_POLICY_UNCACHED);
+    hiubus_ = fdf_testing::CreateMmioBuffer(kHiuBusMemorySize, ZX_CACHE_POLICY_UNCACHED);
 
     mmio_ = std::unique_ptr<MmioRegisters>(
         new MmioRegisters{&*dosbus_, &*aobus_, &*dmc_, &*hiubus_, /*reset*/ nullptr,
@@ -111,10 +90,6 @@ class Vdec1UnitTest : public testing::Test {
   }
 
  protected:
-  std::unique_ptr<uint32_t[]> dosbus_memory_;
-  std::unique_ptr<uint32_t[]> aobus_memory_;
-  std::unique_ptr<uint32_t[]> dmc_memory_;
-  std::unique_ptr<uint32_t[]> hiubus_memory_;
   std::optional<DosRegisterIo> dosbus_;
   std::optional<AoRegisterIo> aobus_;
   std::optional<DmcRegisterIo> dmc_;

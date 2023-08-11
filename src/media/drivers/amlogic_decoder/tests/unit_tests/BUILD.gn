@@ -13,6 +13,7 @@ executable("amlogic-decoder-unittest-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
