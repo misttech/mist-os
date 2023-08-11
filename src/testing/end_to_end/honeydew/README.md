@@ -249,6 +249,19 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ```
 
 ## HoneyDew code guidelines
+**Running below shell scripts will automatically ensure you have followed the
+guidelines:**
+1. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
+2. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh`
+   and ensure unit test coverage for code changes is >= 70%
+3. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`
+   and fix any errors it suggests
+4. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/uninstall.sh`
+
+**These guidelines need to be run at the least on the following patchsets:**
+1. Initial patchset just before adding reviewers
+2. Final patchset just before merging the CL
+On all other patchsets, it is recommended but optional to run these guidelines.
 
 ### Install dependencies
 Below guidelines requires certain dependencies that are not yet available in
@@ -325,7 +338,7 @@ Broadly this is how we can define the scope of each tests:
   * Tests individual code units (such as functions) in isolation from the rest
     of the system by mocking all of the dependencies.
   * Makes it easy to test different error conditions, corner cases etc
-  * Minimum of 90% of HoneyDew code is tested using these unit tests
+  * Minimum of 70% of HoneyDew code is tested using these unit tests
 * Functional test cases
   * Aims to ensure that a given API works as intended and indeed does what it is
     supposed to do (that is, `<device>.reboot()` actually reboots Fuchsia
@@ -333,7 +346,7 @@ Broadly this is how we can define the scope of each tests:
   * Every single HoneyDew’s Host-(Fuchsia)Target interaction API should have at
     least one functional test case
 
-We use [coverage] tool for measuring 90% code coverage requirement of HoneyDew.
+We use [coverage] tool for measuring the code coverage requirement of HoneyDew.
 
 At this point, we do not have an automated way (in CQ) for identifying this and
 alerting the CL author prior to submitting the CL. Until then CL author need to
@@ -373,7 +386,7 @@ HoneyDew is meant to be the one stop solution for any Host-(Fuchsia)Target
 interactions. We can only make this possible when more people contribute to
 HoneyDew and add more and more interactions that others can also benefit.
 
-Here are some of the pointers that you can use while contributing to HoneyDew:
+### Getting started
 * HoneyDew is currently supported only on Linux. So please use a Linux machine
   for the development and testing of HoneyDew
 * Follow [instructions on how to submit contributions to the Fuchsia project]
@@ -381,10 +394,15 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 * If you are using [vscode IDE] then I recommend installing these
   [vscode extensions] from [vscode extension marketplace] and using these
   [vscode settings]
+
+### Best Practices
+Here are some of the best practices that should be followed while contributing
+to HoneyDew:
 * If contribution involves adding a new class method or new class itself, you
   may have to update the [interfaces] definitions
 * Ensure there is both [unit tests] and [functional tests] coverage for
-  contribution
+  contribution and have run the impacted [functional tests] either locally or
+  in infra to make sure contribution is indeed working
 * If a new unit test is added,
   * ensure [unit tests README] has the instructions to run this new test
   * ensure this new test is included in `group("tests")` section in the
@@ -395,18 +413,56 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
   * ensure [functional tests README] has the instructions to run this new test
   * ensure this new test is included in `group("tests")` section in the
     [top level HoneyDew functional tests BUILD] file
-* Ensure code is meeting all the
-  [HoneyDew code guidelines](#honeydew-code-guidelines) by sharing a proof
-  (output) with CL reviewers (until CQ/Pre-Submit is updated to automatically
-  check this)
-* Please ensure your CL does not introduce any regressions by successfully
-  running the [honeydew builders using try-jobs]
+* Ensure code is meeting all the [HoneyDew code guidelines]
+* Before merging the CL, ensure CL does not introduce any regressions by
+  successfully running the [honeydew builders using try-jobs]
 * At least one of the [HoneyDew OWNERS] should be added as a reviewer
-* CL reviewers to make sure CL author has shared all the necessary output (as
-  mentioned above) that was run using the latest patchset before approving the
-  CL
+
+### Code Review Expectations
+Here are some of the things to follow during HoneyDew CL review process as a
+CL author/contributor (or) CL reviewer/approver:
+
+#### Author
+* On the initial patchset where reviewers will be added, do the following before
+  starting the review:
+  1. Make sure you have followed all of the [Best Practices]
+  2. Include the following information in the commit message:
+    ```
+    ...
+
+    Verified the following on Patchset: <initial patchset number>
+    * HoneyDew code guidelines
+    * Successfully ran the impacted functional tests using [LocalRun|InfraRun]
+    ```
+* On final patchset that will be used for merging, do the following before
+  merging the CL:
+  1. Re-run the [Honeydew code conformance scripts]
+  2. Ensure CL does not introduce any regressions by successfully running the
+     [honeydew builders using try-jobs]
+  3. Update the commit message with the final patchset number:
+    ```
+    ...
+
+    Verified the following on Patchset: <final patchset number>
+    * HoneyDew code guidelines
+    * Successfully ran the impacted functional tests using [LocalRun|InfraRun]
+    * Successfully ran Honeydew builders using try-jobs
+    ```
+
+#### Reviewer
+* Remind the CL author to follow [Best Practices] section by opening a comment
+  and asking author to resolve this comment only after they verify on absolute
+  final patchset that will be merged
+* Verify the author has included all the information in commit message as
+  mentioned [here](#Author)
 
 [HoneyDew OWNERS]: ../OWNERS
+
+[Best Practices]: #Best-Practices
+
+[HoneyDew code guidelines]: #honeydew-code-guidelines
+
+[Honeydew code conformance scripts]: #honeydew-code-guidelines
 
 [interfaces]: interfaces/
 
