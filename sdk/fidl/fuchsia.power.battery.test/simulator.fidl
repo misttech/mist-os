@@ -63,6 +63,18 @@ closed protocol BatterySimulatorController {
     /// Reconnect to the real battery
     /// This should be called after DisconnectRealBattery
     strict ReconnectRealBattery();
+
+    /// Sets Present Voltage in mV. This should be called after
+    /// DisconnectRealBattery
+    strict SetPresentVoltageMv(struct {
+        voltage uint32;
+    });
+
+    /// Sets Remaining Capacity Uah. This should be called after
+    /// DisconnectRealBattery
+    strict SetRemainingCapacityUah(struct {
+        capacity uint32;
+    });
 };
 
 /// Simulator interface for battery simulation

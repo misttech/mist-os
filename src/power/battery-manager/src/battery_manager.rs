@@ -195,6 +195,20 @@ impl BatteryManager {
                         / bi.last_full_capacity as f32,
                 );
 
+                new_battery_info.present_voltage_mv = Some(bi.present_voltage);
+
+                match bi.unit {
+                    hpower::BatteryUnit::Ma => {
+                        new_battery_info.remaining_capacity_uah =
+                            Some(bi.remaining_capacity * 1000);
+                    }
+                    hpower::BatteryUnit::Mw => {
+                        let uah =
+                            bi.remaining_capacity as f64 * 1000000.0 / bi.present_voltage as f64;
+                        new_battery_info.remaining_capacity_uah = Some(uah as u32);
+                    }
+                }
+
                 // level_status
                 if power_info.state & hpower::POWER_STATE_CRITICAL != 0 {
                     new_battery_info.level_status = Some(fpower::LevelStatus::Critical);
@@ -348,6 +362,8 @@ mod tests {
                     charge_status,
                     charge_source,
                     level_percent,
+                    present_voltage_mv,
+                    remaining_capacity_uah,
                     level_status,
                     health,
                     time_remaining,
@@ -517,6 +533,8 @@ mod tests {
         want.charge_source = Some(fpower::ChargeSource::None);
         want.level_status = Some(fpower::LevelStatus::Ok);
         want.level_percent = Some((3000.0 * 100.0) / 5000.0);
+        want.present_voltage_mv = Some(7000);
+        want.remaining_capacity_uah = Some(3000 * 1000);
         want.time_remaining =
             Some(fpower::TimeRemaining::BatteryLife(6 * nanos_in_one_hour.into_nanos()));
         let mut battery_info = get_default_battery_info();
@@ -534,6 +552,7 @@ mod tests {
         want.charge_source = Some(fpower::ChargeSource::None);
         want.level_status = Some(fpower::LevelStatus::Warning);
         want.level_percent = Some((700.0 * 100.0) / 5000.0);
+        want.remaining_capacity_uah = Some(700 * 1000);
         want.time_remaining =
             Some(fpower::TimeRemaining::BatteryLife(nanos_in_one_hour.into_nanos()));
         let _ = battery_manager.update_battery_info(power_info.clone(), Some(battery_info.clone()));
@@ -548,6 +567,7 @@ mod tests {
         want.charge_source = Some(fpower::ChargeSource::None);
         want.level_status = Some(fpower::LevelStatus::Low);
         want.level_percent = Some((500.0 * 100.0) / 5000.0);
+        want.remaining_capacity_uah = Some(500 * 1000);
         want.time_remaining =
             Some(fpower::TimeRemaining::BatteryLife(nanos_in_one_hour.into_nanos()));
         let _ = battery_manager.update_battery_info(power_info.clone(), Some(battery_info.clone()));
@@ -577,6 +597,7 @@ mod tests {
         want.charge_source = Some(fpower::ChargeSource::AcAdapter);
         want.level_status = Some(fpower::LevelStatus::Ok);
         want.level_percent = Some((3000.0 * 100.0) / 5000.0);
+        want.remaining_capacity_uah = Some(3000 * 1000);
         want.time_remaining =
             Some(fpower::TimeRemaining::FullCharge(2 * nanos_in_one_hour.into_nanos()));
         let _ = battery_manager.update_battery_info(power_info.clone(), Some(battery_info.clone()));
@@ -605,9 +626,25 @@ mod tests {
         want.charge_source = Some(fpower::ChargeSource::AcAdapter);
         want.level_status = Some(fpower::LevelStatus::Ok);
         want.level_percent = Some(100.0);
+        want.remaining_capacity_uah = Some(5000 * 1000);
         want.time_remaining = Some(fpower::TimeRemaining::FullCharge(0));
         let _ = battery_manager.update_battery_info(power_info.clone(), Some(battery_info.clone()));
         check_status(&battery_manager.get_battery_info_copy(), &want, true, 9);
+
+        // state: battery charging via AC/level full, unit set to mW
+        power_info.state = 0x5; // ONLINE | CHARGING
+        battery_info.remaining_capacity = 5000;
+        battery_info.unit = hpower::BatteryUnit::Mw;
+        let mut want = battery_manager.get_battery_info_copy();
+        want.status = Some(fpower::BatteryStatus::Ok);
+        want.charge_status = Some(fpower::ChargeStatus::Full);
+        want.charge_source = Some(fpower::ChargeSource::AcAdapter);
+        want.level_status = Some(fpower::LevelStatus::Ok);
+        want.level_percent = Some(100.0);
+        want.remaining_capacity_uah = Some(5000 * 1000 / 7);
+        want.time_remaining = Some(fpower::TimeRemaining::FullCharge(0));
+        let _ = battery_manager.update_battery_info(power_info.clone(), Some(battery_info.clone()));
+        check_status(&battery_manager.get_battery_info_copy(), &want, true, 10);
 
         // state: battery charging via AC/extreme values (check overflow)
         power_info.state = 0x5; // ONLINE | CHARGING
@@ -620,8 +657,9 @@ mod tests {
         want.charge_source = Some(fpower::ChargeSource::AcAdapter);
         want.level_status = Some(fpower::LevelStatus::Low);
         want.level_percent = Some(0.0);
+        want.remaining_capacity_uah = Some(0);
         want.time_remaining = Some(fpower::TimeRemaining::FullCharge(i64::max_value()));
         let _ = battery_manager.update_battery_info(power_info.clone(), Some(battery_info.clone()));
-        check_status(&battery_manager.get_battery_info_copy(), &want, true, 10);
+        check_status(&battery_manager.get_battery_info_copy(), &want, true, 11);
     }
 }
