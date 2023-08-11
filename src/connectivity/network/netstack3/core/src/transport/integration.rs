@@ -7,15 +7,13 @@ use lock_order::{
     relation::LockBefore,
     Locked,
 };
-use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{Ipv4, Ipv6};
 use packet::BufferMut;
 
 use crate::{
     device::WeakDeviceId,
     ip::{device::IpDeviceNonSyncContext, BufferTransportIpContext},
-    socket::datagram::{
-        DualStackDatagramBoundStateContext, EitherIpSocket, UninstantiableDualStackContext,
-    },
+    socket::datagram::UninstantiableDualStackContext,
     transport::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
         udp,
@@ -259,28 +257,19 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     }
 }
 
+impl<L, C: NonSyncContext> udp::UdpStateContext for Locked<&SyncCtx<C>, L> {}
+
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
-    DualStackDatagramBoundStateContext<Ipv6, C, udp::Udp> for Locked<&SyncCtx<C>, L>
+    udp::DualStackBoundStateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
-    fn dual_stack_enabled(&self, state: &udp::SocketState<Ipv6, Self::WeakDeviceId>) -> bool {
-        state.dual_stack_enabled()
-    }
-
-    fn to_other_receiving_id(&self, id: udp::SocketId<Ipv6>) -> EitherIpSocket<udp::Udp> {
-        EitherIpSocket::V6(id)
-    }
-
-    fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
-        addr.to_ipv6_mapped()
-    }
 
     fn with_both_bound_sockets_mut<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut udp::UdpBoundSocketMap<Ipv6, Self::WeakDeviceId>,
-            &mut udp::UdpBoundSocketMap<Ipv4, Self::WeakDeviceId>,
+            &mut udp::BoundSockets<Ipv6, Self::WeakDeviceId>,
+            &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId>,
         ) -> O,
     >(
         &mut self,
@@ -290,25 +279,19 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
             self.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
         let (mut bound_v6, mut locked) =
             locked.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv6>>();
-        let udp::BoundSockets { bound_sockets: bound_first, lazy_port_alloc: _ } = &mut *bound_v6;
-        let udp::BoundSockets { bound_sockets: bound_second, lazy_port_alloc: _ } = &mut *bound_v4;
-        cb(&mut locked, bound_first, bound_second)
+        cb(&mut locked, &mut bound_v6, &mut bound_v4)
     }
 
     fn with_other_bound_sockets_mut<
         O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut udp::UdpBoundSocketMap<Ipv4, Self::WeakDeviceId>,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
         let (mut bound_v4, mut locked) =
             self.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
-        let udp::BoundSockets { bound_sockets, lazy_port_alloc: _ } = &mut *bound_v4;
-        cb(&mut locked.cast_locked(), bound_sockets)
+        cb(&mut locked.cast_locked(), &mut bound_v4)
     }
 }
 
