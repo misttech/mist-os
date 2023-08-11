@@ -5,11 +5,11 @@
 #ifndef SRC_CAMERA_DRIVERS_CONTROLLER_PIPELINE_MANAGER_H_
 #define SRC_CAMERA_DRIVERS_CONTROLLER_PIPELINE_MANAGER_H_
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/camera2/cpp/fidl.h>
 #include <fuchsia/hardware/gdc/cpp/banjo.h>
 #include <fuchsia/hardware/ge2d/cpp/banjo.h>
 #include <fuchsia/hardware/isp/cpp/banjo.h>
+#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 
@@ -49,8 +49,7 @@ namespace camera {
 // internal config, and process, respectively.
 class PipelineManager {
  public:
-  PipelineManager(async_dispatcher_t* dispatcher,
-                  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+  PipelineManager(async_dispatcher_t* dispatcher, const ddk::SysmemProtocolClient& sysmem,
                   const ddk::IspProtocolClient& isp, const ddk::GdcProtocolClient& gdc,
                   const ddk::Ge2dProtocolClient& ge2d, LoadFirmwareCallback load_firmware);
   ~PipelineManager();

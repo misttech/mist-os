@@ -32,8 +32,6 @@ executable("controller_unittest_bin") {
   deps = [
     ":constants",
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_hlcpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/camera/drivers/controller:source",
@@ -42,9 +40,6 @@ executable("controller_unittest_bin") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   if (internal_access) {
     defines = [ "INTERNAL_ACCESS" ]

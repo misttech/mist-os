@@ -6,11 +6,11 @@
 #define SRC_CAMERA_DRIVERS_CONTROLLER_CONTROLLER_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.camera/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/gdc/cpp/banjo.h>
 #include <fuchsia/hardware/ge2d/cpp/banjo.h>
 #include <fuchsia/hardware/isp/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
@@ -60,6 +60,7 @@ class ControllerDevice : public ControllerDeviceType,
   async::Loop loop_;
 
   // Composite driver children.
+  ddk::SysmemProtocolClient sysmem_;
   ddk::IspProtocolClient isp_;
   ddk::GdcProtocolClient gdc_;
   ddk::Ge2dProtocolClient ge2d_;

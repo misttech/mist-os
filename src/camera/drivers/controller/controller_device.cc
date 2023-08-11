@@ -20,6 +20,7 @@ namespace camera {
 ControllerDevice::ControllerDevice(zx_device_t* parent)
     : ControllerDeviceType(parent),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      sysmem_(parent, "sysmem"),
       isp_(parent, "isp"),
       gdc_(parent, "gdc"),
       ge2d_(parent, "ge2d") {}
@@ -28,27 +29,11 @@ ControllerDevice::~ControllerDevice() { loop_.Shutdown(); }
 
 fpromise::result<std::unique_ptr<ControllerDevice>, zx_status_t> ControllerDevice::Create(
     zx_device_t* parent) {
-  zx::result sysmem =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(parent, "sysmem");
-  if (sysmem.is_error()) {
-    FX_PLOGS(ERROR, sysmem.status_value()) << "Failed to get sysmem protocol";
-    return fpromise::error(sysmem.status_value());
-  }
   std::unique_ptr<ControllerDevice> device(new ControllerDevice(parent));
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
-  fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_server_end(
-      sysmem_allocator.NewRequest().TakeChannel());
-  fidl::OneWayStatus connect_status =
-      fidl::WireCall(sysmem.value())->ConnectServer(std::move(allocator_server_end));
-  if (!connect_status.ok()) {
-    FX_PLOGS(ERROR, connect_status.status()) << "Failed to send ConnectServer request";
-    return fpromise::error(connect_status.status());
-  }
-
   device->controller_ = std::make_unique<ControllerImpl>(
-      device->loop_.dispatcher(), std::move(sysmem_allocator), device->isp_, device->gdc_,
-      device->ge2d_, fit::bind_member(device.get(), &ControllerDevice::LoadFirmware));
+      device->loop_.dispatcher(), device->sysmem_, device->isp_, device->gdc_, device->ge2d_,
+      fit::bind_member(device.get(), &ControllerDevice::LoadFirmware));
   device->debug_ = std::make_unique<DebugImpl>(device->loop_.dispatcher(), device->isp_);
 
   zx_status_t status = device->loop_.StartThread("camera-controller");

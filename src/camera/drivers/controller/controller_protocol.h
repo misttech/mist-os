@@ -5,12 +5,12 @@
 #ifndef SRC_CAMERA_DRIVERS_CONTROLLER_CONTROLLER_PROTOCOL_H_
 #define SRC_CAMERA_DRIVERS_CONTROLLER_CONTROLLER_PROTOCOL_H_
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/camera2/cpp/fidl.h>
 #include <fuchsia/camera2/hal/cpp/fidl.h>
 #include <fuchsia/hardware/gdc/cpp/banjo.h>
 #include <fuchsia/hardware/ge2d/cpp/banjo.h>
 #include <fuchsia/hardware/isp/cpp/banjo.h>
+#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/fidl/cpp/binding.h>
 
 #include "src/camera/drivers/controller/configs/internal_config.h"
@@ -23,7 +23,7 @@ namespace camera {
 
 class ControllerImpl : public fuchsia::camera2::hal::Controller {
  public:
-  ControllerImpl(async_dispatcher_t* dispatcher, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+  ControllerImpl(async_dispatcher_t* dispatcher, const ddk::SysmemProtocolClient& sysmem,
                  const ddk::IspProtocolClient& isp, const ddk::GdcProtocolClient& gdc,
                  const ddk::Ge2dProtocolClient& ge2d, LoadFirmwareCallback load_firmware);
   void Connect(fidl::InterfaceRequest<fuchsia::camera2::hal::Controller> request);

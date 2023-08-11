@@ -480,8 +480,7 @@ zx_status_t Sherlock::CameraInit() {
   };
 
   const ddk::BindRule kSysmemRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
 
   };
 
@@ -498,8 +497,7 @@ zx_status_t Sherlock::CameraInit() {
   };
 
   const device_bind_prop_t kSysmemProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
   };
 
   auto node_group = ddk::CompositeNodeSpec(kIspRules, kIspProperties)

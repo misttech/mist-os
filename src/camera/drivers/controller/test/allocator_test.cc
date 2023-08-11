@@ -34,21 +34,17 @@ namespace camera {
 class ControllerMemoryAllocatorTest : public gtest::TestLoopFixture {
  public:
   ControllerMemoryAllocatorTest()
-      : context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()) {}
+      : context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()),
+        fake_sysmem_([this](auto request) { return context_->svc()->Connect(std::move(request)); }),
+        sysmem_(fake_sysmem_.client()) {}
 
   void SetUp() override {
     ASSERT_EQ(ZX_OK, context_->svc()->Connect(sysmem_allocator_.NewRequest()));
     ASSERT_EQ(ZX_OK, zx::event::create(0, &event_));
 
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator1;
-    ASSERT_EQ(ZX_OK, context_->svc()->Connect(sysmem_allocator1.NewRequest()));
-    controller_memory_allocator_ =
-        std::make_unique<ControllerMemoryAllocator>(std::move(sysmem_allocator1));
-
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator2;
-    ASSERT_EQ(ZX_OK, context_->svc()->Connect(sysmem_allocator2.NewRequest()));
+    controller_memory_allocator_ = std::make_unique<ControllerMemoryAllocator>(sysmem_);
     pipeline_manager_ = std::make_unique<PipelineManager>(
-        dispatcher(), std::move(sysmem_allocator2), isp_, gdc_, ge2d_,
+        dispatcher(), sysmem_, isp_, gdc_, ge2d_,
         fit::bind_member(this, &ControllerMemoryAllocatorTest::LoadFirmware));
   }
 
@@ -72,22 +68,11 @@ class ControllerMemoryAllocatorTest : public gtest::TestLoopFixture {
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<ControllerMemoryAllocator> controller_memory_allocator_;
   std::unique_ptr<camera::PipelineManager> pipeline_manager_;
+  FakeSysmem fake_sysmem_;
+  ddk::SysmemProtocolClient sysmem_;
   ddk::IspProtocolClient isp_;
   ddk::GdcProtocolClient gdc_;
   ddk::Ge2dProtocolClient ge2d_;
-
- private:
-  zx::result<fuchsia::sysmem::AllocatorSyncPtr> CreateSysmemAllocator(
-      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem>& sysmem) {
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
-    fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_server_end(
-        sysmem_allocator.NewRequest().TakeChannel());
-    fidl::OneWayStatus status = sysmem->ConnectServer(std::move(allocator_server_end));
-    if (!status.ok()) {
-      return zx::error(status.status());
-    }
-    return zx::ok(std::move(sysmem_allocator));
-  }
 };
 
 // Validate FR --> GDC1 --> OutputStreamMLDS

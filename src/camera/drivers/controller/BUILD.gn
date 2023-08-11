@@ -64,10 +64,10 @@ source_set("source") {
     "//sdk/banjo/fuchsia.hardware.gdc:fuchsia.hardware.gdc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ge2d:fuchsia.hardware.ge2d_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.isp:fuchsia.hardware.isp_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.camera2:fuchsia.camera2_hlcpp",
     "//sdk/fidl/fuchsia.camera2.debug:fuchsia.camera2.debug_hlcpp",
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
 
     # The LLCPP bindings for fuchsia.hardware.camera is used by controller_device.h
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp_wire",

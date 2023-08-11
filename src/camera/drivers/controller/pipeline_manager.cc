@@ -28,7 +28,7 @@
 namespace camera {
 
 PipelineManager::PipelineManager(async_dispatcher_t* dispatcher,
-                                 fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+                                 const ddk::SysmemProtocolClient& sysmem,
                                  const ddk::IspProtocolClient& isp,
                                  const ddk::GdcProtocolClient& gdc,
                                  const ddk::Ge2dProtocolClient& ge2d,
@@ -37,7 +37,7 @@ PipelineManager::PipelineManager(async_dispatcher_t* dispatcher,
       isp_(isp),
       gdc_(gdc),
       ge2d_(ge2d),
-      memory_allocator_(std::move(sysmem_allocator)),
+      memory_allocator_(sysmem),
       load_firmware_(std::move(load_firmware)) {}
 
 PipelineManager::~PipelineManager() {
