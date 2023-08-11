@@ -193,7 +193,13 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
 pub(crate) struct IpOptions<I: Ip + IpExt, D, S: DatagramSocketSpec + ?Sized> {
     multicast_memberships: MulticastMemberships<I::Addr, D>,
     hop_limits: SocketHopLimits,
-    _marker: PhantomData<S>,
+    other_stack: S::OtherStackIpOptions<I>,
+}
+
+impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
+    pub(crate) fn other_stack(&self) -> &S::OtherStackIpOptions<I> {
+        &self.other_stack
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -850,6 +856,12 @@ pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
 // TCP, extract a supertrait from `DatagramSocketSpec` as described in the TODO
 // below and put that together with this trait.
 pub(crate) trait DualStackIpExt: Ip {
+    /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
+    type OtherVersion: Ip
+        + IpDeviceStateIpExt
+        + DualStackIpExt<OtherVersion = Self>
+        + crate::ip::IpExt;
+
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
@@ -860,11 +872,13 @@ pub(crate) trait DualStackIpExt: Ip {
     // DatagramSocketSpec into its own trait and use that as the bound here.
     type DualStackReceivingId<S: DatagramSocketSpec>: Clone + Debug + Eq;
 
-    /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
-    type OtherVersion: Ip
-        + IpDeviceStateIpExt
-        + DualStackIpExt<OtherVersion = Self>
-        + crate::ip::IpExt;
+    /// The IP options type for the other stack that will be held for a socket.
+    ///
+    /// For [`Ipv4`], this is `()`, and for [`Ipv6`] it is `State`. For a
+    /// protocol like UDP or TCP where the IPv6 socket is dual-stack capable,
+    /// the generic state struct can have a field with type
+    /// `I::OtherStackIpOptions<Ipv4InIpv6Options>`.
+    type OtherStackIpOptions<State: Clone + Debug + Default>: Clone + Debug + Default;
 
     /// Convert a socket ID into a `Self::DualStackReceivingId`.
     ///
@@ -891,10 +905,11 @@ pub(crate) enum EitherIpSocket<S: DatagramSocketSpec> {
 }
 
 impl DualStackIpExt for Ipv4 {
+    type OtherVersion = Ipv6;
+
     /// Incoming IPv4 packets may be received by either IPv4 or IPv6 sockets.
     type DualStackReceivingId<S: DatagramSocketSpec> = EitherIpSocket<S>;
-
-    type OtherVersion = Ipv6;
+    type OtherStackIpOptions<State: Clone + Debug + Default> = ();
 
     fn dual_stack_receiver<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
@@ -904,10 +919,11 @@ impl DualStackIpExt for Ipv4 {
 }
 
 impl DualStackIpExt for Ipv6 {
+    type OtherVersion = Ipv4;
+
     /// Incoming IPv6 packets may only be received by IPv6 sockets.
     type DualStackReceivingId<S: DatagramSocketSpec> = S::SocketId<Self>;
-
-    type OtherVersion = Ipv4;
+    type OtherStackIpOptions<State: Clone + Debug + Default> = State;
 
     fn dual_stack_receiver<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
@@ -932,6 +948,9 @@ pub(crate) trait DatagramSocketSpec {
     /// be returned by [`create`] and used to identify which socket is being
     /// acted on by calls like [`listen`], [`connect`], [`remove`], etc.
     type SocketId<I: IpExt>: Clone + Debug + EntryKey + From<usize> + Eq;
+
+    /// IP-level options for sending `I::OtherVersion` IP packets.
+    type OtherStackIpOptions<I: IpExt>: Clone + Debug + Default;
 
     /// The sharing state for a listening socket in a [`BoundSocketMap`].
     ///
@@ -1056,7 +1075,7 @@ where
             }
         };
 
-        let IpOptions { multicast_memberships, hop_limits: _, _marker } = ip_options;
+        let IpOptions { multicast_memberships, hop_limits: _, other_stack: _ } = ip_options;
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
             leave_all_joined_groups(sync_ctx, ctx, multicast_memberships)
         });
@@ -2323,7 +2342,8 @@ pub(crate) fn get_bound_device<
     id: S::SocketId<I>,
 ) -> Option<SC::WeakDeviceId> {
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
-        let (_, device): (&IpOptions<_, _, _>, _) = get_options_device(state, id);
+        let (_, device): (&IpOptions<_, _, _>, _) =
+            get_options_device(state.get(id.get_key_index()).expect("missing socket"));
         device.clone()
     })
 }
@@ -2430,7 +2450,8 @@ pub(crate) fn set_multicast_membership<
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
     sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
-        let (_, bound_device): (&IpOptions<_, _, _>, _) = get_options_device(state, id.clone());
+        let (_, bound_device): (&IpOptions<_, _, _>, _) =
+            get_options_device(state.get(id.get_key_index()).expect("socket not found"));
 
         let interface = match interface {
             MulticastMembershipInterfaceSelector::Specified(selector) => match selector {
@@ -2464,7 +2485,7 @@ pub(crate) fn set_multicast_membership<
             return Err(SetMulticastMembershipError::DeviceDoesNotExist);
         };
 
-        let IpOptions { multicast_memberships, hop_limits: _, _marker } = ip_options;
+        let IpOptions { multicast_memberships, hop_limits: _, other_stack: _ } = ip_options;
         let change = multicast_memberships
             .apply_membership_change(multicast_group, &interface.as_weak(sync_ctx), want_membership)
             .ok_or(SetMulticastMembershipError::NoMembershipChange)?;
@@ -2494,11 +2515,10 @@ pub(crate) fn set_multicast_membership<
     })
 }
 
-fn get_options_device<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
-    state: &SocketsState<I, D, S>,
-    id: S::SocketId<I>,
+pub(crate) fn get_options_device<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
+    state: &SocketState<I, D, S>,
 ) -> (&IpOptions<I, D, S>, &Option<D>) {
-    match state.get(id.get_key_index()).expect("socket not found") {
+    match state {
         SocketState::Unbound(state) => {
             let UnboundSocketState { ip_options, device, sharing: _ } = state;
             (ip_options, device)
@@ -2586,14 +2606,54 @@ pub(crate) fn get_ip_hop_limits<
     id: S::SocketId<I>,
 ) -> HopLimits {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
-        let (options, device) = get_options_device(state, id);
-        let IpOptions { hop_limits, multicast_memberships: _, _marker } = options;
+        let (options, device) =
+            get_options_device(state.get(id.get_key_index()).expect("socket not found"));
+        let IpOptions { hop_limits, multicast_memberships: _, other_stack: _ } = options;
         let device = device.as_ref().and_then(|d| sync_ctx.upgrade_weak_device_id(d));
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
             hop_limits.get_limits_with_defaults(
                 &TransportIpContext::<I, _>::get_default_hop_limits(sync_ctx, device.as_ref()),
             )
         })
+    })
+}
+
+pub(crate) fn with_dual_stack_ip_options_mut<
+    I: IpExt,
+    SC: DatagramStateContext<I, C, S>,
+    C: DatagramStateNonSyncContext<I, S>,
+    S: DatagramSocketSpec,
+    R,
+>(
+    sync_ctx: &mut SC,
+    _ctx: &mut C,
+    id: S::SocketId<I>,
+    cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
+) -> R {
+    sync_ctx.with_sockets_state_mut(|_sync_ctx, state| {
+        let options = get_options_mut(state, id);
+
+        cb(&mut options.other_stack)
+    })
+}
+
+pub(crate) fn with_dual_stack_ip_options<
+    I: IpExt,
+    SC: DatagramStateContext<I, C, S>,
+    C: DatagramStateNonSyncContext<I, S>,
+    S: DatagramSocketSpec,
+    R,
+>(
+    sync_ctx: &mut SC,
+    _ctx: &mut C,
+    id: S::SocketId<I>,
+    cb: impl FnOnce(&S::OtherStackIpOptions<I>) -> R,
+) -> R {
+    sync_ctx.with_sockets_state(|_sync_ctx, state| {
+        let (options, _device) =
+            get_options_device(state.get(id.get_key_index()).expect("not found"));
+
+        cb(&options.other_stack)
     })
 }
 
@@ -2753,6 +2813,7 @@ mod test {
     impl DatagramSocketSpec for FakeStateSpec {
         type AddrSpec = FakeAddrSpec;
         type SocketId<I: IpExt> = Id;
+        type OtherStackIpOptions<I: IpExt> = ();
         type UnboundSharingState<I: IpExt> = Sharing;
         type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
         type ListenerSharingState = Sharing;

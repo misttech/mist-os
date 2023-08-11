@@ -263,9 +263,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     DualStackDatagramBoundStateContext<Ipv6, C, udp::Udp> for Locked<&SyncCtx<C>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
-    fn dual_stack_enabled(&self, _socket: &udp::SocketState<Ipv6, Self::WeakDeviceId>) -> bool {
-        // TODO(https://fxbug.dev/21198): Enable dual-stack socket support.
-        false
+    fn dual_stack_enabled(&self, state: &udp::SocketState<Ipv6, Self::WeakDeviceId>) -> bool {
+        state.dual_stack_enabled()
     }
 
     fn to_other_receiving_id(&self, id: udp::SocketId<Ipv6>) -> EitherIpSocket<udp::Udp> {
