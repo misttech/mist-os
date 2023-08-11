@@ -145,6 +145,9 @@ void Pipe::SetBufferSize(SetBufferSizeRequestView request,
   zx_status_t status = SetBufferSizeLocked(request->size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "[%s] Pipe::SetBufferSize() failed to create buffer: %lu", kTag, request->size);
+  }
+
+  if (status != ZX_OK && status != ZX_ERR_NO_MEMORY) {
     completer.Close(status);
   } else {
     completer.Reply(status);
