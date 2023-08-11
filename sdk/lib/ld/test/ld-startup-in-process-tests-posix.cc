@@ -16,6 +16,7 @@
 
 #include "../posix.h"
 #include "ld-load-tests-base.h"
+#include "test-chdir-guard.h"
 
 namespace ld::testing {
 namespace {
@@ -160,7 +161,13 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   exec_loader_ = std::move(result->loader);
 }
 
-int64_t LdStartupInProcessTests::Run() { return CallOnStack(entry_, sp_); }
+int64_t LdStartupInProcessTests::Run() {
+  // Move into the directory where ld.so.1 and all the files are so that they
+  // can be loaded by simple relative file names.  For now, the POSIX version
+  // of the dynamic linker uses the plain SONAME as a relative filename.
+  TestChdirGuard in_test_lib_dir;
+  return CallOnStack(entry_, sp_);
+}
 
 LdStartupInProcessTests::~LdStartupInProcessTests() {
   if (stack_) {

@@ -83,6 +83,7 @@ source_set("load-tests") {
       "ld-startup-in-process-tests-posix.cc",
       "ld-startup-in-process-tests-posix.h",
     ]
+    deps += [ ":test-chdir-guard" ]
   }
 
   # Plumb in the switch via the response file to give the libprefix.
@@ -91,6 +92,16 @@ source_set("load-tests") {
   cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
 
   data_deps = [ ":load-test-data" ]
+}
+
+source_set("test-chdir-guard") {
+  testonly = true
+  public = [ "test-chdir-guard.h" ]
+  sources = [ "test-chdir-guard.cc" ]
+  deps = [
+    "//src/lib/elfldltl/testing",
+    "//third_party/googletest:gtest",
+  ]
 }
 
 if (is_host) {
