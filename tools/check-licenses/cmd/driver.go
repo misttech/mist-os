@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"runtime/trace"
 	"time"
@@ -52,11 +51,9 @@ func Execute(ctx context.Context) error {
 		startFilter := time.Now()
 		target := Config.Target
 		if target == "" {
-			target = fmt.Sprintf("%v.%v",
-				Config.BuildInfoProduct,
-				Config.BuildInfoBoard)
+			target = "//:default"
 		}
-		log.Printf("Filtering out projects that are not in the build graph for [%v]...",
+		log.Printf("Filtering out projects that are not in the build graph for [%s]...",
 			target)
 		if err := project.FilterProjects(); err != nil {
 			log.Println("Error!")

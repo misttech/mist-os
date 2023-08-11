@@ -1,9 +1,6 @@
 {
     "outputLicenseFile": {OUTPUT_LICENSE_FILE},
     "runAnalysis": {RUN_ANALYSIS},
-    "buildInfoVersion": "{BUILD_INFO_VERSION}",
-    "buildInfoProduct": "{BUILD_INFO_PRODUCT}",
-    "buildInfoBoard": "{BUILD_INFO_BOARD}",
     "target": "",
     "fuchsiaDir": "{FUCHSIA_DIR}",
     "outDir": "{OUT_DIR}",

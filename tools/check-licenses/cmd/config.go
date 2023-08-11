@@ -60,12 +60,6 @@ type CheckLicensesConfig struct {
 	// On the command-line, a user can provide a GN target (e.g. //sdk)
 	// to generate a NOTICE file for.
 	Target string `json:"target"`
-	// The SDK version for the current workspace.
-	BuildInfoVersion string `json:"buildInfoVersion"`
-	// The product currently set in the fx args for the local workspace.
-	BuildInfoProduct string `json:"buildInfoProduct"`
-	// The board currently set in the fx args for the local workspace.
-	BuildInfoBoard string `json:"buildInfoBoard"`
 
 	// The following variables represent Config files for the
 	// check-licenses subpackage of the same name.
@@ -144,15 +138,6 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 
 	if c.Target == "" {
 		c.Target = other.Target
-	}
-	if c.BuildInfoVersion == "" {
-		c.BuildInfoVersion = other.BuildInfoVersion
-	}
-	if c.BuildInfoProduct == "" {
-		c.BuildInfoProduct = other.BuildInfoProduct
-	}
-	if c.BuildInfoBoard == "" {
-		c.BuildInfoBoard = other.BuildInfoBoard
 	}
 
 	c.File.Merge(other.File)

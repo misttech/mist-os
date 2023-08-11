@@ -48,16 +48,6 @@ template("license_data") {
     run_analysis = invoker.run_analysis
   }
 
-  if (build_info_version == "") {
-    build_info_version = "version"
-  }
-  if (build_info_product == "") {
-    build_info_product = "product"
-  }
-  if (build_info_board == "") {
-    build_info_board = "board"
-  }
-
   # TODO(fxb/116788): Remove once SPDX generation is not flaky.
   produce_spdx = defined(invoker.produce_spdx) && invoker.produce_spdx
 
@@ -79,9 +69,6 @@ template("license_data") {
   }
 
   txt_notices_output = "license_texts_grouped_by_project_deduped.txt.gz"
-
-  product_board = "${build_info_product}.${build_info_board}"
-  path_prefix = "${build_info_version}/${product_board}"
 
   license_outdir = "$target_out_dir/license/gen"
 
@@ -180,12 +167,12 @@ template("license_data") {
     ]
 
     outputs = [
-      "$temp_out_dir/$path_prefix/out/$txt_notices_output",
-      "$temp_out_dir/$path_prefix/out/$compliance_output",
+      "$temp_out_dir/out/$txt_notices_output",
+      "$temp_out_dir/out/$compliance_output",
     ]
 
     if (produce_spdx) {
-      outputs += [ "$temp_out_dir/$path_prefix/$spdx_output" ]
+      outputs += [ "$temp_out_dir/$spdx_output" ]
     }
 
     args = [
@@ -209,15 +196,6 @@ template("license_data") {
       ]
     }
 
-    args += [
-      "--build_info_version",
-      build_info_version,
-      "--build_info_product",
-      build_info_product,
-      "--build_info_board",
-      build_info_board,
-    ]
-
     args += [ target ]
 
     if (emit_metadata) {
@@ -226,7 +204,7 @@ template("license_data") {
           {
             license_files = rebase_path(temp_out_licenses_dir, root_build_dir)
             compliance_file =
-                rebase_path("$temp_out_dir/$path_prefix/out/$compliance_output",
+                rebase_path("$temp_out_dir/out/$compliance_output",
                             root_build_dir)
           },
         ]
@@ -242,7 +220,7 @@ template("license_data") {
                              "visibility",
                            ])
 
-    sources = [ "$temp_out_dir/$path_prefix/out/$txt_notices_output" ]
+    sources = [ "$temp_out_dir/out/$txt_notices_output" ]
     outputs = [ "$out_dir/NOTICE.txt.gz" ]
     deps = [ ":$check_licenses_target" ]
   }
@@ -256,7 +234,7 @@ template("license_data") {
                                "visibility",
                              ])
 
-      sources = [ "$temp_out_dir/$path_prefix/$spdx_output" ]
+      sources = [ "$temp_out_dir/$spdx_output" ]
       outputs = [ "$out_dir/results.spdx.json" ]
       deps = [ ":$check_licenses_target" ]
     }

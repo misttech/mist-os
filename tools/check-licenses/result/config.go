@@ -17,9 +17,6 @@ type ResultConfig struct {
 	GnGenOutputFile   string      `json:"gnGenOutputFile"`
 	OutputLicenseFile bool        `json:"outputLicenseFile"`
 	RunAnalysis       bool        `json:"runAnalysis"`
-	BuildInfoVersion  string      `json:"buildInfoVersion"`
-	BuildInfoProduct  string      `json:"buildInfoProduct"`
-	BuildInfoBoard    string      `json:"buildInfoBoard"`
 
 	Checks    []*Check `json:"checks"`
 	CheckURLs bool
@@ -81,15 +78,6 @@ func (c *ResultConfig) Merge(other *ResultConfig) {
 	}
 	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
 	c.RunAnalysis = c.RunAnalysis || other.RunAnalysis
-	if c.BuildInfoVersion == "" {
-		c.BuildInfoVersion = other.BuildInfoVersion
-	}
-	if c.BuildInfoProduct == "" {
-		c.BuildInfoProduct = other.BuildInfoProduct
-	}
-	if c.BuildInfoBoard == "" {
-		c.BuildInfoBoard = other.BuildInfoBoard
-	}
 	if c.SPDXDocName == "" {
 		c.SPDXDocName = other.SPDXDocName
 	}
