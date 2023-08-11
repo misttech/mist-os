@@ -22,7 +22,7 @@ std::optional<uint32_t> GetGicIrq(devicetree::PropertyValue interrupt_bytes,
     return std::nullopt;
   }
 
-  auto interrupt = interrupt_bytes.AsBytes().substr(0, 3 * sizeof(uint32_t));
+  auto interrupt = interrupt_bytes.AsBytes().subspan(0, 3 * sizeof(uint32_t));
 
   // Now we can instantiate a prop encoded array.
   devicetree::PropEncodedArray<devicetree::PropEncodedArrayElement<3>> cells(interrupt, 1, 1, 1);
@@ -63,7 +63,7 @@ std::optional<uint32_t> GetPlicIrq(devicetree::PropertyValue interrupt_bytes,
   // value 1. An interrupt ID of 0 is reserved to mean “no interrupt”.
   //
   // See Chapter 7 Section 5 of  Volume II: RISC-V Privileged Architectures V1.10
-  auto interrupt = interrupt_bytes.AsBytes().substr(0, sizeof(uint32_t));
+  auto interrupt = interrupt_bytes.AsBytes().subspan(0, sizeof(uint32_t));
   devicetree::PropEncodedArray<devicetree::PropEncodedArrayElement<1>> cells(interrupt, 1);
   return static_cast<uint32_t>(*cells[0][0]);
 }

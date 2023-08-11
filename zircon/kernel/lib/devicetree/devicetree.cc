@@ -86,10 +86,11 @@ struct PropertyBlockContents {
 
 PropertyBlockContents ReadPropertyBlock(ByteView bytes) {
   ZX_ASSERT(bytes.size() >= sizeof(FdtProperty));
-  uint32_t prop_size = ReadBigEndianUint32(bytes.substr(offsetof(FdtProperty, len))).value;
-  auto [name_offset, block_end] = ReadBigEndianUint32(bytes.substr(offsetof(FdtProperty, nameoff)));
-  ByteView value = block_end.substr(0, prop_size);
-  return {value, name_offset, block_end.substr(StructBlockAlign(prop_size))};
+  uint32_t prop_size = ReadBigEndianUint32(bytes.subspan(offsetof(FdtProperty, len))).value;
+  auto [name_offset, block_end] =
+      ReadBigEndianUint32(bytes.subspan(offsetof(FdtProperty, nameoff)));
+  ByteView value = block_end.subspan(0, prop_size);
+  return {value, name_offset, block_end.subspan(StructBlockAlign(prop_size))};
 }
 
 }  // namespace
@@ -253,27 +254,27 @@ Devicetree::Devicetree(ByteView blob) {
   ZX_ASSERT(ReadBigEndianUint32(blob).value == kMagic);
 
   const uint32_t size =
-      ReadBigEndianUint32(blob.substr(offsetof(struct_fdt_header, totalsize))).value;
+      ReadBigEndianUint32(blob.subspan(offsetof(struct_fdt_header, totalsize))).value;
   ZX_ASSERT(size <= blob.size());
   ByteView fdt(blob.data(), size);
 
   const uint32_t struct_block_offset =
-      ReadBigEndianUint32(fdt.substr(offsetof(struct_fdt_header, off_dt_struct))).value;
+      ReadBigEndianUint32(fdt.subspan(offsetof(struct_fdt_header, off_dt_struct))).value;
   const uint32_t struct_block_size =
-      ReadBigEndianUint32(fdt.substr(offsetof(struct_fdt_header, size_dt_struct))).value;
+      ReadBigEndianUint32(fdt.subspan(offsetof(struct_fdt_header, size_dt_struct))).value;
   ZX_ASSERT(struct_block_offset < fdt.size());
   ZX_ASSERT(fdt.size() - struct_block_offset >= struct_block_size);
 
   const uint8_t* struct_block_base = fdt.data() + struct_block_offset;
   ByteView struct_block(struct_block_base, struct_block_size);
   ZX_ASSERT(struct_block_size > 0);
-  ZX_ASSERT(ReadBigEndianUint32(struct_block.substr(struct_block_size - sizeof(uint32_t))).value ==
+  ZX_ASSERT(ReadBigEndianUint32(struct_block.subspan(struct_block_size - sizeof(uint32_t))).value ==
             FDT_END);
 
   const uint32_t string_block_offset =
-      ReadBigEndianUint32(fdt.substr(offsetof(struct_fdt_header, off_dt_strings))).value;
+      ReadBigEndianUint32(fdt.subspan(offsetof(struct_fdt_header, off_dt_strings))).value;
   const uint32_t string_block_size =
-      ReadBigEndianUint32(fdt.substr(offsetof(struct_fdt_header, size_dt_strings))).value;
+      ReadBigEndianUint32(fdt.subspan(offsetof(struct_fdt_header, size_dt_strings))).value;
   ZX_ASSERT(string_block_offset <= fdt.size());
   ZX_ASSERT(fdt.size() - struct_block_offset >= struct_block_size);
 
@@ -282,7 +283,7 @@ Devicetree::Devicetree(ByteView blob) {
                                 string_block_size);
 
   const uint32_t mem_rsvmap_offset =
-      ReadBigEndianUint32(fdt.substr(offsetof(struct_fdt_header, off_mem_rsvmap))).value;
+      ReadBigEndianUint32(fdt.subspan(offsetof(struct_fdt_header, off_mem_rsvmap))).value;
   ZX_ASSERT(mem_rsvmap_offset <= fdt.size());
   const uint8_t* mem_rsvmap_base = fdt.data() + mem_rsvmap_offset;
   ByteView mem_rsvmap{mem_rsvmap_base, fdt.size() - mem_rsvmap_offset};
@@ -329,9 +330,10 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
   ByteView unprocessed = subtree;
 
   // The node name follows the begin token.
-  size_t name_end = unprocessed.find_first_of(uint8_t{0});
-  ZX_ASSERT_MSG(name_end != ByteView::npos, "unterminated node name");
-  std::string_view name{reinterpret_cast<const char*>(unprocessed.data()), name_end};
+  auto name_end = std::find(unprocessed.begin(), unprocessed.end(), 0);
+  ZX_ASSERT_MSG(name_end != unprocessed.end(), "unterminated node name");
+  size_t name_len = std::distance(unprocessed.begin(), name_end);
+  std::string_view name{reinterpret_cast<const char*>(unprocessed.data()), name_len};
 
   // GCC detects this as a dangling pointer that "escapes", but we know it's
   // safe because the `path->pop_back();` always runs before `node` dies.
@@ -344,7 +346,7 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
   auto unwind_path = fit::defer([path]() { path->pop_back(); });
 #pragma GCC diagnostic pop
 
-  unprocessed.remove_prefix(StructBlockAlign(name_end + 1));
+  unprocessed = unprocessed.subspan(StructBlockAlign(name_len + 1));
 
   // Seek past all no-op tokens and properties.
   ByteView props_block = unprocessed;
@@ -369,7 +371,7 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
   // Recall that it is a simplifying assumption of Properties that it must
   // be instantiated with a block that is either empty or that which begins
   // just after a property token.
-  props_block.remove_suffix(unprocessed.size());
+  props_block = props_block.subspan(0, props_block.size() - unprocessed.size());
 
   auto call = [&](auto&& walker) { return walker(*path, decoder); };
   bool post_visit = visit;
@@ -438,7 +440,7 @@ void MemoryReservations::iterator::Normalize() {
 }
 
 MemoryReservations::iterator& MemoryReservations::iterator::operator++() {
-  mem_rsvmap_.remove_prefix(sizeof(RawRsvMapEntry));
+  mem_rsvmap_ = mem_rsvmap_.subspan(sizeof(RawRsvMapEntry));
   Normalize();
   return *this;
 }

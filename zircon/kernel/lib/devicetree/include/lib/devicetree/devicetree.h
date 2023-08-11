@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <iterator>
+#include <numeric>
 #include <optional>
 #include <string_view>
 #include <type_traits>
@@ -34,7 +35,7 @@
 
 namespace devicetree {
 
-using ByteView = std::basic_string_view<uint8_t>;
+using ByteView = cpp20::span<const uint8_t>;
 
 // Represents a tuple of N-elements encoded as collection of cells. Each cell is a 32 bit big endian
 // unsigned integer.
@@ -62,7 +63,7 @@ class PropEncodedArrayElement {
         continue;
       }
       elements_[i] = internal::ParseCells(
-          raw_element.substr(offset, sizeof(uint32_t) * num_cells[i]), uint32_t(num_cells[i]));
+          raw_element.subspan(offset, sizeof(uint32_t) * num_cells[i]), uint32_t(num_cells[i]));
       offset += static_cast<size_t>(num_cells[i]) * sizeof(uint32_t);
     }
   }
@@ -102,7 +103,7 @@ class PropEncodedArray {
 
   constexpr ElementType operator[](size_t index) const {
     ZX_ASSERT(index * entry_size_ < prop_encoded_raw_.size());
-    return ElementType(prop_encoded_raw_.substr(index * entry_size_, entry_size_),
+    return ElementType(prop_encoded_raw_.subspan(index * entry_size_, entry_size_),
                        cells_for_elements_);
   }
 
@@ -494,7 +495,9 @@ class Properties {
 
     iterator& operator=(const iterator&) = default;
 
-    bool operator==(const iterator& it) const { return position_ == it.position_; }
+    bool operator==(const iterator& it) const {
+      return position_.data() == it.position_.data() && position_.size() == it.position_.size();
+    }
 
     bool operator!=(const iterator& it) const { return !(*this == it); }
 

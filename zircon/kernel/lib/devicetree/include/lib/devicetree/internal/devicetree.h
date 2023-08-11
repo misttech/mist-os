@@ -8,16 +8,13 @@
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_INTERNAL_DEVICETREE_H_
 
 #include <inttypes.h>
+#include <lib/stdcompat/span.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 
-#include <numeric>
-#include <optional>
-#include <string_view>
-
 namespace devicetree::internal {
 
-using ByteView = std::basic_string_view<uint8_t>;
+using ByteView = cpp20::span<const uint8_t>;
 
 struct ReadBigEndianUint32Result {
   uint32_t value;
@@ -29,7 +26,7 @@ inline ReadBigEndianUint32Result ReadBigEndianUint32(ByteView bytes) {
   return {
       (static_cast<uint32_t>(bytes[0]) << 24) | (static_cast<uint32_t>(bytes[1]) << 16) |
           (static_cast<uint32_t>(bytes[2]) << 8) | static_cast<uint32_t>(bytes[3]),
-      bytes.substr(sizeof(uint32_t)),
+      bytes.subspan(sizeof(uint32_t)),
   };
 }
 
@@ -40,7 +37,7 @@ constexpr uint64_t ParseCells(ByteView bytes) {
   if constexpr (N == 1) {
     return higher;
   } else {
-    uint64_t lower = ReadBigEndianUint32(bytes.substr(4)).value;
+    uint64_t lower = ReadBigEndianUint32(bytes.subspan(4)).value;
     return higher << 32 | lower;
   }
 }
