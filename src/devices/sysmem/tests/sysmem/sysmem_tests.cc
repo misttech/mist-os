@@ -3066,10 +3066,53 @@ TEST(Sysmem, CloseTokenV1) {
   EXPECT_OK(token_2->Sync());
 }
 
+// Sysmem may start with the amlogic secure heaps not ready, so retrying creating memory until
+// everything works.
+// TODO(fxbug.dev/132085): Remove this once sysmem handles this case better.
+void WaitForAmlogicSecureHeap() {
+  // Booting the system to the state where it will have a heap available shouldn't take more that 15
+  // seconds.
+  auto deadline = zx::deadline_after(zx::sec(20));
+
+  while (zx::clock::get_monotonic() < deadline) {
+    auto collection = make_single_participant_collection_v1();
+
+    fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
+    constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageHwDecoder;
+    constexpr uint32_t kBufferCount = 4;
+    constraints.min_buffer_count_for_camping = kBufferCount;
+    constraints.has_buffer_memory_constraints = true;
+    constexpr uint32_t kBufferSizeBytes = 64 * 1024;
+    constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
+        .min_size_bytes = kBufferSizeBytes,
+        .max_size_bytes = 128 * 1024,
+        .physically_contiguous_required = true,
+        .secure_required = true,
+        .ram_domain_supported = false,
+        .cpu_domain_supported = false,
+        .inaccessible_domain_supported = true,
+        .heap_permitted_count = 1,
+        .heap_permitted = {fuchsia_sysmem::wire::HeapType::kAmlogicSecure},
+    };
+    ZX_DEBUG_ASSERT(constraints.image_format_constraints_count == 0);
+
+    ASSERT_OK(collection->SetConstraints(true, std::move(constraints)));
+
+    auto allocate_result = collection->WaitForBuffersAllocated();
+    if (allocate_result.ok() && allocate_result.value().status == ZX_OK) {
+      return;
+    }
+    printf("No amlogic secure heap available, retrying.\n");
+    zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  }
+  fprintf(stderr, "Waiting for amlogic secure heap timed out, continuing test anyway.\n");
+}
+
 TEST(Sysmem, HeapAmlogicSecureV1) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   for (uint32_t i = 0; i < 64; ++i) {
     bool need_aux = (i % 4 == 0);
@@ -3182,6 +3225,7 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV1) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   // 256 64 KiB chunks, and well below protected_memory_size, even accounting for fragmentation.
   const uint32_t kBlockSize = 64 * 1024;
@@ -3435,6 +3479,7 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessibleV1) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   fuchsia_sysmem::wire::CoherencyDomain domains[] = {
       fuchsia_sysmem::wire::CoherencyDomain::kCpu,
@@ -3497,6 +3542,7 @@ TEST(Sysmem, HeapAmlogicSecureVdecV1) {
   if (!is_board_with_amlogic_secure_vdec()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   for (uint32_t i = 0; i < 64; ++i) {
     auto collection = make_single_participant_collection_v1();

@@ -3250,11 +3250,55 @@ TEST(Sysmem, CloseTokenV2) {
 
   EXPECT_TRUE(token_2->Sync().is_ok());
 }
+// Sysmem may start with the amlogic secure heaps not ready, so retrying creating memory until
+// everything works.
+// TODO(fxbug.dev/132085): Remove this once sysmem handles this case better.
+void WaitForAmlogicSecureHeap() {
+  // Booting the system to the state where it will have a heap available shouldn't take more that 15
+  // seconds.
+  auto deadline = zx::deadline_after(zx::sec(20));
+
+  while (zx::clock::get_monotonic() < deadline) {
+    auto collection = make_single_participant_collection_v2();
+    v2::BufferCollectionConstraints constraints;
+    constraints.usage().emplace();
+    constraints.usage()->video() = v2::kVideoUsageHwDecoder;
+    constexpr uint32_t kBufferCount = 4;
+    constraints.min_buffer_count_for_camping() = kBufferCount;
+    constraints.buffer_memory_constraints().emplace();
+    auto& buffer_memory = constraints.buffer_memory_constraints().value();
+    constexpr uint32_t kBufferSizeBytes = 64 * 1024;
+    buffer_memory.min_size_bytes() = kBufferSizeBytes;
+    buffer_memory.max_size_bytes() = 128 * 1024;
+    buffer_memory.physically_contiguous_required() = true;
+    buffer_memory.secure_required() = true;
+    buffer_memory.ram_domain_supported() = false;
+    buffer_memory.cpu_domain_supported() = false;
+    buffer_memory.inaccessible_domain_supported() = true;
+    buffer_memory.heap_permitted() = {v2::HeapType::kAmlogicSecure};
+    ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
+
+    v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    ASSERT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+
+    auto allocate_result = collection->WaitForAllBuffersAllocated();
+
+    if (allocate_result.is_ok()) {
+      return;
+    }
+    printf("No amlogic secure heap available, retrying.\n");
+    zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  }
+  fprintf(stderr, "Waiting for amlogic secure heap timed out, continuing test anyway.\n");
+}
 
 TEST(Sysmem, HeapAmlogicSecureV2) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
+
+  WaitForAmlogicSecureHeap();
 
   for (uint32_t i = 0; i < 64; ++i) {
     auto collection = make_single_participant_collection_v2();
@@ -3319,6 +3363,7 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV2) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   // 256 64 KiB chunks, and well below protected_memory_size, even accounting for fragmentation.
   const uint32_t kBlockSize = 64 * 1024;
@@ -3526,6 +3571,7 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessibleV2) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   v2::CoherencyDomain domains[] = {
       v2::CoherencyDomain::kCpu,
@@ -3589,6 +3635,7 @@ TEST(Sysmem, HeapAmlogicSecureVdecV2) {
   if (!is_board_with_amlogic_secure_vdec()) {
     return;
   }
+  WaitForAmlogicSecureHeap();
 
   for (uint32_t i = 0; i < 64; ++i) {
     auto collection = make_single_participant_collection_v2();
