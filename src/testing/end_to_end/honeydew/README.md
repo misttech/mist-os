@@ -252,8 +252,7 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 **Running below shell scripts will automatically ensure you have followed the
 guidelines:**
 1. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
-2. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh`
-   and ensure unit test coverage for code changes is >= 70%
+2. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh --affected`
 3. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`
    and fix any errors it suggests
 4. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/uninstall.sh`
@@ -327,8 +326,11 @@ follow the below instructions every time HoneyDew code is changed.
 
 ### Code Coverage
 **Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh`
-**will automatically perform the below mentioned coverage steps. Use this to**
-**ensure code you have touched has unit test coverage.**
+**will automatically perform the below mentioned coverage steps which shows
+comprehensive coverage on the entire Honeydew codebase.**
+
+**For a targeted report on only the locally modified files , run the command
+above with the `--affected` flag.**
 
 It is a hard requirement that HoneyDew code is well tested using a combination
 of unit and functional tests.
