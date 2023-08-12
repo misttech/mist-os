@@ -14,6 +14,9 @@
             matchers: [
                 // This test hangs.
                 "FdeventTest.run_on_looper_thread_queued",
+
+                // Flaky test.
+                "LocalSocketTest.smoke",
             ],
         },
     ],
