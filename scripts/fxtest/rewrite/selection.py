@@ -93,6 +93,14 @@ class TestSelections:
     # The threshold used to match these tests.
     threshold: float
 
+    def has_device_test(self) -> bool:
+        """Determine if this set of test selections has any device tests.
+
+        Returns:
+            bool: True if a test that requires a device is selected, False otherwise.
+        """
+        return any([entry.build.test.package_url for entry in self.selected])
+
 
 def select_tests(
     entries: typing.List[Test], selection: typing.List[str]

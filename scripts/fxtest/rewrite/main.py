@@ -2,15 +2,619 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+from __future__ import annotations
+
 import asyncio
+from dataclasses import dataclass
+from dataclasses import field
+import functools
+import gzip
+import json
+import os
+import random
+import re
+import sys
+import typing
+
+import args
+import console
+import dataparse
+import environment
+import event
+import execution
+import log
+import selection
+import termout
+import test_list_file
+import tests_json_file
+import util.command as command
 
 
 def main():
-    asyncio.run(async_main())
+    asyncio.run(async_main(args.parse_args()))
 
 
-async def async_main():
-    print("Welcome to the new fx test")
+async def async_main(flags: args.Flags):
+    # Main logic for fx test.
+
+    recorder = event.EventRecorder()
+
+    do_status_output_signal: asyncio.Event = asyncio.Event()
+
+    tasks: typing.List[asyncio.Task] = []
+    tasks.append(
+        asyncio.create_task(
+            console.console_printer(recorder, flags, do_status_output_signal)
+        )
+    )
+
+    async def complete(exit_code=0):
+        """Wait for all tasks to finish, then exit with the given code.
+
+        This is used to ensure that all logging and printing is
+        done before terminating.
+
+        Args:
+            exit_code (int, optional): Program exit code. Defaults to 0.
+        """
+        try:
+            await asyncio.wait_for(asyncio.wait(tasks), timeout=5)
+        except asyncio.TimeoutError:
+            print(
+                "\n\nTimed out waiting for tasks to exit, terminating...\n",
+                file=sys.stderr,
+            )
+        sys.exit(exit_code)
+
+    # Initialize event recording.
+    recorder.emit_init()
+
+    # Try to parse the flags. Emit one event before and another
+    # after flag post processing.
+    try:
+        recorder.emit_parse_flags(flags.__dict__)
+        flags.validate()
+        recorder.emit_parse_flags(flags.__dict__)
+    except args.FlagError as e:
+        recorder.emit_end(f"Flags are invalid: {e}")
+        await complete(1)
+
+    # Initialize status printing at this point, if desired.
+    if flags.status:
+        do_status_output_signal.set()
+        termout.init()
+
+    # Process and initialize the incoming environment.
+    exec_env: environment.ExecutionEnvironment
+    try:
+        exec_env = environment.ExecutionEnvironment.initialize_from_args(flags)
+    except environment.EnvironmentError as e:
+        recorder.emit_end(f"Failed to initialize environment: {e}\nDid you run fx set?")
+        await complete(1)
+    recorder.emit_process_env(exec_env.__dict__)
+
+    # Configure file logging based on flags.
+    if flags.log and exec_env.log_file:
+        tasks.append(
+            asyncio.create_task(
+                log.writer(recorder, gzip.open(exec_env.log_file, "wt"))
+            )
+        )
+        recorder.emit_instruction_message(f"Logging all output to: {exec_env.log_file}")
+        recorder.emit_instruction_message(
+            "Use the `--logpath` argument to specify a log location or `--no-log` to disable\n"
+        )
+
+    # Print a message for users who want to know how to see all test output.
+    if not flags.output:
+        recorder.emit_instruction_message(
+            f"To show all output, specify the `-o/--output` flag."
+        )
+
+    # Load the list of tests to execute.
+    try:
+        tests = await load_test_list(recorder, exec_env)
+    except Exception as e:
+        recorder.emit_end(f"Failed to load tests: {e}")
+        await complete(1)
+
+    # Use flags to select which tests to run.
+    try:
+        selections = selection.select_tests(tests, flags.selection)
+        recorder.emit_test_selections(selections)
+    except selection.SelectionError as e:
+        recorder.emit_end(f"Selection is invalid: {e}")
+        await complete(1)
+
+    # Check that the selected tests are valid.
+    if not await validate_test_selections(selections, recorder, flags):
+        recorder.emit_end("Test selections could not be validated.")
+        await complete(1)
+
+    # If desired, we randomize the execution order of tests.
+    # Otherwise, they are run in the order they appear in the tests.json file.
+    if flags.random:
+        random.shuffle(selections.selected)
+
+    # Don't actually run any tests if --dry was specified, instead just
+    # print which tests were selected and exit.
+    if flags.dry:
+        recorder.emit_info_message("Selected the following tests:")
+        for s in selections.selected:
+            recorder.emit_info_message(f"  {s.info.name}")
+        recorder.emit_instruction_message("\nWill not run any tests, --dry specified")
+        recorder.emit_end()
+        await complete(0)
+
+    # If enabled, try to build and update the selected tests.
+    if flags.build and not await do_build(selections, recorder, exec_env):
+        recorder.emit_end("Failed to build.")
+        await complete(1)
+
+    # Finally, run all selected tests.
+    if not await run_all_tests(selections, recorder, flags, exec_env):
+        recorder.emit_end("Failed to run tests.")
+        await complete(1)
+
+    recorder.emit_end()
+    await complete()
+
+
+async def load_test_list(
+    recorder: event.EventRecorder, exec_env: environment.ExecutionEnvironment
+) -> typing.List[test_list_file.Test]:
+    """Load the input files listing tests and parse them into a list of Tests.
+
+    Args:
+        recorder (event.EventRecorder): Recorder for events.
+        exec_env (environment.ExecutionEnvironment): Environment we run in.
+
+    Raises:
+        TestFileError: If the tests.json file is invalid.
+        DataParseError: If data could not be deserialized from JSON input.
+        JSONDecodeError: If a JSON file fails to parse.
+        IOError: If a file fails to open.
+        ValueError: If the tests.json and test-list.json files are
+            incompatible for some reason.
+
+    Returns:
+        typing.List[test_list_file.Test]: List of available tests to execute.
+    """
+
+    # Load the tests.json file.
+    try:
+        parse_id = recorder.emit_start_file_parsing(
+            exec_env.relative_to_root(exec_env.test_json_file), exec_env.test_json_file
+        )
+        test_file_entries: typing.List[
+            tests_json_file.TestEntry
+        ] = tests_json_file.TestEntry.from_file(exec_env.test_json_file)
+        recorder.emit_test_file_loaded(test_file_entries, exec_env.test_json_file)
+        recorder.emit_end(id=parse_id)
+    except (tests_json_file.TestFileError, json.JSONDecodeError, IOError) as e:
+        recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
+        raise e
+
+    # Load the test-list.json file.
+    try:
+        parse_id = recorder.emit_start_file_parsing(
+            exec_env.relative_to_root(exec_env.test_list_file), exec_env.test_list_file
+        )
+        test_list_entries = test_list_file.TestListFile.entries_from_file(
+            exec_env.test_list_file
+        )
+        recorder.emit_end(id=parse_id)
+    except (dataparse.DataParseError, json.JSONDecodeError, IOError) as e:
+        recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
+        raise e
+
+    # Join the contents of the two files and return it.
+    try:
+        tests = test_list_file.Test.join_test_descriptions(
+            test_file_entries, test_list_entries
+        )
+        return tests
+    except ValueError as e:
+        recorder.emit_end(f"tests.json and test-list.json are inconsistent: {e}")
+        raise e
+
+
+async def validate_test_selections(
+    selections: selection.TestSelections,
+    recorder: event.EventRecorder,
+    flags: args.Flags,
+) -> bool:
+    """Validate the selections matched from tests.json.
+
+    Args:
+        selections (TestSelections): The selection output to validate.
+        recorder (event.EventRecorder): An event recorder to write useful messages to.
+
+    Returns:
+        bool: True if the selections are valid, False if we should abort.
+    """
+
+    missing_groups: typing.List[selection.MatchGroup] = []
+
+    for group, matches in selections.group_matches:
+        if not matches:
+            missing_groups.append(group)
+
+    if missing_groups:
+        recorder.emit_warning_message(
+            "\nCould not find any tests to run for at least one set of arguments you provided."
+        )
+        recorder.emit_info_message(
+            "\nMake sure this test is transitively in your 'fx set' arguments."
+        )
+        recorder.emit_info_message(
+            "See https://fuchsia.dev/fuchsia-src/development/testing/faq for more information."
+        )
+
+        def suggestion_args(
+            arg: str, threshold: float | None = None
+        ) -> typing.List[str]:
+            name = "fx"
+            suggestion_args = ["search-tests", "--max-results=6", arg]
+            if threshold is not None:
+                suggestion_args += ["--threshold", str(threshold)]
+            if not flags.style:
+                suggestion_args += ["--no-color"]
+            return [name] + suggestion_args
+
+        arg_threshold_pairs = []
+        for group in missing_groups:
+            # Create pairs of a search string and threshold.
+            # Thresholds depend on the number of arguments joined.
+            # We have only a single search field, so we concatenate
+            # the names into one big group.  To correct for lower
+            # match thresholds due to this union, we adjust the
+            # threshold when there is more than a single value to
+            # match against.
+            all_args = group.names.union(group.components).union(group.packages)
+            arg_threshold_pairs.append(
+                (
+                    ",".join(list(all_args)),
+                    max(0.4, 0.9 - len(all_args) * 0.05) if len(all_args) > 1 else None,
+                ),
+            )
+
+        outputs = await run_commands_in_parallel(
+            [
+                suggestion_args(arg_pair[0], arg_pair[1])
+                for arg_pair in arg_threshold_pairs
+            ],
+            "Find suggestions",
+            recorder=recorder,
+            maximum_parallel=10,
+        )
+
+        if any([val is None for val in outputs]):
+            return False
+
+        for group, output in zip(missing_groups, outputs):
+            assert output is not None  # Checked above
+            recorder.emit_info_message(
+                f"\nFor `{group}`, did you mean any of the following?\n"
+            )
+            recorder.emit_verbatim_message(output.stdout)
+
+    return not missing_groups
+
+
+async def do_build(
+    tests: selection.TestSelections,
+    recorder: event.EventRecorder,
+    exec_env: environment.ExecutionEnvironment,
+) -> bool:
+    """Attempt to build the selected tests.
+
+    Args:
+        tests (selection.TestSelections): Tests to attempt to build.
+        recorder (event.EventRecorder): Recorder for events.
+        exec_env (environment.ExecutionEnvironment): Incoming execution environment.
+
+    Returns:
+        bool: True only if the tests were build and published, False otherwise.
+    """
+    label_to_rule = re.compile(r"//([^()]+)\(")
+    build_command_line = []
+    for selection in tests.selected:
+        label = selection.build.test.package_label or selection.build.test.label
+        path = selection.build.test.path
+        if path is not None:
+            # Host tests are build by output name.
+            build_command_line.append(path)
+        elif label:
+            # Other tests are built by label content, without toolchain.
+            match = label_to_rule.match(label)
+            if match:
+                build_command_line.append(match.group(1))
+        else:
+            recorder.emit_warning_message(f"Unknown entry {selection}")
+            return False
+
+    build_id = recorder.emit_build_start(targets=build_command_line)
+    recorder.emit_instruction_message("Use --no-build to skip building")
+
+    output = await execution.run_command(
+        "fx",
+        *(["build"] + build_command_line),
+        recorder=recorder,
+        parent=build_id,
+        print_verbatim=True,
+    )
+
+    error = None
+    if not output:
+        error = "Failure running build"
+    elif output.return_code != 0:
+        error = f"Build returned non-zero exit code {output.return_code}"
+
+    if error is not None:
+        recorder.emit_end(error, id=build_id)
+        return False
+
+    amber_directory = os.path.join(exec_env.out_dir, "amber-files")
+    publish_args = [
+        "fx",
+        "ffx",
+        "repository",
+        "publish",
+        "--trusted-root",
+        os.path.join(amber_directory, "repository/root.json"),
+        "--ignore-missing-packages",
+        "--time-versioning",
+        "--package-list",
+        os.path.join(exec_env.out_dir, "all_package_manifests.list"),
+        amber_directory,
+    ]
+
+    output = await execution.run_command(
+        *publish_args, recorder=recorder, parent=build_id, print_verbatim=True
+    )
+    if not output:
+        error = "Failure publishing packages."
+    elif output.return_code != 0:
+        error = f"Publish returned non-zero exit code {output.return_code}"
+    elif not await post_build_checklist(tests, recorder, exec_env, build_id):
+        error = "Post build checklist failed"
+
+    recorder.emit_end(error, id=build_id)
+
+    return error is None
+
+
+def has_tests_in_base(
+    tests: selection.TestSelections,
+    recorder: event.EventRecorder,
+    exec_env: environment.ExecutionEnvironment,
+) -> bool:
+    # TODO(b/291144505): This logic was ported from update-if-in-base, but it appears to be wrong.
+    # BUG(b/291144505): Fix this.
+    base_file = os.path.join(exec_env.out_dir, "base_packages.list")
+    parse_id = recorder.emit_start_file_parsing("base_packages.list", base_file)
+
+    contents = None
+    try:
+        with open(base_file) as f:
+            contents = f.read()
+    except IOError as e:
+        recorder.emit_end(f"Parsing file failed: {e}", id=parse_id)
+        raise e
+
+    ret = any(
+        [
+            t.build.test.package_url is not None
+            and t.build.test.package_url in contents
+            for t in tests.selected
+        ]
+    )
+
+    recorder.emit_end(id=parse_id)
+
+    return ret
+
+
+@functools.lru_cache
+async def has_device_connected(
+    recorder: event.EventRecorder, parent: event.Id | None = None
+) -> bool:
+    """Check if a device is connected for running target tests.
+
+    Args:
+        recorder (event.EventRecorder): Recorder for events.
+        parent (event.Id, optional): Parent task ID. Defaults to None.
+
+    Returns:
+        bool: True only if a device is available to run target tests.
+    """
+    output = await execution.run_command(
+        "fx", "is-package-server-running", recorder=recorder, parent=parent
+    )
+    return output is not None and output.return_code == 0
+
+
+async def post_build_checklist(
+    tests: selection.TestSelections,
+    recorder: event.EventRecorder,
+    exec_env: environment.ExecutionEnvironment,
+    build_id: event.Id,
+) -> bool:
+    """Perform a number of post-build checks to ensure we are ready to run tests.
+
+    Args:
+        tests (selection.TestSelections): Tests selected to run.
+        recorder (event.EventRecorder): Recorder for events.
+        exec_env (environment.ExecutionEnvironment): Execution environment.
+        build_id (event.Id): ID of the build event to use at the parent of any operations executed here.
+
+    Returns:
+        bool: True only if post-build checks passed, False otherwise.
+    """
+    if tests.has_device_test() and await has_device_connected(
+        recorder, parent=build_id
+    ):
+        try:
+            if has_tests_in_base(tests, recorder, exec_env):
+                recorder.emit_info_message(
+                    "Some selected test(s) are in the base package set. Running an OTA."
+                )
+                output = await execution.run_command(
+                    "fx", "ota", recorder=recorder, print_verbatim=True
+                )
+                if not output or output.return_code != 0:
+                    recorder.emit_warning_message("OTA failed")
+                    return False
+        except IOError as e:
+            return False
+
+    return True
+
+
+async def run_all_tests(
+    tests: selection.TestSelections,
+    recorder: event.EventRecorder,
+    flags: args.Flags,
+    exec_env: environment.ExecutionEnvironment,
+) -> bool:
+    """Execute all selected tests.
+
+    Args:
+        tests (selection.TestSelections): The selected tests to run.
+        recorder (event.EventRecorder): Recorder for events.
+        flags (args.Flags): Incoming command flags.
+        exec_env (environment.ExecutionEnvironment): Execution environment.
+
+    Returns:
+        bool: True only if all tests ran successfully, False otherwise.
+    """
+    max_parallel = 4  # TODO(b/295340779): Get from flags
+    if tests.has_device_test() and not await has_device_connected(recorder):
+        recorder.emit_warning_message("\nCould not find a running package server.")
+        recorder.emit_instruction_message(
+            "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+        )
+        return False
+
+    test_group = recorder.emit_test_group(len(tests.selected))
+
+    @dataclass
+    class RunState:
+        total_running: int = 0
+        non_hermetic_running: int = 0
+        hermetic_test_queue: asyncio.Queue[execution.TestExecution] = field(
+            default_factory=lambda: asyncio.Queue()
+        )
+        non_hermetic_test_queue: asyncio.Queue[execution.TestExecution] = field(
+            default_factory=lambda: asyncio.Queue()
+        )
+
+    run_condition = asyncio.Condition()
+    run_state = RunState()
+
+    for test in tests.selected:
+        exec = execution.TestExecution(test, exec_env)
+        if exec.is_hermetic():
+            run_state.hermetic_test_queue.put_nowait(exec)
+        else:
+            run_state.non_hermetic_test_queue.put_nowait(exec)
+
+    tasks = []
+
+    async def test_executor():
+        to_run: execution.TestExecution
+        was_non_hermetic: bool = False
+
+        while True:
+            async with run_condition:
+                while run_state.total_running == max_parallel:
+                    await run_condition.wait()
+
+                if (
+                    run_state.non_hermetic_running == 0
+                    and not run_state.non_hermetic_test_queue.empty()
+                ):
+                    to_run = run_state.non_hermetic_test_queue.get_nowait()
+                    run_state.non_hermetic_running += 1
+                    was_non_hermetic = True
+                elif run_state.hermetic_test_queue.empty():
+                    return
+                else:
+                    to_run = run_state.hermetic_test_queue.get_nowait()
+                    was_non_hermetic = False
+                run_state.total_running += 1
+
+            test_suite_id = recorder.emit_test_suite_started(
+                to_run.name(), not was_non_hermetic, parent=test_group
+            )
+            status: event.TestSuiteStatus
+            message: typing.Optional[str] = None
+            try:
+                command_line = " ".join(to_run.command_line())
+                recorder.emit_instruction_message(f"Command: {command_line}")
+                await to_run.run(recorder, flags, test_suite_id)
+                status = event.TestSuiteStatus.PASSED
+            except execution.TestCouldNotRun as e:
+                status = event.TestSuiteStatus.SKIPPED
+                message = str(e)
+            except execution.TestFailed as e:
+                status = event.TestSuiteStatus.FAILED
+            finally:
+                recorder.emit_test_suite_ended(test_suite_id, status, message)
+
+            async with run_condition:
+                run_state.total_running -= 1
+                if was_non_hermetic:
+                    run_state.non_hermetic_running -= 1
+                run_condition.notify()
+
+    for _ in range(max_parallel):
+        tasks.append(asyncio.create_task(test_executor()))
+
+    await asyncio.wait(tasks)
+
+    recorder.emit_end(id=test_group)
+
+    return True
+
+
+async def run_commands_in_parallel(
+    commands: typing.List[typing.List[str]],
+    group_name: str,
+    recorder: typing.Optional[event.EventRecorder] = None,
+    maximum_parallel: typing.Optional[int] = None,
+) -> typing.List[typing.Optional[command.CommandOutput]]:
+    assert recorder
+
+    parent = recorder.emit_event_group(group_name, queued_events=len(commands))
+    output: typing.List[typing.Optional[command.CommandOutput]] = [None] * len(commands)
+    in_progress: typing.Set[asyncio.Task] = set()
+
+    index = 0
+
+    def can_add() -> bool:
+        nonlocal index
+        return index < len(commands) and (
+            maximum_parallel is None or len(in_progress) < maximum_parallel
+        )
+
+    while index < len(commands) or in_progress:
+        while can_add():
+
+            async def set_index(i: int):
+                output[i] = await execution.run_command(
+                    *commands[i], recorder=recorder, parent=parent
+                )
+
+            in_progress.add(asyncio.create_task(set_index(index)))
+            index += 1
+
+        _, in_progress = await asyncio.wait(in_progress)
+
+    recorder.emit_end(id=parent)
+
+    return output
 
 
 if __name__ == "__main__":
