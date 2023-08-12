@@ -2,11 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite ahci;
+
+using fuchsia.acpi;
+using fuchsia.hardware.sysmem;
 using fuchsia.pci;
 using fuchsia.pci.massstorage;
 
-fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
-fuchsia.BIND_PCI_CLASS ==  fuchsia.pci.BIND_PCI_CLASS.MASS_STORAGE;
-fuchsia.BIND_PCI_SUBCLASS ==  fuchsia.pci.massstorage.BIND_PCI_SUBCLASS.SATA;
-fuchsia.BIND_PCI_INTERFACE ==  0x01;
-fuchsia.BIND_COMPOSITE == 1;
+primary node "pci" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_PCI_CLASS ==  fuchsia.pci.BIND_PCI_CLASS.MASS_STORAGE;
+  fuchsia.BIND_PCI_SUBCLASS ==  fuchsia.pci.massstorage.BIND_PCI_SUBCLASS.SATA;
+  fuchsia.BIND_PCI_INTERFACE ==  0x01;
+}
+
+optional node "sysmem" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
+optional node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+}

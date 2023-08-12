@@ -12,7 +12,7 @@ TEST_F(DeviceEnumerationTest, AemuX64Test) {
 
       "sys/platform/pt/acpi",
       "sys/platform/pt/acpi/acpi-pwrbtn",
-      "sys/platform/pt/PCI0/bus/00:1f.2/00:1f.2/ahci",
+      "sys/platform/pt/PCI0/bus/00:1f.2/00_1f_2/ahci",
       "sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite/i8042/i8042-keyboard",
       "sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite/i8042/i8042-mouse",
   };
