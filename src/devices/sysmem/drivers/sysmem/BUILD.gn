@@ -21,6 +21,7 @@ driver_bind_rules("sysmem_bind") {
   bind_output = "sysmem.bindbc"
   tests = "bind_tests.json"
   deps = [
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.hardware.platform.device",
     "//src/devices/bind/fuchsia.platform",
   ]
