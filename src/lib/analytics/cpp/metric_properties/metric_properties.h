@@ -33,6 +33,9 @@ bool Exists(std::string_view name);
 // Migrate persistent storage location from $HOME to $XDG_DATA_HOME
 void MigrateMetricDirectory();
 
+// Check existence of home directory
+bool HasHome();
+
 }  // namespace analytics::metric_properties
 
 #endif  // SRC_LIB_ANALYTICS_CPP_METRIC_PROPERTIES_METRIC_PROPERTIES_H_

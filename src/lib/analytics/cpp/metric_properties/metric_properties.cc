@@ -120,4 +120,6 @@ void MigrateMetricDirectory() {
   }
 }
 
+bool HasHome() { return internal::GetOptionalPathFromEnv("HOME").has_value(); }
+
 }  // namespace analytics::metric_properties

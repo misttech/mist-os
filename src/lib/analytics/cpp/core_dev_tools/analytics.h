@@ -75,13 +75,12 @@ namespace analytics::core_dev_tools {
 template <class T>
 class Analytics {
  public:
-  // Same as Init() but will behave differently when run by bot
   static void InitBotAware(AnalyticsOption analytics_option, bool enable_on_bots = false) {
-    metric_properties::MigrateMetricDirectory();
-    if (IsDisabledByEnvironment()) {
+    if (IsDisabledByEnvironment() || !metric_properties::HasHome()) {
       T::SetRuntimeAnalyticsStatus(AnalyticsStatus::kDisabled);
       return;
     }
+    metric_properties::MigrateMetricDirectory();
     BotInfo bot = GetBotInfo();
     if (bot.IsRunByBot()) {
       if (enable_on_bots && (internal::PersistentStatus::IsFirstLaunchOfFirstTool() ||
