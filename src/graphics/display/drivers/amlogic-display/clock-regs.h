@@ -27,52 +27,52 @@ namespace amlogic_display {
 //
 // The video clock tree takes the following clock sources:
 //
-// - `vid_pll`
+// - "vid_pll"
 //   Video "PLL", which is actually an output signal of the HDMI clock tree
 //   taking the HDMI PLL as its source.
 //   * A311D Datasheet, Section 8.7.1.3 HDMI Clock Tree, Page 113
 //   * S905D2 Datasheet, Section 6.6.2.3 HDMI Clock Tree, Page 97
 //   * S905D3 Datasheet, Section 6.7.2.3 HDMI Clock Tree, Page 97
-// - `gp0_pll`
+// - "gp0_pll"
 //   General-purpose PLL 0.
 //   * A311D Datasheet, Section 8.7.2.3 GP0 PLL, Page 117
 //   * S905D2 Datasheet, Section 6.6.3.3 GP0 PLL, Page 101
 //   * S905D3 Datasheet, Section 6.7.3.2 GP0 PLL, Page 100
-// - `hifi_pll`
+// - "hifi_pll"
 //   HiFi PLL.
 //   * A311D Datasheet, Section 8.7.2.5 HIFI PLL, Page 118
 //   * S905D2 Datasheet, Section 6.6.3.5 HIFI PLL, Page 102
 //   * S905D3 Datasheet, Section 6.7.3.3 HIFI PLL, Page 101
-// - `mp1_clk`
-//   Also known as `MPLL1`, `MPLL_DDS_CLK1`. The fixed-frequency PLL (MPLL,
+// - "mp1_clk"
+//   Also known as "MPLL1", "MPLL_DDS_CLK1". The fixed-frequency PLL (MPLL,
 //   also known as FIX_PLL) is divided by a programmable frequency divider,
 //   providing a clock with frequency of up to 500MHz.
 //   References for all MPLL / FIX_PLL outputs:
 //   * A311D Datasheet, Section 8.7.2.5 MPLL (Fixed PLL), Page 119
 //   * S905D2 Datasheet, Section 6.6.3.6 MPLL (Fixed PLL), Page 103
 //   * S905D3 Datasheet, Section 6.7.3.7 MPLL  Page 104
-// - `fclk_div3`
-//   Also known as `MPLL_CLK_OUT_DIV3`. The fixed-frequency MPLL is divided by a
+// - "fclk_div3"
+//   Also known as "MPLL_CLK_OUT_DIV3". The fixed-frequency MPLL is divided by a
 //   fixed-value frequency divider, providing a 666MHz fixed-frequency clock.
-// - `fclk_div4`
-//   Also known as `MPLL_CLK_OUT_DIV4`. The fixed-frequency MPLL is divided by a
+// - "fclk_div4"
+//   Also known as "MPLL_CLK_OUT_DIV4". The fixed-frequency MPLL is divided by a
 //   fixed-value frequency divider, providing a 500MHz fixed-frequency clock.
-// - `fclk_div5`
-//   Also known as `MPLL_CLK_OUT_DIV5`. The fixed-frequency MPLL is divided by a
+// - "fclk_div5"
+//   Also known as "MPLL_CLK_OUT_DIV5". The fixed-frequency MPLL is divided by a
 //   fixed-value frequency divider, providing a 400MHz fixed-frequency clock.
-// - `fclk_div7`
-//   Also known as `MPLL_CLK_OUT_DIV7`. The fixed-frequency MPLL is divided by a
+// - "fclk_div7"
+//   Also known as "MPLL_CLK_OUT_DIV7". The fixed-frequency MPLL is divided by a
 //   fixed-value frequency divider, providing a 285.7MHz fixed-frequency clock.
 //
 // It provides the following clock signals:
-// - `cts_tcon` / `tcon_clko` (Timing controller)
-// - `lcd_an_clk_ph2` (LCD Analog clock for PHY2)
-// - `lcd_an_clk_ph3` (LCD Analog clock for PHY3)
-// - `cts_enci_clk` (ENCI (Interlaced Encoder) clock)
-// - `cts_encl_clk` (ENCL (LVDS Encoder) clock)
-// - `cts_encp_clk` (ENCP (Progressive Encoder) clock)
-// - `hdmi_tx_pixel` (HDMI Transmitter pixel clock)
-// - `cts_vdac_clk` (Video digital-analog converter clock)
+// - "cts_tcon" / "tcon_clko" (Timing controller)
+// - "lcd_an_clk_ph2" (LCD Analog clock for PHY2)
+// - "lcd_an_clk_ph3" (LCD Analog clock for PHY3)
+// - "cts_enci_clk" (ENCI (Interlaced Encoder) clock)
+// - "cts_encl_clk" (ENCL (LVDS Encoder) clock)
+// - "cts_encp_clk" (ENCP (Progressive Encoder) clock)
+// - "hdmi_tx_pixel" (HDMI Transmitter pixel clock)
+// - "cts_vdac_clk" (Video digital-analog converter clock)
 //
 // The following sections of the Amlogic datasheets are good for understanding
 // the PLLs and the dividers that make up the clock tree sources:
@@ -139,22 +139,14 @@ enum class VideoClock {
 // S905D3 Datasheet, Figure 6-13 "Video Clock Tree", Section 6.7.2.4 EE Clock
 // Tree, Page 99.
 enum class VideoClockMuxSource : uint32_t {
-  // `vid_pll`, the video "PLL" output of the HDMI clock tree.
-  kVideoPll = 0,
-  // `gp0_pll`
-  kGeneralPurpose0Pll = 1,
-  // `hifi_pll`
-  kHifiPll = 2,
-  // `mp1_clk`
-  kMpll1 = 3,
-  // `fclk_div3`
-  kFixed666Mhz = 4,
-  // `fclk_div4`
-  kFixed500Mhz = 5,
-  // `fclk_div5`
-  kFixed400Mhz = 6,
-  // `fclk_div7`
-  kFixed285_7Mhz = 7,
+  kVideoPll = 0,            // vid_pll
+  kGeneralPurpose0Pll = 1,  // gp0_pll
+  kHifiPll = 2,             // hifi_pll
+  kMpll1 = 3,               // mp1_clk
+  kFixed666Mhz = 4,         // fclk_div3
+  kFixed500Mhz = 5,         // fclk_div4
+  kFixed400Mhz = 6,         // fclk_div5
+  kFixed285_7Mhz = 7,       // fclk_div7
 };
 
 // Selection of video clock and dividers for encoder clock muxes.
@@ -201,7 +193,7 @@ class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32
   // trees and are not used by this driver, so we don't define these bits.
 
   // Iff true, overrides the Video DAC clock source selection in
-  // `video_dac_clock_selection` field to `adc_pll_clk_b2`.
+  // "video_dac_clock_selection" field to "adc_pll_clk_b2".
   DEF_BIT(19, video_dac_clock_selects_adc_pll_clock_b2);
 
   DEF_RSVDZ_BIT(18);
@@ -221,27 +213,21 @@ class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32
 
   // Also known as "/N2" in the Video Clock Tree diagram.
   //
-  // It's preferred to use {Get,Set}Divider2() to get / set the divider value.
+  // Prefer `Divider2()` and `SetDivider2()` to accessing the field directly.
   DEF_FIELD(7, 0, divider2_minus_one);
   static constexpr int kMinDivider2 = 1;
-  static constexpr int kMaxDivider2 = [] {
-    constexpr int kFieldLow = 0;
-    constexpr int kFieldHigh = 7;
-    return 1 << (kFieldHigh - kFieldLow + 1);
-  }();
+  static constexpr int kMaxDivider2 = 256;
+  static_assert(kMaxDivider2 == 1 << (7 - 0 + 1));
 
-  VideoClock2Divider& SetDivider2(int divider2) {
+  VideoClock2Divider &SetDivider2(int divider2) {
     ZX_DEBUG_ASSERT(divider2 >= kMinDivider2);
     ZX_DEBUG_ASSERT(divider2 <= kMaxDivider2);
     return set_divider2_minus_one(divider2 - 1);
   }
 
-  int GetDivider2() const { return divider2_minus_one() + 1; }
+  int Divider2() const { return divider2_minus_one() + 1; }
 
-  static auto Get() {
-    constexpr uint32_t kRegAddr = 0x4a * sizeof(uint32_t);
-    return hwreg::RegisterAddr<VideoClock2Divider>(kRegAddr);
-  }
+  static auto Get() { return hwreg::RegisterAddr<VideoClock2Divider>(0x4a * sizeof(uint32_t)); }
 };
 
 // HHI_VIID_CLK_CNTL
@@ -253,9 +239,9 @@ class VideoClock2Control : public hwreg::RegisterBase<VideoClock2Control, uint32
  public:
   DEF_RSVDZ_FIELD(31, 20);
 
-  // Gate-controls the input (also gate-controlled by the
-  // `clock2_divider_enabled` bit of the `VideoClock2Divider` register) and
-  // output signals for the video clock 2 divider.
+  // Gate-controls the input (also gate-controlled by the `divider_enabled` bit
+  // of the `VideoClock2Divider` register) and output signals for the video
+  // clock 2 divider.
   DEF_BIT(19, clock_enabled);
 
   DEF_ENUM_FIELD(VideoClockMuxSource, 18, 16, mux_source);
@@ -273,10 +259,7 @@ class VideoClock2Control : public hwreg::RegisterBase<VideoClock2Control, uint32
   DEF_BIT(1, div2_enabled);
   DEF_BIT(0, div1_enabled);
 
-  static auto Get() {
-    constexpr uint32_t kRegAddr = 0x4b * sizeof(uint32_t);
-    return hwreg::RegisterAddr<VideoClock2Control>(kRegAddr);
-  }
+  static auto Get() { return hwreg::RegisterAddr<VideoClock2Control>(0x4b * sizeof(uint32_t)); }
 };
 
 // HHI_VID_CLK_DIV
@@ -304,46 +287,37 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
 
   // Also known as "/N1" in the Video Clock Tree diagram.
   //
-  // It's preferred to use {Get,Set}Divider1() to get / set the divider value.
+  // Prefer `Divider1()` and `SetDivider1()` to accessing the field directly.
   DEF_FIELD(15, 8, divider1_minus_one);
   static constexpr int kMinDivider1 = 1;
-  static constexpr int kMaxDivider1 = [] {
-    constexpr int kFieldLow = 8;
-    constexpr int kFieldHigh = 15;
-    return 1 << (kFieldHigh - kFieldLow + 1);
-  }();
+  static constexpr int kMaxDivider1 = 256;
+  static_assert(kMaxDivider1 == 1 << (15 - 8 + 1));
 
-  VideoClock1Divider& SetDivider1(int divider1) {
+  VideoClock1Divider &SetDivider1(int divider1) {
     ZX_DEBUG_ASSERT(divider1 >= kMinDivider1);
     ZX_DEBUG_ASSERT(divider1 <= kMaxDivider1);
     return set_divider1_minus_one(divider1 - 1);
   }
 
-  int GetDivider1() const { return divider1_minus_one() + 1; }
+  int Divider1() const { return divider1_minus_one() + 1; }
 
   // Also known as "/N0" in the Video Clock Tree diagram.
   //
-  // It's preferred to use {Get,Set}Divider0() to get / set the divider value.
+  // Prefer `Divider0()` and `SetDivider0()` to accessing the field directly.
   DEF_FIELD(7, 0, divider0_minus_one);
   static constexpr int kMinDivider0 = 1;
-  static constexpr int kMaxDivider0 = [] {
-    constexpr int kFieldLow = 0;
-    constexpr int kFieldHigh = 7;
-    return 1 << (kFieldHigh - kFieldLow + 1);
-  }();
+  static constexpr int kMaxDivider0 = 256;
+  static_assert(kMaxDivider0 == 1 << (7 - 0 + 1));
 
-  VideoClock1Divider& SetDivider0(int divider0) {
+  VideoClock1Divider &SetDivider0(int divider0) {
     ZX_DEBUG_ASSERT(divider0 >= kMinDivider0);
     ZX_DEBUG_ASSERT(divider0 <= kMaxDivider0);
     return set_divider0_minus_one(divider0 - 1);
   }
 
-  int GetDivider0() const { return divider0_minus_one() + 1; }
+  int Divider0() const { return divider0_minus_one() + 1; }
 
-  static auto Get() {
-    constexpr uint32_t kRegAddr = 0x59 * sizeof(uint32_t);
-    return hwreg::RegisterAddr<VideoClock1Divider>(kRegAddr);
-  }
+  static auto Get() { return hwreg::RegisterAddr<VideoClock1Divider>(0x59 * sizeof(uint32_t)); }
 };
 
 // HHI_VID_CLK_CNTL
@@ -379,7 +353,7 @@ class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32
   // using A311D chip) and then setting the bit to 0.
   DEF_BIT(15, soft_reset);
 
-  // Enables the mux for the clock `lcd_an_clk_ph2` and `lcd_an_clk_ph3`.
+  // Enables the mux for the clock "lcd_an_clk_ph2" and "lcd_an_clk_ph3".
   DEF_BIT(14, lcd_analog_clock_mux_enabled);
 
   enum class LcdAnalogClockSelection : uint32_t {
@@ -400,10 +374,7 @@ class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32
   DEF_BIT(1, div2_enabled);
   DEF_BIT(0, div1_enabled);
 
-  static auto Get() {
-    constexpr uint32_t kRegAddr = 0x5f * sizeof(uint32_t);
-    return hwreg::RegisterAddr<VideoClock1Control>(kRegAddr);
-  }
+  static auto Get() { return hwreg::RegisterAddr<VideoClock1Control>(0x5f * sizeof(uint32_t)); }
 };
 
 // HHI_VID_CLK_CNTL2
@@ -426,20 +397,18 @@ class VideoClockOutputControl : public hwreg::RegisterBase<VideoClockOutputContr
   DEF_BIT(0, encoder_interlaced_enabled);
 
   static auto Get() {
-    constexpr uint32_t kRegAddr = 0x65 * sizeof(uint32_t);
-    return hwreg::RegisterAddr<VideoClockOutputControl>(kRegAddr);
+    return hwreg::RegisterAddr<VideoClockOutputControl>(0x65 * sizeof(uint32_t));
   }
 };
 
-// HHI_HDMI_CLK_CNTL
+// HHI_HDMI_CLK_CNTL - Configures "cts_hdmitx_sys_clk" and
+// "cts_hdmitx_pixel_clk".
 //
 // A311D Datasheet, Section 8.7.6 Register Descriptions, Page 157.
 // S905D2 Datasheet, Section 6.6.6 Register Descriptions, Page 142.
 // S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 133.
 class HdmiClockControl : public hwreg::RegisterBase<HdmiClockControl, uint32_t> {
  public:
-  DEF_RSVDZ_FIELD(31, 20);
-
   // Selection of video clock muxes.
   //
   // The mux value <-> clock source mapping is shown in the following diagram
@@ -469,51 +438,563 @@ class HdmiClockControl : public hwreg::RegisterBase<HdmiClockControl, uint32_t> 
     kVideoClock2Div6 = 11,
     kVideoClock2Div12 = 12,
 
-    // `cts_tcon` clock provided by the video clock tree.
+    // "cts_tcon" clock provided by the video clock tree.
     //
     // This value is not documented in S905D3 datasheets. However, experiments
     // on a Nelson device (Amlogic S905D3) show that the value is the same as
     // other devices.
     kTimingControllerClock = 15,
   };
+
+  enum class HdmiTxSystemClockSource : uint32_t {
+    kExternalOscillator24Mhz = 0,  // xtal
+    kFixed500Mhz = 1,              // fclk_div4
+    kFixed666Mhz = 2,              // fclk_div3
+    kFixed400Mhz = 3,              // fclk_div5
+  };
+
+  static constexpr int kMinHdmiTxSystemClockDivider = 1;
+  static constexpr int kMaxHdmiTxSystemClockDivider = 128;
+  static_assert(kMaxHdmiTxSystemClockDivider == 1 << (6 - 0 + 1));
+
+  static auto Get() { return hwreg::RegisterAddr<HdmiClockControl>(0x73 * sizeof(uint32_t)); }
+
+  DEF_RSVDZ_FIELD(31, 20);
+
   DEF_ENUM_FIELD(HdmiTxPixelClockSource, 19, 16, hdmi_tx_pixel_clock_selection);
 
   DEF_RSVDZ_FIELD(15, 11);
 
-  enum class HdmiTxSystemClockSource : uint32_t {
-    kExternalOscillator24Mhz = 0,
-    kFixed500Mhz = 1,
-    kFixed666Mhz = 2,
-    kFixed400Mhz = 3,
-  };
   DEF_ENUM_FIELD(HdmiTxSystemClockSource, 10, 9, hdmi_tx_system_clock_selection);
 
   DEF_BIT(8, hdmi_tx_system_clock_enabled);
 
   DEF_RSVDZ_BIT(7);
 
-  // It's preferred to use {Get,Set}HdmiTxSystemClockDivider() to get / set the
-  // divider value.
+  // Prefer `HdmiTxSystemClockDivider()` and `SetHdmiTxSystemClockDivider()` to
+  // accessing the field directly.
   DEF_FIELD(6, 0, hdmi_tx_system_clock_divider_minus_one);
-  static constexpr int kMinHdmiTxSystemClockDivider = 1;
-  static constexpr int kMaxHdmiTxSystemClockDivider = [] {
-    constexpr int kFieldLow = 0;
-    constexpr int kFieldHigh = 6;
-    return 1 << (kFieldHigh - kFieldLow + 1);
-  }();
 
-  HdmiClockControl& SetHdmiTxSystemClockDivider(int divider) {
+  HdmiClockControl &SetHdmiTxSystemClockDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinHdmiTxSystemClockDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxHdmiTxSystemClockDivider);
     return set_hdmi_tx_system_clock_divider_minus_one(divider - 1);
   }
 
-  int GetHdmiTxSystemClockDivider() const { return hdmi_tx_system_clock_divider_minus_one() + 1; }
+  int HdmiTxSystemClockDivider() const { return hdmi_tx_system_clock_divider_minus_one() + 1; }
+};
+
+// ## EE (Everything Else) Clock Tree
+//
+// EE Clock Tree consists of clocks in the EE power domain, which includes
+// (but not limited to) codecs, Mali GPUs, PWM controllers, Video Processing
+// Unit (VPU) and video signal transmitters.
+//
+// Video Clock Tree is technically part of the EE Clock Tree, with a more
+// complicated muxing and frequency divider logic.
+//
+// Details of sources and frequency dividers for each clock is available at:
+// A311D Datasheet, Section 8.7.1.4 "EE Clock Tree", Page 113.
+// S905D2 Datasheet, Section 6.7.1.4 "EE Clock Tree", Page 97.
+// S905D3 Datasheet, Section 6.7.2.4 "EE Clock Tree", Page 98.
+//
+// Below we only list all the registers configuring clocks used for display.
+//
+// ### Branched clock inputs
+//
+// Some of the clocks have a final mux with two identical branches to facilitate
+// fast clock transitions without frequency glitches. The unused branch can be
+// configured for the new clock speed, and then the final mux is switched over
+// for a quick transition. The branches have to be symmetrical for this to be
+// easy to use.
+//
+// Similar dynamic muxes are also documented in other clock trees. The A53
+// clock tree on S905D2, the A53/A73 clock tree on A311D, and the A55 clock
+// tree on S905D3 all have similar designs documented.
+//
+// A311D Datasheet, Section 8.7.1.1 "A53/A73 Clock Tree", Pages 109-111.
+// S905D2 Datasheet, Section 6.7.1.1 "A53 Clock Tree", Pages 92-94.
+// S905D3 Datasheet, Section 6.7.2.1 "A55 Clock Tree", Pages 92-94.
+//
+// ### Frequency Dividers
+//
+// The control register fields store "division ratio - 1" for each frequency
+// divider.
+//
+// This is not documented in A311D / S905D2 / S905D3 datasheets, but experiments
+// on VIM3 (using A311D), Astro (using S905D2) and Nelson (using S905D3) and
+// Amlogic-provided code has verified this. Besides, datasheets of new
+// generation chips (for example, A311D2) have mentioned that, "if you want
+// div8, set to 7".
+//
+// A311D2 Datasheet, Table 7-153 "CLKCTRL_CPU_CLKC_CTRL", Page 199.
+
+// HHI_VPU_CLKC_CNTL - Configures the "cts_vpu_clkc" clock signal.
+//
+// The circuit has two branches, and a final mux that chooses between one of
+// them. Each branch has an input mux connected to several clock sources,
+// followed by a frequency divider.
+//
+// The mapping between register fields and branches is not available in the
+// register description table, but in the EE Clock Tree table only.
+//
+// A311D Datasheet, Section 8.7.1.4 "EE Clock Tree", row "cts_vpu_clkc",
+//   Page 113; Section 8.7.6 Register Descriptions, Page 155.
+// S905D2 Datasheet, Section 6.6.6 Register Descriptions, Page 132;
+//   Section 6.7.1.4 "EE Clock Tree", row "cts_vpu_clkc", Page 97.
+// S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 141.
+//    Section 6.7.2.4 "EE Clock Tree", row "cts_vpu_clkc", Page 98.
+class VpuClockCControl : public hwreg::RegisterBase<VpuClockCControl, uint32_t> {
+ public:
+  enum class FinalMuxSource : uint32_t {
+    kBranch0 = 0,
+    kBranch1 = 1,
+  };
+
+  enum class ClockSource : uint32_t {
+    kFixed500Mhz = 0,         // fclk_div4
+    kFixed666Mhz = 1,         // fclk_div3
+    kFixed400Mhz = 2,         // fclk_div5
+    kFixed285_7Mhz = 3,       // fclk_div7
+    kMpll1 = 4,               // mpll1
+    kVideoPll = 5,            // vid_pll
+    kMpll2 = 6,               // mpll2
+    kGeneralPurpose0Pll = 7,  // gp0_pll
+  };
+
+  static constexpr int kMinBranchMuxDivider = 1;
+  static constexpr int kMaxBranchMuxDivider = 128;
+
+  static auto Get() { return hwreg::RegisterAddr<VpuClockCControl>(0x6d * sizeof(uint32_t)); }
+
+  DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
+  DEF_RSVDZ_FIELD(30, 29);
+  DEF_ENUM_FIELD(ClockSource, 27, 25, branch1_mux_source);
+  DEF_BIT(24, branch1_mux_enabled);
+  DEF_RSVDZ_BIT(23);
+
+  // Prefer `Branch1MuxDivider()` and `SetBranch1MuxDivider()` to accessing the field
+  // directly.
+  DEF_FIELD(22, 16, branch1_mux_divider_minus_one);
+  static_assert(kMaxBranchMuxDivider == 1 << (22 - 16 + 1));
+
+  // This field is undocumented on Amlogic datasheets.
+  // Amlogic-provided code directly writes 0 to this field regardless of its
+  // original value, so we can believe that zero is a safe setting for this
+  // field.
+  DEF_RSVDZ_FIELD(15, 12);
+
+  DEF_ENUM_FIELD(ClockSource, 11, 9, branch0_mux_source);
+  DEF_BIT(8, branch0_mux_enabled);
+  DEF_RSVDZ_BIT(7);
+
+  // Prefer `Branch0MuxDivider()` and `SetBranch0MuxDivider()` to accessing the field
+  // directly.
+  DEF_FIELD(6, 0, branch0_mux_divider_minus_one);
+  static_assert(kMaxBranchMuxDivider == 1 << (6 - 0 + 1));
+
+  VpuClockCControl &SetBranch1MuxDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
+    return set_branch1_mux_divider_minus_one(divider - 1);
+  }
+
+  int Branch1MuxDivider() const { return branch1_mux_divider_minus_one() + 1; }
+
+  VpuClockCControl &SetBranch0MuxDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
+    return set_branch0_mux_divider_minus_one(divider - 1);
+  }
+
+  int Branch0MuxDivider() const { return branch0_mux_divider_minus_one() + 1; }
+};
+
+// HHI_VPU_CLK_CNTL - Configures the "cts_vpu_clk" clock signal.
+//
+// The circuit has two branches, and a final mux that chooses between one of
+// them. Each branch has an input mux connected to several clock sources,
+// followed by a frequency divider.
+//
+// The mapping between register fields and branches is not available in the
+// register description table, but in the EE Clock Tree table only.
+//
+// A311D Datasheet, Section 8.7.1.4 "EE Clock Tree", row "cts_vpu_clk",
+//   Page 113; Section 8.7.6 Register Descriptions, Page 156.
+// S905D2 Datasheet, Section 6.7.1.4 "EE Clock Tree", row "cts_vpu_clk",
+//   Page 97; Section 6.6.6 Register Descriptions, Page 132.
+// S905D3 Datasheet, Section 6.7.2.4 "EE Clock Tree", row "cts_vpu_clk",
+//   Page 98; Section 6.7.6 Register Descriptions, Page 142.
+class VpuClockControl : public hwreg::RegisterBase<VpuClockControl, uint32_t> {
+ public:
+  enum class FinalMuxSource : uint32_t {
+    kBranch0 = 0,
+    kBranch1 = 1,
+  };
+
+  enum class ClockSource : uint32_t {
+    kFixed666Mhz = 0,         // fclk_div3
+    kFixed500Mhz = 1,         // fclk_div4
+    kFixed400Mhz = 2,         // fclk_div5
+    kFixed285_7Mhz = 3,       // fclk_div7
+    kMpll1 = 4,               // mpll1
+    kVideoPll = 5,            // vid_pll
+    kHifiPll = 6,             // hifi_pll
+    kGeneralPurpose0Pll = 7,  // gp0_pll
+  };
+
+  static constexpr int kMinBranchMuxDivider = 1;
+  static constexpr int kMaxBranchMuxDivider = 128;
+
+  static auto Get() { return hwreg::RegisterAddr<VpuClockControl>(0x6f * sizeof(uint32_t)); }
+
+  DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
+  DEF_RSVDZ_FIELD(30, 29);
+  DEF_ENUM_FIELD(ClockSource, 27, 25, branch1_mux_source);
+  DEF_BIT(24, branch1_mux_enabled);
+  DEF_RSVDZ_BIT(23);
+
+  // Prefer `Branch1MuxDivider()` and `SetBranch1MuxDivider()` to accessing the field
+  // directly.
+  DEF_FIELD(22, 16, branch1_mux_divider_minus_one);
+  static_assert(kMaxBranchMuxDivider == 1 << (22 - 16 + 1));
+
+  // This field is undocumented on Amlogic datasheets.
+  // Amlogic-provided code directly writes 0 to this field regardless of its
+  // original value, so we can believe that zero is a safe setting for this
+  // field.
+  DEF_RSVDZ_FIELD(15, 12);
+
+  DEF_ENUM_FIELD(ClockSource, 11, 9, branch0_mux_source);
+  DEF_BIT(8, branch0_mux_enabled);
+  DEF_RSVDZ_BIT(7);
+
+  // Prefer `Branch0MuxDivider()` and `SetBranch0MuxDivider()` to accessing the field
+  // directly.
+  DEF_FIELD(6, 0, branch0_mux_divider_minus_one);
+  static_assert(kMaxBranchMuxDivider == 1 << (6 - 0 + 1));
+
+  VpuClockControl &SetBranch1MuxDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
+    return set_branch1_mux_divider_minus_one(divider - 1);
+  }
+
+  int Branch1MuxDivider() const { return branch1_mux_divider_minus_one() + 1; }
+
+  VpuClockControl &SetBranch0MuxDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
+    return set_branch0_mux_divider_minus_one(divider - 1);
+  }
+
+  int Branch0MuxDivider() const { return branch0_mux_divider_minus_one() + 1; }
+};
+
+// HHI_VAPBCLK_CNTL - Configures the "cts_vapbclk" and "cts_ge2d_clk" clock
+// signal.
+//
+// The circuit has two branches, and a final mux that chooses between one of
+// them. Each branch has an input mux connected to several clock sources,
+// followed by a frequency divider.
+//
+// The mapping between register fields and branches are available in both the
+// register description table, and the EE Clock Tree table.
+//
+// A311D Datasheet, Section 8.7.1.4 "EE Clock Tree", row "cts_vapbclk" and
+//   "cts_ge2d_clk", Page 113; Section 8.7.6 Register Descriptions, Page 164.
+// S905D2 Datasheet, Section 6.7.1.4 "EE Clock Tree", row "cts_vapbclk" and
+//   "cts_ge2d_clk", Page 97; Section 6.6.6 Register Descriptions, Page 141.
+// S905D3 Datasheet, Section 6.7.2.4 "EE Clock Tree", row "cts_vapbclk" and
+//   "cts_ge2d_clk", Page 98; Section 6.7.6 Register Descriptions, Page 136.
+class VideoAdvancedPeripheralBusClockControl
+    : public hwreg::RegisterBase<VideoAdvancedPeripheralBusClockControl, uint32_t> {
+ public:
+  enum class FinalMuxSource : uint32_t {
+    kBranch0 = 0,
+    kBranch1 = 1,
+  };
+
+  enum class ClockSource : uint32_t {
+    kFixed500Mhz = 0,    // fclk_div4
+    kFixed666Mhz = 1,    // fclk_div3
+    kFixed400Mhz = 2,    // fclk_div5
+    kFixed285_7Mhz = 3,  // fclk_div7
+    kMpll1 = 4,          // mpll1
+    kVideoPll = 5,       // vid_pll
+    kMpll2 = 6,          // mpll2
+    kFixed800Mhz = 7,    // fclk_div2p5
+  };
+
+  static constexpr int kMinBranchMuxDivider = 1;
+  static constexpr int kMaxBranchMuxDivider = 128;
 
   static auto Get() {
-    constexpr uint32_t kRegAddr = 0x73 * sizeof(uint32_t);
-    return hwreg::RegisterAddr<HdmiClockControl>(kRegAddr);
+    return hwreg::RegisterAddr<VideoAdvancedPeripheralBusClockControl>(0x7d * sizeof(uint32_t));
   }
+
+  DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
+
+  // Gate-controls "cts_ge2d_clk" which takes "cts_vapbclk" output as its clock
+  // source and has no frequency dividers.
+  //
+  // This bit is named "enable" in A311D, S905D2 and S905D3 datasheet register
+  // descriptions, but the "EE clock table" shows that it gates the
+  // "cts_ge2d_clk" signal. Besides, A311D2 datasheet also documents it as
+  // ""cts_ge2d_clk" enable" in the register descriptions.
+  //
+  // A311D2 Datasheet, Section 7.6.5 Register Descriptions, Page 200.
+  DEF_BIT(30, ge2d_clock_enabled);
+
+  DEF_RSVDZ_FIELD(29, 28);
+  DEF_ENUM_FIELD(ClockSource, 27, 25, branch1_mux_source);
+  DEF_BIT(24, branch1_mux_enabled);
+  DEF_RSVDZ_BIT(23);
+
+  // Prefer `Branch1MuxDivider()` and `SetBranch1MuxDivider()` to accessing the field
+  // directly.
+  DEF_FIELD(22, 16, branch1_mux_divider_minus_one);
+  static_assert(kMaxBranchMuxDivider == 1 << (22 - 16 + 1));
+
+  DEF_RSVDZ_FIELD(15, 12);
+  DEF_ENUM_FIELD(ClockSource, 11, 9, branch0_mux_source);
+  DEF_BIT(8, branch0_mux_enabled);
+  DEF_RSVDZ_BIT(7);
+
+  // Prefer `Branch0MuxDivider()` and `SetBranch0MuxDivider()` to accessing the field
+  // directly.
+  DEF_FIELD(6, 0, branch0_mux_divider_minus_one);
+  static_assert(kMaxBranchMuxDivider == 1 << (6 - 0 + 1));
+
+  VideoAdvancedPeripheralBusClockControl &SetBranch1MuxDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
+    return set_branch1_mux_divider_minus_one(divider - 1);
+  }
+
+  int Branch1MuxDivider() const { return branch1_mux_divider_minus_one() + 1; }
+
+  VideoAdvancedPeripheralBusClockControl &SetBranch0MuxDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
+    return set_branch0_mux_divider_minus_one(divider - 1);
+  }
+
+  int Branch0MuxDivider() const { return branch0_mux_divider_minus_one() + 1; }
+};
+
+// HHI_VPU_CLKB_CNTL - Configures the "cts_vpu_clkb" and "cts_vpu_clkb_tmp"
+// clock signals.
+//
+// The VPU Clock B (cts_vpu_clkb) first selects its source from a mux with
+// VPU clock and 500, 400, 285.7 MHz fixed clocks, and then gets divided by
+// divider 1 and divider 2.
+//
+// The datasheets describe it as two clock signals: the target clock signal
+// "cts_vpu_clkb", and a temporary clock signal ("cts_vpu_clkb_tmp").
+//
+// "cts_vpu_clkb_tmp" takes inputs from PLLs, and "cts_vpu_clkb" takes inputs
+// from only "cts_vpu_clkb_tmp", and clock has its own divider. Since the
+// temporary clock signal is not used anywhere else, this is equivalent to our
+// two-divider model described above.
+//
+// A311D Datasheet, Section 8.7.1.4 "EE Clock Tree", row "cts_vpu_clkb" and
+//   "cts_vpu_clkb_tmp", Page 113; Section 8.7.6 Register Descriptions,
+//   Page 164.
+// S905D2 Datasheet, Section 6.7.1.4 "EE Clock Tree", row "cts_vpu_clkb" and
+//   "cts_vpu_clkb_tmp", Page 97; Section 6.6.6 Register Descriptions, Page 141.
+// S905D3 Datasheet, Section 6.7.2.4 "EE Clock Tree", row "cts_vpu_clkb" and
+//   "cts_vpu_clkb_tmp", Page 98; Section 6.7.6 Register Descriptions, Page 136.
+class VpuClockBControl : public hwreg::RegisterBase<VpuClockBControl, uint32_t> {
+ public:
+  // In the S905D3 datasheet, the mapping between selection values and clock
+  // sources are not mentioned in the register description table, but only in
+  // the EE Clock tree table, which matches the rest of the definitions.
+  enum class ClockSource : uint32_t {
+    kVpuClock = 0,       // cts_vpu_clk
+    kFixed500Mhz = 1,    // fclk_div4
+    kFixed400Mhz = 2,    // fclk_div5
+    kFixed285_7Mhz = 3,  // fclk_div7
+  };
+
+  static constexpr int kMinDivider1 = 1;
+  static constexpr int kMaxDivider1 = 16;
+
+  static constexpr int kMinDivider2 = 1;
+  static constexpr int kMaxDivider2 = 256;
+
+  static auto Get() { return hwreg::RegisterAddr<VpuClockBControl>(0x83 * sizeof(uint32_t)); }
+
+  DEF_RSVDZ_FIELD(31, 25);
+
+  // The clock is enabled only when both `divider1_enabled` and
+  // `divider2_enabled` are true.
+  DEF_BIT(24, divider1_enabled);
+
+  DEF_ENUM_FIELD(ClockSource, 21, 20, clock_source);
+
+  // Prefer `Divider1()` and `SetDivider1()` to accessing the field directly.
+  DEF_FIELD(19, 16, divider1_minus_one);
+  static_assert(kMaxDivider1 == 1 << (19 - 16 + 1));
+
+  // Iff true, latches the register write until the next vpu_clkb_pulse signal.
+  DEF_BIT(9, effective_after_vpu_clkb_pulse);
+
+  // The clock is enabled only when both `divider1_enabled` and
+  // `divider2_enabled` are true.
+  DEF_BIT(8, divider2_enabled);
+
+  // Prefer `Divider2()` and `SetDivider2()` to accessing the field directly.
+  DEF_FIELD(7, 0, divider2_minus_one);
+  static_assert(kMaxDivider2 == 1 << (7 - 0 + 1));
+
+  VpuClockBControl &SetDivider1(int divider1) {
+    ZX_DEBUG_ASSERT(divider1 >= kMinDivider1);
+    ZX_DEBUG_ASSERT(divider1 <= kMaxDivider1);
+    return set_divider1_minus_one(divider1 - 1);
+  }
+
+  int Divider1() const { return divider1_minus_one() + 1; }
+
+  VpuClockBControl &SetDivider2(int divider2) {
+    ZX_DEBUG_ASSERT(divider2 >= kMinDivider2);
+    ZX_DEBUG_ASSERT(divider2 <= kMaxDivider2);
+    return set_divider2_minus_one(divider2 - 1);
+  }
+
+  int Divider2() const { return divider2_minus_one() + 1; }
+};
+
+// HHI_VDIN_MEAS_CLK_CNTL - Configures the "cts_vdin_meas_clk" and
+// "cts_dsi_meas_clk" clock signals.
+//
+// A311D Datasheet, Section 8.7.1.4 Clock Tree, Page 113; Section 8.7.6
+//   Register Descriptions, Page 164.
+// S905D2 Datasheet, Section 6.7.1.4 Clock Tree, Page 97; Section 6.6.6
+//   Register Descriptions, Page 151.
+// S905D3 Datasheet, Section 6.7.2.4 Clock Tree, Page 98; Section 6.7.6
+//   Register Descriptions, Page 140.
+class VideoInputMeasureClockControl
+    : public hwreg::RegisterBase<VideoInputMeasureClockControl, uint32_t> {
+ public:
+  enum class ClockSource : uint32_t {
+    kExternalOscillator24Mhz = 0,  // xtal
+    kFixed500Mhz = 1,              // fclk_div4
+    kFixed666Mhz = 2,              // fclk_div3
+    kFixed400Mhz = 3,              // fclk_div5
+    kVideoPll = 4,                 // vid_pll
+    kGeneralPurpose0Pll = 5,       // gp0_pll
+    kFixed1000Mhz = 6,             // fclk_div2
+    kFixed285_7Mhz = 7,            // fclk_div7
+  };
+
+  static constexpr int kMinDsiMeasureClockDivider = 1;
+  static constexpr int kMaxDsiMeasureClockDivider = 128;
+
+  static constexpr int kMinVideoInputMeasureClockDivider = 1;
+  static constexpr int kMaxVideoInputMeasureClockDivider = 128;
+
+  static auto Get() {
+    return hwreg::RegisterAddr<VideoInputMeasureClockControl>(0x94 * sizeof(uint32_t));
+  }
+
+  DEF_RSVDZ_FIELD(31, 24);
+
+  // In the S905D3 and S905D2 datasheets, bits 31-12 are documented as "unused"
+  // in the register-level documentation but bits 23-12 (DSI measure clock
+  // control) are mentioned in the EE clock tree table.
+  //
+  // Clock-measurement-based experiments on Astro (using S905D2) and Nelson
+  // (using S905D3) show that the clock input value 0-7 have the definition
+  // above on these devices.
+  DEF_ENUM_FIELD(ClockSource, 23, 21, dsi_measure_clock_selection);
+
+  DEF_BIT(20, dsi_measure_clock_enabled);
+
+  // Prefer `DsiMeasureClockDivider()` and `SetDsiMeasureClockDivider()` to
+  // accessing the field directly.
+  DEF_FIELD(18, 12, dsi_measure_clock_divider_minus_one);
+  static_assert(kMaxDsiMeasureClockDivider == 1 << (18 - 12 + 1));
+
+  // In the S905D2 and A311D datasheets, the register description table listed
+  // clock sources 0-7, while the EE clock tree table only listed clock source
+  // 0-3.
+  //
+  // Clock-measurement-based experiments on Astro (using S905D2) and VIM3
+  // (using A311D) show that the clock input value 0-7 have the definition
+  // above on these devices.
+  DEF_ENUM_FIELD(ClockSource, 11, 9, video_input_measure_clock_selection);
+
+  DEF_BIT(8, video_input_measure_clock_enabled);
+
+  // Prefer `VideoInputMeasureClockDivider()` and
+  // `SetVideoInputMeasureClockDivider()` to accessing the field directly.
+  DEF_FIELD(6, 0, video_input_measure_clock_divider_minus_one);
+  static_assert(kMaxVideoInputMeasureClockDivider == 1 << (6 - 0 + 1));
+
+  VideoInputMeasureClockControl &SetDsiMeasureClockDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinDsiMeasureClockDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxDsiMeasureClockDivider);
+    return set_dsi_measure_clock_divider_minus_one(divider - 1);
+  }
+
+  int DsiMeasureClockDivider() const { return dsi_measure_clock_divider_minus_one() + 1; }
+
+  VideoInputMeasureClockControl &SetVideoInputMeasureClockDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinVideoInputMeasureClockDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxVideoInputMeasureClockDivider);
+    return set_video_input_measure_clock_divider_minus_one(divider - 1);
+  }
+
+  int VideoInputMeasureClockDivider() const {
+    return video_input_measure_clock_divider_minus_one() + 1;
+  }
+};
+
+// HHI_MIPIDSI_PHY_CLK_CNTL - Configures the "mipi_dsi_phy_clk" (also known as
+// "cts_dsi_phy_clk") clock signal.
+//
+// This register is not documented in S905D3 datasheets but mentioned in S905D3
+// EE clock tree table.
+//
+// A311D Datasheet, Section 8.7.1.4 Clock Tree, Page 113; Section 8.7.6
+//   Register Descriptions, Page 164.
+// S905D2 Datasheet, Section 6.7.1.4 Clock Tree, Page 97; Section 6.6.6
+//   Register Descriptions, Page 151.
+// S905D3 Datasheet, Section 6.7.2.4 Clock Tree, Page 98.
+class MipiDsiPhyClockControl : public hwreg::RegisterBase<MipiDsiPhyClockControl, uint32_t> {
+ public:
+  enum class ClockSource : uint32_t {
+    kVideoPll = 0,            // vid_pll
+    kGeneralPurpose0Pll = 1,  // gp0_pll
+    kHifiPll = 2,             // hifi_pll
+    kMpll1 = 3,               // mpll1
+    kFixed1000Mhz = 4,        // fclk_div2
+    kFixed800Mhz = 5,         // fclk_div2p5
+    kFixed666Mhz = 6,         // fclk_div3
+    kFixed285_7Mhz = 7,       // fclk_div7
+  };
+
+  static constexpr int kMinDivider = 1;
+  static constexpr int kMaxDivider = 128;
+  static_assert(kMaxDivider == 1 << (6 - 0 + 1));
+
+  static auto Get() { return hwreg::RegisterAddr<MipiDsiPhyClockControl>(0x95 * sizeof(uint32_t)); }
+
+  DEF_ENUM_FIELD(ClockSource, 14, 12, clock_source);
+
+  DEF_BIT(8, enabled);
+
+  // Prefer `Divider()` and `SetDivider()` to accessing the field directly.
+  DEF_FIELD(6, 0, divider_minus_one);
+
+  MipiDsiPhyClockControl &SetDivider(int divider) {
+    ZX_DEBUG_ASSERT(divider >= kMinDivider);
+    ZX_DEBUG_ASSERT(divider <= kMaxDivider);
+    return set_divider_minus_one(divider - 1);
+  }
+
+  int Divider() const { return divider_minus_one() + 1; }
 };
 
 }  // namespace amlogic_display
