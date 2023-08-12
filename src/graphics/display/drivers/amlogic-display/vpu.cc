@@ -9,6 +9,7 @@
 
 #include <ddktl/device.h>
 
+#include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
@@ -19,8 +20,6 @@ namespace amlogic_display {
 
 namespace {
 constexpr uint32_t kFirstTimeLoadMagicNumber = 0x304e65;  // 0Ne
-constexpr uint32_t kVpuMux = 0;
-constexpr uint32_t kVpuDiv = 3;
 
 constexpr int16_t RGB709_to_YUV709l_coeff[24] = {
     0x0000, 0x0000, 0x0000, 0x00bb, 0x0275, 0x003f, 0x1f99, 0x1ea6, 0x01c2, 0x01c2, 0x1e67, 0x1fd7,
@@ -244,21 +243,50 @@ void Vpu::VppInit() {
 
 void Vpu::ConfigureClock() {
   ZX_DEBUG_ASSERT(initialized_);
+  // TODO(fxbug.dev/131925): These values are incorrect and will crash the
+  // device.
+  //
   // vpu clock
-  WRITE32_REG(HHI, HHI_VPU_CLK_CNTL, ((kVpuMux << 9) | (kVpuDiv << 0)));
-  SET_BIT32(HHI, HHI_VPU_CLK_CNTL, 1, 8, 1);
+  auto vpu_clock_control = VpuClockControl::Get().FromValue(0);
+  vpu_clock_control.set_final_mux_selection(VpuClockControl::FinalMuxSource::kBranch0)
+      .set_branch0_mux_source(VpuClockControl::ClockSource::kFixed666Mhz)
+      .SetBranch0MuxDivider(4)
+      .WriteTo(&*hhi_mmio_);
+  vpu_clock_control.ReadFrom(&*hhi_mmio_).set_branch0_mux_enabled(true).WriteTo(&*hhi_mmio_);
 
   // vpu clkb
   // bit 0 is set since kVpuClkFrequency > clkB max frequency (350MHz)
-  WRITE32_REG(HHI, HHI_VPU_CLKB_CNTL, ((1 << 8) | (1 << 0)));
+  VpuClockBControl::Get()
+      .FromValue(0)
+      .set_clock_source(VpuClockBControl::ClockSource::kFixed500Mhz)
+      .SetDivider2(2)
+      .WriteTo(&*hhi_mmio_);
 
   // vapb clk
   // turn on ge2d clock since kVpuClkFrequency > 250MHz
-  WRITE32_REG(HHI, HHI_VAPBCLK_CNTL, (1 << 30) | (0 << 9) | (1 << 0));
+  VideoAdvancedPeripheralBusClockControl::Get()
+      .FromValue(0)
+      .set_final_mux_selection(VideoAdvancedPeripheralBusClockControl::FinalMuxSource::kBranch0)
+      .set_ge2d_clock_enabled(true)
+      .set_branch0_mux_source(VideoAdvancedPeripheralBusClockControl::ClockSource::kFixed500Mhz)
+      .SetBranch0MuxDivider(2)
+      .WriteTo(&*hhi_mmio_);
+  VideoAdvancedPeripheralBusClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_branch0_mux_enabled(true)
+      .WriteTo(&*hhi_mmio_);
 
-  SET_BIT32(HHI, HHI_VAPBCLK_CNTL, 1, 8, 1);
-
-  SET_BIT32(HHI, HHI_VID_CLK_CNTL2, 0, 0, 8);
+  VideoClockOutputControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_encoder_interlaced_enabled(false)
+      .set_encoder_tv_enabled(false)
+      .set_encoder_progressive_enabled(false)
+      .set_encoder_lvds_enabled(false)
+      .set_video_dac_clock_enabled(false)
+      .set_hdmi_tx_pixel_clock_enabled(false)
+      .set_lcd_analog_clock_phy3_enabled(false)
+      .set_lcd_analog_clock_phy2_enabled(false)
+      .WriteTo(&*hhi_mmio_);
 
   // dmc_arb_config
   WRITE32_REG(VPU, VPU_RDARB_MODE_L1C1, 0x0);
@@ -400,8 +428,11 @@ void Vpu::PowerOff() {
   // Power down VPU domain
   SET_BIT32(AOBUS, AOBUS_GEN_PWR_SLEEP0, 1, 8, 1);  // PDN
 
-  SET_BIT32(HHI, HHI_VAPBCLK_CNTL, 0, 8, 1);
-  SET_BIT32(HHI, HHI_VPU_CLK_CNTL, 0, 8, 1);
+  VideoAdvancedPeripheralBusClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_branch0_mux_enabled(false)
+      .WriteTo(&*hhi_mmio_);
+  VpuClockControl::Get().ReadFrom(&*hhi_mmio_).set_branch0_mux_enabled(false).WriteTo(&*hhi_mmio_);
 }
 
 void Vpu::AfbcPower(bool power_on) {

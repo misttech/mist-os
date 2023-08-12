@@ -9,6 +9,8 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
+
 namespace amlogic_display {
 
 namespace {
@@ -228,9 +230,19 @@ void Clock::Disable() {
   }
   WRITE32_REG(VPU, ENCL_VIDEO_EN, 0);
 
-  SET_BIT32(HHI, HHI_VID_CLK_CNTL2, 0, ENCL_GATE_VCLK, 1);
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 0, 0, 5);
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 0, VCLK2_EN, 1);
+  VideoClockOutputControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_encoder_lvds_enabled(false)
+      .WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_div1_enabled(false)
+      .set_div2_enabled(false)
+      .set_div4_enabled(false)
+      .set_div6_enabled(false)
+      .set_div12_enabled(false)
+      .WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(false).WriteTo(&*hhi_mmio_);
 
   // disable pll
   SET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, 0, LCD_PLL_EN_HPLL_G12A, 1);
@@ -285,8 +297,8 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
     return status;
   }
 
-  // Enable VIID Clock (whatever that is)
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 0, VCLK2_EN, 1);
+  // Disable Video Clock mux 2 since we are changing its input selection.
+  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(false).WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
   // Disable the div output clock
@@ -298,41 +310,66 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
   // Enable the final output clock
   SET_BIT32(HHI, HHI_VID_PLL_CLK_DIV, 1, 19, 1);  // Undocumented register bit
 
-  // Undocumented register bits
-  SET_BIT32(HHI, HHI_VDIN_MEAS_CLK_CNTL, 0, 21, 3);
-  SET_BIT32(HHI, HHI_VDIN_MEAS_CLK_CNTL, 0, 12, 7);
-  SET_BIT32(HHI, HHI_VDIN_MEAS_CLK_CNTL, 1, 20, 1);
+  // Enable DSI measure clocks.
+  VideoInputMeasureClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_dsi_measure_clock_selection(
+          VideoInputMeasureClockControl::ClockSource::kExternalOscillator24Mhz)
+      .WriteTo(&*hhi_mmio_);
+  VideoInputMeasureClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .SetDsiMeasureClockDivider(1)
+      .WriteTo(&*hhi_mmio_);
+  VideoInputMeasureClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_dsi_measure_clock_enabled(true)
+      .WriteTo(&*hhi_mmio_);
 
-  // USE VID_PLL
-  SET_BIT32(HHI, HHI_MIPIDSI_PHY_CLK_CNTL, 0, 12, 3);
-  // enable dsi_phy_clk
-  SET_BIT32(HHI, HHI_MIPIDSI_PHY_CLK_CNTL, 1, 8, 1);
-  // set divider to 0 -- undocumented
-  SET_BIT32(HHI, HHI_MIPIDSI_PHY_CLK_CNTL, 0, 0, 7);
+  // Use Video PLL (vid_pll) as MIPI_DSY PHY clock source.
+  MipiDsiPhyClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_clock_source(MipiDsiPhyClockControl::ClockSource::kVideoPll)
+      .WriteTo(&*hhi_mmio_);
+  // Enable MIPI-DSY PHY clock.
+  MipiDsiPhyClockControl::Get().ReadFrom(&*hhi_mmio_).set_enabled(true).WriteTo(&*hhi_mmio_);
+  // Set divider to 1.
+  // TODO(fxbug.dev/131925): This should occur before enabling the clock.
+  MipiDsiPhyClockControl::Get().ReadFrom(&*hhi_mmio_).SetDivider(1).WriteTo(&*hhi_mmio_);
 
-  // setup the XD divider value
-  SET_BIT32(HHI, HHI_VIID_CLK_DIV, (pll_cfg_.clock_factor - 1), VCLK2_XD, 8);
+  // Set the Video clock 2 divider.
+  VideoClock2Divider::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .SetDivider2(pll_cfg_.clock_factor)
+      .WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
-  // select vid_pll_clk
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 0, VCLK2_CLK_IN_SEL, 3);
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 1, VCLK2_EN, 1);
+  VideoClock2Control::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_mux_source(VideoClockMuxSource::kVideoPll)
+      .WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(true).WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(2)));
 
-  // [15:12] encl_clk_sel, select vclk2_div1
-  SET_BIT32(HHI, HHI_VIID_CLK_DIV, 8, ENCL_CLK_SEL, 4);
-  // release vclk2_div_reset and enable vclk2_div
-  SET_BIT32(HHI, HHI_VIID_CLK_DIV, 1, VCLK2_XD_EN, 2);
+  // Select video clock 2 for ENCL clock.
+  VideoClock2Divider::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_encl_clock_selection(EncoderClockSource::kVideoClock2)
+      .WriteTo(&*hhi_mmio_);
+  // Enable video clock 2 divider.
+  VideoClock2Divider::Get().ReadFrom(&*hhi_mmio_).set_divider_enabled(true).WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 1, VCLK2_DIV1_EN, 1);
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 1, VCLK2_SOFT_RST, 1);
+  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_div1_enabled(true).WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_soft_reset(true).WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
-  SET_BIT32(HHI, HHI_VIID_CLK_CNTL, 0, VCLK2_SOFT_RST, 1);
+  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_soft_reset(false).WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
-  // enable CTS_ENCL clk gate
-  SET_BIT32(HHI, HHI_VID_CLK_CNTL2, 1, ENCL_GATE_VCLK, 1);
+  // Enable ENCL clock output.
+  VideoClockOutputControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_encoder_lvds_enabled(true)
+      .WriteTo(&*hhi_mmio_);
 
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 

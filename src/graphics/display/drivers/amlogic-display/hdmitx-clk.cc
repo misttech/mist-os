@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
+#include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
@@ -77,12 +78,14 @@ zx_status_t HdmiHost::ConfigurePll() {
         .set_viu2_sel_venc(static_cast<uint8_t>(pll->viu_type))
         .WriteTo(&(*vpu_mmio_));
   }
-  HhiHdmiClkCntlReg::Get()
-      .ReadFrom(&(*hhi_mmio_))
-      .set_clk_sel(0)
-      .set_clk_div(0)
-      .set_clk_en(1)
-      .WriteTo(&(*hhi_mmio_));
+  HdmiClockControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_hdmi_tx_system_clock_selection(
+          HdmiClockControl::HdmiTxSystemClockSource::kExternalOscillator24Mhz)
+      .SetHdmiTxSystemClockDivider(1)
+      .set_hdmi_tx_system_clock_enabled(true)
+      .WriteTo(&*hhi_mmio_);
+
   ConfigureHpllClkOut(pll->hpll_clk_out);
 
   HhiHdmiPllCntlReg::Get()
@@ -94,40 +97,58 @@ zx_status_t HdmiHost::ConfigurePll() {
 
   ConfigureOd3Div(static_cast<uint8_t>(pll->vid_pll_div));
 
-  HhiVidClkCntlReg::Get().ReadFrom(&(*hhi_mmio_)).set_clk_in_sel(0).WriteTo(&(*hhi_mmio_));
-  HhiVidClkDivReg::Get()
+  VideoClock1Control::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_mux_source(VideoClockMuxSource::kVideoPll)
+      .WriteTo(&*hhi_mmio_);
+  VideoClock1Divider::Get()
       .ReadFrom(&(*hhi_mmio_))
-      .set_xd0((pll->vid_clk_div == 0) ? 0 : (pll->vid_clk_div - 1))
+      .SetDivider0((pll->vid_clk_div == 0) ? 1 : (pll->vid_clk_div))
       .WriteTo(&(*hhi_mmio_));
-  HhiVidClkCntlReg::Get()
+  VideoClock1Control::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_div4_enabled(true)
+      .set_div2_enabled(true)
+      .set_div1_enabled(true)
+      .WriteTo(&*hhi_mmio_);
+
+  HdmiClockControl::Get()
       .ReadFrom(&(*hhi_mmio_))
-      .set_div4_en(1)
-      .set_div2_en(1)
-      .set_div1_en(1)
+      .set_hdmi_tx_pixel_clock_selection(HdmiClockControl::HdmiTxPixelClockSource::kVideoClock1)
       .WriteTo(&(*hhi_mmio_));
 
-  HhiHdmiClkCntlReg::Get()
-      .ReadFrom(&(*hhi_mmio_))
-      .set_crt_hdmi_pixel_clk_sel((pll->hdmi_tx_pixel_div == 12) ? 4
-                                                                 : (pll->hdmi_tx_pixel_div >> 1))
-      .WriteTo(&(*hhi_mmio_));
-  HhiVidClkCntl2Reg::Get().ReadFrom(&(*hhi_mmio_)).set_hdmi_tx_pixel_clk(1).WriteTo(&(*hhi_mmio_));
+  VideoClockOutputControl::Get()
+      .ReadFrom(&*hhi_mmio_)
+      .set_hdmi_tx_pixel_clock_enabled(true)
+      .WriteTo(&*hhi_mmio_);
 
   if (pll->encp_div != (uint32_t)-1) {
-    HhiVidClkDivReg::Get()
+    VideoClock1Divider::Get()
         .ReadFrom(&(*hhi_mmio_))
-        .set_encp_clk_sel((pll->encp_div == 12) ? 4 : (pll->encp_div >> 1))
+        .set_encp_clock_selection(EncoderClockSource::kVideoClock1)
         .WriteTo(&(*hhi_mmio_));
-    HhiVidClkCntl2Reg::Get().ReadFrom(&(*hhi_mmio_)).set_encp(1).WriteTo(&(*hhi_mmio_));
-    HhiVidClkCntlReg::Get().ReadFrom(&(*hhi_mmio_)).set_clk_en0(1).WriteTo(&(*hhi_mmio_));
+    VideoClockOutputControl::Get()
+        .ReadFrom(&*hhi_mmio_)
+        .set_encoder_progressive_enabled(true)
+        .WriteTo(&*hhi_mmio_);
+    VideoClock1Control::Get()
+        .ReadFrom(&(*hhi_mmio_))
+        .set_divider0_enabled(true)
+        .WriteTo(&(*hhi_mmio_));
   }
   if (pll->enci_div != (uint32_t)-1) {
-    HhiVidClkDivReg::Get()
+    VideoClock1Divider::Get()
         .ReadFrom(&(*hhi_mmio_))
-        .set_enci_clk_sel((pll->encp_div == 12) ? 4 : (pll->encp_div >> 1))
+        .set_enci_clock_selection(EncoderClockSource::kVideoClock1)
         .WriteTo(&(*hhi_mmio_));
-    HhiVidClkCntl2Reg::Get().ReadFrom(&(*hhi_mmio_)).set_enci(1).WriteTo(&(*hhi_mmio_));
-    HhiVidClkCntlReg::Get().ReadFrom(&(*hhi_mmio_)).set_clk_en0(1).WriteTo(&(*hhi_mmio_));
+    VideoClockOutputControl::Get()
+        .ReadFrom(&*hhi_mmio_)
+        .set_encoder_interlaced_enabled(true)
+        .WriteTo(&*hhi_mmio_);
+    VideoClock1Control::Get()
+        .ReadFrom(&(*hhi_mmio_))
+        .set_divider0_enabled(true)
+        .WriteTo(&(*hhi_mmio_));
   }
 
   zxlogf(INFO, "done!");

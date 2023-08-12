@@ -8,6 +8,7 @@
 
 #include <limits>
 
+#include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
@@ -92,11 +93,12 @@ zx_status_t HdmiHost::HostOn() {
   SET_BIT32(GPIO_MUX, PERIPHS_PIN_MUX_B, 0x11, 0, 8);
 
   // enable clocks
-  HhiHdmiClkCntlReg::Get()
+  HdmiClockControl::Get()
       .ReadFrom(&(*hhi_mmio_))
-      .set_clk_div(0)
-      .set_clk_en(1)
-      .set_clk_sel(0)
+      .SetHdmiTxSystemClockDivider(1)
+      .set_hdmi_tx_system_clock_enabled(true)
+      .set_hdmi_tx_system_clock_selection(
+          HdmiClockControl::HdmiTxSystemClockSource::kExternalOscillator24Mhz)
       .WriteTo(&(*hhi_mmio_));
 
   // enable clk81 (needed for HDMI module and a bunch of other modules)

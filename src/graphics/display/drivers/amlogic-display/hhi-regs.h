@@ -22,20 +22,9 @@
 #define HHI_MEM_PD_REG0 (0x040 << 2)
 #define HHI_VPU_MEM_PD_REG0 (0x041 << 2)
 #define HHI_VPU_MEM_PD_REG1 (0x042 << 2)
-#define HHI_VIID_CLK_DIV (0x04a << 2)
-#define HHI_VIID_CLK_CNTL (0x04b << 2)
 #define HHI_VPU_MEM_PD_REG2 (0x04d << 2)
 #define HHI_GCLK_MPEG2 (0x052 << 2)
-#define HHI_VID_CLK_DIV (0x059 << 2)
-#define HHI_VID_CLK_CNTL (0x5f << 2)
-#define HHI_VID_CLK_CNTL2 (0x065 << 2)
 #define HHI_VID_PLL_CLK_DIV (0x068 << 2)
-#define HHI_VPU_CLK_CNTL (0x06f << 2)
-#define HHI_HDMI_CLK_CNTL (0x073 << 2)
-#define HHI_VAPBCLK_CNTL (0x07d << 2)
-#define HHI_VPU_CLKB_CNTL (0x083 << 2)
-#define HHI_VDIN_MEAS_CLK_CNTL (0x094 << 2)
-#define HHI_MIPIDSI_PHY_CLK_CNTL (0x095 << 2)
 #define HHI_VDAC_CNTL0_G12A (0x0bb << 2)
 #define HHI_VDAC_CNTL1_G12A (0x0bc << 2)
 #define HHI_HDMI_PLL_CNTL0 (0x0c8 << 2)
@@ -138,56 +127,6 @@
 
 // HHI_MIPI_CNTL2 Register Bit Def
 #define MIPI_CNTL2_DEFAULT_VAL (0x2680fc5a)  // 4-lane DSI LINK
-
-// HHI_VIID_CLK_DIV Register Bit Def
-#define DAC0_CLK_SEL (28)
-#define DAC1_CLK_SEL (24)
-#define DAC2_CLK_SEL (20)
-#define VCLK2_XD_RST (17)
-#define VCLK2_XD_EN (16)
-#define ENCL_CLK_SEL (12)
-#define VCLK2_XD (0)
-
-// HHI_VIID_CLK_CNTL Register Bit Def
-#define VCLK2_EN (19)
-#define VCLK2_CLK_IN_SEL (16)
-#define VCLK2_SOFT_RST (15)
-#define VCLK2_DIV12_EN (4)
-#define VCLK2_DIV6_EN (3)
-#define VCLK2_DIV4_EN (2)
-#define VCLK2_DIV2_EN (1)
-#define VCLK2_DIV1_EN (0)
-
-// HHI_VIID_DIVIDER_CNTL Register Bit Def
-#define DIV_CLK_IN_EN (16)
-#define DIV_CLK_SEL (15)
-#define DIV_POST_TCNT (12)
-#define DIV_LVDS_CLK_EN (11)
-#define DIV_LVDS_DIV2 (10)
-#define DIV_POST_SEL (8)
-#define DIV_POST_SOFT_RST (7)
-#define DIV_PRE_SEL (4)
-#define DIV_PRE_SOFT_RST (3)
-#define DIV_POST_RST (1)
-#define DIV_PRE_RST (0)
-
-// HHI_VID_CLK_DIV Register Bit Def
-#define ENCI_CLK_SEL (28)
-#define ENCP_CLK_SEL (24)
-#define ENCT_CLK_SEL (20)
-#define VCLK_XD_RST (17)
-#define VCLK_XD_EN (16)
-#define ENCL_CLK_SEL (12)
-#define VCLK_XD1 (8)
-#define VCLK_XD0 (0)
-
-// HHI_VID_CLK_CNTL2 Register Bit Def
-#define HDMI_TX_PIXEL_GATE_VCLK (5)
-#define VDAC_GATE_VCLK (4)
-#define ENCL_GATE_VCLK (3)
-#define ENCP_GATE_VCLK (2)
-#define ENCT_GATE_VCLK (1)
-#define ENCI_GATE_VCLK (0)
 
 // HHI_HDMI_PHY_CNTL Register Bit Def
 #define LCD_PLL_LOCK_HPLL_G12A (31)
@@ -342,53 +281,6 @@ class HhiHdmiPllVlockCntl : public hwreg::RegisterBase<HhiHdmiPllVlockCntl, uint
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllVlockCntl>(HHI_HDMI_PLL_VLOCK_CNTL); }
 };
 
-class HhiVidClkCntlReg : public hwreg::RegisterBase<HhiVidClkCntlReg, uint32_t> {
- public:
-  DEF_FIELD(31, 21, tcon_clk0_ctrl);
-  DEF_BIT(20, clk_en1);
-  DEF_BIT(19, clk_en0);
-  DEF_FIELD(18, 16, clk_in_sel);
-  DEF_BIT(15, soft_reset);
-  DEF_BIT(14, ph23_enable);
-  DEF_BIT(13, div12_ph23);
-  DEF_BIT(4, div12_en);
-  DEF_BIT(3, div6_en);
-  DEF_BIT(2, div4_en);
-  DEF_BIT(1, div2_en);
-  DEF_BIT(0, div1_en);
-
-  static auto Get() { return hwreg::RegisterAddr<HhiVidClkCntlReg>(HHI_VID_CLK_CNTL); }
-};
-
-class HhiVidClkCntl2Reg : public hwreg::RegisterBase<HhiVidClkCntl2Reg, uint32_t> {
- public:
-  // Gated Clock Control
-  DEF_BIT(8, atv_demod_vdac);
-  DEF_BIT(7, lcd_an_clk_phy2);
-  DEF_BIT(6, lcd_an_clk_phy3);
-  DEF_BIT(5, hdmi_tx_pixel_clk);
-  DEF_BIT(4, vdac_clk);
-  DEF_BIT(3, encl);
-  DEF_BIT(2, encp);
-  DEF_BIT(1, enct);
-  DEF_BIT(0, enci);
-
-  static auto Get() { return hwreg::RegisterAddr<HhiVidClkCntl2Reg>(HHI_VID_CLK_CNTL2); }
-};
-
-class HhiVidClkDivReg : public hwreg::RegisterBase<HhiVidClkDivReg, uint32_t> {
- public:
-  DEF_FIELD(31, 28, enci_clk_sel);
-  DEF_FIELD(27, 24, encp_clk_sel);
-  DEF_FIELD(23, 20, enct_clk_sel);
-  DEF_BIT(17, clk_div_reset);
-  DEF_BIT(16, clk_div_en);
-  DEF_FIELD(15, 8, xd1);
-  DEF_FIELD(7, 0, xd0);
-
-  static auto Get() { return hwreg::RegisterAddr<HhiVidClkDivReg>(HHI_VID_CLK_DIV); }
-};
-
 //
 // A311D datasheet Section 8.7.1.3 "HDMI Clock Tree" Figure 8-12 "HDMI Clock
 // Tree"
@@ -401,21 +293,6 @@ class HhiVidPllClkDivReg : public hwreg::RegisterBase<HhiVidPllClkDivReg, uint32
   DEF_FIELD(14, 0, shift_preset);
 
   static auto Get() { return hwreg::RegisterAddr<HhiVidPllClkDivReg>(HHI_VID_PLL_CLK_DIV); }
-};
-
-//
-// A311D datasheet Section 8.7.1.3 "HDMI Clock Tree"
-class HhiHdmiClkCntlReg : public hwreg::RegisterBase<HhiHdmiClkCntlReg, uint32_t> {
- public:
-  DEF_FIELD(19, 16, crt_hdmi_pixel_clk_sel);
-  DEF_FIELD(10, 9, clk_sel);  // 0: oscin
-                              // 1: fclk_div4
-                              // 2: fclk_div3
-                              // 3: fclk_div5
-  DEF_BIT(8, clk_en);
-  DEF_FIELD(6, 0, clk_div);
-
-  static auto Get() { return hwreg::RegisterAddr<HhiHdmiClkCntlReg>(HHI_HDMI_CLK_CNTL); }
 };
 
 class HhiMemPdReg0 : public hwreg::RegisterBase<HhiMemPdReg0, uint32_t> {
@@ -528,7 +405,6 @@ class HhiHdmiPhyStatusReg : public hwreg::RegisterBase<HhiHdmiPhyStatusReg, uint
 
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyStatusReg>(HHI_HDMI_PHY_STATUS); }
 };
-
 
 }  // namespace amlogic_display
 
