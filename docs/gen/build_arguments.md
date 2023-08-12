@@ -5581,7 +5581,7 @@ A list of binary labels to include in ZBIs built for this product.
 
 **Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
-From //products/bringup.gni:25
+From //products/bringup.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -5589,7 +5589,7 @@ From //build/product.gni:14
 
 **Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
-From //products/bringup.gni:25
+From //products/bringup.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -6252,7 +6252,7 @@ Chooses the executable template for performance tests
 
 **Current value (from the default):** `"pw_executable"`
 
-From //third_party/pigweed/src/pw_perf_test/perf_test.gni:30
+From //third_party/pigweed/src/pw_perf_test/perf_test.gni:31
 
 ### pw_perf_test_MAIN_FUNCTION
 
@@ -6260,7 +6260,7 @@ Chooses the EventHandler for running the perf tests
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_perf_test:log_perf_handler_main"`
 
-From //third_party/pigweed/src/pw_perf_test/perf_test.gni:27
+From //third_party/pigweed/src/pw_perf_test/perf_test.gni:28
 
 ### pw_perf_test_TIMER_INTERFACE_BACKEND
 
@@ -6268,7 +6268,7 @@ Chooses the backend for how the framework calculates time
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_perf_test/perf_test.gni:24
+From //third_party/pigweed/src/pw_perf_test/perf_test.gni:25
 
 ### pw_preprocessor_CONFIG
 
