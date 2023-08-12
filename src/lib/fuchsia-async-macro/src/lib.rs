@@ -85,7 +85,7 @@ fn executor_ident() -> Ident {
 
 fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemFn);
-    let syn::ItemFn { attrs, sig, vis: _, block } = item;
+    let syn::ItemFn { attrs, sig, vis, block } = item;
     if let Err(e) = (|| {
         // Disallow const, unsafe or abi linkage, generics etc
         if let Some(c) = &sig.constness {
@@ -149,7 +149,7 @@ fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStre
     let output = quote_spanned! {span=>
         // Preserve any original attributes.
         #(#attrs)* #test
-        fn #ident () #ret_type {
+        #vis fn #ident () #ret_type {
             // Note: `ItemFn::block` includes the function body braces. Do not add
             // additional braces (will break source code coverage analysis).
             // TODO(fxbug.dev/77212): Try to improve the Rust compiler to ease
