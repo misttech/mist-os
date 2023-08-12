@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 from dataclasses import dataclass
 from dataclasses import field
 import functools
@@ -13,6 +14,7 @@ import json
 import os
 import random
 import re
+import signal
 import sys
 import typing
 
@@ -24,6 +26,7 @@ import event
 import execution
 import log
 import selection
+import statusinfo
 import termout
 import test_list_file
 import tests_json_file
@@ -31,7 +34,30 @@ import util.command as command
 
 
 def main():
-    asyncio.run(async_main(args.parse_args()))
+    # Main entrypoint.
+    # Set up the event loop to catch termination signals (i.e. Ctrl+C), and
+    # cancel the main task when they are received.
+    fut = asyncio.ensure_future(async_main(args.parse_args()))
+    register_on_terminate_signal(fut.cancel)
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(fut)
+    except asyncio.CancelledError:
+        print("\n\nReceived interrupt, exiting")
+
+
+def register_on_terminate_signal(fn: typing.Callable):
+    """Run a callable when a termination signal is caught by this program.
+
+    When either SIGTERM or SIGINT is caught by this program, call
+    the given function.
+
+    Args:
+        fn (typing.Callable): The function to call.
+    """
+    loop = asyncio.get_event_loop()
+    for s in [signal.SIGTERM, signal.SIGINT]:
+        loop.add_signal_handler(s, fn)
 
 
 async def async_main(flags: args.Flags):
@@ -103,6 +129,17 @@ async def async_main(flags: args.Flags):
         recorder.emit_instruction_message(f"Logging all output to: {exec_env.log_file}")
         recorder.emit_instruction_message(
             "Use the `--logpath` argument to specify a log location or `--no-log` to disable\n"
+        )
+
+        # For convenience, display the log output path when the program exits.
+        # Since the async loop may already be exited at that point, directly
+        # print to the console.
+        atexit.register(
+            print,
+            statusinfo.dim(
+                f"Output was logged to: {os.path.relpath(exec_env.log_file, os.getcwd())}",
+                style=flags.style,
+            ),
         )
 
     # Print a message for users who want to know how to see all test output.
