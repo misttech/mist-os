@@ -1,51 +1,69 @@
 # fx test (rewrite)
 
-This directory contains the source code for `fx test2`, the new version of `fx test`.
+This directory contains the source code for a rewrite of `fx test`.
 
-This tool is under active development and should be considered an incomplete work in progress.
-You can access the current state of the tool using `fx test2`. See below for the full migration roadmap.
+This tool is ready for early use, but many features are still missing.
+
+For the current status, see [b/293917801](http://b/293917801) and its dependencies.
+
+You can use the new `fx test` locally as follows:
+
+```bash
+$ export FUCHSIA_DISABLED_legacy_fxtest=1
+fx test
+
+# To revert
+unset FUCHSIA_DISABLED_legacy_fxtest
+```
+
+Or for an individual run:
+
+```bash
+fx --disable=legacy_fxtest test
+```
 
 ## Roadmap
 
-Current Status: **Work In Progress (1)**.
+Current Status: **Fishfood release (2)**.
 
-1. **Work in progress**
+1. Work in progress
 
-   The in-development rewrite of `fx test` will be available at `fx test2`.
+   Choice of `fx test` implementation is controlled by the `fx`
+   flag `legacy_fxtest`, which is enabled by default. Disabling the
+   flag, as shown above, provides access to the new implementation.
+
    It is **not** feature complete and does not meet the requirements
    of Fuchsia testing.
 
-1. "Fishfood" release
+1. **"Fishfood" release**
 
-   `fx test2` roughly has the features necessary to do testing for
-   Fuchsia. It may still be missing critical features, but we want
-   an initial set of users trying it for more of their testing
-   workflows.
+   The new implementation roughly has the features necessary to
+   do testing for Fuchsia. It is still missing critical features,
+   but we want an initial set of users trying it for more of their
+   testing workflows.
 
 1. "Dogfood" release
 
-   `fx test2` meets or exceeds feature parity with `fx test`. We
-   will encourage all developers to use `fx test2` as their daily
-   driver. `fx test` will show an informational message encouraging
-   users to switch.
+   The new implementation meets or exceeds feature parity with the
+   old implementation, and we encourage all developers to disable
+   the `legacy_fxtest` flag to use the new implementation as their
+   daily driver.
 
 1. Pre-release
 
-   `fx test2` is the preferred way to test. `fx test` will display
-   a warning to switch or alias `fx test=fx test2`
+   The old implementation will show a warning that `legacy_fxtest=0`
+   will become the default, and they should switch.
 
 1. Release
 
-   `fx test2` is the default way to test, and will be renamed to
-   `fx test`. The old `fx test` will be renamed to `fx test1` to
-   provide an escape hatch for unforeseen issues. `fx test2` will
-   be an alias for `fx test` and will print a warning to switch to
-   calling `fx test` directly.
+   `legacy_fxtest=0` becomes the default. The new implementation
+   provides information on how to revert back to the old behavior
+   if needed and where to file a bug.
 
 1. Post-release cleanup
 
-   `fx test` (previously `fx test2`) is the only way to test. `fx
-   test2` and `fx test` aliases will be deleted.
+   The `legacy_fxtest` flag is removed, and the old implementation
+   of `fx test` is deleted.
 
 ## Development Instructions
 
@@ -55,7 +73,7 @@ tool.
 
 ### Build just the tool
 
-To build only `fx test2`, run:
+To build only the new implementation, run:
 
 ```
 fx build host-tools/test2
@@ -65,12 +83,14 @@ This avoids a full build.
 
 ### Include and run tests
 
-To test `fx test2`'s libraries, include
+To test the new implementation's libraries, include
 `--with //scripts/tools/fxtest/rewrite:tests` in your `fx set`.
 For example:
 
 ```bash
 fx set core.x64 --with //scripts/tools/fxtest/rewrite:tests
+
+# This, ironically, does not yet work with the new implementation!
 fx test --host
 ```
 

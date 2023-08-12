@@ -95,6 +95,16 @@ async def async_main(flags: args.Flags):
     # Initialize event recording.
     recorder.emit_init()
 
+    info_first_line = (
+        "✅ You are using the new fx test, which is currently in Fishfood ✅"
+    )
+    info_block = """See details here: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
+To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please file a bug under b/293917801.
+"""
+
+    recorder.emit_info_message(info_first_line)
+    recorder.emit_instruction_message(info_block)
+
     # Try to parse the flags. Emit one event before and another
     # after flag post processing.
     try:

@@ -4,6 +4,7 @@
 
 import 'dart:io';
 
+import 'package:io/ansi.dart';
 import 'package:args/args.dart';
 import 'package:fxtest/fxtest.dart';
 import 'package:fxutils/fxutils.dart';
@@ -74,6 +75,10 @@ class FuchsiaTestCommandCli {
   }
 
   Future<void> run() async {
+    print('Want to try something new? 🤔\n' +
+        'The rewrite of `fx test` is in Fishfood. 🐟\n' +
+        'Learn more: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite');
+
     _cmd = createCommand();
 
     //register a listener for when run completes, which resolves the
