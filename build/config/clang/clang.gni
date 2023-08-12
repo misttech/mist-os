@@ -31,3 +31,9 @@ declare_args() {
 # The value of clang_prefix relative to root_build_dir, useful
 # when expanding it in command arguments.
 rebased_clang_prefix = rebase_path(clang_prefix, root_build_dir)
+
+# TODO(https://fxbug.dev/132101): Enable clang_ml_inliner when
+# the mac-arm64 toolchain supports it.
+if (host_platform == "mac-arm64") {
+  clang_ml_inliner = false
+}
