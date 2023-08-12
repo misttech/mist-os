@@ -340,6 +340,15 @@ else
   fx-info "\n"
 fi
 
+if [[ ! -e "${FUCHSIA_BUILD_DIR}/ssh-keys/ssh_config" ]]; then
+  fx-warn "The ssh config file ${FUCHSIA_BUILD_DIR}/ssh-keys/ssh_config doesn't exist."
+  fx-warn "If 'fx serve' hangs, you may need to run this to fix your ssh configuration:"
+  fx-warn ""
+  fx-warn "\$ fx shell --check"
+  fx-warn ""
+  fx-warn "Then re-run this command."
+fi
+
 log "Discovery..."
 
 # State is used to prevent too much output
