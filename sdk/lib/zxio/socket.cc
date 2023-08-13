@@ -1122,7 +1122,7 @@ struct network_socket : public base_socket<T> {
           __FALLTHROUGH;
         }
       default:
-        return SockOptResult::Errno(EPROTONOSUPPORT);
+        return SockOptResult::Errno(EOPNOTSUPP);
     }
   }
 
@@ -1300,7 +1300,7 @@ struct network_socket : public base_socket<T> {
           __FALLTHROUGH;
         }
       default:
-        return SockOptResult::Errno(EPROTONOSUPPORT);
+        return SockOptResult::Errno(ENOPROTOOPT);
     }
   }
 
@@ -3651,7 +3651,7 @@ static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
           return base_socket(zxio_packet_socket(io).client)
               .get_solsocket_sockopt_fidl(optname, optval, optlen);
         default:
-          return SockOptResult::Errno(EPROTONOSUPPORT);
+          return SockOptResult::Errno(ENOPROTOOPT);
       }
     }();
     *out_code = result.err;
@@ -3665,7 +3665,7 @@ static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
           return base_socket(zxio_packet_socket(io).client)
               .set_solsocket_sockopt_fidl(optname, optval, optlen);
         default:
-          return SockOptResult::Errno(EPROTONOSUPPORT);
+          return SockOptResult::Errno(ENOPROTOOPT);
       }
     }();
     *out_code = result.err;
