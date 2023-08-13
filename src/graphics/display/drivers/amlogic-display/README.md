@@ -171,6 +171,9 @@ The code contains references to the following documents.
 * [AMLogic S905D3 datasheet][s905d3-datasheet] - revision 0.2, released
   2019-05-14; distributed by Khadas for the VIM3L, referenced as "S905D3
   datasheet"
+* [AMLogic S905Y4 datasheet][s905y4-datasheet] - revision 0.7, released
+  2022-09-08, distributed by Khadas for the VIM1S, referenced as "S905Y4
+  datasheet"
 * [AMLogic S912 datasheet][s912-datasheet] - revision 0.1, released 3/14/2017;
   distributed by Khadas for the VIM2, referenced as "S912 datasheet"
 * [Synopsis DesignWare Cores HDMI Transmitter Controller Databook][dw-hdmi-databook]
@@ -181,6 +184,7 @@ The code contains references to the following documents.
 [a311d-datasheet]: https://dl.khadas.com/products/vim3/datasheet/a311d_datasheet_08_wesion.pdf
 [a311d2-datasheet]: https://dl.khadas.com/products/vim4/datasheet/amlogic_a311d2_datasheet_v06.pdf
 [s905d3-datasheet]: https://dl.khadas.com/products/vim3l/datasheet/s905d3_datasheet_0.2_wesion.pdf
+[s905y4-datasheet]: https://dl.khadas.com/products/vim1s/datasheet/amlogic_s905y4_datasheet_v0.7.pdf
 [s912-datasheet]: https://dl.khadas.com/products/vim2/datasheet/s912_datasheet_v0.220170314publicversion-wesion.pdf
 [dw-hmdi-databook]: https://www.synopsys.com/dw/doc.php/iip/DWC_hdmi_tx/2.12a/doc/DWC_hdmi_tx_databook.pdf
 [dw-dsi-databook]: https://www.synopsys.com/dw/doc.php/iip/DWC_mipi_dsi_host/1.51a/doc/DWC_mipi_dsi_host_databook.pdf
