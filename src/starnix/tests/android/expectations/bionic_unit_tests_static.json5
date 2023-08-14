@@ -258,6 +258,10 @@
                 "pthread.pthread_getcpuclockid__clock_gettime",
                 "unistd*.sleep",
 
+                // TODO(https://fxbug.dev/131217): Flaky on the bots - needs to be investigated.
+                "android_mallopt.multiple_enable_gwp_asan",
+                "pidfd.pidfd_open",
+
                 // These tests were updated and no longer pass.
                 "stdio.popen_return_value_signal",
                 "stdio_nofortify.popen_return_value_signal",
