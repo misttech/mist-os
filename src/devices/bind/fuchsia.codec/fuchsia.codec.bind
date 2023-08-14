@@ -5,5 +5,5 @@
 library fuchsia.codec;
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  SERVICE = 23,
+  SERVICE = 0x17,
 };

@@ -5,8 +5,8 @@
 library fuchsia.hid;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  BUS = 22,
-  DEVICE = 23,
+  BUS = 0x16,
+  DEVICE = 0x17,
 };
 
 /// TODO (fxbug.dev/103439): Until bind language can handle lists/vectors better.

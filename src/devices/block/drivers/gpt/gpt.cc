@@ -27,7 +27,7 @@
 #include <mutex>
 
 #include <bind/fuchsia/block/cpp/bind.h>
-#include <bind/fuchsia/gpt/cpp/bind.h>
+#include <bind/fuchsia/block/gpt/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 #include <safemath/checked_math.h>
 
@@ -186,8 +186,8 @@ zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) 
   uint8_to_guid_string(partition_type_guid_, gpt_entry_.type);
 
   const zx_device_str_prop_t str_props[]{
-      {bind_fuchsia_gpt::PARTITIONNAME.c_str(), str_prop_str_val(partition_name_)},
-      {bind_fuchsia_gpt::PARTITIONTYPEGUID.c_str(), str_prop_str_val(partition_type_guid_)},
+      {bind_fuchsia_block_gpt::PARTITION_NAME.c_str(), str_prop_str_val(partition_name_)},
+      {bind_fuchsia_block_gpt::PARTITION_TYPE_GUID.c_str(), str_prop_str_val(partition_type_guid_)},
       {bind_fuchsia_block::IGNOREDEVICE.c_str(), str_prop_bool_val(ignore_device)},
   };
 

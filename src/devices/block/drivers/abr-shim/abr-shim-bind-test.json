@@ -2,7 +2,7 @@
     {
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.BLOCK_IMPL",
-            "fuchsia.gpt.PartitionTypeGuid": "\"1D75395D-F2C6-476B-A8B7-45CC1C97B476\"",
+            "fuchsia.block.gpt.PARTITION_TYPE_GUID": "\"1D75395D-F2C6-476B-A8B7-45CC1C97B476\"",
             "fuchsia.block.IgnoreDevice": "true"
         },
         "expected": "match",
@@ -11,7 +11,7 @@
     {
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.BLOCK",
-            "fuchsia.gpt.PartitionTypeGuid": "\"1D75395D-F2C6-476B-A8B7-45CC1C97B476\"",
+            "fuchsia.block.gpt.PARTITION_TYPE_GUID": "\"1D75395D-F2C6-476B-A8B7-45CC1C97B476\"",
             "fuchsia.block.IgnoreDevice": "true"
         },
         "expected": "abort",
@@ -20,7 +20,7 @@
     {
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.BLOCK_IMPL",
-            "fuchsia.gpt.PartitionTypeGuid": "\"1D75395D-F2C6-476B-A8B7-45CC1C97B476\""
+            "fuchsia.block.gpt.PARTITION_TYPE_GUID": "\"1D75395D-F2C6-476B-A8B7-45CC1C97B476\""
         },
         "expected": "abort",
         "name": "Device not ignored"

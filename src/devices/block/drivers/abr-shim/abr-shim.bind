@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 using fuchsia.block;
+using fuchsia.block.gpt;
 using fuchsia.hardware.block;
-using fuchsia.gpt;
 
 fuchsia.BIND_PROTOCOL == fuchsia.hardware.block.BIND_PROTOCOL.BLOCK_IMPL;
-fuchsia.gpt.PartitionTypeGuid == "1D75395D-F2C6-476B-A8B7-45CC1C97B476";  // GUID_ABR_META_STRING
+fuchsia.block.gpt.PARTITION_TYPE_GUID == "1D75395D-F2C6-476B-A8B7-45CC1C97B476";  // GUID_ABR_META_STRING
 fuchsia.block.IgnoreDevice == true;

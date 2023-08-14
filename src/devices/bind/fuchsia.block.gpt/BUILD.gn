@@ -4,8 +4,7 @@
 
 import("//build/bind/bind.gni")
 
-# TODO(fxb/131608): Move sdk category to partner.
-bind_library("fuchsia.gpt") {
-  sdk_category = "experimental"
-  source = "fuchsia.gpt.bind"
+bind_library("fuchsia.block.gpt") {
+  sdk_category = "partners"
+  source = "fuchsia.block.gpt.bind"
 }

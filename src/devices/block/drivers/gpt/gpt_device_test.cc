@@ -278,11 +278,11 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
     ASSERT_EQ(props.size(), 3);
 
-    EXPECT_STREQ(props[0].key, "fuchsia.gpt.PartitionName");
+    EXPECT_STREQ(props[0].key, "fuchsia.block.gpt.PARTITION_NAME");
     ASSERT_EQ(props[0].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[0].property_value.data.str_val, "Linux filesystem");
 
-    EXPECT_STREQ(props[1].key, "fuchsia.gpt.PartitionTypeGuid");
+    EXPECT_STREQ(props[1].key, "fuchsia.block.gpt.PARTITION_TYPE_GUID");
     ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[1].property_value.data.str_val, "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
 
@@ -301,11 +301,11 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
     ASSERT_EQ(props.size(), 3);
 
-    EXPECT_STREQ(props[0].key, "fuchsia.gpt.PartitionName");
+    EXPECT_STREQ(props[0].key, "fuchsia.block.gpt.PARTITION_NAME");
     ASSERT_EQ(props[0].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[0].property_value.data.str_val, kPartition1Name);
 
-    EXPECT_STREQ(props[1].key, "fuchsia.gpt.PartitionTypeGuid");
+    EXPECT_STREQ(props[1].key, "fuchsia.block.gpt.PARTITION_TYPE_GUID");
     ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[1].property_value.data.str_val, "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
 
