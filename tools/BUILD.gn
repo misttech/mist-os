@@ -124,6 +124,7 @@ group("tests_no_e2e") {
     "//tools/symbolizer:tests",
     "//tools/sys-realm-analyzer:tests($host_toolchain)",
     "//tools/test_list_tool:test_list_tool_test($host_toolchain)",
+    "//tools/test_pilot:tests",
     "//tools/testgen:tests",
     "//tools/testing:tests($host_toolchain)",
     "//tools/update_crates:tests($host_toolchain)",
