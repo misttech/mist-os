@@ -1,5 +1,6 @@
 # This is the stdout of `fx shell run fuchsia-pkg://fuchsia.com/crasher#meta/rust_crasher.cmx`
-thread 'main' panicked at 'I HAVE PANICKED', ../../src/developer/forensics/crasher/rust/src/main.rs:6:5
+thread 'main' panicked at ../../src/developer/forensics/crasher/rust/src/main.rs:6:5
+I HAVE PANICKED
 stack backtrace:
 [[[ELF module #0x0 "" BuildID=e1c9115da8f4a732 0x75701d1000]]]
 [[[ELF module #0x1 "libfdio.so" BuildID=f60992baff92044c 0x260ea9cc000]]]

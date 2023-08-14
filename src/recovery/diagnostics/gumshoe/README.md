@@ -45,9 +45,9 @@ can force this test to fail by altering it:
 and running the "fx test" command above, and then inspecting
 ~/output.txt for the error:
 
-thread 'main' panicked at
-'MockHandlebarsTrait::trait_register_template_file:
-Expectation(<anything>) called more than 3 times'
+thread 'main' panicked at ...:
+MockHandlebarsTrait::trait_register_template_file:
+Expectation(<anything>) called more than 3 times
 
 How To Run Interactively (Harder)
 

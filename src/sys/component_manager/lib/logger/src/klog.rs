@@ -224,10 +224,8 @@ mod tests {
             // This will panic again if the message is not found,
             // and the message will not include "panic_test".
             old_hook(info);
-            expect_message_in_debuglog(format!(
-                "[component_manager] PANIC: panicked at 'panic_test {}'",
-                logged_value
-            ));
+            expect_message_in_debuglog(format!("[component_manager] PANIC: panicked at"));
+            expect_message_in_debuglog(format!("panic_test {logged_value}"));
         }));
 
         init();

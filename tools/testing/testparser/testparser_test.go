@@ -537,11 +537,13 @@ booooo I printed an error, but it doesn't count as fail reason
 [stdout - legacy_test]
 ---- tests::test_add stderr ----
 [stdout - legacy_test]
-thread 'main' panicked at 'assertion failed: ` + "`(left != right)`" + `
+thread 'main' panicked at ../../src/lib/zircon/rust/src/channel.rs:761:9:
+[stdout - legacy_test]
+assertion failed: ` + "`(left != right)`" + `
 [stdout - legacy_test]
   left: ` + "`ObjectType(PORT)`" + `,
 [stdout - legacy_test]
-  right: ` + "`ObjectType(PORT)`', ../../src/lib/zircon/rust/src/channel.rs:761:9`" + `
+  right: ` + "`ObjectType(PORT)`" + `
 [stdout - legacy_test]
 stack backtrace:
 [stdout - legacy_test]
@@ -556,11 +558,13 @@ stack backtrace:
 [stdout - legacy_test]
 ---- tests::test_substract stderr ----
 [stdout - legacy_test]
-thread 'main' panicked at 'assertion failed: ` + "`(left != right)`" + `
+thread 'main' panicked at ../../src/lib/zircon/rust/src/channel.rs:783:9:
+[stdout - legacy_test]
+assertion failed: ` + "`(left != right)`" + `
 [stdout - legacy_test]
   left: ` + "`Err((5, 0))`" + `,
 [stdout - legacy_test]
-  right: ` + "`Err((5, 0))`" + `', ../../src/lib/zircon/rust/src/channel.rs:783:9
+  right: ` + "`Err((5, 0))`" + `
 [stdout - legacy_test]
 stack backtrace:
 [stdout - legacy_test]
@@ -606,14 +610,14 @@ One or more test runs failed.`
 			CaseName:    "test_add",
 			Status:      runtests.TestFailure,
 			Format:      "Rust",
-			FailReason:  "thread 'main' panicked at 'assertion failed: `(left != right)`\n  left: `ObjectType(PORT)`,\n  right: `ObjectType(PORT)`', ../../src/lib/zircon/rust/src/channel.rs:761:9`",
+			FailReason:  "thread 'main' panicked at ../../src/lib/zircon/rust/src/channel.rs:761:9:\nassertion failed: `(left != right)`\n  left: `ObjectType(PORT)`,\n  right: `ObjectType(PORT)`",
 		}, {
 			DisplayName: "tests::test_substract",
 			SuiteName:   "tests",
 			CaseName:    "test_substract",
 			Status:      runtests.TestFailure,
 			Format:      "Rust",
-			FailReason:  "thread 'main' panicked at 'assertion failed: `(left != right)`\n  left: `Err((5, 0))`,\n  right: `Err((5, 0))`', ../../src/lib/zircon/rust/src/channel.rs:783:9",
+			FailReason:  "thread 'main' panicked at ../../src/lib/zircon/rust/src/channel.rs:783:9:\nassertion failed: `(left != right)`\n  left: `Err((5, 0))`,\n  right: `Err((5, 0))`",
 		},
 	}
 	testCaseCmp(t, stdout, want)

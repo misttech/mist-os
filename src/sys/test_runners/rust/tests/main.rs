@@ -99,16 +99,30 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
 
     assert_eq!(expected_events, events_without_failing_test_logs);
 
-    let panic_message = r"thread 'main' panicked at 'I'm supposed panic!()', ../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:20:9";
-    assert!(failing_test_logs.len() > 3, "{:?}", failing_test_logs);
-    assert_eq!(
-        &failing_test_logs[0..3],
-        &[
-            RunEvent::case_stderr("my_tests::failing_test", panic_message),
-            RunEvent::case_stderr("my_tests::failing_test", "stack backtrace:"),
-            RunEvent::case_stderr("my_tests::failing_test", "{{{reset}}}"),
-        ]
-    );
+    let reset = "{{{reset}}}";
+    let (reset_index, _) = failing_test_logs
+        .iter()
+        .enumerate()
+        .find(|(_, event)| {
+            let RunEvent::CaseStderr { name: _, stderr_message: line } = event else {
+                return false;
+            };
+            line == reset
+        })
+        .expect("should have reset log");
+    assert!(failing_test_logs.len() > reset_index, "{:?}", failing_test_logs);
+    let assert_contains = |msg| {
+        failing_test_logs[0..reset_index].iter().any(|event| {
+            let RunEvent::CaseStderr { name: _, stderr_message: line } = event else {
+                return false;
+            };
+            line.contains(msg)
+        })
+    };
+    assert_contains("thread 'main' panicked at");
+    assert_contains("I'm supposed panic!()");
+    assert_contains("../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:20:9");
+    assert_contains("stack backtrace:");
     assert_eq!(
         failing_test_logs.last().unwrap(),
         &RunEvent::case_stderr("my_tests::failing_test", "test failed.")

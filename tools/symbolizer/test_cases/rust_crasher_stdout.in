@@ -1,5 +1,6 @@
 # This is the stdout of `fx shell run fuchsia-pkg://fuchsia.com/crasher#meta/rust_crasher.cmx`
-thread 'main' panicked at 'I HAVE PANICKED', ../../src/developer/forensics/crasher/rust/src/main.rs:6:5
+thread 'main' panicked at ../../src/developer/forensics/crasher/rust/src/main.rs:6:5
+I HAVE PANICKED
 stack backtrace:
 {{{reset}}}
 {{{module:0x0::elf:e1c9115da8f4a732}}}
