@@ -76,6 +76,7 @@ if (labels.images == "//build/images/bringup") {
       storage = {
         configure_fshost = true
         filesystems = {
+          no_zxcrypt = true
           volume = {
             fvm = {
               data = {
@@ -143,6 +144,7 @@ if (labels.images == "//build/images/bringup") {
     ]
 
     fshost_config = {
+      forward_variables_from(board_fshost_config, "*")
       no_zxcrypt = true
     }
 
