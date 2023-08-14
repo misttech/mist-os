@@ -74,6 +74,7 @@ if (labels.images == "//build/images/bringup") {
       build_type = "eng"
       feature_set_level = "utility"
       storage = {
+        configure_fshost = true
         filesystems = {
           volume = {
             fvm = {
@@ -101,6 +102,7 @@ if (labels.images == "//build/images/bringup") {
     image_name = "fuchsia"
     product_assembly_config_label = ":product_assembly_config"
     board_config = board_information_for_assembly
+    use_assembly_fshost = true
 
     # As `:product_assembly_config` specifies an `eng` build-type, the assembly
     # needs to be allowed to use the "eng" platform bundles as deps / inputs.

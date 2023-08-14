@@ -406,92 +406,93 @@ impl ImagesConfig {
         }
 
         // Add the filesystems specified in the product.
-        match &product.volume {
-            pfc::VolumeConfig::NoVolume => {}
-            pfc::VolumeConfig::Fxfs => {
-                let size_bytes = board.fxfs.size_bytes;
-                images.push(Image::Fxfs(Fxfs { size_bytes }));
-            }
-            pfc::VolumeConfig::Fvm(fvm) => {
-                let slice_size = board.fvm.slice_size.0;
+        if product.image_mode != pfc::FilesystemImageMode::NoImage {
+            match &product.volume {
+                pfc::VolumeConfig::Fxfs => {
+                    let size_bytes = board.fxfs.size_bytes;
+                    images.push(Image::Fxfs(Fxfs { size_bytes }));
+                }
+                pfc::VolumeConfig::Fvm(fvm) => {
+                    let slice_size = board.fvm.slice_size.0;
 
-                // Construct the list of FVM filesystems.
-                let mut filesystems = vec![];
-                let mut filesystem_names = vec![];
-                if let Some(_) = fvm.data {
-                    filesystems
-                        .push(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
-                    filesystem_names.push("empty-data".to_string());
-                }
-                if let Some(pfc::BlobFvmVolumeConfig { blob_layout }) = &fvm.blob {
-                    filesystems.push(FvmFilesystem::BlobFS(BlobFS {
-                        name: "blob".into(),
-                        layout: blob_layout.clone(),
-                        maximum_bytes: board.fvm.blobfs.build_time_maximum_bytes,
-                        minimum_data_bytes: board.fvm.blobfs.minimum_data_bytes,
-                        minimum_inodes: board.fvm.blobfs.minimum_inodes,
-                        maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
-                    }));
-                    filesystem_names.push("blob".to_string());
-                }
-                if let Some(pfc::ReservedFvmVolumeConfig { reserved_bytes }) = fvm.reserved {
-                    filesystems.push(FvmFilesystem::Reserved(Reserved {
-                        name: "internal".into(),
-                        slices: reserved_bytes,
-                    }));
-                    filesystem_names.push("internal".to_string());
-                }
-
-                // Construct the list of FVM outputs.
-                let mut outputs = vec![];
-                outputs.push(FvmOutput::Standard(StandardFvm {
-                    name: "fvm".into(),
-                    filesystems: filesystem_names.clone(),
-                    compress: false,
-                    resize_image_file_to_fit: false,
-                    truncate_to_length: board.fvm.truncate_to_length.clone(),
-                }));
-                if let Some(sparse) = &board.fvm.sparse_output {
-                    outputs.push(FvmOutput::Sparse(SparseFvm {
-                        name: "fvm.sparse".into(),
-                        filesystems: filesystem_names.clone(),
-                        max_disk_size: sparse.max_disk_size.clone(),
-                    }));
-                }
-                if board.fvm.fastboot_output.is_some() && board.fvm.nand_output.is_some() {
-                    bail!("A board may only build either a fastboot or nand FVM but not both");
-                }
-                if let Some(fastboot) = &board.fvm.fastboot_output {
+                    // Construct the list of FVM filesystems.
+                    let mut filesystems = vec![];
+                    let mut filesystem_names = vec![];
+                    if let Some(_) = fvm.data {
+                        filesystems.push(FvmFilesystem::EmptyData(EmptyData {
+                            name: "empty-data".into(),
+                        }));
+                        filesystem_names.push("empty-data".to_string());
+                    }
+                    if let Some(pfc::BlobFvmVolumeConfig { blob_layout }) = &fvm.blob {
+                        filesystems.push(FvmFilesystem::BlobFS(BlobFS {
+                            name: "blob".into(),
+                            layout: blob_layout.clone(),
+                            maximum_bytes: board.fvm.blobfs.build_time_maximum_bytes,
+                            minimum_data_bytes: board.fvm.blobfs.minimum_data_bytes,
+                            minimum_inodes: board.fvm.blobfs.minimum_inodes,
+                            maximum_contents_size: board.fvm.blobfs.size_checker_maximum_bytes,
+                        }));
+                        filesystem_names.push("blob".to_string());
+                    }
+                    if let Some(pfc::ReservedFvmVolumeConfig { reserved_bytes }) = fvm.reserved {
+                        filesystems.push(FvmFilesystem::Reserved(Reserved {
+                            name: "internal".into(),
+                            slices: reserved_bytes,
+                        }));
+                        filesystem_names.push("internal".to_string());
+                    }
+                    // Construct the list of FVM outputs.
+                    let mut outputs = vec![];
                     outputs.push(FvmOutput::Standard(StandardFvm {
-                        name: "fvm.fastboot".into(),
+                        name: "fvm".into(),
                         filesystems: filesystem_names.clone(),
-                        compress: fastboot.compress,
-                        resize_image_file_to_fit: true,
-                        truncate_to_length: fastboot.truncate_to_length.clone(),
+                        compress: false,
+                        resize_image_file_to_fit: false,
+                        truncate_to_length: board.fvm.truncate_to_length.clone(),
                     }));
-                } else if let Some(nand) = &board.fvm.nand_output {
-                    let bfc::NandFvmConfig {
-                        max_disk_size,
-                        compress,
-                        block_count,
-                        oob_size,
-                        page_size,
-                        pages_per_block,
-                    } = nand.clone();
-                    outputs.push(FvmOutput::Nand(NandFvm {
-                        name: "fvm.fastboot".into(),
-                        filesystems: filesystem_names.clone(),
-                        max_disk_size,
-                        compress,
-                        block_count,
-                        oob_size,
-                        page_size,
-                        pages_per_block,
-                    }));
-                }
+                    if let Some(sparse) = &board.fvm.sparse_output {
+                        outputs.push(FvmOutput::Sparse(SparseFvm {
+                            name: "fvm.sparse".into(),
+                            filesystems: filesystem_names.clone(),
+                            max_disk_size: sparse.max_disk_size.clone(),
+                        }));
+                    }
+                    if board.fvm.fastboot_output.is_some() && board.fvm.nand_output.is_some() {
+                        bail!("A board may only build either a fastboot or nand FVM but not both");
+                    }
+                    if let Some(fastboot) = &board.fvm.fastboot_output {
+                        outputs.push(FvmOutput::Standard(StandardFvm {
+                            name: "fvm.fastboot".into(),
+                            filesystems: filesystem_names.clone(),
+                            compress: fastboot.compress,
+                            resize_image_file_to_fit: true,
+                            truncate_to_length: fastboot.truncate_to_length.clone(),
+                        }));
+                    } else if let Some(nand) = &board.fvm.nand_output {
+                        let bfc::NandFvmConfig {
+                            max_disk_size,
+                            compress,
+                            block_count,
+                            oob_size,
+                            page_size,
+                            pages_per_block,
+                        } = nand.clone();
+                        outputs.push(FvmOutput::Nand(NandFvm {
+                            name: "fvm.fastboot".into(),
+                            filesystems: filesystem_names.clone(),
+                            max_disk_size,
+                            compress,
+                            block_count,
+                            oob_size,
+                            page_size,
+                            pages_per_block,
+                        }));
+                    }
 
-                // Add the FVM images.
-                images.push(Image::Fvm(Fvm { slice_size, filesystems, outputs }));
+                    // Add the FVM images.
+                    images.push(Image::Fvm(Fvm { slice_size, filesystems, outputs }));
+                }
             }
         }
 
@@ -538,6 +539,7 @@ mod tests {
                     truncate_to_length: Some(3456),
                 }),
             },
+            gpt_all: false,
         }
     }
 
@@ -578,17 +580,20 @@ mod tests {
                 }),
                 fastboot_output: None,
             },
+            gpt_all: false,
         }
     }
 
     #[test]
-    fn from_product_and_board_no_volume() {
+    fn from_product_and_board_no_images() {
         let board = test_board_config_fastboot();
         let product = pfc::ProductFilesystemConfig {
             image_name: pfc::ImageName("a-product".into()),
             watch_for_nand: false,
             format_data_on_corruption: pfc::FormatDataOnCorruption(true),
-            volume: pfc::VolumeConfig::NoVolume,
+            no_zxcrypt: false,
+            image_mode: pfc::FilesystemImageMode::NoImage,
+            volume: pfc::VolumeConfig::Fxfs,
         };
 
         let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
@@ -622,6 +627,8 @@ mod tests {
             image_name: pfc::ImageName("a-product".into()),
             watch_for_nand: false,
             format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            no_zxcrypt: false,
+            image_mode: pfc::FilesystemImageMode::Partition,
             volume: pfc::VolumeConfig::Fxfs,
         };
 
@@ -657,6 +664,8 @@ mod tests {
             image_name: pfc::ImageName("a-product".into()),
             watch_for_nand: false,
             format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            no_zxcrypt: false,
+            image_mode: pfc::FilesystemImageMode::Partition,
             volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
                 data: Some(pfc::DataFvmVolumeConfig {
                     use_disk_based_minfs_migration: true,
@@ -749,6 +758,8 @@ mod tests {
             image_name: pfc::ImageName("a-product".into()),
             watch_for_nand: false,
             format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            no_zxcrypt: false,
+            image_mode: pfc::FilesystemImageMode::Partition,
             volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
                 data: Some(pfc::DataFvmVolumeConfig {
                     use_disk_based_minfs_migration: true,

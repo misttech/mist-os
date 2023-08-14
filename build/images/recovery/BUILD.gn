@@ -57,10 +57,12 @@ if (is_fuchsia) {
       generate_fxfs = !bootfs_only
     }
     board_config = board_information_for_assembly
+    fshost_config = board_fshost_config
 
     include_component_id_index = true
     additional_boot_args =
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
+    use_assembly_fshost = true
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
     bootfs_labels +=
@@ -210,10 +212,13 @@ if (is_fuchsia) {
   if (!fxfs_blob) {
     _storage_config = {
       storage = {
+        configure_fshost = true
         filesystems = {
+          image_mode = "ramdisk"
           volume = {
             fvm = {
               data = {
+                data_filesystem_format = data_filesystem_format
               }
               blob = {
               }
@@ -225,7 +230,9 @@ if (is_fuchsia) {
   } else {
     _storage_config = {
       storage = {
+        configure_fshost = true
         filesystems = {
+          image_mode = "ramdisk"
           volume = "fxfs"
         }
       }
@@ -261,7 +268,6 @@ if (is_fuchsia) {
     core_realm_definition = ":core-eng"
 
     product_assembly_config_label = ":for-eng"
-    board_config = board_information_for_assembly
   }
 
   product_assembly_configuration("for-fastboot") {
@@ -362,6 +368,7 @@ if (is_fuchsia) {
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
     generate_vbmeta = use_vbmeta
+    use_assembly_fshost = true
 
     if (!fxfs_blob) {
       generate_fvm = !bootfs_only
@@ -380,6 +387,7 @@ if (is_fuchsia) {
 
     product_assembly_config_label = ":for-fdr"
     board_config = board_information_for_assembly
+    fshost_config = board_fshost_config
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
     bootfs_labels +=
@@ -436,12 +444,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":for-installer"
 
     core_realm_definition = ":core-installer"
-
-    # The installer needs to see all partitions on the system so that it can
-    #determine the installation source and destination
-    fshost_config = {
-      gpt_all = true
-    }
   }
 
   recovery_build_info_product = "${target_gen_dir}/product.txt"

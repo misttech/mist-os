@@ -78,6 +78,7 @@ if (is_fuchsia) {
       build_type = "user"
       feature_set_level = "utility"
       storage = {
+        configure_fshost = true
         filesystems = {
           image_name = "assembly"
           volume = {
@@ -98,6 +99,11 @@ if (is_fuchsia) {
     generate_fvm = true
     generate_fvm_fastboot = false
     generate_vbmeta = false
+    use_assembly_fshost = true
+
+    # This test uses an explicit board, therefore the arguments should not be
+    # compared with the arguments from the global GN args.
+    skip_fshost_validator = true
 
     product_assembly_config_label = ":product_assembly_config"
     board_config = files.board_config

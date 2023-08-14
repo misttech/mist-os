@@ -27,6 +27,7 @@ test_assembly_config("compiled_package") {
       include_example_aib = true
     }
     storage = {
+      configure_fshost = true
       filesystems = {
         image_name = "assemble_test"
         volume = {

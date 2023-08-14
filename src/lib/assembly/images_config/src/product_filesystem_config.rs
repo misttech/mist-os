@@ -24,7 +24,17 @@ pub struct ProductFilesystemConfig {
     #[serde(default)]
     pub format_data_on_corruption: FormatDataOnCorruption,
 
+    /// Disable zxcrypt. This argument only applies when using minfs.
+    #[serde(default)]
+    pub no_zxcrypt: bool,
+
+    /// Whether the filesystem image should be placed in a separate partition,
+    /// in a ramdisk, or nonexistent.
+    #[serde(default)]
+    pub image_mode: FilesystemImageMode,
+
     /// Which volume to build to hold the filesystems.
+    #[serde(default)]
     pub volume: VolumeConfig,
 }
 
@@ -48,13 +58,31 @@ impl Default for FormatDataOnCorruption {
     }
 }
 
-/// Which volume should be built to hold data and blobs for this product.
+/// Whether the filesystem should be placed in a separate partition, in a
+/// ramdisk, or nonexistent.
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub enum FilesystemImageMode {
+    /// No filesystem image should be generated.
+    #[serde(rename = "no_image")]
+    NoImage,
+
+    /// The filesystem image should be placed in a ramdisk in the ZBI.
+    #[serde(rename = "ramdisk")]
+    Ramdisk,
+
+    /// The filesystem image should be placed in a separate partition.
+    #[serde(rename = "partition")]
+    #[default]
+    Partition,
+}
+
+/// How to configure the filesystem volume.
+/// Some systems may configure this without actually generating filesystem
+/// images in order to configure fshost without needing an actual filesystem.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub enum VolumeConfig {
-    /// No volume.
-    #[serde(rename = "none")]
-    NoVolume,
     /// A fxfs volume.
     #[serde(rename = "fxfs")]
     #[default]
@@ -104,10 +132,14 @@ pub struct DataFvmVolumeConfig {
 /// The data format to use inside the fvm.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[serde(rename_all = "lowercase")]
 pub enum DataFilesystemFormat {
     /// A fxfs filesystem for persisting data.
     #[default]
     Fxfs,
+
+    /// A f2fs filesystem for persisting data.
+    F2fs,
 
     /// A minfs filesystem for persisting data.
     Minfs,

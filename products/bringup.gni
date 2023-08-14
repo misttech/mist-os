@@ -6,6 +6,8 @@
 use_bringup_assembly = true
 bootfs_only = true
 
+assembly_fshost = true
+
 base_package_labels = []
 cache_package_labels = []
 universe_package_labels = []
@@ -22,3 +24,5 @@ product_bootfs_labels += [
 ]
 
 product_bootfs_labels += [ "//src/diagnostics/iquery" ]
+
+zedboot_product_assembly_config_label = "//products/zedboot"
