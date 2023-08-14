@@ -19,6 +19,8 @@
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 
+#include "src/devices/lib/mmio/test-helper.h"
+
 namespace ddk_mock {
 
 // An MMIO range that responds to a list of pre-determined memory accesses.
@@ -129,14 +131,8 @@ class MockMmioRange {
         .Write32 = MockMmioRange::Write32,
         .Write64 = MockMmioRange::Write64,
     };
-    return fdf::MmioBuffer(
-        mmio_buffer_t{
-            .vaddr = FakeMmioPtr(this),
-            .offset = 0,
-            .size = range_size_,
-            .vmo = ZX_HANDLE_INVALID,
-        },
-        &kMockMmioOps, this);
+
+    return fdf_testing::CreateMmioBuffer(range_size_, ZX_CACHE_POLICY_CACHED, &kMockMmioOps, this);
   }
 
  private:

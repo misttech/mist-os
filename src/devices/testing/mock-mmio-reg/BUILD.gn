@@ -13,5 +13,6 @@ zx_library("mock-mmio-reg") {
   sdk = "source"
   sdk_headers = [ "mock-mmio-reg/mock-mmio-reg.h" ]
   testonly = true
+  deps = [ "//src/devices/lib/mmio:test_helper" ]
   sources = []
 }

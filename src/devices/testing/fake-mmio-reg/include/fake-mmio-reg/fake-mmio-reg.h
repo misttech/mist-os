@@ -11,6 +11,8 @@
 
 #include <fbl/vector.h>
 
+#include "src/devices/lib/mmio/test-helper.h"
+
 namespace ddk_fake {
 
 namespace {
@@ -82,14 +84,8 @@ class FakeMmioRegRegion {
 
   // Returns an mmio_buffer_t that can be used for constructing a fdf::MmioBuffer object.
   fdf::MmioBuffer GetMmioBuffer() {
-    return fdf::MmioBuffer(
-        mmio_buffer_t{
-            .vaddr = FakeMmioPtr(this),
-            .offset = 0,
-            .size = reg_size_ * reg_count_,
-            .vmo = ZX_HANDLE_INVALID,
-        },
-        &kFakeMmioOps, this);
+    return fdf_testing::CreateMmioBuffer(reg_size_ * reg_count_, ZX_CACHE_POLICY_CACHED,
+                                         &kFakeMmioOps, this);
   }
 
  private:

@@ -23,6 +23,7 @@ test("fake-mmio-reg-test-bin") {
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//src/devices/lib/mmio",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-mmio-reg",
     "//src/lib/ddk",
     "//zircon/system/ulib/zx",

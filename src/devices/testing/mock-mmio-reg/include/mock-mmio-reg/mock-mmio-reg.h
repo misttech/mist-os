@@ -13,6 +13,8 @@
 #include <fbl/vector.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/lib/mmio/test-helper.h"
+
 namespace ddk_mock {
 
 namespace {
@@ -186,14 +188,8 @@ class MockMmioRegRegion {
   }
 
   fdf::MmioBuffer GetMmioBuffer() {
-    return fdf::MmioBuffer(
-        mmio_buffer_t{
-            .vaddr = FakeMmioPtr(this),
-            .offset = 0,
-            .size = (reg_offset_ + reg_size_) * reg_count_,
-            .vmo = ZX_HANDLE_INVALID,
-        },
-        &kMockMmioOps, this);
+    return fdf_testing::CreateMmioBuffer((reg_offset_ + reg_size_) + reg_count_,
+                                         ZX_CACHE_POLICY_CACHED, &kMockMmioOps, this);
   }
 
  private:
