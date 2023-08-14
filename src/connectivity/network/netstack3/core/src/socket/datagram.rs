@@ -160,7 +160,7 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
 }
 
 pub(crate) enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
-    Listen(&'a S::ListenerAddrState, ListenerAddr<I::Addr, D, A::LocalIdentifier>),
+    Listen(&'a S::ListenerAddrState, ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
     Conn(&'a S::ConnAddrState, ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>),
 }
 
@@ -176,7 +176,10 @@ pub(crate) struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec + ?Sized> {
     ip_options: IpOptions<I, D, S>,
-    addr: ListenerAddr<I::Addr, D, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+    addr: ListenerAddr<
+        ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+        D,
+    >,
 }
 
 #[derive(Derivative)]
@@ -844,7 +847,7 @@ where
 pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
     SocketMapStateSpec<ListenerId = Self::ReceivingId, ConnId = Self::ReceivingId>
     + SocketMapConflictPolicy<
-        ListenerAddr<I::Addr, D, A::LocalIdentifier>,
+        ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
         <Self as SocketMapStateSpec>::ListenerSharingState,
         I,
         D,
@@ -1048,7 +1051,7 @@ where
 #[derive(Debug)]
 pub(crate) enum SocketInfo<I: Ip, D, A: SocketMapAddrSpec> {
     Unbound,
-    Listener(ListenerAddr<I::Addr, D, A::LocalIdentifier>),
+    Listener(ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
     Connected(ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>),
 }
 
@@ -1528,9 +1531,8 @@ where
         sharing: S::ListenerSharingState,
     ) -> Result<
         ListenerAddr<
-            I::Addr,
+            ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
             SC::WeakDeviceId,
-            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         >,
         LocalAddressError,
     > {

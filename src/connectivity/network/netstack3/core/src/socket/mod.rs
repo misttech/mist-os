@@ -145,7 +145,7 @@ pub(crate) struct ListenerAddrInfo {
     pub(crate) specified_addr: bool,
 }
 
-impl<A: IpAddress, D: Id, LI> ListenerAddr<A, D, LI> {
+impl<A: IpAddress, D: Id, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
     pub(crate) fn info(&self) -> ListenerAddrInfo {
         let Self { device, ip: ListenerIpAddr { addr, identifier: _ } } = self;
         ListenerAddrInfo { has_device: device.is_some(), specified_addr: addr.is_some() }
@@ -329,7 +329,7 @@ pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
     Hash(bound = "D: Hash")
 )]
 pub(crate) enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
-    Listen(ListenerAddr<I::Addr, D, A::LocalIdentifier>),
+    Listen(ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
     Conn(ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>),
 }
 
@@ -385,8 +385,10 @@ pub(crate) struct SocketAddrTypeTag<S> {
     pub(crate) sharing: S,
 }
 
-impl<'a, A: IpAddress, D, LI, S> From<(&'a ListenerAddr<A, D, LI>, S)> for SocketAddrTypeTag<S> {
-    fn from((addr, sharing): (&'a ListenerAddr<A, D, LI>, S)) -> Self {
+impl<'a, A: IpAddress, D, LI, S> From<(&'a ListenerAddr<ListenerIpAddr<A, LI>, D>, S)>
+    for SocketAddrTypeTag<S>
+{
+    fn from((addr, sharing): (&'a ListenerAddr<ListenerIpAddr<A, LI>, D>, S)) -> Self {
         let ListenerAddr { ip: ListenerIpAddr { addr, identifier: _ }, device } = addr;
         SocketAddrTypeTag {
             has_device: device.is_some(),
@@ -759,7 +761,7 @@ where
     pub(crate) fn listeners(&self) -> Sockets<&SocketMap<AddrVec<I, D, A>, Bound<S>>, Listener>
     where
         S: SocketMapConflictPolicy<
-            ListenerAddr<I::Addr, D, A::LocalIdentifier>,
+            ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
             <S as SocketMapStateSpec>::ListenerSharingState,
             I,
             D,
@@ -777,7 +779,7 @@ where
     ) -> Sockets<&mut SocketMap<AddrVec<I, D, A>, Bound<S>>, Listener>
     where
         S: SocketMapConflictPolicy<
-            ListenerAddr<I::Addr, D, A::LocalIdentifier>,
+            ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
             <S as SocketMapStateSpec>::ListenerSharingState,
             I,
             D,
@@ -866,7 +868,7 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMap
 {
     type Id = S::ListenerId;
     type SharingState = S::ListenerSharingState;
-    type Addr = ListenerAddr<I::Addr, D, A::LocalIdentifier>;
+    type Addr = ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>;
     type AddrState = S::ListenerAddrState;
     fn to_addr_vec(addr: &Self::Addr) -> AddrVec<I, D, A> {
         AddrVec::Listen(addr.clone())
@@ -1189,14 +1191,16 @@ mod tests {
         }
     }
 
-    const LISTENER_ADDR: ListenerAddr<Ipv4Addr, FakeWeakDeviceId<FakeDeviceId>, u16> =
-        ListenerAddr {
-            ip: ListenerIpAddr {
-                addr: Some(unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
-                identifier: 0,
-            },
-            device: None,
-        };
+    const LISTENER_ADDR: ListenerAddr<
+        ListenerIpAddr<Ipv4Addr, u16>,
+        FakeWeakDeviceId<FakeDeviceId>,
+    > = ListenerAddr {
+        ip: ListenerIpAddr {
+            addr: Some(unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
+            identifier: 0,
+        },
+        device: None,
+    };
 
     const CONN_ADDR: ConnAddr<Ipv4Addr, FakeWeakDeviceId<FakeDeviceId>, u16, ()> = ConnAddr {
         ip: unsafe {

@@ -455,7 +455,10 @@ impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IpPortSpec> for (Udp, I, D
 
 enum LookupResult<'a, I: IpExt, D: Id> {
     Conn(&'a I::DualStackReceivingId<Udp>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
-    Listener(&'a I::DualStackReceivingId<Udp>, ListenerAddr<I::Addr, D, NonZeroU16>),
+    Listener(
+        &'a I::DualStackReceivingId<Udp>,
+        ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+    ),
 }
 
 #[derive(Hash, Copy, Clone)]
@@ -790,12 +793,11 @@ pub struct ListenerInfo<A: IpAddress, D> {
     pub local_port: NonZeroU16,
 }
 
-impl<A: IpAddress, D> From<ListenerAddr<A, D, NonZeroU16>> for ListenerInfo<A, D> {
+impl<A: IpAddress, D> From<ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>> for ListenerInfo<A, D> {
     fn from(
         ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }: ListenerAddr<
-            A,
+            ListenerIpAddr<A, NonZeroU16>,
             D,
-            NonZeroU16,
         >,
     ) -> Self {
         let local_ip = addr.map(|addr| transport::maybe_with_zone(addr, device));
@@ -7212,7 +7214,7 @@ where {
         I::IntoIter: ExactSizeIterator,
     {
         enum Socket<A: IpAddress, D, LI, RI> {
-            Listener(SocketId<A::Version>, ListenerAddr<A, D, LI>),
+            Listener(SocketId<A::Version>, ListenerAddr<ListenerIpAddr<A, LI>, D>),
             Conn(SocketId<A::Version>, ConnAddr<A, D, LI, RI>),
         }
         let spec = spec.into_iter();

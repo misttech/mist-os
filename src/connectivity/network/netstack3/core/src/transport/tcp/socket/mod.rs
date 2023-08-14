@@ -341,7 +341,7 @@ enum BoundSocketState<I: IpExt, D: Id, C: NonSyncContext> {
                 C::ListenerNotifierOrProvidedBuffers,
             >,
             ListenerSharingState,
-            ListenerAddr<I::Addr, D, NonZeroU16>,
+            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ),
     ),
     Connected(
@@ -469,7 +469,7 @@ impl<I: Ip> SocketMapAddrStateSpec for ListenerAddrState<I> {
 
 impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapUpdateSharingPolicy<
-        ListenerAddr<I::Addr, D, NonZeroU16>,
+        ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState,
         I,
         D,
@@ -478,7 +478,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
 {
     fn allows_sharing_update(
         socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
-        addr: &ListenerAddr<I::Addr, D, NonZeroU16>,
+        addr: &ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState{listening: old_listening, sharing: old_sharing}: &ListenerSharingState,
         ListenerSharingState{listening: new_listening, sharing: new_sharing}: &ListenerSharingState,
     ) -> Result<(), UpdateSharingError> {
@@ -672,7 +672,7 @@ impl Default for SharingState {
 
 impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapConflictPolicy<
-        ListenerAddr<I::Addr, D, NonZeroU16>,
+        ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState,
         I,
         D,
@@ -681,7 +681,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
 {
     fn check_insert_conflicts(
         sharing: &ListenerSharingState,
-        addr: &ListenerAddr<I::Addr, D, NonZeroU16>,
+        addr: &ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         let addr = AddrVec::Listen(addr.clone());
@@ -2812,8 +2812,10 @@ fn maybe_zoned<A: IpAddress, D: Clone>(
         .unwrap_or(ZonedAddr::Unzoned(ip))
 }
 
-impl<A: IpAddress, D: Clone> From<ListenerAddr<A, D, NonZeroU16>> for BoundInfo<A, D> {
-    fn from(addr: ListenerAddr<A, D, NonZeroU16>) -> Self {
+impl<A: IpAddress, D: Clone> From<ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>>
+    for BoundInfo<A, D>
+{
+    fn from(addr: ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>) -> Self {
         let ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device } = addr;
         let addr = addr.map(|ip| maybe_zoned(ip, &device));
         BoundInfo { addr, port: identifier, device }

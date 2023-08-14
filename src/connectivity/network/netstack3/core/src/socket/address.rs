@@ -25,8 +25,8 @@ pub(crate) struct ListenerIpAddr<A: IpAddress, LI> {
 
 /// The address of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct ListenerAddr<A: IpAddress, D, P> {
-    pub(crate) ip: ListenerIpAddr<A, P>,
+pub(crate) struct ListenerAddr<A, D> {
+    pub(crate) ip: A,
     pub(crate) device: Option<D>,
 }
 
@@ -69,10 +69,10 @@ impl<I: Ip, A: SocketMapAddrSpec> From<ConnIpAddr<I::Addr, A::LocalIdentifier, A
     }
 }
 
-impl<I: Ip, D, A: SocketMapAddrSpec> From<ListenerAddr<I::Addr, D, A::LocalIdentifier>>
-    for AddrVec<I, D, A>
+impl<I: Ip, D, A: SocketMapAddrSpec>
+    From<ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>> for AddrVec<I, D, A>
 {
-    fn from(listener: ListenerAddr<I::Addr, D, A::LocalIdentifier>) -> Self {
+    fn from(listener: ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>) -> Self {
         AddrVec::Listen(listener)
     }
 }
