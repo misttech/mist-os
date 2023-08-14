@@ -8,7 +8,6 @@
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/testing/loader.h>
 #include <lib/ld/testing/test-processargs.h>
-#include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -18,13 +17,15 @@
 #include <optional>
 #include <string_view>
 
-#include "ld-load-tests-base.h"
+#include <gtest/gtest.h>
+
+#include "ld-load-zircon-process-tests-base.h"
 
 namespace ld::testing {
 
 // This is the common base class for template instantiations.  It handles the
 // process mechanics, while the templated subclass does the loading.
-class LdStartupCreateProcessTestsBase : public LdLoadTestsBase {
+class LdStartupCreateProcessTestsBase : public LdLoadZirconProcessTestsBase {
  public:
   void Init(std::initializer_list<std::string_view> args = {});
 
@@ -50,7 +51,6 @@ class LdStartupCreateProcessTestsBase : public LdLoadTestsBase {
   uintptr_t vdso_base_ = 0;
   std::optional<size_t> stack_size_;
   TestProcessArgs procargs_;
-  zx::process process_;
   zx::vmar root_vmar_;
   zx::thread thread_;
 };

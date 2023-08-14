@@ -19,31 +19,28 @@ zx::unowned_vmo LdStartupCreateProcessTestsBase::GetVdsoVmo() {
 }
 
 void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_view> args) {
-  std::string_view process_name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
-  ASSERT_EQ(
-      zx::process::create(*zx::job::default_job(), process_name.data(),
-                          static_cast<uint32_t>(process_name.size()), 0, &process_, &root_vmar_),
-      ZX_OK);
+  std::string_view name = process_name();
+  zx::process process;
+  ASSERT_EQ(zx::process::create(*zx::job::default_job(), name.data(),
+                                static_cast<uint32_t>(name.size()), 0, &process, &root_vmar_),
+            ZX_OK);
+  set_process(std::move(process));
 
-  ASSERT_EQ(zx::thread::create(process_, process_name.data(),
-                               static_cast<uint32_t>(process_name.size()), 0, &thread_),
+  ASSERT_EQ(zx::thread::create(this->process(), name.data(), static_cast<uint32_t>(name.size()), 0,
+                               &thread_),
             ZX_OK);
 
   fbl::unique_fd log_fd;
   ASSERT_NO_FATAL_FAILURE(InitLog(log_fd));
   ASSERT_NO_FATAL_FAILURE(bootstrap()
-                              .AddProcess(process_.borrow())
+                              .AddProcess(this->process().borrow())
                               .AddThread(thread_.borrow())
                               .AddAllocationVmar(root_vmar_.borrow())
                               .AddFd(STDERR_FILENO, std::move(log_fd))
                               .SetArgs(args));
 }
 
-LdStartupCreateProcessTestsBase::~LdStartupCreateProcessTestsBase() {
-  if (process_) {
-    EXPECT_EQ(process_.kill(), ZX_OK);
-  }
-}
+LdStartupCreateProcessTestsBase::~LdStartupCreateProcessTestsBase() = default;
 
 int64_t LdStartupCreateProcessTestsBase::Run() {
   // Allocate the stack.  This is delayed until here in case the test uses
@@ -93,7 +90,7 @@ int64_t LdStartupCreateProcessTestsBase::Run() {
   auto start_process = [this, sp]() {
     zx::channel bootstrap_receiver = procargs_.PackBootstrap();
 
-    ASSERT_EQ(process_.start(thread_, entry_, sp, std::move(bootstrap_receiver), vdso_base_),
+    ASSERT_EQ(this->process().start(thread_, entry_, sp, std::move(bootstrap_receiver), vdso_base_),
               ZX_OK);
   };
 
@@ -102,21 +99,7 @@ int64_t LdStartupCreateProcessTestsBase::Run() {
     return -1;
   }
 
-  // Wait for the process to die and collect its exit code.
-  int64_t result = -1;
-  auto wait_for_termination = [this, &result]() {
-    zx_signals_t signals;
-    ASSERT_EQ(process_.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), &signals), ZX_OK);
-    ASSERT_TRUE(signals & ZX_PROCESS_TERMINATED);
-    zx_info_process_t info;
-    ASSERT_EQ(process_.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr), ZX_OK);
-    ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_STARTED);
-    ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_EXITED);
-    result = info.return_code;
-  };
-  wait_for_termination();
-
-  return result;
+  return Wait();
 }
 
 }  // namespace ld::testing
