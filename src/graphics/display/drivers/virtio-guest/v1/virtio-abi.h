@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_VIRTIO_ABI_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_VIRTIO_ABI_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_VIRTIO_ABI_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_VIRTIO_ABI_H_
 
 // The constants and structures in this file are from the OASIS Virtual I/O
 // Device (VIRTIO) specification, which can be downloaded from
@@ -384,4 +384,4 @@ struct AttachResourceBackingCommand {
 
 }  // namespace virtio_abi
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_VIRTIO_ABI_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_VIRTIO_ABI_H_

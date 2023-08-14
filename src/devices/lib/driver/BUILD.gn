@@ -272,7 +272,7 @@ group("driver") {
     "//src/graphics/display/drivers/simple:*",
     "//src/graphics/display/drivers/ssd1306:*",
     "//src/graphics/display/drivers/ssd1306:*",
-    "//src/graphics/display/drivers/virtio-guest:*",
+    "//src/graphics/display/drivers/virtio-guest/v1:*",
     "//src/graphics/drivers/aml-gpu:*",
     "//src/graphics/drivers/misc/goldfish:*",
     "//src/graphics/drivers/misc/goldfish:*",

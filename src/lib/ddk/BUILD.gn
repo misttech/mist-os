@@ -365,7 +365,7 @@ sdk_static_library("ddk") {
     "//src/graphics/display/drivers/intel-i915:*",
     "//src/graphics/display/drivers/simple:*",
     "//src/graphics/display/drivers/ssd1306:*",
-    "//src/graphics/display/drivers/virtio-guest:*",
+    "//src/graphics/display/drivers/virtio-guest/v1:*",
     "//src/graphics/display/lib/designware:*",
     "//src/graphics/display/lib/designware/test:*",
     "//src/graphics/display/lib/edid:*",

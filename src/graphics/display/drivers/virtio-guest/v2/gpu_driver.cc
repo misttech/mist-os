@@ -7,7 +7,7 @@
 #include <lib/virtio/driver_utils.h>
 #include <zircon/types.h>
 
-#include "src/graphics/display/drivers/virtio-guest/gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
 
 static zx_status_t virtio_gpu_bind(void* ctx, zx_device_t* bus_device) {
   char flag[32];

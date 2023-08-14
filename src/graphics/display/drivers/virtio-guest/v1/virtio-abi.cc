@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 
 namespace virtio_abi {
 
