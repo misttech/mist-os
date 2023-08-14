@@ -57,10 +57,8 @@ fuchsia_test_package("android") {
 
   if (target_cpu == "x64") {
     subpackages = starnix_test_subpackages
+    subpackages += [ "//src/starnix/containers/bionic:bionic_package" ]
   }
 
-  deps = [
-    ":container_resources",
-    "//src/lib/testing/expectation:expectation_comparer",
-  ]
+  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
 }

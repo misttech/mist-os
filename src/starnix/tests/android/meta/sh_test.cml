@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/starnix/containers/bionic/meta/bionic_container.shard.cml",
+        "//src/starnix/containers/bionic/meta/bionic_container_for_test.shard.cml",
         "//src/starnix/tests/starnix_test.shard.cml",
     ],
     program: {

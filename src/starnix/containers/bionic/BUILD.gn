@@ -22,3 +22,29 @@ resource("minimal_init_rc") {
   sources = [ "init.rc" ]
   outputs = [ "data/init.rc" ]
 }
+
+group("container_resources") {
+  deps = [ "//src/starnix/containers:default_init" ]
+
+  if (target_cpu == "x64") {
+    deps += [
+      ":minimal_init_rc",
+      ":system_image",
+      ":testcases_image",
+      "//src/starnix/containers:data_tmp_target",
+    ]
+  }
+}
+
+fuchsia_component("bionic_container") {
+  manifest = "meta/bionic_container.cml"
+  component_name = "bionic_container"
+}
+
+fuchsia_package("bionic_package") {
+  package_name = "bionic"
+  deps = [
+    ":bionic_container",
+    ":container_resources",
+  ]
+}
