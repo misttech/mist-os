@@ -17,9 +17,12 @@ use crate::nl80211::{
 };
 
 mod band;
+mod bss;
 
 pub use band::*;
+pub use bss::*;
 
+// Note: variants are sorted in ascending order by `kind` value.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Nl80211Attr {
     Wiphy(u32),
@@ -30,6 +33,7 @@ pub enum Nl80211Attr {
     Mac([u8; 6]),
     WiphyBands(Vec<Vec<Nl80211BandAttr>>),
     MaxScanSsids(u8),
+    Bss(Vec<Nl80211BssAttr>),
     ScanFrequencies(Vec<u32>),
     ScanSsids(Vec<Vec<u8>>),
     MaxScheduledScanSsids(u8),
@@ -57,6 +61,7 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(val) => size_of_val(val),
             ScanFrequencies(val) => to_nested_values(val).as_slice().buffer_len(),
             ScanSsids(val) => to_nested_values(val).as_slice().buffer_len(),
+            Bss(val) => val.as_slice().buffer_len(),
             MaxScheduledScanSsids(val) => size_of_val(val),
             MaxMatchSets(val) => size_of_val(val),
             FeatureFlags(val) => size_of_val(val),
@@ -82,6 +87,7 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(_) => NL80211_ATTR_MAX_NUM_SCAN_SSIDS,
             ScanFrequencies(_) => NL80211_ATTR_SCAN_FREQUENCIES,
             ScanSsids(_) => NL80211_ATTR_SCAN_SSIDS,
+            Bss(val) => NL80211_ATTR_BSS,
             MaxScheduledScanSsids(_) => NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS,
             MaxMatchSets(_) => NL80211_ATTR_MAX_MATCH_SETS,
             FeatureFlags(_) => NL80211_ATTR_FEATURE_FLAGS,
@@ -116,6 +122,7 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(val) => buffer[0] = *val,
             ScanFrequencies(val) => to_nested_values(val).as_slice().emit(buffer),
             ScanSsids(val) => to_nested_values(val).as_slice().emit(buffer),
+            Bss(val) => val.as_slice().emit(buffer),
             MaxScheduledScanSsids(val) => buffer[0] = *val,
             MaxMatchSets(val) => buffer[0] = *val,
             FeatureFlags(val) => NativeEndian::write_u32(buffer, *val),
@@ -219,6 +226,7 @@ mod tests {
             MaxScanSsids(10),
             ScanFrequencies(vec![1, 2, 3]),
             ScanSsids(vec![]),
+            // Bss is not parseable right now, skip.
             MaxScheduledScanSsids(11),
             MaxMatchSets(12),
             FeatureFlags(1234),
@@ -312,6 +320,31 @@ mod tests {
             4, 0, NL80211_BAND_ATTR_HT_CAPA as u8, 0, // ht capable
             8, 0, 2, 0, // entry 2 header
             4, 0, NL80211_BAND_ATTR_VHT_CAPA as u8, 0, // vht capable
+        ];
+        assert_eq!(buffer, expected_buffer);
+    }
+
+    #[test]
+    fn emit_bss() {
+        let attr = Nl80211Attr::Bss(vec![
+            Nl80211BssAttr::Bssid([11, 22, 33, 44, 55, 66]),
+            Nl80211BssAttr::Frequency(0xaabbccdd),
+        ]);
+
+        let mut buffer = vec![0; attr.buffer_len()];
+        attr.emit(&mut buffer[..]);
+
+        #[rustfmt::skip]
+        let expected_buffer = vec![
+            24, 0, // length
+            NL80211_ATTR_BSS as u8, 0, // kind
+            10, 0, // bssid entry: length
+            1, 0, // bssid entry: kind
+            11, 22, 33, 44, 55, 66, // bssid entry: value
+            0, 0, // bssid entry: padding
+            8, 0, // frequency entry: length
+            2, 0, // frequency entry: kind
+            0xdd, 0xcc, 0xbb, 0xaa, // frequency entry: value
         ];
         assert_eq!(buffer, expected_buffer);
     }

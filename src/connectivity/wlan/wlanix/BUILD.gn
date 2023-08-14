@@ -44,6 +44,7 @@ rustc_binary("wlanix_bin") {
   sources = [
     "src/main.rs",
     "src/nl80211/attr/band.rs",
+    "src/nl80211/attr/bss.rs",
     "src/nl80211/attr/mod.rs",
     "src/nl80211/cmd.rs",
     "src/nl80211/constants.rs",
