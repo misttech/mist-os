@@ -126,7 +126,7 @@ impl MountedVolumesGuard<'_> {
         store: Arc<ObjectStore>,
         flush_task_config: FlushTaskConfig,
     ) -> Result<FxVolumeAndRoot, Error> {
-        store.track_statistics(&metrics::object_stores(), name);
+        metrics::object_stores_tracker().register_store(name, Arc::downgrade(&store));
         let store_id = store.store_object_id();
         let unique_id = zx::Event::create();
         let volume = FxVolumeAndRoot::new::<T>(
@@ -176,6 +176,7 @@ impl MountedVolumesGuard<'_> {
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
             inspect.unregister_volume(name.to_string());
         }
+        metrics::object_stores_tracker().unregister_store(name);
         let directory_node = self.volumes_directory.directory_node.clone();
         self.volumes_directory
             .root_volume

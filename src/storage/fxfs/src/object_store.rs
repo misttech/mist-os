@@ -68,7 +68,6 @@ use {
     fprint::TypeFingerprint,
     fuchsia_async as fasync,
     fuchsia_inspect::ArrayProperty,
-    futures::FutureExt,
     fxfs_crypto::{ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
     once_cell::sync::OnceCell,
     scopeguard::ScopeGuard,
@@ -684,50 +683,34 @@ impl ObjectStore {
         }
     }
 
-    /// Creates a lazy inspect node named `str` under `parent` which will yield statistics for the
-    /// object store when queried.
-    pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
-        let this = Arc::downgrade(self);
-        parent.record_lazy_child(name, move || {
-            let this_clone = this.clone();
-            async move {
-                let inspector = fuchsia_inspect::Inspector::default();
-                if let Some(this) = this_clone.upgrade() {
-                    // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
-                    let counters = this.counters.lock().unwrap();
-                    let root = inspector.root();
-                    root.record_string(
-                        "guid",
-                        Uuid::from_bytes(this.store_info().guid).to_string(),
-                    );
-                    root.record_uint("store_object_id", this.store_object_id);
-                    root.record_uint("mutations_applied", counters.mutations_applied);
-                    root.record_uint("mutations_dropped", counters.mutations_dropped);
-                    root.record_uint("num_flushes", counters.num_flushes);
-                    if let Some(last_flush_time) = counters.last_flush_time.as_ref() {
-                        root.record_uint(
-                            "last_flush_time_ms",
-                            last_flush_time
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or(std::time::Duration::ZERO)
-                                .as_millis()
-                                .try_into()
-                                .unwrap_or(0u64),
-                        );
-                    }
-                    let sizes = root.create_uint_array(
-                        "persistent_layer_file_sizes",
-                        counters.persistent_layer_file_sizes.len(),
-                    );
-                    for i in 0..counters.persistent_layer_file_sizes.len() {
-                        sizes.set(i, counters.persistent_layer_file_sizes[i]);
-                    }
-                    root.record(sizes);
-                }
-                Ok(inspector)
-            }
-            .boxed()
-        });
+    /// Populates an inspect node with store statistics.
+    pub fn record_data(self: &Arc<Self>, root: &fuchsia_inspect::Node) {
+        // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+        let counters = self.counters.lock().unwrap();
+        root.record_string("guid", Uuid::from_bytes(self.store_info().guid).to_string());
+        root.record_uint("store_object_id", self.store_object_id);
+        root.record_uint("mutations_applied", counters.mutations_applied);
+        root.record_uint("mutations_dropped", counters.mutations_dropped);
+        root.record_uint("num_flushes", counters.num_flushes);
+        if let Some(last_flush_time) = counters.last_flush_time.as_ref() {
+            root.record_uint(
+                "last_flush_time_ms",
+                last_flush_time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or(std::time::Duration::ZERO)
+                    .as_millis()
+                    .try_into()
+                    .unwrap_or(0u64),
+            );
+        }
+        let sizes = root.create_uint_array(
+            "persistent_layer_file_sizes",
+            counters.persistent_layer_file_sizes.len(),
+        );
+        for i in 0..counters.persistent_layer_file_sizes.len() {
+            sizes.set(i, counters.persistent_layer_file_sizes[i]);
+        }
+        root.record(sizes);
     }
 
     pub fn device(&self) -> &Arc<dyn Device> {

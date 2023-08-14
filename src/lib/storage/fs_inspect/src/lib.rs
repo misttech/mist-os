@@ -15,9 +15,9 @@ use {
     fuchsia_inspect::{LazyNode, Node},
     futures::FutureExt,
     std::{
-        collections::HashMap,
+        collections::hash_map::HashMap,
         string::String,
-        sync::{Mutex, Weak},
+        sync::{Arc, Mutex, Weak},
     },
 };
 
@@ -46,8 +46,8 @@ pub trait FsInspectVolume {
 pub struct FsInspectTree {
     _info: LazyNode,
     _usage: LazyNode,
-    volumes_node: Node,
-    volumes: Mutex<HashMap<String, LazyNode>>,
+    _volumes: LazyNode,
+    volumes_tracker: Arc<Mutex<HashMap<String, Weak<dyn FsInspectVolume + Send + Sync + 'static>>>>,
 }
 
 impl FsInspectTree {
@@ -80,41 +80,64 @@ impl FsInspectTree {
             .boxed()
         });
 
-        let volumes_node = root.create_child(VOLUMES_NODE_NAME);
+        let volumes_tracker = Arc::new(Mutex::new(HashMap::<
+            String,
+            Weak<dyn FsInspectVolume + Send + Sync + 'static>,
+        >::new()));
+        let tracker_weak = Arc::downgrade(&volumes_tracker);
+        let volumes_node = root.create_lazy_child(VOLUMES_NODE_NAME, move || {
+            let tracker_ref = tracker_weak.clone();
+            async move {
+                let inspector = fuchsia_inspect::Inspector::default();
+                let root = inspector.root();
+                let tracker = match tracker_ref.upgrade() {
+                    Some(tracker) => tracker,
+                    // This probably shouldn't happen, but if it does then it would be during a
+                    // shutdown race, so just return empty.
+                    None => return Ok(inspector),
+                };
+                let volumes = {
+                    let tracker = tracker.lock().unwrap();
+                    let mut volumes = Vec::with_capacity(tracker.len());
+                    for (name, volume) in tracker.iter() {
+                        volumes.push((name.clone(), volume.clone()));
+                    }
+                    volumes
+                };
+                for (name, volume_weak) in volumes {
+                    let volume = match volume_weak.upgrade() {
+                        Some(v) => v,
+                        None => continue,
+                    };
+                    let child = root.create_child(name.clone());
+                    volume.get_volume_data().await.record_into(&child);
+                    root.record(child);
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        });
 
         FsInspectTree {
             _info: info_node,
             _usage: usage_node,
-            volumes_node,
-            volumes: Mutex::new(HashMap::new()),
+            _volumes: volumes_node,
+            volumes_tracker,
         }
     }
 
     /// Registers a provider for per-volume data.  If `volume` is dropped, the node will remain
     /// present in the inspect tree but yield no data, until `Self::unregister_volume` is called.
     pub fn register_volume(
-        &self,
+        self: &Arc<Self>,
         name: String,
         volume: Weak<dyn FsInspectVolume + Send + Sync + 'static>,
     ) {
-        self.volumes.lock().unwrap().insert(
-            name.clone(),
-            self.volumes_node.create_lazy_child(name, move || {
-                let volume = volume.clone();
-                async move {
-                    let inspector = fuchsia_inspect::Inspector::default();
-                    if let Some(volume) = volume.upgrade() {
-                        volume.get_volume_data().await.record_into(inspector.root());
-                    }
-                    Ok(inspector)
-                }
-                .boxed()
-            }),
-        );
+        self.volumes_tracker.lock().unwrap().insert(name, volume);
     }
 
     pub fn unregister_volume(&self, name: String) {
-        self.volumes.lock().unwrap().remove(&name);
+        self.volumes_tracker.lock().unwrap().remove(&name);
     }
 }
 
