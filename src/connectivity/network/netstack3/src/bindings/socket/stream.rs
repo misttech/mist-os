@@ -552,6 +552,7 @@ impl IntoErrno for AcceptError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             AcceptError::WouldBlock => fposix::Errno::Eagain,
+            AcceptError::NotSupported => fposix::Errno::Einval,
         }
     }
 }
@@ -773,29 +774,22 @@ where
     > {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx: ns_ctx } =
             self;
-        match *id {
-            SocketId::Listener(listener) => {
-                let mut ctx = ns_ctx.clone();
-                let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                let (accepted, addr, peer) =
-                    accept::<I, _>(sync_ctx, non_sync_ctx, listener.into())
-                        .map_err(IntoErrno::into_errno)?;
-                let addr = addr
-                    .try_into_fidl_with_ctx(&non_sync_ctx)
-                    .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
-                    .into_sock_addr();
-                let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
-                let (client, request_stream) = crate::bindings::socket::create_request_stream();
-                peer.signal_handle(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
-                    .expect("failed to signal connection established");
-                spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, accepted);
-                spawn_connected_socket_task(ns_ctx.clone(), accepted, peer, request_stream);
-                Ok((want_addr.then_some(addr), client))
-            }
-            SocketId::Unbound(_) | SocketId::Connection(_) | SocketId::Bound(_) => {
-                Err(fposix::Errno::Einval)
-            }
-        }
+
+        let mut ctx = ns_ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (accepted, addr, peer) =
+            accept::<I, _>(sync_ctx, non_sync_ctx, *id).map_err(IntoErrno::into_errno)?;
+        let addr = addr
+            .try_into_fidl_with_ctx(&non_sync_ctx)
+            .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
+            .into_sock_addr();
+        let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
+        let (client, request_stream) = crate::bindings::socket::create_request_stream();
+        peer.signal_handle(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
+            .expect("failed to signal connection established");
+        spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, accepted);
+        spawn_connected_socket_task(ns_ctx.clone(), accepted, peer, request_stream);
+        Ok((want_addr.then_some(addr), client))
     }
 
     fn get_error(self) -> Result<(), fposix::Errno> {

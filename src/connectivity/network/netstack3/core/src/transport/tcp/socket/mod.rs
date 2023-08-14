@@ -1363,11 +1363,10 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 pending: _,
                 socket_options: _,
                 notifier,
-            } = assert_matches!(
-                sockets.socket_state.get_mut(&id),
-                Some(SocketState::Bound(BoundSocketState::Listener((MaybeListener::Listener(l), _sharing, _addr)))) => l,
-                "invalid socket ID"
-            );
+            } = match sockets.socket_state.get_mut(&id).expect("invalid socket ID") {
+                SocketState::Bound(BoundSocketState::Listener((MaybeListener::Listener(l), _sharing, _addr))) => l,
+                SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Connected(_)) | SocketState::Bound(BoundSocketState::Listener((MaybeListener::Bound(_), _, _)))=> return Err(AcceptError::NotSupported),
+            };
             let (conn_id, client_buffers) = ready.pop_front().ok_or(AcceptError::WouldBlock)?;
             notifier.new_incoming_connections(ready.len());
 
@@ -2395,6 +2394,8 @@ where
 pub enum AcceptError {
     /// There is no established socket currently.
     WouldBlock,
+    /// Cannot accept on this socket.
+    NotSupported,
 }
 
 /// Errors for the listen operation.
