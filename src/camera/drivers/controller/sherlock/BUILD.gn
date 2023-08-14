@@ -39,7 +39,7 @@ source_set("config") {
   ]
 }
 
-camera_controller_driver("sherlock-camera-controller") {
+camera_controller_driver("sherlock") {
   deps = [ ":config" ]
 
   # The following config files are currently gated behind internal

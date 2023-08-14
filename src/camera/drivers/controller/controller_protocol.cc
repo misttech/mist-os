@@ -15,13 +15,14 @@
 namespace camera {
 
 ControllerImpl::ControllerImpl(async_dispatcher_t* dispatcher,
-                               const ddk::SysmemProtocolClient& sysmem,
+                               fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
                                const ddk::IspProtocolClient& isp, const ddk::GdcProtocolClient& gdc,
                                const ddk::Ge2dProtocolClient& ge2d,
                                LoadFirmwareCallback load_firmware)
     : dispatcher_(dispatcher),
       binding_(this),
-      pipeline_manager_(dispatcher, sysmem, isp, gdc, ge2d, std::move(load_firmware)),
+      pipeline_manager_(dispatcher, std::move(sysmem_allocator), isp, gdc, ge2d,
+                        std::move(load_firmware)),
       product_config_(ProductConfig::Create()) {
   binding_.set_error_handler(
       [](zx_status_t status) { FX_PLOGS(INFO, status) << "controller client disconnected"; });

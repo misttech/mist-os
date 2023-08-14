@@ -28,10 +28,15 @@ import("//build/drivers.gni")
 #     of camera::ProductConfig::Create.
 #     Type: list(path)
 #
+#   board (optional)
+#     The name of the board.
+#     Type: string
+#     Default: $target_name
+#
 #   package_name (optional)
 #     The name of the driver package.
 #     Type: string
-#     Default: $target_name
+#     Default: $board-camera-controller
 #
 #   gdc_config_files (optional)
 #     List of paths, relative to //prebuilt/camera/arm/gdc/configs, to include
@@ -44,7 +49,8 @@ import("//build/drivers.gni")
 #     Type: list(path)
 #
 template("camera_controller_driver") {
-  package_name = target_name
+  board = target_name
+  package_name = "${board}-camera-controller"
   if (defined(invoker.package_name)) {
     package_name = invoker.package_name
   }
@@ -64,13 +70,13 @@ template("camera_controller_driver") {
 
   driver_component_target = "${package_name}_driver_component"
   fuchsia_driver_component(driver_component_target) {
-    colocate = true
     deps = [ ":${driver_target}" ]
     info = "${driver_target}-info.json"
+    manifest = "meta/camera-controller-${board}.cml"
   }
 
   if (defined(invoker.gdc_config_files)) {
-    resource("firmware-configs-$target_name") {
+    resource("firmware-configs-$package_name") {
       sources = []
       foreach(config_file, invoker.gdc_config_files) {
         assert(
@@ -83,7 +89,7 @@ template("camera_controller_driver") {
   }
 
   if (defined(invoker.watermark_files)) {
-    resource("firmware-watermarks-$target_name") {
+    resource("firmware-watermarks-$package_name") {
       sources = []
       foreach(watermark_file, invoker.watermark_files) {
         assert(get_path_info(watermark_file, "dir") == ".",
