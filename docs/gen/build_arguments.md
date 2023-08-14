@@ -140,7 +140,19 @@ From //build/config/sanitizers/sanitizer_default_options.gni:16
 Skip configuring fshost in GN and do it via Assembly instead.
 Used as a parameter to assembled_system().
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `true`
+
+From //products/bringup.gni:9
+
+**Overridden from the default:** `false`
+
+From //build/images/args.gni:182
+
+**Current value for `target_cpu = "x64"`:** `true`
+
+From //products/bringup.gni:9
+
+**Overridden from the default:** `false`
 
 From //build/images/args.gni:182
 
@@ -253,7 +265,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:14
+From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
@@ -261,7 +273,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:14
+From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
@@ -5352,7 +5364,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:15
+From //products/bringup.gni:17
 
 **Overridden from the default:** `[]`
 
@@ -5360,7 +5372,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:15
+From //products/bringup.gni:17
 
 **Overridden from the default:** `[]`
 
@@ -5581,7 +5593,7 @@ A list of binary labels to include in ZBIs built for this product.
 
 **Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
-From //products/bringup.gni:24
+From //products/bringup.gni:26
 
 **Overridden from the default:** `[]`
 
@@ -5589,7 +5601,7 @@ From //build/product.gni:14
 
 **Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
 
-From //products/bringup.gni:24
+From //products/bringup.gni:26
 
 **Overridden from the default:** `[]`
 
@@ -7485,7 +7497,7 @@ bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:16
+From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -7493,7 +7505,7 @@ From //BUILD.gn:102
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:16
+From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -8763,7 +8775,19 @@ From //build/images/zedboot/zedboot_args.gni:7
 
 The product assembly config used to configure the Zedboot image.
 
-**Current value (from the default):** `"//products/zedboot"`
+**Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
+
+From //products/bringup.gni:28
+
+**Overridden from the default:** `false`
+
+From //build/product.gni:44
+
+**Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
+
+From //products/bringup.gni:28
+
+**Overridden from the default:** `false`
 
 From //build/product.gni:44
 
