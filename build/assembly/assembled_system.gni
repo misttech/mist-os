@@ -1174,7 +1174,7 @@ template("assembled_system") {
     dest_dir = rebase_path("${files.outdir}/${labels.bazel_legacy_aib}",
                            root_build_dir)
     deps = [ ":${labels.legacy_assembly_input_bundle}" ]
-    if (!_skip_fshost_validator) {
+    if (!_skip_fshost_validator && use_bazel_images_only) {
       # TODO(b/287558873) Remove once fshost is migrated
       deps += [ ":${labels.fshost_validator}" ]
     }
