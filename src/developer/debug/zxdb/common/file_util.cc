@@ -88,7 +88,9 @@ std::filesystem::path PathRelativeTo(const std::filesystem::path& path,
   }
   std::filesystem::path res;
   while (base_it != base.end()) {
-    res.append("..");
+    if (*base_it != ".") {
+      res.append("..");
+    }
     base_it++;
   }
   while (path_it != path.end()) {
