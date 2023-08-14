@@ -155,12 +155,8 @@ impl WaitCallback {
 }
 
 /// A type that can put a thread to sleep waiting for a condition.
-pub struct Waiter(Arc<WaiterImpl>);
-
-impl PartialEq<Waiter> for Waiter {
-    fn eq(&self, other: &Waiter) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
-    }
+pub struct Waiter {
+    inner: Arc<WaiterImpl>,
 }
 
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
@@ -172,17 +168,24 @@ struct WaiterImpl {
     key_map: Mutex<HashMap<WaitKey, WaitCallback>>, // the key 0 is reserved for 'no handler'
     next_key: AtomicU64,
     ignore_signals: bool,
+
+    /// List of wait queues this Waiter is waiting on, so that when the Waiter is Dropped it can
+    /// remove itself from the queues.
+    wait_queues: Mutex<Vec<Weak<WaitQueueImpl>>>,
 }
 
 impl Waiter {
     /// Internal constructor.
     fn new_internal(ignore_signals: bool) -> Self {
-        Self(Arc::new(WaiterImpl {
-            port: zx::Port::create(),
-            key_map: Mutex::new(HashMap::new()),
-            next_key: AtomicU64::new(1),
-            ignore_signals,
-        }))
+        Self {
+            inner: Arc::new(WaiterImpl {
+                port: zx::Port::create(),
+                key_map: Mutex::new(HashMap::new()),
+                next_key: AtomicU64::new(1),
+                ignore_signals,
+                wait_queues: Mutex::new(vec![]),
+            }),
+        }
     }
 
     /// Create a new waiter.
@@ -197,7 +200,7 @@ impl Waiter {
 
     /// Create a weak reference to this waiter.
     pub fn weak(&self) -> WaiterRef {
-        WaiterRef(Arc::downgrade(&self.0))
+        WaiterRef(Arc::downgrade(&self.inner))
     }
 
     /// Wait until the waiter is woken up.
@@ -260,14 +263,14 @@ impl Waiter {
         // current thread should not own any local ref that might delay the release of a resource
         // while doing so.
         debug_assert_no_local_temp_ref();
-        match self.0.port.wait(deadline) {
+        match self.inner.port.wait(deadline) {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {
                     let contents = packet.contents();
                     let key = WaitKey { raw: packet.key() };
                     match contents {
                         zx::PacketContents::SignalOne(sigpkt) => {
-                            let handler = self.0.key_map.lock().remove(&key);
+                            let handler = self.inner.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
                                 match callback {
                                     WaitCallback::SignalHandler(handler) => {
@@ -281,7 +284,7 @@ impl Waiter {
                         }
                         zx::PacketContents::User(usrpkt) => {
                             let events: WaitEvents = usrpkt.into();
-                            let handler = self.0.key_map.lock().remove(&key);
+                            let handler = self.inner.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
                                 match callback {
                                     WaitCallback::EventHandler(handler) => {
@@ -316,7 +319,7 @@ impl Waiter {
     }
 
     fn next_key(&self) -> WaitKey {
-        let key = self.0.next_key.fetch_add(1, Ordering::Relaxed);
+        let key = self.inner.next_key.fetch_add(1, Ordering::Relaxed);
         // TODO - find a better reaction to wraparound
         assert!(key != 0, "bad key from u64 wraparound");
         WaitKey { raw: key }
@@ -325,7 +328,7 @@ impl Waiter {
     fn register_callback(&self, callback: WaitCallback) -> WaitKey {
         let key = self.next_key();
         assert!(
-            self.0.key_map.lock().insert(key, callback).is_none(),
+            self.inner.key_map.lock().insert(key, callback).is_none(),
             "unexpected callback already present for key {key:?}"
         );
         key
@@ -334,7 +337,7 @@ impl Waiter {
     pub fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
         let callback = WaitCallback::EventHandler(handler);
         let key = self.register_callback(callback);
-        self.queue_events(&key, WaitEvents::Fd(events));
+        self.inner.queue_events(&key, WaitEvents::Fd(events));
     }
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
@@ -350,12 +353,12 @@ impl Waiter {
         let callback = WaitCallback::SignalHandler(handler);
         let key = self.register_callback(callback);
         handle.wait_async_handle(
-            &self.0.port,
+            &self.inner.port,
             key.raw,
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
         )?;
-        let waiter_impl = Arc::downgrade(&self.0);
+        let waiter_impl = Arc::downgrade(&self.inner);
         Ok(HandleWaitCanceler::new(move |handle_ref| {
             if let Some(waiter_impl) = waiter_impl.upgrade() {
                 waiter_impl.port.cancel(&handle_ref, key.raw).is_ok()
@@ -386,33 +389,60 @@ impl Waiter {
         self.register_callback(callback)
     }
 
-    fn queue_events(&self, key: &WaitKey, event: WaitEvents) {
-        self.queue_user_packet_data(key, zx::sys::ZX_OK, event)
-    }
-
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
     /// typical caller should then unwind to the syscall dispatch loop to let the signal be
     /// processed. See wait_until() for more details.
     ///
     /// Ignored if the waiter was created with new_ignoring_signals().
     pub fn interrupt(&self) {
-        if self.0.ignore_signals {
-            return;
-        }
-        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, WaitEvents::All);
+        self.inner.interrupt();
+    }
+}
+
+impl WaiterImpl {
+    fn queue_events(&self, key: &WaitKey, event: WaitEvents) {
+        self.queue_user_packet_data(key, zx::sys::ZX_OK, event)
     }
 
     /// Queue a packet to the underlying Zircon port, which will cause the
     /// waiter to wake up.
     fn queue_user_packet_data(&self, key: &WaitKey, status: i32, events: WaitEvents) {
         let packet = zx::Packet::from_user_packet(key.raw, status, events.into());
-        self.0.port.queue(&packet).map_err(impossible_error).unwrap();
+        self.port.queue(&packet).map_err(impossible_error).unwrap();
+    }
+
+    fn interrupt(&self) {
+        if self.ignore_signals {
+            return;
+        }
+        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, WaitEvents::All);
+    }
+}
+
+impl Drop for Waiter {
+    fn drop(&mut self) {
+        // Delete ourselves from each wait queue we know we're on to prevent Weak references to
+        // ourself from sticking around forever.
+        for wait_queue in self.inner.wait_queues.lock().iter() {
+            if let Some(wait_queue) = wait_queue.upgrade() {
+                wait_queue
+                    .waiters
+                    .lock()
+                    .retain(|entry| entry.waiter.0.as_ptr() != Arc::as_ptr(&self.inner))
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for WaiterImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Waiter").field("port", &self.port).finish_non_exhaustive()
     }
 }
 
 impl std::fmt::Debug for Waiter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Waiter").field("port", &self.0.port).finish_non_exhaustive()
+        self.inner.fmt(f)
     }
 }
 
@@ -436,10 +466,28 @@ impl WaiterRef {
         self.0.strong_count() != 0
     }
 
-    /// Call the closure with a reference to the waiter if this weak ref is valid, or None if it
-    /// isn't.
-    pub fn access<R>(&self, f: impl FnOnce(Option<&Waiter>) -> R) -> R {
-        f(self.0.upgrade().map(Waiter).as_ref())
+    pub fn interrupt(&self) {
+        self.access(|waiter| {
+            if let Some(waiter) = waiter {
+                waiter.interrupt();
+            }
+        });
+    }
+
+    /// Call the closure with a reference to the insides of the waiter if this weak ref is valid,
+    /// or None if it isn't.
+    ///
+    /// This doesn't return &Waiter because that would require creating a new Waiter object, and
+    /// Waiter's Drop is used for cleanup, and we don't want this function to end up running the
+    /// cleanup using the shared WaiterImpl.
+    fn access<R>(&self, f: impl FnOnce(Option<&WaiterImpl>) -> R) -> R {
+        f(self.0.upgrade().as_ref().map(|w| w.as_ref()))
+    }
+}
+
+impl PartialEq<Waiter> for WaiterRef {
+    fn eq(&self, other: &Waiter) -> bool {
+        self.0.as_ptr() == Arc::as_ptr(&other.inner)
     }
 }
 
@@ -462,9 +510,12 @@ impl PartialEq for WaiterRef {
 /// has occurred. The waiters will then wake up on their own thread to handle
 /// the event.
 #[derive(Default, Debug)]
-pub struct WaitQueue {
+pub struct WaitQueue(Arc<WaitQueueImpl>);
+
+#[derive(Default, Debug)]
+struct WaitQueueImpl {
     /// The list of waiters.
-    waiters: Arc<Mutex<Vec<WaitEntry>>>,
+    waiters: Mutex<Vec<WaitEntry>>,
 }
 
 /// An entry in a WaitQueue.
@@ -495,14 +546,23 @@ impl WaitQueue {
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     fn wait_async_on_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
         let key = entry.key;
-        self.waiters.lock().push(entry);
+        self.0.waiters.lock().push(entry);
+        let weak_self = Arc::downgrade(&self.0);
+        waiter.inner.wait_queues.lock().push(weak_self.clone());
         let waiter = waiter.weak();
-        let waiters = Arc::downgrade(&self.waiters);
         WaitCanceler::new(move || {
-            if let Some(waiters) = waiters.upgrade() {
+            if let Some(strong_self) = weak_self.upgrade() {
+                waiter.access(|waiter| {
+                    if let Some(waiter) = waiter {
+                        waiter
+                            .wait_queues
+                            .lock()
+                            .retain(|queue| queue.as_ptr() != weak_self.as_ptr());
+                    }
+                });
                 let mut cancelled = false;
                 // TODO(steveaustin) Maybe make waiters a map to avoid linear search
-                waiters.lock().retain(|entry| {
+                strong_self.waiters.lock().retain(|entry| {
                     if entry.waiter.0.as_ptr() == waiter.0.as_ptr() && entry.key == key {
                         cancelled = true;
                         false
@@ -604,7 +664,7 @@ impl WaitQueue {
 
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         let mut woken = 0;
-        self.waiters.lock().retain(|entry| {
+        self.0.waiters.lock().retain(|entry| {
             entry.waiter.access(|waiter| {
                 // Drop entries whose waiter no longer exists.
                 let waiter = if let Some(waiter) = waiter {
@@ -661,13 +721,13 @@ impl WaitQueue {
     }
 
     pub fn transfer(&self, other: &WaitQueue) {
-        let mut other_entries = std::mem::take(other.waiters.lock().deref_mut());
-        self.waiters.lock().append(&mut other_entries);
+        let mut other_entries = std::mem::take(other.0.waiters.lock().deref_mut());
+        self.0.waiters.lock().append(&mut other_entries);
     }
 
     /// Returns whether there is no active waiters waiting on this `WaitQueue`.
     pub fn is_empty(&self) -> bool {
-        let mut waiters = self.waiters.lock();
+        let mut waiters = self.0.waiters.lock();
         waiters.retain(|entry| entry.waiter.is_valid());
         waiters.is_empty()
     }

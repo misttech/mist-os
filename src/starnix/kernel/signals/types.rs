@@ -91,13 +91,7 @@ impl RunState {
     pub fn wake(&self) {
         match self {
             RunState::Running => (),
-            RunState::Waiter(waiter) => {
-                waiter.access(|waiter| {
-                    if let Some(waiter) = waiter {
-                        waiter.interrupt()
-                    }
-                });
-            }
+            RunState::Waiter(waiter) => waiter.interrupt(),
             RunState::Event(event) => event.interrupt(),
         }
     }
