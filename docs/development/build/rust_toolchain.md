@@ -125,8 +125,8 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
      | $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
          $DEV_ROOT/infra/fuchsia/recipes/recipe_modules/toolchain/resources/runtimes.py \
            --dir install/fuchsia-rust/lib \
-           --readelf fuchsia-build/*/llvm/bin/llvm-readelf \
-           --objcopy fuchsia-build/*/llvm/bin/llvm-objcopy \
+           --readelf fuchsia-build/host/llvm/bin/llvm-readelf \
+           --objcopy fuchsia-build/host/llvm/bin/llvm-objcopy \
      > install/fuchsia-rust/lib/runtime.json
    ```
 
