@@ -9,6 +9,7 @@
 #include "ld-startup-in-process-tests-zircon.h"
 #else
 #include "ld-startup-in-process-tests-posix.h"
+#include "ld-startup-spawn-process-tests-posix.h"
 #endif
 
 namespace {
@@ -21,6 +22,9 @@ using LoadTypes = ::testing::Types<
 // relocation so they can make the syscall to exit.
 #if 0  // def __Fuchsia__
     ld::testing::LdStartupCreateProcessTests<>,
+#endif
+#ifndef __Fuchsia__  // TODO(fxbug.dev/130483): add fdio_spawn version
+    ld::testing::LdStartupSpawnProcessTests,
 #endif
     ld::testing::LdStartupInProcessTests>;
 

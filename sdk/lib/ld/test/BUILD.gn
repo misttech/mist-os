@@ -82,6 +82,8 @@ source_set("load-tests") {
     sources += [
       "ld-startup-in-process-tests-posix.cc",
       "ld-startup-in-process-tests-posix.h",
+      "ld-startup-spawn-process-tests-posix.cc",
+      "ld-startup-spawn-process-tests-posix.h",
     ]
     deps += [ ":test-chdir-guard" ]
   }
