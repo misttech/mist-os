@@ -22,11 +22,6 @@
             // test component exists yet.
         },
         {
-            // TODO(fxbug.dev/107054): Remove use of input-synthesis.
-            name: "input-synthesis",
-            url: "#meta/input-synthesis-component.cm",
-        },
-        {
             name: "input-helper",
             url: "#meta/input-helper.cm",
         },
@@ -40,15 +35,7 @@
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [
-                "#input-helper",
-                "#input-synthesis",
-            ],
-        },
-        {
-            protocol: [ "fuchsia.input.injection.InputDeviceRegistry" ],
-            from: "#scene_manager",
-            to: [ "#input-synthesis" ],
+            to: [ "#input-helper" ],
         },
         {
             protocol: [ "fuchsia.input.injection.InputDeviceRegistry" ],
@@ -65,20 +52,11 @@
             from: "parent",
             to: [
                 "#input-helper",
-                "#input-synthesis",
                 "#scene_manager",
             ],
         },
     ],
     expose: [
-        {
-            // TODO(fxbug.dev/107054): Remove these.
-            protocol: [
-                "test.inputsynthesis.Mouse",
-                "test.inputsynthesis.Text",
-            ],
-            from: "#input-synthesis",
-        },
         {
             protocol: [ "fuchsia.ui.test.input.Registry" ],
             from: "#input-helper",

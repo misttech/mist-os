@@ -28,10 +28,6 @@
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.test.input.Registry",
                 "fuchsia.ui.test.scene.Controller",
-
-                // TODO(fxbug.dev/107054): Remove these.
-                "test.inputsynthesis.Mouse",
-                "test.inputsynthesis.Text",
             ],
         },
     ],
@@ -78,12 +74,6 @@
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.test.input.Registry",
                 "fuchsia.ui.test.scene.Controller",
-
-                // TODO(fxbug.dev/107054): Remove these.
-                // Clients of test-ui-stack should use fuchsia.ui.test.input
-                // wherever possible.
-                "test.inputsynthesis.Mouse",
-                "test.inputsynthesis.Text",
             ],
             from: "self",
         },

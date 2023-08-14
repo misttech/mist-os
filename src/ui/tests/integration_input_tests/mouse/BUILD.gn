@@ -75,9 +75,6 @@ fuchsia_test_package("mouse-input-test") {
     # configurations on which these tests run rather than as deps.
     "//src/chromium:web_context_provider_for_test",
 
-    # Used by some tests.
-    "//src/lib/ui/input-synthesis:input-synthesis-component",
-
     # Launched in the test realm for hermeticity.
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",

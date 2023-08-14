@@ -51,7 +51,6 @@ source_set("ui_test_realm") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl",
-    "//src/lib/ui/input-synthesis:test.inputsynthesis_hlcpp",
     "//src/testing/fidl/intl_property_manager:intl_property_manager_component",
     "//src/ui/a11y/testing/fidl:test.accessibility_hlcpp",
   ]
@@ -96,7 +95,6 @@ fuchsia_component("scene_manager_scene") {
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/graphics/display/testing/fake-coordinator-connector:child-component",
-    "//src/lib/ui/input-synthesis:input-synthesis-component",
     "//src/ui/a11y/bin/a11y_manager:component_v2",
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
     "//src/ui/bin/text:text_manager_comp",

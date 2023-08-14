@@ -20,8 +20,6 @@
 
 #include <cstring>
 
-#include <test/inputsynthesis/cpp/fidl.h>
-
 #include "src/ui/testing/test_ui_stack/test_ui_stack_config_lib.h"
 #include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 
@@ -89,12 +87,6 @@ int run_test_ui_stack(int argc, const char** argv) {
   AddPublicService<fuchsia::ui::test::input::Registry>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia::ui::test::scene::Controller>(context.get(),
                                                          realm_exposed_services.get());
-
-  // Input-synthesis services.
-  // TODO(fxbug.dev/107054): Remove these as soon as they are replaceable by
-  // fuchsia.ui.test.input, which is the preferred testing library.
-  AddPublicService<test::inputsynthesis::Mouse>(context.get(), realm_exposed_services.get());
-  AddPublicService<test::inputsynthesis::Text>(context.get(), realm_exposed_services.get());
 
   context->outgoing()->ServeFromStartupInfo();
 

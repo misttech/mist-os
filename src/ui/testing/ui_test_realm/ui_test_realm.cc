@@ -35,7 +35,6 @@
 #include <math.h>
 
 #include <test/accessibility/cpp/fidl.h>
-#include <test/inputsynthesis/cpp/fidl.h>
 
 #include "sdk/lib/syslog/cpp/macros.h"
 
