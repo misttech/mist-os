@@ -58,7 +58,8 @@ use crate::{
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
             DualStackDatagramBoundStateContext, EitherIpSocket, ExpectedConnError,
             ExpectedUnboundError, FoundSockets, InUseError, LocalIdentifierAllocator,
-            MulticastMembershipInterfaceSelector, SendError as DatagramSendError,
+            MaybeDualStack, MulticastMembershipInterfaceSelector,
+            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
             SetMulticastMembershipError, ShutdownType, SocketHopLimits,
             SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             SocketsState as DatagramSocketsState,
@@ -868,6 +869,21 @@ pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
         + MulticastMembershipHandler<I, C>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
+    type DualStackContext: DualStackDatagramBoundStateContext<
+        I,
+        C,
+        Udp,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+    type NonDualStackContext: NonDualStackDatagramBoundStateContext<
+        I,
+        C,
+        Udp,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+
     /// Calls the function with an immutable reference to UDP sockets.
     fn with_bound_sockets<
         O,
@@ -886,15 +902,10 @@ pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
         cb: F,
     ) -> O;
 
-    type DualStackContext: DualStackDatagramBoundStateContext<
-        I,
-        C,
-        Udp,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-
-    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext>;
+    /// Returns a context for dual- or non-dual-stack operation.
+    fn dual_stack_context(
+        &mut self,
+    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext>;
 
     /// Calls the function without access to the UDP bound socket state.
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -983,6 +994,12 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>
         &mut self,
         cb: F,
     ) -> O;
+}
+
+/// An execution context for UDP non-dual-stack operations.
+pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
+    UdpStateContext + DeviceIdContext<AnyDevice>
+{
 }
 
 /// An execution context for the UDP protocol when a buffer is provided.
@@ -1866,7 +1883,10 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
     }
 
     type DualStackContext = SC::DualStackContext;
-    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
+    type NonDualStackContext = SC::NonDualStackContext;
+    fn dual_stack_context(
+        &mut self,
+    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
         BoundStateContext::dual_stack_context(self)
     }
 
@@ -1929,6 +1949,13 @@ impl<C: StateNonSyncContext<Ipv6>, SC: DualStackBoundStateContext<Ipv6, C> + Udp
             },
         )
     }
+}
+
+impl<
+        C: StateNonSyncContext<Ipv4>,
+        SC: BoundStateContext<Ipv4, C> + NonDualStackBoundStateContext<Ipv4, C> + UdpStateContext,
+    > NonDualStackDatagramBoundStateContext<Ipv4, C, Udp> for SC
+{
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
@@ -2500,7 +2527,7 @@ mod tests {
         },
         socket::{
             self,
-            datagram::{MulticastInterfaceSelector, UninstantiableDualStackContext},
+            datagram::{MulticastInterfaceSelector, UninstantiableContext},
         },
         testutil::{set_logger_for_test, TestIpExt as _},
     };
@@ -2730,6 +2757,7 @@ mod tests {
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
         type DualStackContext = I::UdpDualStackBoundStateContext<D, DUAL_STACK_ENABLED>;
+        type NonDualStackContext = I::UdpNonDualStackBoundStateContext<D, DUAL_STACK_ENABLED>;
 
         fn with_bound_sockets<
             O,
@@ -2761,13 +2789,15 @@ mod tests {
             cb(inner)
         }
 
-        fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
-            struct WrapDualStackContext<
-                'a,
-                I: Ip + TestIpExt,
-                D: FakeStrongDeviceId + 'static,
-                const DUAL_STACK_ENABLED: bool,
-            >(&'a mut I::UdpDualStackBoundStateContext<D, DUAL_STACK_ENABLED>);
+        fn dual_stack_context(
+            &mut self,
+        ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
+            struct Wrap<'a, I: Ip + TestIpExt, D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool>(
+                MaybeDualStack<
+                    &'a mut I::UdpDualStackBoundStateContext<D, DUAL_STACK_ENABLED>,
+                    &'a mut I::UdpNonDualStackBoundStateContext<D, DUAL_STACK_ENABLED>,
+                >,
+            );
             // TODO(https://fxbug.dev/131992): Replace this with a derived impl.
             impl<
                     'a,
@@ -2775,21 +2805,39 @@ mod tests {
                     NewIp: TestIpExt,
                     D: FakeStrongDeviceId + 'static,
                     const DUAL_STACK_ENABLED: bool,
-                > GenericOverIp<NewIp> for WrapDualStackContext<'a, I, D, DUAL_STACK_ENABLED>
+                > GenericOverIp<NewIp> for Wrap<'a, I, D, DUAL_STACK_ENABLED>
             {
-                type Type = WrapDualStackContext<'a, NewIp, D, DUAL_STACK_ENABLED>;
+                type Type = Wrap<'a, NewIp, D, DUAL_STACK_ENABLED>;
             }
 
-            I::map_ip::<_, Option<WrapDualStackContext<'_, I, D, DUAL_STACK_ENABLED>>>(
+            let Wrap(context) = I::map_ip(
                 IpInvariant(self),
-                |_| None,
-                |IpInvariant(this)| DUAL_STACK_ENABLED.then_some(this).map(WrapDualStackContext),
-            )
-            .map(|WrapDualStackContext(this)| this)
+                |IpInvariant(this)| Wrap(MaybeDualStack::NotDualStack(this)),
+                |IpInvariant(this)| {
+                    Wrap(match DUAL_STACK_ENABLED {
+                        true => MaybeDualStack::DualStack(this),
+                        false => MaybeDualStack::NotDualStack(this),
+                    })
+                },
+            );
+            context
         }
     }
 
     impl<D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool> UdpStateContext
+        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    {
+    }
+
+    impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
+        NonDualStackBoundStateContext<Ipv4, FakeUdpNonSyncCtx>
+        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    {
+    }
+
+    /// Allow non-dual-stack operation for IPv6.
+    impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
+        NonDualStackDatagramBoundStateContext<Ipv6, FakeUdpNonSyncCtx, Udp>
         for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
     {
     }
@@ -3029,6 +3077,8 @@ mod tests {
     trait TestIpExt: crate::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool>:
             DualStackDatagramBoundStateContext<Self, FakeUdpNonSyncCtx, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
+        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool>:
+            NonDualStackDatagramBoundStateContext<Self, FakeUdpNonSyncCtx, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
         fn try_into_recv_src_addr(addr: Self::Addr) -> Option<Self::RecvSrcAddr>;
     }
 
@@ -3036,7 +3086,13 @@ mod tests {
         type UdpDualStackBoundStateContext<
             D: FakeStrongDeviceId + 'static,
             const DUAL_STACK_ENABLED: bool,
-        > = UninstantiableDualStackContext<Self, Udp, FakeUdpDualStackInnerSyncCtx<D>>;
+        > = UninstantiableContext<Self, Udp, FakeUdpDualStackInnerSyncCtx<D>>;
+
+        type UdpNonDualStackBoundStateContext<
+            D: FakeStrongDeviceId + 'static,
+            const DUAL_STACK_ENABLED: bool,
+        > = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
+
         fn try_into_recv_src_addr(addr: Ipv4Addr) -> Option<Ipv4Addr> {
             Some(addr)
         }
@@ -3047,6 +3103,11 @@ mod tests {
             D: FakeStrongDeviceId + 'static,
             const DUAL_STACK_ENABLED: bool,
         > = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
+        type UdpNonDualStackBoundStateContext<
+            D: FakeStrongDeviceId + 'static,
+            const DUAL_STACK_ENABLED: bool,
+        > = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
+
         fn try_into_recv_src_addr(addr: Ipv6Addr) -> Option<Ipv6SourceAddr> {
             Ipv6SourceAddr::new(addr)
         }

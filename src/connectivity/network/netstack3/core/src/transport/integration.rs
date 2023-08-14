@@ -13,10 +13,10 @@ use packet::BufferMut;
 use crate::{
     device::WeakDeviceId,
     ip::{device::IpDeviceNonSyncContext, BufferTransportIpContext},
-    socket::datagram::UninstantiableDualStackContext,
+    socket::datagram::{MaybeDualStack, UninstantiableContext},
     transport::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
-        udp,
+        udp::{self},
     },
     NonSyncContext, SyncCtx,
 };
@@ -133,7 +133,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::BoundStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
-    type DualStackContext = UninstantiableDualStackContext<Ipv4, udp::Udp, Self>;
+    type DualStackContext = UninstantiableContext<Ipv4, udp::Udp, Self>;
+    type NonDualStackContext = Self;
 
     fn with_bound_sockets<
         O,
@@ -159,8 +160,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
         cb(&mut locked, &mut bound_sockets)
     }
 
-    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
-        None
+    fn dual_stack_context(
+        &mut self,
+    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
+        MaybeDualStack::NotDualStack(self)
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -220,6 +223,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
     type DualStackContext = Self;
+    type NonDualStackContext = UninstantiableContext<Ipv6, udp::Udp, Self>;
 
     fn with_bound_sockets<
         O,
@@ -245,8 +249,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
         cb(&mut locked, &mut bound_sockets)
     }
 
-    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
-        Some(self)
+    fn dual_stack_context(
+        &mut self,
+    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
+        MaybeDualStack::DualStack(self)
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -293,6 +299,11 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
             self.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
         cb(&mut locked.cast_locked(), &mut bound_v4)
     }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
+    udp::NonDualStackBoundStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+{
 }
 
 impl<

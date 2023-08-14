@@ -413,6 +413,19 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
         WeakDeviceId = Self::WeakDeviceId,
     >;
 
+    /// Context for single-stack socket access.
+    ///
+    /// This type provides access, via an implementation of the
+    /// [`NonDualStackDatagramBoundStateContext`] trait, to functionality
+    /// necessary to implement sockets that do not support dual-stack operation.
+    type NonDualStackContext: NonDualStackDatagramBoundStateContext<
+        I,
+        C,
+        S,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+
     /// The additional allocator passed to the callback provided to
     /// `with_sockets_mut`.
     type LocalIdAllocator: LocalIdentifierAllocator<
@@ -458,19 +471,45 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, C, S: Data
         cb: F,
     ) -> O;
 
-    /// Provides access to the dual-stack context, if one is available.
+    /// Provides access to either the dual-stack or non-dual-stack context.
     ///
     /// For socket types that don't support dual-stack operation (like ICMP,
-    /// raw IP sockets, and UDPv4), this method should always return `None`.
-    /// Otherwise it should provide an instance of the `DualStackContext`, which
-    /// can be used by the caller to access dual-stack state.
-    fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext>;
+    /// raw IP sockets, and UDPv4), this method should always return a reference
+    /// to the non-dual-stack context to allow the caller to access
+    /// non-dual-stack state. Otherwise it should provide an instance of the
+    /// `DualStackContext`, which can be used by the caller to access dual-stack
+    /// state.
+    fn dual_stack_context(
+        &mut self,
+    ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext>;
 
     /// Calls the function with only the inner context.
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
+}
+
+/// Control flow type containing either a dual-stack or non-dual-stack context.
+///
+/// This type exists to provide nice names to the result of
+/// [`BoundStateContext::dual_stack_context`], and to allow generic code to
+/// match on when checking whether a socket protocol and IP version support
+/// dual-stack operation. If dual-stack operation is supported, a
+/// [`MaybeDualStack::DualStack`] value will be held, otherwise a `NonDualStack`
+/// value.
+///
+/// Note that the templated types to not have trait bounds; those are provided
+/// by the trait with the `dual_stack_context` function.
+///
+/// In monomorphized code, this type frequently has exactly one template
+/// parameter that is uninstantiable (it contains an instance of
+/// [`core::convert::Infallible`] or some other empty enum, or a reference to
+/// the same)! That lets the compiler optimize it out completely, creating no
+/// actual runtime overhead.
+pub(crate) enum MaybeDualStack<DS, NDS> {
+    DualStack(DS),
+    NotDualStack(NDS),
 }
 
 /// Provides access to dual-stack socket state.
@@ -545,6 +584,12 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
     ) -> O;
 }
 
+/// Provides access to socket state for a single IP version.
+pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSocketSpec>:
+    DeviceIdContext<AnyDevice>
+{
+}
+
 /// An uninstantiable type that implements  [`LocalIdentifierAllocator`].
 pub(crate) struct UninstantiableAllocator(Never);
 
@@ -570,9 +615,9 @@ impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>
 
 /// An uninstantiable type that ipmlements
 /// [`DualStackDatagramBoundStateContext`].
-pub(crate) struct UninstantiableDualStackContext<I, S, P>(Never, PhantomData<(I, S, P)>);
+pub(crate) struct UninstantiableContext<I, S, P>(Never, PhantomData<(I, S, P)>);
 
-impl<I, S, P> AsRef<Never> for UninstantiableDualStackContext<I, S, P> {
+impl<I, S, P> AsRef<Never> for UninstantiableContext<I, S, P> {
     fn as_ref(&self) -> &Never {
         let Self(never, _marker) = self;
         &never
@@ -580,7 +625,7 @@ impl<I, S, P> AsRef<Never> for UninstantiableDualStackContext<I, S, P> {
 }
 
 impl<I, S, P: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
-    for UninstantiableDualStackContext<I, S, P>
+    for UninstantiableContext<I, S, P>
 {
     type DeviceId = P::DeviceId;
     type WeakDeviceId = P::WeakDeviceId;
@@ -599,7 +644,12 @@ impl<I, S, P: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
 }
 
 impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
-    DualStackDatagramBoundStateContext<I, C, S> for UninstantiableDualStackContext<I, S, P>
+    NonDualStackDatagramBoundStateContext<I, C, S> for UninstantiableContext<I, S, P>
+{
+}
+
+impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
+    DualStackDatagramBoundStateContext<I, C, S> for UninstantiableContext<I, S, P>
 where
     for<'a> P::IpSocketsCtx<'a>: TransportIpContext<I::OtherVersion, C>,
 {
@@ -1479,9 +1529,11 @@ where
         SocketState::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
     };
 
-    let dual_stack = sync_ctx
-        .dual_stack_context()
-        .and_then(|ds| ds.dual_stack_enabled(entry.get()).then_some(ds));
+    let dual_stack = match sync_ctx.dual_stack_context() {
+        MaybeDualStack::DualStack(ds) => Some(ds),
+        MaybeDualStack::NotDualStack(_) => None,
+    }
+    .and_then(|ds| ds.dual_stack_enabled(entry.get()).then_some(ds));
 
     let bound_operation: BoundOperation<'_, I, _> = match (dual_stack, addr) {
         // No dual-stack support, so only bind on the current stack.
@@ -3018,7 +3070,8 @@ mod test {
     {
         type IpSocketsCtx<'a> = FakeInnerSyncCtx<D>;
         type LocalIdAllocator = ();
-        type DualStackContext = UninstantiableDualStackContext<I, FakeStateSpec, Self>;
+        type DualStackContext = UninstantiableContext<I, FakeStateSpec, Self>;
+        type NonDualStackContext = Self;
 
         fn with_bound_sockets<
             O,
@@ -3066,11 +3119,19 @@ mod test {
             cb(inner)
         }
 
-        fn dual_stack_context(&mut self) -> Option<&mut Self::DualStackContext> {
+        fn dual_stack_context(
+            &mut self,
+        ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
             // Dual-stack operation will be tested through UDP since that's the
             // only datagram socket type that will use it.
-            None
+            MaybeDualStack::NotDualStack(self)
         }
+    }
+
+    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
+        NonDualStackDatagramBoundStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
+        for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
+    {
     }
 
     impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
