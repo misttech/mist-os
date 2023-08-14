@@ -1,57 +1,49 @@
 [
-  {
-    "name": "Protocol",
-    "expected": "abort",
-    "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE",
-      "fuchsia.BIND_COMPOSITE": "1"
+    {
+        "node": "pci",
+        "tests": [
+            {
+                "name": "SCSI",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
+                    "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_SCSI"
+                }
+            },
+            {
+                "name": "T_SCSI",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
+                    "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_T_SCSI_HOST"
+                }
+            }
+        ]
+    },
+    {
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
+    },
+    {
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
-  },
-  {
-    "name": "SCSI",
-    "expected": "match",
-    "device": {
-      "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-      "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-      "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_SCSI",
-      "fuchsia.BIND_COMPOSITE": "1"
-    }
-  },
-  {
-    "name": "T_SCSI",
-    "expected": "match",
-    "device": {
-      "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-      "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-      "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_T_SCSI_HOST",
-      "fuchsia.BIND_COMPOSITE": "1"
-    }
-  },
-  {
-    "name": "Missing Protocol",
-    "expected": "abort",
-    "device": {
-      "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-      "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_SCSI",
-      "fuchsia.BIND_COMPOSITE": "1"
-    }
-  },
-  {
-    "name": "Missing PCI VID",
-    "expected": "abort",
-    "device": {
-      "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-      "fuchsia.BIND_PCI_DID": "fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_SCSI",
-      "fuchsia.BIND_COMPOSITE": "1"
-    }
-  },
-  {
-    "name": "Missing PCI DID",
-    "expected": "abort",
-    "device": {
-      "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-      "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.VIRTIO",
-      "fuchsia.BIND_COMPOSITE": "1"
-    }
-  }
 ]

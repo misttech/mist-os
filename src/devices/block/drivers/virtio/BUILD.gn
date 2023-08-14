@@ -70,7 +70,11 @@ source_set("scsi_lib") {
 driver_bind_rules("virtio_scsi_bind") {
   rules = "virtio_scsi.bind"
   tests = "scsi_bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
+  deps = [
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.hardware.sysmem",
+    "//src/devices/bind/fuchsia.pci",
+  ]
 }
 
 fuchsia_driver("virtio_scsi-driver") {
