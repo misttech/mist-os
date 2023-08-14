@@ -37,8 +37,8 @@ fuchsia_driver("aml-securemem-driver") {
 
   deps = [
     ":aml-securemem-bind",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
@@ -76,8 +76,8 @@ test("aml-securemem-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":aml-securemem-bind",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",

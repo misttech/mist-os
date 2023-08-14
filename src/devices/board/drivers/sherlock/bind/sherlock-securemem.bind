@@ -18,7 +18,7 @@ primary node "pdev" {
 }
 
 node "sysmem" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 
 node "tee" {
