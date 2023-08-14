@@ -326,6 +326,16 @@ function diff_file_relpath() {
       esac
       ;;
 
+    action_cache_v15.blaze) expect=ignore ;;
+    filename_index_v15.blaze) expect=ignore ;;
+    command.profile.gz) expect=ignore ;;
+
+    workspace-events.log*) expect=ignore ;;
+
+    # numbered bazel action logs (unordered)
+    stdout-*) expect=ignore ;;
+    stderr-*) expect=ignore ;;
+
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
@@ -421,6 +431,9 @@ function diff_dir_recursive() {
     # Ignore files whose names are content-hash like.
     amber-files/repository/blobs/) return ;;
     amber-files/repository/targets/) return ;;
+
+    # bazel runfiles dirs use absolute symlinks, so ignore those
+    *.runfiles) return ;;
     *) ;;  # continue
   esac
 
