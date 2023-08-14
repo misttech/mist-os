@@ -310,6 +310,7 @@ group("driver") {
     "//src/media/audio/drivers/virtual_audio:*",
     "//src/media/drivers/amlogic_decoder:*",
     "//src/storage/fvm/driver:*",
+    "//src/testing/fuzzing/syzkaller:*",
     "//src/ui/backlight/drivers/ti-lp8556:*",
     "//src/ui/backlight/drivers/vim3-pwm-backlight:*",
     "//src/ui/input/drivers/ctaphid:*",
