@@ -39,12 +39,12 @@ use netstack3_core::{
         },
         segment::Payload,
         socket::{
-            accept, bind, close, close_conn, connect, create_socket, get_info, get_socket_error,
-            listen, receive_buffer_size, reuseaddr, send_buffer_size, set_device,
-            set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown,
-            with_socket_options, with_socket_options_mut, AcceptError, BindError, BoundInfo,
-            ConnectError, ConnectionInfo, ListenError, ListenerNotifier, NoConnection,
-            SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
+            accept, bind, close, connect, create_socket, get_info, get_socket_error, listen,
+            receive_buffer_size, reuseaddr, send_buffer_size, set_device, set_receive_buffer_size,
+            set_reuseaddr, set_send_buffer_size, shutdown, with_socket_options,
+            with_socket_options_mut, AcceptError, BindError, BoundInfo, ConnectError,
+            ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
+            SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -494,27 +494,23 @@ where
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
-        let Self { id, peer: _, local_socket_and_watcher: _ } = self;
-        match id {
-            SocketId::Unbound(unbound) => close::<I, _>(sync_ctx, unbound.into()),
-            SocketId::Bound(bound) => close::<I, _>(sync_ctx, bound.into()),
-            SocketId::Connection(conn) => {
-                close_conn::<I, _>(sync_ctx, non_sync_ctx, conn.into());
+        let Self { mut id, peer, local_socket_and_watcher: _ } = self;
+        match shutdown::<I, _>(
+            &sync_ctx,
+            non_sync_ctx,
+            &mut id,
+            Shutdown { send: true, receive: true },
+        ) {
+            Ok(true) => {
+                peer.set_disposition(
+                    Some(zx::SocketWriteDisposition::Disabled),
+                    Some(zx::SocketWriteDisposition::Disabled),
+                )
+                .expect("failed to set socket disposition");
             }
-            SocketId::Listener(listener) => {
-                let mut id = listener.into();
-                assert_matches::assert_matches!(
-                    shutdown::<I, _>(
-                        sync_ctx,
-                        non_sync_ctx,
-                        &mut id,
-                        Shutdown { send: false, receive: true }
-                    ),
-                    Ok(false)
-                );
-                close::<I, _>(sync_ctx, id);
-            }
+            Ok(false) | Err(NoConnection) => {}
         }
+        close::<I, _>(sync_ctx, non_sync_ctx, id)
     }
 }
 

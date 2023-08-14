@@ -1120,8 +1120,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         remote: SocketAddr<I::Addr, Self::DeviceId>,
     ) -> Result<SocketId<I>, ConnectError>;
 
-    fn close_conn(&mut self, ctx: &mut C, id: SocketId<I>);
-    fn close(&mut self, id: SocketId<I>);
+    fn close(&mut self, ctx: &mut C, id: SocketId<I>);
 
     // TODO(https://fxbug.dev/126141): The `SocketId` is modified in-place, but
     // would become unnecessary at a later stage of merging socket ID.
@@ -1539,50 +1538,56 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         )
     }
 
-    fn close_conn(&mut self, ctx: &mut C, id: SocketId<I>) {
-        self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
-            debug!("close on {id:?}");
-            let mut entry = match sockets.socket_state.entry(id) {
-                IdMapCollectionEntry::Vacant(_) => panic!("invalid socket ID"),
-                IdMapCollectionEntry::Occupied(e) => e,
-            };
-            let (conn, _, addr): &mut (_, SharingState, _) =
-            assert_matches!(entry.get_mut(), SocketState::Bound(BoundSocketState::Connected(conn)) => conn);
-            conn.defunct = true;
-            let already_closed =
-                match conn.state.close(CloseReason::Close { now: ctx.now() }, &conn.socket_options)
-                {
-                    Err(CloseError::NoConnection) => true,
-                    Err(CloseError::Closing) => false,
-                    Ok(()) => matches!(conn.state, State::Closed(_)),
+    fn close(&mut self, ctx: &mut C, id: SocketId<I>) {
+        self.with_ip_transport_ctx_and_tcp_sockets_mut(
+            |ip_transport_ctx, Sockets { socket_state, socketmap, port_alloc: _ }| {
+                let mut entry = match socket_state.entry(id) {
+                    IdMapCollectionEntry::Vacant(_) => panic!("invalid socket ID"),
+                    IdMapCollectionEntry::Occupied(e) => e,
                 };
-            if already_closed {
-                assert_matches!(sockets.socketmap.conns_mut().remove(&id, &addr), Ok(()));
-                let (_state, _sharing, _addr) = assert_matches!(
-                    entry.remove(),
-                    SocketState::Bound(BoundSocketState::Connected(conn)) => conn
-                );
-                let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(id));
-                return;
-            }
-            do_send_inner(id, conn, &addr, ip_transport_ctx, ctx)
-        })
-    }
-
-    fn close(&mut self, id: SocketId<I>) {
-        self.with_tcp_sockets_mut(|Sockets { socket_state, socketmap, port_alloc: _ }| {
-            match socket_state.remove(&id).expect("invalid socket ID") {
-                SocketState::Unbound(_) => {}
-                SocketState::Bound(BoundSocketState::Listener((
-                    MaybeListener::Bound(_),
-                    _sharing,
-                    addr,
-                ))) => {
-                    assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                match entry.get_mut() {
+                    SocketState::Unbound(_) => {
+                        assert_matches!(entry.remove(), SocketState::Unbound(_))
+                    }
+                    SocketState::Bound(BoundSocketState::Listener((
+                        MaybeListener::Bound(_),
+                        _sharing,
+                        addr,
+                    ))) => {
+                        assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                        assert_matches!(entry.remove(), SocketState::Bound(_));
+                    }
+                    SocketState::Bound(BoundSocketState::Listener((
+                        MaybeListener::Listener(_),
+                        _sharing,
+                        _addr,
+                    ))) => {
+                        unreachable!("should not call close directly on a listener");
+                    }
+                    SocketState::Bound(BoundSocketState::Connected((conn, _sharing, addr))) => {
+                        conn.defunct = true;
+                        let already_closed = match conn
+                            .state
+                            .close(CloseReason::Close { now: ctx.now() }, &conn.socket_options)
+                        {
+                            Err(CloseError::NoConnection) => true,
+                            Err(CloseError::Closing) => false,
+                            Ok(()) => matches!(conn.state, State::Closed(_)),
+                        };
+                        if already_closed {
+                            assert_matches!(socketmap.conns_mut().remove(&id, &addr), Ok(()));
+                            let (_state, _sharing, _addr) = assert_matches!(
+                                entry.remove(),
+                                SocketState::Bound(BoundSocketState::Connected(conn)) => conn
+                            );
+                            let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(id));
+                            return;
+                        }
+                        do_send_inner(id, conn, &addr, ip_transport_ctx, ctx)
+                    }
                 }
-                _ => panic!("invalid socket state"),
-            }
-        });
+            },
+        );
     }
 
     fn shutdown(
@@ -2612,21 +2617,6 @@ where
     Ok(conn_id)
 }
 
-/// Closes the connection. The user has promised that they will not use `id`
-/// again, we can reclaim the connection after the connection becomes `Closed`.
-pub fn close_conn<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: SocketId<I>)
-where
-    I: IpExt,
-    C: crate::NonSyncContext,
-{
-    let mut sync_ctx = Locked::new(sync_ctx);
-    I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close_conn(sync_ctx, ctx, id),
-        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close_conn(sync_ctx, ctx, id),
-    )
-}
-
 /// Shuts down a socket.
 ///
 /// For a connection, calling this function signals the other side of the
@@ -2663,16 +2653,16 @@ where
 }
 
 /// Closes a socket.
-pub fn close<I, C>(sync_ctx: &SyncCtx<C>, id: SocketId<I>)
+pub fn close<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: SocketId<I>)
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant(&mut sync_ctx), id),
-        |(IpInvariant(sync_ctx), id)| SocketHandler::close(sync_ctx, id),
-        |(IpInvariant(sync_ctx), id)| SocketHandler::close(sync_ctx, id),
+        (IpInvariant((&mut sync_ctx, ctx)), id),
+        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close(sync_ctx, ctx, id),
+        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close(sync_ctx, ctx, id),
     )
 }
 
@@ -3831,7 +3821,7 @@ mod tests {
                 ),
                 Ok(false)
             );
-            SocketHandler::close(sync_ctx, id);
+            SocketHandler::close(sync_ctx, non_sync_ctx, id);
         });
 
         (net, client, client_snd_end, accepted)
@@ -4655,7 +4645,7 @@ mod tests {
             0.0,
         );
         let close_called = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
+            SocketHandler::close(sync_ctx, non_sync_ctx, local);
             non_sync_ctx.now()
         });
 
@@ -4675,7 +4665,7 @@ mod tests {
 
         if peer_calls_close {
             net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-                SocketHandler::close_conn(sync_ctx, non_sync_ctx, remote);
+                SocketHandler::close(sync_ctx, non_sync_ctx, remote);
             });
         }
 
@@ -4734,7 +4724,7 @@ mod tests {
             }
         }
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
+            SocketHandler::close(sync_ctx, non_sync_ctx, local);
         });
         net.run_until_idle(handle_frame, handle_timer);
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
@@ -4797,7 +4787,7 @@ mod tests {
                     );
                     assert_matches!(conn.state, State::Closed(_));
                 });
-                SocketHandler::close_conn(sync_ctx, non_sync_ctx, id);
+                SocketHandler::close(sync_ctx, non_sync_ctx, id);
                 sync_ctx.with_tcp_sockets(|sockets| {
                     assert_matches!(sockets.socket_state.get(&id), None);
                 })
@@ -4815,7 +4805,7 @@ mod tests {
             ));
         let unbound =
             SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx, Default::default());
-        SocketHandler::close(&mut sync_ctx, unbound);
+        SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, unbound);
 
         sync_ctx.with_tcp_sockets(|Sockets { socket_state, socketmap: _, port_alloc: _ }| {
             assert_matches!(socket_state.get(&unbound), None);
@@ -4840,7 +4830,7 @@ mod tests {
             None,
         )
         .expect("bind should succeed");
-        SocketHandler::close(&mut sync_ctx, bound);
+        SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, bound);
 
         sync_ctx.with_tcp_sockets(|Sockets { socket_state, socketmap: _, port_alloc: _ }| {
             assert_matches!(socket_state.get(&unbound), None);
@@ -5369,7 +5359,7 @@ mod tests {
                 ),
                 Ok(false)
             );
-            SocketHandler::close(sync_ctx, id);
+            SocketHandler::close(sync_ctx, non_sync_ctx, id);
 
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             assert_eq!(
@@ -5804,12 +5794,12 @@ mod tests {
         // Now we shutdown the sockets and try to bring the local socket to
         // TIME-WAIT.
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
+            SocketHandler::close(sync_ctx, non_sync_ctx, local);
         });
         assert!(!net.step(handle_frame, handle_timer).is_idle());
         assert!(!net.step(handle_frame, handle_timer).is_idle());
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::close_conn(sync_ctx, non_sync_ctx, remote);
+            SocketHandler::close(sync_ctx, non_sync_ctx, remote);
         });
         assert!(!net.step(handle_frame, handle_timer).is_idle());
         assert!(!net.step(handle_frame, handle_timer).is_idle());
