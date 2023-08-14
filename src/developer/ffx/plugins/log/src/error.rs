@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use ffx_config::api::ConfigError;
+use ffx_core::macro_deps::fidl;
 use fidl_fuchsia_developer_ffx::{OpenTargetError, TargetConnectionError};
-use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
+use fidl_fuchsia_developer_remotecontrol::IdentifyHostError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,37 +16,25 @@ pub enum LogError {
     TargetConnectionError { error: TargetConnectionError },
     #[error("Failed to identify host: {:?}", error)]
     IdentifyHostError { error: IdentifyHostError },
-    #[error(transparent)]
-    UnknownError(#[from] anyhow::Error),
-    #[error(transparent)]
-    ConfigError(#[from] ConfigError),
-    #[error(transparent)]
-    FidlError(#[from] fidl::Error),
-    #[error("No boot timestamp")]
-    NoBootTimestamp,
-    #[error("failed to connect: {:?}", error)]
-    ConnectCapabilityError { error: ConnectCapabilityError },
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
-    #[error("Cannot use dump with --since now")]
-    DumpWithSinceNow,
-    #[error("No symbolizer configuration provided")]
-    NoSymbolizerConfig,
-}
-
-impl From<LogError> for fho::Error {
-    fn from(value: LogError) -> Self {
-        match value {
-            LogError::DumpWithSinceNow => fho::Error::User(value.into()),
-            err => fho::Error::Unexpected(err.into()),
-        }
-    }
-}
-
-impl From<ConnectCapabilityError> for LogError {
-    fn from(error: ConnectCapabilityError) -> Self {
-        Self::ConnectCapabilityError { error }
-    }
+    #[error("Unknown error: {}", error)]
+    UnknownError {
+        #[from]
+        error: anyhow::Error,
+    },
+    #[error("No RCS proxy available")]
+    NoRcsProxyAvailable,
+    #[error("Failed to get log settings: {:?}", error)]
+    ConfigError {
+        #[from]
+        error: ConfigError,
+    },
+    #[error("FIDL error: {:?}", error)]
+    FidlError {
+        #[from]
+        error: fidl::Error,
+    },
+    #[error("No hostname available")]
+    NoHostname,
 }
 
 impl From<OpenTargetError> for LogError {
