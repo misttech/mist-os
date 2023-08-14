@@ -644,6 +644,12 @@ impl_try_from_witness!(
 impl_witness!(UnicastAddr, "unicast", UnicastAddress, is_unicast);
 impl_into_specified!(UnicastAddr, UnicastAddress, is_unicast);
 impl_nested_witness!(UnicastAddress, UnicastAddr, LinkLocalAddress, LinkLocalAddr, new_link_local);
+impl_into_specified_for_nested_witness!(
+    UnicastAddress,
+    UnicastAddr,
+    LinkLocalAddress,
+    LinkLocalAddr
+);
 impl_try_from_witness!(
     [UnicastAddr: UnicastAddress],
     [MulticastAddr: MulticastAddress],
