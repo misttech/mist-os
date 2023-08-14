@@ -1776,7 +1776,7 @@ pub enum EnvironmentExtends {
 /// environments: [
 ///     {
 ///         name: "test-env",
-///         extend: "realm",
+///         extends: "realm",
 ///         runners: [
 ///             {
 ///                 runner: "gtest-runner",
@@ -2325,6 +2325,7 @@ pub struct Use {
     /// (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     /// the directory in the component's namespace.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(json_type = "array of string")]
     pub rights: Option<Rights>,
 
     /// (`directory` only) A subdirectory within the directory capability to provide in the
@@ -2443,6 +2444,7 @@ pub struct Expose {
     /// (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     /// the exposed directory capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(json_type = "array of string")]
     pub rights: Option<Rights>,
 
     /// (`directory` only) the relative path of a subdirectory within the source directory
@@ -2625,6 +2627,7 @@ pub struct Offer {
     /// (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     /// the offered directory capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(json_type = "array of string")]
     pub rights: Option<Rights>,
 
     /// (`directory` only) the relative path of a subdirectory within the source directory

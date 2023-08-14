@@ -388,7 +388,7 @@ Example:
 environments: [
     {
         name: "test-env",
-        extend: "realm",
+        extends: "realm",
         runners: [
             {
                 runner: "gtest-runner",
@@ -497,7 +497,7 @@ this component and the capability's source.
 - `path`: (_optional `string`_) The path at which to install the capability in the component's namespace. For protocols,
     defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
     disallowed for declarations with arrays of capability names.
-- `rights`: (_optional `string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
+- `rights`: (_optional `array of string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     the directory in the component's namespace.
 - `subdir`: (_optional `string`_) (`directory` only) A subdirectory within the directory capability to provide in the
     component's namespace.
@@ -579,7 +579,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     defaults to the original name. `as` cannot be used when an array of multiple capability
     names is provided.
 - `to`: (_optional `string`_) The capability target. Either `parent` or `framework`. Defaults to `parent`.
-- `rights`: (_optional `string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
+- `rights`: (_optional `array of string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     the exposed directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
     capability to route.
@@ -679,7 +679,7 @@ instance or a [child collection][doc-collections].
         shutdown. When component manager stops the parent realm, the source may
         stop before the clients. Clients of weak dependencies must be able to
         handle these dependencies becoming unavailable.
-- `rights`: (_optional `string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
+- `rights`: (_optional `array of string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     the offered directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
     capability to route.
