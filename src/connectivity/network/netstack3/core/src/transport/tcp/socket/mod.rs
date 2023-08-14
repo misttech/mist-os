@@ -1096,7 +1096,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         id: SocketId<I>,
         local_ip: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
-    ) -> Result<SocketId<I>, LocalAddressError>;
+    ) -> Result<SocketId<I>, BindError>;
 
     fn listen(
         &mut self,
@@ -1210,10 +1210,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         id: SocketId<I>,
         addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
-    ) -> Result<SocketId<I>, LocalAddressError> {
+    ) -> Result<SocketId<I>, BindError> {
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { socket_state, port_alloc, socketmap }| {
+                match socket_state.get_mut(&id).expect("invalid_state") {
+                    SocketState::Unbound(_) => {}
+                    SocketState::Bound(_) => return Err(BindError::AlreadyBound),
+                }
                 let port = match port {
                     None => {
                         let addr = addr.as_ref().map(ZonedAddr::addr);
@@ -1221,7 +1225,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                             Some(port) => {
                                 NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
                             }
-                            None => return Err(LocalAddressError::FailedToAllocateLocalPort),
+                            None => return Err(LocalAddressError::FailedToAllocateLocalPort.into()),
                         }
                     }
                     Some(port) => port,
@@ -1246,7 +1250,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         // device is either the one from the address or the one
                         // to which the socket was previously bound.
                         let (addr, required_device) =
-                            crate::transport::resolve_addr_with_device(addr, bound_device.clone())?;
+                            crate::transport::resolve_addr_with_device(addr, bound_device.clone())
+                                .map_err(LocalAddressError::Zone)?;
 
                         let mut assigned_to = ip_transport_ctx.get_devices_with_assigned_addr(addr);
                         if !assigned_to.any(|d| {
@@ -1254,7 +1259,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                                 .as_ref()
                                 .map_or(true, |device| device == &EitherDeviceId::Strong(d))
                         }) {
-                            return Err(LocalAddressError::AddressMismatch);
+                            return Err(LocalAddressError::AddressMismatch.into());
                         }
 
                         (Some(addr), required_device)
@@ -2346,7 +2351,7 @@ pub fn bind<I, C>(
     id: SocketId<I>,
     local_ip: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
     port: Option<NonZeroU16>,
-) -> Result<SocketId<I>, LocalAddressError>
+) -> Result<SocketId<I>, BindError>
 where
     I: IpExt,
     C: crate::NonSyncContext,
@@ -2459,6 +2464,17 @@ pub enum ConnectError {
     /// The handshake is refused by the remote host.
     #[error("The handshake is aborted")]
     Aborted,
+}
+
+/// Possible errors when connecting a socket.
+#[derive(Debug, Error, GenericOverIp, PartialEq)]
+pub enum BindError {
+    /// The socket was already bound.
+    #[error("The socket was already bound")]
+    AlreadyBound,
+    /// The socekt cannot bind to the local address.
+    #[error(transparent)]
+    LocalAddressError(#[from] LocalAddressError),
 }
 
 /// Connects a socket to a remote address.
@@ -3860,7 +3876,7 @@ mod tests {
                 SpecifiedAddr::new(conflict_addr).map(ZonedAddr::Unzoned),
                 Some(PORT_1)
             ),
-            Err(LocalAddressError::AddressInUse)
+            Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
         let _b2 = SocketHandler::bind(
             &mut sync_ctx,
@@ -3916,7 +3932,7 @@ mod tests {
                     SocketInfo::Bound(bound) => bound.port
                 )
             });
-        assert_eq!(result, expected_result);
+        assert_eq!(result, expected_result.map_err(From::from));
     }
 
     #[ip_test]
@@ -3937,7 +3953,7 @@ mod tests {
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                 None
             ),
-            Err(LocalAddressError::AddressMismatch)
+            Err(BindError::LocalAddressError(LocalAddressError::AddressMismatch))
         );
 
         sync_ctx.with_tcp_sockets(|sockets| {
@@ -3965,7 +3981,9 @@ mod tests {
                 Some(ZonedAddr::Unzoned(local_ip)),
                 None
             ),
-            Err(LocalAddressError::Zone(ZonedAddressError::RequiredZoneNotProvided))
+            Err(BindError::LocalAddressError(LocalAddressError::Zone(
+                ZonedAddressError::RequiredZoneNotProvided
+            )))
         );
 
         sync_ctx.with_tcp_sockets(|sockets| {
@@ -4299,7 +4317,7 @@ mod tests {
         // is shadowed by `bound_a`.
         assert_matches!(
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, s, None, Some(LOCAL_PORT)),
-            Err(LocalAddressError::AddressInUse)
+            Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
 
         // Once `s` is bound to a different device, though, it no longer
@@ -4942,7 +4960,7 @@ mod tests {
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip,)),
                     Some(PORT_1),
                 ),
-                Err(LocalAddressError::AddressInUse)
+                Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
             );
             // Bring the already-shutdown listener back to listener again.
             let _: SocketId<_> =
@@ -5196,7 +5214,7 @@ mod tests {
         let second_bind_result =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(PORT_1));
 
-        assert_eq!(second_bind_result.map(|_: SocketId<I>| ()), expected);
+        assert_eq!(second_bind_result.map(|_: SocketId<I>| ()), expected.map_err(From::from));
     }
 
     #[ip_test]
@@ -5347,7 +5365,7 @@ mod tests {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx, Default::default());
             assert_eq!(
                 SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, None, Some(PORT_1)),
-                Err(LocalAddressError::AddressInUse)
+                Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
             );
 
             // Binding should succeed after setting ReuseAddr.
@@ -5394,7 +5412,7 @@ mod tests {
                 second_addr,
                 Some(PORT_1)
             ),
-            Err(LocalAddressError::AddressInUse)
+            Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
 
         // Setting SO_REUSEADDR for the second socket isn't enough.
@@ -5407,7 +5425,7 @@ mod tests {
                 second_addr,
                 Some(PORT_1)
             ),
-            Err(LocalAddressError::AddressInUse)
+            Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
 
         // Setting SO_REUSEADDR for the first socket lets the second bind.

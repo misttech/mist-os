@@ -42,9 +42,9 @@ use netstack3_core::{
             accept, bind, close, close_conn, connect, create_socket, get_info, get_socket_error,
             listen, receive_buffer_size, reuseaddr, send_buffer_size, set_device,
             set_receive_buffer_size, set_reuseaddr, set_send_buffer_size, shutdown,
-            with_socket_options, with_socket_options_mut, AcceptError, BoundInfo, ConnectError,
-            ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
-            SocketAddr, SocketId, SocketInfo,
+            with_socket_options, with_socket_options_mut, AcceptError, BindError, BoundInfo,
+            ConnectError, ConnectionInfo, ListenError, ListenerNotifier, NoConnection,
+            SetReuseAddrError, SocketAddr, SocketId, SocketInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -570,6 +570,15 @@ impl IntoErrno for ConnectError {
     }
 }
 
+impl IntoErrno for BindError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            Self::AlreadyBound => fposix::Errno::Einval,
+            Self::LocalAddressError(err) => err.into_errno(),
+        }
+    }
+}
+
 impl IntoErrno for NoConnection {
     fn into_errno(self) -> fidl_fuchsia_posix::Errno {
         fposix::Errno::Enotconn
@@ -661,28 +670,14 @@ where
 {
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        match *id {
-            SocketId::Unbound(unbound) => {
-                let addr = I::SocketAddress::from_sock_addr(addr)?;
-                let mut ctx = ctx.clone();
-                let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                let (addr, port) =
-                    addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
-                let bound = bind::<I, _>(
-                    sync_ctx,
-                    non_sync_ctx,
-                    unbound.into(),
-                    addr,
-                    NonZeroU16::new(port),
-                )
-                .map_err(IntoErrno::into_errno)?;
-                *id = bound;
-                Ok(())
-            }
-            SocketId::Bound(_) | SocketId::Connection(_) | SocketId::Listener(_) => {
-                Err(fposix::Errno::Einval)
-            }
-        }
+        let addr = I::SocketAddress::from_sock_addr(addr)?;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (addr, port) =
+            addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
+        *id = bind::<I, _>(sync_ctx, non_sync_ctx, *id, addr, NonZeroU16::new(port))
+            .map_err(IntoErrno::into_errno)?;
+        Ok(())
     }
 
     fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
