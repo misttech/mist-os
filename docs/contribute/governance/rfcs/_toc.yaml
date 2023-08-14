@@ -460,3 +460,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0221_python_for_out-of-tree_system_testing.md
   - title: "RFC-0222: Fuchsia Controller"
     path: /docs/contribute/governance/rfcs/0222_fuchsia_controller.md
+  - title: "RFC-0223: zx_vmo_transfer_data"
+    path: /docs/contribute/governance/rfcs/0223_zx_vmo_transfer_data.md

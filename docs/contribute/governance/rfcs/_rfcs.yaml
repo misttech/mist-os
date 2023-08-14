@@ -2905,3 +2905,16 @@
   reviewers: ['jeremymanson@google.com', 'mgnb@google.com', 'ianloic@google.com', 'chok@google.com', 'hjfreyer@google.com', 'jzgriffin@google.com']
   submitted: '2022-11-17'
   reviewed: '2023-06-13'
+
+- name: 'RFC-0223'
+  title: 'zx_vmo_transfer_data'
+  short_description: 'Introduces a new syscall called zx_vmo_transfer_data that efficiently moves data from one VMO to another.'
+  authors: ['rudymathu@google.com']
+  file: '0223_zx_vmo_transfer_data.md'
+  area: ['Kernel']
+  issue: []
+  gerrit_change_id: ['859841']
+  status: 'Accepted'
+  reviewers: ['jamesr@google.com', 'mvanotti@google.com', 'rashaeqbal@google.com']
+  submitted: '2023-05-22'
+  reviewed: '2023-08-14'
