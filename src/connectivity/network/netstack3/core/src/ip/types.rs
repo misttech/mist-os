@@ -7,7 +7,7 @@
 use core::fmt::{Debug, Display, Formatter};
 
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither},
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither},
     SpecifiedAddr,
 };
 
@@ -55,7 +55,7 @@ pub enum AddableMetric {
 ///
 /// `AddableEntry` guarantees that at least one of the egress device or
 /// gateway is set.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
 pub struct AddableEntry<A: IpAddress, D> {
     subnet: Subnet<A>,
     device: Option<D>,
@@ -97,7 +97,7 @@ impl<D, A: IpAddress> AddableEntry<A, D> {
 
 /// An IPv4 forwarding entry or an IPv6 forwarding entry.
 #[allow(missing_docs)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
 pub enum AddableEntryEither<D> {
     V4(AddableEntry<Ipv4Addr, D>),
     V6(AddableEntry<Ipv6Addr, D>),
@@ -120,14 +120,7 @@ impl<D> AddableEntryEither<D> {
 
 impl<A: IpAddress, D> From<AddableEntry<A, D>> for AddableEntryEither<D> {
     fn from(entry: AddableEntry<A, D>) -> AddableEntryEither<D> {
-        #[derive(GenericOverIp)]
-        struct EntryHolder<I: Ip, D>(AddableEntry<I::Addr, D>);
-        let IpInvariant(entry_either) = A::Version::map_ip(
-            EntryHolder(entry),
-            |EntryHolder(entry)| IpInvariant(AddableEntryEither::V4(entry)),
-            |EntryHolder(entry)| IpInvariant(AddableEntryEither::V6(entry)),
-        );
-        entry_either
+        A::Version::map_ip(entry, AddableEntryEither::V4, AddableEntryEither::V6)
     }
 }
 
@@ -154,7 +147,7 @@ impl Metric {
 /// A forwarding entry.
 ///
 /// `Entry` is a `Subnet` with an egress device and optional gateway.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
 pub struct Entry<A: IpAddress, D> {
     /// The matching subnet.
     pub subnet: Subnet<A>,
@@ -181,7 +174,7 @@ impl<A: IpAddress, D: Debug> Display for Entry<A, D> {
 
 /// An IPv4 forwarding entry or an IPv6 forwarding entry.
 #[allow(missing_docs)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq)]
 pub enum EntryEither<D> {
     V4(Entry<Ipv4Addr, D>),
     V6(Entry<Ipv6Addr, D>),
@@ -191,12 +184,7 @@ impl<A: IpAddress, D> From<Entry<A, D>> for EntryEither<D> {
     fn from(entry: Entry<A, D>) -> EntryEither<D> {
         #[derive(GenericOverIp)]
         struct EntryHolder<I: Ip, D>(Entry<I::Addr, D>);
-        let IpInvariant(entry_either) = A::Version::map_ip(
-            EntryHolder(entry),
-            |EntryHolder(entry)| IpInvariant(EntryEither::V4(entry)),
-            |EntryHolder(entry)| IpInvariant(EntryEither::V6(entry)),
-        );
-        entry_either
+        A::Version::map_ip(entry, EntryEither::V4, EntryEither::V6)
     }
 }
 

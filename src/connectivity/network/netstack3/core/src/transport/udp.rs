@@ -2577,14 +2577,11 @@ mod tests {
         for FakeBoundSockets<D, DUAL_STACK_ENABLED>
     {
         fn as_ref(&self) -> &BoundSockets<I, D> {
-            #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + IpExt, D: WeakId>(&'a BoundSockets<I, D>);
-            let Wrap(state) = I::map_ip(
+            I::map_ip(
                 IpInvariant(self),
-                |IpInvariant(state)| Wrap(&state.v4),
-                |IpInvariant(state)| Wrap(&state.v6),
-            );
-            state
+                |IpInvariant(state)| &state.v4,
+                |IpInvariant(state)| &state.v6,
+            )
         }
     }
 
@@ -2592,14 +2589,11 @@ mod tests {
         for FakeBoundSockets<D, DUAL_STACK_ENABLED>
     {
         fn as_mut(&mut self) -> &mut BoundSockets<I, D> {
-            #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + IpExt, D: WeakId>(&'a mut BoundSockets<I, D>);
-            let Wrap(state) = I::map_ip(
+            I::map_ip(
                 IpInvariant(self),
-                |IpInvariant(state)| Wrap(&mut state.v4),
-                |IpInvariant(state)| Wrap(&mut state.v6),
-            );
-            state
+                |IpInvariant(state)| &mut state.v4,
+                |IpInvariant(state)| &mut state.v6,
+            )
         }
     }
 
@@ -2903,17 +2897,15 @@ mod tests {
     ) -> bool {
         #[derive(GenericOverIp)]
         struct WrapIn<I: Ip + IpExt>(I::DualStackReceivingId<Udp>);
-        #[derive(GenericOverIp)]
-        struct WrapOut<I: Ip + IpExt>(SocketId<I>);
-        let WrapOut(found_socket) = I::map_ip(
+        let found_socket = I::map_ip(
             WrapIn(found_socket),
             |WrapIn(id)| match id {
-                EitherIpSocket::V4(id) => WrapOut(id),
+                EitherIpSocket::V4(id) => id,
                 EitherIpSocket::V6(_v6id) => {
                     unreachable!("cross-version delivery is not supported")
                 }
             },
-            |WrapIn(id)| WrapOut(id),
+            |WrapIn(id)| id,
         );
         super::try_deliver(sync_ctx, ctx, found_socket, dst_ip, src, buffer)
     }
