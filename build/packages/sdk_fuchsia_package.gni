@@ -125,7 +125,8 @@ template("sdk_fuchsia_package") {
     _distribution_name = invoker.distribution_name
 
     # Note: Golden file does not support multiple API level currently.
-    golden_content_checklist_file = "//sdk/packages/${_distribution_name}/${target_cpu}/release/content_checklist.api"
+    golden_content_checklist_file =
+        "//sdk/packages/${_distribution_name}/release/content_checklist.api"
     computed_content_checklist_file =
         "${_sdk_package_dir}/content_checklist.api"
     _content_checklist_target = "${target_name}.content_checklist"
