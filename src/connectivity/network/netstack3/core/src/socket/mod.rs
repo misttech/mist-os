@@ -664,6 +664,7 @@ where
         SocketType::from_addr_vec_ref(addr_entry.key())
     }
 
+    #[cfg(test)]
     pub(crate) fn id(&self) -> SocketType::Id {
         let Self { id, addr_entry: _, _marker } = self;
         SocketType::from_socket_id_ref(id).clone()

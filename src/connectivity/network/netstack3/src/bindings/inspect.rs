@@ -9,7 +9,7 @@
 
 use super::{BindingsNonSyncCtxImpl, Ctx, DeviceIdExt};
 use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
-use netstack3_core::{data_structures::id_map::EntryKey, device::DeviceId, ip, transport::tcp};
+use netstack3_core::{device::DeviceId, ip, transport::tcp};
 use std::{borrow::Cow, num::NonZeroU16, ops::Deref};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
@@ -19,14 +19,7 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     /// Guarantees that no two unique `SocketId`s (even for different IP
     /// versions) will have have the same output value.
     fn transform_id<I: Ip>(id: tcp::socket::SocketId<I>) -> usize {
-        let (index, variant) = match id {
-            tcp::socket::SocketId::Unbound(id) => (id.get_key_index(), 0),
-            tcp::socket::SocketId::Bound(id) => (id.get_key_index(), 1),
-            tcp::socket::SocketId::Listener(id) => (id.get_key_index(), 2),
-            tcp::socket::SocketId::Connection(id) => (id.get_key_index(), 3),
-        };
-
-        let unique_for_ip_version = index * 4 + variant;
+        let unique_for_ip_version: usize = id.into();
         2 * unique_for_ip_version
             + match I::VERSION {
                 IpVersion::V4 => 0,

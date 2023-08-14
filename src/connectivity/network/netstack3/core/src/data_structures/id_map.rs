@@ -728,6 +728,14 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
             }
         }
     }
+
+    /// Remove the entry from [`IdMap`].
+    pub fn remove(self) -> Option<T> {
+        match self {
+            Entry::Vacant(_) => None,
+            Entry::Occupied(e) => Some(e.remove()),
+        }
+    }
 }
 
 #[cfg(test)]

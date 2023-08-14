@@ -39,7 +39,7 @@ use crate::{
         segment::{Options, Segment},
         seqnum::UnscaledWindowSize,
         socket::{
-            do_send_inner, isn::IsnGenerator, Acceptor, BoundSocketState, Connection, ConnectionId,
+            do_send_inner, isn::IsnGenerator, Acceptor, BoundSocketState, Connection,
             HandshakeStatus, Listener, ListenerAddrState, ListenerNotifier as _,
             ListenerSharingState, MaybeListener, NonSyncContext, SocketId, SocketState, Sockets,
             SyncContext, TcpIpTransportContext, TimerId,
@@ -301,7 +301,7 @@ where
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
     let (conn, _, addr) = assert_matches!(
-        sockets.socket_state.get_mut(&conn_id),
+        sockets.socket_state.get_mut(conn_id.into()),
         Some(SocketState::Bound(BoundSocketState::Connected(conn))) => conn,
         "invalid socket ID"
     );
@@ -369,7 +369,7 @@ where
                 // not to use the connection again, we can remove the
                 // connection from the socketmap.
                 let (_state, _sharing, addr) = assert_matches!(
-                    sockets.socket_state.entry(conn_id).remove(),
+                    sockets.socket_state.entry(conn_id.into()).remove(),
                     Some(SocketState::Bound(BoundSocketState::Connected(conn))) => conn
                 );
                 assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id, &addr), Ok(()));
@@ -414,7 +414,7 @@ where
             listener_id
         });
         let Listener { pending, ready, backlog: _, buffer_sizes: _, socket_options: _, notifier } = assert_matches!(
-            sockets.socket_state.get_mut(&acceptor_id),
+            sockets.socket_state.get_mut(acceptor_id.into()),
             Some(SocketState::Bound(BoundSocketState::Listener((MaybeListener::Listener(l), _sharing, _addr)))) => l,
             "invalid socket ID"
         );
@@ -460,7 +460,7 @@ where
 {
     let Sockets { port_alloc: _, socketmap, socket_state } = sockets;
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
-        socket_state.get(&listener_id),
+        socket_state.get(listener_id.into()),
         Some(SocketState::Bound(BoundSocketState::Listener(l))) => l,
         "invalid socket ID"
     );
@@ -571,47 +571,37 @@ where
         // state that we don't want.
         if let Some(tw_reuse) = tw_reuse {
             let (_conn, _sharing, conn_addr) = assert_matches!(
-                socket_state.entry(tw_reuse).remove(),
+                socket_state.entry(tw_reuse.into()).remove(),
                 Some(SocketState::Bound(BoundSocketState::Connected(conn))) => conn
             );
             assert_matches!(socketmap.conns_mut().remove(&tw_reuse, &conn_addr), Ok(()));
             assert_matches!(ctx.cancel_timer(TimerId::new::<I>(tw_reuse)), Some(_));
         }
-        let conn_id = socketmap
+        let addr = ConnAddr {
+            ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
+            device: bound_device,
+        };
+        let conn_id = socket_state.push(SocketState::Bound(BoundSocketState::Connected((
+            Connection {
+                acceptor: Some(Acceptor::Pending(listener_id)),
+                state,
+                ip_sock,
+                defunct: false,
+                socket_options,
+                soft_error: None,
+                handshake_status: HandshakeStatus::Pending,
+            },
+            sharing,
+            addr.clone(),
+        ))));
+        let conn_id = SocketId(conn_id, IpVersionMarker::default());
+        let _entry = socketmap
             .conns_mut()
-            .try_insert_with(
-                ConnAddr {
-                    ip: ConnIpAddr {
-                        local: (local_ip, local_port),
-                        remote: (remote_ip, remote_port),
-                    },
-                    device: bound_device,
-                },
-                sharing,
-                |addr, sharing| {
-                    let state = Connection {
-                        acceptor: Some(Acceptor::Pending(listener_id)),
-                        state,
-                        ip_sock,
-                        defunct: false,
-                        socket_options,
-                        soft_error: None,
-                        handshake_status: HandshakeStatus::Pending,
-                    };
-                    let entry = socket_state.push_entry(
-                        |index| {
-                            SocketId::Connection(ConnectionId(index, IpVersionMarker::default()))
-                        },
-                        SocketState::Bound(BoundSocketState::Connected((state, sharing, addr))),
-                    );
-                    assert_matches!(entry.key(), SocketId::Connection(conn_id) => (*conn_id).into())
-                },
-            )
-            .expect("failed to create a new connection")
-            .id();
+            .try_insert(addr, sharing, conn_id)
+            .expect("failed to create a new connection");
         assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id),), None);
         let maybe_listener = assert_matches!(
-            sockets.socket_state.get_mut(&listener_id),
+            sockets.socket_state.get_mut(listener_id.into()),
             Some(SocketState::Bound(BoundSocketState::Listener((l, _sharing, _addr)))) => l,
             "invalid socket ID"
         );
