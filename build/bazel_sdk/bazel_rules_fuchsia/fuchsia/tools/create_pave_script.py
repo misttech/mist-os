@@ -40,7 +40,7 @@ def main():
     pb_dir = os.path.basename(os.path.dirname(args.product_bundle))
 
     def rel_path(path):
-        return "${dir}/" + pb_dir + "/" + path
+        return "$dir/" + pb_dir + "/" + path
 
     bootserver = rel_path("bootserver")
     board_name = product_bundle["partitions"]["hardware_revision"]

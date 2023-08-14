@@ -32,7 +32,7 @@ def main():
 
     # Replace {dir}/<src_dir>/ with {dir}/<dst_dir>/
     output_data = input_data.replace(
-        '{dir}/' + args.src_dir, '{dir}/' + args.dst_dir)
+        '$dir/' + args.src_dir, '$dir/' + args.dst_dir)
 
     with open(args.output, 'w') as f:
         f.write(output_data)
