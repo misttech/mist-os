@@ -302,6 +302,7 @@ while [[ $# -ne 0 ]]; do
       ;;
     -xx)
       set -x
+      export FUCHSIA_DEVSHELL_VERBOSITY=1
       ;;
     --)
       shift
