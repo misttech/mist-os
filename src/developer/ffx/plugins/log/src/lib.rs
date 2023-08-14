@@ -136,22 +136,12 @@ struct DeviceConnection {
 async fn connect_to_target(
     target_collection_proxy: &TargetCollectionProxy,
     query: &TargetQuery,
-    stream_mode: &mut fidl_fuchsia_diagnostics::StreamMode,
-    prev_timestamp: Option<u64>,
+    stream_mode: fidl_fuchsia_diagnostics::StreamMode,
 ) -> Result<DeviceConnection, LogError> {
     // Connect to device
     let rcs_client = connect_to_rcs(target_collection_proxy, query).await?;
     let boot_timestamp =
         rcs_client.identify_host().await??.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
-    // If we detect a reboot we want to SnapshotThenSubscribe so
-    // we get all of the logs from the reboot. If not, we use Snapshot
-    // to avoid getting duplicate logs.
-    match prev_timestamp {
-        Some(timestamp) if timestamp != boot_timestamp => {
-            *stream_mode = fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe;
-        }
-        _ => {}
-    }
     // Connect to ArchiveAccessor
     let (diagnostics_client, diagnostics_server) = create_proxy::<ArchiveAccessorMarker>()?;
     rcs::connect_with_timeout::<ArchiveAccessorMarker>(
@@ -176,7 +166,7 @@ async fn connect_to_target(
         .stream_diagnostics(
             &StreamParameters {
                 data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
-                stream_mode: Some(*stream_mode),
+                stream_mode: Some(stream_mode),
                 format: Some(fidl_fuchsia_diagnostics::Format::Json),
                 client_selector_configuration: Some(
                     fidl_fuchsia_diagnostics::ClientSelectorConfiguration::SelectAll(true),
@@ -223,18 +213,19 @@ where
     // handle reconnects manually.
     let mut prev_timestamp = None;
     loop {
-        let connection = connect_to_target(
-            &target_collection_proxy,
-            &target_query,
-            &mut stream_mode,
-            prev_timestamp,
-        )
-        .await?;
-        prev_timestamp = Some(connection.boot_timestamp);
+        let connection =
+            connect_to_target(&target_collection_proxy, &target_query, stream_mode).await?;
         if !cmd.select.is_empty() {
             connection.log_settings_client.set_interest(&cmd.select).await?;
         }
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
+        match prev_timestamp {
+            Some(timestamp) if timestamp != connection.boot_timestamp => {
+                stream_mode = fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe;
+            }
+            _ => {}
+        }
+        prev_timestamp = Some(connection.boot_timestamp);
         let maybe_err =
             dump_logs_from_socket(connection.log_socket, &mut formatter, &symbolizer_channel).await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
@@ -820,103 +811,11 @@ mod tests {
         // polling the future.
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
 
+        // This sets the boot timestamp for the third boot because once we've
+        // gotten the connection closed, but haven't polled the 3rd one yet,
+        // the 3rd connect request is in-flight but not yet ack'd so any configuration
+        // changes impacting that must be set here.
         scheduler.config.boot_timestamp.set(42);
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
-        // Second connection has a different timestamp so should be treated
-        // as a reboot.
-        assert_matches!(
-            event_stream.next().await,
-            Some(TestEvent::Connected(StreamMode::SnapshotThenSubscribe))
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
-    }
-
-    #[fuchsia::test]
-    async fn logger_shows_logs_since_specific_timestamp_across_reboots_heuristic() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
-            clock: TimeFormat::Local,
-            since: Some(log_command::DetailedDateTime {
-                is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
-            }),
-            until: None,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymbolizer::new();
-        let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:00")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:03")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world 2!")
-                .build(),
-            ],
-            send_mode_event: true,
-            ..Default::default()
-        }));
-        let mut event_stream = task_manager.take_event_stream().unwrap();
-        let scheduler = task_manager.get_scheduler();
-        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
-        task_manager.spawn(handle_target_collection_connection(
-            target_collection_server,
-            scheduler.clone(),
-        ));
-        let test_buffers = TestBuffers::default();
-
-        // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = task_manager.spawn_result(log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            symbolizer,
-        ));
-
-        // Run the stream until we get the expected message.
-        let mut runner = pin!(task_manager.run());
-        check_for_message(&mut runner, &test_buffers, TEST_STR).await;
-
-        // First connection should have used Subscribe mode.
-        assert_matches!(
-            event_stream.next().await,
-            Some(TestEvent::Connected(StreamMode::Subscribe))
-        );
-
-        // Device is paused when we exit the loop because there's nothing
-        // polling the future.
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
-
         check_for_message(&mut runner, &test_buffers, TEST_STR).await;
 
         // Second connection has a matching timestamp to the first one, so we should
@@ -930,7 +829,6 @@ mod tests {
         // For the third connection, we should get a
         // SnapshotThenSubscribe request because the timestamp
         // changed and it's clear it's actually a separate boot not a disconnect/reconnect
-        scheduler.config.boot_timestamp.set(42);
         check_for_message(&mut runner, &test_buffers, TEST_STR).await;
         assert_matches!(
             event_stream.next().await,
