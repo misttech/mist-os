@@ -34,8 +34,20 @@ impl PidTable {
     fn get_entry(&self, pid: pid_t) -> Option<&PidEntry> {
         self.table.get(&pid)
     }
+
     fn get_entry_mut(&mut self, pid: pid_t) -> &mut PidEntry {
         self.table.entry(pid).or_insert_with(Default::default)
+    }
+
+    fn remove_item<F>(&mut self, pid: pid_t, do_remove: F)
+    where
+        F: FnOnce(&mut PidEntry),
+    {
+        let entry = self.get_entry_mut(pid);
+        do_remove(entry);
+        if entry.task.is_none() && entry.group.is_none() && entry.process_group.is_none() {
+            self.table.remove(&pid);
+        }
     }
 
     pub fn allocate_pid(&mut self) -> pid_t {
@@ -57,9 +69,10 @@ impl PidTable {
     }
 
     pub fn remove_task(&mut self, pid: pid_t) {
-        let entry = self.get_entry_mut(pid);
-        assert!(entry.task.is_some());
-        entry.task = None;
+        self.remove_item(pid, |entry| {
+            let removed = entry.task.take();
+            assert!(removed.is_some())
+        });
     }
 
     pub fn get_thread_group(&self, pid: pid_t) -> Option<Arc<ThreadGroup>> {
@@ -80,9 +93,10 @@ impl PidTable {
     }
 
     pub fn remove_thread_group(&mut self, pid: pid_t) {
-        let entry = self.get_entry_mut(pid);
-        assert!(entry.group.is_some());
-        entry.group = None;
+        self.remove_item(pid, |entry| {
+            let removed = entry.group.take();
+            assert!(removed.is_some())
+        });
     }
 
     pub fn get_process_group(&self, pid: pid_t) -> Option<Arc<ProcessGroup>> {
@@ -98,9 +112,10 @@ impl PidTable {
     }
 
     pub fn remove_process_group(&mut self, pid: pid_t) {
-        let entry = self.get_entry_mut(pid);
-        assert!(entry.process_group.is_some());
-        entry.process_group = None;
+        self.remove_item(pid, |entry| {
+            let removed = entry.process_group.take();
+            assert!(removed.is_some())
+        });
     }
 
     /// Returns the process ids for all the currently running processes.
