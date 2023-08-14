@@ -41,8 +41,7 @@ class FakeAmlI2cController {
   };
 
   explicit FakeAmlI2cController(zx::unowned_interrupt irq)
-      : mmio_(sizeof(reg_values_[0]), 8),
-        irq_(std::move(irq)) {
+      : mmio_(sizeof(reg_values_[0]), 8), irq_(std::move(irq)) {
     for (size_t i = 0; i < std::size(reg_values_); i++) {
       mmio_[i * sizeof(reg_values_[0])].SetReadCallback(ReadRegCallback(i));
       mmio_[i * sizeof(reg_values_[0])].SetWriteCallback(WriteRegCallback(i));
@@ -643,6 +642,7 @@ TEST_F(AmlI2cTest, CanUsePDevFragment) {
   fake_pdev::FakePDevFidl::Config config;
   config.irqs[0] = {};
   ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+  controller_.emplace(config.irqs[0].borrow());
   config.mmios[0] = controller_->GetMmioBuffer();
   config.device_info = {
       .mmio_count = 1,
