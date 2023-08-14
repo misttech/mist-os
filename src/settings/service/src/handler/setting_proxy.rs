@@ -516,8 +516,6 @@ impl SettingProxy {
         self.request(ProxyRequest::TeardownTimeout);
     }
 
-    // TODO(fxbug.dev/67536): Remove this method once no more communication
-    // happens over the core MessageHub.
     /// Notifies handler in the case the notification listener count is
     /// non-zero and we aren't already listening for changes or there
     /// are no more listeners and we are actively listening.
