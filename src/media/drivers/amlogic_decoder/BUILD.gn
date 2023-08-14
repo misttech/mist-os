@@ -230,6 +230,7 @@ if (target_cpu == "arm64") {
       ":test_support",
       "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
       "//sdk/lib/syslog/cpp",
+      "//src/devices/lib/mmio:test_helper",
       "//src/media/lib/codec_impl",
       "//third_party/boringssl:crypto",
       "//third_party/googletest:gtest",

@@ -15,15 +15,17 @@
 
 #define DIV_ROUND_UP(n, d) ((n + d - 1) / d)
 
-static void a113_clk_update_reg(a113_clk_dev_t *dev, uint32_t offset, uint32_t pos, uint32_t bits,
-                                uint32_t value) {
+namespace {
+void a113_clk_update_reg(fdf::MmioBuffer *dev, uint32_t offset, uint32_t pos, uint32_t bits,
+                         uint32_t value) {
   uint32_t reg = a113_clk_get_reg(dev, offset);
   reg &= ~(((1 << bits) - 1) << pos);
   reg |= (value & ((1 << bits) - 1)) << pos;
   a113_clk_set_reg(dev, offset, reg);
 }
+}  // namespace
 
-zx_status_t a113_clk_set_mpll2(a113_clk_dev_t *device, uint64_t rate, uint64_t *actual) {
+zx_status_t a113_clk_set_mpll2(fdf::MmioBuffer *device, uint64_t rate, uint64_t *actual) {
   /* Overall ratio is reference/(n + sdm/16384)
      In this case the 2.0GHz fixed rate pll is the reference
   */
@@ -32,9 +34,9 @@ zx_status_t a113_clk_set_mpll2(a113_clk_dev_t *device, uint64_t rate, uint64_t *
 
   uint64_t sdm = DIV_ROUND_UP((A113_FIXED_PLL_RATE - n * rate) * SDM_FRACTIONALITY, rate);
   ZX_DEBUG_ASSERT(sdm < (1 << 14));
-  zxlogf(INFO, "%s sdm= %ld  n= %ld", __func__, sdm, n);
-  a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 0, 14, (uint32_t)sdm);
-  a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 16, 9, (uint32_t)n);
+  zxlogf(INFO, "sdm= %ld  n= %ld", sdm, n);
+  a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 0, 14, static_cast<uint32_t>(sdm));
+  a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 16, 9, static_cast<uint32_t>(n));
 
   // Enable sdm divider
   a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 15, 1, 1);
@@ -44,7 +46,8 @@ zx_status_t a113_clk_set_mpll2(a113_clk_dev_t *device, uint64_t rate, uint64_t *
   a113_clk_update_reg(device, A113_HHI_PLL_TOP_MISC, 2, 1, 1);
 
   if (actual) {
-    *actual = ((uint64_t)SDM_FRACTIONALITY * A113_FIXED_PLL_RATE) / ((SDM_FRACTIONALITY * n) + sdm);
+    *actual = (static_cast<uint64_t>(SDM_FRACTIONALITY) * A113_FIXED_PLL_RATE) /
+              ((SDM_FRACTIONALITY * n) + sdm);
   }
 
   return ZX_OK;

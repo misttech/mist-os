@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "amlogic-video.h"
+#include "src/devices/lib/mmio/test-helper.h"
 #include "tests/test_basic_client.h"
 #include "tests/test_support.h"
 #include "vp9_decoder.h"
@@ -19,6 +20,17 @@
 namespace amlogic_decoder {
 namespace test {
 namespace {
+
+template <typename U>
+bool MmioMemcmp(const fdf::MmioBuffer& actual, const std::unique_ptr<U[]>& expected) {
+  auto* raw_ptr = reinterpret_cast<uint8_t*>(expected.get());
+  for (size_t i = 0; i < actual.get_size(); i++) {
+    if (actual.Read8(i) != raw_ptr[i]) {
+      return true;
+    }
+  }
+  return false;
+}
 
 class FakeVideoOwner : public AmlogicVideo::Owner {
  public:
@@ -140,12 +152,7 @@ class Vp9UnitTest {
     ASSERT_TRUE(video);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
 
-    auto dosbus_memory = std::unique_ptr<uint32_t[]>(new uint32_t[kDosbusMemorySize]);
-    memset(dosbus_memory.get(), 0, kDosbusMemorySize);
-    mmio_buffer_t dosbus_mmio = {.vaddr = FakeMmioPtr(dosbus_memory.get()),
-                                 .size = kDosbusMemorySize,
-                                 .vmo = ZX_HANDLE_INVALID};
-    DosRegisterIo dosbus(dosbus_mmio);
+    DosRegisterIo dosbus(fdf_testing::CreateMmioBuffer(kDosbusMemorySize));
     FakeOwner fake_owner(&dosbus, video.get());
     TestBasicClient client;
     auto decoder = std::make_unique<Vp9Decoder>(
@@ -162,29 +169,24 @@ class Vp9UnitTest {
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
 
     auto zeroed_memory = std::unique_ptr<uint32_t[]>(new uint32_t[kDosbusMemorySize]);
-    auto dosbus_memory = std::unique_ptr<uint32_t[]>(new uint32_t[kDosbusMemorySize]);
     memset(zeroed_memory.get(), 0, kDosbusMemorySize);
-    memset(dosbus_memory.get(), 0, kDosbusMemorySize);
-    mmio_buffer_t dosbus_mmio = {.vaddr = FakeMmioPtr(dosbus_memory.get()),
-                                 .size = kDosbusMemorySize,
-                                 .vmo = ZX_HANDLE_INVALID};
-    DosRegisterIo dosbus(dosbus_mmio);
+    DosRegisterIo dosbus(fdf_testing::CreateMmioBuffer(kDosbusMemorySize));
     FakeOwner fake_owner(&dosbus, video.get());
     TestBasicClient client;
     auto decoder =
         std::make_unique<Vp9Decoder>(&fake_owner, &client, Vp9Decoder::InputType::kSingleStream,
                                      std::nullopt, use_compressed_output, false);
     EXPECT_EQ(ZX_OK, decoder->InitializeBuffers());
-    EXPECT_EQ(0, memcmp(dosbus_memory.get(), zeroed_memory.get(), kDosbusMemorySize));
+    EXPECT_EQ(0, MmioMemcmp(dosbus, zeroed_memory));
     EXPECT_FALSE(fake_owner.have_set_protected());
     EXPECT_TRUE(static_cast<FakeDecoderCore*>(fake_owner.hevc_core())->powered_on_);
 
     EXPECT_EQ(ZX_OK, decoder->InitializeHardware());
-    EXPECT_NE(0, memcmp(dosbus_memory.get(), zeroed_memory.get(), kDosbusMemorySize));
+    EXPECT_NE(0, MmioMemcmp(dosbus, zeroed_memory));
     EXPECT_TRUE(fake_owner.have_set_protected());
     auto dosbus_memory_copy = std::unique_ptr<uint32_t[]>(new uint32_t[kDosbusMemorySize]);
-    memcpy(dosbus_memory_copy.get(), dosbus_memory.get(), kDosbusMemorySize);
-    memset(dosbus_memory.get(), 0, kDosbusMemorySize);
+    dosbus.ReadBuffer(0, dosbus_memory_copy.get(), kDosbusMemorySize);
+    dosbus.WriteBuffer(0, zeroed_memory.get(), kDosbusMemorySize);
 
     decoder->state_ = Vp9Decoder::DecoderState::kSwappedOut;
 
@@ -193,7 +195,7 @@ class Vp9UnitTest {
       video->watchdog()->Cancel();
     }
     EXPECT_EQ(ZX_OK, decoder->InitializeHardware());
-    EXPECT_EQ(0, memcmp(dosbus_memory.get(), dosbus_memory_copy.get(), kDosbusMemorySize));
+    EXPECT_EQ(0, MmioMemcmp(dosbus, dosbus_memory_copy));
   }
 };
 

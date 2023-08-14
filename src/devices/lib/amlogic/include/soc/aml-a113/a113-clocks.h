@@ -17,20 +17,15 @@
 #define A113_HHI_MPLL_CNTL8 (0xa8)
 #define A113_HHI_PLL_TOP_MISC (0xba)
 
-typedef struct {
-  mmio_buffer_t mmio;
-  MMIO_PTR uint32_t *regs_vaddr;
-} a113_clk_dev_t;
-
-static inline uint32_t a113_clk_get_reg(a113_clk_dev_t *dev, uint32_t offset) {
-  return MmioRead32(dev->regs_vaddr + offset);
+static inline uint32_t a113_clk_get_reg(fdf::MmioBuffer *dev, uint32_t offset) {
+  return dev->Read32(offset);
 }
 
-static inline uint32_t a113_clk_set_reg(a113_clk_dev_t *dev, uint32_t offset, uint32_t value) {
-  MmioWrite32(value, dev->regs_vaddr + offset);
+static inline uint32_t a113_clk_set_reg(fdf::MmioBuffer *dev, uint32_t offset, uint32_t value) {
+  dev->Write32(value, offset);
   return a113_clk_get_reg(dev, offset);
 }
 
-zx_status_t a113_clk_set_mpll2(a113_clk_dev_t *device, uint64_t rate, uint64_t *actual);
+zx_status_t a113_clk_set_mpll2(fdf::MmioBuffer *device, uint64_t rate, uint64_t *actual);
 
 #endif  // SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_A113_A113_CLOCKS_H_

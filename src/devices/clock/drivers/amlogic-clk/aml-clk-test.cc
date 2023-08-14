@@ -39,8 +39,8 @@ constexpr uint32_t kCpuClkSupportedFrequencies[] = {
 
 class AmlClockTest : public AmlClock {
  public:
-  AmlClockTest(fdf::MmioBuffer mmio_buffer, mmio_buffer_t dosbus_buffer, uint32_t did)
-      : AmlClock(nullptr, std::move(mmio_buffer), fdf::MmioBuffer(dosbus_buffer), std::nullopt,
+  AmlClockTest(fdf::MmioBuffer mmio_buffer, fdf::MmioBuffer dosbus_buffer, uint32_t did)
+      : AmlClock(nullptr, std::move(mmio_buffer), std::move(dosbus_buffer), std::nullopt,
                  std::nullopt, did) {}
   ~AmlClockTest() = default;
 
@@ -56,14 +56,9 @@ bool MmioMemcmp(fdf::MmioBuffer& actual, std::unique_ptr<uint8_t[]>& expected) {
   return false;
 }
 
-std::tuple<std::unique_ptr<uint8_t[]>, mmio_buffer_t> MakeDosbusMmio() {
-  auto value = std::make_unique<uint8_t[]>(S912_DOS_LENGTH);
-  mmio_buffer_t buffer;
-  buffer.vaddr = FakeMmioPtr(value.get());
-  buffer.offset = 0;
-  buffer.size = S912_DOS_LENGTH;
-  buffer.vmo = ZX_HANDLE_INVALID;
-  return std::make_tuple(std::move(value), buffer);
+std::tuple<fdf::MmioView, fdf::MmioBuffer> MakeDosbusMmio() {
+  auto dos_buffer = fdf_testing::CreateMmioBuffer(S912_DOS_LENGTH);
+  return std::make_tuple(dos_buffer.View(0), std::move(dos_buffer));
 }
 
 TEST(ClkTestAml, AxgEnableDisableAll) {
@@ -73,7 +68,7 @@ TEST(ClkTestAml, AxgEnableDisableAll) {
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
 
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_AXG_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_AXG_CLK);
 
   // Initialization sets a bunch of registers that we don't care about, so we
   // can reset the array to a clean slate.
@@ -120,7 +115,7 @@ TEST(ClkTestAml, G12aEnableDisableAll) {
   auto actual = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   // Initialization sets a bunch of registers that we don't care about, so we
   // can reset the array to a clean slate.
@@ -168,7 +163,7 @@ TEST(ClkTestAml, Sm1EnableDisableAll) {
   auto actual = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_SM1_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_SM1_CLK);
 
   // Initialization sets a bunch of registers that we don't care about, so we
   // can reset the array to a clean slate.
@@ -215,13 +210,12 @@ TEST(ClkTestAml, G12aEnableDos) {
   auto actual = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
-  memset(dos_data.get(), 0, S905D2_DOS_LENGTH);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   zx_status_t st = clk.ClockImplEnable(g12a_clk::CLK_DOS_GCLK_VDEC);
   EXPECT_OK(st);
 
-  EXPECT_EQ(0x3ff, reinterpret_cast<uint32_t*>(dos_data.get())[0x3f01]);
+  EXPECT_EQ(0x3ff, dos_data.Read32(0x3f01 * sizeof(uint32_t)));
 }
 
 TEST(ClkTestAml, ForceDisable) {
@@ -230,7 +224,7 @@ TEST(ClkTestAml, ForceDisable) {
   auto actual = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   // Initialization sets a bunch of registers that we don't care about, so we
   // can reset the array to a clean slate.
@@ -274,7 +268,7 @@ static void TestPlls(const uint32_t did) {
   auto buffer = fdf_testing::CreateMmioBuffer(S905D2_HIU_LENGTH);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, did);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), did);
 
   constexpr uint16_t kPllStart = 0;
   constexpr uint16_t kPllEnd = HIU_PLL_COUNT;
@@ -304,7 +298,7 @@ TEST(ClkTestAml, Sm1MuxRo) {
   auto regs = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_SM1_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_SM1_CLK);
 
   // Ensure that SetInput fails for RO muxes.
   zx_status_t st = clk.ClockImplSetInput(sm1_clk::CLK_MPEG_CLK_SEL, 0);
@@ -339,7 +333,7 @@ TEST(ClkTestAml, Sm1Mux) {
   auto regs = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_SM1_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_SM1_CLK);
 
   const uint32_t newParentIdx = test_mux.n_inputs - 1;
   zx_status_t st = clk.ClockImplSetInput(kTestMux, newParentIdx);
@@ -370,7 +364,7 @@ TEST(ClkTestAml, TestCpuClkSetRate) {
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
 
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   zx_status_t st;
   for (size_t i = 0; i < std::size(kCpuClkSupportedFrequencies); i++) {
@@ -391,7 +385,7 @@ TEST(ClkTestAml, TestCpuClkQuerySupportedRates) {
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
 
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   uint64_t rate;
   zx_status_t st = clk.ClockImplQuerySupportedRate(kTestCpuClk, kJustOver1GHz, &rate);
@@ -408,7 +402,7 @@ TEST(ClkTestAml, TestCpuClkGetRate) {
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
 
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
   zx_status_t st;
 
   st = clk.ClockImplSetRate(kTestCpuClk, kOneGHz);
@@ -431,7 +425,7 @@ TEST(ClkTestAml, TestCpuClkG12b) {
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
 
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12B_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12B_CLK);
   zx_status_t st;
 
   st = clk.ClockImplSetRate(kTestCpuBigClk, kBigClockTestFreq);
@@ -458,7 +452,7 @@ TEST(ClkTestAml, DisableRefZero) {
   auto actual = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   // Initialization sets a bunch of registers that we don't care about, so we
   // can reset the array to a clean slate.
@@ -481,7 +475,7 @@ TEST(ClkTestAml, EnableDisableRefCount) {
   auto actual = buffer.View(0);
 
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), dos_buffer, PDEV_DID_AMLOGIC_G12A_CLK);
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   // Initialization sets a bunch of registers that we don't care about, so we
   // can reset the array to a clean slate.

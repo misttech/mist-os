@@ -67,7 +67,7 @@ zx_library("amlogic") {
   sources = [
     "a1-hiu.cc",
     "a1-pll-rates.cc",
-    "a113-clocks.c",
+    "a113-clocks.cc",
     "a5-hiu.cc",
     "a5-pll-rates.cc",
     "aml-audio.cc",
