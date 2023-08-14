@@ -63,6 +63,7 @@ zx_library("virtio") {
   ]
   public_deps = [
     "//sdk/lib/stdcompat",
+    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
