@@ -627,13 +627,17 @@ async fn handle_cmd(
 /// that rustyline should handle the next line of input.
 fn cmd_stream(
     state: Arc<Mutex<State>>,
-) -> (impl Stream<Item = String>, impl Sink<(), Error = mpsc::SendError>) {
+) -> (
+    thread::JoinHandle<Result<(), Error>>,
+    impl Stream<Item = String>,
+    impl Sink<(), Error = mpsc::SendError>,
+) {
     // Editor thread and command processing thread must be synchronized so that output
     // is printed in the correct order.
     let (mut cmd_sender, cmd_receiver) = mpsc::channel(0);
     let (ack_sender, mut ack_receiver) = mpsc::channel(0);
 
-    let _ = thread::spawn(move || -> Result<(), Error> {
+    let repl_thread = thread::spawn(move || -> Result<(), Error> {
         let mut exec = fasync::LocalExecutor::new();
 
         let fut = async {
@@ -669,7 +673,7 @@ fn cmd_stream(
         };
         exec.run_singlethreaded(fut)
     });
-    (cmd_receiver, ack_sender)
+    (repl_thread, cmd_receiver, ack_sender)
 }
 
 async fn watch_peers(access_svc: AccessProxy, state: Arc<Mutex<State>>) -> Result<(), Error> {
@@ -725,7 +729,7 @@ async fn run_repl(
 ) -> Result<(), Error> {
     // `cmd_stream` blocks on input in a separate thread and passes commands and acks back to
     // the main thread via async channels.
-    let (mut commands, mut acks) = cmd_stream(state.clone());
+    let (repl_thread, mut commands, mut acks) = cmd_stream(state.clone());
 
     while let Some(cmd) = commands.next().await {
         match parse_and_handle_cmd(&access_svc, &host_svc, &pairing_svc, state.clone(), cmd).await {
@@ -735,6 +739,10 @@ async fn run_repl(
         }
         acks.send(()).await?;
     }
+    // Close out the streams, which will cause the REPL thread to terminate.
+    drop(commands);
+    drop(acks);
+    let _ = repl_thread.join();
     Ok(())
 }
 
