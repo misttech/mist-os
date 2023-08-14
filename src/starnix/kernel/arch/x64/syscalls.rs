@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{
     arch::uapi::epoll_event,
@@ -16,9 +17,9 @@ use crate::{
         DirentSink32, FdNumber,
     },
     mm::MemoryAccessorExt,
-    signals::syscalls::sys_signalfd4,
+    signals::{syscalls::sys_signalfd4, RunState},
     syscalls::not_implemented,
-    task::{syscalls::do_clone, CurrentTask, Waiter},
+    task::{syscalls::do_clone, CurrentTask},
     time::*,
     types::*,
 };
@@ -249,10 +250,15 @@ pub fn sys_open(
 }
 
 pub fn sys_pause(current_task: &CurrentTask) -> Result<(), Errno> {
-    let waiter = Waiter::new();
-    waiter.wait(current_task)?;
-
-    Ok(())
+    let event = InterruptibleEvent::new();
+    let guard = event.begin_wait();
+    current_task.run_in_state(RunState::Event(event.clone()), || {
+        match guard.block_until(zx::Time::INFINITE) {
+            Err(WakeReason::Interrupted) => error!(EINTR),
+            Err(WakeReason::DeadlineExpired) => panic!("blocking forever cannot time out"),
+            Ok(()) => Ok(()),
+        }
+    })
 }
 
 pub fn sys_pipe(current_task: &CurrentTask, user_pipe: UserRef<FdNumber>) -> Result<(), Errno> {
