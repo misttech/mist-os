@@ -72,25 +72,14 @@ pub(crate) enum SocketState<I: Ip + IpExt, D: device::WeakId, S: DatagramSocketS
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) enum BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
-    Listener(
-        (
-            ListenerState<I, D, S>,
-            S::ListenerSharingState,
-            ListenerAddr<I::Addr, D, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-        ),
-    ),
-    Connected(
-        (
-            ConnState<I, D, S>,
-            <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ConnSharingState,
-            ConnAddr<
-                I::Addr,
-                D,
-                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-            >,
-        ),
-    ),
+    Listener {
+        state: ListenerState<I, D, S>,
+        sharing: S::ListenerSharingState,
+    },
+    Connected {
+        state: ConnState<I, D, S>,
+        sharing: <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ConnSharingState,
+    },
 }
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
@@ -178,22 +167,29 @@ pub(crate) enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateS
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"), Default(bound = ""))]
 pub(crate) struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
-    pub(crate) device: Option<D>,
-    pub(crate) sharing: S::UnboundSharingState<I>,
-    pub(crate) ip_options: IpOptions<I, D, S>,
+    device: Option<D>,
+    sharing: S::UnboundSharingState<I>,
+    ip_options: IpOptions<I, D, S>,
 }
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec + ?Sized> {
-    pub(crate) ip_options: IpOptions<I, D, S>,
+    ip_options: IpOptions<I, D, S>,
+    addr: ListenerAddr<I::Addr, D, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 }
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized> {
-    pub(crate) socket: IpSock<I, D, IpOptions<I, D, S>>,
-    pub(crate) shutdown: Shutdown,
+    socket: IpSock<I, D, IpOptions<I, D, S>>,
+    shutdown: Shutdown,
+    addr: ConnAddr<
+        I::Addr,
+        D,
+        <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+    >,
     /// Determines whether a call to disconnect this socket should also clear
     /// the device on the socket address.
     ///
@@ -208,7 +204,15 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
     ///
     /// TODO(http://fxbug.dev/110370): Implement this by changing socket
     /// addresses.
-    pub(crate) clear_device_on_disconnect: bool,
+    clear_device_on_disconnect: bool,
+}
+
+impl<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec> ConnState<I, D, S> {
+    pub(crate) fn should_receive(&self) -> bool {
+        let Self { shutdown, socket: _, clear_device_on_disconnect: _, addr: _ } = self;
+        let Shutdown { receive, send: _ } = shutdown;
+        !*receive
+    }
 }
 
 #[derive(Derivative, GenericOverIp)]
@@ -1070,24 +1074,26 @@ where
                 DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
                     sync_ctx,
                     |_sync_ctx, bound, _allocator| match state {
-                        BoundSocketState::Listener(state) => {
-                            let (state, _sharing, addr) = state;
+                        BoundSocketState::Listener { state, sharing: _ } => {
+                            let ListenerState { addr, ip_options } = state;
                             bound
                                 .listeners_mut()
                                 .remove(&S::make_receiving_map_id(id), &addr)
                                 .expect("Invalid UDP listener ID");
 
-                            let ListenerState { ip_options } = state;
                             (ip_options, SocketInfo::Listener(addr))
                         }
-                        BoundSocketState::Connected(state) => {
-                            let (state, _sharing, addr) = state;
+                        BoundSocketState::Connected { state, sharing: _ } => {
+                            let ConnState {
+                                addr,
+                                socket,
+                                clear_device_on_disconnect: _,
+                                shutdown: _,
+                            } = state;
                             bound
                                 .conns_mut()
                                 .remove(&S::make_receiving_map_id(id), &addr)
                                 .expect("UDP connection not found");
-                            let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } =
-                                state;
                             (socket.into_options(), SocketInfo::Connected(addr))
                         }
                     },
@@ -1118,12 +1124,13 @@ where
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
-            SocketState::Bound(BoundSocketState::Listener(state)) => {
-                let (_state, _sharing, addr) = state;
+            SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
+                let ListenerState { addr, ip_options: _ } = state;
                 SocketInfo::Listener(addr.clone())
             }
-            SocketState::Bound(BoundSocketState::Connected(state)) => {
-                let (_state, _sharing, addr) = state;
+            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
+                let ConnState { addr, socket: _, shutdown: _, clear_device_on_disconnect: _ } =
+                    state;
                 SocketInfo::Connected(addr.clone())
             }
         }
@@ -1641,12 +1648,14 @@ where
 
     // Replace the unbound state only after we're sure the
     // insertion has succeeded.
-    *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
-        // TODO(https://fxbug.dev/131970): Remove this clone().
-        { ListenerState { ip_options: ip_options.clone() } },
-        sharing.clone().into(),
-        bound_addr,
-    )));
+    *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener {
+        state: ListenerState {
+            // TODO(https://fxbug.dev/131970): Remove this clone().
+            ip_options: ip_options.clone(),
+            addr: bound_addr,
+        },
+        sharing: sharing.clone().into(),
+    });
     Ok(())
 }
 
@@ -1705,15 +1714,15 @@ where
                 (None, None, unbound_sharing.clone().into(), device.as_ref(), None, ip_options)
             }
             SocketState::Bound(state) => match state {
-                BoundSocketState::Listener(state) => {
-                    let (
-                        ListenerState { ip_options },
-                        listener_sharing,
-                        listener_addr @ ListenerAddr {
-                            ip: ListenerIpAddr { addr, identifier },
-                            device,
-                        },
-                    ): &(ListenerState<_, _, _>, _, _) = state;
+                BoundSocketState::Listener { state, sharing: listener_sharing } => {
+                    let ListenerState {
+                        ip_options,
+                        addr:
+                            listener_addr @ ListenerAddr {
+                                ip: ListenerIpAddr { addr, identifier },
+                                device,
+                            },
+                    } = state;
                     (
                         addr.as_ref(),
                         Some(identifier),
@@ -1727,15 +1736,17 @@ where
                         ip_options,
                     )
                 }
-                BoundSocketState::Connected(state) => {
-                    let (
-                        ConnState { socket, clear_device_on_disconnect, shutdown: _ },
-                        conn_sharing,
-                        original_addr @ ConnAddr {
-                            ip: ConnIpAddr { local: (ip, identifier), remote: _ },
-                            device,
-                        },
-                    ): &(ConnState<_, _, _>, _, _) = state;
+                BoundSocketState::Connected { state, sharing: conn_sharing } => {
+                    let ConnState {
+                        socket,
+                        clear_device_on_disconnect,
+                        shutdown: _,
+                        addr:
+                            original_addr @ ConnAddr {
+                                ip: ConnIpAddr { local: (ip, identifier), remote: _ },
+                                device,
+                            },
+                    } = state;
                     (
                         Some(ip),
                         Some(identifier),
@@ -1843,15 +1854,15 @@ where
         // Update the bound state after there's no further path for errors.
         // TODO(https://fxbug.dev/131970): Remove this clone.
         *ip_sock.options_mut() = ip_options.clone();
-        *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected((
-            ConnState {
+        *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected {
+            state: ConnState {
                 socket: ip_sock,
                 clear_device_on_disconnect,
                 shutdown: Shutdown::default(),
+                addr: bound_addr,
             },
             sharing,
-            bound_addr,
-        )));
+        });
         Ok(())
     })
 }
@@ -1883,17 +1894,14 @@ where
             IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
             IdMapEntry::Occupied(o) => o,
         };
-        let (conn_state, sharing, addr): &mut (
-            _,
-            <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ConnSharingState,
-            _,
-        ) = match entry.get_mut() {
-            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+        let (conn_state, sharing) = match entry.get_mut() {
+            SocketState::Unbound(_)
+            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
                 return Err(ExpectedConnError)
             }
-            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+            SocketState::Bound(BoundSocketState::Connected { state, sharing }) => (state, sharing),
         };
-        let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = conn_state;
+        let ConnState { socket, clear_device_on_disconnect, shutdown: _, addr } = conn_state;
 
         let id = S::make_receiving_map_id(id);
         let bound_addr = DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
@@ -1925,11 +1933,10 @@ where
         );
         // TODO(https://fxbug.dev/131970): Remove this clone.
         let ip_options = socket.options().clone();
-        *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener((
-            ListenerState { ip_options },
-            sharing.clone().into(),
-            bound_addr,
-        )));
+        *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener {
+            state: ListenerState { ip_options, addr: bound_addr },
+            sharing: sharing.clone().into(),
+        });
         Ok(())
     })
 }
@@ -1958,14 +1965,14 @@ pub(crate) fn shutdown_connected<
 ) -> Result<(), ExpectedConnError> {
     sync_ctx.with_sockets_state_mut(|_sync_ctx, state| {
         let state = match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+            SocketState::Unbound(_)
+            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
                 return Err(ExpectedConnError)
             }
-            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
 
-        let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
-            state;
+        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _ } = state;
         let (shutdown_send, shutdown_receive) = match which {
             ShutdownType::Send => (true, false),
             ShutdownType::Receive => (false, true),
@@ -1990,14 +1997,14 @@ pub(crate) fn get_shutdown_connected<
 ) -> Option<ShutdownType> {
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+            SocketState::Unbound(_)
+            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
                 return None
             }
-            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
 
-        let (ConnState { socket: _, clear_device_on_disconnect: _, shutdown }, _sharing, _addr) =
-            state;
+        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _ } = state;
         let Shutdown { send, receive } = shutdown;
         Some(match (send, receive) {
             (false, false) => return None,
@@ -2032,21 +2039,19 @@ pub(crate) fn send_conn<
 ) -> Result<(), SendError<B, S::Serializer<I, B>>> {
     sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_) | SocketState::Bound(BoundSocketState::Listener(_)) => {
+            SocketState::Unbound(_)
+            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
                 return Err(SendError::NotConnected(body))
             }
-            SocketState::Bound(BoundSocketState::Connected(state)) => state,
+            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
 
-        let (
-            ConnState {
-                socket,
-                clear_device_on_disconnect: _,
-                shutdown: Shutdown { send: shutdown_send, receive: _ },
-            },
-            _sharing,
+        let ConnState {
+            socket,
+            clear_device_on_disconnect: _,
+            shutdown: Shutdown { send: shutdown_send, receive: _ },
             addr,
-        ) = state;
+        } = state;
         if *shutdown_send {
             return Err(SendError::NotWriteable(body));
         }
@@ -2098,16 +2103,13 @@ where
             SocketState::Bound(state) => state,
         };
         let (local, device, ip_options, proto) = match state {
-            BoundSocketState::Connected(state) => {
-                let (
-                    ConnState { socket, clear_device_on_disconnect: _, shutdown },
-                    _,
-                    ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
-                ): &(
-                    _,
-                    <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ConnSharingState,
-                    _,
-                ) = state;
+            BoundSocketState::Connected { state, sharing: _ } => {
+                let ConnState {
+                    socket,
+                    clear_device_on_disconnect: _,
+                    shutdown,
+                    addr: ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
+                } = state;
 
                 let Shutdown { send: shutdown_write, receive: _ } = shutdown;
                 if *shutdown_write {
@@ -2117,7 +2119,7 @@ where
 
                 ((Some(*local_ip), local_id.clone()), device, socket.options(), socket.proto())
             }
-            BoundSocketState::Listener(state) => {
+            BoundSocketState::Listener { state, sharing: _ } => {
                 // TODO(https://fxbug.dev/92447) If `local_ip` is `None`, and so
                 // `new_ip_socket` picks a local IP address for us, it may cause problems
                 // when we don't match the bound listener addresses. We should revisit
@@ -2125,14 +2127,14 @@ where
                 //
                 // Also, if the local IP address is a multicast address this function should
                 // probably fail and `send_udp_conn_to` must be used instead.
-                let (
-                    ListenerState { ip_options },
-                    _,
-                    ListenerAddr {
-                        ip: ListenerIpAddr { addr: local_ip, identifier: local_port },
-                        device,
-                    },
-                ): &(_, S::ListenerSharingState, _) = state;
+                let ListenerState {
+                    ip_options,
+                    addr:
+                        ListenerAddr {
+                            ip: ListenerIpAddr { addr: local_ip, identifier: local_port },
+                            device,
+                        },
+                } = state;
                 ((*local_ip, local_port.clone()), device, ip_options, proto)
             }
         };
@@ -2219,10 +2221,10 @@ pub(crate) fn set_device<
                 Ok(())
             }
             SocketState::Bound(state) => match state {
-                BoundSocketState::Listener(state) => {
+                BoundSocketState::Listener { state, sharing: _ } => {
                     // Don't allow changing the device if one of the IP addresses in the socket
                     // address vector requires a zone (scope ID).
-                    let (_, _, addr): &(ListenerState<_, _, _>, S::ListenerSharingState, _) = state;
+                    let ListenerState { ip_options: _, addr } = state;
                     let ListenerAddr {
                         device: old_device,
                         ip: ListenerIpAddr { addr: ip_addr, identifier: _ },
@@ -2256,24 +2258,17 @@ pub(crate) fn set_device<
                         },
                     )?;
 
-                    let (_, _, addr): &mut (ListenerState<_, _, _>, S::ListenerSharingState, _) =
-                        state;
                     *addr = new_addr;
                     Ok(())
                 }
-                BoundSocketState::Connected(bound_state) => {
-                    let (state, _, addr): &(
-                        _,
-                        <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ConnSharingState,
-                        _,
-                    ) = bound_state;
-                    let ConnAddr {
-                        device: old_device,
-                        ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
-                    } = addr;
+                BoundSocketState::Connected { state, sharing: _ } => {
+                    let ConnState { socket, clear_device_on_disconnect: _, shutdown: _, addr } =
+                        state;
+                    let ConnAddr { device: old_device, ip } = addr;
+                    let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = *ip;
                     if !socket::can_device_change(
-                        Some(local_ip),
-                        Some(remote_ip),
+                        Some(&local_ip),
+                        Some(&remote_ip),
                         old_device.as_ref(),
                         new_device,
                     ) {
@@ -2282,7 +2277,6 @@ pub(crate) fn set_device<
                         )));
                     }
 
-                    let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
                     let (new_addr, mut new_socket) =
                         DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
                             sync_ctx,
@@ -2291,8 +2285,8 @@ pub(crate) fn set_device<
                                     .new_ip_socket(
                                         ctx,
                                         new_device.map(EitherDeviceId::Strong),
-                                        Some(*local_ip),
-                                        *remote_ip,
+                                        Some(local_ip),
+                                        remote_ip,
                                         socket.proto(),
                                         Default::default(),
                                     )
@@ -2322,12 +2316,8 @@ pub(crate) fn set_device<
                         )?;
                     // Since the move was successful, replace the old socket with
                     // the new one but move the options over.
-                    let (state, _, addr): &mut (
-                        _,
-                        <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ConnSharingState,
-                        _,
-                    ) = bound_state;
-                    let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = state;
+                    let ConnState { socket, clear_device_on_disconnect, shutdown: _, addr: _ } =
+                        state;
                     let _: IpOptions<_, _, _> = new_socket.replace_options(socket.take_options());
                     *socket = new_socket;
                     *addr = new_addr;
@@ -2536,24 +2526,17 @@ pub(crate) fn get_options_device<I: IpExt, D: device::WeakId, S: DatagramSocketS
             let UnboundSocketState { ip_options, device, sharing: _ } = state;
             (ip_options, device)
         }
-        SocketState::Bound(BoundSocketState::Listener(state)) => {
-            let (ListenerState { ip_options }, _, ListenerAddr { device, ip: _ }): &(
-                _,
-                S::ListenerSharingState,
-                _,
-            ) = state;
+        SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
+            let ListenerState { ip_options, addr: ListenerAddr { device, ip: _ } } = state;
             (ip_options, device)
         }
-        SocketState::Bound(BoundSocketState::Connected(state)) => {
-            let (
-                ConnState { socket, clear_device_on_disconnect: _, shutdown: _ },
-                _,
-                ConnAddr { device, ip: _ },
-            ): &(
-                _,
-                <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ConnSharingState,
-                _,
-            ) = state;
+        SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
+            let ConnState {
+                socket,
+                clear_device_on_disconnect: _,
+                shutdown: _,
+                addr: ConnAddr { device, ip: _ },
+            } = state;
             (socket.options(), device)
         }
     }
@@ -2571,20 +2554,12 @@ where
             let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
             ip_options
         }
-        SocketState::Bound(BoundSocketState::Listener(state)) => {
-            let (ListenerState { ip_options }, _, _): &mut (
-                _,
-                S::ListenerSharingState,
-                ListenerAddr<_, _, _>,
-            ) = state;
+        SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
+            let ListenerState { ip_options, addr: _ } = state;
             ip_options
         }
-        SocketState::Bound(BoundSocketState::Connected(state)) => {
-            let (ConnState { socket, clear_device_on_disconnect: _, shutdown: _ }, _, _): &mut (
-                _,
-                <S::SocketMapSpec<I, _> as SocketMapStateSpec>::ConnSharingState,
-                ConnAddr<_, _, _, _>,
-            ) = state;
+        SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
+            let ConnState { socket, clear_device_on_disconnect: _, shutdown: _, addr: _ } = state;
             socket.options_mut()
         }
     }
@@ -2714,15 +2689,8 @@ where
                 sharing
             }
             SocketState::Bound(state) => match state {
-                BoundSocketState::Listener(state) => {
-                    let (_, sharing, _): &(ListenerState<_, _, _>, _, ListenerAddr<_, _, _>) =
-                        state;
-                    sharing
-                }
-                BoundSocketState::Connected(state) => {
-                    let (_, sharing, _): &(ConnState<_, _, _>, _, ConnAddr<_, _, _, _>) = state;
-                    sharing
-                }
+                BoundSocketState::Listener { state: _, sharing } => sharing,
+                BoundSocketState::Connected { state: _, sharing } => sharing,
             },
         }
         .clone()

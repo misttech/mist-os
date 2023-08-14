@@ -54,16 +54,16 @@ use crate::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
-            BoundSockets as DatagramBoundSockets, ConnState, ConnectError,
-            DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec,
-            DatagramStateContext, DualStackDatagramBoundStateContext, EitherIpSocket,
-            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError,
-            LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
-            SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
-            SocketHopLimits, SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
+            BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
+            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
+            DualStackDatagramBoundStateContext, EitherIpSocket, ExpectedConnError,
+            ExpectedUnboundError, FoundSockets, InUseError, LocalIdentifierAllocator,
+            MulticastMembershipInterfaceSelector, SendError as DatagramSendError,
+            SetMulticastMembershipError, ShutdownType, SocketHopLimits,
+            SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             SocketsState as DatagramSocketsState,
         },
-        AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult, Shutdown,
+        AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult,
         SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
@@ -1205,19 +1205,14 @@ fn try_deliver<
 ) -> bool {
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
         let should_deliver = match state.get_socket_state(&id).expect("socket ID is valid") {
-            DatagramSocketState::Bound(DatagramBoundSocketState::Connected(state)) => {
-                let (
-                    ConnState {
-                        socket: _,
-                        shutdown: Shutdown { send: _, receive: shutdown_receive },
-                        clear_device_on_disconnect: _,
-                    },
-                    _sharing,
-                    _addr,
-                ) = state;
-                !*shutdown_receive
-            }
-            DatagramSocketState::Bound(DatagramBoundSocketState::Listener(_))
+            DatagramSocketState::Bound(DatagramBoundSocketState::Connected {
+                state,
+                sharing: _,
+            }) => state.should_receive(),
+            DatagramSocketState::Bound(DatagramBoundSocketState::Listener {
+                state: _,
+                sharing: _,
+            })
             | DatagramSocketState::Unbound(_) => true,
         };
         if should_deliver {
@@ -2503,9 +2498,7 @@ mod tests {
         },
         socket::{
             self,
-            datagram::{
-                BoundSocketState, MulticastInterfaceSelector, UninstantiableDualStackContext,
-            },
+            datagram::{MulticastInterfaceSelector, UninstantiableDualStackContext},
         },
         testutil::{set_logger_for_test, TestIpExt as _},
     };
@@ -4918,21 +4911,15 @@ mod tests {
             remote_port,
         )
         .expect("connect failed");
-        let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
-        let (_state, _tag_state, addr) = assert_matches!(
-            sockets_state.get_socket_state(&socket).unwrap(),
-            DatagramSocketState::Bound(DatagramBoundSocketState::Connected(state)) => state
-        );
-
+        let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket);
         assert_eq!(
-            addr,
-            &ConnAddr {
-                ip: ConnIpAddr {
-                    local: (local_ip::<I>(), local_port),
-                    remote: (remote_ip::<I>(), remote_port),
-                },
-                device: None
-            }
+            info,
+            SocketInfo::Connected(ConnInfo {
+                local_ip: ZonedAddr::Unzoned(local_ip::<I>()),
+                local_port,
+                remote_ip: ZonedAddr::Unzoned(remote_ip::<I>()),
+                remote_port,
+            })
         );
     }
 
@@ -4988,31 +4975,23 @@ mod tests {
             NonZeroU16::new(1010).unwrap(),
         )
         .expect("connect failed");
-        let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
         let valid_range = &UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE;
-        let port_a = assert_matches!(sockets_state.get_socket_state(&conn_a),
-            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
-                (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
-            ))) => local_identifier)
-        .get();
+        let mut get_conn_port = |id| {
+            let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, id);
+            let info = assert_matches!(info, SocketInfo::Connected(info) => info);
+            let ConnInfo { local_ip: _, local_port, remote_ip: _, remote_port: _ } = info;
+            local_port
+        };
+        let port_a = get_conn_port(conn_a).get();
+        let port_b = get_conn_port(conn_b).get();
+        let port_c = get_conn_port(conn_c).get();
+        let port_d = get_conn_port(conn_d).get();
         assert!(valid_range.contains(&port_a));
-        let port_b = assert_matches!(sockets_state.get_socket_state(&conn_b),
-            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
-                (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
-            ))) => local_identifier)
-        .get();
+        assert!(valid_range.contains(&port_b));
+        assert!(valid_range.contains(&port_c));
+        assert!(valid_range.contains(&port_d));
         assert_ne!(port_a, port_b);
-        let port_c = assert_matches!(sockets_state.get_socket_state(&conn_c),
-            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
-                (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
-            ))) => local_identifier)
-        .get();
         assert_ne!(port_a, port_c);
-        let port_d = assert_matches!(sockets_state.get_socket_state(&conn_d),
-            Some(DatagramSocketState::Bound(BoundSocketState::Connected(
-                (_state, _tag_state, ConnAddr{ip: ConnIpAddr{local: (_, local_identifier), ..}, device: _})
-            ))) => local_identifier)
-        .get();
         assert_ne!(port_a, port_d);
     }
 
@@ -5080,21 +5059,14 @@ mod tests {
         )
         .expect("listen_udp failed");
 
-        let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
-        let wildcard_port = assert_matches!(
-            sockets_state.get_socket_state(&wildcard_list),
-            Some(DatagramSocketState::Bound(BoundSocketState::Listener((
-                _,
-                _,
-                ListenerAddr{ ip: ListenerIpAddr {identifier, addr: None}, device: None}
-            )))) => identifier);
-        let specified_port = assert_matches!(
-            sockets_state.get_socket_state(&specified_list),
-            Some(DatagramSocketState::Bound(BoundSocketState::Listener((
-                _,
-                _,
-                ListenerAddr{ ip: ListenerIpAddr {identifier, addr: _}, device: None}
-            )))) => identifier);
+        let mut get_listener_port = |id| {
+            let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, id);
+            let info = assert_matches!(info, SocketInfo::Listener(info) => info);
+            let ListenerInfo { local_ip: _, local_port } = info;
+            local_port
+        };
+        let wildcard_port = get_listener_port(wildcard_list);
+        let specified_port = get_listener_port(specified_list);
         assert!(UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE
             .contains(&wildcard_port.get()));
         assert!(UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE
@@ -5123,16 +5095,11 @@ mod tests {
             socket
         });
 
-        let expected_addr = ListenerAddr {
-            ip: ListenerIpAddr { addr: None, identifier: local_port },
-            device: None,
-        };
-        let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
         for listener in listeners {
-            assert_matches!(
-                sockets_state.get_socket_state(&listener),
-                Some(DatagramSocketState::Bound(BoundSocketState::Listener((_, _, addr))))
-                => assert_eq!(addr, &expected_addr));
+            assert_eq!(
+                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, listener),
+                SocketInfo::Listener(ListenerInfo { local_ip: None, local_port })
+            );
         }
     }
 
