@@ -10,6 +10,8 @@ import("//build/testing/host_test_data.gni")
 executables = [
   ":ret17",
   ":ret17.in-process",
+  ":relative-reloc",
+  ":relative-reloc.in-process",
 ]
 libs = []
 modules = []
@@ -122,4 +124,9 @@ config("test-executable.in-process.config") {
 test_executable("ret17") {
   can_be_in_process = true
   sources = [ "ret17.cc" ]
+}
+
+test_executable("relative-reloc") {
+  can_be_in_process = true
+  sources = [ "relative-reloc.cc" ]
 }

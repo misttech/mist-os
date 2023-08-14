@@ -6,7 +6,9 @@
 #define LIB_LD_STARTUP_LOAD_H_
 
 #include <lib/elfldltl/load.h>
+#include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/relro.h>
+#include <lib/elfldltl/resolve.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
@@ -15,6 +17,7 @@
 
 #include "allocator.h"
 #include "diagnostics.h"
+#include "lib/elfldltl/link.h"
 
 namespace ld {
 
@@ -141,14 +144,12 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
 
     // Now that there is a Memory object to use, decode the dynamic section.
-    elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded> needed;
-    DecodeModuleDynamic(this->module(), diag, memory(), dyn_phdr, needed,
-                        elfldltl::DynamicRelocationInfoObserver(this->reloc_info()));
+    size_t needed_count = DecodeDynamic(diag, dyn_phdr);
 
     // Everything is now prepared to proceed with loading dependencies
     // and performing relocation.
     return {
-        .needed_count = needed.count(),
+        .needed_count = needed_count,
         .entry = ehdr.entry + loader_.load_bias(),
         .stack_size = stack_size,
     };
@@ -163,6 +164,18 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   void ProtectRelro(Diagnostics& diag) {
     ModuleDiagnostics module_diag{diag, this->name().str()};
     std::ignore = loader_.ProtectRelro(diag, relro_);
+  }
+
+  void RelocateRelative(Diagnostics& diag) {
+    elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
+  }
+
+  // Returns number of DT_NEEDED entries. See StartupLoadResult, for why that is useful.
+  size_t DecodeDynamic(Diagnostics& diag, const std::optional<typename Elf::Phdr>& dyn_phdr) {
+    elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded> needed;
+    DecodeModuleDynamic(module(), diag, memory(), dyn_phdr, needed,
+                        elfldltl::DynamicRelocationInfoObserver(reloc_info()));
+    return needed.count();
   }
 
   Loader& loader() { return loader_; }

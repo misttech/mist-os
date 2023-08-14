@@ -119,7 +119,7 @@ StartupModule* LoadExecutable(Diagnostics& diag, StartupData& startup, ScratchAl
   // the executable image, but the object will never be destroyed anyway.
   main_executable->memory() = ModuleMemory{module};
 
-  DecodeModuleDynamic(module, diag, main_executable->memory(), phdr_info.dyn_phdr);
+  main_executable->DecodeDynamic(diag, phdr_info.dyn_phdr);
 
   return main_executable;
 }
@@ -204,8 +204,12 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   // consists of doing the bookkeeping that loading other modules does.
   auto* main_executable = LoadExecutable(diag, startup, scratch, initial_exec, entry, phdr, phnum);
 
-  // TODO(mcgrathr): Load deps, relocate.
-  std::ignore = main_executable;
+  // TODO(mcgrathr): Load deps.
+
+  // Bail out before relocation if there were any loading errors.
+  CheckErrors(diag);
+
+  main_executable->RelocateRelative(diag);
 
   // Now that startup is completed, protect not only the RELRO, but also all
   // the data and bss.

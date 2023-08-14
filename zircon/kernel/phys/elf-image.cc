@@ -213,7 +213,7 @@ void ElfImage::Relocate() {
                             elfldltl::DynamicRelocationInfoObserver(reloc_info));
     ZX_ASSERT(reloc_info.rel_symbolic().empty());
     ZX_ASSERT(reloc_info.rela_symbolic().empty());
-    bool relocated = elfldltl::RelocateRelative(image_, reloc_info, *load_bias_);
+    bool relocated = elfldltl::RelocateRelative(diagnostics, image_, reloc_info, *load_bias_);
     ZX_ASSERT(relocated);
 
     // Make sure everything is written before the image is used as code.

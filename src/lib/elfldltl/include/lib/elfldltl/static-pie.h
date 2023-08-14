@@ -44,7 +44,7 @@ inline void LinkStaticPie(const Self& self, DiagnosticsType& diagnostics, Args&&
   RelocationInfo<Elf> reloc_info;
   DecodeDynamic(diagnostics, memory, Self::Dynamic(), DynamicRelocationInfoObserver(reloc_info));
 
-  if (RelocateRelative(memory, reloc_info, bias)) {
+  if (RelocateRelative(diagnostics, memory, reloc_info, bias)) {
     std::atomic_signal_fence(std::memory_order_seq_cst);
   } else [[unlikely]] {
     __builtin_trap();

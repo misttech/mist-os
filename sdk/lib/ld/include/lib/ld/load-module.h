@@ -92,6 +92,10 @@ class LoadModule {
     assert(module_);
     return *module_;
   }
+  constexpr const Module& module() const {
+    assert(module_);
+    return *module_;
+  }
 
   constexpr Soname& soname() const { return module().soname; }
 
@@ -127,7 +131,7 @@ class LoadModule {
     return reloc_info_;
   }
   template <auto R = WithRelocInfo, typename = std::enable_if_t<R == LoadModuleRelocInfo::kYes>>
-  RelocationInfo& reloc_info() const {
+  const RelocationInfo& reloc_info() const {
     return reloc_info_;
   }
 

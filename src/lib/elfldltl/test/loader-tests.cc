@@ -88,7 +88,7 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
 
     if (options.reloc) {
       uintptr_t bias = reinterpret_cast<uintptr_t>(mem.image().data()) - mem.base();
-      ASSERT_TRUE(RelocateRelative(mem, reloc_info, bias));
+      ASSERT_TRUE(RelocateRelative(diag, mem, reloc_info, bias));
 
       auto resolve = [this, bias](const auto& ref,
                                   elfldltl::RelocateTls tls_type) -> std::optional<Definition> {

@@ -189,7 +189,12 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   LoadExecutableResult main =
       LoadExecutable(diag, startup, scratch, initial_exec, std::move(startup.executable_vmo));
 
-  // TODO(mcgrathr): Load deps, relocate.
+  // TODO(mcgrathr): Load deps.
+
+  // Bail out before relocation if there were any loading errors.
+  CheckErrors(diag);
+
+  main.module->RelocateRelative(diag);
 
   if constexpr (kProtectData) {
     // Now that startup is completed, protect not only the RELRO, but also all

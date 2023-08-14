@@ -19,29 +19,37 @@ namespace elfldltl {
 // relocation records.  This calls memory.Store(reloc_address, runtime_address)
 // or memory.StoreAdd(reloc_address, bias) to store the adjusted values.
 // Returns false iff any calls into the Memory object returned false.
-template <class Memory, class RelocInfo>
-[[nodiscard]] constexpr bool RelocateRelative(Memory& memory, const RelocInfo& info,
-                                              typename RelocInfo::size_type bias) {
+template <class Diagnostics, class Memory, class RelocInfo>
+constexpr bool RelocateRelative(Diagnostics& diag, Memory& memory, const RelocInfo& info,
+                                typename RelocInfo::size_type bias) {
   using Addr = typename RelocInfo::Addr;
   using size_type = typename RelocInfo::size_type;
 
   struct Visitor {
+    constexpr bool CheckStore(bool b, size_type addr) {
+      if (!b) [[unlikely]] {
+        return diag_.FormatError("invalid address in RELATIVE relocation", FileAddress{addr});
+      }
+      return true;
+    }
+
     // RELA entry with separate addend.
-    constexpr bool operator()(const typename RelocInfo::Rela& reloc) const {
+    constexpr bool operator()(const typename RelocInfo::Rela& reloc) {
       auto addr = bias_ + reloc.addend();
-      return memory_.template Store<Addr>(reloc.offset, addr);
+      return CheckStore(memory_.template Store<Addr>(reloc.offset, addr), reloc.offset);
     }
 
     // REL or RELR entry with addend in place.
-    constexpr bool operator()(size_type addr) const {
-      return memory_.template StoreAdd<Addr>(addr, bias_);
+    constexpr bool operator()(size_type addr) {
+      return CheckStore(memory_.template StoreAdd<Addr>(addr, bias_), addr);
     }
 
     Memory& memory_;
+    Diagnostics& diag_;
     size_type bias_;
   };
 
-  return info.VisitRelative(Visitor{memory, bias});
+  return info.VisitRelative(Visitor{memory, diag, bias});
 }
 
 // Symbolic relocation for STT_TLS symbols requires the symbolic resolution

@@ -62,7 +62,7 @@ inline SymbolInfo<typename Self::Elf> LinkStaticPieWithVdso(
                 DynamicSymbolInfoObserver(symbol_info));
 
   // Apply simple fixups first, just in case anything else needs them done.
-  if (RelocateRelative(memory, reloc_info, bias)) {
+  if (RelocateRelative(diagnostics, memory, reloc_info, bias)) {
     std::atomic_signal_fence(std::memory_order_seq_cst);
   } else [[unlikely]] {
     __builtin_trap();
