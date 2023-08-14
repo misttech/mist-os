@@ -589,6 +589,7 @@ impl IntoErrno for ListenError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             ListenError::ListenerExists => fposix::Errno::Eaddrinuse,
+            ListenError::NotSupported => fposix::Errno::Einval,
         }
     }
 }
@@ -703,46 +704,32 @@ where
 
     fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        match *id {
-            SocketId::Bound(bound) => {
-                let mut ctx = ctx.clone();
-                let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-                // The POSIX specification for `listen` [1] says
-                //
-                //   If listen() is called with a backlog argument value that is
-                //   less than 0, the function behaves as if it had been called
-                //   with a backlog argument value of 0.
-                //
-                //   A backlog argument of 0 may allow the socket to accept
-                //   connections, in which case the length of the listen queue
-                //   may be set to an implementation-defined minimum value.
-                //
-                // [1]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/listen.html
-                //
-                // Always accept connections with a minimum backlog size of 1.
-                // Use a maximum value of 4096 like Linux.
-                const MINIMUM_BACKLOG_SIZE: NonZeroUsize =
-                    const_unwrap_option(NonZeroUsize::new(1));
-                const MAXIMUM_BACKLOG_SIZE: NonZeroUsize =
-                    const_unwrap_option(NonZeroUsize::new(4096));
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        // The POSIX specification for `listen` [1] says
+        //
+        //   If listen() is called with a backlog argument value that is
+        //   less than 0, the function behaves as if it had been called
+        //   with a backlog argument value of 0.
+        //
+        //   A backlog argument of 0 may allow the socket to accept
+        //   connections, in which case the length of the listen queue
+        //   may be set to an implementation-defined minimum value.
+        //
+        // [1]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/listen.html
+        //
+        // Always accept connections with a minimum backlog size of 1.
+        // Use a maximum value of 4096 like Linux.
+        const MINIMUM_BACKLOG_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
+        const MAXIMUM_BACKLOG_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(4096));
 
-                let backlog = usize::try_from(backlog).unwrap_or(0);
-                let backlog = NonZeroUsize::new(backlog).map_or(MINIMUM_BACKLOG_SIZE, |b| {
-                    NonZeroUsize::min(
-                        MAXIMUM_BACKLOG_SIZE,
-                        NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE),
-                    )
-                });
+        let backlog = usize::try_from(backlog).unwrap_or(0);
+        let backlog = NonZeroUsize::new(backlog).map_or(MINIMUM_BACKLOG_SIZE, |b| {
+            NonZeroUsize::min(MAXIMUM_BACKLOG_SIZE, NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE))
+        });
 
-                let listener = listen::<I, _>(sync_ctx, bound.into(), backlog)
-                    .map_err(IntoErrno::into_errno)?;
-                *id = listener;
-                Ok(())
-            }
-            SocketId::Unbound(_) | SocketId::Connection(_) | SocketId::Listener(_) => {
-                Err(fposix::Errno::Einval)
-            }
-        }
+        *id = listen::<I, _>(sync_ctx, *id, backlog).map_err(IntoErrno::into_errno)?;
+        Ok(())
     }
 
     fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {

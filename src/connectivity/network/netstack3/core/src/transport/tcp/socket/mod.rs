@@ -1304,11 +1304,15 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     ) -> Result<SocketId<I>, ListenError> {
         self.with_tcp_sockets_mut(|sockets| {
             debug!("listen on {id:?} with backlog {backlog}");
-            let (listener, listener_sharing, addr) = assert_matches!(
-                sockets.socket_state.get_mut(&id),
-                Some(SocketState::Bound(BoundSocketState::Listener(l))) => l,
-                "invalid socket ID"
-            );
+            let (listener, listener_sharing, addr) =
+                match sockets.socket_state.get_mut(&id).expect("invalid socket ID") {
+                    SocketState::Bound(BoundSocketState::Listener((l, sharing, addr))) => match l {
+                        MaybeListener::Listener(_) => return Err(ListenError::NotSupported),
+                        MaybeListener::Bound(_) => (l, sharing, addr),
+                    },
+                    SocketState::Bound(BoundSocketState::Connected(_))
+                    | SocketState::Unbound(_) => return Err(ListenError::NotSupported),
+                };
             let entry =
                 sockets.socketmap.listeners_mut().entry(&id, &addr).expect("invalid listener id");
             let ListenerSharingState { sharing, listening } = listener_sharing;
@@ -2398,6 +2402,8 @@ pub enum AcceptError {
 pub enum ListenError {
     /// There would be a conflict with another listening socket.
     ListenerExists,
+    /// Cannot listen on such socket.
+    NotSupported,
 }
 
 /// Possible error for calling `shutdown` on a not-yet connected socket.
