@@ -33,6 +33,12 @@ pub struct LogEntry {
     pub version: Option<u64>,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct LogEntryWithNoVersionField {
+    pub data: LogData,
+    pub timestamp: Timestamp,
+}
+
 impl LogEntry {
     pub fn new(data: LogData) -> Result<Self> {
         Ok(LogEntry {
