@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 group("tests") {
   testonly = true
@@ -42,10 +43,6 @@ fuchsia_test_component("reboot_ota_update") {
   manifest = "meta/reboot_ota_update.cml"
 }
 
-fuchsia_test_component("container") {
-  manifest = "meta/container.cml"
-}
-
 fuchsia_test_component("realm") {
   manifest = "meta/realm.cml"
 }
@@ -59,13 +56,14 @@ fuchsia_test_component("reboot_integration_test") {
 fuchsia_test_package("starnix_reboot_integration_tests") {
   test_components = [ ":reboot_integration_test" ]
   deps = [
-    ":container",
     ":realm",
     ":reboot_no_args",
     ":reboot_ota_update",
     "//src/starnix/tests/android:container_resources",
   ]
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+
+  subpackages = starnix_test_subpackages +
+                [ "//src/starnix/containers/bionic:bionic_package" ]
 
   # TODO(b/295073633): remove when starnix can gracefully shutdown
   test_specs = {

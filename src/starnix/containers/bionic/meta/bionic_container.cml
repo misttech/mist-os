@@ -2,11 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/starnix/containers/bionic/meta/bionic_container.shard.cml",
-        "//src/starnix/containers/container.shard.cml",
-    ],
+    include: [ "//src/starnix/containers/container.shard.cml" ],
     program: {
         runner: "starnix",
+        features: [
+            "binder",
+            "selinux_enabled",
+            "test_data",
+        ],
+        init: [ "/system/bin/init" ],
+        kernel_cmdline: "androidboot.hardware=starnix androidboot.init_rc=/container/init.rc",
+        mounts: [
+            "/:remote_bundle:data/system",
+            "/oem:remote_bundle:data/testcases",
+            "/data:remotefs:data",
+            "/dev:devtmpfs",
+            "/dev/shm:tmpfs",
+            "/data/tmp:tmpfs",
+            "/dev/shm:tmpfs",
+            "/dev/pts:devpts",
+            "/proc:proc",
+            "/sys:sysfs",
+            "/sys/fs/selinux:selinuxfs",
+        ],
+        rlimits: [ "RLIMIT_NOFILE=131072" ],
+        name: "bionic_test",
+        startup_file_path: "/data/tmp/apex_init",
     },
 }

@@ -13,7 +13,7 @@
         },
         {
             name: "container",
-            url: "#meta/container.cm",
+            url: "bionic#meta/bionic_container.cm",
             environment: "#starnix_runner_env",
         },
         {
