@@ -18,6 +18,10 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:2:2/aml-i2c",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-81/rtc",
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-50",
+      "sys/platform/05:06:12:1/audio-pcm-out-composite-spec/vim3-audio-tdm1-out",
+      "sys/platform/05:06:12:2/audio-i2s-out-composite-spec/vim3-audio-tdm1-out",
+      "sys/platform/05:06:12:3/audio-pcm-in-composite-spec/vim3-audio-tdm1-in",
+      "sys/platform/05:06:12:4/audio-i2s-in-composite-spec/vim3-audio-tdm1-in",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
 
       // TODO(b/291154545): Add bluetooth paths when firmware is publicly available.

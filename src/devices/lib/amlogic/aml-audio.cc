@@ -11,7 +11,11 @@
 // - Page908(EE_AUDIO_MCLK_A_CTRL)
 // - Page920(EE_AUDIO_CLK_PDMIN_CTRL0)
 // - Page920(EE_AUDIO_CLK_PDMIN_CTRL1)
-uint8_t ToS905D2AudioClkSrcSel(ee_audio_mclk_src_t clk_src) {
+// and also`A311D Datasheet`
+// - Page1174(EE_AUDIO_MCLK_A_CTRL)
+// - Page1185(EE_AUDIO_CLK_PDMIN_CTRL0)
+// - Page1186(EE_AUDIO_CLK_PDMIN_CTRL1)
+uint8_t ToS905D2AndA311DAudioClkSrcSel(ee_audio_mclk_src_t clk_src) {
   switch (clk_src) {
     case MP0_PLL:
       return 0;
@@ -32,7 +36,7 @@ uint8_t ToS905D2AudioClkSrcSel(ee_audio_mclk_src_t clk_src) {
     default:
       break;
   }
-  ZX_PANIC("Unsupport clk_src: %d", clk_src);
+  ZX_PANIC("Unsupported clk_src: %d", clk_src);
 }
 
 // It follows up `S905D3G Datasheet`

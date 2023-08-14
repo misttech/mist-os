@@ -23,6 +23,8 @@ std::unique_ptr<AmlTdmDevice> AmlTdmInDevice::Create(fdf::MmioBuffer mmio, ee_au
   // TODDR A has 256 64-bit lines in the FIFO, B and C have 128.
   uint32_t fifo_depth = 128 * 8;  // in bytes.
   switch (version) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       if (toddr == TODDR_A)
         fifo_depth = 256 * 8;  // TODDR_A has 256 x 64-bit
@@ -36,6 +38,7 @@ std::unique_ptr<AmlTdmDevice> AmlTdmInDevice::Create(fdf::MmioBuffer mmio, ee_au
         fifo_depth = 128 * 8;  // TODDR_B/C/D has 128 x 64-bit
       break;
     case metadata::AmlVersion::kA5:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1:
       fifo_depth = 64 * 8;  // TODDR_A/B has 64 x 64-bit
       break;
@@ -73,8 +76,10 @@ void AmlTdmInDevice::Initialize() {
   // ack delay = 0
   // set destination tdm block and enable that selection
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
-      __FALLTHROUGH;
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       // Enable DDR ARB, and enable this ddr channels bit.
       mmio_.SetBits32((1 << 31) | (1 << (toddr_ch_)), EE_AUDIO_ARB_CTRL);
@@ -156,6 +161,8 @@ zx_status_t AmlTdmInDevice::SetSclkPad(aml_tdm_sclk_pad_t sclk_pad, bool is_cust
   uint32_t pad[2] = {};
   bool pad_ctrl_separated = false;
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       pad[0] = EE_AUDIO_MST_PAD_CTRL1;
       break;
@@ -279,8 +286,10 @@ zx_status_t AmlTdmInDevice::SetDatPad(aml_tdm_dat_pad_t tdm_pin, aml_tdm_dat_lan
 void AmlTdmInDevice::ConfigTdmSlot(uint8_t bit_offset, uint8_t num_slots, uint8_t bits_per_slot,
                                    uint8_t bits_per_sample, uint8_t mix_mask, bool i2s_mode) {
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
-      __FALLTHROUGH;
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G: {
       uint32_t src = 0;
       switch (tdm_ch_) {

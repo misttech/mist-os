@@ -218,7 +218,8 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
-      : AmlG12TdmStream(parent, false, std::move(pdev), std::move(enable_gpio)) {
+      : AmlG12TdmStream(parent, false, std::move(pdev),
+                        fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio))) {
     SetCommonDefaults();
     codecs_.push_back(std::make_unique<SimpleCodecClient>());
     codecs_[0]->SetCodec(std::move(codec_client_end));
@@ -233,7 +234,8 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
                    std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
-      : AmlG12TdmStream(parent, false, std::move(pdev), std::move(enable_gpio)) {
+      : AmlG12TdmStream(parent, false, std::move(pdev),
+                        fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio))) {
     SetCommonDefaults();
     aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, region.GetMmioBuffer());
     // Simply one ring buffer channel per codec.
@@ -1570,7 +1572,8 @@ TEST_F(StreamTest, EnableAndMuteChannelsTdm1Lane) {
 struct AmlG12I2sInTest : public AmlG12TdmStream {
   AmlG12I2sInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
-      : AmlG12TdmStream(parent, true, std::move(pdev), std::move(enable_gpio)) {
+      : AmlG12TdmStream(parent, true, std::move(pdev),
+                        fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio))) {
     metadata_.is_input = true;
     metadata_.mClockDivFactor = 10;
     metadata_.sClockDivFactor = 25;
@@ -1699,7 +1702,9 @@ class TestAmlG12TdmStream : public AmlG12TdmStream {
  public:
   explicit TestAmlG12TdmStream(zx_device_t* parent, ddk::PDevFidl pdev,
                                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
-      : AmlG12TdmStream(parent, false, std::move(pdev), std::move(enable_gpio)) {}
+      : AmlG12TdmStream(parent, false, std::move(pdev),
+                        fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio))) {
+  }
   bool AllowNonContiguousRingBuffer() override { return true; }
   inspect::Inspector& inspect() { return AmlG12TdmStream::inspect(); }
 };
@@ -1986,6 +1991,21 @@ TEST_F(AmlG12TdmTest, Inspect) {
       CheckProperty(hierarchy().node(), "dma_status", inspect::UintPropertyValue(0)));
   ASSERT_NO_FATAL_FAILURE(
       CheckProperty(hierarchy().node(), "tdm_status", inspect::UintPropertyValue(0)));
+
+  child_dev->UnbindOp();
+  EXPECT_TRUE(child_dev->UnbindReplyCalled());
+}
+
+TEST_F(AmlG12TdmTest, NoGpio) {
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto metadata = GetDefaultMetadata();
+  fake_parent()->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
+  auto controller = audio::SimpleAudioStream::Create<AmlG12TdmStream>(
+      fake_parent().get(), false, std::move(pdev.value()),
+      fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>());  // No GPIO.
+  auto* child_dev = fake_parent()->GetLatestChild();
+  ASSERT_NOT_NULL(child_dev);
 
   child_dev->UnbindOp();
   EXPECT_TRUE(child_dev->UnbindReplyCalled());

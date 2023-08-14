@@ -100,6 +100,7 @@ fuchsia_driver("vim3-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "vim3-audio.cc",
     "vim3-backlight.cc",
     "vim3-bluetooth.cc",
     "vim3-canvas.cc",

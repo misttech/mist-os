@@ -35,6 +35,10 @@ enum {
   BTI_USB,
   BTI_MALI,
   BTI_VIDEO,
+  BTI_AUDIO_OUT,
+  BTI_AUDIO_IN,
+  BTI_AUDIO_BT_OUT,
+  BTI_AUDIO_BT_IN,
 };
 
 // MAC address metadata indices.
@@ -72,6 +76,7 @@ class Vim3 : public Vim3Type {
   // lifetime of the board driver.
   bool HasLcd();
 
+  zx_status_t AudioInit();
   zx_status_t BacklightInit();
   zx_status_t BluetoothInit();
   zx_status_t CanvasInit();

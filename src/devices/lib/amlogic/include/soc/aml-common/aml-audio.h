@@ -19,6 +19,7 @@ enum class AmlVersion : uint32_t {
   kS905D3G = 2,
   kA5 = 3,
   kA1 = 4,
+  kA311D = 5,
 };
 
 enum class AmlAudioBlock : uint32_t {

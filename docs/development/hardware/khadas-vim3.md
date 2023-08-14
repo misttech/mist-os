@@ -393,12 +393,17 @@ Fuchsia currently supports these features of the VIM3:
 * NNA
 * USB-C in peripheral mode
 * USB-A
+* Audio[^1]
+
+[^1]: VIM3 does not include transducers like speakers and microphones, in
+addition to the transducers, external hardware including DACs/ADCs need to be
+added and integrated via the GPIO header to be able to playback and capture
+audio this way.
 
 These features are under development and may not be supported:
 
 * Video decoder
 * SPI
-* Audio
 
 The following features are not supported, but might be added by future
 contributions:

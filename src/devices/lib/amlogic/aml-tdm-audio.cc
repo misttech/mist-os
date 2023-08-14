@@ -13,6 +13,8 @@
 void AmlTdmDevice::InitMclk() {
   zx_off_t mclk_a = {};
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       mclk_a = EE_AUDIO_MCLK_A_CTRL;
       break;
@@ -43,6 +45,8 @@ zx_status_t AmlTdmDevice::SetMclkDiv(uint32_t div) {
 
   zx_off_t mclk_a = {};
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       mclk_a = EE_AUDIO_MCLK_A_CTRL;
       break;
@@ -98,6 +102,8 @@ zx_status_t AmlTdmDevice::SetMClkPad(aml_tdm_mclk_pad_t mclk_pad) {
   switch (mclk_pad) {
     case MCLK_PAD_0:
       switch (version_) {
+        case metadata::AmlVersion::kA311D:
+          [[fallthrough]];
         case metadata::AmlVersion::kS905D2G:
           GetMmio().ModifyBits<uint32_t>(mclk_ch_, 0, 2, EE_AUDIO_MST_PAD_CTRL0);
           break;
@@ -119,6 +125,8 @@ zx_status_t AmlTdmDevice::SetMClkPad(aml_tdm_mclk_pad_t mclk_pad) {
       break;
     case MCLK_PAD_1:
       switch (version_) {
+        case metadata::AmlVersion::kA311D:
+          [[fallthrough]];
         case metadata::AmlVersion::kS905D2G:
           GetMmio().ModifyBits<uint32_t>(mclk_ch_, 4, 2, EE_AUDIO_MST_PAD_CTRL0);
           break;
@@ -138,8 +146,12 @@ zx_status_t AmlTdmDevice::SetMClkPad(aml_tdm_mclk_pad_t mclk_pad) {
       break;
     case MCLK_PAD_2:
       switch (version_) {
+        case metadata::AmlVersion::kA311D:
+          [[fallthrough]];
         case metadata::AmlVersion::kS905D2G:
+          [[fallthrough]];
         case metadata::AmlVersion::kS905D3G:
+          [[fallthrough]];
         case metadata::AmlVersion::kA1:
           ZX_ASSERT_MSG(0, "Not supported");
           break;

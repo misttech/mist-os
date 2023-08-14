@@ -312,7 +312,7 @@ typedef enum {
     TODDR_C
 } aml_toddr_t;
 
-uint8_t ToS905D2AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
+uint8_t ToS905D2AndA311DAudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 uint8_t ToS905D3GAudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 uint8_t ToA5AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 uint8_t ToA1AudioClkSrcSel(ee_audio_mclk_src_t clk_src);

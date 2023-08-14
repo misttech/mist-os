@@ -14,6 +14,7 @@ primary node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TDM;
   accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
     fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
     fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
     fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
@@ -22,12 +23,12 @@ primary node "pdev" {
   }
 }
 
-node "gpio-enable" {
+optional node "gpio-enable" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.SOC_AUDIO_ENABLE;
 }
 
-node "codec-01" {
+optional node "codec-01" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_CODEC_INSTANCE == 1;
 }

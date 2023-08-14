@@ -18,6 +18,8 @@ std::unique_ptr<AmlTdmDevice> AmlTdmOutDevice::Create(fdf::MmioBuffer mmio, ee_a
                                                       metadata::AmlVersion version) {
   uint32_t fifo_depth = 128 * 8;  // in bytes.
   switch (version) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       if (frddr == FRDDR_A)
         fifo_depth = 256 * 8;  // FRDDR_A has 256 x 64-bit
@@ -72,12 +74,15 @@ void AmlTdmOutDevice::Initialize() {
   // ack delay = 0
   // set destination tdm block and enable that selection
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       // Enable DDR ARB, and enable this ddr channels bit.
       mmio_.SetBits32((1 << 31) | (1 << (4 + frddr_ch_)), EE_AUDIO_ARB_CTRL);
       mmio_.Write32(tdm_ch_ | (0x30 << 16) | (1 << 3), GetFrddrOffset(FRDDR_CTRL0_OFFS));
       break;
     case metadata::AmlVersion::kS905D3G:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1:
       // Enable DDR ARB, and enable this ddr channels bit.
       mmio_.SetBits32((1 << 31) | (1 << (4 + frddr_ch_)), EE_AUDIO_ARB_CTRL);
@@ -140,6 +145,8 @@ zx_status_t AmlTdmOutDevice::SetSclkPad(aml_tdm_sclk_pad_t sclk_pad, bool is_cus
   uint32_t pad[2] = {};
   bool pad_ctrl_separated = false;
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       pad[0] = EE_AUDIO_MST_PAD_CTRL1;
       break;
@@ -267,6 +274,8 @@ zx_status_t AmlTdmOutDevice::SetDatPad(aml_tdm_dat_pad_t tdm_pin, aml_tdm_dat_la
 void AmlTdmOutDevice::ConfigTdmSlot(uint8_t bit_offset, uint8_t num_slots, uint8_t bits_per_slot,
                                     uint8_t bits_per_sample, uint8_t mix_mask, bool i2s_mode) {
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G: {
       uint32_t reg0 = bits_per_slot | (num_slots << 5) | (bit_offset << 15) | (mix_mask << 20);
       mmio_.Write32(reg0, GetTdmOffset(TDMOUT_CTRL0_OFFS));
@@ -279,6 +288,7 @@ void AmlTdmOutDevice::ConfigTdmSlot(uint8_t bit_offset, uint8_t num_slots, uint8
       mmio_.Write32(reg2, GetTdmOffset(TDMOUT_CTRL2_OFFS_D3G));
     } break;
     case metadata::AmlVersion::kA5:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1: {
       uint32_t reg0 =
           bits_per_slot | (num_slots << 5) | (bit_offset << 15) | (1 << 31);  // Bit 31 to enable.

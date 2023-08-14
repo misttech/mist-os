@@ -63,6 +63,8 @@ std::unique_ptr<AmlPdmDevice> AmlPdmDevice::Create(
   // TODDR A has 256 64-bit lines in the FIFO, B and C have 128.
   uint32_t fifo_depth = 128 * 8;  // in bytes.
   switch (version) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       if (toddr_dev == TODDR_A)
         fifo_depth = 256 * 8;  // TODDR_A has 256 x 64-bit
@@ -76,6 +78,7 @@ std::unique_ptr<AmlPdmDevice> AmlPdmDevice::Create(
         fifo_depth = 128 * 8;  // TODDR_B/C/D has 128 x 64-bit
       break;
     case metadata::AmlVersion::kA5:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1:
       fifo_depth = 64 * 8;  // TODDR_A/B has 64 x 64-bit
       break;
@@ -109,6 +112,8 @@ void AmlPdmDevice::InitRegs() {
   // will wedge the system.
   // 3. PDM ARB (A5 don't need it)
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
       audio_mmio_.Write32((0x30 << 16) |      // Enable interrupts for FIFO errors.
                               (0x02 << 13) |  // Right justified 16-bit
@@ -322,11 +327,15 @@ zx_status_t AmlPdmDevice::SetBuffer(zx_paddr_t buf, size_t len) {
 // Stops the pdm from clocking
 void AmlPdmDevice::PdmInDisable() {
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
       audio_mmio_.ClearBits32(1 << 31, EE_AUDIO_CLK_PDMIN_CTRL0);
       break;
     case metadata::AmlVersion::kA5:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1:
       audio2_mmio_.ClearBits32(1 << 31, EE_AUDIO2_CLK_PDMIN_CTRL0);
       break;
@@ -338,11 +347,15 @@ void AmlPdmDevice::PdmInDisable() {
 void AmlPdmDevice::PdmInEnable() {
   // Start pdm_dclk
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
       audio_mmio_.SetBits32(1 << 31, EE_AUDIO_CLK_PDMIN_CTRL0);
       break;
     case metadata::AmlVersion::kA5:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1:
       audio2_mmio_.SetBits32(1 << 31, EE_AUDIO2_CLK_PDMIN_CTRL0);
       break;

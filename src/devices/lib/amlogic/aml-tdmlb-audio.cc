@@ -20,9 +20,12 @@ std::unique_ptr<AmlTdmDevice> AmlTdmLbDevice::Create(fdf::MmioBuffer mmio, ee_au
   uint32_t fifo_depth = {};  // in bytes.
   uint32_t lb_src = {};
   switch (version) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
-      __FALLTHROUGH;
+      [[fallthrough]];
     case metadata::AmlVersion::kA5:
       fifo_depth = 64 * 8;  // TODDR_A/B has 64 x 64-bit
       lb_src = ToTdminLbSrcV2(loopback_config.datalb_src);
@@ -68,9 +71,12 @@ void AmlTdmLbDevice::Initialize() {
   // ack delay = 0
   // set destination tdm block and enable that selection
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
-      __FALLTHROUGH;
+      [[fallthrough]];
     case metadata::AmlVersion::kA5:
       mmio_.Write32((0x00 << 13) |   // Packed.
                         (31 << 8) |  // MSB position of data.
@@ -138,10 +144,14 @@ zx_status_t AmlTdmLbDevice::SetBuffer(zx_paddr_t buf, size_t len) {
 void AmlTdmLbDevice::ConfigTdmSlot(uint8_t bit_offset, uint8_t num_slots, uint8_t bits_per_slot,
                                    uint8_t bits_per_sample, uint8_t mix_mask, bool i2s_mode) {
   switch (version_) {
+    case metadata::AmlVersion::kA311D:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D3G:
+      [[fallthrough]];
     case metadata::AmlVersion::kS905D2G:
-      __FALLTHROUGH;
+      [[fallthrough]];
     case metadata::AmlVersion::kA5:
+      [[fallthrough]];
     case metadata::AmlVersion::kA1: {
       uint32_t reg0 = (i2s_mode << 30) |    // TDM/I2S mode.
                       (lb_src_ << 20) |     // select source for |TDMIN_LB|.

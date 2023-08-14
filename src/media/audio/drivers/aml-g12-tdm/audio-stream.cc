@@ -24,11 +24,12 @@
 namespace audio {
 namespace aml_g12 {
 
-AmlG12TdmStream::AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
-                                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
+AmlG12TdmStream::AmlG12TdmStream(
+    zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
+    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client)
     : SimpleAudioStream(parent, is_input),
       pdev_(std::move(pdev)),
-      enable_gpio_(std::move(enable_gpio)) {
+      enable_gpio_(std::move(gpio_enable_client)) {
   status_time_ = inspect().GetRoot().CreateInt("status_time", 0);
   dma_status_ = inspect().GetRoot().CreateUint("dma_status", 0);
   tdm_status_ = inspect().GetRoot().CreateUint("tdm_status", 0);
@@ -726,31 +727,26 @@ static zx_status_t audio_bind(void* ctx, zx_device_t* device) {
     return status;
   }
   const char* kGpioEnableFragmentName = "gpio-enable";
-  zx::result gpio_enable_client =
+  zx::result gpio_enable =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
           device, kGpioEnableFragmentName);
-  if (gpio_enable_client.is_error() && gpio_enable_client.status_value() != ZX_ERR_NOT_FOUND) {
+  if (gpio_enable.is_error() && gpio_enable.status_value() != ZX_ERR_NOT_FOUND) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kGpioEnableFragmentName,
-           gpio_enable_client.status_string());
-    return gpio_enable_client.status_value();
+           gpio_enable.status_string());
+    return gpio_enable.status_value();
   }
-  if (metadata.is_input) {
-    auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmStream>(
-        device, true, ddk::PDevFidl::FromFragment(device), std::move(gpio_enable_client.value()));
-    if (stream == nullptr) {
-      zxlogf(ERROR, "Could not create aml-g12-tdm driver");
-      return ZX_ERR_NO_MEMORY;
-    }
-    [[maybe_unused]] auto unused = fbl::ExportToRawPtr(&stream);
-  } else {
-    auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmStream>(
-        device, false, ddk::PDevFidl::FromFragment(device), std::move(gpio_enable_client.value()));
-    if (stream == nullptr) {
-      zxlogf(ERROR, "Could not create aml-g12-tdm driver");
-      return ZX_ERR_NO_MEMORY;
-    }
-    [[maybe_unused]] auto unused = fbl::ExportToRawPtr(&stream);
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client;
+  if (gpio_enable.is_ok()) {
+    gpio_enable_client.Bind(std::move(gpio_enable.value()));
   }
+  auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmStream>(
+      device, metadata.is_input, ddk::PDevFidl::FromFragment(device),
+      std::move(gpio_enable_client));
+  if (stream == nullptr) {
+    zxlogf(ERROR, "Could not create aml-g12-tdm driver");
+    return ZX_ERR_NO_MEMORY;
+  }
+  [[maybe_unused]] auto unused = fbl::ExportToRawPtr(&stream);
 
   return ZX_OK;
 }

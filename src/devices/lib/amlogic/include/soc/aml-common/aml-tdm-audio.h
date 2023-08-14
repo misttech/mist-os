@@ -96,8 +96,10 @@ class AmlTdmDevice {
  private:
   static uint8_t ToClkSrcSel(ee_audio_mclk_src_t clk_src, metadata::AmlVersion version) {
     switch (version) {
+      case metadata::AmlVersion::kA311D:
+        [[fallthrough]];
       case metadata::AmlVersion::kS905D2G:
-        return ToS905D2AudioClkSrcSel(clk_src);
+        return ToS905D2AndA311DAudioClkSrcSel(clk_src);
       case metadata::AmlVersion::kS905D3G:
         return ToS905D3GAudioClkSrcSel(clk_src);
       case metadata::AmlVersion::kA5:

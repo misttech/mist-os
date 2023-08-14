@@ -32,7 +32,7 @@ namespace aml_g12 {
 class AmlG12TdmStream : public SimpleAudioStream {
  public:
   AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
-                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio);
+                  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client);
 
  protected:
   zx_status_t Init() __TA_REQUIRES(domain_token()) override;
