@@ -75,9 +75,12 @@ source_set("load-tests") {
       "ld-startup-create-process-tests.h",
       "ld-startup-in-process-tests-zircon.cc",
       "ld-startup-in-process-tests-zircon.h",
+      "ld-startup-spawn-process-tests-zircon.cc",
+      "ld-startup-spawn-process-tests-zircon.h",
     ]
     deps += [
       "../testing",
+      "//sdk/lib/fdio",
       "//zircon/system/ulib/zx",
     ]
   } else {

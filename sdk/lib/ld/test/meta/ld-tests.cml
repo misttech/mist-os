@@ -9,4 +9,9 @@
     program: {
         binary: "test/ld-unittests",
     },
+    use: [
+        {
+            protocol: [ "fuchsia.process.Launcher" ],
+        },
+    ],
 }

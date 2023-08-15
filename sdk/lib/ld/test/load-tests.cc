@@ -7,6 +7,7 @@
 #ifdef __Fuchsia__
 #include "ld-startup-create-process-tests.h"
 #include "ld-startup-in-process-tests-zircon.h"
+#include "ld-startup-spawn-process-tests-zircon.h"
 #else
 #include "ld-startup-in-process-tests-posix.h"
 #include "ld-startup-spawn-process-tests-posix.h"
@@ -19,11 +20,10 @@ using LdLoadTests = Fixture;
 
 using LoadTypes = ::testing::Types<
 // TODO(fxbug.dev/130483): The separate-process tests require symbolic
-// relocation so they can make the syscall to exit.
+// relocation so they can make the syscall to exit. The spawn-process
+// tests also need a loader service to get ld.so.1 itself.
 #if 0  // def __Fuchsia__
     ld::testing::LdStartupCreateProcessTests<>,
-#endif
-#ifndef __Fuchsia__  // TODO(fxbug.dev/130483): add fdio_spawn version
     ld::testing::LdStartupSpawnProcessTests,
 #endif
     ld::testing::LdStartupInProcessTests>;
