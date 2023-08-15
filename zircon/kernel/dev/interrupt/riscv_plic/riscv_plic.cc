@@ -167,6 +167,8 @@ void plic_handle_irq(iframe_t* frame) {
     return;
   }
 
+  CPU_STATS_INC(interrupts);
+
   cpu_num_t cpu = arch_curr_cpu_num();
 
   // ktrace_tiny(TAG_IRQ_ENTER, (vector << 8) | cpu);

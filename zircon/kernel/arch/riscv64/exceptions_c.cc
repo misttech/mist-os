@@ -165,6 +165,7 @@ void riscv64_page_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* f
   }
 
   arch_enable_ints();
+  CPU_STATS_INC(page_faults);
   zx_status_t pf_status = vmm_page_fault_handler(tval, pf_flags);
   arch_disable_ints();
   if (pf_status == ZX_OK) {
