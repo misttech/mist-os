@@ -58,7 +58,7 @@ class GlobalChannelWaker(object):
     def __init__(self):
         self.handle_ready_queues = HANDLE_READY_QUEUES
 
-    def register(self, channel: fc.FidlChannel):
+    def register(self, channel: fc.Channel):
         channel_number = channel.as_int()
         if channel_number not in self.handle_ready_queues:
             self.handle_ready_queues[channel_number] = _QueueWrapper()
@@ -78,17 +78,17 @@ class GlobalChannelWaker(object):
         except RuntimeError:
             pass
 
-    def unregister(self, channel: fc.FidlChannel):
+    def unregister(self, channel: fc.Channel):
         logging.debug(f"Unregistering channel: {channel.as_int()}")
         channel_number = channel.as_int()
         if channel_number in self.handle_ready_queues:
             self.handle_ready_queues.pop(channel_number)
 
-    def post_channel_ready(self, channel: fc.FidlChannel):
+    def post_channel_ready(self, channel: fc.Channel):
         logging.debug(f"Re-notifying for channel: {channel.as_int()}")
         self.handle_ready_queues[channel.as_int()].put_nowait(channel.as_int())
 
-    async def wait_channel_ready(self, channel: fc.FidlChannel) -> int:
+    async def wait_channel_ready(self, channel: fc.Channel) -> int:
         res = await self.handle_ready_queues[channel.as_int()].get()
         self.handle_ready_queues[channel.as_int()].task_done()
         return res

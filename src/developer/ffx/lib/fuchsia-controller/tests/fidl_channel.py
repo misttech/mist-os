@@ -2,21 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from fuchsia_controller_py import FidlChannel, ZxStatus
+from fuchsia_controller_py import Channel, ZxStatus
 import unittest
 
 
-class FidlChannelTests(unittest.TestCase):
-    """FidlChannel tests."""
+class ChannelTests(unittest.TestCase):
+    """Channel tests."""
 
     def test_channel_write_then_read(self):
-        (a, b) = FidlChannel.create()
+        (a, b) = Channel.create()
         a.write((bytearray([1, 2, 3]), []))
         buf, hdls = b.read()
         self.assertEqual(buf, bytearray([1, 2, 3]))
 
     def test_channel_write_fails_when_closed(self):
-        (a, b) = FidlChannel.create()
+        (a, b) = Channel.create()
         del b
         with self.assertRaises(ZxStatus):
             try:
@@ -26,8 +26,8 @@ class FidlChannelTests(unittest.TestCase):
                 raise e
 
     def test_channel_passing(self):
-        (a, b) = FidlChannel.create()
-        (c, d) = FidlChannel.create()
+        (a, b) = Channel.create()
+        (c, d) = Channel.create()
         # This is using 'take' rather than 'as_int' as using 'as_int' would cause a double-close
         # error on a channel that has already been closed.
         a.write((bytearray(), [(0, c.take(), 0, 0, 0)]))

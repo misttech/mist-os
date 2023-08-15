@@ -5,8 +5,8 @@
 
 #include <Python.h>
 
+#include "channel.h"
 #include "error.h"
-#include "fidl_channel.h"
 #include "fuchsia_controller.h"
 #include "isolate_directory.h"
 #include "macros.h"
@@ -155,8 +155,7 @@ PyObject *Context_connect_daemon_protocol(Context *self, PyObject *protocol) {
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&fidl_channel::FidlChannelType), "I",
-                               handle);
+  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
 }
 
 PyObject *Context_connect_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) {
@@ -165,8 +164,7 @@ PyObject *Context_connect_target_proxy(Context *self, PyObject *Py_UNUSED(unused
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&fidl_channel::FidlChannelType), "I",
-                               handle);
+  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
 }
 
 PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
@@ -180,8 +178,7 @@ PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&fidl_channel::FidlChannelType), "I",
-                               handle);
+  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
 }
 
 PyMethodDef Context_methods[] = {
@@ -233,10 +230,10 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   if (PyType_Ready(&ContextType) < 0) {
     return nullptr;
   }
-  if (PyType_Ready(&fidl_handle::FidlHandleType) < 0) {
+  if (PyType_Ready(&handle::HandleType) < 0) {
     return nullptr;
   }
-  if (PyType_Ready(&fidl_channel::FidlChannelType) < 0) {
+  if (PyType_Ready(&channel::ChannelType) < 0) {
     return nullptr;
   }
   if (PyType_Ready(&isolate::IsolateDirType) < 0) {
@@ -263,16 +260,16 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
     Py_DECREF(zx_status_type);
     return nullptr;
   }
-  Py_INCREF(&fidl_handle::FidlHandleType);
-  if (PyModule_AddObject(m.get(), "FidlHandle",
-                         reinterpret_cast<PyObject *>(&fidl_handle::FidlHandleType)) < 0) {
-    Py_DECREF(&fidl_handle::FidlHandleType);
+  Py_INCREF(&handle::HandleType);
+  if (PyModule_AddObject(m.get(), "Handle", reinterpret_cast<PyObject *>(&handle::HandleType)) <
+      0) {
+    Py_DECREF(&handle::HandleType);
     return nullptr;
   }
-  Py_INCREF(&fidl_channel::FidlChannelType);
-  if (PyModule_AddObject(m.get(), "FidlChannel",
-                         reinterpret_cast<PyObject *>(&fidl_channel::FidlChannelType)) < 0) {
-    Py_DECREF(&fidl_channel::FidlChannelType);
+  Py_INCREF(&channel::ChannelType);
+  if (PyModule_AddObject(m.get(), "Channel", reinterpret_cast<PyObject *>(&channel::ChannelType)) <
+      0) {
+    Py_DECREF(&channel::ChannelType);
     return nullptr;
   }
   return m.take();

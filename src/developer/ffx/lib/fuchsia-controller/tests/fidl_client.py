@@ -9,7 +9,7 @@ import os.path
 import asyncio
 from fidl._ipc import _QueueWrapper
 import fidl.fuchsia_developer_ffx as ffx
-from fuchsia_controller_py import Context, IsolateDir, FidlChannel, ZxStatus
+from fuchsia_controller_py import Context, IsolateDir, Channel, ZxStatus
 from fidl_codec import encode_fidl_message, method_ordinal
 from unittest.mock import Mock, patch
 
@@ -19,7 +19,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_and_decode_staged_message(self):
         channel = Mock()
-        channel.__class__ = FidlChannel
+        channel.__class__ = Channel
         channel.as_int.return_value = 0
         channel.read.side_effect = [
             (bytearray([2, 0, 0, 0]), []),
@@ -42,7 +42,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_and_decode_blocked(self):
         channel = Mock()
-        channel.__class__ = FidlChannel
+        channel.__class__ = Channel
         channel.as_int.return_value = 0
         channel.read.side_effect = [
             ZxStatus(ZxStatus.ZX_ERR_SHOULD_WAIT),
@@ -63,7 +63,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_and_decode_simul_notification(self):
         channel = Mock()
-        channel.__class__ = FidlChannel
+        channel.__class__ = Channel
         channel.as_int.return_value = 0
         channel.read.side_effect = [
             ZxStatus(ZxStatus.ZX_ERR_SHOULD_WAIT),
@@ -82,7 +82,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unexpected_txid(self):
         channel = Mock()
-        channel.__class__ = FidlChannel
+        channel.__class__ = Channel
         channel.as_int.return_value = 0
         channel.read.side_effect = [(bytearray([1, 0, 0, 0]), ())]
         proxy = ffx.Echo.Client(channel)
@@ -95,7 +95,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_staging_stages(self):
         channel = Mock()
-        channel.__class__ = FidlChannel
+        channel.__class__ = Channel
         channel.as_int.return_value = 0
         proxy = ffx.Echo.Client(channel)
         proxy.pending_txids.add(1)

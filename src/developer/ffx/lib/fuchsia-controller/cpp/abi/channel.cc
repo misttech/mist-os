@@ -2,28 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fidl_channel.h"
+#include "channel.h"
 
 #include "convert.h"
 #include "error.h"
 #include "mod.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
-namespace fidl_channel {
+namespace channel {
 
-int FidlChannel_init(FidlChannel *self, PyObject *args, PyObject *kwds) {
+int Channel_init(Channel *self, PyObject *args, PyObject *kwds) {
   static const char *kwlist[] = {"handle", nullptr};
   PyObject *handle = nullptr;
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", const_cast<char **>(kwlist), &handle)) {
     return -1;
   }
-  bool is_handle =
-      PyObject_IsInstance(handle, reinterpret_cast<PyObject *>(&fidl_handle::FidlHandleType));
+  bool is_handle = PyObject_IsInstance(handle, reinterpret_cast<PyObject *>(&handle::HandleType));
   bool is_long = PyLong_Check(handle);
   if (!is_handle && !is_long) {
-    PyErr_SetString(
-        PyExc_TypeError,
-        "Expected 'handle' to be either a fuchsia_controller_py.FidlHandle type or an int");
+    PyErr_SetString(PyExc_TypeError,
+                    "Expected 'handle' to be either a fuchsia_controller_py.Handle type or an int");
     return -1;
   }
 
@@ -38,7 +36,7 @@ int FidlChannel_init(FidlChannel *self, PyObject *args, PyObject *kwds) {
     self->super.handle = converted_handle;
   }
   if (is_handle) {
-    auto f_handle = reinterpret_cast<fidl_handle::FidlHandle *>(handle);
+    auto f_handle = reinterpret_cast<handle::Handle *>(handle);
     self->super.handle = f_handle->handle;
     // Nullifies the previous handle, preventing it from closing this channel.
     f_handle->handle = 0;
@@ -46,7 +44,7 @@ int FidlChannel_init(FidlChannel *self, PyObject *args, PyObject *kwds) {
   return 0;
 }
 
-PyObject *FidlChannel_write(FidlChannel *self, PyObject *buf) {
+PyObject *Channel_write(Channel *self, PyObject *buf) {
   if (PyTuple_Check(buf) != 1 || PyTuple_Size(buf) != 2) {
     PyErr_SetString(PyExc_TypeError, "Expected tuple of two elements");
     return nullptr;
@@ -137,7 +135,7 @@ PyObject *FidlChannel_write(FidlChannel *self, PyObject *buf) {
   Py_RETURN_NONE;
 }
 
-PyObject *FidlChannel_read(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
+PyObject *Channel_read(Channel *self, PyObject *Py_UNUSED(arg)) {
   // This is the max FIDL message size;
   static constexpr uint64_t c_buf_len = 65536;
   static char c_buf[c_buf_len] = {};
@@ -180,12 +178,12 @@ PyObject *FidlChannel_read(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
   return res.take();
 }
 
-PyObject *FidlChannel_as_int(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
+PyObject *Channel_as_int(Channel *self, PyObject *Py_UNUSED(arg)) {
   return PyLong_FromUnsignedLongLong(self->super.handle);
 }
 
-// First arg in this function is FidlChannelType.
-PyObject *FidlChannel_create(PyObject *cls, PyObject *Py_UNUSED(arg)) {
+// First arg in this function is ChannelType.
+PyObject *Channel_create(PyObject *cls, PyObject *Py_UNUSED(arg)) {
   zx_handle_t hdl0;
   zx_handle_t hdl1;
   ffx_channel_create(mod::get_module_state()->ctx, 0, &hdl0, &hdl1);
@@ -206,37 +204,37 @@ PyObject *FidlChannel_create(PyObject *cls, PyObject *Py_UNUSED(arg)) {
   return tuple.take();
 }
 
-PyObject *FidlChannel_take(FidlChannel *self, PyObject *Py_UNUSED(arg)) {
+PyObject *Channel_take(Channel *self, PyObject *Py_UNUSED(arg)) {
   auto result = PyLong_FromUnsignedLongLong(self->super.handle);
   self->super.handle = 0;
   return result;
 }
 
-PyMethodDef FidlChannel_methods[] = {
-    {"write", reinterpret_cast<PyCFunction>(FidlChannel_write), METH_O, nullptr},
-    {"read", reinterpret_cast<PyCFunction>(FidlChannel_read), METH_NOARGS, nullptr},
-    {"as_int", reinterpret_cast<PyCFunction>(FidlChannel_as_int), METH_NOARGS, nullptr},
-    {"take", reinterpret_cast<PyCFunction>(FidlChannel_take), METH_NOARGS,
+PyMethodDef Channel_methods[] = {
+    {"write", reinterpret_cast<PyCFunction>(Channel_write), METH_O, nullptr},
+    {"read", reinterpret_cast<PyCFunction>(Channel_read), METH_NOARGS, nullptr},
+    {"as_int", reinterpret_cast<PyCFunction>(Channel_as_int), METH_NOARGS, nullptr},
+    {"take", reinterpret_cast<PyCFunction>(Channel_take), METH_NOARGS,
      "Takes the underlying fidl handle, setting it internally to zero (thus invalidating the "
      "underlying channel). This is used for sending a handle through FIDL function calls."},
-    {"create", reinterpret_cast<PyCFunction>(FidlChannel_create), METH_NOARGS | METH_CLASS,
+    {"create", reinterpret_cast<PyCFunction>(Channel_create), METH_NOARGS | METH_CLASS,
      "classmethod for creating a pair of FIDL channels. These are connected bidirectionally."},
     {nullptr, nullptr, 0, nullptr}};
 
-DES_MIX PyTypeObject FidlChannelType = {
+DES_MIX PyTypeObject ChannelType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
 
-        .tp_name = "fuchsia_controller_py.FidlChannel",
+        .tp_name = "fuchsia_controller_py.Channel",
     .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_doc =
         "Fuchsia controller FIDL channel. This can be read from and written to.\n"
         "\n"
-        "Can be constructed from a FidlHandle object, but keep in mind that this will mark\n"
+        "Can be constructed from a Handle object, but keep in mind that this will mark\n"
         "the caller's handle invalid, leaving this channel to be the only owner of the underlying\n"
         "handle.",
-    .tp_methods = FidlChannel_methods,
-    .tp_base = &fidl_handle::FidlHandleType,
-    .tp_init = reinterpret_cast<initproc>(FidlChannel_init),
+    .tp_methods = Channel_methods,
+    .tp_base = &handle::HandleType,
+    .tp_init = reinterpret_cast<initproc>(Channel_init),
 };
 
-}  // namespace fidl_channel
+}  // namespace channel

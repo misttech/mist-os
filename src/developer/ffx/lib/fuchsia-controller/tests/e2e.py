@@ -9,7 +9,7 @@ import tempfile
 import os.path
 import asyncio
 from fidl_codec import encode_fidl_message, method_ordinal
-from fuchsia_controller_py import Context, IsolateDir, FidlChannel
+from fuchsia_controller_py import Context, IsolateDir, Channel
 
 
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
@@ -52,7 +52,7 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
 
     def test_sending_and_later_awaiting_protocol_method_call(self):
         ctx = self._make_ctx()
-        (ch0, ch1) = FidlChannel.create()
+        (ch0, ch1) = Channel.create()
         echo_proxy1 = ffx_fidl.Echo.Client(ch0)
         echo_proxy2 = ffx_fidl.Echo.Client(
             ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
@@ -85,7 +85,7 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.response, "otherthing")
 
     async def test_client_sends_message_before_coro_await(self):
-        (ch0, ch1) = FidlChannel.create()
+        (ch0, ch1) = Channel.create()
         echo_proxy = ffx_fidl.Echo.Client(ch0)
         coro = echo_proxy.echo_string(value="foo")
         buf, _ = ch1.read()
@@ -146,8 +146,8 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.response, "barzzz")
 
     async def test_sending_fidl_protocol(self):
-        tc_server, tc_client = FidlChannel.create()
-        list_server, list_client = FidlChannel.create()
+        tc_server, tc_client = Channel.create()
+        list_server, list_client = Channel.create()
         tc_proxy = ffx_fidl.TargetCollection.Client(tc_client)
         query = ffx_fidl.TargetQuery(string_matcher="foobar")
         tc_proxy.list_targets(query=query, reader=list_client.take())

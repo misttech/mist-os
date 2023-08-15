@@ -60,7 +60,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 def _connect_device_proxy(
         ctx: fuchsia_controller.Context,
-        proxy_name: str) -> fuchsia_controller.FidlChannel:
+        proxy_name: str) -> fuchsia_controller.Channel:
     """Opens a proxy to the device, according to a lookup table of names.
 
     Args:
