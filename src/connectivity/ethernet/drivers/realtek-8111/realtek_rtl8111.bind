@@ -2,9 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite realtek_rtl8111;
+
+using fuchsia.acpi;
+using fuchsia.hardware.sysmem;
 using fuchsia.pci;
 
-fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
-fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.REALTEK;
-fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.RTL8111;
-fuchsia.BIND_COMPOSITE == 1;
+primary node "pci" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.REALTEK;
+  fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.RTL8111;
+  fuchsia.BIND_PCI_INTERFACE == 1;
+}
+
+optional node "sysmem" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
+optional node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+}

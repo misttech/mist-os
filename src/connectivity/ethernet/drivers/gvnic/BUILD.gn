@@ -22,7 +22,11 @@ driver_bind_rules("gvnic_bind") {
   rules = "gvnic.bind"
   bind_output = "gvnic.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
+  deps = [
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.hardware.sysmem",
+    "//src/devices/bind/fuchsia.pci",
+  ]
 }
 
 fuchsia_driver("gvnic-driver") {
