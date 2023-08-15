@@ -243,14 +243,11 @@ void Vpu::VppInit() {
 
 void Vpu::ConfigureClock() {
   ZX_DEBUG_ASSERT(initialized_);
-  // TODO(fxbug.dev/131925): These values are incorrect and will crash the
-  // device.
-  //
   // vpu clock
   auto vpu_clock_control = VpuClockControl::Get().FromValue(0);
   vpu_clock_control.set_final_mux_selection(VpuClockControl::FinalMuxSource::kBranch0)
       .set_branch0_mux_source(VpuClockControl::ClockSource::kFixed666Mhz)
-      .SetBranch0MuxDivider(4)
+      .SetBranch0MuxDivider(1)
       .WriteTo(&*hhi_mmio_);
   vpu_clock_control.ReadFrom(&*hhi_mmio_).set_branch0_mux_enabled(true).WriteTo(&*hhi_mmio_);
 
