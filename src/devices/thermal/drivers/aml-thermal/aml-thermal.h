@@ -13,6 +13,7 @@
 #include <threads.h>
 
 #include <memory>
+#include <string>
 #include <utility>
 
 #include <ddktl/device.h>
@@ -29,11 +30,12 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlThermal);
   AmlThermal(zx_device_t* device, std::unique_ptr<thermal::AmlTSensor> tsensor,
-             fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config)
+             fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config, const char* name)
       : DeviceType(device),
         tsensor_(std::move(tsensor)),
         thermal_config_(std::move(thermal_config)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        name_(name) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
 
@@ -58,13 +60,14 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
                              SetDvfsOperatingPointCompleter::Sync& completer) override;
   void GetFanLevel(GetFanLevelCompleter::Sync& completer) override;
   void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override;
-  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
 
   zx_status_t StartConnectDispatchThread();
 
   std::unique_ptr<thermal::AmlTSensor> tsensor_;
   fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_;
   async::Loop loop_;
+  const std::string name_;
 };
 }  // namespace thermal
 

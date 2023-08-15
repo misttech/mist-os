@@ -24,11 +24,17 @@
 namespace thermal {
 
 zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
-  ddk::PDevProtocolClient pdev(device);
-  zx_status_t status;
+  ddk::PDevFidl pdev{device};
   if (!pdev.is_valid()) {
-    zxlogf(ERROR, "%s: failed to get pdev protocol", __func__);
-    return ZX_ERR_NOT_SUPPORTED;
+    zxlogf(ERROR, "Failed to get platform device");
+    return ZX_ERR_INTERNAL;
+  }
+
+  pdev_device_info_t device_info{};
+  zx_status_t status = pdev.GetDeviceInfo(&device_info);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not get thermal config metadata: %s", zx_status_get_string(status));
+    return status;
   }
 
   // Get the thermal policy metadata.
@@ -55,8 +61,8 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
     return status;
   }
 
-  auto thermal_device = fbl::make_unique_checked<AmlThermal>(&ac, device, std::move(tsensor),
-                                                             std::move(thermal_config));
+  auto thermal_device = fbl::make_unique_checked<AmlThermal>(
+      &ac, device, std::move(tsensor), std::move(thermal_config), device_info.name);
   if (!ac.check()) {
     zxlogf(ERROR, "aml-thermal; Failed to allocate AmlThermal");
     return ZX_ERR_NO_MEMORY;
@@ -128,6 +134,10 @@ void AmlThermal::GetFanLevel(GetFanLevelCompleter::Sync& completer) {
 void AmlThermal::SetFanLevel(SetFanLevelRequestView request,
                              SetFanLevelCompleter::Sync& completer) {
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
+}
+
+void AmlThermal::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+  completer.Reply(fidl::StringView::FromExternal(name_));
 }
 
 zx_status_t AmlThermal::ThermalConnect(zx::channel ch) { return ZX_ERR_NOT_SUPPORTED; }

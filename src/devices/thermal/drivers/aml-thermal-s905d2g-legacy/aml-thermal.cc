@@ -272,6 +272,10 @@ void AmlThermal::SetFanLevel(SetFanLevelRequestView request,
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
+void AmlThermal::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+  completer.Reply(fidl::StringView::FromExternal(kTemperatureSensorName));
+}
+
 void AmlThermal::DdkRelease() { delete this; }
 
 zx_status_t AmlThermal::PopulateClusterDvfsTable(

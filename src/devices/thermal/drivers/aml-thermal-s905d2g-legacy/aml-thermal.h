@@ -54,6 +54,8 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
   zx_status_t SetTarget(uint32_t opp_idx, fuchsia_hardware_thermal::wire::PowerDomain power_domain);
 
  private:
+  static constexpr char kTemperatureSensorName[] = "CPU thermal";
+
   static zx_status_t PopulateClusterDvfsTable(
       const zx::resource& smc_resource, const aml_thermal_info_t& aml_info,
       fuchsia_hardware_thermal::wire::PowerDomain cluster,
@@ -76,7 +78,7 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
                              SetDvfsOperatingPointCompleter::Sync& completer) override;
   void GetFanLevel(GetFanLevelCompleter::Sync& completer) override;
   void SetFanLevel(SetFanLevelRequestView request, SetFanLevelCompleter::Sync& completer) override;
-  void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
+  void GetSensorName(GetSensorNameCompleter::Sync& completer) override;
 
   int ThermalNotificationThread();
   zx_status_t NotifyThermalDaemon();

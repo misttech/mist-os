@@ -292,6 +292,10 @@ void Lp8556Device::GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
+void Lp8556Device::GetSensorName(GetSensorNameCompleter::Sync& completer) {
+  completer.Reply(fidl::StringView::FromExternal(kPowerSensorName));
+}
+
 zx_status_t Lp8556Device::Init() {
   root_ = inspector_.GetRoot().CreateChild("ti-lp8556");
   double brightness_nits = 0.0;
