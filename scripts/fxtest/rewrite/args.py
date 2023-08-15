@@ -36,6 +36,8 @@ class Flags:
     logpath: str | None
     status: bool | None
     verbose: bool
+    status_lines: int
+    status_delay: float
 
     def validate(self):
         """Validate incoming flags, raising an exception on failure.
@@ -49,6 +51,8 @@ class Flags:
             raise FlagError("--simple is incompatible with --style")
         if self.device and self.host:
             raise FlagError("--device is incompatible with --host")
+        if self.status_delay < 0.005:
+            raise FlagError("--status-delay must be at least 0.005 (5ms)")
 
         if not termout.is_valid() and self.status:
             raise FlagError("Refusing to output interactive status to a non-TTY.")
@@ -193,6 +197,18 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         action=argparse.BooleanOptionalAction,
         default=None,
         help="Toggle interactive status printing to console. Default is to vary behavior depending on if output is to a TTY. Setting to True on a non-TTY is an error.",
+    )
+    output.add_argument(
+        "--status-lines",
+        default=8,
+        type=int,
+        help="Number of lines used to display status output.",
+    )
+    output.add_argument(
+        "--status-delay",
+        default=0.033,
+        type=float,
+        help="Control how frequently the status output is updated. Default is every 0.033s, but you can increase the number for calmer output on slower connections.",
     )
 
     flags: Flags = Flags(**vars(parser.parse_args(cli_args)))

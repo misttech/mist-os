@@ -96,10 +96,6 @@ async def console_printer(
     state = ConsoleState()
     print_queue: asyncio.Queue[typing.List[str]] = asyncio.Queue()
 
-    # TODO(b/294112583): Get these parameters from args.
-    MAX_STATUS_LINES: int = 8
-    PRINT_DELAY_SECONDS: float = 0.05
-
     # Spawn an asynchronous task to actually process incoming events.
     # The rest of this method simply displays the status output and prints
     # lines that are requested by the other task.
@@ -114,7 +110,7 @@ async def console_printer(
         # and refresh the output.
         try:
             lines_to_print = await asyncio.wait_for(
-                print_queue.get(), PRINT_DELAY_SECONDS
+                print_queue.get(), flags.status_delay
             )
         except asyncio.TimeoutError:
             lines_to_print = []
@@ -122,7 +118,7 @@ async def console_printer(
         if do_status_output_event.is_set():
             status_lines = _create_status_lines_from_state(flags, state)
 
-            termout.write_lines(status_lines[:MAX_STATUS_LINES], lines_to_print)
+            termout.write_lines(status_lines[: flags.status_lines], lines_to_print)
         elif lines_to_print:
             print("\n".join(lines_to_print))
 

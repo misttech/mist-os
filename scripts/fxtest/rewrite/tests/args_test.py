@@ -20,6 +20,7 @@ class TestArgs(unittest.TestCase):
             ["--simple", "--style"],
             ["--status"],
             ["--device", "--host"],
+            ["--status-delay", ".00001"],
         ]:
             flags = args.parse_args(arg_list)
             try:
