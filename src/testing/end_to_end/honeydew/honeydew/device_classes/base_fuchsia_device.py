@@ -183,7 +183,7 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         Returns:
             session.Session object
         """
-        return session_ffx.Session()
+        return session_ffx.Session(device_name=self.device_name, ffx=self.ffx)
 
     # List all the public methods in alphabetical order
     def health_check(self) -> None:

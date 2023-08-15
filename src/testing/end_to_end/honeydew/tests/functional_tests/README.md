@@ -157,6 +157,20 @@ $ ffx emu stop ; ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing:tracing_test --e2e --output
 ```
+
+### Session tests
+
+For SL4F test
+
+```shell
+$ fx set terminal.qemu-x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test --e2e --output
+```
+
 ## Transport tests
 
 ### Fastboot tests
@@ -173,10 +187,10 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tes
 
 ### FFX tests
 ``` shell
-$ fx set core.qemu-x64 \
+$ fx set terminal.qemu-x64 \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with //src/ui/examples:flatland-examples \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_ffx:ffx_test --e2e --output

@@ -11,7 +11,7 @@ class Session(abc.ABC):
 
     @abc.abstractmethod
     def start(self) -> None:
-        """Start session if not started yet.
+        """Start session.
 
         Raises:
             honeydew.errors.SessionError: session failed to start.
@@ -35,5 +35,4 @@ class Session(abc.ABC):
 
         Raises:
             honeydew.errors.SessionError: Session failed to stop the session.
-                Session is not started.
         """

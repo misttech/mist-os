@@ -16,10 +16,20 @@ if (is_host) {
     ]
   }
 
+  group("terminal_tests_fyi") {
+    testonly = true
+    public_deps = [
+      # TODO(b/294272164): session functional test can only run on terminal
+      # product. Use `terminal_tests_fyi` to avoid it run on CQ.
+      "test_session:session_test($host_toolchain)",
+    ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [
       ":emulator_tests_fyi",
+      ":terminal_tests_fyi",
       "test_bluetooth:bluetooth_gap_test($host_toolchain)",
       "test_bluetooth:bluetooth_gap_test_fc($host_toolchain)",
     ]
