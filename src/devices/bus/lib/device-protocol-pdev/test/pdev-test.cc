@@ -22,6 +22,7 @@
 
 constexpr uint32_t kVid = 1;
 constexpr uint32_t kPid = 1;
+constexpr char kName[] = "test device";
 
 namespace fhpd = fuchsia_hardware_platform_device;
 
@@ -260,10 +261,14 @@ TEST(PDevFidlTest, GetDeviceInfo) {
   FakePDevFidlWithThread infra;
   zx::result client_channel = infra.Start({
       .device_info =
-          pdev_device_info_t{
-              .vid = kVid,
-              .pid = kPid,
-          },
+          []() {
+            pdev_device_info_t device_info{
+                .vid = kVid,
+                .pid = kPid,
+            };
+            strncpy(device_info.name, kName, sizeof(device_info.name));
+            return device_info;
+          }(),
   });
   ASSERT_OK(client_channel);
 
@@ -272,6 +277,7 @@ TEST(PDevFidlTest, GetDeviceInfo) {
   ASSERT_OK(pdev.GetDeviceInfo(&device_info));
   ASSERT_EQ(kPid, device_info.pid);
   ASSERT_EQ(kVid, device_info.vid);
+  ASSERT_STREQ(kName, device_info.name);
 }
 
 TEST(PDevFidlTest, GetBoardInfo) {

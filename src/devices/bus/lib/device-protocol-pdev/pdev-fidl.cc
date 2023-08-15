@@ -171,6 +171,13 @@ zx_status_t PDevFidl::GetDeviceInfo(pdev_device_info_t* out_info) {
   if (result->value()->has_metadata_count()) {
     out_info->metadata_count = result->value()->metadata_count();
   }
+  if (result->value()->has_name()) {
+    std::string name = std::string(result->value()->name().get());
+    if (name.size() > sizeof(out_info->name)) {
+      return ZX_ERR_BUFFER_TOO_SMALL;
+    }
+    strncpy(out_info->name, name.c_str(), sizeof(out_info->name));
+  }
 
   return ZX_OK;
 }
