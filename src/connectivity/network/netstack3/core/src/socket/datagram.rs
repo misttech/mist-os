@@ -1394,22 +1394,27 @@ where
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
             SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
-                let ListenerState { addr: ListenerAddr { ip, device }, ip_options: _ } = state;
-                let converter = sync_ctx.dual_stack_context().to_converter();
-                let ip = match converter {
-                    MaybeDualStack::DualStack(converter) => {
+                let ListenerState { addr, ip_options: _ } = state;
+                let ListenerAddr { ip, device } = addr.clone();
+                let ip = match sync_ctx.dual_stack_context() {
+                    MaybeDualStack::DualStack(ds) => {
                         let DualStackListenerIpAddr { addr, identifier } =
-                            converter.convert(ip.clone());
-                        match addr {
-                            DualStackIpAddr::ThisStack(addr) => ListenerIpAddr { addr, identifier },
-                            DualStackIpAddr::OtherStack(_) => {
-                                todo!("https://fxbug.dev/21198: dual-stack socket get info")
-                            }
-                        }
+                            ds.converter().convert(ip);
+                        let addr =
+                            match addr {
+                                DualStackIpAddr::ThisStack(addr) => addr,
+                                DualStackIpAddr::OtherStack(addr) => {
+                                    SpecifiedAddr::new(ds.from_other_ip_addr(addr.map_or(
+                                        <I::OtherVersion as Ip>::UNSPECIFIED_ADDRESS,
+                                        |a| *a,
+                                    )))
+                                }
+                            };
+                        ListenerIpAddr { addr, identifier }
                     }
-                    MaybeDualStack::NotDualStack(converter) => converter.convert(ip.clone()),
+                    MaybeDualStack::NotDualStack(nds) => nds.converter().convert(ip),
                 };
-                SocketInfo::Listener(ListenerAddr { ip, device: device.clone() })
+                SocketInfo::Listener(ListenerAddr { ip, device })
             }
             SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
                 let ConnState { addr, socket: _, shutdown: _, clear_device_on_disconnect: _ } =
@@ -1706,6 +1711,8 @@ enum TryUnmapResult<I: Ip + DualStackIpExt, D> {
 /// The only inputs that will produce [`TryUnmapResult::Mapped`] are
 /// IPv4-mapped IPv6 addresses. All other inputs will produce
 /// [`TryUnmapResult::CannotBeUnmapped`].
+// TODO(https://fxbug.dev/21198): Move this onto a method on the dual-stack
+// context trait so that it doesn't need map_ip.
 fn try_unmap<A: IpAddress, D>(addr: ZonedAddr<A, D>) -> TryUnmapResult<A::Version, D>
 where
     A::Version: DualStackIpExt,

@@ -6941,6 +6941,54 @@ where {
         );
     }
 
+    #[test_case(net_ip_v6!("::"), true; "dual stack any")]
+    #[test_case(net_ip_v6!("::"), false; "v6 any")]
+    #[test_case(net_ip_v6!("::ffff:0.0.0.0"), true; "v4 unspecified")]
+    #[test_case(net_ip_v6!("::ffff:192.168.1.10"), true; "v4 specified")]
+    #[test_case(net_ip_v6!("2201::1"), true; "v6 specified dual stack enabled")]
+    #[test_case(net_ip_v6!("2201::1"), false; "v6 specified dual stack disabled")]
+    fn dual_stack_get_info(bind_addr: Ipv6Addr, enable_dual_stack: bool) {
+        const V4_LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
+        const V6_LOCAL_IP: Ipv6Addr = net_ip_v6!("2201::1");
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(
+                FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs::<SpecifiedAddr<IpAddr>>(
+                    vec![
+                        SpecifiedAddr::new(V4_LOCAL_IP).unwrap().into(),
+                        SpecifiedAddr::new(V6_LOCAL_IP).unwrap().into(),
+                    ],
+                    vec![],
+                ),
+            );
+
+        let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            listener,
+            enable_dual_stack,
+        )
+        .expect("can set dual-stack enabled");
+        let bind_addr = SpecifiedAddr::new(bind_addr);
+        assert_eq!(
+            SocketHandler::<Ipv6, _>::listen_udp(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                listener,
+                bind_addr.map(ZonedAddr::Unzoned),
+                Some(LOCAL_PORT),
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            SocketHandler::<Ipv6, _>::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, listener),
+            SocketInfo::Listener(ListenerInfo {
+                local_ip: bind_addr.map(ZonedAddr::Unzoned),
+                local_port: LOCAL_PORT
+            })
+        );
+    }
+
     #[test]
     fn test_icmp_error() {
         struct InitializedContext<I: TestIpExt> {
