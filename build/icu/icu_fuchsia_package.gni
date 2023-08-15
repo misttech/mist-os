@@ -45,10 +45,7 @@ template("icu_fuchsia_package") {
                    "_flavored_icu_deps",
                  ])
 
-      if (defined(package_name)) {
-        package_name =
-            "${package_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
-      } else {
+      if (!defined(package_name)) {
         package_name = target_name
       }
 
