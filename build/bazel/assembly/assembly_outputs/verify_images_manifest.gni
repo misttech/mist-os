@@ -123,5 +123,10 @@ template("verify_images_manifest") {
         args += [ image ]
       }
     }
+
+    metadata = {
+      # Do not transitively include images from the assemblies.
+      images_barrier = []
+    }
   }
 }

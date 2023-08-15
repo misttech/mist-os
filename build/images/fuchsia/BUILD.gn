@@ -225,10 +225,13 @@ if (is_fuchsia) {
     public_deps = [
       ":assembly_inputs",
       ":fuchsia_assembly",
-      ":product_bundle",
       ":scrutiny_x_smoke_test",
       ":update",
     ]
+
+    if (!use_bazel_images_only) {
+      public_deps += [ ":product_bundle" ]
+    }
 
     metadata = {
       # Only include the update package(s) manifest(s) in metadata collection.

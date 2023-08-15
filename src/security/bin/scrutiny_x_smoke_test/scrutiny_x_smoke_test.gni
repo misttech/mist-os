@@ -72,5 +72,10 @@ template("scrutiny_x_smoke_test") {
       # Uncomment line below to get verbose output from smoke test build step.
       # "--debug",
     ]
+
+    metadata = {
+      # Do not transitively include product bundles.
+      product_bundles_barrier = []
+    }
   }
 }

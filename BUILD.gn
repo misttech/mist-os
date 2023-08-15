@@ -602,6 +602,7 @@ build_api_module("fuzzers") {
 #
 build_api_module("images") {
   testonly = true
+  walk_keys = [ "images_barrier" ]
   data_keys = [ "images" ]
   deps = [
     # XXX(46415): as the build is specialized by board (bootfs_only)
@@ -1475,13 +1476,6 @@ group("default") {
     deps += [
       "//:drivers-check",
       "//build/images:default-images",
-    ]
-  }
-
-  if (use_bazel_images_only) {
-    assert_no_deps = [
-      "//build/images/fuchsia",
-      "//build/images/zedboot",
     ]
   }
 }
