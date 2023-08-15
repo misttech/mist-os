@@ -19,6 +19,7 @@ Future<void> _killProcesses(PerfTestHelper helper) async {
   await helper.sl4fDriver.ssh.run('killall "basemgr*"');
   await helper.sl4fDriver.ssh.run('killall "a11y-manager*"');
   await helper.sl4fDriver.ssh.run('killall "root_presenter*"');
+  await helper.sl4fDriver.ssh.run('killall "scene_manager*"');
   await helper.sl4fDriver.ssh.run('killall "scenic*"');
   await helper.sl4fDriver.ssh.run('killall "tiles*"');
   await helper.sl4fDriver.ssh.run('killall "flutter*"');
