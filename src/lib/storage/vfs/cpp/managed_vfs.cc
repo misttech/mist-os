@@ -7,6 +7,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 #include <lib/sync/completion.h>
+#include <zircon/errors.h>
 
 #include <memory>
 #include <utility>
@@ -94,7 +95,9 @@ void ManagedVfs::FinishShutdown(async_dispatcher_t*, async::TaskBase*,
 zx_status_t ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                            zx::channel channel) {
   std::lock_guard lock(lock_);
-  ZX_DEBUG_ASSERT(!is_shutting_down_.load());
+  if (is_shutting_down_.load()) {
+    return ZX_ERR_CANCELED;
+  }
   connections_.push_back(std::move(connection));
   connections_.back().StartDispatching(std::move(channel), [this](
                                                                internal::Connection* connection) {
