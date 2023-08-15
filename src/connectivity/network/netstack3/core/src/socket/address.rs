@@ -12,7 +12,7 @@ use net_types::{
     SpecifiedAddr,
 };
 
-use crate::socket::{AddrVec, SocketMapAddrSpec};
+use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
 
 /// The IP address and identifier (port) of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -42,6 +42,29 @@ pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
 pub(crate) struct ConnAddr<A: IpAddress, D, LI, RI> {
     pub(crate) ip: ConnIpAddr<A, LI, RI>,
     pub(crate) device: Option<D>,
+}
+
+/// The IP address and identifier (port) of a dual-stack listening socket.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct DualStackListenerIpAddr<A: IpAddress, LI>
+where
+    A::Version: DualStackIpExt,
+{
+    /// The specific address being listened on.
+    pub(crate) addr: DualStackIpAddr<A>,
+    /// The local identifier (i.e. port for TCP/UDP).
+    pub(crate) identifier: LI,
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum DualStackIpAddr<A: IpAddress>
+where
+    A::Version: DualStackIpExt,
+    // TODO(https://fxbug.dev/132092): Use a witness type for these addresses
+    // that asserts that they can't be IPv4-mapped-IPv6 addresses.
+{
+    ThisStack(Option<SpecifiedAddr<A>>),
+    OtherStack(Option<SpecifiedAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr>>),
 }
 
 /// Uninstantiable type used to implement [`SocketMapAddrSpec`] for addresses

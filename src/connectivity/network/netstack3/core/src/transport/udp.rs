@@ -415,6 +415,7 @@ impl DatagramSocketSpec for Udp {
     type AddrSpec = IpPortSpec;
     type SocketId<I: IpExt> = SocketId<I>;
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
+    type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<NonZeroU16>;
     type UnboundSharingState<I: IpExt> = Sharing;
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
     type ListenerSharingState = Sharing;
@@ -860,7 +861,7 @@ impl<
 
 /// An execution context for the UDP protocol which also provides access to state.
 pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
-    DeviceIdContext<AnyDevice>
+    DeviceIdContext<AnyDevice> + UdpStateContext
 {
     /// The synchronized context passed to the callback provided to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, C>
@@ -917,7 +918,8 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
 {
     /// The synchronized context passed to the callback.
     type SocketStateCtx<'a>: BoundStateContext<I, C>
-        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + UdpStateContext;
 
     /// Calls the function with an immutable reference to a socket's state.
     fn with_sockets_state<
@@ -958,7 +960,7 @@ pub(crate) trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
 pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
-    UdpStateContext + DeviceIdContext<AnyDevice>
+    DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, C>
@@ -996,7 +998,7 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>
 
 /// An execution context for UDP non-dual-stack operations.
 pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
-    UdpStateContext + DeviceIdContext<AnyDevice>
+    DeviceIdContext<AnyDevice>
 {
 }
 
@@ -1843,7 +1845,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> DatagramStateC
     }
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C>>
+impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C> + UdpStateContext>
     DatagramBoundStateContext<I, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
@@ -1908,6 +1910,11 @@ impl<C: StateNonSyncContext<Ipv6>, SC: DualStackBoundStateContext<Ipv6, C> + Udp
         *dual_stack_enabled
     }
 
+    type Converter = ();
+    fn converter(&self) -> Self::Converter {
+        ()
+    }
+
     fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
         addr.to_ipv6_mapped()
     }
@@ -1956,6 +1963,10 @@ impl<
         SC: BoundStateContext<Ipv4, C> + NonDualStackBoundStateContext<Ipv4, C> + UdpStateContext,
     > NonDualStackDatagramBoundStateContext<Ipv4, C, Udp> for SC
 {
+    type Converter = ();
+    fn converter(&self) -> Self::Converter {
+        ()
+    }
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
@@ -2516,6 +2527,7 @@ mod tests {
             FakeCtxWithSyncCtx, FakeFrameCtx, FakeNonSyncCtx, FakeSyncCtx, Wrapped,
             WrappedFakeSyncCtx,
         },
+        convert::BidirectionalConverter,
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         error::RemoteAddressError,
         ip::{
@@ -2527,6 +2539,7 @@ mod tests {
         },
         socket::{
             self,
+            address::{DualStackIpAddr, DualStackListenerIpAddr},
             datagram::{MulticastInterfaceSelector, UninstantiableContext},
         },
         testutil::{set_logger_for_test, TestIpExt as _},
@@ -2835,11 +2848,36 @@ mod tests {
     {
     }
 
+    struct FakeSingleStackConverter;
+
+    impl<A: IpAddress, LI> BidirectionalConverter<DualStackListenerIpAddr<A, LI>>
+        for FakeSingleStackConverter
+    where
+        A::Version: TestIpExt,
+    {
+        type Output = ListenerIpAddr<A, LI>;
+        fn convert_back(&self, b: ListenerIpAddr<A, LI>) -> DualStackListenerIpAddr<A, LI> {
+            let ListenerIpAddr { addr, identifier } = b;
+            DualStackListenerIpAddr { addr: DualStackIpAddr::ThisStack(addr), identifier }
+        }
+        fn convert(&self, a: DualStackListenerIpAddr<A, LI>) -> ListenerIpAddr<A, LI> {
+            let DualStackListenerIpAddr { addr, identifier } = a;
+            match addr {
+                DualStackIpAddr::ThisStack(addr) => ListenerIpAddr { addr, identifier },
+                DualStackIpAddr::OtherStack(_) => panic!("not dual-stack"),
+            }
+        }
+    }
+
     /// Allow non-dual-stack operation for IPv6.
     impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
         NonDualStackDatagramBoundStateContext<Ipv6, FakeUdpNonSyncCtx, Udp>
         for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
     {
+        type Converter = FakeSingleStackConverter;
+        fn converter(&self) -> Self::Converter {
+            FakeSingleStackConverter
+        }
     }
 
     impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
