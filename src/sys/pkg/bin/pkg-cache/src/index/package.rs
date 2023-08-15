@@ -10,7 +10,7 @@ use {
     },
     fuchsia_hash::Hash,
     fuchsia_inspect as finspect,
-    fuchsia_pkg::{PackageName, PackagePath},
+    fuchsia_pkg::PackagePath,
     std::{collections::HashSet, sync::Arc},
 };
 
@@ -105,17 +105,16 @@ impl PackageIndex {
 
     /// Notifies the appropriate indices that the package with the given hash has completed
     /// installation.
-    /// Returns the package's name if the package was activated in the dynamic index.
-    pub fn complete_install(
+    pub(crate) fn complete_install(
         &mut self,
         package_hash: Hash,
-    ) -> Result<Option<PackageName>, CompleteInstallError> {
+    ) -> Result<crate::cache_service::PackageStatus, CompleteInstallError> {
         let is_retained = self.retained.contains_package(&package_hash);
 
         match self.dynamic.complete_install(package_hash) {
-            Err(_) if is_retained => Ok(None),
+            Err(_) if is_retained => Ok(crate::cache_service::PackageStatus::Other),
             Err(e) => Err(e),
-            Ok(name) => Ok(Some(name)),
+            Ok(()) => Ok(crate::cache_service::PackageStatus::Active),
         }
     }
 
@@ -141,9 +140,9 @@ impl PackageIndex {
         self.retained.replace(index);
     }
 
-    /// Returns package name if the package is active.
-    pub fn get_name_if_active(&self, hash: &Hash) -> Option<&PackageName> {
-        self.dynamic.get_name_if_active(hash)
+    /// Returns if the package is active in the dynamic index.
+    pub fn is_active(&self, hash: &Hash) -> bool {
+        self.dynamic.is_active(hash)
     }
 
     /// Returns all blobs protected by the dynamic and retained indices.
@@ -198,7 +197,10 @@ pub async fn set_retained_index(
 mod tests {
     use {
         super::*,
-        crate::{index::dynamic::Package, test_utils::add_meta_far_to_blobfs},
+        crate::{
+            cache_service::PackageStatus, index::dynamic::Package,
+            test_utils::add_meta_far_to_blobfs,
+        },
         assert_matches::assert_matches,
         maplit::{hashmap, hashset},
     };
@@ -221,7 +223,7 @@ mod tests {
         }));
 
         index.fulfill_meta_far(hash(0), path("pending"), hashset! {hash(1)}).unwrap();
-        assert_eq!(index.complete_install(hash(0)).unwrap(), Some("pending".parse().unwrap()));
+        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
 
         assert_eq!(
             index.retained.packages(),
@@ -263,8 +265,8 @@ mod tests {
             hash(1) => None,
         }));
 
-        assert_eq!(index.complete_install(hash(0)).unwrap(), Some("withmetafar1".parse().unwrap()));
-        assert_eq!(index.complete_install(hash(1)).unwrap(), Some("withmetafar2".parse().unwrap()));
+        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
+        assert_eq!(index.complete_install(hash(1)).unwrap(), PackageStatus::Active);
 
         assert_eq!(
             index.retained.packages(),
@@ -323,7 +325,7 @@ mod tests {
 
         index.start_install(hash(0));
         index.fulfill_meta_far(hash(0), path("retaiendonly"), hashset! {hash(123)}).unwrap();
-        assert_eq!(index.complete_install(hash(0)).unwrap(), None);
+        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Other);
 
         assert_eq!(
             index.retained.packages(),
@@ -347,7 +349,7 @@ mod tests {
         // install a package not tracked by the retained index
         index.start_install(hash(2));
         index.fulfill_meta_far(hash(2), path("dynamic-only"), hashset! {hash(10)}).unwrap();
-        assert_eq!(index.complete_install(hash(2)).unwrap(), Some("dynamic-only".parse().unwrap()));
+        assert_eq!(index.complete_install(hash(2)).unwrap(), PackageStatus::Active);
 
         assert_eq!(
             index.retained.packages(),
@@ -506,8 +508,8 @@ mod tests {
         index.fulfill_meta_far(hash(0), path("pkg1"), hashset! {hash(10)}).unwrap();
         index.fulfill_meta_far(hash(1), path("pkg2"), hashset! {hash(11), hash(61)}).unwrap();
 
-        assert_eq!(index.complete_install(hash(0)).unwrap(), Some("pkg1".parse().unwrap()));
-        assert_eq!(index.complete_install(hash(1)).unwrap(), Some("pkg2".parse().unwrap()));
+        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
+        assert_eq!(index.complete_install(hash(1)).unwrap(), PackageStatus::Active);
 
         assert_eq!(
             index.all_blobs(),

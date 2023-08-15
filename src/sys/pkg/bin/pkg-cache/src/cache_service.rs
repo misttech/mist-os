@@ -52,7 +52,6 @@ pub(crate) async fn serve(
     base_packages: Arc<BasePackages>,
     cache_packages: Option<Arc<system_image::CachePackages>>,
     executability_restrictions: system_image::ExecutabilityRestrictions,
-    non_static_allow_list: Arc<system_image::NonStaticAllowList>,
     scope: package_directory::ExecutionScope,
     stream: PackageCacheRequestStream,
     cobalt_sender: ProtocolSender<MetricEvent>,
@@ -83,7 +82,6 @@ pub(crate) async fn serve(
                         package_index.as_ref(),
                         base_packages.as_ref(),
                         executability_restrictions,
-                        non_static_allow_list.as_ref(),
                         &blobfs,
                         meta_far_blob,
                         needed_blobs,
@@ -121,14 +119,14 @@ pub(crate) async fn serve(
         .await
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub(crate) enum PackageStatus {
     Base,
-    Active(fuchsia_pkg::PackageName),
+    Active,
     Other,
 }
 
-pub(crate) async fn get_package_status(
+async fn get_package_status(
     base_packages: &BasePackages,
     package_index: &async_lock::RwLock<PackageIndex>,
     package: &fuchsia_hash::Hash,
@@ -137,33 +135,25 @@ pub(crate) async fn get_package_status(
         return PackageStatus::Base;
     }
 
-    match package_index.read().await.get_name_if_active(package) {
-        Some(name) => PackageStatus::Active(name.clone()),
-        None => PackageStatus::Other,
+    match package_index.read().await.is_active(package) {
+        true => PackageStatus::Active,
+        false => PackageStatus::Other,
     }
 }
 
-pub(crate) enum ExecutabilityStatus {
+enum ExecutabilityStatus {
     Allowed,
     Forbidden,
 }
 
-pub(crate) fn executability_status(
+fn executability_status(
     executability_restrictions: system_image::ExecutabilityRestrictions,
     package_status: &PackageStatus,
-    non_static_allow_list: &system_image::NonStaticAllowList,
 ) -> ExecutabilityStatus {
     use {system_image::ExecutabilityRestrictions::*, ExecutabilityStatus::*, PackageStatus::*};
     match (executability_restrictions, package_status) {
         (Enforce, Base) => Allowed,
-        (Enforce, Active(name)) => {
-            if non_static_allow_list.allows(name) {
-                Allowed
-            } else {
-                Forbidden
-            }
-        }
-        (Enforce, Other) => Forbidden,
+        (Enforce, _) => Forbidden,
         (DoNotEnforce, _) => Allowed,
     }
 }
@@ -183,7 +173,6 @@ async fn get(
     package_index: &async_lock::RwLock<PackageIndex>,
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
-    non_static_allow_list: &system_image::NonStaticAllowList,
     blobfs: &blobfs::Client,
     meta_far_blob: BlobInfo,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
@@ -200,12 +189,12 @@ async fn get(
     let (root_dir, package_status) =
         match get_package_status(base_packages, package_index, &meta_far_blob.blob_id.into()).await
         {
-            ps @ PackageStatus::Base | ps @ PackageStatus::Active(_) => {
+            ps @ PackageStatus::Base | ps @ PackageStatus::Active => {
                 let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
                 (None, ps)
             }
             PackageStatus::Other => {
-                let (root_dir, name) =
+                let (root_dir, package_status) =
                     serve_needed_blobs(needed_blobs, meta_far_blob, package_index, blobfs, node)
                         .await
                         .map_err(|e| {
@@ -223,11 +212,6 @@ async fn get(
                             );
                             Status::UNAVAILABLE
                         })?;
-                let package_status = if let Some(name) = name {
-                    PackageStatus::Active(name)
-                } else {
-                    PackageStatus::Other
-                };
                 (Some(root_dir), package_status)
             }
         };
@@ -252,11 +236,7 @@ async fn get(
         };
         let () = Arc::new(root_dir).open(
             scope,
-            make_pkgdir_flags(executability_status(
-                executability_restrictions,
-                &package_status,
-                non_static_allow_list,
-            )),
+            make_pkgdir_flags(executability_status(executability_restrictions, &package_status)),
             vfs::path::Path::dot(),
             dir.into_channel().into(),
         );
@@ -371,10 +351,7 @@ async fn serve_needed_blobs(
     package_index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
     node: &finspect::Node,
-) -> Result<
-    (package_directory::RootDir<blobfs::Client>, Option<fuchsia_pkg::PackageName>),
-    ServeNeededBlobsError,
-> {
+) -> Result<(package_directory::RootDir<blobfs::Client>, PackageStatus), ServeNeededBlobsError> {
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
@@ -2127,7 +2104,6 @@ mod get_handler_tests {
                 &package_index,
                 &BasePackages::new_test_only(HashSet::new(), vec![]),
                 system_image::ExecutabilityRestrictions::DoNotEnforce,
-                &system_image::NonStaticAllowList::empty(),
                 &blobfs,
                 meta_blob_info,
                 stream,

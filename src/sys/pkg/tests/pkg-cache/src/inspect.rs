@@ -54,27 +54,6 @@ async fn system_image_hash_ignored() {
 }
 
 #[fuchsia::test]
-async fn non_static_allow_list() {
-    let system_image_package = SystemImageBuilder::new()
-        .pkgfs_non_static_packages_allowlist(&["a-package-name", "another-name"])
-        .build()
-        .await;
-    let env =
-        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
-    env.block_until_started().await;
-
-    let hierarchy = env.inspect_hierarchy().await;
-    // TODO(b/294583092) The allowlist is being deleted, it is currently not loaded.
-    assert_data_tree!(
-        hierarchy,
-        "root": contains {
-            "non_static_allow_list": {},
-        }
-    );
-    env.stop().await;
-}
-
-#[fuchsia::test]
 async fn base_packages() {
     let env = TestEnv::builder().build().await;
     env.block_until_started().await;

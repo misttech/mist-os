@@ -13,17 +13,8 @@ use {
 /// handle to the package directory has RIGHT_EXECUTABLE.
 ///
 /// If executability enforcement is enabled (the default), the handle should have RIGHT_EXECUTABLE
-/// according to the following table (active means active in the dynamic index, other includes
-/// being in the retained index):
-///
-/// | Location | Allowlisted | Is Executable |
-/// +----------+-------------+---------------|
-/// | base     | yes         | yes           |
-/// | base     | no          | yes           |
-/// | active   | yes         | yes           |
-/// | active   | no          | no            |
-/// | other    | yes         | no            |
-/// | other    | no          | no            |
+/// if and only if the package is a base package (e.g. being in the dynamic or retained indices
+/// should not affect executability).
 ///
 /// If executability enforcement is disabled (by the presence of file
 /// data/pkgfs_disable_executability_restrictions in the meta.far of the system_image package
@@ -88,23 +79,6 @@ async fn base_package_executable() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn allowlisted_dynamic_index_active_package_not_executable() {
-    // TODO(b/294583092) The allowlist is being deleted, it is currently not loaded.
-    let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
-    let system_image = SystemImageBuilder::new()
-        .cache_packages(&[&pkg])
-        .pkgfs_non_static_packages_allowlist(&["cache-package"]);
-
-    let () = verify_package_executability(
-        pkg,
-        system_image,
-        IsRetained::False,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await;
-}
-
-#[fuchsia_async::run_singlethreaded(test)]
 async fn dynamic_index_active_package_not_executable() {
     let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
     let system_image = SystemImageBuilder::new().cache_packages(&[&pkg]);
@@ -113,21 +87,6 @@ async fn dynamic_index_active_package_not_executable() {
         pkg,
         system_image,
         IsRetained::False,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await;
-}
-
-#[fuchsia_async::run_singlethreaded(test)]
-async fn allowlisted_retained_index_package_not_executable() {
-    let pkg = PackageBuilder::new("retained-package").build().await.unwrap();
-    let system_image =
-        SystemImageBuilder::new().pkgfs_non_static_packages_allowlist(&["retained-package"]);
-
-    let () = verify_package_executability(
-        pkg,
-        system_image,
-        IsRetained::True,
         fio::OpenFlags::RIGHT_READABLE,
     )
     .await;
@@ -143,6 +102,22 @@ async fn retained_index_package_not_executable() {
         system_image,
         IsRetained::True,
         fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await;
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn enforcement_disabled_dynamic_index_active_package_executable() {
+    let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
+    let system_image = SystemImageBuilder::new()
+        .cache_packages(&[&pkg])
+        .pkgfs_disable_executability_restrictions();
+
+    let () = verify_package_executability(
+        pkg,
+        system_image,
+        IsRetained::False,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )
     .await;
 }

@@ -6,7 +6,7 @@ use {
     anyhow::anyhow,
     fuchsia_inspect::{self as finspect, Property as _},
     fuchsia_merkle::Hash,
-    fuchsia_pkg::{PackageName, PackagePath},
+    fuchsia_pkg::PackagePath,
     fuchsia_zircon as zx,
     std::{
         collections::{HashMap, HashSet},
@@ -68,13 +68,12 @@ impl DynamicIndex {
         self.active_packages.clone()
     }
 
-    /// Returns package name if the package is active.
-    pub fn get_name_if_active(&self, hash: &Hash) -> Option<&PackageName> {
-        self.packages.get(hash).and_then(|p| match p {
-            PackageWithInspect { package: Package::Active { path, .. }, .. } => Some(path.name()),
-            PackageWithInspect { package: Package::Pending, .. }
-            | PackageWithInspect { package: Package::WithMetaFar { .. }, .. } => None,
-        })
+    /// True iff the package is active in the dynamic index.
+    pub fn is_active(&self, hash: &Hash) -> bool {
+        matches!(
+            self.packages.get(hash),
+            Some(PackageWithInspect { package: Package::Active { .. }, .. })
+        )
     }
 
     fn make_package_node(&mut self, package: &Package, hash: &Hash) -> PackageNode {
@@ -220,12 +219,8 @@ impl DynamicIndex {
     }
 
     /// Notifies dynamic index that the given package has completed installation.
-    /// Returns the package's name.
-    pub fn complete_install(
-        &mut self,
-        package_hash: Hash,
-    ) -> Result<PackageName, CompleteInstallError> {
-        let name = match self.packages.get_mut(&package_hash) {
+    pub fn complete_install(&mut self, package_hash: Hash) -> Result<(), CompleteInstallError> {
+        match self.packages.get_mut(&package_hash) {
             Some(PackageWithInspect {
                 package: package @ Package::WithMetaFar { .. },
                 package_node,
@@ -245,12 +240,10 @@ impl DynamicIndex {
                         node: child_node,
                     };
 
-                    let name = path.name().clone();
                     if let Some(previous_package) = self.active_packages.insert(path, package_hash)
                     {
                         self.packages.remove(&previous_package);
                     }
-                    name
                 } else {
                     unreachable!()
                 }
@@ -260,8 +253,8 @@ impl DynamicIndex {
                     package.map(|pwi| pwi.package.to_owned()),
                 ));
             }
-        };
-        Ok(name)
+        }
+        Ok(())
     }
 
     /// Notifies dynamic index that the given package installation has been canceled.
@@ -429,11 +422,10 @@ mod tests {
         fuchsia_pkg_testing::PackageBuilder,
         fuchsia_url::PinnedAbsolutePackageUrl,
         maplit::{hashmap, hashset},
-        std::str::FromStr,
     };
 
     #[test]
-    fn test_get_name_if_active() {
+    fn test_is_active() {
         let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
         dynamic_index.add_package(Hash::from([1; 32]), Package::Pending);
@@ -458,12 +450,9 @@ mod tests {
             },
         );
 
-        assert_eq!(dynamic_index.get_name_if_active(&Hash::from([1; 32])), None);
-        assert_eq!(dynamic_index.get_name_if_active(&Hash::from([2; 32])), None);
-        assert_eq!(
-            dynamic_index.get_name_if_active(&Hash::from([3; 32])),
-            Some(&PackageName::from_str("fake-package-2").unwrap())
-        );
+        assert!(!dynamic_index.is_active(&Hash::from([1; 32])));
+        assert!(!dynamic_index.is_active(&Hash::from([2; 32])));
+        assert!(dynamic_index.is_active(&Hash::from([3; 32])));
     }
 
     #[test]
@@ -570,8 +559,7 @@ mod tests {
             Package::WithMetaFar { path: path.clone(), required_blobs: required_blobs.clone() },
         );
 
-        let name = dynamic_index.complete_install(hash).unwrap();
-        assert_eq!(name, *path.name());
+        let () = dynamic_index.complete_install(hash).unwrap();
         assert_eq!(
             dynamic_index.packages(),
             hashmap! {

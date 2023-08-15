@@ -115,74 +115,51 @@ async fn main_inner() -> Result<(), Error> {
     }
     .context("error opening blobfs")?;
 
-    let (
-        system_image,
-        executability_restrictions,
-        non_static_allow_list,
-        base_packages,
-        cache_packages,
-    ) = if use_system_image {
-        let boot_args = connect_to_protocol::<fidl_fuchsia_boot::ArgumentsMarker>()
-            .context("error connecting to fuchsia.boot/Arguments")?;
-        let system_image = system_image::SystemImage::new(blobfs.clone(), &boot_args)
-            .await
-            .context("Accessing contents of system_image package")?;
-        inspector.root().record_string("system_image", system_image.hash().to_string());
+    let (system_image, executability_restrictions, base_packages, cache_packages) =
+        if use_system_image {
+            let boot_args = connect_to_protocol::<fidl_fuchsia_boot::ArgumentsMarker>()
+                .context("error connecting to fuchsia.boot/Arguments")?;
+            let system_image = system_image::SystemImage::new(blobfs.clone(), &boot_args)
+                .await
+                .context("Accessing contents of system_image package")?;
+            inspector.root().record_string("system_image", system_image.hash().to_string());
 
-        let (base_packages_res, cache_packages_res) =
-            join!(BasePackages::new(&blobfs, &system_image), async {
-                let cache_packages =
-                    system_image.cache_packages().await.context("reading cache_packages")?;
-                index::load_cache_packages(&mut package_index, &cache_packages, &blobfs).await;
-                let cache_packages = Arc::new(cache_packages);
-                inspector.root().record_lazy_values(
-                    "cache-packages",
-                    cache_packages.record_lazy_inspect("cache-packages"),
-                );
-                Ok(cache_packages)
-            });
-        let base_packages = base_packages_res.context("loading base packages")?;
-        let cache_packages = cache_packages_res.map_or_else(
-            |e: anyhow::Error| {
-                error!("Failed to load cache packages: {e:#}");
-                None
-            },
-            Some,
-        );
+            let (base_packages_res, cache_packages_res) =
+                join!(BasePackages::new(&blobfs, &system_image), async {
+                    let cache_packages =
+                        system_image.cache_packages().await.context("reading cache_packages")?;
+                    index::load_cache_packages(&mut package_index, &cache_packages, &blobfs).await;
+                    let cache_packages = Arc::new(cache_packages);
+                    inspector.root().record_lazy_values(
+                        "cache-packages",
+                        cache_packages.record_lazy_inspect("cache-packages"),
+                    );
+                    Ok(cache_packages)
+                });
+            let base_packages = base_packages_res.context("loading base packages")?;
+            let cache_packages = cache_packages_res.map_or_else(
+                |e: anyhow::Error| {
+                    error!("Failed to load cache packages: {e:#}");
+                    None
+                },
+                Some,
+            );
 
-        let executability_restrictions = system_image.load_executability_restrictions();
-        // TODO(b/294583092) Delete non static allowlist code after lack of clients is verified.
-        let non_static_allow_list = system_image::NonStaticAllowList::empty();
+            let executability_restrictions = system_image.load_executability_restrictions();
 
-        (
-            Some(system_image),
-            executability_restrictions,
-            non_static_allow_list,
-            base_packages,
-            cache_packages,
-        )
-    } else {
-        info!("not loading system_image due to structured config");
-        inspector.root().record_string("system_image", "ignored");
-        (
-            None,
-            system_image::ExecutabilityRestrictions::Enforce,
-            system_image::NonStaticAllowList::empty(),
-            BasePackages::empty(),
-            None,
-        )
-    };
+            (Some(system_image), executability_restrictions, base_packages, cache_packages)
+        } else {
+            info!("not loading system_image due to structured config");
+            inspector.root().record_string("system_image", "ignored");
+            (None, system_image::ExecutabilityRestrictions::Enforce, BasePackages::empty(), None)
+        };
 
     inspector
         .root()
         .record_string("executability-restrictions", format!("{executability_restrictions:?}"));
-    inspector
-        .root()
-        .record_child("non_static_allow_list", |n| non_static_allow_list.record_inspect(n));
 
     let base_packages = Arc::new(base_packages);
     inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
-    let non_static_allow_list = Arc::new(non_static_allow_list);
     let package_index = Arc::new(async_lock::RwLock::new(package_index));
     let scope = vfs::execution_scope::ExecutionScope::new();
     let (cobalt_sender, cobalt_fut) = ProtocolConnector::new_with_buffer_size(
@@ -215,7 +192,6 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&base_packages),
                         cache_packages.clone(),
                         executability_restrictions,
-                        Arc::clone(&non_static_allow_list),
                         scope.clone(),
                         stream,
                         cobalt_sender.clone(),
