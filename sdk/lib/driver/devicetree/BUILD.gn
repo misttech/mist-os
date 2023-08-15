@@ -35,6 +35,7 @@ source_set("devicetree") {
     "manager.cc",
     "node.cc",
     "visitors/bind-property.cc",
+    "visitors/bti.cc",
     "visitors/mmio.cc",
   ]
 }

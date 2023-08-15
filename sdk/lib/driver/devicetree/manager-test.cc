@@ -318,13 +318,12 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
                       *pbus_node.properties());
 }
 
-TEST_F(ManagerTest, TestMmioProperties) {
+TEST_F(ManagerTest, TestMmioProperty) {
   Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
   ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
 
   DoPublish(manager);
 
-  ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
   // First node is devicetree root. Second one is the sample-device. Check MMIO of sample-device.
   auto mmio = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1).mmio();
 
@@ -339,6 +338,24 @@ TEST_F(ManagerTest, TestMmioProperties) {
   ASSERT_EQ((uint64_t)TEST_REG_C_BASE_WORD0 << 32 | TEST_REG_C_BASE_WORD1, *(*mmio)[2].base());
   ASSERT_EQ((uint64_t)TEST_REG_C_LENGTH_WORD0 << 32 | TEST_REG_C_LENGTH_WORD1,
             *(*mmio)[2].length());
+}
+
+TEST_F(ManagerTest, TestBtiProperty) {
+  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+  ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
+
+  DoPublish(manager);
+
+  // First node is devicetree root. Second one is the sample-device.
+  // Third is sample-bti-device.
+  // Check BTI of sample-bti-device.
+  auto bti = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 2).bti();
+
+  // Test BTI properties.
+  ASSERT_TRUE(bti);
+  ASSERT_EQ(1lu, bti->size());
+  ASSERT_EQ((uint32_t)TEST_IOMMU_PHANDLE, *(*bti)[0].iommu_index());
+  ASSERT_EQ((uint32_t)TEST_BTI_ID, *(*bti)[0].bti_id());
 }
 
 }  // namespace

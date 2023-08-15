@@ -11,6 +11,7 @@
 #include "sdk/lib/driver/devicetree/node.h"
 #include "sdk/lib/driver/devicetree/visitor.h"
 #include "sdk/lib/driver/devicetree/visitors/bind-property.h"
+#include "sdk/lib/driver/devicetree/visitors/bti.h"
 #include "sdk/lib/driver/devicetree/visitors/mmio.h"
 
 namespace fdf_devicetree {
@@ -49,7 +50,7 @@ class MultiVisitor : public Visitor {
   std::array<std::unique_ptr<Visitor>, sizeof...(Visitors)> visitors_;
 };
 
-using DefaultVisitor = MultiVisitor<BindPropertyVisitor, MmioVisitor>;
+using DefaultVisitor = MultiVisitor<BindPropertyVisitor, MmioVisitor, BtiVisitor>;
 
 }  // namespace fdf_devicetree
 

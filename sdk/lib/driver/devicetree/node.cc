@@ -43,6 +43,13 @@ void Node::AddMmio(fuchsia_hardware_platform_bus::Mmio mmio) {
   pbus_node_.mmio()->emplace_back(std::move(mmio));
 }
 
+void Node::AddBti(fuchsia_hardware_platform_bus::Bti bti) {
+  if (!pbus_node_.bti()) {
+    pbus_node_.bti() = std::vector<fuchsia_hardware_platform_bus::Bti>();
+  }
+  pbus_node_.bti()->emplace_back(std::move(bti));
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr) {
   if (node_properties_.empty()) {

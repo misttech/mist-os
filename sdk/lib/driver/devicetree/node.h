@@ -25,6 +25,8 @@ class Node {
   // Add Mmio to the platform device associated with the device tree node.
   void AddMmio(fuchsia_hardware_platform_bus::Mmio mmio);
 
+  void AddBti(fuchsia_hardware_platform_bus::Bti bti);
+
   // Publish this node.
   // TODO(fxbug.dev/108070): Switch to fdf::SyncClient when it's available.
   zx::result<> Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
