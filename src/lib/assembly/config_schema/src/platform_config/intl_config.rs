@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// The type if intl configuration to be used.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum Type {
     /// Intl services are not used at all. Some very basic configurations such
     /// as bringup don't need internationalization support.
