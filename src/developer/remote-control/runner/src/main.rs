@@ -5,12 +5,11 @@
 use {
     anyhow::{Context as _, Result},
     argh::FromArgs,
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy},
+    fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
     fuchsia_component::client::connect_to_protocol,
     futures::future::select,
     futures::io::BufReader,
     futures::prelude::*,
-    hoist::{hoist, OvernetInstance},
     std::os::unix::io::{AsRawFd, FromRawFd},
 };
 
@@ -34,20 +33,6 @@ fn zx_socket_from_fd(fd: i32) -> Result<fidl::AsyncSocket> {
     let handle = fdio::transfer_fd(unsafe { std::fs::File::from_raw_fd(fd) })?;
     fidl::AsyncSocket::from_socket(fidl::Socket::from(handle))
         .context("making fidl::AsyncSocket from fidl::Socket")
-}
-
-async fn send_request(proxy: &RemoteControlProxy, id: Option<u64>) -> Result<()> {
-    // If the program was launched with a u64, that's our ffx daemon ID, so add it to RCS.
-    // The daemon id is used to map the RCS instance back to an ip address or
-    // nodename in the daemon, for target merging.
-    if let Some(id) = id {
-        proxy.add_id(id).await.with_context(|| format!("Failed to add id {} to RCS", id))
-    } else {
-        // We just need to make a request to the RCS - it doesn't really matter
-        // what we choose here so long as there are no side effects.
-        let _ = proxy.identify_host().await?;
-        Ok(())
-    }
 }
 
 /// Utility to bridge an overnet/RCS connection via SSH. If you're running this manually, you are
@@ -89,9 +74,7 @@ async fn main() -> Result<()> {
     if args.circuit {
         rcs_proxy.add_overnet_link(args.id.unwrap_or(0), remote_socket).await?;
     } else {
-        send_request(&rcs_proxy, args.id).await?;
-        let controller = hoist().connect_as_mesh_controller()?;
-        controller.attach_socket_link(remote_socket)?;
+        panic!("Legacy overnet is no longer supported.")
     }
 
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
@@ -125,6 +108,20 @@ mod test {
         std::cell::RefCell,
         std::rc::Rc,
     };
+
+    async fn send_request(proxy: &RemoteControlProxy, id: Option<u64>) -> Result<()> {
+        // If the program was launched with a u64, that's our ffx daemon ID, so add it to RCS.
+        // The daemon id is used to map the RCS instance back to an ip address or
+        // nodename in the daemon, for target merging.
+        if let Some(id) = id {
+            proxy.add_id(id).await.with_context(|| format!("Failed to add id {} to RCS", id))
+        } else {
+            // We just need to make a request to the RCS - it doesn't really matter
+            // what we choose here so long as there are no side effects.
+            let _ = proxy.identify_host().await?;
+            Ok(())
+        }
+    }
 
     fn setup_fake_rcs(handle_stream: bool) -> RemoteControlProxy {
         let (proxy, mut stream) = create_proxy_and_stream::<RemoteControlMarker>().unwrap();

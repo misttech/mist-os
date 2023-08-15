@@ -21,7 +21,6 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/connectivity/overnet/lib/hoist",
     "//src/lib/fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
