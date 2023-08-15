@@ -58,17 +58,11 @@ zx_status_t RootDevice::Create(void* ctx, zx_device_t* device) {
 }
 
 RootDevice::RootDevice(zx_device_t* parent)
-    : RootDeviceType(parent),
-      input_dev_loop_(&kAsyncLoopConfigNeverAttachToThread),
-      pipe_io_loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  input_dev_loop_.StartThread("input-devices-event-thread");
+    : RootDeviceType(parent), pipe_io_loop_(&kAsyncLoopConfigNeverAttachToThread) {
   pipe_io_loop_.StartThread("pipe-event-thread");
 }
 
-RootDevice::~RootDevice() {
-  input_dev_loop_.Shutdown();
-  pipe_io_loop_.Shutdown();
-}
+RootDevice::~RootDevice() { pipe_io_loop_.Shutdown(); }
 
 zx_status_t RootDevice::Setup(const std::map<uint64_t, InputDeviceInfo>& input_devices) {
   zx::result client_end = DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>();
@@ -105,7 +99,8 @@ zx_status_t RootDevice::Setup(const std::map<uint64_t, InputDeviceInfo>& input_d
 
   for (const auto& kv : input_devices) {
     if (sensor_mask & kv.first) {
-      auto create_result = kv.second.create_fn(this, input_dev_loop_.dispatcher());
+      auto create_result = kv.second.create_fn(
+          this, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()));
       if (create_result.is_ok()) {
         input_devices_.AddDevice(create_result.value(), kv.second.name);
 

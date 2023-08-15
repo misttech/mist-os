@@ -5,6 +5,7 @@
 #include "tcs3400.h"
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -39,15 +40,6 @@ constexpr int64_t kMinIntegrationTimeStep = 1;
 constexpr int64_t kMaxIntegrationTimeStep = 256;
 
 #define GET_BYTE(val, shift) static_cast<uint8_t>(((val) >> (shift)) & 0xFF)
-
-// clang-format off
-// zx_port_packet::type
-#define TCS_SHUTDOWN  0x01
-#define TCS_CONFIGURE 0x02
-#define TCS_INTERRUPT 0x03
-#define TCS_REARM_IRQ 0x04
-#define TCS_POLL      0x05
-// clang-format on
 
 constexpr fuchsia_input_report::wire::Axis kLightSensorAxis = {
     .range = {.min = 0, .max = UINT16_MAX},
@@ -219,151 +211,125 @@ zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
   return zx::ok(report);
 }
 
-int Tcs3400Device::Thread() {
-  // Both polling and interrupts are supported simultaneously
-  zx_time_t poll_timeout = ZX_TIME_INFINITE;
-  zx_time_t irq_rearm_timeout = ZX_TIME_INFINITE;
-  for (;;) {
-    zx_port_packet_t packet;
-    zx_time_t timeout = std::min(poll_timeout, irq_rearm_timeout);
-    zx_status_t status = port_.wait(zx::time(timeout), &packet);
-    if (status != ZX_OK && status != ZX_ERR_TIMED_OUT) {
-      zxlogf(ERROR, "port wait failed: %d", status);
-      return thrd_error;
-    }
+void Tcs3400Device::Configure() {
+  Tcs3400FeatureReport feature_report;
+  {
+    fbl::AutoLock lock(&feature_lock_);
+    feature_report = feature_rpt_;
+  }
 
-    if (status == ZX_ERR_TIMED_OUT) {
-      if (timeout == irq_rearm_timeout) {
-        packet.key = TCS_REARM_IRQ;
-      } else {
-        packet.key = TCS_POLL;
-      }
-    }
+  uint8_t control_reg = 0;
+  // clang-format off
+  if (feature_report.sensitivity == 4)  control_reg = 1;
+  if (feature_report.sensitivity == 16) control_reg = 2;
+  if (feature_report.sensitivity == 64) control_reg = 3;
+  // clang-format on
 
-    Tcs3400FeatureReport feature_report;
-    {
-      fbl::AutoLock lock(&feature_lock_);
-      feature_report = feature_rpt_;
-    }
+  again_ = static_cast<uint8_t>(feature_report.sensitivity);
 
-    switch (packet.key) {
-      case TCS_SHUTDOWN:
-        zxlogf(INFO, "shutting down");
-        return thrd_success;
-      case TCS_CONFIGURE:
-        if (feature_report.report_interval_us == 0) {  // per spec 0 is device's default
-          poll_timeout = ZX_TIME_INFINITE;             // we define the default as no polling
-        } else {
-          poll_timeout = zx_deadline_after(ZX_USEC(feature_report.report_interval_us));
-        }
+  const int64_t atime = feature_report.integration_time_us / kIntegrationTimeStepSizeMicroseconds;
+  atime_ = static_cast<uint8_t>(kMaxIntegrationTimeStep - atime);
 
-        {
-          uint8_t control_reg = 0;
-          // clang-format off
-          if (feature_report.sensitivity == 4)  control_reg = 1;
-          if (feature_report.sensitivity == 16) control_reg = 2;
-          if (feature_report.sensitivity == 64) control_reg = 3;
-          // clang-format on
-
-          again_ = static_cast<uint8_t>(feature_report.sensitivity);
-
-          const int64_t atime =
-              feature_report.integration_time_us / kIntegrationTimeStepSizeMicroseconds;
-          atime_ = static_cast<uint8_t>(kMaxIntegrationTimeStep - atime);
-
-          struct Setup {
-            uint8_t cmd;
-            uint8_t val;
-          } __PACKED setup[] = {
-              // First we don't set TCS_I2C_ENABLE_ADC_ENABLE to disable the sensor.
-              {TCS_I2C_ENABLE, TCS_I2C_ENABLE_POWER_ON | TCS_I2C_ENABLE_INT_ENABLE},
-              {TCS_I2C_AILTL, GET_BYTE(feature_report.threshold_low, 0)},
-              {TCS_I2C_AILTH, GET_BYTE(feature_report.threshold_low, 8)},
-              {TCS_I2C_AIHTL, GET_BYTE(feature_report.threshold_high, 0)},
-              {TCS_I2C_AIHTH, GET_BYTE(feature_report.threshold_high, 8)},
-              {TCS_I2C_PERS, SAMPLES_TO_TRIGGER},
-              {TCS_I2C_CONTROL, control_reg},
-              {TCS_I2C_ATIME, atime_},
-              // We now do set TCS_I2C_ENABLE_ADC_ENABLE to re-enable the sensor.
-              {TCS_I2C_ENABLE,
-               TCS_I2C_ENABLE_POWER_ON | TCS_I2C_ENABLE_ADC_ENABLE | TCS_I2C_ENABLE_INT_ENABLE},
-          };
-          for (const auto& i : setup) {
-            status = WriteReg(i.cmd, i.val);
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "i2c_write_sync failed: %d", status);
-              break;  // do not exit thread, future transactions may succeed
-            }
-          }
-        }
-        break;
-      case TCS_INTERRUPT:
-        zx_interrupt_ack(irq_.get());  // rearm interrupt at the IRQ level
-
-        {
-          const zx::result<Tcs3400InputReport> report = ReadInputRpt();
-          if (report.is_error()) {
-            irq_rearm_timeout = zx_deadline_after(INTERRUPTS_HYSTERESIS);
-            break;
-          }
-          if (feature_report.reporting_state ==
-              fuchsia_input_report::wire::SensorReportingState::kReportNoEvents) {
-            irq_rearm_timeout = zx_deadline_after(INTERRUPTS_HYSTERESIS);
-            break;
-          }
-
-          if (report->illuminance > feature_report.threshold_high ||
-              report->illuminance < feature_report.threshold_low) {
-            readers_.SendReportToAllReaders(*report);
-          }
-
-          fbl::AutoLock lock(&input_lock_);
-          input_rpt_ = *report;
-        }
-
-        irq_rearm_timeout = zx_deadline_after(INTERRUPTS_HYSTERESIS);
-        break;
-      case TCS_REARM_IRQ:
-        // rearm interrupt at the device level
-        {
-          status = WriteReg(TCS_I2C_AICLEAR, 0x00);
-          if (status != ZX_OK) {
-            zxlogf(ERROR, "i2c_write_sync failed: %d", status);
-            // Continue on error, future transactions may succeed
-          }
-        }
-
-        irq_rearm_timeout = ZX_TIME_INFINITE;
-        break;
-      case TCS_POLL:
-        if (feature_report.reporting_state !=
-            fuchsia_input_report::wire::SensorReportingState::kReportAllEvents) {
-          break;
-        }
-
-        {
-          const zx::result<Tcs3400InputReport> report = ReadInputRpt();
-          if (report.is_ok()) {
-            readers_.SendReportToAllReaders(*report);
-            fbl::AutoLock lock(&input_lock_);
-            input_rpt_ = *report;
-          }
-        }
-
-        poll_timeout += ZX_USEC(feature_report.report_interval_us);
-        zx_time_t now = zx_clock_get_monotonic();
-        if (now > poll_timeout) {
-          poll_timeout = zx_deadline_after(ZX_USEC(feature_report.report_interval_us));
-        }
-        break;
+  struct Setup {
+    uint8_t cmd;
+    uint8_t val;
+  } __PACKED setup[] = {
+      // First we don't set TCS_I2C_ENABLE_ADC_ENABLE to disable the sensor.
+      {TCS_I2C_ENABLE, TCS_I2C_ENABLE_POWER_ON | TCS_I2C_ENABLE_INT_ENABLE},
+      {TCS_I2C_AILTL, GET_BYTE(feature_report.threshold_low, 0)},
+      {TCS_I2C_AILTH, GET_BYTE(feature_report.threshold_low, 8)},
+      {TCS_I2C_AIHTL, GET_BYTE(feature_report.threshold_high, 0)},
+      {TCS_I2C_AIHTH, GET_BYTE(feature_report.threshold_high, 8)},
+      {TCS_I2C_PERS, SAMPLES_TO_TRIGGER},
+      {TCS_I2C_CONTROL, control_reg},
+      {TCS_I2C_ATIME, atime_},
+      // We now do set TCS_I2C_ENABLE_ADC_ENABLE to re-enable the sensor.
+      {TCS_I2C_ENABLE,
+       TCS_I2C_ENABLE_POWER_ON | TCS_I2C_ENABLE_ADC_ENABLE | TCS_I2C_ENABLE_INT_ENABLE},
+  };
+  for (const auto& i : setup) {
+    auto status = WriteReg(i.cmd, i.val);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "i2c_write_sync failed: %d", status);
+      break;  // do not exit thread, future transactions may succeed
     }
   }
-  return thrd_success;
+
+  if (feature_report.report_interval_us == 0) {  // per spec 0 is device's default
+    polling_handler_.Cancel();                   // we define the default as no polling
+  } else if (!polling_handler_.is_pending()) {
+    polling_handler_.PostDelayed(dispatcher_, zx::usec(feature_report.report_interval_us));
+  }
+}
+
+void Tcs3400Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                              zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  Tcs3400FeatureReport feature_report;
+  {
+    fbl::AutoLock lock(&feature_lock_);
+    feature_report = feature_rpt_;
+  }
+
+  zx_interrupt_ack(irq_.get());  // rearm interrupt at the IRQ level
+
+  const zx::result<Tcs3400InputReport> report = ReadInputRpt();
+  if (report.is_error()) {
+    async::PostDelayedTask(dispatcher_, fit::bind_member(this, &Tcs3400Device::RearmIrq),
+                           zx::duration(INTERRUPTS_HYSTERESIS));
+    return;
+  }
+  if (feature_report.reporting_state ==
+      fuchsia_input_report::wire::SensorReportingState::kReportNoEvents) {
+    async::PostDelayedTask(dispatcher_, fit::bind_member(this, &Tcs3400Device::RearmIrq),
+                           zx::duration(INTERRUPTS_HYSTERESIS));
+    return;
+  }
+
+  if (report->illuminance > feature_report.threshold_high ||
+      report->illuminance < feature_report.threshold_low) {
+    readers_.SendReportToAllReaders(std::move(*report));
+  }
+
+  fbl::AutoLock lock(&input_lock_);
+  input_rpt_ = *report;
+
+  async::PostDelayedTask(dispatcher_, fit::bind_member(this, &Tcs3400Device::RearmIrq),
+                         zx::duration(INTERRUPTS_HYSTERESIS));
+}
+
+void Tcs3400Device::RearmIrq() {
+  // rearm interrupt at the device level
+  auto status = WriteReg(TCS_I2C_AICLEAR, 0x00);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "i2c_write_sync failed: %d", status);
+    // Continue on error, future transactions may succeed
+  }
+}
+
+void Tcs3400Device::HandlePoll(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                               zx_status_t status) {
+  Tcs3400FeatureReport feature_report;
+  {
+    fbl::AutoLock lock(&feature_lock_);
+    feature_report = feature_rpt_;
+  }
+
+  if (feature_report.reporting_state ==
+      fuchsia_input_report::wire::SensorReportingState::kReportAllEvents) {
+    const zx::result<Tcs3400InputReport> report = ReadInputRpt();
+    if (report.is_ok()) {
+      readers_.SendReportToAllReaders(std::move(*report));
+      fbl::AutoLock lock(&input_lock_);
+      input_rpt_ = *report;
+    }
+  }
+
+  polling_handler_.PostDelayed(dispatcher_, zx::usec(feature_report.report_interval_us));
 }
 
 void Tcs3400Device::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                           GetInputReportsReaderCompleter::Sync& completer) {
-  readers_.CreateReader(loop_.dispatcher(), std::move(request->reader));
+  readers_.CreateReader(dispatcher_, std::move(request->reader));
   sync_completion_signal(&next_reader_wait_);  // Only for tests.
 }
 
@@ -495,14 +461,8 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
     feature_rpt_.integration_time_us = atime * kIntegrationTimeStepSizeMicroseconds;
   }
 
-  zx_port_packet packet = {TCS_CONFIGURE, ZX_PKT_TYPE_USER, ZX_OK, {}};
-  zx_status_t status = port_.queue(&packet);
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    zxlogf(ERROR, "zx_port_queue failed: %d", status);
-    completer.ReplyError(status);
-  }
+  Configure();
+  completer.ReplySuccess();
 }
 
 void Tcs3400Device::GetInputReport(GetInputReportRequestView request,
@@ -545,47 +505,37 @@ void Tcs3400Device::WaitForNextReader() {
 }
 
 // static
-zx::result<Tcs3400Device*> Tcs3400Device::CreateAndGetDevice(void* ctx, zx_device_t* parent) {
+zx_status_t Tcs3400Device::Create(void* ctx, zx_device_t* parent) {
   ddk::I2cChannel channel(parent, "i2c");
   if (!channel.is_valid()) {
-    return zx::error(ZX_ERR_NO_RESOURCES);
+    return ZX_ERR_NO_RESOURCES;
   }
 
   zx::result gpio =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent, "gpio");
   if (gpio.is_error()) {
     zxlogf(ERROR, "Failed to connect to gpio protocol: %s", gpio.status_string());
-    return gpio.take_error();
+    return gpio.error_value();
   }
 
-  zx::port port;
-  zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "port_create failed: %d", status);
-    return zx::error(status);
-  }
-
-  auto dev = std::make_unique<tcs::Tcs3400Device>(parent, std::move(channel),
-                                                  std::move(gpio.value()), std::move(port));
-  status = dev->Bind();
+  auto dev = std::make_unique<tcs::Tcs3400Device>(
+      parent, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
+      std::move(channel), std::move(gpio.value()));
+  auto status = dev->Bind();
   if (status != ZX_OK) {
     zxlogf(ERROR, "bind failed: %d", status);
-    return zx::error(status);
+    return status;
   }
 
   status = dev->DdkAdd("tcs-3400");
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %d", status);
-    return zx::error(status);
+    return status;
   }
-
   // devmgr is now in charge of the memory for dev
-  return zx::ok(dev.release());
-}
+  [[maybe_unused]] auto ptr = dev.release();
 
-zx_status_t Tcs3400Device::Create(void* ctx, zx_device_t* parent) {
-  auto status = CreateAndGetDevice(ctx, parent);
-  return status.is_error() ? status.error_value() : ZX_OK;
+  return ZX_OK;
 }
 
 zx_status_t Tcs3400Device::InitGain(uint8_t gain) {
@@ -661,12 +611,7 @@ zx_status_t Tcs3400Device::InitMetadata() {
         fuchsia_input_report::wire::SensorReportingState::kReportAllEvents;
     feature_rpt_.integration_time_us = atime * kIntegrationTimeStepSizeMicroseconds;
   }
-  zx_port_packet packet = {TCS_CONFIGURE, ZX_PKT_TYPE_USER, ZX_OK, {}};
-  status = port_.queue(&packet);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "zx_port_queue failed: %d", status);
-    return status;
-  }
+  Configure();
   return ZX_OK;
 }
 
@@ -720,47 +665,21 @@ zx_status_t Tcs3400Device::Bind() {
     return interrupt_result->error_value();
   }
   irq_ = std::move(interrupt_result->value()->irq);
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(dispatcher_);
 
-  zx_status_t status = irq_.bind(port_, TCS_INTERRUPT, 0);
+  auto status = InitMetadata();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "zx_interrupt_bind failed: %d", status);
-    return status;
-  }
-
-  status = InitMetadata();
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  int rc = thrd_create_with_name(
-      &thread_, [](void* arg) -> int { return reinterpret_cast<Tcs3400Device*>(arg)->Thread(); },
-      reinterpret_cast<void*>(this), "tcs3400-thread");
-  if (rc != thrd_success) {
-    return ZX_ERR_INTERNAL;
-  }
-
-  if ((status = loop_.StartThread("tcs3400-reader-thread")) != ZX_OK) {
-    zxlogf(ERROR, "failed to start loop: %d", status);
-    ShutDown();
     return status;
   }
 
   return ZX_OK;
 }
 
-void Tcs3400Device::ShutDown() {
-  zx_port_packet packet = {TCS_SHUTDOWN, ZX_PKT_TYPE_USER, ZX_OK, {}};
-  zx_status_t status = port_.queue(&packet);
-  ZX_ASSERT(status == ZX_OK);
-  if (thread_) {
-    thrd_join(thread_, nullptr);
-  }
-  irq_.destroy();
-  loop_.Shutdown();
-}
-
 void Tcs3400Device::DdkUnbind(ddk::UnbindTxn txn) {
-  ShutDown();
+  irq_handler_.Cancel();
+  polling_handler_.Cancel();
+  irq_.destroy();
   txn.Reply();
 }
 

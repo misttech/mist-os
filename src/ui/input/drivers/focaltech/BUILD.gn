@@ -112,11 +112,13 @@ test("focaltech-test-bin") {
   ]
   deps = [
     ":common",
-    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-default",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

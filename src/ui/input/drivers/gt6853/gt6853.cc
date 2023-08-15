@@ -109,7 +109,8 @@ zx_status_t Gt6853Device::Create(void* ctx, zx_device_t* parent) {
   }
 
   std::unique_ptr<Gt6853Device> device = std::make_unique<Gt6853Device>(
-      parent, std::move(i2c), std::move(interrupt_gpio.value()), std::move(reset_gpio.value()));
+      parent, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
+      std::move(i2c), std::move(interrupt_gpio.value()), std::move(reset_gpio.value()));
   if (!device) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -136,8 +137,7 @@ void Gt6853Device::DdkUnbind(ddk::UnbindTxn txn) {
 
 void Gt6853Device::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                          GetInputReportsReaderCompleter::Sync& completer) {
-  zx_status_t status =
-      input_report_readers_.CreateReader(loop_.dispatcher(), std::move(request->reader));
+  zx_status_t status = input_report_readers_.CreateReader(dispatcher_, std::move(request->reader));
   if (status == ZX_OK) {
     sync_completion_signal(&next_reader_wait_);  // Only for tests.
   }
@@ -279,28 +279,16 @@ zx_status_t Gt6853Device::Init() {
     firmware_status_.Set("skipped");
   }
 
-  status = thrd_create_with_name(
-      &thread_, [](void* arg) -> int { return reinterpret_cast<Gt6853Device*>(arg)->Thread(); },
-      this, "gt6853-thread");
-  if (status != thrd_success) {
-    zxlogf(ERROR, "Failed to create thread: %d", status);
-    return thrd_status_to_zx_status(status);
-  }
+  irq_handler_.set_object(interrupt_.get());
+  irq_handler_.Begin(dispatcher_);
 
   // Set scheduling role for device thread.
   {
     const char* role_name = "fuchsia.ui.input.drivers.gt6853.device";
-    status = device_set_profile_by_role(parent(), thrd_get_zx_handle(thread_), role_name,
-                                        strlen(role_name));
+    status = device_set_profile_by_role(parent(), zx_thread_self(), role_name, strlen(role_name));
     if (status != ZX_OK) {
       zxlogf(WARNING, "Failed to apply role to worker: %d", status);
     }
-  }
-
-  if ((status = loop_.StartThread("gt6853-reader-thread")) != ZX_OK) {
-    zxlogf(ERROR, "Failed to start loop: %d", status);
-    Shutdown();
-    return status;
   }
 
   return ZX_OK;
@@ -1084,75 +1072,79 @@ zx::result<> Gt6853Device::WriteAndCheck(Register reg, const uint8_t* buffer, si
   return zx::ok();
 }
 
-int Gt6853Device::Thread() {
-  zx::time timestamp;
-  while (interrupt_.wait(&timestamp) == ZX_OK) {
-    zx::result<uint8_t> status = ReadReg8(Register::kEventStatusReg);
-    if (status.is_error()) {
-      zxlogf(ERROR, "Failed to read event status register");
-      return thrd_error;
-    }
-    if (status.value() != kTouchEvent) {
-      continue;
-    }
-
-    if ((status = ReadReg8(Register::kContactsReg)).is_error()) {
-      zxlogf(ERROR, "Failed to read contact count register");
-      return thrd_error;
-    }
-
-    const uint8_t contacts = status.value() & 0b1111;
-    if (contacts > kMaxContacts) {
-      zxlogf(ERROR, "Touch event with too many contacts: %u", contacts);
-      return thrd_error;
-    }
-
-    uint8_t contacts_buffer[kContactSize * kMaxContacts] = {};
-    if (Read(Register::kContactsStartReg, contacts_buffer, contacts * kContactSize).is_error()) {
-      zxlogf(ERROR, "Failed to read contacts");
-      return thrd_error;
-    }
-
-    // Clear the status register so that interrupts stop being generated.
-    if (WriteReg8(Register::kEventStatusReg, 0).is_error()) {
-      zxlogf(ERROR, "Failed to reset event status register");
-      return thrd_error;
-    }
-
-    Gt6853InputReport report = {
-        .event_time = timestamp,
-        .contacts = {},
-        .num_contacts = contacts,
-    };
-    for (uint8_t i = 0; i < contacts; i++) {
-      report.contacts[i] = ParseContact(&contacts_buffer[i * kContactSize]);
-    }
-
-    input_report_readers_.SendReportToAllReaders(report);
-
-    const zx::duration latency = zx::clock::get_monotonic() - timestamp;
-
-    total_latency_ += latency;
-    report_count_++;
-    average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
-
-    if (latency > max_latency_) {
-      max_latency_ = latency;
-      max_latency_usecs_.Set(max_latency_.to_usecs());
-    }
-
-    if (contacts > 0) {
-      total_report_count_.Add(1);
-      last_event_timestamp_.Set(timestamp.get());
-    }
+void Gt6853Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                             zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  if (status != ZX_OK) {
+    return;
   }
 
-  return thrd_success;
+  zx::result<uint8_t> result = ReadReg8(Register::kEventStatusReg);
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to read event status register");
+    return;
+  }
+  if (result.value() != kTouchEvent) {
+    interrupt_.ack();
+    return;
+  }
+
+  if ((result = ReadReg8(Register::kContactsReg)).is_error()) {
+    zxlogf(ERROR, "Failed to read contact count register");
+    return;
+  }
+
+  const uint8_t contacts = result.value() & 0b1111;
+  if (contacts > kMaxContacts) {
+    zxlogf(ERROR, "Touch event with too many contacts: %u", contacts);
+    return;
+  }
+
+  uint8_t contacts_buffer[kContactSize * kMaxContacts] = {};
+  if (Read(Register::kContactsStartReg, contacts_buffer, contacts * kContactSize).is_error()) {
+    zxlogf(ERROR, "Failed to read contacts");
+    return;
+  }
+
+  // Clear the status register so that interrupts stop being generated.
+  if (WriteReg8(Register::kEventStatusReg, 0).is_error()) {
+    zxlogf(ERROR, "Failed to reset event status register");
+    return;
+  }
+
+  auto timestamp = zx::time(interrupt->timestamp);
+  Gt6853InputReport report = {
+      .event_time = timestamp,
+      .contacts = {},
+      .num_contacts = contacts,
+  };
+  for (uint8_t i = 0; i < contacts; i++) {
+    report.contacts[i] = ParseContact(&contacts_buffer[i * kContactSize]);
+  }
+
+  input_report_readers_.SendReportToAllReaders(report);
+
+  const zx::duration latency = zx::clock::get_monotonic() - timestamp;
+
+  total_latency_ += latency;
+  report_count_++;
+  average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
+
+  if (latency > max_latency_) {
+    max_latency_ = latency;
+    max_latency_usecs_.Set(max_latency_.to_usecs());
+  }
+
+  if (contacts > 0) {
+    total_report_count_.Add(1);
+    last_event_timestamp_.Set(timestamp.get());
+  }
+
+  interrupt_.ack();
 }
 
 void Gt6853Device::Shutdown() {
+  irq_handler_.Cancel();
   interrupt_.destroy();
-  thrd_join(thread_, nullptr);
 }
 
 static zx_driver_ops_t gt6853_driver_ops = []() -> zx_driver_ops_t {

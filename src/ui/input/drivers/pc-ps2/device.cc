@@ -107,8 +107,8 @@ void PS2InputReport::ToFidlInputReport(
   input_report.event_time(event_time.get());
 }
 
-zx_status_t I8042Device::Bind(Controller* parent, Port port) {
-  auto dev = std::make_unique<I8042Device>(parent, port);
+zx_status_t I8042Device::Bind(Controller* parent, async_dispatcher_t* dispatcher, Port port) {
+  auto dev = std::make_unique<I8042Device>(parent, dispatcher, port);
   zx_status_t status = dev->Bind();
   if (status == ZX_OK) {
     // The DDK takes ownership of the device.
@@ -145,34 +145,21 @@ zx_status_t I8042Device::Bind() {
   zx_status_t status;
 #endif
 
-  status = loop_.StartThread("i8042-reader-thread");
-  if (status != ZX_OK) {
-    return status;
-  }
-
   status = DdkAdd(ddk::DeviceAddArgs(kPortInfo[port_].devname));
   if (status != ZX_OK) {
     return status;
   }
 
-  // Start the IRQ thread.
-  irq_thread_ = std::thread([this]() { IrqThread(); });
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(dispatcher_);
 
   return ZX_OK;
 }
 
 void I8042Device::DdkUnbind(ddk::UnbindTxn txn) {
-  if (!irq_thread_.joinable()) {
-    txn.Reply();
-    return;
-  }
-  {
-    std::scoped_lock lock(unbind_lock_);
-    unbind_.emplace(std::move(txn));
-  }
-  // Destroy the IRQ, causing the IRQ handler to finish.
+  irq_handler_.Cancel();
   irq_.destroy();
-  unbind_ready_.notify_all();
+  txn.Reply();
 }
 
 zx::result<finput::BootProtocol> I8042Device::Identify() {
@@ -235,8 +222,7 @@ zx::result<finput::BootProtocol> I8042Device::Identify() {
 void I8042Device::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                         GetInputReportsReaderCompleter::Sync& completer) {
   std::scoped_lock lock(hid_lock_);
-  zx_status_t status =
-      input_report_readers_.CreateReader(loop_.dispatcher(), std::move(request->reader));
+  zx_status_t status = input_report_readers_.CreateReader(dispatcher_, std::move(request->reader));
   if (status == ZX_OK) {
 #ifdef PS2_TEST
     sync_completion_signal(&next_reader_wait_);
@@ -343,35 +329,30 @@ void I8042Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   completer.Reply(descriptor.Build());
 }
 
-void I8042Device::IrqThread() {
-  while (true) {
-    zx::time timestamp;
-    zx_status_t status = irq_.wait(&timestamp);
-    if (status != ZX_OK) {
-      break;
-    }
-
-    bool retry;
-    do {
-      retry = false;
-
-      auto status = controller_->ReadStatus();
-      if (status.obf()) {
-        retry = true;
-        uint8_t data = controller_->ReadData();
-        if (protocol_ == finput::BootProtocol::kKbd) {
-          ProcessScancode(timestamp, data);
-        } else if (protocol_ == finput::BootProtocol::kMouse) {
-          ProcessMouse(timestamp, data);
-        }
-      }
-    } while (retry);
+void I8042Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                            const zx_packet_interrupt_t* interrupt) {
+  if (status != ZX_OK) {
+    return;
   }
 
-  std::scoped_lock lock(unbind_lock_);
-  unbind_ready_.wait(unbind_lock_,
-                     [this]() __TA_REQUIRES(unbind_lock_) { return unbind_.has_value(); });
-  unbind_->Reply();
+  auto timestamp = zx::time(interrupt->timestamp);
+  bool retry;
+  do {
+    retry = false;
+
+    auto status = controller_->ReadStatus();
+    if (status.obf()) {
+      retry = true;
+      uint8_t data = controller_->ReadData();
+      if (protocol_ == finput::BootProtocol::kKbd) {
+        ProcessScancode(timestamp, data);
+      } else if (protocol_ == finput::BootProtocol::kMouse) {
+        ProcessMouse(timestamp, data);
+      }
+    }
+  } while (retry);
+
+  irq_.ack();
 }
 
 void I8042Device::ProcessScancode(zx::time timestamp, uint8_t code) {

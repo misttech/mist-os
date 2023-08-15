@@ -7,8 +7,10 @@
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/driver.h>
 
@@ -17,10 +19,8 @@
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.hardware.goldfish.pipe/cpp/markers.h"
 #include "src/devices/testing/goldfish/fake_pipe/fake_pipe.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/input/drivers/goldfish_sensor/input_device.h"
 
 namespace goldfish::sensor {
@@ -110,31 +110,38 @@ class TestRootDevice : public RootDevice {
   using RootDevice::RootDevice;
 };
 
-class RootDeviceTest : public ::testing::Test, public loop_fixture::RealLoop {
+struct IncomingNamespace {
+  testing::FakePipe fake_pipe_;
+  component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
+};
+
+class RootDeviceTest : public ::testing::Test {
  public:
-  RootDeviceTest() : async_loop_(&kAsyncLoopConfigNeverAttachToThread), outgoing_(dispatcher()) {}
-
   void SetUp() override {
-    async_loop_.StartThread("goldfish-server-thread");
-
-    fake_parent_ = MockDevice::FakeRootParent();
-    zx::result service_result = outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
-        fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
-            .device = fake_pipe_.bind_handler(async_loop_.dispatcher()),
-        }));
-    ASSERT_EQ(service_result.status_value(), ZX_OK);
+    ASSERT_EQ(incoming_loop_.StartThread("incoming-ns-thread"), ZX_OK);
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
+    incoming_.SyncCall([server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+      zx::result service_result =
+          infra->outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
+              fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
+                  .device = infra->fake_pipe_.bind_handler(async_get_default_dispatcher()),
+              }));
+      ASSERT_EQ(service_result.status_value(), ZX_OK);
+      ASSERT_EQ(infra->outgoing_.Serve(std::move(server)).status_value(), ZX_OK);
+    });
 
     fake_parent_->AddFidlService(fuchsia_hardware_goldfish_pipe::Service::Name,
                                  std::move(endpoints->client));
 
-    auto device = std::make_unique<TestRootDevice>(fake_parent_.get());
-    ASSERT_EQ(device->Bind(), ZX_OK);
-    // dut_ will be deleted by MockDevice when test ends.
-    dut_ = device.release();
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      auto device = std::make_unique<TestRootDevice>(fake_parent_.get());
+      ASSERT_EQ(device->Bind(), ZX_OK);
+      // dut_ will be deleted by MockDevice when test ends.
+      dut_ = device.release();
+    });
+    EXPECT_EQ(result.status_value(), ZX_OK);
     ASSERT_EQ(fake_parent_->child_count(), 1u);
   }
 
@@ -142,94 +149,116 @@ class RootDeviceTest : public ::testing::Test, public loop_fixture::RealLoop {
     FakeInputDevice::EraseAllDevices();
 
     if (dut_) {
-      device_async_remove(dut_->zxdev());
-      mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+      auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+        device_async_remove(dut_->zxdev());
+        mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+      });
+      EXPECT_EQ(result.status_value(), ZX_OK);
     }
-    async_loop_.Shutdown();
   }
 
  protected:
-  std::shared_ptr<MockDevice> fake_parent_;
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
   TestRootDevice* dut_;
-  testing::FakePipe fake_pipe_;
-  async::Loop async_loop_;
-  component::OutgoingDirectory outgoing_;
-  std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
 };
 
 TEST_F(RootDeviceTest, SetupDevices) {
   bool list_sensors_called = false;
-  fake_pipe_.SetOnCmdWriteCallback(
-      [pipe = &this->fake_pipe_, &list_sensors_called](const std::vector<uint8_t>& cmd) {
-        const char* kCmdExpected = "000clist-sensors";
-        if (memcmp(cmd.data(), kCmdExpected, strlen(kCmdExpected)) == 0) {
-          list_sensors_called = true;
-          const char* kFrameLength = "0004";
-          const char* kFrameContents = "0001";
-          pipe->EnqueueBytesToRead(
-              std::vector<uint8_t>(kFrameLength, kFrameLength + strlen(kFrameLength)));
-          pipe->EnqueueBytesToRead(
-              std::vector<uint8_t>(kFrameContents, kFrameContents + strlen(kFrameContents)));
-        }
-      });
+  incoming_.SyncCall([&list_sensors_called](IncomingNamespace* infra) mutable {
+    infra->fake_pipe_.SetOnCmdWriteCallback(
+        [pipe = &infra->fake_pipe_, &list_sensors_called](const std::vector<uint8_t>& cmd) {
+          const char* kCmdExpected = "000clist-sensors";
+          if (memcmp(cmd.data(), kCmdExpected, strlen(kCmdExpected)) == 0) {
+            list_sensors_called = true;
+            const char* kFrameLength = "0004";
+            const char* kFrameContents = "0001";
+            pipe->EnqueueBytesToRead(
+                std::vector<uint8_t>(kFrameLength, kFrameLength + strlen(kFrameLength)));
+            pipe->EnqueueBytesToRead(
+                std::vector<uint8_t>(kFrameContents, kFrameContents + strlen(kFrameContents)));
+          }
+        });
+  });
 
-  PerformBlockingWork([&] { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
+  auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(),
+                                         [&]() { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
+  EXPECT_EQ(result.status_value(), ZX_OK);
   EXPECT_EQ(FakeInputDevice::GetAllDevices().size(), 1u);
   EXPECT_TRUE(list_sensors_called);
 
   // Only fake1 is set.
-  const char* kSetFake1 = "000bset:fake1:1";
-  EXPECT_EQ(memcmp(fake_pipe_.io_buffer_contents().back().data(), kSetFake1, strlen(kSetFake1)), 0);
+  incoming_.SyncCall([](IncomingNamespace* infra) mutable {
+    const char* kSetFake1 = "000bset:fake1:1";
+    EXPECT_EQ(
+        memcmp(infra->fake_pipe_.io_buffer_contents().back().data(), kSetFake1, strlen(kSetFake1)),
+        0);
+  });
 }
 
 TEST_F(RootDeviceTest, SetupMultipleDevices) {
   bool list_sensors_called = false;
-  fake_pipe_.SetOnCmdWriteCallback(
-      [pipe = &this->fake_pipe_, &list_sensors_called](const std::vector<uint8_t>& cmd) {
-        const char* kCmdExpected = "000clist-sensors";
-        if (memcmp(cmd.data(), kCmdExpected, strlen(kCmdExpected)) == 0) {
-          list_sensors_called = true;
-          const char* kFrameLength = "0004";
-          const char* kFrameContents = "0003";
-          pipe->EnqueueBytesToRead(
-              std::vector<uint8_t>(kFrameLength, kFrameLength + strlen(kFrameLength)));
-          pipe->EnqueueBytesToRead(
-              std::vector<uint8_t>(kFrameContents, kFrameContents + strlen(kFrameContents)));
-        }
-      });
+  incoming_.SyncCall([&list_sensors_called](IncomingNamespace* infra) mutable {
+    infra->fake_pipe_.SetOnCmdWriteCallback(
+        [pipe = &infra->fake_pipe_, &list_sensors_called](const std::vector<uint8_t>& cmd) {
+          const char* kCmdExpected = "000clist-sensors";
+          if (memcmp(cmd.data(), kCmdExpected, strlen(kCmdExpected)) == 0) {
+            list_sensors_called = true;
+            const char* kFrameLength = "0004";
+            const char* kFrameContents = "0003";
+            pipe->EnqueueBytesToRead(
+                std::vector<uint8_t>(kFrameLength, kFrameLength + strlen(kFrameLength)));
+            pipe->EnqueueBytesToRead(
+                std::vector<uint8_t>(kFrameContents, kFrameContents + strlen(kFrameContents)));
+          }
+        });
+  });
 
-  PerformBlockingWork([&] { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
+  auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(),
+                                         [&]() { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
+  EXPECT_EQ(result.status_value(), ZX_OK);
   EXPECT_EQ(FakeInputDevice::GetAllDevices().size(), 2u);
   EXPECT_TRUE(list_sensors_called);
 
   // Both fake1 and fake2 are set.
-  const char* kSetFake1 = "000bset:fake1:1";
-  const char* kSetFake2 = "000bset:fake2:1";
-  EXPECT_EQ(memcmp(fake_pipe_.io_buffer_contents().rbegin()->data(), kSetFake2, strlen(kSetFake2)),
-            0);
-  EXPECT_EQ(
-      memcmp((++fake_pipe_.io_buffer_contents().rbegin())->data(), kSetFake1, strlen(kSetFake1)),
-      0);
+  incoming_.SyncCall([](IncomingNamespace* infra) mutable {
+    const char* kSetFake1 = "000bset:fake1:1";
+    const char* kSetFake2 = "000bset:fake2:1";
+    EXPECT_EQ(memcmp(infra->fake_pipe_.io_buffer_contents().rbegin()->data(), kSetFake2,
+                     strlen(kSetFake2)),
+              0);
+    EXPECT_EQ(memcmp((++infra->fake_pipe_.io_buffer_contents().rbegin())->data(), kSetFake1,
+                     strlen(kSetFake1)),
+              0);
+  });
 }
 
 TEST_F(RootDeviceTest, DispatchSensorReports) {
   // Set list-sensors mask to 0x03, enabling both fake1 and fake2 devices.
   bool list_sensors_called = false;
-  fake_pipe_.SetOnCmdWriteCallback(
-      [pipe = &this->fake_pipe_, &list_sensors_called](const std::vector<uint8_t>& cmd) {
-        const char* kCmdExpected = "000clist-sensors";
-        if (memcmp(cmd.data(), kCmdExpected, strlen(kCmdExpected)) == 0) {
-          list_sensors_called = true;
-          const char* kFrameLength = "0004";
-          const char* kFrameContents = "0003";
-          pipe->EnqueueBytesToRead(
-              std::vector<uint8_t>(kFrameLength, kFrameLength + strlen(kFrameLength)));
-          pipe->EnqueueBytesToRead(
-              std::vector<uint8_t>(kFrameContents, kFrameContents + strlen(kFrameContents)));
-        }
-      });
+  incoming_.SyncCall([&list_sensors_called](IncomingNamespace* infra) mutable {
+    infra->fake_pipe_.SetOnCmdWriteCallback(
+        [pipe = &infra->fake_pipe_, &list_sensors_called](const std::vector<uint8_t>& cmd) {
+          const char* kCmdExpected = "000clist-sensors";
+          if (memcmp(cmd.data(), kCmdExpected, strlen(kCmdExpected)) == 0) {
+            list_sensors_called = true;
+            const char* kFrameLength = "0004";
+            const char* kFrameContents = "0003";
+            pipe->EnqueueBytesToRead(
+                std::vector<uint8_t>(kFrameLength, kFrameLength + strlen(kFrameLength)));
+            pipe->EnqueueBytesToRead(
+                std::vector<uint8_t>(kFrameContents, kFrameContents + strlen(kFrameContents)));
+          }
+        });
+  });
 
-  PerformBlockingWork([&] { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
+  auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(),
+                                         [&]() { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
+  EXPECT_EQ(result.status_value(), ZX_OK);
   EXPECT_EQ(FakeInputDevice::GetAllDevices().size(), 2u);
   EXPECT_TRUE(list_sensors_called);
 

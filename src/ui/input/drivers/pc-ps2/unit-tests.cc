@@ -182,22 +182,24 @@ zx::interrupt GetInterrupt(uint32_t irq_no) {
 class ControllerTest : public zxtest::Test {
  public:
   void SetUp() override {
-    root_ = MockDevice::FakeRootParent();
     zx_status_t status = i8042::Controller::Bind(nullptr, root_.get());
     ASSERT_OK(status);
 
     controller_dev_ = root_->GetLatestChild();
-
-    loop_.StartThread("pc-ps2-test-thread");
   }
 
   void TearDown() override {
-    device_async_remove(controller_dev_);
-    mock_ddk::ReleaseFlaggedDevices(controller_dev_);
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      device_async_remove(controller_dev_);
+      mock_ddk::ReleaseFlaggedDevices(controller_dev_);
+    });
+    EXPECT_OK(result.status_value());
   }
 
   void InitDevices() {
-    controller_dev_->InitOp();
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(),
+                                           [&]() { controller_dev_->InitOp(); });
+    EXPECT_OK(result.status_value());
     controller_dev_->WaitUntilInitReplyCalled(zx::time::infinite());
     ASSERT_OK(controller_dev_->InitReplyCallStatus());
     sync_completion_wait(&controller_dev_->GetDeviceContext<i8042::Controller>()->added_children(),
@@ -207,20 +209,21 @@ class ControllerTest : public zxtest::Test {
     ASSERT_OK(endpoints.status_value());
 
     binding_ =
-        fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
+        fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server),
                          controller_dev_->GetLatestChild()->GetDeviceContext<i8042::I8042Device>());
     client_.Bind(std::move(endpoints->client));
   }
 
  protected:
   Fake8042 i8042_;
-  std::shared_ptr<MockDevice> root_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
   zx_device* controller_dev_;
 
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> client_;
 
  private:
-  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   std::optional<fidl::ServerBindingRef<fuchsia_input_report::InputDevice>> binding_;
 };
 

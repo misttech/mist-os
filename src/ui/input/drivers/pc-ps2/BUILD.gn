@@ -29,6 +29,7 @@ common_deps = [
   "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
   "//sdk/lib/input_report_reader",
   "//src/devices/lib/driver",
+  "//src/devices/lib/driver:driver_runtime",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/async-loop:async-loop-cpp",

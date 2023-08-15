@@ -37,6 +37,7 @@ fuchsia_driver("ams-light-driver") {
     "//sdk/lib/input_report_reader",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -69,6 +70,7 @@ test("ams-light-test-bin") {
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
     "//src/devices/gpio/testing/fake-gpio",
+    "//src/devices/lib/driver:driver_runtime",
 
     # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
     # "//sdk/lib/component/outgoing/cpp".

@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
 
 #include <zxtest/zxtest.h>
+
+#include "zircon/system/public/zircon/time.h"
 
 struct MouseReport {
   int64_t movement_x;
@@ -68,12 +71,17 @@ void MouseDevice::SendReport(const MouseReport& report) {
 
 void MouseDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                         GetInputReportsReaderCompleter::Sync& completer) {
-  zx_status_t status =
-      input_report_readers_.CreateReader(loop_.dispatcher(), std::move(request->reader));
-  if (status == ZX_OK) {
-    // Signal to a test framework (if it exists) that we are connected to a reader.
-    sync_completion_signal(&next_reader_wait_);
-  }
+  sync_completion_t wait;
+  async::PostTask(loop_.dispatcher(), [&]() {
+    zx_status_t status =
+        input_report_readers_.CreateReader(loop_.dispatcher(), std::move(request->reader));
+    if (status == ZX_OK) {
+      // Signal to a test framework (if it exists) that we are connected to a reader.
+      sync_completion_signal(&next_reader_wait_);
+    }
+    sync_completion_signal(&wait);
+  });
+  sync_completion_wait(&wait, ZX_TIME_INFINITE);
 }
 
 void MouseDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {

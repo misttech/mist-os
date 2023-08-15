@@ -72,7 +72,8 @@ class InputReportReaderManager final {
                            fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server) {
     ZX_ASSERT(dispatcher);
     std::scoped_lock lock(lock_);
-    auto reader = InputReportReader::Create(this, next_reader_id_, dispatcher, std::move(server));
+    auto reader =
+        std::make_unique<InputReportReader>(this, next_reader_id_, dispatcher, std::move(server));
     if (!reader) {
       return ZX_ERR_INTERNAL;
     }
@@ -127,7 +128,7 @@ class InputReportReaderManager final {
 
   std::mutex lock_;
   size_t next_reader_id_ __TA_GUARDED(lock_) = 1;
-  std::list<std::shared_ptr<InputReportReader>> readers_list_ __TA_GUARDED(lock_);
+  std::list<std::unique_ptr<InputReportReader>> readers_list_ __TA_GUARDED(lock_);
 };
 
 // This class represents an InputReportReader that sends InputReports out to a specific client.
@@ -139,14 +140,13 @@ template <class Report>
 class InputReportReaderManager<Report>::InputReportReader final
     : public fidl::WireServer<fuchsia_input_report::InputReportsReader> {
  public:
-  // Create the InputReportReader. `manager` and `dispatcher` must outlive this InputReportReader.
-  static std::shared_ptr<InputReportReader> Create(
-      InputReportReaderManager<Report>* manager, size_t reader_id, async_dispatcher_t* dispatcher,
-      fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server);
-
   // This is only public to make std::unique_ptr work.
-  explicit InputReportReader(InputReportReaderManager<Report>* manager, size_t reader_id)
-      : reader_id_(reader_id), manager_(manager) {}
+  explicit InputReportReader(InputReportReaderManager<Report>* manager, size_t reader_id,
+                             async_dispatcher_t* dispatcher,
+                             fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server)
+      : binding_(dispatcher, std::move(server), this, std::mem_fn(&InputReportReader::OnUnbound)),
+        reader_id_(reader_id),
+        manager_(manager) {}
 
   void ReceiveReport(const Report& report) __TA_EXCLUDES(&report_lock_);
 
@@ -157,6 +157,12 @@ class InputReportReaderManager<Report>::InputReportReader final
   static constexpr size_t kInputReportBufferSize = 4096 * 4;
 
   void ReplyWithReports(ReadInputReportsCompleterBase& completer) __TA_REQUIRES(&report_lock_);
+  void OnUnbound(fidl::UnbindInfo info) {
+    ZX_DEBUG_ASSERT_MSG(manager_, "InputReportReaderManager must outlive InputReportReaders!");
+    manager_->RemoveReaderFromList(this);
+  }
+
+  fidl::ServerBinding<fuchsia_input_report::InputReportsReader> binding_;
 
   std::mutex report_lock_;
   std::optional<ReadInputReportsCompleter::Async> completer_ __TA_GUARDED(&report_lock_);
@@ -168,28 +174,6 @@ class InputReportReaderManager<Report>::InputReportReader final
 };
 
 // Template Implementation.
-template <class Report>
-inline std::shared_ptr<typename InputReportReaderManager<Report>::InputReportReader>
-InputReportReaderManager<Report>::InputReportReader::Create(
-    InputReportReaderManager<Report>* manager, size_t reader_id, async_dispatcher_t* dispatcher,
-    fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server) {
-  if (!manager || !dispatcher) {
-    return nullptr;
-  }
-
-  fidl::OnUnboundFn<InputReportReader> unbound_fn(
-      [](InputReportReader* reader, fidl::UnbindInfo info,
-         fidl::ServerEnd<fuchsia_input_report::InputReportsReader> channel) {
-        if (reader && reader->manager_) {
-          reader->manager_->RemoveReaderFromList(reader);
-        }
-      });
-
-  auto reader = std::make_shared<InputReportReader>(manager, reader_id);
-  fidl::BindServer(dispatcher, std::move(server), reader, std::move(unbound_fn));
-  return reader;
-}
-
 template <class Report>
 inline void InputReportReaderManager<Report>::InputReportReader::ReceiveReport(
     const Report& report) {

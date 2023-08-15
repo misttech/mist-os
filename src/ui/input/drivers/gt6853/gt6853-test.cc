@@ -300,8 +300,11 @@ class Gt6853Test : public zxtest::Test {
 
   void TearDown() override {
     if (device_) {
-      device_async_remove(device_);
-      EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));
+      auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+        device_async_remove(device_);
+        EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));
+      });
+      EXPECT_OK(result.status_value());
     }
     device_ = nullptr;
     loop_.Quit();
@@ -317,7 +320,11 @@ class Gt6853Test : public zxtest::Test {
     config_vmo = &config_vmo_;
     firmware_vmo = &firmware_vmo_;
 
-    zx_status_t status = Gt6853Device::Create(nullptr, fake_parent_.get());
+    zx_status_t status;
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      status = Gt6853Device::Create(nullptr, fake_parent_.get());
+    });
+    EXPECT_OK(result.status_value());
     device_ = fake_parent_->GetLatestChild();
 
     std::vector interrupt_gpio_states =
@@ -375,7 +382,7 @@ class Gt6853Test : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
     EXPECT_OK(endpoints);
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server),
                      device_->GetDeviceContext<Gt6853Device>());
 
     return std::move(endpoints->client);
@@ -395,8 +402,6 @@ class Gt6853Test : public zxtest::Test {
 
  private:
   void InitParent() {
-    fake_parent_ = MockDevice::FakeRootParent();
-
     // Create i2c fragment.
     auto i2c_handler = fuchsia_hardware_i2c::Service::InstanceHandler(
         {.device = i2c_.SyncCall(&fidl::WireServer<fuchsia_hardware_i2c::Device>::bind_handler,
@@ -452,7 +457,9 @@ class Gt6853Test : public zxtest::Test {
   }
 
   std::shared_ptr<sync_completion_t> i2c_read_completion_ = std::make_shared<sync_completion_t>();
-  std::shared_ptr<MockDevice> fake_parent_;
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   async::Loop fragments_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<FakeTouchDevice> i2c_{fragments_loop_.dispatcher(),

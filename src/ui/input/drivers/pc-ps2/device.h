@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/zx/interrupt.h>
 
@@ -81,28 +82,20 @@ using DeviceType = ddk::Device<I8042Device, ddk::Unbindable,
                                ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin>;
 class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
-  explicit I8042Device(Controller* parent, Port port)
+  explicit I8042Device(Controller* parent, async_dispatcher_t* dispatcher, Port port)
       : DeviceType(parent->zxdev()),
+        dispatcher_(dispatcher),
         controller_(parent),
         port_(port),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         report_({
             .event_time = {},
             .type = fuchsia_hardware_input::BootProtocol::kNone,
         }) {}
 
-  static zx_status_t Bind(Controller* parent, Port port);
+  static zx_status_t Bind(Controller* parent, async_dispatcher_t* dispatcher, Port port);
   zx_status_t Bind();
 
-  void DdkRelease() {
-    if (irq_.is_valid()) {
-      irq_.destroy();
-    }
-    if (irq_thread_.joinable()) {
-      irq_thread_.join();
-    }
-    delete this;
-  }
+  void DdkRelease() { delete this; }
   void DdkUnbind(ddk::UnbindTxn txn);
 
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
@@ -135,14 +128,16 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
 #endif
 
  private:
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
+
+  async_dispatcher_t* dispatcher_;
+
   Controller* controller_;
   Port port_;
   fuchsia_hardware_input::wire::BootProtocol protocol_;
-  std::thread irq_thread_;
   zx::interrupt irq_;
-  std::mutex unbind_lock_;
-  std::condition_variable_any unbind_ready_;
-  std::optional<ddk::UnbindTxn> unbind_ __TA_GUARDED(unbind_lock_);
+  async::IrqMethod<I8042Device, &I8042Device::HandleIrq> irq_handler_{this};
 
   std::mutex hid_lock_;
   input_report_reader::InputReportReaderManager<PS2InputReport> input_report_readers_
@@ -150,7 +145,6 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
 #ifdef PS2_TEST
   sync_completion_t next_reader_wait_;
 #endif
-  async::Loop loop_;
 
   uint8_t last_code_ = 0;
   PS2InputReport report_;
@@ -164,7 +158,6 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
   }
 
   zx::result<fuchsia_hardware_input::wire::BootProtocol> Identify();
-  void IrqThread();
   // Keyboard input
   void ProcessScancode(zx::time timestamp, uint8_t code);
   KeyStatus AddKey(fuchsia_input::wire::Key key);

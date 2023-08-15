@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.mem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/input_report_reader/reader.h>
@@ -71,17 +72,17 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
     kIspAddr = 0xc000,
   };
 
-  Gt6853Device(zx_device_t* parent, ddk::I2cChannel i2c)
-      : Gt6853Device(parent, std::move(i2c), {}, {}) {}
+  Gt6853Device(zx_device_t* parent, async_dispatcher_t* dispatcher, ddk::I2cChannel i2c)
+      : Gt6853Device(parent, dispatcher, std::move(i2c), {}, {}) {}
 
-  Gt6853Device(zx_device_t* parent, ddk::I2cChannel i2c,
+  Gt6853Device(zx_device_t* parent, async_dispatcher_t* dispatcher, ddk::I2cChannel i2c,
                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> interrupt_gpio,
                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio)
       : DeviceType(parent),
+        dispatcher_(dispatcher),
         i2c_(std::move(i2c)),
         interrupt_gpio_(std::move(interrupt_gpio)),
-        reset_gpio_(std::move(reset_gpio)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+        reset_gpio_(std::move(reset_gpio)) {}
   ~Gt6853Device() override = default;
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -150,19 +151,20 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   zx::result<> Write(Register reg, const uint8_t* buffer, size_t size);
   zx::result<> WriteAndCheck(Register reg, const uint8_t* buffer, size_t size);
 
-  int Thread();
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
   void Shutdown();  // Only called after thread_ has been started.
+
+  async_dispatcher_t* dispatcher_;
 
   ddk::I2cChannel i2c_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> interrupt_gpio_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
   zx::interrupt interrupt_;
-
-  thrd_t thread_ = {};
+  async::IrqMethod<Gt6853Device, &Gt6853Device::HandleIrq> irq_handler_{this};
 
   input_report_reader::InputReportReaderManager<Gt6853InputReport> input_report_readers_;
   sync_completion_t next_reader_wait_;
-  async::Loop loop_;
 
   inspect::Inspector inspector_;
   inspect::Node root_;

@@ -58,7 +58,6 @@ class RootDevice : public RootDeviceType {
   std::unique_ptr<PipeAutoReader> auto_reader_;
   InputDeviceDispatcher input_devices_;
 
-  async::Loop input_dev_loop_;
   async::Loop pipe_io_loop_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(RootDevice);

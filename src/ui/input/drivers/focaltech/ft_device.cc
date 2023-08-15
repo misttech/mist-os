@@ -103,46 +103,40 @@ FtDevice::FtInputReport FtDevice::ParseReport(const uint8_t* buf) {
   return report;
 }
 
-int FtDevice::Thread() {
-  zx_status_t status;
-  zx::time timestamp;
-  zxlogf(INFO, "focaltouch: entering irq thread");
-  while (true) {
-    status = irq_.wait(&timestamp);
-    if (!running_.load()) {
-      return ZX_OK;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "focaltouch: Interrupt error %d", status);
-    }
-    TRACE_DURATION("input", "FtDevice Read");
-    uint8_t i2c_buf[kMaxPoints * kFingerRptSize + 1];
-    status = Read(FTS_REG_CURPOINT, i2c_buf, kMaxPoints * kFingerRptSize + 1);
-    if (status == ZX_OK) {
-      auto report = ParseReport(i2c_buf);
-      report.event_time = timestamp;
-      readers_.SendReportToAllReaders(report);
-
-      const zx::duration latency = zx::clock::get_monotonic() - timestamp;
-
-      total_latency_ += latency;
-      report_count_++;
-      average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
-
-      if (latency > max_latency_) {
-        max_latency_ = latency;
-        max_latency_usecs_.Set(max_latency_.to_usecs());
-      }
-
-      if (i2c_buf[0] > 0) {
-        total_report_count_.Add(1);
-        last_event_timestamp_.Set(timestamp.get());
-      }
-    } else {
-      zxlogf(ERROR, "focaltouch: i2c read error");
-    }
+void FtDevice::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                         const zx_packet_interrupt_t* interrupt) {
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "focaltouch: Interrupt error %d", status);
   }
-  zxlogf(INFO, "focaltouch: exiting");
+  TRACE_DURATION("input", "FtDevice Read");
+  uint8_t i2c_buf[kMaxPoints * kFingerRptSize + 1];
+  status = Read(FTS_REG_CURPOINT, i2c_buf, kMaxPoints * kFingerRptSize + 1);
+  if (status == ZX_OK) {
+    auto timestamp = zx::time(interrupt->timestamp);
+    auto report = ParseReport(i2c_buf);
+    report.event_time = timestamp;
+    readers_.SendReportToAllReaders(report);
+
+    const zx::duration latency = zx::clock::get_monotonic() - timestamp;
+
+    total_latency_ += latency;
+    report_count_++;
+    average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
+
+    if (latency > max_latency_) {
+      max_latency_ = latency;
+      max_latency_usecs_.Set(max_latency_.to_usecs());
+    }
+
+    if (i2c_buf[0] > 0) {
+      total_report_count_.Add(1);
+      last_event_timestamp_.Set(timestamp.get());
+    }
+  } else {
+    zxlogf(ERROR, "focaltouch: i2c read error");
+  }
+
+  irq_.ack();
 }
 
 zx_status_t FtDevice::Init() {
@@ -153,24 +147,25 @@ zx_status_t FtDevice::Init() {
   }
 
   const char* kIntGpioFragmentName = "gpio-int";
-  zx::result gpio_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-      parent(), kIntGpioFragmentName);
-  if (gpio_client.is_error()) {
+  zx::result int_gpio_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent(),
+                                                                             kIntGpioFragmentName);
+  if (int_gpio_client.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kIntGpioFragmentName,
-           gpio_client.status_string());
+           int_gpio_client.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
-  int_gpio_.Bind(std::move(gpio_client.value()));
+  int_gpio_.Bind(std::move(int_gpio_client.value()));
 
   const char* kResetGpioFragmentName = "gpio-reset";
-  gpio_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+  auto reset_gpio_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
       parent(), kResetGpioFragmentName);
-  if (gpio_client.is_error()) {
+  if (reset_gpio_client.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kResetGpioFragmentName,
-           gpio_client.status_string());
+           reset_gpio_client.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
-  reset_gpio_.Bind(std::move(gpio_client.value()));
+  reset_gpio_.Bind(std::move(reset_gpio_client.value()));
 
   {
     fidl::WireResult result = int_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
@@ -196,6 +191,8 @@ zx_status_t FtDevice::Init() {
     return interrupt->error_value();
   }
   irq_ = std::move(interrupt.value()->irq);
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(dispatcher_);
 
   size_t actual;
   FocaltechMetadata device_info;
@@ -291,14 +288,6 @@ zx_status_t FtDevice::Init() {
   return ZX_OK;
 }
 
-void FtDevice::StartThread() {
-  auto thunk = [](void* arg) -> int { return reinterpret_cast<FtDevice*>(arg)->Thread(); };
-
-  running_.store(true);
-  int ret = thrd_create_with_name(&thread_, thunk, this, "focaltouch-thread");
-  ZX_DEBUG_ASSERT(ret == thrd_success);
-}
-
 zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
   zxlogf(INFO, "focaltouch: driver started...");
 
@@ -312,13 +301,11 @@ zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
 
   auto cleanup = fit::defer([&]() { ft_dev->ShutDown(); });
 
-  ft_dev->StartThread();
-
   // Set scheduler role for device thread.
   {
     const char* role_name = "fuchsia.ui.input.drivers.focaltech.device";
-    status = device_set_profile_by_role(ft_dev->parent(), thrd_get_zx_handle(ft_dev->thread_),
-                                        role_name, strlen(role_name));
+    status = device_set_profile_by_role(ft_dev->parent(), zx_thread_self(), role_name,
+                                        strlen(role_name));
     if (status != ZX_OK) {
       zxlogf(WARNING, "focaltouch: Failed to apply scheduler role: %s",
              zx_status_get_string(status));
@@ -350,9 +337,8 @@ void FtDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 zx_status_t FtDevice::ShutDown() {
-  running_.store(false);
+  irq_handler_.Cancel();
   irq_.destroy();
-  thrd_join(thread_, NULL);
   return ZX_OK;
 }
 

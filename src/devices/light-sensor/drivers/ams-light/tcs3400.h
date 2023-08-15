@@ -7,8 +7,8 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/async/cpp/irq.h>
+#include <lib/async/cpp/task.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -58,16 +58,9 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
-  // Visible for testing.
-  static zx::result<Tcs3400Device*> CreateAndGetDevice(void* ctx, zx_device_t* parent);
-
-  Tcs3400Device(zx_device_t* device, ddk::I2cChannel i2c,
-                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio, zx::port port)
-      : DeviceType(device),
-        i2c_(std::move(i2c)),
-        gpio_(std::move(gpio)),
-        port_(std::move(port)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+  Tcs3400Device(zx_device_t* device, async_dispatcher_t* dispatcher, ddk::I2cChannel i2c,
+                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio)
+      : DeviceType(device), dispatcher_(dispatcher), i2c_(std::move(i2c)), gpio_(std::move(gpio)) {}
   ~Tcs3400Device() override = default;
 
   zx_status_t Bind();
@@ -90,16 +83,23 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
 
   // Visible for testing.
   void WaitForNextReader();
-  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
  private:
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
+  void HandlePoll(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
+  void RearmIrq();
+  void Configure();
+
+  async_dispatcher_t* dispatcher_;
+  async::IrqMethod<Tcs3400Device, &Tcs3400Device::HandleIrq> irq_handler_{this};
+  async::TaskMethod<Tcs3400Device, &Tcs3400Device::HandlePoll> polling_handler_{this};
+
   ddk::I2cChannel i2c_;  // Accessed by the main thread only before thread_ has been started.
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_;
   zx::interrupt irq_;
-  thrd_t thread_ = {};
-  zx::port port_;
   fbl::Mutex input_lock_;
   fbl::Mutex feature_lock_;
   Tcs3400InputReport input_rpt_ TA_GUARDED(input_lock_) = {};
@@ -109,15 +109,12 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   bool isSaturated_ = false;
   zx::time lastSaturatedLog_ = zx::time::infinite_past();
   sync_completion_t next_reader_wait_;
-  async::Loop loop_;
   input_report_reader::InputReportReaderManager<Tcs3400InputReport> readers_;
 
   zx::result<Tcs3400InputReport> ReadInputRpt();
   zx_status_t InitGain(uint8_t gain);
   zx_status_t WriteReg(uint8_t reg, uint8_t value);
   zx_status_t ReadReg(uint8_t reg, uint8_t& output_value);
-  int Thread();
-  void ShutDown();
 };
 }  // namespace tcs
 

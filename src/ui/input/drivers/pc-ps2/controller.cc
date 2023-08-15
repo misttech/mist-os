@@ -43,7 +43,9 @@ zx_status_t Controller::Bind(void *ctx, zx_device_t *parent) {
 }
 
 void Controller::DdkInit(ddk::InitTxn txn) {
-  init_thread_ = std::thread([this, txn = std::move(txn)]() mutable {
+  init_thread_ = std::thread([this, txn = std::move(txn),
+                              dispatcher = fdf_dispatcher_get_async_dispatcher(
+                                  fdf_dispatcher_get_current_dispatcher())]() mutable {
     zx_status_t status;
     auto cancel = fit::defer([&txn, &status]() {
       zxlogf(ERROR, "init status: %s", zx_status_get_string(status));
@@ -165,13 +167,13 @@ void Controller::DdkInit(ddk::InitTxn txn) {
     txn.Reply(ZX_OK);
 
     // Failure here won't fail everything else.
-    zx_status_t bind_status = I8042Device::Bind(this, Port::kPort1);
+    zx_status_t bind_status = I8042Device::Bind(this, dispatcher, Port::kPort1);
     if (bind_status != ZX_OK) {
       zxlogf(WARNING, "Failed to bind Port 1: %s", zx_status_get_string(bind_status));
     }
 
     if (has_port2_) {
-      bind_status = I8042Device::Bind(this, Port::kPort2);
+      bind_status = I8042Device::Bind(this, dispatcher, Port::kPort2);
       if (bind_status != ZX_OK) {
         zxlogf(WARNING, "Failed to bind Port 2: %s", zx_status_get_string(bind_status));
       }

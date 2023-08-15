@@ -110,7 +110,6 @@ class Tcs3400Test : public zxtest::Test {
         .polling_time_us = 0,
     };
 
-    fake_parent_ = MockDevice::FakeRootParent();
     fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kLightSensorMetadata,
                               sizeof(kLightSensorMetadata));
 
@@ -143,10 +142,14 @@ class Tcs3400Test : public zxtest::Test {
 
     EXPECT_OK(loop_.StartThread());
 
-    const auto status = Tcs3400Device::CreateAndGetDevice(nullptr, fake_parent_.get());
-    ASSERT_TRUE(status.is_ok());
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      const auto status = Tcs3400Device::Create(nullptr, fake_parent_.get());
+      ASSERT_OK(status);
+    });
+    EXPECT_OK(result.status_value());
     ASSERT_EQ(fuchsia_hardware_gpio::GpioFlags::kNoPull, fake_gpio_.GetReadFlags());
-    device_ = status.value();
+    auto* child = fake_parent_->GetLatestChild();
+    device_ = child->GetDeviceContext<Tcs3400Device>();
 
     fake_i2c_.WaitForConfiguration();
 
@@ -155,8 +158,11 @@ class Tcs3400Test : public zxtest::Test {
   }
 
   void TearDown() override {
-    device_async_remove(device_->zxdev());
-    EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      device_async_remove(device_->zxdev());
+      EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));
+    });
+    EXPECT_OK(result.status_value());
     loop_.Shutdown();
   }
 
@@ -167,7 +173,7 @@ class Tcs3400Test : public zxtest::Test {
       return {};
     }
 
-    fidl::BindServer(device_->dispatcher(), std::move(server), device_);
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server), device_);
     return client;
   }
 
@@ -251,7 +257,9 @@ class Tcs3400Test : public zxtest::Test {
   Tcs3400Device* device_ = nullptr;
 
  private:
-  std::shared_ptr<MockDevice> fake_parent_;
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
   async::Loop loop_;
   component::OutgoingDirectory outgoing_;
 };
@@ -955,16 +963,17 @@ class Tcs3400MetadataTest : public zxtest::Test {
 
     EXPECT_OK(loop.StartThread());
 
-    const auto status = Tcs3400Device::CreateAndGetDevice(nullptr, fake_parent.get());
-    ASSERT_TRUE(status.is_ok());
+    const auto status = Tcs3400Device::Create(nullptr, fake_parent.get());
+    ASSERT_OK(status);
     ASSERT_EQ(fuchsia_hardware_gpio::GpioFlags::kNoPull, fake_gpio.GetReadFlags());
+    auto* child = fake_parent->GetLatestChild();
 
     fake_i2c.WaitForConfiguration();
 
     EXPECT_EQ(fake_i2c.GetRegisterLastWrite(TCS_I2C_ATIME), atime_register);
     EXPECT_EQ(fake_i2c.GetRegisterLastWrite(TCS_I2C_CONTROL), again_register);
 
-    device_async_remove(status.value()->zxdev());
+    device_async_remove(child);
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent.get()));
     loop.Shutdown();
   }
@@ -988,6 +997,8 @@ TEST_F(Tcs3400MetadataTest, IntegrationTime) {
 
 TEST(Tcs3400Test, TooManyI2cErrors) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
 
   metadata::LightSensorParams parameters = {};
   parameters.gain = 64;
@@ -1009,12 +1020,9 @@ TEST(Tcs3400Test, TooManyI2cErrors) {
   ASSERT_TRUE(gpio_endpoints.is_ok());
   fidl::BindServer(loop.dispatcher(), std::move(gpio_endpoints->server), &fake_gpio);
 
-  zx::port port;
-  ASSERT_OK(zx::port::create(0, &port));
-
   EXPECT_OK(loop.StartThread());
-  Tcs3400Device device(fake_parent.get(), std::move(i2c_endpoints->client),
-                       std::move(gpio_endpoints->client), std::move(port));
+  Tcs3400Device device(fake_parent.get(), dispatcher->async_dispatcher(),
+                       std::move(i2c_endpoints->client), std::move(gpio_endpoints->client));
 
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &parameters,
                            sizeof(metadata::LightSensorParams));

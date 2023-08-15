@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/driver.h>
@@ -21,7 +22,6 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace goldfish::sensor {
 
@@ -29,35 +29,31 @@ template <class DutType>
 class InputDeviceTest : public ::testing::TestWithParam<bool> {
  public:
   void SetUp() override {
-    fake_parent_ = MockDevice::FakeRootParent();
-
-    loop_ = std::make_unique<async::TestLoop>();
-    auto device = std::make_unique<DutType>(fake_parent_.get(), loop_->dispatcher());
-    ASSERT_EQ(device->DdkAdd("goldfish-sensor-input"), ZX_OK);
-    // dut_ will be deleted by MockDevice when the test ends.
-    dut_ = device.release();
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      auto device = std::make_unique<DutType>(fake_parent_.get(), dispatcher_->async_dispatcher());
+      ASSERT_EQ(device->DdkAdd("goldfish-sensor-input"), ZX_OK);
+      // dut_ will be deleted by MockDevice when the test ends.
+      dut_ = device.release();
+    });
+    EXPECT_EQ(result.status_value(), ZX_OK);
 
     ASSERT_EQ(fake_parent_->child_count(), 1u);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
     ASSERT_TRUE(endpoints.is_ok());
 
-    binding_ = fidl::BindServer(loop_->dispatcher(), std::move(endpoints->server),
+    binding_ = fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server),
                                 fake_parent_->GetLatestChild()->GetDeviceContext<InputDevice>());
 
-    device_client_ = fidl::WireClient(std::move(endpoints->client), loop_->dispatcher());
+    device_client_.Bind(std::move(endpoints->client));
   }
 
   void TearDown() override {
-    // After tests finishes, there might still be some pending events on the
-    // loop that uses the InputReportsReader which could cause a use-after-free
-    // error if we destroy the loop after destroying the device. Thus we destroy
-    // the loop first. This is safe as long as we don't call
-    // GetInputReportsReader() after resetting |loop_|.
-    loop_.reset();
-
-    device_async_remove(dut_->zxdev());
-    mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
+      device_async_remove(dut_->zxdev());
+      mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+    });
+    EXPECT_EQ(result.status_value(), ZX_OK);
   }
 
   DutType* dut() const { return static_cast<DutType*>(dut_); }
@@ -65,10 +61,11 @@ class InputDeviceTest : public ::testing::TestWithParam<bool> {
   bool HasMeasurementId() const { return GetParam(); }
 
  protected:
-  std::shared_ptr<MockDevice> fake_parent_;
-  std::unique_ptr<async::TestLoop> loop_;
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf::UnownedSynchronizedDispatcher dispatcher_ =
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
   InputDevice* dut_;
-  fidl::WireClient<fuchsia_input_report::InputDevice> device_client_;
+  fidl::WireSyncClient<fuchsia_input_report::InputDevice> device_client_;
   std::optional<fidl::ServerBindingRef<fuchsia_input_report::InputDevice>> binding_;
 };
 
@@ -82,13 +79,7 @@ class TestAccelerationInputDevice : public AccelerationInputDevice {
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
                              GetInputReportsReaderCompleter::Sync& completer) override {
     AccelerationInputDevice::GetInputReportsReader(request, completer);
-    ++readers_created_;
   }
-  size_t readers_created() const { return readers_created_.load(); }
-
- private:
-  // For test purpose only.
-  std::atomic<size_t> readers_created_ = 0;
 };
 
 using AccelerationInputDeviceTest = InputDeviceTest<TestAccelerationInputDevice>;
@@ -100,14 +91,13 @@ TEST_P(AccelerationInputDeviceTest, ReadInputReports) {
 
   auto reader_result = device_client_->GetInputReportsReader(std::move(server_end));
   ASSERT_TRUE(reader_result.ok());
-  auto reader_client = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
-      std::move(client_end), loop_->dispatcher());
-
-  ASSERT_TRUE(loop_->RunUntilIdle());
+  auto reader_client =
+      fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client_end));
 
   // The FIDL callback runs on another thread.
   // We will need to wait for the FIDL callback to finish before using |client|.
-  ASSERT_TRUE(dut()->readers_created());
+  auto descriptor = device_client_->GetDescriptor();
+  ASSERT_TRUE(descriptor.ok());
 
   SensorReport rpt = {.name = "acceleration", .data = {Numeric(1.0), Numeric(2.0), Numeric(3.0)}};
   if (HasMeasurementId()) {
@@ -115,65 +105,51 @@ TEST_P(AccelerationInputDeviceTest, ReadInputReports) {
   }
   EXPECT_EQ(dut_->OnReport(rpt), ZX_OK);
 
-  reader_client->ReadInputReports().ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
-             result) {
-        ASSERT_TRUE(result.ok());
-        auto* response = result.Unwrap();
-        ASSERT_TRUE(response->is_ok());
-        auto& reports = response->value()->reports;
-        ASSERT_EQ(reports.count(), 1u);
-        auto& report = response->value()->reports[0];
-        ASSERT_TRUE(report.has_sensor());
-        auto& sensor = response->value()->reports[0].sensor();
-        ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 3);
-        EXPECT_EQ(sensor.values().at(0), 100);
-        EXPECT_EQ(sensor.values().at(1), 200);
-        EXPECT_EQ(sensor.values().at(2), 300);
-      });
-  ASSERT_TRUE(loop_->RunUntilIdle());
+  auto result = reader_client->ReadInputReports();
+  ASSERT_TRUE(result.ok());
+  auto* response = result.Unwrap();
+  ASSERT_TRUE(response->is_ok());
+  auto& reports = response->value()->reports;
+  ASSERT_EQ(reports.count(), 1u);
+  auto& report = response->value()->reports[0];
+  ASSERT_TRUE(report.has_sensor());
+  auto& sensor = response->value()->reports[0].sensor();
+  ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 3);
+  EXPECT_EQ(sensor.values().at(0), 100);
+  EXPECT_EQ(sensor.values().at(1), 200);
+  EXPECT_EQ(sensor.values().at(2), 300);
 }
 
 TEST_F(AccelerationInputDeviceTest, Descriptor) {
-  bool get_descriptor_called = false;
-  device_client_->GetDescriptor().ThenExactlyOnce(
-      [&get_descriptor_called](
-          fidl::WireUnownedResult<fuchsia_input_report::InputDevice::GetDescriptor>& result) {
-        ASSERT_TRUE(result.ok());
-        auto* response = result.Unwrap();
-        get_descriptor_called = true;
-        ASSERT_NE(response, nullptr);
-        const auto& descriptor = response->descriptor;
+  auto result = device_client_->GetDescriptor();
+  ASSERT_TRUE(result.ok());
+  auto* response = result.Unwrap();
+  ASSERT_NE(response, nullptr);
+  const auto& descriptor = response->descriptor;
 
-        ASSERT_TRUE(descriptor.has_sensor());
-        EXPECT_FALSE(descriptor.has_keyboard());
-        EXPECT_FALSE(descriptor.has_mouse());
-        EXPECT_FALSE(descriptor.has_touch());
-        EXPECT_FALSE(descriptor.has_consumer_control());
+  ASSERT_TRUE(descriptor.has_sensor());
+  EXPECT_FALSE(descriptor.has_keyboard());
+  EXPECT_FALSE(descriptor.has_mouse());
+  EXPECT_FALSE(descriptor.has_touch());
+  EXPECT_FALSE(descriptor.has_consumer_control());
 
-        ASSERT_TRUE(descriptor.sensor().has_input());
-        ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
-        ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
-        const auto& values = descriptor.sensor().input()[0].values();
+  ASSERT_TRUE(descriptor.sensor().has_input());
+  ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
+  ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
+  const auto& values = descriptor.sensor().input()[0].values();
 
-        ASSERT_EQ(values.count(), 3u);
-        EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kAccelerometerX);
-        EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kAccelerometerY);
-        EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kAccelerometerZ);
+  ASSERT_EQ(values.count(), 3u);
+  EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kAccelerometerX);
+  EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kAccelerometerY);
+  EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kAccelerometerZ);
 
-        EXPECT_EQ(values[0].axis.unit.type,
-                  fuchsia_input_report::wire::UnitType::kSiLinearAcceleration);
-        EXPECT_EQ(values[1].axis.unit.type,
-                  fuchsia_input_report::wire::UnitType::kSiLinearAcceleration);
-        EXPECT_EQ(values[2].axis.unit.type,
-                  fuchsia_input_report::wire::UnitType::kSiLinearAcceleration);
+  EXPECT_EQ(values[0].axis.unit.type, fuchsia_input_report::wire::UnitType::kSiLinearAcceleration);
+  EXPECT_EQ(values[1].axis.unit.type, fuchsia_input_report::wire::UnitType::kSiLinearAcceleration);
+  EXPECT_EQ(values[2].axis.unit.type, fuchsia_input_report::wire::UnitType::kSiLinearAcceleration);
 
-        EXPECT_EQ(values[0].axis.unit.exponent, -2);
-        EXPECT_EQ(values[1].axis.unit.exponent, -2);
-        EXPECT_EQ(values[2].axis.unit.exponent, -2);
-      });
-  ASSERT_TRUE(loop_->RunUntilIdle());
-  EXPECT_TRUE(get_descriptor_called);
+  EXPECT_EQ(values[0].axis.unit.exponent, -2);
+  EXPECT_EQ(values[1].axis.unit.exponent, -2);
+  EXPECT_EQ(values[2].axis.unit.exponent, -2);
 }
 
 TEST_P(AccelerationInputDeviceTest, InvalidInputReports) {
@@ -218,13 +194,7 @@ class TestGyroscopeInputDevice : public GyroscopeInputDevice {
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
                              GetInputReportsReaderCompleter::Sync& completer) override {
     GyroscopeInputDevice::GetInputReportsReader(request, completer);
-    ++readers_created_;
   }
-  size_t readers_created() const { return readers_created_.load(); }
-
- private:
-  // For test purpose only.
-  std::atomic<size_t> readers_created_ = 0;
 };
 
 using GyroscopeInputDeviceTest = InputDeviceTest<TestGyroscopeInputDevice>;
@@ -236,14 +206,13 @@ TEST_P(GyroscopeInputDeviceTest, ReadInputReports) {
 
   auto reader_result = device_client_->GetInputReportsReader(std::move(server_end));
   ASSERT_TRUE(reader_result.ok());
-  auto reader_client = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
-      std::move(client_end), loop_->dispatcher());
-
-  ASSERT_TRUE(loop_->RunUntilIdle());
+  auto reader_client =
+      fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client_end));
 
   // The FIDL callback runs on another thread.
   // We will need to wait for the FIDL callback to finish before using |client|.
-  ASSERT_TRUE(dut()->readers_created());
+  auto descriptor = device_client_->GetDescriptor();
+  ASSERT_TRUE(descriptor.ok());
 
   SensorReport rpt = {.name = "gyroscope",
                       .data = {Numeric(M_PI), Numeric(2.0 * M_PI), Numeric(3.0 * M_PI)}};
@@ -253,66 +222,55 @@ TEST_P(GyroscopeInputDeviceTest, ReadInputReports) {
 
   EXPECT_EQ(dut_->OnReport(rpt), ZX_OK);
 
-  reader_client->ReadInputReports().ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
-             result) {
-        ASSERT_TRUE(result.ok());
-        auto* response = result.Unwrap();
-        ASSERT_TRUE(response->is_ok());
-        auto& reports = response->value()->reports;
-        ASSERT_EQ(reports.count(), 1u);
-        auto& report = response->value()->reports[0];
-        ASSERT_TRUE(report.has_sensor());
-        auto& sensor = response->value()->reports[0].sensor();
-        ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 3);
-        EXPECT_EQ(sensor.values().at(0), 18000);
-        EXPECT_EQ(sensor.values().at(1), 36000);
-        EXPECT_EQ(sensor.values().at(2), 54000);
-      });
-  ASSERT_TRUE(loop_->RunUntilIdle());
+  auto result = reader_client->ReadInputReports();
+  ASSERT_TRUE(result.ok());
+  auto* response = result.Unwrap();
+  ASSERT_TRUE(response->is_ok());
+  auto& reports = response->value()->reports;
+  ASSERT_EQ(reports.count(), 1u);
+  auto& report = response->value()->reports[0];
+  ASSERT_TRUE(report.has_sensor());
+  auto& sensor = response->value()->reports[0].sensor();
+  ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 3);
+  EXPECT_EQ(sensor.values().at(0), 18000);
+  EXPECT_EQ(sensor.values().at(1), 36000);
+  EXPECT_EQ(sensor.values().at(2), 54000);
 }
 
 TEST_F(GyroscopeInputDeviceTest, Descriptor) {
-  bool get_descriptor_called = false;
-  device_client_->GetDescriptor().ThenExactlyOnce(
-      [&get_descriptor_called](
-          fidl::WireUnownedResult<fuchsia_input_report::InputDevice::GetDescriptor>& result) {
-        ASSERT_TRUE(result.ok());
-        auto* response = result.Unwrap();
+  auto result = device_client_->GetDescriptor();
+  ASSERT_TRUE(result.ok());
+  auto* response = result.Unwrap();
 
-        get_descriptor_called = true;
-        ASSERT_NE(response, nullptr);
-        const auto& descriptor = response->descriptor;
+  ASSERT_NE(response, nullptr);
+  const auto& descriptor = response->descriptor;
 
-        ASSERT_TRUE(descriptor.has_sensor());
-        EXPECT_FALSE(descriptor.has_keyboard());
-        EXPECT_FALSE(descriptor.has_mouse());
-        EXPECT_FALSE(descriptor.has_touch());
-        EXPECT_FALSE(descriptor.has_consumer_control());
+  ASSERT_TRUE(descriptor.has_sensor());
+  EXPECT_FALSE(descriptor.has_keyboard());
+  EXPECT_FALSE(descriptor.has_mouse());
+  EXPECT_FALSE(descriptor.has_touch());
+  EXPECT_FALSE(descriptor.has_consumer_control());
 
-        ASSERT_TRUE(descriptor.sensor().has_input());
-        ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
-        ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
-        const auto& values = descriptor.sensor().input()[0].values();
+  ASSERT_TRUE(descriptor.sensor().has_input());
+  ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
+  ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
+  const auto& values = descriptor.sensor().input()[0].values();
 
-        ASSERT_EQ(values.count(), 3u);
-        EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kGyroscopeX);
-        EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kGyroscopeY);
-        EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kGyroscopeZ);
+  ASSERT_EQ(values.count(), 3u);
+  EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kGyroscopeX);
+  EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kGyroscopeY);
+  EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kGyroscopeZ);
 
-        EXPECT_EQ(values[0].axis.unit.type,
-                  fuchsia_input_report::wire::UnitType::kEnglishAngularVelocity);
-        EXPECT_EQ(values[1].axis.unit.type,
-                  fuchsia_input_report::wire::UnitType::kEnglishAngularVelocity);
-        EXPECT_EQ(values[2].axis.unit.type,
-                  fuchsia_input_report::wire::UnitType::kEnglishAngularVelocity);
+  EXPECT_EQ(values[0].axis.unit.type,
+            fuchsia_input_report::wire::UnitType::kEnglishAngularVelocity);
+  EXPECT_EQ(values[1].axis.unit.type,
+            fuchsia_input_report::wire::UnitType::kEnglishAngularVelocity);
+  EXPECT_EQ(values[2].axis.unit.type,
+            fuchsia_input_report::wire::UnitType::kEnglishAngularVelocity);
 
-        EXPECT_EQ(values[0].axis.unit.exponent, -2);
-        EXPECT_EQ(values[1].axis.unit.exponent, -2);
-        EXPECT_EQ(values[2].axis.unit.exponent, -2);
-      });
-  ASSERT_TRUE(loop_->RunUntilIdle());
-  EXPECT_TRUE(get_descriptor_called);
+  EXPECT_EQ(values[0].axis.unit.exponent, -2);
+  EXPECT_EQ(values[1].axis.unit.exponent, -2);
+  EXPECT_EQ(values[2].axis.unit.exponent, -2);
 }
 
 TEST_P(GyroscopeInputDeviceTest, InvalidInputReports) {
@@ -357,13 +315,7 @@ class TestRgbcLightInputDevice : public RgbcLightInputDevice {
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
                              GetInputReportsReaderCompleter::Sync& completer) override {
     RgbcLightInputDevice::GetInputReportsReader(request, completer);
-    ++readers_created_;
   }
-  size_t readers_created() const { return readers_created_.load(); }
-
- private:
-  // For test purpose only.
-  std::atomic<size_t> readers_created_ = 0;
 };
 
 using RgbcLightInputDeviceTest = InputDeviceTest<TestRgbcLightInputDevice>;
@@ -375,14 +327,13 @@ TEST_P(RgbcLightInputDeviceTest, ReadInputReports) {
 
   auto reader_result = device_client_->GetInputReportsReader(std::move(server_end));
   ASSERT_TRUE(reader_result.ok());
-  auto reader_client = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
-      std::move(client_end), loop_->dispatcher());
-
-  ASSERT_TRUE(loop_->RunUntilIdle());
+  auto reader_client =
+      fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client_end));
 
   // The FIDL callback runs on another thread.
   // We will need to wait for the FIDL callback to finish before using |client|.
-  ASSERT_TRUE(dut()->readers_created());
+  auto descriptor = device_client_->GetDescriptor();
+  ASSERT_TRUE(descriptor.ok());
 
   SensorReport rpt = {.name = "rgbclight",
                       .data = {Numeric(100L), Numeric(200L), Numeric(300L), Numeric(400L)}};
@@ -391,61 +342,50 @@ TEST_P(RgbcLightInputDeviceTest, ReadInputReports) {
   }
   EXPECT_EQ(dut_->OnReport(rpt), ZX_OK);
 
-  reader_client->ReadInputReports().ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
-             result) {
-        ASSERT_TRUE(result.ok());
-        auto* response = result.Unwrap();
-        ASSERT_TRUE(response->is_ok());
-        auto& reports = response->value()->reports;
-        ASSERT_EQ(reports.count(), 1u);
-        auto& report = response->value()->reports[0];
-        ASSERT_TRUE(report.has_sensor());
-        auto& sensor = response->value()->reports[0].sensor();
-        ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 4);
-        EXPECT_EQ(sensor.values().at(0), 100L);
-        EXPECT_EQ(sensor.values().at(1), 200L);
-        EXPECT_EQ(sensor.values().at(2), 300L);
-        EXPECT_EQ(sensor.values().at(3), 400L);
-      });
-  ASSERT_TRUE(loop_->RunUntilIdle());
+  auto result = reader_client->ReadInputReports();
+  ASSERT_TRUE(result.ok());
+  auto* response = result.Unwrap();
+  ASSERT_TRUE(response->is_ok());
+  auto& reports = response->value()->reports;
+  ASSERT_EQ(reports.count(), 1u);
+  auto& report = response->value()->reports[0];
+  ASSERT_TRUE(report.has_sensor());
+  auto& sensor = response->value()->reports[0].sensor();
+  ASSERT_TRUE(sensor.has_values() && sensor.values().count() == 4);
+  EXPECT_EQ(sensor.values().at(0), 100L);
+  EXPECT_EQ(sensor.values().at(1), 200L);
+  EXPECT_EQ(sensor.values().at(2), 300L);
+  EXPECT_EQ(sensor.values().at(3), 400L);
 }
 
 TEST_F(RgbcLightInputDeviceTest, Descriptor) {
-  bool get_descriptor_called = false;
-  device_client_->GetDescriptor().ThenExactlyOnce(
-      [&get_descriptor_called](
-          fidl::WireUnownedResult<fuchsia_input_report::InputDevice::GetDescriptor>& result) {
-        ASSERT_TRUE(result.ok());
-        auto* response = result.Unwrap();
-        get_descriptor_called = true;
-        ASSERT_NE(response, nullptr);
-        const auto& descriptor = response->descriptor;
+  auto result = device_client_->GetDescriptor();
+  ASSERT_TRUE(result.ok());
+  auto* response = result.Unwrap();
+  ASSERT_NE(response, nullptr);
+  const auto& descriptor = response->descriptor;
 
-        ASSERT_TRUE(descriptor.has_sensor());
-        EXPECT_FALSE(descriptor.has_keyboard());
-        EXPECT_FALSE(descriptor.has_mouse());
-        EXPECT_FALSE(descriptor.has_touch());
-        EXPECT_FALSE(descriptor.has_consumer_control());
+  ASSERT_TRUE(descriptor.has_sensor());
+  EXPECT_FALSE(descriptor.has_keyboard());
+  EXPECT_FALSE(descriptor.has_mouse());
+  EXPECT_FALSE(descriptor.has_touch());
+  EXPECT_FALSE(descriptor.has_consumer_control());
 
-        ASSERT_TRUE(descriptor.sensor().has_input());
-        ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
-        ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
-        const auto& values = descriptor.sensor().input()[0].values();
+  ASSERT_TRUE(descriptor.sensor().has_input());
+  ASSERT_EQ(descriptor.sensor().input().count(), 1UL);
+  ASSERT_TRUE(descriptor.sensor().input()[0].has_values());
+  const auto& values = descriptor.sensor().input()[0].values();
 
-        ASSERT_EQ(values.count(), 4u);
-        EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kLightRed);
-        EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kLightGreen);
-        EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kLightBlue);
-        EXPECT_EQ(values[3].type, fuchsia_input_report::wire::SensorType::kLightIlluminance);
+  ASSERT_EQ(values.count(), 4u);
+  EXPECT_EQ(values[0].type, fuchsia_input_report::wire::SensorType::kLightRed);
+  EXPECT_EQ(values[1].type, fuchsia_input_report::wire::SensorType::kLightGreen);
+  EXPECT_EQ(values[2].type, fuchsia_input_report::wire::SensorType::kLightBlue);
+  EXPECT_EQ(values[3].type, fuchsia_input_report::wire::SensorType::kLightIlluminance);
 
-        EXPECT_EQ(values[0].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
-        EXPECT_EQ(values[1].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
-        EXPECT_EQ(values[2].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
-        EXPECT_EQ(values[3].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
-      });
-  ASSERT_TRUE(loop_->RunUntilIdle());
-  EXPECT_TRUE(get_descriptor_called);
+  EXPECT_EQ(values[0].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
+  EXPECT_EQ(values[1].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
+  EXPECT_EQ(values[2].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
+  EXPECT_EQ(values[3].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
 }
 
 TEST_P(RgbcLightInputDeviceTest, InvalidInputReports) {

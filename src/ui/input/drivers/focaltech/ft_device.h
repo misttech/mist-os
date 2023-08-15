@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/focaltech/focaltech.h>
@@ -100,7 +101,6 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
 
   // Visible for testing.
   zx_status_t Init();
-  void StartThread();
   zx_status_t ShutDown();
 
 #ifdef FT_TEST
@@ -172,7 +172,8 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
   uint8_t Read(uint8_t addr);
   zx_status_t Read(uint8_t addr, uint8_t* buf, size_t len);
 
-  int Thread();
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
 
   static FtInputReport ParseReport(const uint8_t* buf);
 
@@ -184,10 +185,8 @@ class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTR
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> int_gpio_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
   zx::interrupt irq_;
+  async::IrqMethod<FtDevice, &FtDevice::HandleIrq> irq_handler_{this};
   ddk::I2cChannel i2c_;
-
-  thrd_t thread_;
-  std::atomic<bool> running_;
 
   inspect::Inspector inspector_;
   inspect::Node node_;
