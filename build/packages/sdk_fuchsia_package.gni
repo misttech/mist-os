@@ -265,6 +265,12 @@ template("sdk_fuchsia_package") {
       file_list = _sdk_package_file_list
 
       non_sdk_deps = [ ":${_sdk_manifest_target}" ]
+
+      # Barrier enforced to prevent assembly from adding to `base` set,
+      # keeping this target as an SDK-only addition.
+      metadata = {
+        package_barrier = []
+      }
     }
   } else {
     # Fuchsia SDK packages should only be built with target_toolchain. However, it
