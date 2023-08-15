@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs::File, ops::Deref};
 
 pub use v1::*;
-pub use v2::{ProductBundleV2, Repository};
+pub use v2::{ProductBundleV2, Repository, Type};
 
 /// Returns a representation of a ProductBundle that has been loaded from disk.
 ///

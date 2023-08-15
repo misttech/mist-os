@@ -29,6 +29,7 @@ use fuchsia_repo::{repo_client::RepoClient, repository::FileSystemRepository};
 use pathdiff::diff_utf8_paths;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::str::FromStr;
 
 /// Description of the data needed to set up (flash) a device.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -136,10 +137,22 @@ impl Repository {
 }
 
 #[derive(Clone, Debug, Copy, Hash, PartialEq, Eq)]
-enum Type {
+pub enum Type {
     Flash,
     Emu,
     Update,
+}
+
+impl FromStr for Type {
+    type Err = anyhow::Error;
+    fn from_str(value: &str) -> Result<Type, anyhow::Error> {
+        match value.to_lowercase().as_str() {
+            "flash" => Ok(Type::Flash),
+            "emu" => Ok(Type::Emu),
+            "update" => Ok(Type::Update),
+            _ => Err(anyhow!("Invalid Type: {}. Expect one of : flash, emu, update", value)),
+        }
+    }
 }
 
 impl ProductBundleV2 {
