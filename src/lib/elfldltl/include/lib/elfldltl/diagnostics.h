@@ -419,49 +419,6 @@ constexpr auto CollectStringsDiagnostics(T& container, Flags&&... flags) {
   return Diagnostics(add_error, std::forward<Flags>(flags)...);
 }
 
-template <typename S, size_t N>
-constexpr decltype(auto) operator<<(S&& ostream, internal::ConstString<N> string) {
-  return std::forward<S>(ostream) << static_cast<std::string_view>(string);
-}
-
-// This returns a Report callable that uses << on an ostream-style object.
-// Any additional arguments are passed via << as a prefix on each message.  The
-// ostream should probably be in << std::hex state for the output to look good.
-template <typename Ostream, typename... Args>
-constexpr auto OstreamDiagnosticsReport(Ostream& ostream, Args&&... prefix) {
-  return [prefix = std::make_tuple(std::forward<Args>(prefix)...), &ostream](
-             std::string_view error, auto&&... args) mutable -> bool {
-    std::apply([&](auto&&... prefix) { ((ostream << prefix), ...); }, prefix);
-    ostream << error;
-    ((ostream << args), ...);
-    ostream << "\n";
-    return true;
-  };
-}
-
-template <typename Ostream, class Flags = DiagnosticsFlags, typename... Args>
-constexpr auto OstreamDiagnostics(Ostream& ostream, Flags&& flags = {}, Args&&... prefix) {
-  return Diagnostics(OstreamDiagnosticsReport(ostream, std::forward<Args>(prefix)...), flags);
-}
-
-// These overloads let the object returned by OstreamDiagnostics format the
-// special argument types.
-
-template <typename S, typename T>
-constexpr decltype(auto) operator<<(S&& ostream, FileOffset<T> offset) {
-  return std::forward<S>(ostream) << " at file offset " << *offset;
-}
-
-template <typename S, typename T>
-constexpr decltype(auto) operator<<(S&& ostream, FileAddress<T> address) {
-  return std::forward<S>(ostream) << " at relative address " << *address;
-}
-
-template <typename S, typename T, typename = decltype(std::declval<T>().str())>
-constexpr decltype(auto) operator<<(S&& ostream, T&& t) {
-  return std::forward<S>(ostream) << t.str();
-}
-
 }  // namespace elfldltl
 
 #endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DIAGNOSTICS_H_

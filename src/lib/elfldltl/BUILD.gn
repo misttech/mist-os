@@ -43,6 +43,7 @@ library_headers("headers") {
     "lib/elfldltl/constants.h",
     "lib/elfldltl/container.h",
     "lib/elfldltl/diagnostics.h",
+    "lib/elfldltl/diagnostics-ostream.h",
     "lib/elfldltl/dynamic.h",
     "lib/elfldltl/fd.h",
     "lib/elfldltl/field.h",

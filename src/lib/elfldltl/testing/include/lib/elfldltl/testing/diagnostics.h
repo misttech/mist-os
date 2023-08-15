@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_DIAGNOSTICS_H_
 #define SRC_LIB_ELFLDLTL_TESTING_INCLUDE_LIB_ELFLDLTL_TESTING_DIAGNOSTICS_H_
 
+#include <lib/elfldltl/diagnostics-ostream.h>
 #include <lib/elfldltl/diagnostics.h>
 
 #include <functional>
