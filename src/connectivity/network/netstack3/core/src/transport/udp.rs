@@ -57,7 +57,7 @@ use crate::{
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
             DualStackDatagramBoundStateContext, EitherIpSocket, ExpectedConnError,
-            ExpectedUnboundError, FoundSockets, InUseError, LocalIdentifierAllocator,
+            ExpectedUnboundError, FoundSockets, InUseError, IpOptions, LocalIdentifierAllocator,
             MaybeDualStack, MulticastMembershipInterfaceSelector,
             NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
             SetMulticastMembershipError, ShutdownType, SocketHopLimits,
@@ -117,8 +117,6 @@ pub(crate) type UdpBoundSocketMap<I, D> = DatagramBoundSockets<I, D, IpPortSpec,
 impl<I: IpExt, NewIp: IpExt, D: WeakId> GenericOverIp<NewIp> for UdpBoundSocketMap<I, D> {
     type Type = UdpBoundSocketMap<NewIp, D>;
 }
-
-pub(crate) type SocketState<I, D> = DatagramSocketState<I, D, Udp>;
 
 #[derive(Derivative, GenericOverIp)]
 #[derivative(Default(bound = ""))]
@@ -1902,9 +1900,11 @@ impl<C: StateNonSyncContext<Ipv6>, SC: DualStackBoundStateContext<Ipv6, C> + Udp
     DualStackDatagramBoundStateContext<Ipv6, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
-    fn dual_stack_enabled(&self, state: &SocketState<Ipv6, SC::WeakDeviceId>) -> bool {
-        let (options, _device) = datagram::get_options_device(state);
-        let DualStackSocketState { dual_stack_enabled } = options.other_stack();
+    fn dual_stack_enabled(
+        &self,
+        state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, Udp>>,
+    ) -> bool {
+        let DualStackSocketState { dual_stack_enabled } = state.as_ref().other_stack();
         *dual_stack_enabled
     }
 

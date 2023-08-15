@@ -69,6 +69,17 @@ pub(crate) enum SocketState<I: Ip + IpExt, D: device::WeakId, S: DatagramSocketS
     Bound(BoundSocketState<I, D, S>),
 }
 
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+    for SocketState<I, D, S>
+{
+    fn as_ref(&self) -> &IpOptions<I, D, S> {
+        match self {
+            Self::Unbound(unbound) => unbound.as_ref(),
+            Self::Bound(bound) => bound.as_ref(),
+        }
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) enum BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
@@ -80,6 +91,17 @@ pub(crate) enum BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketS
         state: ConnState<I, D, S>,
         sharing: <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ConnSharingState,
     },
+}
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+    for BoundSocketState<I, D, S>
+{
+    fn as_ref(&self) -> &IpOptions<I, D, S> {
+        match self {
+            Self::Listener { state, sharing: _ } => state.as_ref(),
+            Self::Connected { state, sharing: _ } => state.as_ref(),
+        }
+    }
 }
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
@@ -172,6 +194,12 @@ pub(crate) struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
     ip_options: IpOptions<I, D, S>,
 }
 
+impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>> for UnboundSocketState<I, D, S> {
+    fn as_ref(&self) -> &IpOptions<I, D, S> {
+        &self.ip_options
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec + ?Sized> {
@@ -180,6 +208,14 @@ pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec + 
         ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
         D,
     >,
+}
+
+impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+    for ListenerState<I, D, S>
+{
+    fn as_ref(&self) -> &IpOptions<I, D, S> {
+        &self.ip_options
+    }
 }
 
 #[derive(Derivative)]
@@ -210,6 +246,14 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
     clear_device_on_disconnect: bool,
 }
 
+impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+    for ConnState<I, D, S>
+{
+    fn as_ref(&self) -> &IpOptions<I, D, S> {
+        self.socket.options()
+    }
+}
+
 impl<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec> ConnState<I, D, S> {
     pub(crate) fn should_receive(&self) -> bool {
         let Self { shutdown, socket: _, clear_device_on_disconnect: _, addr: _ } = self;
@@ -224,6 +268,12 @@ pub(crate) struct IpOptions<I: Ip + IpExt, D, S: DatagramSocketSpec + ?Sized> {
     multicast_memberships: MulticastMemberships<I::Addr, D>,
     hop_limits: SocketHopLimits,
     other_stack: S::OtherStackIpOptions<I>,
+}
+
+impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<Self> for IpOptions<I, D, S> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
 }
 
 impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
@@ -523,7 +573,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         + TransportIpContext<I::OtherVersion, C>;
 
     /// Returns if the socket state indicates dual-stack operation is enabled.
-    fn dual_stack_enabled(&self, socket: &SocketState<I, Self::WeakDeviceId, S>) -> bool;
+    fn dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool;
 
     /// Converts a socket ID to a receiving ID.
     ///
@@ -655,7 +705,7 @@ where
 {
     type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
 
-    fn dual_stack_enabled(&self, _socket: &SocketState<I, Self::WeakDeviceId, S>) -> bool {
+    fn dual_stack_enabled(&self, _state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool {
         self.uninstantiable_unreachable()
     }
 
@@ -1533,7 +1583,7 @@ where
         MaybeDualStack::DualStack(ds) => Some(ds),
         MaybeDualStack::NotDualStack(_) => None,
     }
-    .and_then(|ds| ds.dual_stack_enabled(entry.get()).then_some(ds));
+    .and_then(|ds| ds.dual_stack_enabled(ip_options).then_some(ds));
 
     let bound_operation: BoundOperation<'_, I, _> = match (dual_stack, addr) {
         // No dual-stack support, so only bind on the current stack.
