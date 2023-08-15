@@ -58,6 +58,16 @@ class FakeCompositeNodeSpec : public CompositeNodeSpec {
       fidl::AnyArena& arena) const override {
     return fuchsia_driver_development::wire::CompositeInfo::Builder(arena).Build();
   }
+
+  void RemoveImpl(RemoveCompositeNodeCallback callback) override {
+    remove_invoked_ = true;
+    callback(zx::ok());
+  }
+
+  bool remove_invoked() const { return remove_invoked_; }
+
+ private:
+  bool remove_invoked_ = false;
 };
 
 class FakeDeviceManagerBridge : public CompositeManagerBridge {
@@ -80,6 +90,11 @@ class FakeDeviceManagerBridge : public CompositeManagerBridge {
     }
     auto defer =
         fit::defer([callback = std::move(callback), result]() mutable { callback(result); });
+  }
+
+  void RequestRebindFromDriverIndex(std::string spec, std::optional<std::string> driver_url_suffix,
+                                    RequestRebindCallback callback) override {
+    callback(zx::ok(fuchsia_driver_index::DriverIndexRebindCompositeNodeSpecResponse{}));
   }
 
   void AddSpecMatch(std::string_view name, fdi::MatchedCompositeNodeSpecInfo match) {
@@ -112,11 +127,17 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
         .name = name,
         .size = parents.size(),
     });
-    return composite_node_spec_manager_->AddSpec(fidl::ToWire(arena, fdf::CompositeNodeSpec{{
-                                                                         .name = name,
-                                                                         .parents = parents,
-                                                                     }}),
-                                                 std::move(spec));
+    auto spec_ptr = spec.get();
+    auto result = composite_node_spec_manager_->AddSpec(fidl::ToWire(arena, fdf::CompositeNodeSpec{{
+                                                                                .name = name,
+                                                                                .parents = parents,
+                                                                            }}),
+                                                        std::move(spec));
+    if (result.is_ok()) {
+      specs_[name] = spec_ptr;
+    }
+
+    return result;
   }
 
   std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
@@ -125,7 +146,14 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
                                         inspect_.CreateDevice(name, zx::vmo(), 0));
   }
 
+  void VerifyRemoveInvokedForSpec(bool expected, const std::string& name) {
+    ZX_ASSERT(specs_[name]);
+    ASSERT_EQ(expected, specs_[name]->remove_invoked());
+  }
+
   std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
+
+  std::unordered_map<std::string, FakeCompositeNodeSpec*> specs_;
   InspectManager inspect_ = InspectManager(nullptr);
   FakeDeviceManagerBridge bridge_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
@@ -368,7 +396,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddDuplicate) {
             AddSpec(allocator, spec_name, std::move(parent_specs)).error_value());
 }
 
-TEST_F(CompositeNodeSpecManagerTest, TestRebindCompositeMatch) {
+TEST_F(CompositeNodeSpecManagerTest, TestDuplicateSpecsWithMatch) {
   fidl::Arena allocator;
   std::vector<fdf::ParentSpec> parent_specs{
       MakeParentSpec({fdf::MakeAcceptBindRule(1, 10)}, {fdf::MakeProperty(1, 1)}),
@@ -382,4 +410,71 @@ TEST_F(CompositeNodeSpecManagerTest, TestRebindCompositeMatch) {
   ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name)->parent_specs().size());
   ASSERT_EQ(fuchsia_driver_framework::CompositeNodeSpecError::kAlreadyExists,
             AddSpec(allocator, spec_name, std::move(parent_specs)).error_value());
+}
+
+TEST_F(CompositeNodeSpecManagerTest, TestRebindRequestWithNoMatch) {
+  fidl::Arena allocator;
+  std::vector<fdf::ParentSpec> parent_specs{
+      MakeParentSpec({fdf::MakeAcceptBindRule(1, 10)}, {fdf::MakeProperty(1, 1)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule(10, 1)}, {fdf::MakeProperty(100, 10)}),
+  };
+
+  std::string spec_name = "test_name";
+  ASSERT_TRUE(AddSpec(allocator, spec_name, parent_specs).is_ok());
+
+  bool is_callback_success = false;
+  composite_node_spec_manager_->Rebind(spec_name, std::nullopt,
+                                       [&is_callback_success](zx::result<> result) {
+                                         if (result.is_ok()) {
+                                           is_callback_success = true;
+                                         }
+                                       });
+  ASSERT_TRUE(is_callback_success);
+  VerifyRemoveInvokedForSpec(true, spec_name);
+}
+
+TEST_F(CompositeNodeSpecManagerTest, TestRebindRequestWithMatch) {
+  fidl::Arena allocator;
+  std::vector<fdf::ParentSpec> parent_specs{
+      MakeParentSpec({fdf::MakeAcceptBindRule(1, 10)}, {fdf::MakeProperty(1, 1)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule(10, 1)}, {fdf::MakeProperty(100, 10)}),
+  };
+
+  std::string spec_name = "test_name";
+  ASSERT_TRUE(AddSpec(allocator, spec_name, parent_specs).is_ok());
+  bridge_.AddSpecMatch(spec_name, MakeCompositeNodeSpecInfo(spec_name, 0, {"node-0", "node-1"}));
+
+  auto matched_parent_1 = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
+  }};
+  matched_parent_1.specs()->push_back(
+      MakeCompositeNodeSpecInfo(spec_name, 0, {"node-0", "node-1"}));
+  ASSERT_EQ(1u, composite_node_spec_manager_
+                    ->BindParentSpec(fidl::ToWire(allocator, matched_parent_1),
+                                     std::weak_ptr<dfv2::Node>())
+                    .value()
+                    .completed_node_and_drivers.size());
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
+
+  auto matched_parent_2 = fdi::MatchedCompositeNodeParentInfo{{
+      .specs = std::vector<fdi::MatchedCompositeNodeSpecInfo>(),
+  }};
+  matched_parent_2.specs()->push_back(
+      MakeCompositeNodeSpecInfo(spec_name, 1, {"node-0", "node-1"}));
+  ASSERT_EQ(1u, composite_node_spec_manager_
+                    ->BindParentSpec(fidl::ToWire(allocator, matched_parent_2),
+                                     std::weak_ptr<dfv2::Node>())
+                    .value()
+                    .completed_node_and_drivers.size());
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
+
+  bool is_callback_success = false;
+  composite_node_spec_manager_->Rebind(spec_name, std::nullopt,
+                                       [&is_callback_success](zx::result<> result) {
+                                         if (result.is_ok()) {
+                                           is_callback_success = true;
+                                         }
+                                       });
+  ASSERT_TRUE(is_callback_success);
+  VerifyRemoveInvokedForSpec(true, spec_name);
 }

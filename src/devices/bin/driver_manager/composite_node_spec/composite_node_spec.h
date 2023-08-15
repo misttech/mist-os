@@ -16,6 +16,8 @@ class Node;
 
 using DeviceOrNode = std::variant<std::weak_ptr<DeviceV1Wrapper>, std::weak_ptr<dfv2::Node>>;
 
+using RemoveCompositeNodeCallback = fit::callback<void(zx::result<>)>;
+
 struct CompositeNodeSpecCreateInfo {
   std::string name;
   size_t size;
@@ -41,6 +43,10 @@ class CompositeNodeSpec {
   virtual fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
       fidl::AnyArena& arena) const = 0;
 
+  // Remove the underlying composite node and unmatch all of its parents. Called for
+  // rebind.
+  void Remove(RemoveCompositeNodeCallback callback);
+
   // Exposed for testing.
   const std::vector<std::optional<DeviceOrNode>>& parent_specs() const { return parent_specs_; }
 
@@ -53,6 +59,10 @@ class CompositeNodeSpec {
   virtual zx::result<std::optional<DeviceOrNode>> BindParentImpl(
       fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) = 0;
+
+  // Subclass implementation for Remove(). Subclasses are expected to remove the underlying
+  // composite node and unmatch all of the parents from it.
+  virtual void RemoveImpl(RemoveCompositeNodeCallback callback) = 0;
 
   const std::string& name() const { return name_; }
 

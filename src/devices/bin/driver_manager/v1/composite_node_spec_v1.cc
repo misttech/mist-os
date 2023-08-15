@@ -124,4 +124,9 @@ fdd::wire::CompositeInfo CompositeNodeSpecV1::GetCompositeInfo(fidl::AnyArena& a
       .Build();
 }
 
+void CompositeNodeSpecV1::RemoveImpl(RemoveCompositeNodeCallback callback) {
+  // TODO(fxb/124976): Implement this.
+  callback(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 }  // namespace composite_node_specs

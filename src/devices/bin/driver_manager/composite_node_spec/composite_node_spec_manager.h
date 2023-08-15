@@ -54,6 +54,9 @@ class CompositeNodeSpecManager {
   zx::result<> BindParentSpec(fuchsia_driver_index::MatchedCompositeNodeParentInfo match_info,
                               const DeviceOrNode& device_or_node, bool enable_multibind = false);
 
+  void Rebind(std::string spec_name, std::optional<std::string> restart_driver_url_suffix,
+              fit::callback<void(zx::result<>)> rebind_spec_completer);
+
   std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfo(
       fidl::AnyArena& arena) const;
 
@@ -61,6 +64,9 @@ class CompositeNodeSpecManager {
   const CompositeNodeSpecMap& specs() const { return specs_; }
 
  private:
+  void OnRequestRebindComplete(std::string spec_name,
+                               fit::callback<void(zx::result<>)> rebind_spec_completer);
+
   // Contains all composite node specs. This maps the name to a CompositeNodeSpec object.
   CompositeNodeSpecMap specs_;
 

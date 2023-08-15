@@ -28,6 +28,8 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
       const DeviceOrNode& device_or_node) override;
 
  private:
+  void RemoveImpl(RemoveCompositeNodeCallback callback) override;
+
   fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
       fidl::AnyArena& arena) const override;
 

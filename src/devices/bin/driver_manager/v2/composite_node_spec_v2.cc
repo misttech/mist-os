@@ -52,6 +52,11 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
   return zx::ok(composite_node.value());
 }
 
+void CompositeNodeSpecV2::RemoveImpl(RemoveCompositeNodeCallback callback) {
+  // TODO(fxb/124976): Implement this.
+  callback(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 fdd::wire::CompositeInfo CompositeNodeSpecV2::GetCompositeInfo(fidl::AnyArena& arena) const {
   auto composite_info =
       fdd::wire::CompositeInfo::Builder(arena).name(fidl::StringView(arena, name().c_str()));

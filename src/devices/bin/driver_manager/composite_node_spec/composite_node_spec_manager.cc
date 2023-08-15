@@ -149,6 +149,29 @@ zx::result<> CompositeNodeSpecManager::BindParentSpec(
           .status_value());
 }
 
+void CompositeNodeSpecManager::Rebind(std::string spec_name,
+                                      std::optional<std::string> restart_driver_url_suffix,
+                                      fit::callback<void(zx::result<>)> rebind_spec_completer) {
+  if (specs_.find(spec_name) == specs_.end()) {
+    LOGF(WARNING, "Spec %s is not available for rebind", spec_name.c_str());
+    rebind_spec_completer(zx::error(ZX_ERR_NOT_FOUND));
+    return;
+  }
+
+  RequestRebindCallback rebind_request_callback =
+      [this, spec_name, rebind_spec_completer = std::move(rebind_spec_completer)](
+          zx::result<fuchsia_driver_index::DriverIndexRebindCompositeNodeSpecResponse>
+              result) mutable {
+        if (!result.is_ok()) {
+          rebind_spec_completer(result.take_error());
+          return;
+        }
+        OnRequestRebindComplete(spec_name, std::move(rebind_spec_completer));
+      };
+  bridge_->RequestRebindFromDriverIndex(spec_name, restart_driver_url_suffix,
+                                        std::move(rebind_request_callback));
+}
+
 std::vector<fdd::wire::CompositeInfo> CompositeNodeSpecManager::GetCompositeInfo(
     fidl::AnyArena &arena) const {
   std::vector<fdd::wire::CompositeInfo> composites;
@@ -158,4 +181,18 @@ std::vector<fdd::wire::CompositeInfo> CompositeNodeSpecManager::GetCompositeInfo
     }
   }
   return composites;
+}
+
+void CompositeNodeSpecManager::OnRequestRebindComplete(
+    std::string spec_name, fit::callback<void(zx::result<>)> rebind_spec_completer) {
+  specs_[spec_name]->Remove(
+      [this, completer = std::move(rebind_spec_completer)](zx::result<> result) mutable {
+        if (!result.is_ok()) {
+          completer(result.take_error());
+          return;
+        }
+
+        bridge_->BindNodesForCompositeNodeSpec();
+        completer(zx::ok());
+      });
 }

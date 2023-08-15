@@ -37,3 +37,8 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpec::BindParent(
 
   return result;
 }
+
+void CompositeNodeSpec::Remove(RemoveCompositeNodeCallback callback) {
+  std::fill(parent_specs_.begin(), parent_specs_.end(), std::nullopt);
+  RemoveImpl(std::move(callback));
+}
