@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 rustc_library("lib") {
   name = "netcfg"
@@ -80,7 +81,7 @@ rustc_library("lib") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-rustc_binary("bin-basic") {
+network_unified_binary("bin-basic") {
   edition = "2021"
   name = "netcfg_basic"
   source_root = "src/bin/basic.rs"
@@ -91,8 +92,6 @@ rustc_binary("bin-basic") {
   ]
 
   sources = [ "src/bin/basic.rs" ]
-
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 rustc_binary("bin-advanced") {

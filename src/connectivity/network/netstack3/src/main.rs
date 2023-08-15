@@ -14,8 +14,9 @@ mod bindings;
 
 use bindings::NetstackSeed;
 
+/// Runs Netstack3.
 #[fuchsia::main(logging_minimum_severity = "debug")]
-fn main() -> Result<(), anyhow::Error> {
+pub fn main() -> Result<(), anyhow::Error> {
     // TOOD(https://fxbug.dev/125388): Support running with multiple threads.
     // This is currently blocked on fixing race conditions when concurrent
     // operations are allowed.

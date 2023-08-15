@@ -17,7 +17,7 @@ enum IncomingService {
 }
 
 #[fuchsia::main()]
-async fn main() -> Result<()> {
+pub async fn main() -> Result<()> {
     info!("starting");
 
     let mut fs = ServiceFs::new_local();

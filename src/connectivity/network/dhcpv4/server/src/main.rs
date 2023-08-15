@@ -69,7 +69,7 @@ struct Args {
 }
 
 #[fuchsia::main()]
-async fn main() -> Result<(), Error> {
+pub async fn main() -> Result<(), Error> {
     info!("starting");
 
     let Args { persistent } = argh::from_env();

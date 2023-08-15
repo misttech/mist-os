@@ -185,6 +185,16 @@ template("renamed_binary") {
               defined(invoker.keep_original) && invoker.keep_original
         },
       ]
+
+      # Used by the fuchsia_test_component_manifest() template.
+      test_component_manifest_program = [
+        {
+          program = {
+            binary = invoker.dest
+          }
+        },
+      ]
+      test_component_manifest_program_barrier = []
     }
   }
 }

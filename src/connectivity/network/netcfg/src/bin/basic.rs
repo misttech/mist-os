@@ -3,6 +3,6 @@
 // found in the LICENSE file.
 
 #[fuchsia_async::run_singlethreaded]
-async fn main() {
+pub async fn main() {
     netcfg::run::<netcfg::BasicMode>().await.expect("netcfg exited with an error")
 }

@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 common_deps = [
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
@@ -98,7 +99,7 @@ common_sources = [
   "src/main.rs",
 ]
 
-rustc_binary("bin") {
+network_unified_binary("bin") {
   name = "netstack3"
   edition = "2021"
   with_unit_tests = true
@@ -108,7 +109,6 @@ rustc_binary("bin") {
   test_deps = common_test_deps
 
   sources = common_sources
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 rustc_binary("bin-instrumented") {

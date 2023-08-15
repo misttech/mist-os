@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 rustc_library("lib") {
   name = "dns"
@@ -90,13 +91,12 @@ bin_base = {
   non_rust_deps = []
 }
 
-rustc_binary("bin") {
+network_unified_binary("bin") {
   edition = "2021"
   forward_variables_from(bin_base, "*")
 
   name = "dns_resolver"
   with_unit_tests = true
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 rustc_binary("bin_with_fake_time") {

@@ -17,7 +17,7 @@ mod eventloop;
 use crate::eventloop::EventLoop;
 
 #[fuchsia::main(logging_tags = ["reachability"])]
-fn main() {
+pub fn main() {
     // TODO(dpradilla): use a `StructOpt` to pass in a log level option where the user can control
     // how verbose logs should be.
     info!("Starting reachability monitor!");

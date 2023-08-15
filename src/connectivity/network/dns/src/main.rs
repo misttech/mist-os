@@ -1145,7 +1145,7 @@ async fn apply_scheduling_role() -> Result<(), Error> {
 // NB: We manually set tags so logs from trust-dns crates also get the same
 // tags as opposed to only the crate path.
 #[fuchsia::main(logging_tags = ["dns"])]
-async fn main() -> Result<(), Error> {
+pub async fn main() -> Result<(), Error> {
     info!("starting");
 
     let mut resolver_opts = ResolverOpts::default();

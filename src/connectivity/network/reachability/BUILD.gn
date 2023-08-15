@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 bin_base = {
   edition = "2021"
@@ -45,7 +46,7 @@ bin_base = {
   non_rust_deps = []
 }
 
-rustc_binary("bin") {
+network_unified_binary("bin") {
   name = "reachability"
   version = "0.1.0"
   edition = "2021"
@@ -57,8 +58,6 @@ rustc_binary("bin") {
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:assert_matches",
   ]
-
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 rustc_binary("bin_with_fake_time") {
