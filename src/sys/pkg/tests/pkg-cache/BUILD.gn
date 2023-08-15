@@ -75,7 +75,6 @@ fuchsia_component("pkg-cache-integration-test") {
     ":driver",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 

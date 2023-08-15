@@ -184,10 +184,7 @@ fuchsia_package("pkg-cache") {
 fuchsia_component("pkg-cache-test") {
   testonly = true
   manifest = "meta/pkg-cache-bin-test.cml"
-  deps = [
-    ":lib_test",
-    "//src/sys/pkg/bin/pm:pm_bin",
-  ]
+  deps = [ ":lib_test" ]
 }
 
 fuchsia_test_package("pkg-cache-tests") {

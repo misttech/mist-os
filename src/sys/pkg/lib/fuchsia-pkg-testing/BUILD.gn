@@ -16,12 +16,10 @@ rustc_library("fuchsia-pkg-testing") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/reader/rust",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-hyper",
-    "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-url",
     "//src/lib/http-sse:http_sse",
     "//src/lib/versioning/version-history/rust:version-history",
@@ -32,6 +30,7 @@ rustc_library("fuchsia-pkg-testing") {
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg",
+    "//src/sys/pkg/lib/fuchsia-repo",
     "//src/sys/pkg/lib/system-image",
     "//src/sys/pkg/lib/update-package",
     "//src/sys/pkg/testing/blobfs-ramdisk",
@@ -51,6 +50,7 @@ rustc_library("fuchsia-pkg-testing") {
     "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tokio-rustls",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tuf",
     "//third_party/rust_crates:walkdir",
   ]
 
@@ -61,11 +61,9 @@ rustc_library("fuchsia-pkg-testing") {
 
   sources = [
     "src/blobfs.rs",
-    "src/delivery_blob.rs",
     "src/inspect.rs",
     "src/lib.rs",
     "src/package.rs",
-    "src/process.rs",
     "src/repo.rs",
     "src/serve.rs",
     "src/serve/responder.rs",
@@ -89,14 +87,10 @@ fuchsia_unittest_package("fuchsia-pkg-testing-tests") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
     "//src/storage/tools/blobfs-compression",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":fuchsia-pkg-testing-tests",
-    "//src/sys/pkg/bin/pm:pm",
-  ]
+  public_deps = [ ":fuchsia-pkg-testing-tests" ]
 }

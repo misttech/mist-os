@@ -266,6 +266,7 @@ async fn missing_subpackage_meta_far_does_not_hang() {
             .await
             .unwrap(),
     );
+    repo.purge_blobs(subpackage.list_blobs().unwrap().into_iter());
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();

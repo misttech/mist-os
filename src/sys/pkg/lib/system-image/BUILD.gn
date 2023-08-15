@@ -58,7 +58,6 @@ fuchsia_component("system-image-test-component") {
   deps = [
     ":system-image_test",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 

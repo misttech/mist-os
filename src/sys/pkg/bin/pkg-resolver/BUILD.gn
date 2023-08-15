@@ -177,7 +177,6 @@ fuchsia_test_package("unit-tests-package") {
     ":unit-tests-driver",
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
-    "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_components = [ ":unit-tests-root" ]

@@ -5,28 +5,25 @@
 //! Test tools for building and serving TUF repositories containing Fuchsia packages.
 
 use {
-    crate::{
-        package::Package, process::wait_for_process_termination, serve::ServedRepositoryBuilder,
-    },
+    crate::{package::Package, serve::ServedRepositoryBuilder},
     anyhow::{format_err, Context as _, Error},
-    fdio::SpawnBuilder,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_ext::{
         MirrorConfig, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
     },
-    fuchsia_fs::directory::readdir,
     fuchsia_fs::{
-        directory::{self, open_directory, open_file},
+        directory::{self, open_directory, open_file, readdir},
         file::{read, write},
     },
     fuchsia_merkle::Hash,
+    fuchsia_repo::{repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::PmRepository},
     fuchsia_url::RepositoryUrl,
     maybe_owned::MaybeOwned,
     serde::Deserialize,
     std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         fs::{self, File},
-        io::{self, Read, Write},
+        io::{self, Read},
         path::PathBuf,
         sync::Arc,
     },
@@ -69,18 +66,10 @@ impl<'a> RepositoryBuilder<'a> {
 
     /// Builds the repository.
     pub async fn build(self) -> Result<Repository, Error> {
-        let indir = tempfile::tempdir().context("create /in")?;
         let repodir = tempfile::tempdir().context("create /repo")?;
 
-        {
-            let mut manifest = File::create(indir.path().join("manifests.list"))?;
-            for package in &self.packages {
-                writeln!(manifest, "/packages/{}/manifest.json", package.name())?;
-            }
-        }
-
         // If configured to use a template repository directory, first copy it into the repo dir.
-        if let Some(templatedir) = self.repodir {
+        let keys = if let Some(templatedir) = self.repodir {
             for entry in WalkDir::new(&templatedir) {
                 let entry = entry?;
                 if entry.path() == templatedir {
@@ -94,66 +83,57 @@ impl<'a> RepositoryBuilder<'a> {
                     fs::copy(entry.path(), target_path)?;
                 }
             }
-        }
 
-        // Packages need to be built with a specific version. We pick a specific version since then
-        // we won't change merkles when the latest version changes.
-        let version = version_history::VERSION_HISTORY
-            .iter()
-            .find(|v| v.api_level == 7)
-            .expect("API Level 7 to exist");
+            RepoKeys::from_dir(repodir.path().join("keys").as_path()).unwrap()
+        } else {
+            // Otherwise, generate a new empty repo and keys.
+            let keys = RepoKeys::generate(repodir.path()).unwrap();
 
-        let mut pm = SpawnBuilder::new()
-            .options(fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE)
-            .arg("pm")?
-            .arg("-abi-revision")?
-            .arg(version.abi_revision.0.to_string())?
-            .arg("publish")?
-            .arg("-lp")?
-            .arg("-f=/in/manifests.list")?
-            .arg("-repo=/repo")?
-            .add_dir_to_namespace("/in", File::open(indir.path()).context("open /in")?)?
-            .add_dir_to_namespace("/repo", File::open(repodir.path()).context("open /repo")?)?;
+            RepoBuilder::create(
+                PmRepository::builder(repodir.path().to_owned().try_into()?)
+                    .delivery_blob_type(self.delivery_blob_type.map(|t| t.try_into().unwrap()))
+                    .build(),
+                &keys,
+            )
+            .commit()
+            .await
+            .unwrap();
 
-        for package in &self.packages {
-            let package = package.as_ref();
-            pm = pm
-                .add_dir_to_namespace(
-                    format!("/packages/{}", package.name()),
-                    File::open(package.artifacts()).context("open package dir")?,
-                )
-                .context("add package")?;
-        }
+            keys
+        };
 
-        let pm = pm
-            .spawn_from_path("/pkg/bin/pm", &fuchsia_runtime::job_default())
-            .context("spawning pm to build repo")?;
+        // Open the repo for an update.
+        let pm_repo = PmRepository::builder(repodir.path().to_owned().try_into()?)
+            .delivery_blob_type(self.delivery_blob_type.map(|t| t.try_into().unwrap()))
+            .build();
+        let client = {
+            let local = tuf::repository::EphemeralRepository::<tuf::pouf::Pouf1>::new();
 
-        wait_for_process_termination(pm).await.context("waiting for pm to build repo")?;
+            let mut client = tuf::client::Client::with_trusted_root_keys(
+                tuf::client::Config::default(),
+                tuf::metadata::MetadataVersion::None,
+                keys.root_keys().len() as u32,
+                keys.root_keys().into_iter().map(|key| key.public()),
+                local,
+                &pm_repo,
+            )
+            .await
+            .unwrap();
+            client.update().await.unwrap();
 
-        if let Some(delivery_blob_type) = self.delivery_blob_type {
-            fs::create_dir(repodir.path().join(format!("repository/blobs/{delivery_blob_type}")))
-                .context("create delivery blob dir")?;
-            for package in &self.packages {
-                let package = package.as_ref();
-                for blob in package.list_blobs()? {
-                    let delivery_blob_path =
-                        format!("repository/blobs/{delivery_blob_type}/{blob}");
-                    if repodir.path().join(&delivery_blob_path).exists() {
-                        continue;
-                    }
-                    crate::delivery_blob::generate_delivery_blob_in_path(
-                        &repodir,
-                        format!("repository/blobs/{blob}"),
-                        &repodir,
-                        delivery_blob_path,
-                        delivery_blob_type,
-                    )
-                    .await
-                    .context("generate_delivery_blob")?;
-                }
-            }
-        }
+            client
+        };
+        let database = client.database();
+        let mut repo = RepoBuilder::from_database(&pm_repo, &keys, &database);
+
+        repo = repo
+            .add_packages(
+                self.packages.iter().map(|package| package.artifacts().join("manifest.json")),
+            )
+            .await
+            .unwrap();
+        repo.commit().await.unwrap();
+
         Ok(Repository { dir: repodir })
     }
 }
@@ -222,6 +202,13 @@ impl Repository {
     /// Returns a set of all blobs contained in this repository.
     pub fn list_blobs(&self) -> Result<BTreeSet<Hash>, Error> {
         self.iter_blobs()?.collect()
+    }
+
+    /// Removes the specified from the repository.
+    pub fn purge_blobs(&self, blobs: impl Iterator<Item = Hash>) {
+        for blob in blobs {
+            fs::remove_file(self.dir.path().join(format!("repository/blobs/{blob}"))).unwrap()
+        }
     }
 
     /// Reads the contents of requested blob from the repository.
@@ -443,6 +430,8 @@ impl Repository {
 
 #[cfg(test)]
 mod tests {
+    use fuchsia_repo::repo_keys::RepoKeys;
+
     use {super::*, crate::package::PackageBuilder, fuchsia_merkle::MerkleTree};
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -482,7 +471,7 @@ mod tests {
             .await
             .unwrap();
 
-        let blobs = repo.list_blobs().unwrap();
+        let mut blobs = repo.list_blobs().unwrap();
         // 2 meta FARs, 2 binaries, and 1 duplicated resource
         assert_eq!(blobs.len(), 5);
 
@@ -499,6 +488,12 @@ mod tests {
             packages.into_iter().map(|pkg| pkg.path).collect::<Vec<_>>(),
             vec!["fortune/0".to_owned(), "rolldice/0".to_owned()]
         );
+
+        // Ensure purge_blobs purges blobs
+        let cutpoint = blobs.iter().nth(2).unwrap().to_owned();
+        let removed = blobs.split_off(&cutpoint);
+        repo.purge_blobs(removed.into_iter());
+        assert_eq!(repo.list_blobs().unwrap(), blobs);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -506,15 +501,16 @@ mod tests {
         let repodir = tempfile::tempdir().context("create tempdir")?;
 
         // Populate repodir with a freshly created repository.
-        let pm = SpawnBuilder::new()
-            .options(fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE)
-            .arg("pm")?
-            .arg("newrepo")?
-            .arg("-repo=/repo")?
-            .add_dir_to_namespace("/repo", File::open(repodir.path()).context("open /repo")?)?
-            .spawn_from_path("/pkg/bin/pm", &fuchsia_runtime::job_default())
-            .context("spawning pm to build repo")?;
-        wait_for_process_termination(pm).await.context("waiting for pm to build repo")?;
+        let keys_dir = repodir.path().join("keys");
+        fs::create_dir(&keys_dir).unwrap();
+        let repo_keys = RepoKeys::generate(&keys_dir).unwrap();
+        RepoBuilder::create(
+            PmRepository::builder(repodir.path().to_owned().try_into()?).build(),
+            &repo_keys,
+        )
+        .commit()
+        .await
+        .unwrap();
 
         // Build a repo from the template.
         let repo = RepositoryBuilder::from_template_dir(repodir.path())

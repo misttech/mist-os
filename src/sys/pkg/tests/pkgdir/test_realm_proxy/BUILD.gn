@@ -35,10 +35,7 @@ fuchsia_component("test_realm_proxy_component") {
   visibility = [ ":*" ]
   component_name = "default"
   manifest = "meta/default.cml"
-  deps = [
-    ":bin",
-    "//src/sys/pkg/bin/pm:pm_bin",
-  ]
+  deps = [ ":bin" ]
 }
 
 fuchsia_package("test_realm_proxy") {
