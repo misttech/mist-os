@@ -44,8 +44,8 @@ def rules_fuchsia_deps():
     maybe(
         name = "rules_license",
         repo_rule = http_archive,
-        sha256 = "6157e1e68378532d0241ecd15d3c45f6e5cfd98fc10846045509fb2a7cc9e381",
-        url = "https://github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+        sha256 = "4531deccb913639c30e5c7512a054d5d875698daeb75d8cf90f284375fe7c360",
+        url = "https://github.com/bazelbuild/rules_license/releases/download/0.0.7/rules_license-0.0.7.tar.gz",
     )
     # rules_license_dependencies needs to be loaded from @rules_license//:deps.bzl
     # and invoked here, but that is not possible. Fortunately all it does is fetch
