@@ -1031,7 +1031,7 @@ impl Journal {
             handle.owner(),
             handle.object_id(),
             journal_handle_options(),
-            handle.store().crypt(),
+            None,
         )
         .await?;
 

@@ -23,8 +23,7 @@ use {
                 self, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
                 Transaction,
             },
-            HandleOptions, HandleOwner, KeyUnwrapper, ObjectStore, StoreObjectHandle, TrimMode,
-            TrimResult,
+            HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle, TrimMode, TrimResult,
         },
         range::RangeExt,
         round::{round_down, round_up},
@@ -61,14 +60,14 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     pub fn new(
         owner: Arc<S>,
         object_id: u64,
-        keys: Option<KeyUnwrapper>,
+        permanent_keys: bool,
         attribute_id: u64,
         size: u64,
         options: HandleOptions,
         trace: bool,
     ) -> Self {
         Self {
-            handle: StoreObjectHandle::new(owner, object_id, keys, options, trace),
+            handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
             attribute_id,
             content_size: AtomicU64::new(size),
         }

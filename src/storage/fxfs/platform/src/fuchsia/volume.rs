@@ -190,13 +190,8 @@ impl FxVolume {
             GetResult::Placeholder(placeholder) => {
                 let node = match object_descriptor {
                     ObjectDescriptor::File => FxFile::new(
-                        ObjectStore::open_object(
-                            self,
-                            object_id,
-                            HandleOptions::default(),
-                            self.store().crypt(),
-                        )
-                        .await?,
+                        ObjectStore::open_object(self, object_id, HandleOptions::default(), None)
+                            .await?,
                     ) as Arc<dyn FxNode>,
                     ObjectDescriptor::Directory => Arc::new(FxDirectory::new(
                         parent,

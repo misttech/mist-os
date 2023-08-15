@@ -42,7 +42,13 @@ pub struct Directory<S: HandleOwner> {
 impl<S: HandleOwner> Directory<S> {
     fn new(owner: Arc<S>, object_id: u64) -> Self {
         Directory {
-            handle: StoreObjectHandle::new(owner, object_id, None, HandleOptions::default(), false),
+            handle: StoreObjectHandle::new(
+                owner,
+                object_id,
+                /* permanent_keys: */ false,
+                HandleOptions::default(),
+                /* trace: */ false,
+            ),
             is_deleted: AtomicBool::new(false),
         }
     }

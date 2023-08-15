@@ -27,7 +27,6 @@ pub mod writeback_cache;
 pub use caching_object_handle::CachingObjectHandle;
 pub use data_object_handle::{DataObjectHandle, DirectWriter};
 pub use directory::Directory;
-pub use key_manager::KeyUnwrapper;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{SetExtendedAttributeMode, StoreObjectHandle};
 
@@ -51,6 +50,7 @@ use {
             allocator::SimpleAllocator,
             graveyard::Graveyard,
             journal::{JournalCheckpoint, JournaledTransaction},
+            key_manager::KeyManager,
             transaction::{
                 AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation, Options,
                 Transaction, UpdateMutationsKey,
@@ -66,7 +66,6 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
     fprint::TypeFingerprint,
-    fuchsia_async as fasync,
     fuchsia_inspect::ArrayProperty,
     fxfs_crypto::{ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
     once_cell::sync::OnceCell,
@@ -468,6 +467,7 @@ pub struct ObjectStore {
     // Current lock state of the store.
     // Lock ordering: This must be taken after `store_info`.
     lock_state: Mutex<LockState>,
+    key_manager: KeyManager,
 
     // Enable/disable tracing.
     trace: AtomicBool,
@@ -516,6 +516,7 @@ impl ObjectStore {
             store_info_handle: OnceCell::new(),
             mutations_cipher: Mutex::new(mutations_cipher),
             lock_state: Mutex::new(lock_state),
+            key_manager: KeyManager::new(),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
             last_object_id: Mutex::new(last_object_id),
@@ -554,6 +555,7 @@ impl ObjectStore {
             store_info_handle: OnceCell::new(),
             mutations_cipher: Mutex::new(None),
             lock_state: Mutex::new(LockState::Unencrypted),
+            key_manager: KeyManager::new(),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
             last_object_id: Mutex::new(LastObjectId::default()),
@@ -797,7 +799,11 @@ impl ObjectStore {
     }
 
     /// `crypt` can be provided if the crypt service should be different to the default; see the
-    /// comment on create_object.
+    /// comment on create_object.  Users should avoid having more than one handle open for the same
+    /// object at the same time because they might get out-of-sync; there is no code that will
+    /// prevent this.  One example where this can cause an issue is if the object ends up using a
+    /// permanent key (which is the case if a value is passed for `crypt`), the permanent key is
+    /// dropped when a handle is dropped, which will impact any other handles for the same object.
     pub async fn open_object<S: HandleOwner>(
         owner: &Arc<S>,
         object_id: u64,
@@ -806,23 +812,20 @@ impl ObjectStore {
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         let store_crypt = store.crypt();
+        // If a crypt service has been specified, it needs to be a permanent key because cached keys
+        // can only use the store's crypt service.
+        let permanent = crypt.is_some();
         if crypt.is_none() {
             crypt = store_crypt;
         }
-        let keys = if let Some(crypt) = crypt {
-            match store.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::NotFound)? {
-                Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => {
-                    let (keys, task) = KeyUnwrapper::new_from_wrapped(object_id, crypt, keys);
-                    fasync::Task::spawn(task).detach();
-                    Some(keys)
-                }
-                _ => {
-                    bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys"))
-                }
-            }
-        } else {
-            None
-        };
+        if let Some(crypt) = crypt {
+            store.key_manager.pre_fetch(
+                object_id,
+                crypt,
+                store.get_keys(object_id).await?,
+                permanent,
+            );
+        }
 
         let item = store
             .tree
@@ -838,7 +841,7 @@ impl ObjectStore {
             Ok(DataObjectHandle::new(
                 owner.clone(),
                 object_id,
-                keys,
+                permanent,
                 DEFAULT_DATA_ATTRIBUTE_ID,
                 size,
                 options,
@@ -866,6 +869,8 @@ impl ObjectStore {
             store.update_last_object_id(object_id);
         }
         let store_crypt;
+        // See comment for equivalent in open_object.
+        let permanent = crypt.is_some();
         if crypt.is_none() {
             store_crypt = store.crypt();
             crypt = store_crypt.as_deref();
@@ -896,7 +901,7 @@ impl ObjectStore {
                 ObjectValue::file(1, 0, creation_time, modification_time, 0, posix_attributes),
             ),
         );
-        let unwrapped_keys = if let Some(crypt) = crypt {
+        if let Some(crypt) = crypt {
             let (key, unwrapped_key) = crypt.create_key(object_id, KeyPurpose::Data).await?;
             transaction.add(
                 store.store_object_id(),
@@ -905,10 +910,8 @@ impl ObjectStore {
                     ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys(vec![(0, key)]))),
                 ),
             );
-            Some(vec![(0, unwrapped_key)])
-        } else {
-            None
-        };
+            store.key_manager.insert(object_id, &vec![(0, unwrapped_key)], permanent);
+        }
         transaction.add(
             store.store_object_id(),
             Mutation::insert_object(
@@ -919,7 +922,7 @@ impl ObjectStore {
         Ok(DataObjectHandle::new(
             owner.clone(),
             object_id,
-            unwrapped_keys.map(KeyUnwrapper::new_from_unwrapped),
+            permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             0,
             options,
@@ -930,7 +933,9 @@ impl ObjectStore {
     /// There are instances where a store might not be an encrypted store, but the object should
     /// still be encrypted.  For example, the layer files for child stores should be encrypted using
     /// the crypt service of the child store even though the root store doesn't have encryption.  If
-    /// `crypt` is None, the default for the store is used.
+    /// `crypt` is None, the default for the store is used (and prefer to pass None over passing the
+    /// store's crypt service directly because the latter will end up using a permanent key that
+    /// isn't purged when inactive).
     pub async fn create_object<S: HandleOwner>(
         owner: &Arc<S>,
         mut transaction: &mut Transaction<'_>,
@@ -1617,6 +1622,7 @@ impl ObjectStore {
         } else {
             LockState::Locked
         };
+        self.key_manager.clear();
         *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
         self.tree.reset();
 
@@ -1817,6 +1823,14 @@ impl ObjectStore {
             }) => Ok(link),
             Some(item) => Err(anyhow!(FxfsError::Inconsistent)
                 .context(format!("Unexpected item in lookup: {item:?}"))),
+        }
+    }
+
+    /// Retrieves the wrapped keys for the given object.
+    async fn get_keys(&self, object_id: u64) -> Result<WrappedKeys, Error> {
+        match self.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::NotFound)? {
+            Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => Ok(keys),
+            _ => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
         }
     }
 }

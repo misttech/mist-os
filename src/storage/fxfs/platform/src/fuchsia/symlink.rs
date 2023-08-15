@@ -39,9 +39,9 @@ impl FxSymlink {
         StoreObjectHandle::new(
             self.volume.clone(),
             self.object_id,
-            None,
+            /* permanent_keys: */ false,
             HandleOptions::default(),
-            false,
+            /* trace: */ false,
         )
     }
 }

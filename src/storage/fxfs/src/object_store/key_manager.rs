@@ -4,101 +4,370 @@
 
 use {
     crate::log::*,
-    anyhow::{anyhow, Error},
-    async_utils::event::Event,
+    anyhow::{bail, Error},
+    event_listener::Event,
+    fuchsia_async as fasync,
+    futures::future,
     fxfs_crypto::{Crypt, UnwrappedKeys, WrappedKeys, XtsCipherSet},
-    once_cell::sync::OnceCell,
-    std::{future::Future, sync::Arc},
+    std::{
+        cell::UnsafeCell,
+        collections::{hash_map::Entry, HashMap},
+        future::Future,
+        pin::pin,
+        sync::{Arc, Mutex},
+        time::Duration,
+    },
 };
 
-/// Unwraps keys in a background task.
-pub struct KeyUnwrapper {
-    inner: Arc<KeyUnwrapperInner>,
+/// This timeout controls when entries are moved from `hash` to `pending_purge` and then dumped.
+/// Entries will remain in the cache until they remain inactive from between PURGE_TIMEOUT and 2 *
+/// PURGE_TIMEOUT.  This is deliberately set to 37 seconds (rather than a round number) to reduce
+/// the chance that this timer ends up always firing at the same time as other timers.
+const PURGE_TIMEOUT: Duration = Duration::from_secs(37);
+
+/// A simple cache that purges entries periodically when `purge` is called.  The API is similar to
+/// HashMap's.
+struct Cache<V> {
+    hash: HashMap<u64, V>,
+    pending_purge: HashMap<u64, V>,
+    permanent: HashMap<u64, V>,
 }
 
-struct KeyUnwrapperInner {
-    // Both `event` and `keys` have 2 possible states for a total of 4 possible states:
-    //   - `event` is not signalled and `keys` is set: constructed from `new_from_unwrapped`.
-    //   - `event` is not signalled and `keys` is not set: keys are still being unwrapped.
-    //   - `event` is signalled and `keys` is set: keys are unwrapped.
-    //   - `event` is signalled and `keys` is not set: unwrapping the keys failed.
-    event: Event,
-    keys: OnceCell<UnwrappedKeys>,
+impl<V> Cache<V> {
+    fn new() -> Self {
+        Self { hash: HashMap::new(), pending_purge: HashMap::new(), permanent: HashMap::new() }
+    }
+
+    fn get(&mut self, key: u64) -> Option<&V> {
+        match self.hash.entry(key) {
+            Entry::Occupied(o) => Some(o.into_mut()),
+            Entry::Vacant(v) => {
+                // If we find an entry in `pending_purge`, move it into `hash`.
+                if let Some(value) = self.pending_purge.remove(&key) {
+                    Some(v.insert(value))
+                } else {
+                    self.permanent.get(&key)
+                }
+            }
+        }
+    }
+
+    fn insert(&mut self, key: u64, value: V, permanent: bool) {
+        if permanent {
+            self.permanent.insert(key, value);
+        } else {
+            self.hash.insert(key, value);
+        }
+    }
+
+    /// This purges entries that haven't been accessed since the last call to purge.
+    fn purge(&mut self) {
+        self.pending_purge = std::mem::take(&mut self.hash);
+    }
+
+    fn clear(&mut self) {
+        self.hash.clear();
+        self.pending_purge.clear();
+        self.permanent.clear();
+    }
+
+    fn remove(&mut self, key: u64) {
+        self.hash.remove(&key);
+        self.pending_purge.remove(&key);
+        self.permanent.remove(&key);
+    }
 }
 
-impl KeyUnwrapper {
-    /// Creates an instance with the keys already unwrapped. No background task is spawned.
-    pub fn new_from_unwrapped(keys: UnwrappedKeys) -> Self {
-        let once = OnceCell::new();
-        once.get_or_init(move || keys);
-        Self { inner: Arc::new(KeyUnwrapperInner { event: Event::new(), keys: once }) }
-    }
+pub struct KeyManager {
+    inner: Arc<Mutex<Inner>>,
+    _purge_task: fasync::Task<()>,
+}
 
-    /// Creates an instance of `KeyUnwrapper` and also returns a future that when polled will unwrap
-    /// the keys and place them into the `KeyUnwrapper` when they are available.
-    pub fn new_from_wrapped(
-        object_id: u64,
-        crypt: Arc<dyn Crypt>,
-        keys: WrappedKeys,
-    ) -> (Self, impl Future<Output = ()>) {
-        let inner = Arc::new(KeyUnwrapperInner { event: Event::new(), keys: OnceCell::new() });
-        let inner2 = inner.clone();
-        let future = async move {
-            match crypt.unwrap_keys(&keys, object_id).await {
-                Ok(keys) => {
-                    inner2.keys.get_or_init(move || keys);
-                }
-                Err(e) => {
-                    error!(error=?e, oid=object_id, "Failed to unwrap keys");
-                }
-            }
-            inner2.event.signal();
-        };
-        (Self { inner }, future)
-    }
+struct Inner {
+    keys: Cache<Arc<XtsCipherSet>>,
+    unwrapping: HashMap<u64, Arc<UnwrapResult>>,
+}
 
-    pub async fn keys(&self) -> Result<XtsCipherSet, Error> {
-        match self.inner.keys.get() {
-            Some(keys) => Ok(XtsCipherSet::new(keys)),
-            None => {
-                // If the keys are not already unwrapped then wait for the event to be signalled. If
-                // the event is signalled and the keys still aren't present then the unwrapping
-                // failed.
-                self.inner.event.wait().await;
-                self.inner
-                    .keys
-                    .get()
-                    .ok_or_else(|| anyhow!("Failed to unwrap keys"))
-                    .map(XtsCipherSet::new)
-            }
+impl Inner {
+    fn get_unwrap_result(&mut self, object_id: u64) -> Option<Arc<UnwrapResult>> {
+        if self.keys.get(object_id).is_some() {
+            None
+        } else if let Entry::Vacant(v) = self.unwrapping.entry(object_id) {
+            let unwrap_result = UnwrapResult::new();
+            v.insert(unwrap_result.clone());
+            Some(unwrap_result)
+        } else {
+            None
         }
     }
 }
 
+struct UnwrapResult {
+    event: Event,
+    error: UnsafeCell<bool>,
+}
+
+impl UnwrapResult {
+    fn new() -> Arc<Self> {
+        Arc::new(UnwrapResult { event: Event::new(), error: UnsafeCell::new(false) })
+    }
+
+    fn set(
+        &self,
+        inner: &Mutex<Inner>,
+        object_id: u64,
+        permanent: bool,
+        result: Result<Option<Arc<XtsCipherSet>>, Error>,
+    ) {
+        if let Err(error) = &result {
+            // SAFETY: This is safe because we have exclusive access until we call notify below.
+            unsafe {
+                *self.error.get() = true;
+            }
+            error!(?error, oid = object_id, "Failed to unwrap keys");
+        }
+        let mut inner = inner.lock().unwrap();
+        if let Entry::Occupied(o) = inner.unwrapping.entry(object_id) {
+            if std::ptr::eq(Arc::as_ptr(o.get()), self) {
+                o.remove();
+                if let Ok(Some(keys)) = &result {
+                    inner.keys.insert(object_id, keys.clone(), permanent);
+                }
+            }
+        }
+        self.event.notify(usize::MAX);
+    }
+}
+
+unsafe impl Send for UnwrapResult {}
+unsafe impl Sync for UnwrapResult {}
+
+impl KeyManager {
+    pub fn new() -> Self {
+        let inner = Arc::new(Mutex::new(Inner { keys: Cache::new(), unwrapping: HashMap::new() }));
+
+        let purge_task = {
+            let inner = inner.clone();
+            fasync::Task::spawn(async move {
+                loop {
+                    fasync::Timer::new(PURGE_TIMEOUT).await;
+                    inner.lock().unwrap().keys.purge();
+                }
+            })
+        };
+
+        Self { inner, _purge_task: purge_task }
+    }
+
+    /// Initiates a pre-fetch for the key.  This will return before the keys have been unwrapped.
+    pub fn pre_fetch(
+        &self,
+        object_id: u64,
+        crypt: Arc<dyn Crypt>,
+        wrapped_keys: WrappedKeys,
+        permanent: bool,
+    ) {
+        // If it's a permanent key, we must establish the result now to avoid races.  We don't do it
+        // otherwise because taking the lock seems to have a performance hit, so we move it onto the
+        // spawned task.
+        let unwrap_result = if permanent {
+            let unwrap_result = self.inner.lock().unwrap().get_unwrap_result(object_id);
+            if unwrap_result.is_none() {
+                return;
+            }
+            unwrap_result
+        } else {
+            None
+        };
+
+        let inner = self.inner.clone();
+        fasync::Task::spawn(async move {
+            let Some(unwrap_result) =
+                unwrap_result.or_else(|| inner.lock().unwrap().get_unwrap_result(object_id))
+            else {
+                return
+            };
+            unwrap_result.set(
+                &inner,
+                object_id,
+                permanent,
+                crypt.unwrap_keys(&wrapped_keys, object_id).await.map(|k| Some(k.to_cipher_set())),
+            );
+        })
+        .detach();
+    }
+
+    /// Retrieves a key from the cache but won't initiate unwrapping if no key is present.  If the
+    /// key is currently in the process of being unwrapped, this will wait until that has finished.
+    /// This should be used with permanent keys.
+    pub async fn get(&self, object_id: u64) -> Result<Option<Arc<XtsCipherSet>>, Error> {
+        loop {
+            let (unwrap_result, listener) = {
+                let mut inner = self.inner.lock().unwrap();
+
+                if let Some(keys) = inner.keys.get(object_id) {
+                    return Ok(Some(keys.clone()));
+                }
+                let unwrap_result = match inner.unwrapping.entry(object_id) {
+                    Entry::Vacant(_) => return Ok(None),
+                    Entry::Occupied(o) => o.get().clone(),
+                };
+                let listener = unwrap_result.event.listen();
+                (unwrap_result, listener)
+            };
+            listener.await;
+            // SAFETY: This is safe because there can be no mutations happening at this point.
+            if unsafe { *unwrap_result.error.get() } {
+                bail!("Failed to unwrap keys");
+            }
+        }
+    }
+
+    /// This retrieves keys from the cache or initiates unwrapping if they are not in the cache.
+    pub async fn get_or_insert(
+        &self,
+        object_id: u64,
+        crypt: &Arc<dyn Crypt>,
+        wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
+        permanent: bool,
+    ) -> Result<Arc<XtsCipherSet>, Error> {
+        let mut wrapped_keys = pin!(future::maybe_done(wrapped_keys));
+
+        loop {
+            let (unwrap_result, listener) = {
+                let mut inner = self.inner.lock().unwrap();
+
+                if let Some(keys) = inner.keys.get(object_id) {
+                    return Ok(keys.clone());
+                }
+
+                match inner.unwrapping.entry(object_id) {
+                    Entry::Vacant(v) => {
+                        let unwrap_result = UnwrapResult::new();
+                        v.insert(unwrap_result.clone());
+                        (unwrap_result, None)
+                    }
+                    Entry::Occupied(o) => {
+                        let unwrap_result = o.get().clone();
+                        let listener = unwrap_result.event.listen();
+                        (unwrap_result, Some(listener))
+                    }
+                }
+            };
+            if let Some(listener) = listener {
+                listener.await;
+                // SAFETY: This is safe because there can be no mutations happening at this point.
+                if !unsafe { *unwrap_result.error.get() } {
+                    // Loop around and try and get the key.
+                    continue;
+                }
+            } else {
+                // Use a guard in case we're dropped.
+                let mut result = scopeguard::guard(Ok(None), |result| {
+                    unwrap_result.set(&self.inner, object_id, permanent, result);
+                });
+
+                wrapped_keys.as_mut().await;
+                let error = match wrapped_keys.as_mut().output_mut().unwrap() {
+                    Ok(wrapped_keys) => match crypt.unwrap_keys(wrapped_keys, object_id).await {
+                        Ok(unwrapped_keys) => {
+                            let keys = unwrapped_keys.to_cipher_set();
+                            *result = Ok(Some(keys.clone()));
+                            return Ok(keys);
+                        }
+                        Err(e) => e,
+                    },
+                    Err(_) => wrapped_keys.take_output().unwrap().unwrap_err(),
+                };
+                *result = Err(error);
+            }
+            bail!("Failed to unwrap keys");
+        }
+    }
+
+    /// This inserts the keys into the cache.  Any existing keys will be overwritten.  It's
+    /// unspecified what happens if keys for the object are currently being unwrapped.
+    pub fn insert(&self, object_id: u64, keys: impl ToCipherSet, permanent: bool) {
+        self.inner.lock().unwrap().keys.insert(object_id, keys.to_cipher_set(), permanent);
+    }
+
+    pub fn remove(&self, object_id: u64) {
+        self.inner.lock().unwrap().keys.remove(object_id);
+    }
+
+    /// This clears the caches of all keys.
+    pub fn clear(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.keys.clear();
+        inner.unwrapping.clear();
+    }
+}
+
+pub trait ToCipherSet {
+    fn to_cipher_set(self) -> Arc<XtsCipherSet>;
+}
+
+impl ToCipherSet for &UnwrappedKeys {
+    fn to_cipher_set(self) -> Arc<XtsCipherSet> {
+        Arc::new(XtsCipherSet::new(self))
+    }
+}
+
+impl ToCipherSet for Arc<XtsCipherSet> {
+    fn to_cipher_set(self) -> Arc<XtsCipherSet> {
+        self
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use {
-        crate::object_store::KeyUnwrapper,
+        super::{KeyManager, PURGE_TIMEOUT},
         anyhow::{anyhow, Error},
         async_trait::async_trait,
+        fuchsia_async::{self as fasync, TestExecutor, Time},
+        fuchsia_zircon as zx,
         fxfs_crypto::{
-            Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys, KEY_SIZE,
-            WRAPPED_KEY_SIZE,
+            Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys,
+            XtsCipherSet, KEY_SIZE, WRAPPED_KEY_SIZE,
         },
-        std::sync::{Arc, Mutex},
+        std::sync::{
+            atomic::{AtomicU8, Ordering},
+            Arc,
+        },
     };
 
-    #[fuchsia::test]
-    async fn test_key_unwrapper_new_from_unwrapped() {
-        let keys = KeyUnwrapper::new_from_unwrapped(vec![(0, UnwrappedKey::new([0; KEY_SIZE]))]);
-        keys.keys().await.expect("keys should be unwrapped");
+    const PLAIN_TEXT: &[u8] = b"The quick brown fox jumps over the lazy dog";
+    const ERROR_COUNTER: u8 = 0xff;
+
+    fn unwrapped_key(counter: u8) -> UnwrappedKey {
+        UnwrappedKey::new(vec![counter; KEY_SIZE].try_into().unwrap())
     }
 
-    struct TestCrypt(Mutex<Option<Result<UnwrappedKey, Error>>>);
+    fn cipher_text(counter: u8) -> Vec<u8> {
+        let mut text = PLAIN_TEXT.to_vec();
+        XtsCipherSet::new(&vec![(0, unwrapped_key(counter))])
+            .encrypt(0, 0, &mut text)
+            .expect("encrypt failed");
+        text
+    }
+
+    fn wrapped_keys() -> WrappedKeys {
+        WrappedKeys(vec![(
+            0,
+            WrappedKey {
+                wrapping_key_id: 0x1234567812345678,
+                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+            },
+        )])
+    }
+
+    struct TestCrypt(AtomicU8);
 
     impl TestCrypt {
-        fn new(result: Result<UnwrappedKey, Error>) -> Arc<Self> {
-            Arc::new(Self(Mutex::new(Some(result))))
+        fn new(counter: u8) -> Arc<Self> {
+            Arc::new(Self(AtomicU8::new(counter)))
         }
     }
 
@@ -117,62 +386,195 @@ mod tests {
             _wrapped_key: &WrappedKey,
             _owner: u64,
         ) -> Result<UnwrappedKey, Error> {
-            self.0.lock().unwrap().take().expect("Only 1 key can be unwrapped")
+            fasync::Timer::new(std::time::Duration::from_secs(1)).await;
+            let counter = self.0.fetch_add(1, Ordering::Relaxed);
+            if counter == ERROR_COUNTER {
+                Err(anyhow!("Unwrap failed!"))
+            } else {
+                Ok(unwrapped_key(counter))
+            }
         }
     }
 
-    #[fuchsia::test]
-    async fn test_key_unwrapper_new_from_wrapped_wait_for_unwrap() {
-        let wrapped_keys = WrappedKeys(vec![(
-            0,
-            WrappedKey {
-                wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
-            },
-        )]);
-        let crypt = TestCrypt::new(Ok(UnwrappedKey::new([0; KEY_SIZE])));
-        let (keys, future) = KeyUnwrapper::new_from_wrapped(0, crypt, wrapped_keys);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_get_or_insert() {
+        TestExecutor::advance_to(Time::from_nanos(0)).await;
 
-        let key_fut = keys.keys();
-        futures::pin_mut!(key_fut);
-        assert!(futures::poll!(&mut key_fut).is_pending());
+        let crypt = TestCrypt::new(0);
+        let manager1 = Arc::new(KeyManager::new());
+        let manager2 = manager1.clone();
+        let manager3 = manager1.clone();
+        let crypt1 = crypt.clone();
+        let crypt2 = crypt.clone();
 
-        // Unwrap the keys.
-        future.await;
+        let task1 = fasync::Task::spawn(async move {
+            let mut buf = cipher_text(0);
+            manager1
+                .get_or_insert(1, &(crypt1 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false)
+                .await
+                .expect("get_or_insert failed")
+                .decrypt(0, 0, &mut buf)
+                .expect("decrypt failed");
+            assert_eq!(&buf, PLAIN_TEXT);
+        });
+        let task2 = fasync::Task::spawn(async move {
+            let mut buf = cipher_text(0);
+            manager2
+                .get_or_insert(1, &(crypt2 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false)
+                .await
+                .expect("get_or_insert failed")
+                .decrypt(0, 0, &mut buf)
+                .expect("decrypt failed");
+            assert_eq!(&buf, PLAIN_TEXT);
+        });
+        let task3 = fasync::Task::spawn(async move {
+            // Make sure this starts after the get_or_inserts.
+            fasync::Timer::new(zx::Duration::from_millis(500)).await;
+            let mut buf = cipher_text(0);
+            manager3
+                .get(1)
+                .await
+                .expect("get failed")
+                .expect("missing key")
+                .decrypt(0, 0, &mut buf)
+                .expect("decrypt failed");
+            assert_eq!(&buf, PLAIN_TEXT);
+        });
 
-        // The keys should now be available.
-        assert!(futures::poll!(&mut key_fut).is_ready());
+        TestExecutor::advance_to(Time::after(zx::Duration::from_millis(1500))).await;
+
+        task1.await;
+        task2.await;
+        task3.await;
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_pre_fetch() {
+        TestExecutor::advance_to(Time::from_nanos(0)).await;
+
+        let crypt = TestCrypt::new(0);
+        let manager = Arc::new(KeyManager::new());
+
+        manager.pre_fetch(1, crypt.clone(), wrapped_keys(), false);
+
+        TestExecutor::advance_to(Time::after(zx::Duration::from_seconds(1))).await;
+
+        let mut buf = cipher_text(0);
+        manager
+            .get(1)
+            .await
+            .expect("get failed")
+            .expect("missing key")
+            .decrypt(0, 0, &mut buf)
+            .expect("decrypt failed");
+        assert_eq!(&buf, PLAIN_TEXT);
     }
 
     #[fuchsia::test]
-    async fn test_key_unwrapper_new_from_wrapped_keys_already_unwrapped() {
-        let wrapped_keys = WrappedKeys(vec![(
-            0,
-            WrappedKey {
-                wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
-            },
-        )]);
-        let crypt = TestCrypt::new(Ok(UnwrappedKey::new([0; KEY_SIZE])));
-        let (keys, future) = KeyUnwrapper::new_from_wrapped(0, crypt, wrapped_keys);
-        future.await;
+    async fn test_insert_and_remove() {
+        let manager = Arc::new(KeyManager::new());
 
-        keys.keys().await.unwrap();
+        manager.insert(1, &vec![(0, unwrapped_key(0))], false);
+        let mut buf = cipher_text(0);
+        manager
+            .get(1)
+            .await
+            .expect("get failed")
+            .expect("missing key")
+            .decrypt(0, 0, &mut buf)
+            .expect("decrypt failed");
+        assert_eq!(&buf, PLAIN_TEXT);
+        manager.remove(1);
+        assert!(manager.get(1).await.expect("get failed").is_none());
     }
 
-    #[fuchsia::test]
-    async fn test_key_unwrapper_new_from_wrapped_unwrap_failed() {
-        let wrapped_keys = WrappedKeys(vec![(
-            0,
-            WrappedKey {
-                wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
-            },
-        )]);
-        let crypt = TestCrypt::new(Err(anyhow!("Unwrap failed")));
-        let (keys, future) = KeyUnwrapper::new_from_wrapped(0, crypt, wrapped_keys);
-        future.await;
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_purge() {
+        TestExecutor::advance_to(Time::from_nanos(0)).await;
 
-        keys.keys().await.map(|_| ()).expect_err("Unwrapping should have failed");
+        let manager = Arc::new(KeyManager::new());
+        manager.insert(1, &vec![(0, unwrapped_key(0))], false);
+
+        TestExecutor::advance_to(Time::after(PURGE_TIMEOUT.into())).await;
+
+        // After 1 period, the key should still be present.
+        manager.get(1).await.expect("get failed").expect("missing key");
+
+        TestExecutor::advance_to(Time::after(PURGE_TIMEOUT.into())).await;
+
+        // The last access should have reset the timer and it should still be present.
+        manager.get(1).await.expect("get failed").expect("missing key");
+
+        TestExecutor::advance_to(Time::after((2 * PURGE_TIMEOUT).into())).await;
+
+        // The key should have been evicted since two periods passed.
+        assert!(manager.get(1).await.expect("get failed").is_none());
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_permanent() {
+        TestExecutor::advance_to(Time::from_nanos(0)).await;
+
+        let manager = Arc::new(KeyManager::new());
+        manager.insert(1, &vec![(0, unwrapped_key(0))], true);
+        manager.insert(2, &vec![(0, unwrapped_key(0))], false);
+
+        // Skip forward two periods which should cause 2 to be purged but not 1.
+        TestExecutor::advance_to(Time::after((2 * PURGE_TIMEOUT).into())).await;
+
+        assert!(manager.get(1).await.expect("get failed").is_some());
+        assert!(manager.get(2).await.expect("get failed").is_none());
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_clear() {
+        TestExecutor::advance_to(Time::from_nanos(0)).await;
+
+        let manager = Arc::new(KeyManager::new());
+        manager.insert(1, &vec![(0, unwrapped_key(0))], true);
+        manager.insert(2, &vec![(0, unwrapped_key(0))], false);
+        manager.insert(3, &vec![(0, unwrapped_key(0))], false);
+
+        // Skip forward 1 period which should make keys 2 and 3 pending deletion.
+        TestExecutor::advance_to(Time::after(PURGE_TIMEOUT.into())).await;
+
+        // Touch the the second key which should promote it to the active list.
+        assert!(manager.get(2).await.expect("get failed").is_some());
+
+        manager.clear();
+
+        // Clearing should have removed all three keys.
+        assert!(manager.get(1).await.expect("get failed").is_none());
+        assert!(manager.get(2).await.expect("get failed").is_none());
+        assert!(manager.get(3).await.expect("get failed").is_none());
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_error() {
+        TestExecutor::advance_to(Time::from_nanos(0)).await;
+
+        let crypt = TestCrypt::new(ERROR_COUNTER);
+        let manager1 = Arc::new(KeyManager::new());
+        let manager2 = manager1.clone();
+        let crypt1 = crypt.clone();
+        let crypt2 = crypt.clone();
+
+        let task1 = fasync::Task::spawn(async move {
+            assert!(manager1
+                .get_or_insert(1, &(crypt1 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false,)
+                .await
+                .is_err());
+        });
+        let task2 = fasync::Task::spawn(async move {
+            assert!(manager2
+                .get_or_insert(1, &(crypt2 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false,)
+                .await
+                .is_err());
+        });
+
+        TestExecutor::advance_to(Time::after(zx::Duration::from_seconds(1))).await;
+
+        task1.await;
+        task2.await;
     }
 }

@@ -8,20 +8,18 @@ use {
         fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
         log::*,
         lsm_tree::{
-            simple_persistent_layer::SimplePersistentLayer,
             skip_list_layer::SkipListLayer,
             types::{
                 BoxedLayerIterator, Item, Key, Layer, LayerIterator, OrdUpperBound, RangeKey, Value,
             },
         },
-        object_handle::{ReadObjectHandle, INVALID_OBJECT_ID},
+        object_handle::INVALID_OBJECT_ID,
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,
             load_store_info,
             transaction::LockKey,
             volume::root_volume,
-            HandleOptions, ObjectKey, ObjectStore, ObjectValue,
         },
     },
     anyhow::{anyhow, Context, Error},
@@ -356,76 +354,42 @@ impl<'a> Fsck<'a> {
         &mut self,
         filesystem: &dyn Filesystem,
         store_id: u64,
-        mut crypt: Option<Arc<dyn Crypt>>,
+        crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<(), Error> {
-        let root_store = filesystem.root_store();
         let store =
             filesystem.object_manager().store(store_id).context("open_store failed").unwrap();
 
-        let _relock_guard = if store.is_locked() {
+        let _relock_guard;
+        if store.is_locked() {
             if let Some(crypt) = &crypt {
                 store.unlock_read_only(crypt.clone()).await?;
-                Some(scopeguard::guard(store.clone(), |store| {
+                _relock_guard = scopeguard::guard(store.clone(), |store| {
                     store.lock_read_only();
-                }))
+                });
             } else {
                 return Err(anyhow!("Invalid key"));
             }
-        } else {
-            crypt = store.crypt();
-            None
-        };
-
-        for layer_file_object_id in store.layer_file_object_ids() {
-            self.check_layer_file::<ObjectKey, ObjectValue>(
-                &root_store,
-                store_id,
-                layer_file_object_id,
-                crypt.clone(),
-            )
-            .await?;
         }
+
+        if self.options.do_slow_passes {
+            let layer_set = store.tree().immutable_layer_set();
+            for layer in layer_set.layers {
+                let (layer_object_id, layer_size) = if let Some(h) = layer.handle() {
+                    (h.object_id(), h.get_size())
+                } else {
+                    (0, 0)
+                };
+                self.verbose(format!(
+                    "Layer file {} for store {} is {} bytes",
+                    layer_object_id, store_id, layer_size,
+                ));
+                self.check_layer_file_contents(store_id, layer_object_id, layer.clone()).await?
+            }
+        }
+
         store_scanner::scan_store(self, store.as_ref(), &store.root_objects())
             .await
             .context("scan_store failed")
-    }
-
-    async fn check_layer_file<
-        K: Key + KeyExt + OrdUpperBound + std::fmt::Debug,
-        V: Value + std::fmt::Debug,
-    >(
-        &self,
-        root_store: &Arc<ObjectStore>,
-        store_object_id: u64,
-        layer_file_object_id: u64,
-        crypt: Option<Arc<dyn Crypt>>,
-    ) -> Result<(), Error> {
-        let layer_file = self.assert(
-            ObjectStore::open_object(
-                root_store,
-                layer_file_object_id,
-                HandleOptions::default(),
-                crypt,
-            )
-            .await,
-            FsckFatal::MissingLayerFile(store_object_id, layer_file_object_id),
-        )?;
-        if self.options.do_slow_passes {
-            self.verbose(format!(
-                "Layer file {} for store {} is {} bytes",
-                layer_file_object_id,
-                store_object_id,
-                layer_file.get_size()
-            ));
-            let layer = SimplePersistentLayer::open(layer_file).await?;
-            self.check_layer_file_contents(
-                store_object_id,
-                layer_file_object_id,
-                layer as Arc<dyn Layer<K, V>>,
-            )
-            .await?;
-        }
-        Ok(())
     }
 
     async fn check_layer_file_contents<

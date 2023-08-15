@@ -19,7 +19,7 @@ use {
             transaction::{
                 LockKey, Mutation, ObjectStoreMutation, Options, ReadGuard, Transaction,
             },
-            HandleOptions, HandleOwner, KeyUnwrapper, ObjectStore,
+            HandleOptions, HandleOwner, ObjectStore,
         },
         range::RangeExt,
         round::{round_down, round_up},
@@ -30,6 +30,7 @@ use {
         stream::{FuturesOrdered, FuturesUnordered},
         try_join, TryStreamExt,
     },
+    fxfs_crypto::XtsCipherSet,
     std::{
         cmp::min,
         ops::{Bound, Range},
@@ -64,6 +65,18 @@ impl From<fio::SetExtendedAttributeMode> for SetExtendedAttributeMode {
     }
 }
 
+enum Encryption {
+    /// The object doesn't use encryption.
+    None,
+
+    /// The object has keys that are cached (which means unwrapping occurs on-demand) with
+    /// KeyManager.
+    CachedKeys,
+
+    /// The object has permanent keys registered with KeyManager.
+    PermanentKeys,
+}
+
 /// StoreObjectHandle is the lowest-level, untyped handle to an object with the id [`object_id`] in
 /// a particular store, [`owner`]. It provides functionality shared across all objects, such as
 /// reading and writing attributes and managing encryption keys.
@@ -79,9 +92,9 @@ impl From<fio::SetExtendedAttributeMode> for SetExtendedAttributeMode {
 pub struct StoreObjectHandle<S: HandleOwner> {
     owner: Arc<S>,
     object_id: u64,
-    keys: Option<KeyUnwrapper>,
     options: HandleOptions,
     trace: AtomicBool,
+    encryption: Encryption,
 }
 
 impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
@@ -108,11 +121,18 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     pub fn new(
         owner: Arc<S>,
         object_id: u64,
-        keys: Option<KeyUnwrapper>,
+        permanent_keys: bool,
         options: HandleOptions,
         trace: bool,
     ) -> Self {
-        Self { owner, object_id, keys, options, trace: AtomicBool::new(trace) }
+        let encryption = if permanent_keys {
+            Encryption::PermanentKeys
+        } else if owner.as_ref().as_ref().is_encrypted() {
+            Encryption::CachedKeys
+        } else {
+            Encryption::None
+        };
+        Self { owner, object_id, encryption, options, trace: AtomicBool::new(trace) }
     }
 
     pub fn owner(&self) -> &Arc<S> {
@@ -128,7 +148,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.keys.is_some()
+        !matches!(self.encryption, Encryption::None)
     }
 
     /// Get the default set of transaction options for this object. This is mostly the overall
@@ -467,11 +487,33 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         mut buffer: MutableBufferRef<'_>,
         key_id: u64,
     ) -> Result<(), Error> {
-        self.store().device.read(device_offset, buffer.reborrow()).await?;
-        if let Some(keys) = &self.keys {
-            keys.keys().await?.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
+        let store = self.store();
+        store.device.read(device_offset, buffer.reborrow()).await?;
+        if let Some(keys) = self.get_keys().await? {
+            keys.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
         }
         Ok(())
+    }
+
+    async fn get_keys(&self) -> Result<Option<Arc<XtsCipherSet>>, Error> {
+        let store = self.store();
+        Ok(match self.encryption {
+            Encryption::None => None,
+            Encryption::CachedKeys => Some(
+                store
+                    .key_manager
+                    .get_or_insert(
+                        self.object_id,
+                        &store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
+                        store.get_keys(self.object_id),
+                        false,
+                    )
+                    .await?,
+            ),
+            Encryption::PermanentKeys => {
+                Some(store.key_manager.get(self.object_id).await?.unwrap())
+            }
+        })
     }
 
     pub async fn read(
@@ -711,9 +753,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 (range, transfer_buf.as_mut())
             };
 
-        if let Some(keys) = &self.keys {
+        if let Some(keys) = self.get_keys().await? {
             // TODO(https://fxbug.dev/92975): Support key_id != 0.
-            keys.keys().await?.encrypt(range.start, 0, transfer_buf_ref.as_mut_slice())?;
+            keys.encrypt(range.start, 0, transfer_buf_ref.as_mut_slice())?;
         }
 
         self.write_aligned(
@@ -741,13 +783,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         let store_id = store.store_object_id();
 
-        if let Some(keys) = &self.keys {
+        if let Some(keys) = self.get_keys().await? {
             let mut slice = buf.as_mut_slice();
             for r in ranges {
                 let l = r.end - r.start;
                 let (head, tail) = slice.split_at_mut(l as usize);
                 // TODO(https://fxbug.dev/92975): Support key_id != 0.
-                keys.keys().await?.encrypt(r.start, 0, head)?;
+                keys.encrypt(r.start, 0, head)?;
                 slice = tail;
             }
         }
@@ -1002,6 +1044,14 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     }
 }
 
+impl<S: HandleOwner> Drop for StoreObjectHandle<S> {
+    fn drop(&mut self) {
+        if self.is_encrypted() {
+            self.store().key_manager.remove(self.object_id)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -1073,7 +1123,7 @@ mod tests {
             Arc::new(StoreObjectHandle::new(
                 object.owner().clone(),
                 object.object_id(),
-                None,
+                /* permanent_keys: */ false,
                 HandleOptions::default(),
                 false,
             )),

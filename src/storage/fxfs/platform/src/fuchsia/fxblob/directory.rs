@@ -183,7 +183,7 @@ impl BlobDirectory {
                     self.volume(),
                     &mut transaction,
                     HandleOptions::default(),
-                    store.crypt().as_deref(),
+                    None,
                     None,
                 )
                 .await?;
@@ -217,13 +217,9 @@ impl BlobDirectory {
             GetResult::Node(node) => Ok(node),
             GetResult::Placeholder(placeholder) => {
                 let hash = Hash::from_str(name).map_err(|_| FxfsError::Inconsistent)?;
-                let object = ObjectStore::open_object(
-                    volume,
-                    object_id,
-                    HandleOptions::default(),
-                    volume.store().crypt(),
-                )
-                .await?;
+                let object =
+                    ObjectStore::open_object(volume, object_id, HandleOptions::default(), None)
+                        .await?;
                 let (tree, metadata) = match object.read_attr(BLOB_MERKLE_ATTRIBUTE_ID).await? {
                     None => {
                         // If the file is uncompressed and is small enough, it may not have any
