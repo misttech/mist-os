@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cm_runner::{Runner, StartInfo};
 use fidl::endpoints;
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_diagnostics_types as fdiagnostics;
@@ -11,7 +12,8 @@ use futures::{channel::oneshot, future::BoxFuture};
 use thiserror::Error;
 use zx::{AsHandleRef, Koid};
 
-use cm_runner::{component_controller::ComponentController, Runner, StartInfo};
+mod component_controller;
+use component_controller::ComponentController;
 
 /// A [Program] is a unit of execution.
 ///

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod builtin;
-pub mod component_controller;
 pub mod namespace;
 
 pub use namespace::Entry as NamespaceEntry;

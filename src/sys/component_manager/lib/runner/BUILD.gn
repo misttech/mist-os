@@ -20,7 +20,6 @@ rustc_library("runner") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
-    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
@@ -33,14 +32,10 @@ rustc_library("runner") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:assert_matches",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   sources = [
     "src/builtin.rs",
-    "src/component_controller.rs",
     "src/lib.rs",
     "src/namespace.rs",
   ]
