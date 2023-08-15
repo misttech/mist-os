@@ -135,6 +135,13 @@ impl Repository {
     }
 }
 
+#[derive(Clone, Debug, Copy, Hash, PartialEq, Eq)]
+enum Type {
+    Flash,
+    Emu,
+    Update,
+}
+
 impl ProductBundleV2 {
     /// Convert all the paths from relative to absolute, assuming
     /// `product_bundle_dir` is the current base all the paths are relative to.
@@ -147,37 +154,43 @@ impl ProductBundleV2 {
         product_bundle_dir: impl AsRef<Utf8Path>,
     ) -> Result<()> {
         let product_bundle_dir = product_bundle_dir.as_ref();
+        let mut not_supported = HashSet::new();
+
+        // Canonicalize the path. If the path does not exist, print a warning
+        // and skip canonicalization.
+        let mut canonicalize_path = |path: &Utf8Path, image_type: Type| -> Utf8PathBuf {
+            let product_bundle_path = product_bundle_dir.join(path);
+            match product_bundle_path.canonicalize_utf8() {
+                Ok(p) => p,
+                Err(_) => {
+                    eprintln!("Cannot canonicalize {}", &path);
+                    not_supported.insert(image_type);
+                    product_bundle_dir.join(path).to_owned()
+                }
+            }
+        };
 
         // Canonicalize the partitions.
         for part in &mut self.partitions.bootstrap_partitions {
-            part.image = product_bundle_dir
-                .join(&part.image)
-                .canonicalize_utf8()
-                .with_context(|| format!("Canonicalizing {:?}", &part.image))?;
+            part.image = canonicalize_path(&part.image, Type::Flash);
         }
         for part in &mut self.partitions.bootloader_partitions {
-            part.image = product_bundle_dir
-                .join(&part.image)
-                .canonicalize_utf8()
-                .with_context(|| format!("Canonicalizing {:?}", &part.image))?;
+            part.image = canonicalize_path(&part.image, Type::Flash);
         }
         for cred in &mut self.partitions.unlock_credentials {
-            *cred = product_bundle_dir
-                .join(&cred)
-                .canonicalize_utf8()
-                .with_context(|| format!("Canonicalizing {:?}", &cred))?;
+            *cred = canonicalize_path(&cred, Type::Flash);
         }
 
         // Canonicalize the systems.
-        let canonicalize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
+        let mut canonicalize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
                 for image in system.iter_mut() {
-                    image.set_source(
-                        product_bundle_dir
-                            .join(image.source())
-                            .canonicalize_utf8()
-                            .with_context(|| format!("Canonicalizing {:?}", image.source()))?,
-                    );
+                    let image_type = match image {
+                        Image::QemuKernel(_) | Image::FVM(_) => Type::Emu,
+                        _ => Type::Flash,
+                    };
+
+                    image.set_source(&canonicalize_path(&image.source().to_path_buf(), image_type));
                 }
             }
             Ok(())
@@ -187,15 +200,14 @@ impl ProductBundleV2 {
         canonicalize_system(&mut self.system_r)?;
 
         for repository in &mut self.repositories {
-            let canonicalize_dir = |path: &Utf8PathBuf| -> Result<Utf8PathBuf> {
+            let mut canonicalize_dir = |path: &Utf8Path| -> Result<Utf8PathBuf> {
                 let dir = product_bundle_dir.join(path);
                 // Create the directory to ensure that canonicalize will work.
                 if !dir.exists() {
                     std::fs::create_dir_all(&dir)
                         .with_context(|| format!("Creating the directory: {}", dir))?;
                 }
-                let path =
-                    dir.canonicalize_utf8().with_context(|| format!("Canonicalizing {:?}", dir))?;
+                let path = canonicalize_path(path, Type::Update);
                 Ok(path)
             };
             repository.metadata_path = canonicalize_dir(&repository.metadata_path)?;
@@ -232,6 +244,10 @@ impl ProductBundleV2 {
             // Only canonicalize the directory.
             // This prevents problems when virtual_devices_path is a symlink.
             self.virtual_devices_path = Some(dir.canonicalize_utf8()?.join(base));
+        }
+
+        if !not_supported.is_empty() {
+            eprintln!("Warning: Missing artifacts. The following functionality will not work correctly: {:#?}", not_supported);
         }
 
         Ok(())
@@ -359,12 +375,10 @@ mod tests {
             write!(file, "{}", name).unwrap();
         };
 
-        // These files must exist for canonicalize() to work.
         create_temp_file("bootstrap");
         create_temp_file("bootloader");
         create_temp_file("zbi");
         create_temp_file("vbmeta");
-        create_temp_file("fvm");
         create_temp_file("unlock_credentials");
         create_temp_file("device");
 
@@ -404,6 +418,22 @@ mod tests {
         };
         let result = pb.canonicalize_paths(tempdir);
         assert!(result.is_ok());
+
+        // Validate system_a. Note the fvm file does not exist in tempdir.
+        for image in pb.system_a.unwrap() {
+            match image {
+                Image::ZBI { path, signed: _ } => {
+                    assert_eq!(tempdir.join("zbi"), path);
+                }
+                Image::VBMeta(path) => {
+                    assert_eq!(tempdir.join("vbmeta"), path);
+                }
+                Image::FVM(path) => {
+                    assert_eq!(tempdir.join("fvm"), path);
+                }
+                _ => assert!(false),
+            }
+        }
     }
 
     #[test]
