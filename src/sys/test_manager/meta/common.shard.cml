@@ -646,10 +646,15 @@
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
             to: [ "#system-tests" ],
+        },
+        {
+            protocol: [ "fuchsia.ui.scenic.Scenic" ],
+            from: "parent",
+            to: [ "#system-tests" ],
+            availability: "same_as_target",
         },
 
         // `tz_version_parrot` tests use the system tzdata.

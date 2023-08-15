@@ -61,12 +61,17 @@
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.web.ContextProvider",
             ],
             from: "parent",
             to: "#chromium-system-tests",
+        },
+        {
+            protocol: [ "fuchsia.ui.scenic.Scenic" ],
+            from: "parent",
+            to: "#chromium-system-tests",
+            availability: "same_as_target",
         },
         {
             protocol: [

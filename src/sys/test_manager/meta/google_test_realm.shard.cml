@@ -50,13 +50,18 @@
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
 
                 // TODO: add any other required capabilities
             ],
             from: "parent",
             to: "#google-tests",
+        },
+        {
+            protocol: [ "fuchsia.ui.scenic.Scenic" ],
+            from: "parent",
+            to: "#google-tests",
+            availability: "same_as_target",
         },
         {
             storage: "data",

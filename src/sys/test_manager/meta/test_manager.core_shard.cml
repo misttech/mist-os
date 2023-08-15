@@ -184,6 +184,7 @@
                 "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
             to: "#test_manager",
@@ -193,7 +194,6 @@
             protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
             to: "#test_manager",
