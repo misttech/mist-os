@@ -144,20 +144,6 @@ $ fx set core.x64 \
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_gap_test --e2e --output
 ```
 
-### Component tests
-```shell
-$ fx set core.qemu-x64 \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
-    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
-
-# start the emulator with networking enabled
-$ ffx emu stop ; ffx emu start -H --net tap
-
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component:component_test --e2e --output
-```
-
 ### Tracing tests
 ``` shell
 $ fx set core.qemu-x64 \

@@ -7,7 +7,6 @@
 import abc
 from typing import Callable
 
-from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
@@ -26,20 +25,6 @@ class BluetoothGapCapableDevice(abc.ABC):
 
         Returns:
             bluetooth_gap.BluetoothGap object
-        """
-
-
-class ComponentCapableDevice(abc.ABC):
-    """Abstract base class to be implemented by a device which supports the
-    Component affordance."""
-
-    @properties.Affordance
-    @abc.abstractmethod
-    def component(self) -> component.Component:
-        """Returns a component affordance object.
-
-        Returns:
-            component.Component object
         """
 
 

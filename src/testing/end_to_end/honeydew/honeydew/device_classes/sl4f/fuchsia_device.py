@@ -10,12 +10,10 @@ import logging
 from typing import Any, Dict, Optional
 
 from honeydew import custom_types
-from honeydew.affordances.sl4f import component as component_sl4f
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
 from honeydew.affordances.sl4f.bluetooth import \
     bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.device_classes import base_fuchsia_device
-from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
@@ -44,7 +42,6 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
-                    affordances_capable.ComponentCapableDevice,
                     affordances_capable.TracingCapableDevice,
                     transports_capable.SL4FCapableDevice):
     """FuchsiaDevice abstract base class implementation using SL4F.
@@ -97,16 +94,6 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             device_name=self.device_name,
             sl4f=self.sl4f,
             reboot_affordance=self)
-
-    @properties.Affordance
-    def component(self) -> component_interface.Component:
-        """Returns a component affordance object.
-
-        Returns:
-            component.Component object
-        """
-        return component_sl4f.Component(
-            device_name=self.device_name, sl4f=self.sl4f)
 
     @properties.Affordance
     def tracing(self) -> tracing_interface.Tracing:

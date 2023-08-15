@@ -5,17 +5,13 @@
 if (is_host) {
   group("emulator_tests") {
     testonly = true
-    public_deps = [
-      "test_component:component_test($host_toolchain)",
-      "test_tracing:tracing_test($host_toolchain)",
-    ]
+    public_deps = [ "test_tracing:tracing_test($host_toolchain)" ]
   }
 
   group("emulator_tests_fyi") {
     testonly = true
     public_deps = [
       ":emulator_tests",
-      "test_component:component_test_fc($host_toolchain)",
       "test_tracing:tracing_test_fc($host_toolchain)",
     ]
   }

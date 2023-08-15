@@ -14,13 +14,9 @@
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/sl4f:bluetooth_gap_sl4f_test --host --output
 
-    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/sl4f:component_sl4f_test --host --output
-
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/sl4f:tracing_sl4f_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:bluetooth_gap_fc_test --host --output
-
-    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:component_fc_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:tracing_fc_test --host --output
 

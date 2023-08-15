@@ -18,12 +18,10 @@ import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.affordances.fuchsia_controller import component as component_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth import \
     bluetooth_gap as bluetooth_gap_fc
 from honeydew.device_classes import base_fuchsia_device
-from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
@@ -83,7 +81,6 @@ def _connect_device_proxy(
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
-                    affordances_capable.ComponentCapableDevice,
                     affordances_capable.TracingCapableDevice):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
@@ -121,15 +118,6 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             bluetooth_gap.BluetoothGap object
         """
         return bluetooth_gap_fc.BluetoothGap()
-
-    @properties.Affordance
-    def component(self) -> component.Component:
-        """Returns a component affordance object.
-
-        Returns:
-            component.Component object
-        """
-        return component_fc.Component()
 
     @properties.Affordance
     def tracing(self) -> tracing.Tracing:
