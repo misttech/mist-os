@@ -28,7 +28,7 @@ fuchsia_product_bundle(
     name = "product_bundle_eng.x64",
     board_name = "x64",
     default_virtual_device = ":workbench_emu",
-    partitions_config = ":partitions.x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_image = ":assembly_eng.x64",
     product_name = "workbench_eng",
     recovery = "//products/zedboot:x64",
@@ -44,7 +44,7 @@ fuchsia_product_bundle(
     name = "product_bundle_eng.qemu-x64",
     board_name = "qemu-x64",
     default_virtual_device = ":workbench_emu",
-    partitions_config = ":partitions.x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-x64",
     product_image = ":assembly_eng.qemu-x64",
     product_name = "workbench_eng",
     recovery = "//products/zedboot:qemu-x64",
@@ -75,11 +75,13 @@ fuchsia_partitions_configuration(
     ],
     hardware_revision = "x64",
     partitions = [
-        ":vbmeta_a",
         ":zircon_a",
-        ":fvm",
+        ":zircon_b",
         ":zircon_r",
+        ":vbmeta_a",
+        ":vbmeta_b",
         ":vbmeta_r",
+        ":fvm",
     ],
 )
 
@@ -101,6 +103,20 @@ fuchsia_partition(
     name = "zircon_a",
     partition_name = "zircon-a",
     slot = SLOT.A,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "vbmeta_b",
+    partition_name = "vbmeta_b",
+    slot = SLOT.B,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_partition(
+    name = "zircon_b",
+    partition_name = "zircon-b",
+    slot = SLOT.B,
     type = PARTITION_TYPE.ZBI,
 )
 
