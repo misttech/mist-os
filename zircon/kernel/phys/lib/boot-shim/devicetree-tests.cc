@@ -762,23 +762,31 @@ class ChosenNodeMatcherTest : public TestMixin<ArmDevicetreeTest, RiscvDevicetre
     loaded_dtb = LoadDtb("chosen_unknown_intc.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     chosen_unknown_intc_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("chosen_with_reg_offset.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    chosen_with_reg_offset_dtb_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
     chosen_dtb_ = std::nullopt;
     chosen_unknown_intc_dtb_ = std::nullopt;
+    chosen_with_reg_offset_dtb_ = std::nullopt;
     Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree chosen() { return chosen_dtb_->fdt(); }
+  devicetree::Devicetree chosen_with_reg_offset() { return chosen_with_reg_offset_dtb_->fdt(); }
   devicetree::Devicetree chosen_unknown_intc() { return chosen_unknown_intc_dtb_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> chosen_dtb_;
+  static std::optional<LoadedDtb> chosen_with_reg_offset_dtb_;
   static std::optional<LoadedDtb> chosen_unknown_intc_dtb_;
 };
 
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_dtb_ = std::nullopt;
+std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_with_reg_offset_dtb_ = std::nullopt;
 std::optional<LoadedDtb> ChosenNodeMatcherTest::chosen_unknown_intc_dtb_ = std::nullopt;
 
 struct ExpectedChosen {
@@ -862,6 +870,27 @@ TEST_F(ChosenNodeMatcherTest, ParseChosen) {
                          .uart_config =
                              {
                                  .mmio_phys = 0x9000000,
+                                 .irq = 33,
+                             },
+                         .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
+                     });
+}
+
+TEST_F(ChosenNodeMatcherTest, ParseChosenWithRegOffset) {
+  auto fdt = chosen_with_reg_offset();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x48000000,
+                         .ramdisk_end = 0x58000000,
+                         .cmdline = "-foo=bar -bar=baz",
+                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x9000123,
                                  .irq = 33,
                              },
                          .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",

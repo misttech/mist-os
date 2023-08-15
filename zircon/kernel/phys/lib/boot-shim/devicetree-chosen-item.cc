@@ -112,8 +112,8 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
       return devicetree::ScanState::kDoneWithSubtree;
   }
 
-  auto [compatible, interrupts, reg_property] =
-      decoder.FindProperties("compatible", "interrupts", "reg");
+  auto [compatible, interrupts, reg_property, reg_offset] =
+      decoder.FindProperties("compatible", "interrupts", "reg", "reg-offset");
 
   // Without this we cant figure out what driver to use.
   if (!compatible) {
@@ -139,8 +139,16 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
     uart_dcfg_.mmio_phys = *addr;
     uart_dcfg_.irq = 0;
 
+    if (reg_offset) {
+      if (auto offset = reg_offset->AsUint32()) {
+        uart_dcfg_.mmio_phys += *offset;
+      } else {
+        OnError("Failed to parse 'reg-offset' property from UART node.");
+      }
+    }
+
     if (!interrupts) {
-      OnError("Uart Device does not provide interrupt cells.");
+      OnError("UART Device does not provide interrupt cells.");
       return devicetree::ScanState::kDone;
     }
 
