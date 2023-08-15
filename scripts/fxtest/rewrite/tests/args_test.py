@@ -19,6 +19,7 @@ class TestArgs(unittest.TestCase):
             ["--simple", "--status"],
             ["--simple", "--style"],
             ["--status"],
+            ["--device", "--host"],
         ]:
             flags = args.parse_args(arg_list)
             try:

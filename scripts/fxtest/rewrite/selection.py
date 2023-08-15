@@ -13,6 +13,7 @@ wrappers for the outcomes of the selection process.
 from collections import defaultdict
 from dataclasses import dataclass
 from dataclasses import field
+from enum import Enum
 import re
 import typing
 
@@ -99,11 +100,19 @@ class TestSelections:
         Returns:
             bool: True if a test that requires a device is selected, False otherwise.
         """
-        return any([entry.build.test.package_url for entry in self.selected])
+        return any([entry.is_device_test() for entry in self.selected])
+
+
+class SelectionMode(Enum):
+    ANY = 0
+    HOST = 1
+    DEVICE = 2
 
 
 def select_tests(
-    entries: typing.List[Test], selection: typing.List[str]
+    entries: typing.List[Test],
+    selection: typing.List[str],
+    mode: SelectionMode = SelectionMode.ANY,
 ) -> TestSelections:
     """Perform selection on the incoming list of tests.
 
@@ -115,6 +124,7 @@ def select_tests(
     Args:
         entries (typing.List[Test]): Tests to select from.
         selection (typing.List[str]): Selection command line.
+        mode (SelectionMode, optional): Selection mode. Defaults to ANY.
 
     Raises:
         RuntimeError: _description_
@@ -123,12 +133,29 @@ def select_tests(
     Returns:
         TestSelections: Description of the selection process outcome.
     """
+
+    filtered_entry_scores: typing.Dict[str, float] = {}
+    if mode == SelectionMode.HOST:
+        filtered_entry_scores = {
+            test.info.name: 0.0 for test in entries if not test.is_host_test()
+        }
+        entries = list(filter(Test.is_host_test, entries))
+    elif mode == SelectionMode.DEVICE:
+        filtered_entry_scores = {
+            test.info.name: 0.0 for test in entries if not test.is_device_test()
+        }
+        entries = list(filter(Test.is_device_test, entries))
+
+    def make_final_scores(partial: typing.Dict[str, float]) -> typing.Dict[str, float]:
+        filtered_entry_scores.update(partial)
+        return filtered_entry_scores
+
     if not selection:
         # If no selection text is specified, select all tests and
         # report them all as perfect matches.
         return TestSelections(
             entries.copy(),
-            {test.info.name: 1.0 for test in entries},
+            make_final_scores({test.info.name: 1.0 for test in entries}),
             [],
             THRESHOLD,
         )
@@ -321,7 +348,9 @@ def select_tests(
     # Ensure tests match the input ordering for consistency.
     selected_tests = [e for e in entries if e in tests_to_run]
 
-    return TestSelections(selected_tests, dict(best_matches), group_matches, THRESHOLD)
+    return TestSelections(
+        selected_tests, make_final_scores(dict(best_matches)), group_matches, THRESHOLD
+    )
 
 
 def _parse_selection_command_line(

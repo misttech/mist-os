@@ -5,15 +5,9 @@
 import typing
 import unittest
 
-from selection import _parse_selection_command_line
-from selection import MatchGroup
-from selection import select_tests
-from selection import SelectionError
-from test_list_file import Test
-from test_list_file import TestListEntry
-from test_list_file import TestListExecutionEntry
-from tests_json_file import TestEntry
-from tests_json_file import TestSection
+import selection
+import test_list_file
+import tests_json_file
 
 
 class MatchGroupTest(unittest.TestCase):
@@ -21,12 +15,12 @@ class MatchGroupTest(unittest.TestCase):
 
     def test_parse_empty(self):
         """Ensure that an empty selection produces no groups."""
-        groups = _parse_selection_command_line([])
+        groups = selection._parse_selection_command_line([])
         self.assertEqual(len(groups), 0)
 
     def assertMatchContents(
         self,
-        group: MatchGroup,
+        group: selection.MatchGroup,
         names: typing.Set[str],
         packages: typing.Set[str],
         components: typing.Set[str],
@@ -45,9 +39,11 @@ class MatchGroupTest(unittest.TestCase):
 
     def test_parse_single(self):
         """Test parsing and formatting single arguments."""
-        name_group = _parse_selection_command_line(["name"])
-        package_group = _parse_selection_command_line(["--package", "name"])
-        component_group = _parse_selection_command_line(["--component", "name"])
+        name_group = selection._parse_selection_command_line(["name"])
+        package_group = selection._parse_selection_command_line(["--package", "name"])
+        component_group = selection._parse_selection_command_line(
+            ["--component", "name"]
+        )
 
         self.assertMatchContents(name_group[0], {"name"}, set(), set())
         self.assertMatchContents(package_group[0], set(), {"name"}, set())
@@ -59,7 +55,7 @@ class MatchGroupTest(unittest.TestCase):
 
     def test_parse_and(self):
         """Test logical AND parsing and formatting."""
-        groups = _parse_selection_command_line(
+        groups = selection._parse_selection_command_line(
             [
                 "name",
                 "--and",
@@ -80,7 +76,7 @@ class MatchGroupTest(unittest.TestCase):
 
     def test_parse_or(self):
         """Test spreading arguments across multiple MatchGroups."""
-        groups = _parse_selection_command_line(
+        groups = selection._parse_selection_command_line(
             ["name", "--component", "component", "--package", "package"]
         )
         self.assertEqual(len(groups), 3)
@@ -91,7 +87,7 @@ class MatchGroupTest(unittest.TestCase):
 
     def test_all_together(self):
         """Test combination of values, ANDs, and ORs."""
-        groups = _parse_selection_command_line(
+        groups = selection._parse_selection_command_line(
             [
                 "name",
                 "--and",
@@ -117,29 +113,32 @@ class MatchGroupTest(unittest.TestCase):
 
         # Invalid to start an expression with AND
         self.assertRaises(
-            SelectionError, lambda: _parse_selection_command_line(["--and", "value"])
+            selection.SelectionError,
+            lambda: selection._parse_selection_command_line(["--and", "value"]),
         )
 
         # Invalid to use --and after --and
         self.assertRaises(
-            SelectionError,
-            lambda: _parse_selection_command_line(["value", "--and", "--and"]),
+            selection.SelectionError,
+            lambda: selection._parse_selection_command_line(
+                ["value", "--and", "--and"]
+            ),
         )
 
         # Invalid to use --and at the end of a selection
         self.assertRaises(
-            SelectionError,
-            lambda: _parse_selection_command_line(["value", "--and"]),
+            selection.SelectionError,
+            lambda: selection._parse_selection_command_line(["value", "--and"]),
         )
 
         # --package and --component require an argument
         self.assertRaises(
-            SelectionError,
-            lambda: _parse_selection_command_line(["value", "--component"]),
+            selection.SelectionError,
+            lambda: selection._parse_selection_command_line(["value", "--component"]),
         )
         self.assertRaises(
-            SelectionError,
-            lambda: _parse_selection_command_line(["value", "--package"]),
+            selection.SelectionError,
+            lambda: selection._parse_selection_command_line(["value", "--package"]),
         )
 
 
@@ -147,7 +146,9 @@ class SelectTestsTest(unittest.TestCase):
     """Tests related to the selection of test entries to execute."""
 
     @staticmethod
-    def _make_package_test(prefix: str, package: str, component: str) -> Test:
+    def _make_package_test(
+        prefix: str, package: str, component: str
+    ) -> test_list_file.Test:
         """Utility method to simulate a device Test
 
         Args:
@@ -158,25 +159,25 @@ class SelectTestsTest(unittest.TestCase):
         Returns:
             Test: Fake Test entry.
         """
-        return Test(
-            build=TestEntry(
-                test=TestSection(
+        return test_list_file.Test(
+            build=tests_json_file.TestEntry(
+                test=tests_json_file.TestSection(
                     name=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                     label=f"//{prefix}:{package}($toolchain)",
                     package_url=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                 )
             ),
-            info=TestListEntry(
+            info=test_list_file.TestListEntry(
                 name=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                 tags=[],
-                execution=TestListExecutionEntry(
+                execution=test_list_file.TestListExecutionEntry(
                     component_url=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                 ),
             ),
         )
 
     @staticmethod
-    def _make_host_test(prefix: str, name: str) -> Test:
+    def _make_host_test(prefix: str, name: str) -> test_list_file.Test:
         """Utility method to simulate a host Test
 
         Args:
@@ -186,29 +187,51 @@ class SelectTestsTest(unittest.TestCase):
         Returns:
             Test: Fake Test entry.
         """
-        return Test(
-            build=TestEntry(
-                test=TestSection(
+        return test_list_file.Test(
+            build=tests_json_file.TestEntry(
+                test=tests_json_file.TestSection(
                     name=f"host_x64/{name}",
                     label=f"//{prefix}:{name}($toolchain)",
                     path=f"host_x64/{name}",
                 )
             ),
-            info=TestListEntry(
+            info=test_list_file.TestListEntry(
                 name=f"host_x64/{name}",
                 tags=[],
             ),
         )
 
     def test_select_all(self):
-        """Test that empty selection selects all tests with perfect scores."""
-        tests = [self._make_package_test("src/tests", "foo", "bar")]
+        """Test that empty selection selects all mode-matching tests with perfect scores"""
+        tests = [
+            self._make_package_test("src/tests", "foo", "bar"),
+            self._make_host_test("src/tests2", "baz"),
+        ]
 
-        selection = select_tests(tests, [])
+        selected = selection.select_tests(tests, [])
 
-        self.assertEqual(len(selection.selected), 1)
-        for score in selection.best_score.values():
+        self.assertEqual(len(selected.selected), 2)
+        for score in selected.best_score.values():
             self.assertAlmostEqual(score, 1)
+        self.assertTrue(selected.has_device_test())
+
+        host_selected = selection.select_tests(tests, [], selection.SelectionMode.HOST)
+        self.assertEqual(len(host_selected.selected), 1)
+        self.assertAlmostEqual(host_selected.best_score["host_x64/baz"], 1.0)
+        self.assertAlmostEqual(
+            host_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"], 0.0
+        )
+        self.assertFalse(host_selected.has_device_test())
+
+        device_selected = selection.select_tests(
+            tests, [], selection.SelectionMode.DEVICE
+        )
+        self.assertEqual(len(device_selected.selected), 1)
+        self.assertAlmostEqual(
+            device_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"], 1.0
+        )
+        self.assertAlmostEqual(device_selected.best_score["host_x64/baz"], 0.0)
+        self.assertTrue(device_selected.has_device_test())
 
     def test_prefix_matches(self):
         """Test that selecting prefixes of tests results in a perfect match."""
@@ -217,12 +240,14 @@ class SelectTestsTest(unittest.TestCase):
             self._make_package_test("src/tests", "foo-pkg", "bar-test"),
             self._make_host_test("src/other-tests", "binary_test"),
         ]
-        select_path = select_tests(tests, ["//src/tests"])
-        select_name1 = select_tests(tests, ["foo-pkg"])
-        select_name2 = select_tests(tests, ["bar-test"])
-        select_pkg = select_tests(tests, ["--package", "foo-pkg"])
-        select_cm = select_tests(tests, ["--component", "bar-test"])
-        url_prefix = select_tests(tests, ["fuchsia-pkg://fuchsia.com/foo-pkg"])
+        select_path = selection.select_tests(tests, ["//src/tests"])
+        select_name1 = selection.select_tests(tests, ["foo-pkg"])
+        select_name2 = selection.select_tests(tests, ["bar-test"])
+        select_pkg = selection.select_tests(tests, ["--package", "foo-pkg"])
+        select_cm = selection.select_tests(tests, ["--component", "bar-test"])
+        url_prefix = selection.select_tests(
+            tests, ["fuchsia-pkg://fuchsia.com/foo-pkg"]
+        )
 
         self.assertEqual(select_path.selected, select_name1.selected)
         self.assertEqual(select_path.selected, select_name2.selected)
@@ -233,12 +258,12 @@ class SelectTestsTest(unittest.TestCase):
         for _, matches in select_path.group_matches:
             self.assertEqual(len(matches), 1)
 
-        host_path = select_tests(tests, ["binary_test"])
+        host_path = selection.select_tests(tests, ["binary_test"])
         self.assertEqual(
             [s.info.name for s in host_path.selected], ["host_x64/binary_test"]
         )
 
-        full_path = select_tests(tests, ["//src"])
+        full_path = selection.select_tests(tests, ["//src"])
         self.assertEqual(
             [s.info.name for s in full_path.selected], [t.info.name for t in tests]
         )
@@ -251,7 +276,7 @@ class SelectTestsTest(unittest.TestCase):
             self._make_host_test("src/other-tests", "binary_test"),
         ]
 
-        host_fuzzy = select_tests(tests, ["binaryytest"])
+        host_fuzzy = selection.select_tests(tests, ["binaryytest"])
         self.assertEqual(
             [s.info.name for s in host_fuzzy.selected], ["host_x64/binary_test"]
         )

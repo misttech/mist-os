@@ -23,6 +23,8 @@ class Flags:
     build: bool
     updateifinbase: bool
 
+    host: bool
+    device: bool
     selection: typing.List[str]
 
     random: bool
@@ -45,6 +47,8 @@ class Flags:
             raise FlagError("--simple is incompatible with --status")
         if self.simple and self.style:
             raise FlagError("--simple is incompatible with --style")
+        if self.device and self.host:
+            raise FlagError("--device is incompatible with --host")
 
         if not termout.is_valid() and self.status:
             raise FlagError("Refusing to output interactive status to a non-TTY.")
@@ -100,6 +104,19 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     )
 
     selection = parser.add_argument_group("Test Selection Options")
+    selection.add_argument(
+        "--host",
+        action="store_true",
+        default=False,
+        help="Only run host tests. The opposite of `--device`",
+    )
+    selection.add_argument(
+        "-d",
+        "--device",
+        action="store_true",
+        default=False,
+        help="Only run device tests. The opposite of `--host`",
+    )
     selection.add_argument(
         "-p",
         "--package",

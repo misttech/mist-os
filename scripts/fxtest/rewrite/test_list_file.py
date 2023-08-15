@@ -138,6 +138,12 @@ class Test:
     def __eq__(self, other) -> bool:
         return self.build.__eq__(other)
 
+    def is_device_test(self) -> bool:
+        return self.build.test.package_url is not None
+
+    def is_host_test(self) -> bool:
+        return self.build.test.path is not None
+
     @classmethod
     def join_test_descriptions(
         cls: typing.Type[typing.Self],

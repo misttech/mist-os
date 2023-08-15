@@ -167,7 +167,12 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
 
     # Use flags to select which tests to run.
     try:
-        selections = selection.select_tests(tests, flags.selection)
+        mode = selection.SelectionMode.ANY
+        if flags.host:
+            mode = selection.SelectionMode.HOST
+        elif flags.device:
+            mode = selection.SelectionMode.DEVICE
+        selections = selection.select_tests(tests, flags.selection, mode)
         recorder.emit_test_selections(selections)
     except selection.SelectionError as e:
         recorder.emit_end(f"Selection is invalid: {e}")
