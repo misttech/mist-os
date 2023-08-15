@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "load-tests.h"
+
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/load.h>
@@ -177,54 +179,21 @@ template <class Elf, template <class ElfLayout> typename Segment,
 void MergeSameTest() {
   MergeTest<Elf, Segment, Segment, GetPhdr, GetPhdr>();
 }
-
-template <uint64_t Flags, uint64_t FileSz = kPageSize, uint64_t MemSz = kPageSize>
-struct CreatePhdr {
-  template <typename Elf>
-  struct type {
-    constexpr auto operator()(typename Elf::size_type& offset) {
-      using Phdr = typename Elf::Phdr;
-      Phdr phdr{.type = elfldltl::ElfPhdrType::kLoad,
-                .offset = offset,
-                .vaddr = offset,
-                .filesz = FileSz,
-                .memsz = MemSz};
-      phdr.flags = Flags;
-      offset += kPageSize;
-      return phdr;
-    }
-  };
-};
-
 template <typename Elf>
 using ConstantSegment =
     typename elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container>::ConstantSegment;
-
-template <typename Elf>
-using ConstantPhdr = CreatePhdr<elfldltl::PhdrBase::kRead>::type<Elf>;
 
 template <typename Elf>
 using ZeroFillSegment =
     typename elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container>::ZeroFillSegment;
 
 template <typename Elf>
-using ZeroFillPhdr =
-    CreatePhdr<elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite, 0>::type<Elf>;
-
-template <typename Elf>
 using DataWithZeroFillSegment =
     typename elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container>::DataWithZeroFillSegment;
 
 template <typename Elf>
-using DataWithZeroFillPhdr = CreatePhdr<elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite,
-                                        kPageSize, kPageSize * 2>::type<Elf>;
-
-template <typename Elf>
 using DataSegment =
     typename elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container>::DataSegment;
-
-template <typename Elf>
-using DataPhdr = CreatePhdr<elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite>::type<Elf>;
 
 TYPED_TEST(ElfldltlLoadTests, MergeSameConstantSegment) {
   MergeSameTest<typename TestFixture::Elf, ConstantSegment, ConstantPhdr>();

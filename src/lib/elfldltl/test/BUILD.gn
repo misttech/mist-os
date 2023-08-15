@@ -26,6 +26,8 @@ test("elfldltl-unittests") {
     "internal-tests.cc",
     "layout-tests.cc",
     "load-tests.cc",
+    "load-tests.h",
+    "loadinfo-mapped-memory-tests.cc",
     "mapped-fd-file-tests.cc",
     "memory-tests.cc",
     "note-tests.cc",

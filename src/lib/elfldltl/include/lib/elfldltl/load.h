@@ -283,7 +283,7 @@ class LoadInfo {
     return internal::Visit(visitor, segment);
   }
 
-  constexpr typename Container<Segment>::iterator FindSegment(const size_type vaddr) {
+  constexpr typename Container<Segment>::const_iterator FindSegment(size_type vaddr) const {
     auto within_bounds = [vaddr](const auto& segment) {
       return segment.vaddr() <= vaddr && vaddr < segment.vaddr() + segment.memsz();
     };
