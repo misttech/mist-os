@@ -16,6 +16,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/lib/mmio/test-helper.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 // Stub out vmo_op_range to allow tests to use fake VMOs.
@@ -132,16 +133,7 @@ class TestSdhci : public Sdhci {
 
 class SdhciTest : public zxtest::Test {
  public:
-  SdhciTest()
-      : registers_(new uint8_t[kRegisterSetSize]),
-        mmio_(
-            {
-                .vaddr = FakeMmioPtr(registers_.get()),
-                .offset = 0,
-                .size = kRegisterSetSize,
-                .vmo = ZX_HANDLE_INVALID,
-            },
-            0) {}
+  SdhciTest() : mmio_(fdf_testing::CreateMmioBuffer(kRegisterSetSize)) {}
 
  protected:
   void SetUp() { root_ = MockDevice::FakeRootParent(); }
@@ -153,10 +145,8 @@ class SdhciTest : public zxtest::Test {
     ASSERT_OK(fake_bti_create_with_paddrs(dma_paddrs_.data(), dma_paddrs_.size(),
                                           fake_bti.reset_and_get_address()));
 
-    memset(registers_.get(), 0, kRegisterSetSize);
-
     bti_ = fake_bti.borrow();
-    dut_ = new TestSdhci(root_.get(), fdf::MmioView(mmio_), std::move(fake_bti),
+    dut_ = new TestSdhci(root_.get(), mmio_.View(0), std::move(fake_bti),
                          ddk::SdhciProtocolClient(mock_sdhci_.GetProto()), quirks,
                          dma_boundary_alignment);
 
@@ -178,13 +168,12 @@ class SdhciTest : public zxtest::Test {
     EXPECT_EQ(bti_info.pmo_count, count);
   }
 
-  std::unique_ptr<uint8_t[]> registers_;
   ddk::MockSdhci mock_sdhci_;
   zx::interrupt irq_;
   std::vector<zx_paddr_t> dma_paddrs_;
   std::shared_ptr<MockDevice> root_;
   TestSdhci* dut_;  // Managed by root_.
-  fdf::MmioView mmio_;
+  fdf::MmioBuffer mmio_;
   zx::unowned_bti bti_;
 };
 

@@ -78,6 +78,7 @@ test("sdhci-test-bin") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/mmio",
+    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
