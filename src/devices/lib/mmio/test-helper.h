@@ -10,7 +10,10 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/types.h>
+
+#include <variant>
 
 namespace fdf_testing {
 // This provides a helper to quickly create an MmioBuffer for use in tests.
@@ -22,13 +25,24 @@ namespace fdf_testing {
     const ::fdf::internal::MmioBufferOps* ops = &::fdf::internal::kDefaultOps,
     void* ctx = nullptr) {
   zx::vmo vmo;
-  zx_status_t status = zx::vmo::create(/*size=*/size, 0, &vmo);
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT(zx::vmo::create(/*size=*/size, 0, &vmo) == ZX_OK);
   mmio_buffer_t mmio{};
-  status = mmio_buffer_init(&mmio, 0, size, vmo.release(), cache_policy);
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT(mmio_buffer_init(&mmio, 0, size, vmo.release(), cache_policy) == ZX_OK);
   return fdf::MmioBuffer(mmio, ops, ctx);
 }
+
+[[maybe_unused]] static fdf::MmioBuffer CreateMmioBuffer(
+    zx::vmo vmo, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED,
+    const ::fdf::internal::MmioBufferOps* ops = &::fdf::internal::kDefaultOps,
+    void* ctx = nullptr) {
+  zx_info_vmo_t info{};
+  ZX_ASSERT(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), /*actual_count=*/0, /*avail_count=*/0) ==
+            ZX_OK);
+  mmio_buffer_t mmio{};
+  ZX_ASSERT(mmio_buffer_init(&mmio, 0, info.size_bytes, vmo.release(), cache_policy) == ZX_OK);
+  return fdf::MmioBuffer(mmio, ops, ctx);
+}
+
 }  // namespace fdf_testing
 
 #endif  // SRC_DEVICES_LIB_MMIO_TEST_HELPER_H_

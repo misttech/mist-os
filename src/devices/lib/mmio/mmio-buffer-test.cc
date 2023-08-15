@@ -142,4 +142,22 @@ TEST(MmioBuffer, TestMmioBuffer) {
   EXPECT_EQ(view.Read32(offset), test_val);
 }
 
+TEST(MmioBuffer, TestMmioBufferWithVmo) {
+  zx::vmo vmo;
+  size_t size = zx_system_get_page_size();
+  ASSERT_OK(zx::vmo::create(size, 0, &vmo));
+
+  ASSERT_DEATH([]() { fdf_testing::CreateMmioBuffer(zx::vmo(ZX_HANDLE_INVALID)); });
+
+  auto buffer = fdf_testing::CreateMmioBuffer(std::move(vmo));
+  ASSERT_EQ(size, buffer.get_size());
+
+  auto view = buffer.View(0);
+  uint32_t test_val = 0xABCD;
+  zx_off_t offset = 0x60;
+
+  buffer.Write32(test_val, offset);
+  EXPECT_EQ(view.Read32(offset), test_val);
+}
+
 }  // namespace
