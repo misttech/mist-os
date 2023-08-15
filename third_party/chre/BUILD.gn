@@ -2,6 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("chre") {
-  public_deps = [ "src:chre" ]
+config("flatbuffers_include") {
+  include_dirs = [ "//third_party/chre/src/external/flatbuffers/include" ]
+}
+
+source_set("host_flatbuffers") {
+  sources = [
+    "src/host/common/include/chre_host/generated/host_messages_generated.h",
+  ]
+  public_configs = [ ":flatbuffers_include" ]
 }
