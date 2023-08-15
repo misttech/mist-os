@@ -27,6 +27,7 @@
         },
         {
             protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.process.Launcher",
                 "fuchsia.tracing.provider.Registry",
             ],

@@ -5,11 +5,18 @@
 use {
     crate::filesystems::FsManagementFilesystemInstance,
     async_trait::async_trait,
+    diagnostics_reader::{ArchiveReader, Inspect},
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fuchsia_component::client::connect_channel_to_protocol,
     fuchsia_zircon as zx,
-    std::sync::{Arc, Once},
-    storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory, FilesystemConfig},
+    std::{
+        path::Path,
+        sync::{Arc, Once},
+    },
+    storage_benchmarks::{
+        BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem,
+        FilesystemConfig,
+    },
 };
 
 /// Config object for starting Fxfs instances.
@@ -18,24 +25,26 @@ pub struct Fxfs;
 
 #[async_trait]
 impl FilesystemConfig for Fxfs {
-    type Filesystem = FsManagementFilesystemInstance;
+    type Filesystem = FxfsInstance;
 
     async fn start_filesystem(
         &self,
         block_device_factory: &dyn BlockDeviceFactory,
-    ) -> FsManagementFilesystemInstance {
+    ) -> FxfsInstance {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
                 use_zxcrypt: false,
                 fvm_volume_size: Some(60 * 1024 * 1024),
             })
             .await;
-        FsManagementFilesystemInstance::new(
-            fs_management::Fxfs::with_crypt_client(Arc::new(get_crypt_client)),
-            block_device,
-            /*as_blob=*/ false,
-        )
-        .await
+        FxfsInstance {
+            fxfs: FsManagementFilesystemInstance::new(
+                fs_management::Fxfs::with_crypt_client(Arc::new(get_crypt_client)),
+                block_device,
+                /*as_blob=*/ false,
+            )
+            .await,
+        }
     }
 
     fn name(&self) -> String {
@@ -88,6 +97,83 @@ fn get_crypt_client() -> zx::Channel {
     connect_channel_to_protocol::<CryptMarker>(server_end)
         .expect("Failed to connect to crypt service");
     client_end
+}
+
+pub struct FxfsInstance {
+    fxfs: FsManagementFilesystemInstance,
+}
+
+async fn get_flushes(moniker: String) -> (u64, u64) {
+    // Escape the colon that shows up in the fs-collection moniker.
+    let escaped = format!("{}:root", moniker.replace(":", "\\:"));
+    let hierarchy = ArchiveReader::new()
+        .add_selector(escaped.clone())
+        .snapshot::<Inspect>()
+        .await
+        .expect("Inspect snapshot")
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .expect("Expected one inspect hierarchy");
+    let flushes = hierarchy
+        .get_property_by_path(&["stores", "default", "num_flushes"])
+        .unwrap_or_else(|| panic!("No flush property_found: {:?}", hierarchy))
+        .uint()
+        .expect("Flush property should be uint");
+    let transactions = hierarchy
+        .get_property_by_path(&["fs.detail", "completed_transactions"])
+        .unwrap_or_else(|| panic!("No transactions property_found: {:?}", hierarchy))
+        .uint()
+        .expect("Transactions property should be uint");
+    (*flushes, *transactions)
+}
+
+impl FxfsInstance {
+    async fn flush_journal(&self) {
+        // Forces a flush by making metadata changes followed by a sync which will pad out the
+        // journal to the next page until a flush is triggered, which is polled via inspect.
+        let file_path =
+            self.fxfs.benchmark_dir().to_path_buf().join(Path::new(".flusher").to_path_buf());
+        let (old_flushes, transactions) =
+            get_flushes(self.fxfs.get_component_moniker().unwrap()).await;
+        // If nothing has changed since it mounted, no need to flush the journal.
+        if transactions == 0 {
+            return;
+        }
+        loop {
+            {
+                let file =
+                    std::fs::File::create(file_path.clone()).expect("Failed to create flush file");
+                std::fs::File::sync_all(&file).expect("Sync call");
+            }
+            std::fs::remove_file(file_path.clone()).expect("Removing flush file.");
+            if get_flushes(self.fxfs.get_component_moniker().unwrap()).await.0 != old_flushes {
+                break;
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl Filesystem for FxfsInstance {
+    async fn shutdown(self) {
+        self.fxfs.shutdown().await
+    }
+
+    fn benchmark_dir(&self) -> &Path {
+        self.fxfs.benchmark_dir()
+    }
+}
+
+#[async_trait]
+impl CacheClearableFilesystem for FxfsInstance {
+    async fn clear_cache(&mut self) {
+        // Flush the journal, since otherwise metadata stays in the mutable in-memory layer and
+        // clearing cache doesn't remove it, even over remount. So to emulate accessing actually
+        // cold data, we push it down into the on-disk layer by forcing a journal flush.
+        self.flush_journal().await;
+        self.fxfs.clear_cache().await
+    }
 }
 
 #[cfg(test)]

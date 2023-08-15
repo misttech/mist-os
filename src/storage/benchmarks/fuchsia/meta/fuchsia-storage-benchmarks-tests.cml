@@ -23,6 +23,9 @@
             url: "#meta/memfs-component.cm",
         },
     ],
+    use: [
+        { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.logger.LogSink" ],
