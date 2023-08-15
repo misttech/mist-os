@@ -6,22 +6,19 @@ composite goldfish_control_2;
 
 using fuchsia.goldfish.platform;
 using fuchsia.google.platform;
-using fuchsia.hardware.goldfish.pipe;
-using fuchsia.hardware.goldfish.addressspace;
-using fuchsia.hardware.goldfish.sync;
 
 primary node "goldfish-pipe" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.goldfish.pipe.BIND_FIDL_PROTOCOL.PIPE;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.PIPE;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
     fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.GOLDFISH;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOLDFISH_PIPE_CONTROL;
 }
 
 node "goldfish-address-space" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.goldfish.addressspace.BIND_FIDL_PROTOCOL.ADDRESS_SPACE;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.ADDRESS_SPACE;
 }
 
 node "goldfish-sync" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.goldfish.sync.BIND_FIDL_PROTOCOL.SYNC;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.SYNC;
 }
 

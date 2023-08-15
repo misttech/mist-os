@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 using fuchsia.google.platform;
-using fuchsia.hardware.goldfish.pipe;
+using fuchsia.goldfish.platform;
 
-fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.goldfish.pipe.BIND_FIDL_PROTOCOL.PIPE;
+fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.PIPE;
 fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
 fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.GOLDFISH;
 fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOLDFISH_PIPE_SENSOR;

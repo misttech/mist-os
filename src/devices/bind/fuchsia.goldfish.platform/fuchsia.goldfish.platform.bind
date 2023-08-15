@@ -5,8 +5,15 @@
 library fuchsia.goldfish.platform;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  ADDRESS_SPACE = 17,
-  CONTROL = 18,
-  PIPE = 19,
-  SYNC = 154,
+  ADDRESS_SPACE = 0x11,
+  CONTROL = 0x12,
+  PIPE = 0x13,
+  SYNC = 0x9A,
+};
+
+// Must be kept in sync with the definition at src/lib/ddk/include/lib/ddk/fidl-protodefs.h
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  PIPE = 0x05,
+  ADDRESS_SPACE = 0x06,
+  SYNC = 0x07,
 };
