@@ -114,10 +114,10 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   constexpr uint16_t response_offset = 0x12;
   constexpr uint16_t response_length = 0x34;
   constexpr uint16_t prdt_offset = 0x56;
-  constexpr uint16_t prdt_length = 0x78;
+  constexpr uint16_t prdt_entry_count = 0x78;
   constexpr bool sync = false;
   ASSERT_EQ(FillDescriptorAndSendRequest(slot_num.value(), data_dir, response_offset,
-                                         response_length, prdt_offset, prdt_length, sync)
+                                         response_length, prdt_offset, prdt_entry_count, sync)
                 .status_value(),
             ZX_OK);
 
@@ -148,7 +148,7 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   EXPECT_EQ(descriptor->response_upiu_offset(), response_offset / kDwordSize);
   EXPECT_EQ(descriptor->response_upiu_length(), response_length / kDwordSize);
   EXPECT_EQ(descriptor->prdt_offset(), prdt_offset / kDwordSize);
-  EXPECT_EQ(descriptor->prdt_length(), prdt_length / kDwordSize);
+  EXPECT_EQ(descriptor->prdt_length(), prdt_entry_count);
 }
 
 TEST_F(RequestProcessorTest, SendRequestDescriptorTimeout) {
@@ -171,10 +171,10 @@ TEST_F(RequestProcessorTest, SendRequestDescriptorTimeout) {
   uint16_t response_offset = 0x12;
   uint16_t response_length = 0x34;
   uint16_t prdt_offset = 0x56;
-  uint16_t prdt_length = 0x78;
+  uint16_t prdt_entry_count = 0x78;
   bool sync = false;
   ASSERT_EQ(FillDescriptorAndSendRequest(slot_num.value(), data_dir, response_offset,
-                                         response_length, prdt_offset, prdt_length, sync)
+                                         response_length, prdt_offset, prdt_entry_count, sync)
                 .status_value(),
             ZX_OK);
 

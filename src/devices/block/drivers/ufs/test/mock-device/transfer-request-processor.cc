@@ -25,7 +25,7 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
       descriptor.response_upiu_length() * sizeof(uint32_t);
   command_descriptor_data.prdt_base_addr =
       command_desc_base_addr.value() + descriptor.prdt_offset() * sizeof(uint32_t);
-  command_descriptor_data.prdt_length = descriptor.prdt_length() * sizeof(uint32_t);
+  command_descriptor_data.prdt_entry_count = descriptor.prdt_length() * sizeof(uint32_t);
 
   UpiuHeader *command_upiu_header =
       reinterpret_cast<UpiuHeader *>(command_descriptor_data.command_upiu_base_addr);
@@ -103,7 +103,7 @@ zx_status_t TransferRequestProcessor::DefaultCommandHandler(
   cpp20::span<PhysicalRegionDescriptionTableEntry> prdt_upius(
       reinterpret_cast<PhysicalRegionDescriptionTableEntry *>(
           command_descriptor_data.prdt_base_addr),
-      command_descriptor_data.prdt_length);
+      command_descriptor_data.prdt_entry_count);
 
   return mock_device.GetScsiCommandProcessor().HandleScsiCommand(*command_upiu, *response_upiu,
                                                                  prdt_upius);

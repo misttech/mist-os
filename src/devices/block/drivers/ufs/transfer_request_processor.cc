@@ -52,8 +52,8 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
   ZX_DEBUG_ASSERT(prdt_entry_count <= kMaxPrdtNum);
 
   uint16_t prdt_offset = response_offset + response_length;
-  uint32_t prdt_length = prdt_entry_count * sizeof(PhysicalRegionDescriptionTableEntry);
-  const size_t total_length = static_cast<size_t>(prdt_offset) + prdt_length;
+  uint32_t prdt_length_in_bytes = prdt_entry_count * sizeof(PhysicalRegionDescriptionTableEntry);
+  const size_t total_length = static_cast<size_t>(prdt_offset) + prdt_length_in_bytes;
 
   PhysicalRegionDescriptionTableEntry *prdt;
   {
@@ -62,7 +62,7 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
                         "Invalid UPIU size for prdt");
     prdt =
         request_list_.GetDescriptorBuffer<PhysicalRegionDescriptionTableEntry>(slot, prdt_offset);
-    memset(prdt, 0, prdt_length);
+    memset(prdt, 0, prdt_length_in_bytes);
   }
   FillPrdt(prdt, xfer->buffer_phys, prdt_entry_count, data_transfer_length);
 
@@ -83,8 +83,9 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
                response_length);
     zxlogf(TRACE, "5. SCSI: Data Buffer = 0x%lx, 0x%lx", xfer->buffer_phys[0],
            xfer->buffer_phys[1]);
-    zxlogf(TRACE, "6. SCSI: PRDT prdt_offset = %hu, prdt_length = %hu, prdt_entry_count = %d",
-           prdt_offset, prdt_length, prdt_entry_count);
+    zxlogf(TRACE,
+           "6. SCSI: PRDT prdt_offset = %hu, prdt_length_in_bytes = %u, prdt_entry_count = %u",
+           prdt_offset, prdt_length_in_bytes, prdt_entry_count);
   }
 
   {
@@ -93,7 +94,7 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
     request_slot.xfer = std::move(xfer);
   }
 
-  return {prdt_offset, prdt_length};
+  return {prdt_offset, prdt_entry_count};
 }
 
 zx::result<std::unique_ptr<TransferRequestProcessor>> TransferRequestProcessor::Create(
@@ -267,7 +268,7 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
 zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
     uint8_t slot, const TransferRequestDescriptorDataDirection data_dir,
     const uint16_t response_offset, const uint16_t response_length, const uint16_t prdt_offset,
-    const uint32_t prdt_length, bool sync) {
+    const uint32_t prdt_entry_count, bool sync) {
   TransferRequestDescriptor *descriptor;
   zx_paddr_t paddr = 0;
   {
@@ -290,7 +291,7 @@ zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
   descriptor->set_response_upiu_offset(response_offset / kDwordSize);
   descriptor->set_response_upiu_length(response_length / kDwordSize);
   descriptor->set_prdt_offset(prdt_offset / kDwordSize);
-  descriptor->set_prdt_length(prdt_length / kDwordSize);
+  descriptor->set_prdt_length(prdt_entry_count);
 
   if (zx::result<> result = RingRequestDoorbell(slot, sync); result.is_error()) {
     zxlogf(ERROR, "Failed to send cmd %s", result.status_string());

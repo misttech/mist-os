@@ -107,13 +107,13 @@ class TransferRequestProcessor : public RequestProcessor {
     // Record the slot number to |task_tag| for debugging.
     request.GetHeader().task_tag = slot;
 
-    auto [prdt_offset, prdt_length] =
+    auto [prdt_offset, prdt_entry_count] =
         PreparePrdt<RequestType>(request, slot, (is_scsi ? std::move(xfer.value()) : nullptr),
                                  response_offset, response_length);
 
-    if (zx::result<> result =
-            FillDescriptorAndSendRequest(slot, request.GetDataDirection(), response_offset,
-                                         response_length, prdt_offset, prdt_length, /*sync=*/true);
+    if (zx::result<> result = FillDescriptorAndSendRequest(
+            slot, request.GetDataDirection(), response_offset, response_length, prdt_offset,
+            prdt_entry_count, /*sync=*/true);
         result.is_error()) {
       if (is_scsi) {
         auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
@@ -140,7 +140,8 @@ class TransferRequestProcessor : public RequestProcessor {
   zx::result<> FillDescriptorAndSendRequest(uint8_t slot,
                                             TransferRequestDescriptorDataDirection data_dir,
                                             uint16_t response_offset, uint16_t response_length,
-                                            uint16_t prdt_offset, uint32_t prdt_length, bool sync);
+                                            uint16_t prdt_offset, uint32_t prdt_entry_count,
+                                            bool sync);
   zx::result<> GetResponseStatus(TransferRequestDescriptor *descriptor,
                                  AbstractResponseUpiu &response, uint8_t transaction_type);
 

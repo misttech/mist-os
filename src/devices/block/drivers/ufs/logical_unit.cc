@@ -55,15 +55,16 @@ void LogicalUnit::BlockImplQueue(block_op_t *op, block_impl_queue_callback callb
       if (zx_status_t status = block::CheckIoRange(op->rw, block_info_.block_count);
           status != ZX_OK) {
         io_cmd->Complete(status);
+        return;
       }
       zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu", opcode == BLOCK_OPCODE_WRITE ? "wr" : "rd",
              op->rw.length, op->rw.offset_dev);
       break;
     case BLOCK_OPCODE_TRIM:
-      zxlogf(TRACE, "Block IO: trim");
       // TODO(fxbug.dev/124835): Support TRIM command
+      zxlogf(TRACE, "The trim command is not supported.");
       io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
-      break;
+      return;
     case BLOCK_OPCODE_FLUSH:
       zxlogf(TRACE, "Block IO: flush");
       break;

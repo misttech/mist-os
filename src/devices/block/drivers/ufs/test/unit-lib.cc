@@ -50,10 +50,10 @@ void UfsTest::TearDown() {
 zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot,
                                                    TransferRequestDescriptorDataDirection ddir,
                                                    uint16_t resp_offset, uint16_t resp_len,
-                                                   uint16_t prdt_offset, uint16_t prdt_len,
+                                                   uint16_t prdt_offset, uint16_t prdt_entry_count,
                                                    bool sync) {
   return ufs_->GetTransferRequestProcessor().FillDescriptorAndSendRequest(
-      slot, ddir, resp_offset, resp_len, prdt_offset, prdt_len, sync);
+      slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count, sync);
 }
 
 zx::result<std::array<zx_paddr_t, 2>> UfsTest::MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,

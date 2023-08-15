@@ -58,7 +58,7 @@ struct TransferRequestDescriptor {
   DEF_SUBFIELD(dwords[6], 15, 0, response_upiu_length);
   // dword 7
   DEF_SUBFIELD(dwords[7], 31, 16, prdt_offset);
-  DEF_SUBFIELD(dwords[7], 15, 0, prdt_length);
+  DEF_SUBFIELD(dwords[7], 15, 0, prdt_length);  // The number of entries in the PRDT.
 
 } __PACKED;
 static_assert(sizeof(TransferRequestDescriptor) == 32,

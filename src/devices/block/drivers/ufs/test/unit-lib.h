@@ -30,7 +30,8 @@ class UfsTest : public zxtest::Test {
   zx::result<> FillDescriptorAndSendRequest(uint8_t slot,
                                             TransferRequestDescriptorDataDirection ddir,
                                             uint16_t resp_offset, uint16_t resp_len,
-                                            uint16_t prdt_offset, uint16_t prdt_len, bool sync);
+                                            uint16_t prdt_offset, uint16_t prdt_entry_count,
+                                            bool sync);
 
   // Map the data vmo to the address space and assign physical addresses. Currently, it only
   // supports 8KB vmo. So, we get two physical addresses. The return value is the physical address

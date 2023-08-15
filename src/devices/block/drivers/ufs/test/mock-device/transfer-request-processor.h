@@ -24,7 +24,7 @@ struct CommandDescriptorData {
   zx_vaddr_t response_upiu_base_addr;
   uint32_t response_upiu_length;
   zx_vaddr_t prdt_base_addr;
-  uint32_t prdt_length;
+  uint32_t prdt_entry_count;
 };
 
 class TransferRequestProcessor {
