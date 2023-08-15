@@ -103,6 +103,7 @@ test("zbitl-unittests") {
     "tests.cc",
   ]
   deps = [
+    "//sdk/lib/stdcompat",
     "//src/lib/files",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
