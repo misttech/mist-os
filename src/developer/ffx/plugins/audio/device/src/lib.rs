@@ -12,7 +12,7 @@ use {
     fidl::HandleBased,
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
-        AudioDaemonProxy, AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
+        AudioDaemonProxy, AudioDaemonRecordRequest, DeviceInfo, DeviceSelector, RecordLocation,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
     fidl_fuchsia_media::AudioStreamType,
@@ -233,8 +233,13 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         Err(err) => ffx_bail!("Device info failed with error: {}", Status::from_raw(err)),
     };
 
-    let device_info =
+    let device_type =
         info.device_info.ok_or(anyhow::anyhow!("DeviceInfo missing from response."))?;
+
+    let device_info = match device_type {
+        DeviceInfo::StreamConfig(stream_device) => stream_device,
+        _ => ffx_bail!("Device info for non StreamConfig devices not implemented"),
+    };
 
     let stream_properties = device_info.stream_properties.clone().ok_or(anyhow::anyhow!(
         "Stream properties field missing for device with id {0}.",
@@ -545,7 +550,7 @@ where
 
     let request = AudioDaemonPlayRequest {
         socket: Some(daemon_request_socket),
-        location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::RingBuffer(
+        location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::DeviceRingBuffer(
             fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
                 is_input: Some(false),
                 id: Some(device_id),
@@ -597,12 +602,14 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
     >();
 
     let request = AudioDaemonRecordRequest {
-        location: Some(RecordLocation::RingBuffer(fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
-            is_input: Some(true),
-            id: Some(device_id),
-            device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
-            ..Default::default()
-        })),
+        location: Some(RecordLocation::DeviceRingBuffer(
+            fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
+                is_input: Some(true),
+                id: Some(device_id),
+                device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+                ..Default::default()
+            },
+        )),
 
         stream_type: Some(AudioStreamType::from(&record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),

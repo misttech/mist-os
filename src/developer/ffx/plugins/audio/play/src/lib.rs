@@ -82,16 +82,16 @@ where
     &'static E: std::io::Write,
 {
     let renderer = match command.usage {
-        Ultrasound => fidl_fuchsia_audio_ffxdaemon::RendererType::UltrasoundRenderer(
-            fidl_fuchsia_audio_ffxdaemon::UltrasoundRenderer {
+        Ultrasound => fidl_fuchsia_audio_ffxdaemon::RendererConfig::UltrasoundRenderer(
+            fidl_fuchsia_audio_ffxdaemon::UltrasoundRendererConfig {
                 packet_count: command.packet_count,
                 ..Default::default()
             },
         ),
 
         Background(usage) | Media(usage) | SystemAgent(usage) | Communication(usage)
-        | Interruption(usage) => fidl_fuchsia_audio_ffxdaemon::RendererType::StandardRenderer(
-            fidl_fuchsia_audio_ffxdaemon::RendererConfig {
+        | Interruption(usage) => fidl_fuchsia_audio_ffxdaemon::RendererConfig::StandardRenderer(
+            fidl_fuchsia_audio_ffxdaemon::StandardRendererConfig {
                 usage: Some(usage),
                 clock: Some(command.clock),
                 ..Default::default()

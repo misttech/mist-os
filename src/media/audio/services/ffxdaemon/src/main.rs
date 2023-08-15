@@ -14,10 +14,8 @@ use {
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonCancelerMarker, AudioDaemonDeviceInfoResponse, AudioDaemonListDevicesResponse,
         AudioDaemonPlayRequest, AudioDaemonPlayResponse, AudioDaemonRecordRequest,
-        AudioDaemonRecordResponse, AudioDaemonRequest, AudioDaemonRequestStream,
-        CapturerType::{StandardCapturer, UltrasoundCapturer},
-        PlayLocation, RecordLocation,
-        RendererType::{StandardRenderer, UltrasoundRenderer},
+        AudioDaemonRecordResponse, AudioDaemonRequest, AudioDaemonRequestStream, CapturerConfig,
+        PlayLocation, RecordLocation, RendererConfig,
     },
     fidl_fuchsia_media::{AudioCapturerProxy, AudioRendererProxy, AudioStreamType},
     fidl_fuchsia_media_audio,
@@ -220,7 +218,7 @@ impl AudioDaemon {
 
         match location {
             RecordLocation::Capturer(capturer_type) => match capturer_type {
-                StandardCapturer(capturer_info) => {
+                CapturerConfig::StandardCapturer(config) => {
                     let audio_component = fuchsia_component::client::connect_to_protocol::<
                         fidl_fuchsia_media::AudioMarker,
                     >()
@@ -255,15 +253,15 @@ impl AudioDaemon {
                         gain_settings.mute.and_then(|mute| gain_control_proxy.set_mute(mute).ok());
                     }
 
-                    capturer_info.usage.and_then(|usage| capturer_proxy.set_usage(usage).ok());
+                    config.usage.and_then(|usage| capturer_proxy.set_usage(usage).ok());
 
-                    if let Some(clock_type) = capturer_info.clock {
+                    if let Some(clock_type) = config.clock {
                         let reference_clock = Self::setup_reference_clock(clock_type)?;
                         capturer_proxy.set_reference_clock(reference_clock)?;
                     }
                     Ok(capturer_proxy)
                 }
-                UltrasoundCapturer(_) => {
+                CapturerConfig::UltrasoundCapturer(_) => {
                     let component = fuchsia_component::client::connect_to_protocol::<
                         fidl_fuchsia_ultrasound::FactoryMarker,
                     >()
@@ -316,9 +314,9 @@ impl AudioDaemon {
             .into_proxy()
             .map_err(|e| anyhow::anyhow!("Error getting AudioRendererProxy: {e}"))?;
 
-        if let PlayLocation::Renderer(renderer_type) = location {
-            match renderer_type {
-                UltrasoundRenderer(_) => {
+        if let PlayLocation::Renderer(renderer_config) = location {
+            match renderer_config {
+                RendererConfig::UltrasoundRenderer(_) => {
                     let component = fuchsia_component::client::connect_to_protocol::<
                         fidl_fuchsia_ultrasound::FactoryMarker,
                     >()
@@ -339,7 +337,7 @@ impl AudioDaemon {
                         ));
                     }
                 }
-                StandardRenderer(renderer_config) => {
+                RendererConfig::StandardRenderer(renderer_config) => {
                     let audio_component = fuchsia_component::client::connect_to_protocol::<
                         fidl_fuchsia_media::AudioMarker,
                     >()
@@ -453,12 +451,12 @@ impl AudioDaemon {
         let default_packet_count = 4;
 
         let packet_count = match &location {
-            PlayLocation::Renderer(renderer_type) => match &renderer_type {
-                StandardRenderer(renderer_info) => {
-                    renderer_info.packet_count.unwrap_or(default_packet_count)
+            PlayLocation::Renderer(renderer_config) => match &renderer_config {
+                RendererConfig::StandardRenderer(config) => {
+                    config.packet_count.unwrap_or(default_packet_count)
                 }
-                UltrasoundRenderer(renderer_info) => {
-                    renderer_info.packet_count.unwrap_or(default_packet_count)
+                RendererConfig::UltrasoundRenderer(config) => {
+                    config.packet_count.unwrap_or(default_packet_count)
                 }
                 _ => default_packet_count,
             },
@@ -528,7 +526,7 @@ impl AudioDaemon {
             .location
             .ok_or(anyhow::anyhow!("Device id argument missing."))
             .and_then(|play_location| match play_location {
-                PlayLocation::RingBuffer(device_selector) => {
+                PlayLocation::DeviceRingBuffer(device_selector) => {
                     device_selector.id.ok_or(anyhow::anyhow!("Device ID not specified."))
                 }
                 _ => Err(anyhow::anyhow!("Expected Ring Buffer play location")),
@@ -559,7 +557,7 @@ impl AudioDaemon {
             .location
             .ok_or(anyhow::anyhow!("Device id argument missing."))
             .and_then(|location| match location {
-                RecordLocation::RingBuffer(device_selector) => {
+                RecordLocation::DeviceRingBuffer(device_selector) => {
                     device_selector.id.ok_or(anyhow::anyhow!("Device ID not specified."))
                 }
                 _ => Err(anyhow::anyhow!("Expected Ring Buffer location")),
@@ -622,7 +620,7 @@ impl AudioDaemon {
                         Some(PlayLocation::Renderer(..)) => {
                             self.play_renderer(payload, stdout_local).await
                         }
-                        Some(PlayLocation::RingBuffer(..)) => {
+                        Some(PlayLocation::DeviceRingBuffer(..)) => {
                             self.play_device(payload, stdout_local).await
                         }
                         Some(..) => Err(anyhow::anyhow!("No PlayLocation variant specified.")),
@@ -649,7 +647,7 @@ impl AudioDaemon {
                         Some(RecordLocation::Capturer(..)) => {
                             self.record_capturer(payload, stdout_local, stderr_copy).await
                         }
-                        Some(RecordLocation::RingBuffer(..)) => {
+                        Some(RecordLocation::DeviceRingBuffer(..)) => {
                             self.record_device(payload, stdout_local, stderr_copy).await
                         }
                         Some(RecordLocation::Loopback(..)) => {

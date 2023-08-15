@@ -13,17 +13,26 @@ using fuchsia.audio.device;
 using fuchsia.virtualaudio;
 using zx;
 
-/// Where to route incoming audio data.
+/// Where to output audio data supplied by an ffx client.
 type PlayLocation = flexible union {
-    /// Play audio through an AudioRenderer.
-    1: renderer RendererType;
+    /// Create an `AudioRenderer` using the audio_core API and play audio through it.
+    1: renderer RendererConfig;
 
-    /// Play audio directly to device ring buffer.
-    2: ring_buffer DeviceSelector;
+    /// Write audio data directly to a device ring buffer.
+    2: device_ring_buffer DeviceSelector;
 };
 
-/// Configuration for AudioRenderer.
-type RendererConfig = table {
+/// Selection of the frequency range than an `AudioRenderer` can write.
+type RendererConfig = flexible union {
+    /// Renderer for standard frequencies.
+    1: standard_renderer StandardRendererConfig;
+
+    /// Renderer for ultrasonic frequencies.
+    2: ultrasound_renderer UltrasoundRendererConfig;
+};
+
+/// Configuration parameters for creating an `AudioRenderer` for the standard frequency range.
+type StandardRendererConfig = table {
     /// The usage of the audio stream.
     ///
     /// Required.
@@ -35,25 +44,19 @@ type RendererConfig = table {
     /// Optional.
     2: clock ClockType;
 
-    /// How many packets to use when sending data to an AudioRenderer.
+    /// How many packets to use when sending data to an `AudioRenderer`.
     /// Optional. If not specified, AudioDaemon will use four packets.
     3: packet_count uint32;
 };
 
-/// Options for AudioRenderers.
-type RendererType = flexible union {
-    /// Renderer for standard frequencies.
-    1: standard_renderer RendererConfig;
-
-    /// Renderer for ultrasonic frequencies.
-    2: ultrasound_renderer table {
-        /// How many packets to use when sending data to an AudioRenderer.
-        /// Optional. If not specified, AudioDaemon will use four packets.
-        1: packet_count uint32;
-    };
+/// Configuration parameters for creating an `AudioRenderer` for the standard frequency range.
+type UltrasoundRendererConfig = table {
+    /// How many packets to use when sending data to an `AudioRenderer`.
+    /// Optional. If not specified, AudioDaemon will use four packets.
+    1: packet_count uint32;
 };
 
-/// Reference clock options for AudioRenderer and AudioCapturer.
+/// Reference clock options for an `AudioRenderer` or `AudioCapturer`.
 type ClockType = flexible union {
     /// Use a flexible clock.
     1: flexible struct {};
@@ -63,11 +66,11 @@ type ClockType = flexible union {
 
     /// Use a monotonic clock with possible rate adjustment and offset relative to the system
     /// monotonic clock.
-    3: custom CustomClockInfo;
+    3: custom CustomClockConfig;
 };
 
-/// Configuration for the custom reference clock passed to AudioRenderer or AudioCapturer.
-type CustomClockInfo = table {
+/// Configuration for the custom reference clock passed to an `AudioRenderer` or `AudioCapturer`.
+type CustomClockConfig = table {
     /// Frequency rate adjustment to a clone of the system monotonic clock.
     /// Given in parts per million relative to the system monotonic rate.
     /// Must fall within [ZX_CLOCK_UPDATE_MIN_RATE_ADJUST, ZX_CLOCK_UPDATE_MAX_RATE_ADJUST].
@@ -84,29 +87,29 @@ type CustomClockInfo = table {
     2: offset int32;
 };
 
-/// Where to capture audio data.
+/// Where to read audio data from to send back to an ffx client.
 type RecordLocation = flexible union {
-    /// Capture audio through an AudioCapturer.
-    1: capturer CapturerType;
+    /// Create an audio_core `AudioCapturer` and record audio data from it.
+    1: capturer CapturerConfig;
 
-    /// Capture audio loopback.
+    /// Create an audio_core `AudioCapturer` with loopback and record audio data from it.
     2: loopback struct {};
 
-    /// Capture audio directly from the device ring buffer.
-    3: ring_buffer DeviceSelector;
+    /// Raad audio data directly from a device ring buffer.
+    3: device_ring_buffer DeviceSelector;
 };
 
-/// Options for AudioCapturers.
-type CapturerType = flexible union {
+/// Selection of the frequency range than an `AudioCapturer` can read.
+type CapturerConfig = flexible union {
     /// AudioCapturer for standard frequencies.
-    1: standard_capturer CapturerInfo;
+    1: standard_capturer StandardCapturerConfig;
 
     /// AudioCapturer for ultrasonic frequencies.
     2: ultrasound_capturer struct {};
 };
 
-/// Configuration for AudioCapturer.
-type CapturerInfo = table {
+/// Configuration parameters for creating an `AudioCapturer` for the standard frequency range.
+type StandardCapturerConfig = table {
     /// The usage of the audio stream.
     ///
     /// Required.
@@ -132,8 +135,14 @@ type GainSettings = table {
     2: gain float32;
 };
 
-/// Device target info.
-type DeviceInfo = table {
+/// Information about a device.
+type DeviceInfo = flexible union {
+    /// Device supports the fuchsia.hardware.audio/StreamConfig protocol.
+    1: stream_config StreamConfigDeviceInfo;
+};
+
+/// Information about a device that supports the fuchsia.hardware.audio/StreamConfig protocol.
+type StreamConfigDeviceInfo = table {
     /// Top level static properties of the stream.
     ///
     /// Required.
@@ -160,7 +169,7 @@ type DeviceInfo = table {
 type DeviceSelector = table {
     /// Whether device is input or output.
     ///
-    /// Required.
+    /// Required. Future device types may not require this field.
     1: is_input bool;
 
     /// ID of device.
@@ -181,7 +190,7 @@ closed protocol AudioDaemonCanceler {
 /// The main entry point for ffx audio.
 @discoverable
 closed protocol AudioDaemon {
-    /// Plays audio data from socket on either AudioRenderer or on device ring buffer.
+    /// Plays audio data from socket on either an `AudioRenderer` or on device ring buffer.
     /// Returns sockets for transmitting info back to stdout and stderr on host.
     strict Play(resource table {
         /// Socket for audio data. Should transmit entire file in WAV format.
@@ -210,10 +219,10 @@ closed protocol AudioDaemon {
         2: stderr zx.Handle:SOCKET;
     }) error zx.Status;
 
-    /// Records audio data from either AudioCapturer or device ring buffer.
+    /// Records audio data from either an `AudioCapturer` or device ring buffer.
     /// Returns sockets containing audio data and errors back to host.
     strict Record(resource table {
-        /// Record from AudioCapturer or ring buffer.
+        /// Record from `AudioCapturer` or ring buffer.
         ///
         /// Required.
         1: location RecordLocation;

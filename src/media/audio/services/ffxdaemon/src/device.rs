@@ -9,7 +9,9 @@ use {
     anyhow::{self, Context, Error},
     fdio,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_audio_ffxdaemon::{AudioDaemonCancelerMarker, DeviceInfo},
+    fidl_fuchsia_audio_ffxdaemon::{
+        AudioDaemonCancelerMarker, DeviceInfo, DeviceInfo::StreamConfig, StreamConfigDeviceInfo,
+    },
     fidl_fuchsia_hardware_audio::{GainState, StreamConfigProxy},
     fidl_fuchsia_io as fio, fidl_fuchsia_virtualaudio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
@@ -51,13 +53,13 @@ impl Device {
         let plug_state = self.stream_config_client.watch_plug_state().await.ok();
 
         match stream_properties {
-            Ok(stream_properties) => Ok(DeviceInfo {
+            Ok(stream_properties) => Ok(StreamConfig(StreamConfigDeviceInfo {
                 stream_properties: Some(stream_properties),
                 supported_formats,
                 gain_state,
                 plug_state,
                 ..Default::default()
-            }),
+            })),
             Err(e) => Err(e.into()),
         }
     }

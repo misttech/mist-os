@@ -11,7 +11,8 @@ use {
     ffx_audio_record_args::RecordCommand,
     fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, CapturerType, RecordLocation,
+        AudioDaemonProxy, AudioDaemonRecordRequest, CapturerConfig, RecordLocation,
+        StandardCapturerConfig,
     },
     fidl_fuchsia_media::AudioStreamType,
 };
@@ -41,16 +42,15 @@ impl FfxMain for RecordTool {
                 (RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}), None)
             }
             AudioCaptureUsageExtended::Ultrasound => (
-                RecordLocation::Capturer(CapturerType::UltrasoundCapturer(
+                RecordLocation::Capturer(CapturerConfig::UltrasoundCapturer(
                     fidl_fuchsia_audio_ffxdaemon::UltrasoundCapturer {},
                 )),
                 None,
             ),
             _ => (
-                RecordLocation::Capturer(CapturerType::StandardCapturer(CapturerInfo {
-                    usage: capturer_usage,
-                    ..Default::default()
-                })),
+                RecordLocation::Capturer(CapturerConfig::StandardCapturer(
+                    StandardCapturerConfig { usage: capturer_usage, ..Default::default() },
+                )),
                 Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
                     mute: Some(self.cmd.mute),
                     gain: Some(self.cmd.gain),

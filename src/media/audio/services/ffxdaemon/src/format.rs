@@ -349,7 +349,7 @@ pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType
                 };
 
                 Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Custom(
-                    fidl_fuchsia_audio_ffxdaemon::CustomClockInfo {
+                    fidl_fuchsia_audio_ffxdaemon::CustomClockConfig {
                         rate_adjust,
                         offset,
                         ..Default::default()
