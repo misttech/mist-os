@@ -78,12 +78,20 @@ if (is_host) {
   host_test_data("runtime_deps") {
     sources = [
       "$root_out_dir/ffx",
+      "$root_out_dir/ffx-package",
+      "$root_out_dir/ffx-package.json",
+      "$root_out_dir/ffx-repository",
+      "$root_out_dir/ffx-repository.json",
       "$target_gen_dir/pm_deps/package.tar",
     ]
     outputs = [ "$target_gen_dir/runtime_deps/{{source_file_part}}" ]
     deps = [
       ":pm_test_package_gather_deps($host_toolchain)",
       "//src/developer/ffx:ffx_bin",
+      "//src/developer/ffx/plugins/package:ffx_package_tool_metadata",
+      "//src/developer/ffx/plugins/package:ffx_package_tool_versioned",
+      "//src/developer/ffx/plugins/repository:ffx_repository_tool_metadata",
+      "//src/developer/ffx/plugins/repository:ffx_repository_tool_versioned",
     ]
   }
 

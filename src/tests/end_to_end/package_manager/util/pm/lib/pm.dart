@@ -98,7 +98,9 @@ class PackageManagerRepo {
     await ffx(
         ['repository', 'add-from-pm', _repoPath, '--repository', repoName]);
 
-    final start_result = await Process.run(_ffxPath, [
+    final start_result = await Process.run(_ffxPath + "/ffx", [
+      '--config',
+      'ffx.subtool-search-paths=' + _ffxPath,
       '--isolate-dir',
       _ffxIsolateDir,
       'repository',
@@ -184,8 +186,15 @@ class PackageManagerRepo {
   }
 
   Future<String> ffx(List<String> args) async {
-    final result =
-        await Process.run(_ffxPath, ['--isolate-dir', _ffxIsolateDir] + args);
+    final result = await Process.run(
+        _ffxPath + "/ffx",
+        [
+              '--config',
+              'ffx.subtool-search-paths=' + _ffxPath,
+              '--isolate-dir',
+              _ffxIsolateDir
+            ] +
+            args);
     expect(result.exitCode, 0,
         reason: '`ffx ${args.join(" ")}` failed: ' + result.stderr);
     return result.stdout;

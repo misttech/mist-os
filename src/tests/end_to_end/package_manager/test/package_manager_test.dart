@@ -46,7 +46,6 @@ Future<String> formattedHostAddress(sl4f.Sl4f sl4fDriver, Logger log) async {
 void main() {
   final log = Logger('package_manager_test');
   final runtimeDepsPath = Platform.script.resolve('runtime_deps').toFilePath();
-  final ffxPath = Platform.script.resolve('runtime_deps/ffx').toFilePath();
   String hostAddress;
   String manifestPath;
 
@@ -97,7 +96,8 @@ void main() {
         '{"version":"1","content":[{"host_match":"package-manager-test","host_replacement":"%%NAME%%","path_prefix_match":"/","path_prefix_replacement":"/"}]}';
 
     setUp(() async {
-      repoServer = await PackageManagerRepo.initRepo(sl4fDriver, ffxPath, log);
+      repoServer =
+          await PackageManagerRepo.initRepo(sl4fDriver, runtimeDepsPath, log);
 
       // Gather the original package management settings before test begins.
       originalRepos = await getCurrentRepos(sl4fDriver);
