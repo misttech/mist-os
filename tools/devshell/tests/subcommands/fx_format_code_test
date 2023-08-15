@@ -35,7 +35,7 @@ BT_MOCKED_TOOLS=(
   "prebuilt/third_party/vpython/vpython3"
   "${MOCK_CLANG_DIR}/bin/clang-format"
   "${MOCK_GN}"
-  "${MOCK_PYTHON3_DIR}/bin/python${PYTHON_VERSION}"
+  "${MOCK_PYTHON3_DIR}/bin/python3"
   "${MOCK_RUST_DIR}/bin/rustfmt"
   "${FUCHSIA_BUILD_DIR}/host_x64/cmc"
   "${FUCHSIA_BUILD_DIR}/host_x64/fidl-format"

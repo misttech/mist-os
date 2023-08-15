@@ -43,10 +43,9 @@ then
     realpath -s --relative-to="$from" "$to"
   }
 else
-  # Point to our prebuilt python3.11.
-  python_version="3.11"
-  python="$(ls "$project_root"/prebuilt/third_party/python$python_version/*/bin/python$python_version)" || {
-    echo "*** Python interpreter not found under $project_root/prebuilt/third_party/python$python_version."
+  # Point to our prebuilt python3.
+  python="$(ls "$project_root"/prebuilt/third_party/python3/*/bin/python3)" || {
+    echo "*** Python interpreter not found under $project_root/prebuilt/third_party/python3."
     exit 1
   }
   function relpath() {

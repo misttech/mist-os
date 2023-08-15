@@ -5,7 +5,8 @@
 config("include_python") {
   cflags = [
     "-I" + rebase_path(python_include_dir, root_build_dir),
-    "-I" + rebase_path("${python_include_dir}/python${python_version}",
-                       root_build_dir),
+
+    # TODO(b/295680434): Avoid hardcoding python version in build config.
+    "-I" + rebase_path("${python_include_dir}/python3.11", root_build_dir),
   ]
 }

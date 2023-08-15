@@ -23,7 +23,7 @@ set(HOST_PLATFORM "${HOST_OS}-${HOST_CPU}")
 set(CLANG_PREFIX "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/clang/${HOST_PLATFORM}/bin")
 
 set(GOMA_DIR "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/goma/${HOST_PLATFORM}")
-set(PYTHON_DIR "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/python3.11/${HOST_PLATFORM}")
+set(PYTHON_DIR "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/python3/${HOST_PLATFORM}")
 
 if(NOT CLANG_TARGET)
   exec_program("${CLANG_PREFIX}/clang" ARGS --version OUTPUT_VARIABLE CLANG_VERSION)

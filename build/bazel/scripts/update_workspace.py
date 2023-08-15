@@ -572,7 +572,7 @@ def main():
         fuchsia_dir, 'prebuilt', 'third_party', 'ninja', host_tag, 'ninja')
 
     python_prebuilt_dir = os.path.join(
-        fuchsia_dir, 'prebuilt', 'third_party', 'python3.11', host_tag)
+        fuchsia_dir, 'prebuilt', 'third_party', 'python3', host_tag)
 
     output_base_dir = os.path.abspath(os.path.join(topdir, 'output_base'))
     output_user_root = os.path.abspath(os.path.join(topdir, 'output_user_root'))

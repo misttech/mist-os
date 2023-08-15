@@ -304,7 +304,7 @@ def main():
 
     # Location of the prebuilt python toolchain.
     python_prebuilt_dir = (
-        fuchsia_source_dir / "prebuilt" / "third_party" / "python3.11" / host_tag)
+        fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag)
 
     # The Bazel workspace assumes that the Fuchsia cpu is the host
     # CPU unless --cpu or --platforms is used. Extract the target_cpu
