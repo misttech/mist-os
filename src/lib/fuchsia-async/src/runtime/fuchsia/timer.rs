@@ -312,7 +312,7 @@ mod test {
         assert_eq!(0, counter.load(Ordering::SeqCst));
 
         // Pretend to wait until the next timer
-        let first_deadline = exec.next_timer().expect("Expected a pending timeout (1)");
+        let first_deadline = TestExecutor::next_timer().expect("Expected a pending timeout (1)");
         assert!(first_deadline >= 5.seconds() + start);
         exec.set_fake_time(first_deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
@@ -323,7 +323,7 @@ mod test {
         assert_eq!(1, counter.load(Ordering::SeqCst));
 
         // "Wait" until the next timeout and poll again: expect another item from the stream
-        let second_deadline = exec.next_timer().expect("Expected a pending timeout (2)");
+        let second_deadline = TestExecutor::next_timer().expect("Expected a pending timeout (2)");
         exec.set_fake_time(second_deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(2, counter.load(Ordering::SeqCst));

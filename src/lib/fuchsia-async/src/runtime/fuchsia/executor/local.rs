@@ -255,7 +255,7 @@ impl TestExecutor {
     }
 
     /// Returns the deadline for the next timer due to expire.
-    pub fn next_timer(&mut self) -> Option<Time> {
+    pub fn next_timer() -> Option<Time> {
         with_local_timer_heap(|timer_heap| timer_heap.next_deadline().map(|t| t.time()))
     }
 
@@ -264,19 +264,27 @@ impl TestExecutor {
         self.local.inner.collector.snapshot()
     }
 
-    /// Waits for the executor to stall and then sets the fake time to a given value. This will only
-    /// work if the executor is being run via `TestExecutor::run_until_stalled` and can only be
-    /// called by one task at a time. When this returns, the caller should not assume that any tasks
-    /// awoken by newly expired timers have been polled; the caller can force this by calling
-    /// `until_stalled`.
+    /// Advances fake time to the specified time.  This will only work if the executor is being run
+    /// via `TestExecutor::run_until_stalled` and can only be called by one task at a time.  This
+    /// will make sure that repeating timers fire as expected.
     ///
     /// # Panics
     ///
     /// Panics if the executor was not created with fake time, and for the same reasons
     /// `poll_until_stalled` can below.
-    pub async fn when_stalled_set_fake_time(time: Time) {
-        let _: Poll<_> = Self::poll_until_stalled(future::pending::<()>()).await;
-        EHandle::local().inner.set_fake_time(time);
+    pub async fn advance_to(time: Time) {
+        let ehandle = EHandle::local();
+        loop {
+            let _: Poll<_> = Self::poll_until_stalled(future::pending::<()>()).await;
+            if let Some(next_timer) = Self::next_timer() {
+                if next_timer <= time {
+                    ehandle.inner.set_fake_time(next_timer);
+                    continue;
+                }
+            }
+            ehandle.inner.set_fake_time(time);
+            break;
+        }
     }
 
     /// Runs the future until it is ready or the executor is stalled. Returns the state of the
@@ -369,10 +377,10 @@ fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
 #[cfg(test)]
 mod tests {
     use super::{super::spawn, *};
-    use crate::{handle::on_signals::OnSignals, Timer};
+    use crate::{handle::on_signals::OnSignals, Interval, Timer};
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
-    use futures::{future, task::LocalFutureObj};
+    use futures::{future, task::LocalFutureObj, StreamExt};
     use pin_utils::pin_mut;
     use std::{
         cell::{Cell, RefCell},
@@ -584,8 +592,7 @@ mod tests {
     }
 
     #[test]
-    fn test_async_fake_time() {
-        // Test the EHandle set_fake_time method.
+    fn test_advance_to() {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
@@ -597,18 +604,28 @@ mod tests {
                     timer_fired.store(true, Ordering::SeqCst);
                 },
                 async {
+                    let mut fired = 0;
+                    let mut interval = Interval::new(1.seconds());
+                    while let Some(_) = interval.next().await {
+                        fired += 1;
+                        if fired == 3 {
+                            break;
+                        }
+                    }
+                    assert_eq!(fired, 3);
+                },
+                async {
                     assert!(!timer_fired.load(Ordering::SeqCst));
-                    TestExecutor::when_stalled_set_fake_time(Time::after(500.millis())).await;
+                    TestExecutor::advance_to(Time::after(500.millis())).await;
                     // Timer still shouldn't be fired.
                     assert!(!timer_fired.load(Ordering::SeqCst));
-                    TestExecutor::when_stalled_set_fake_time(Time::after(500.millis())).await;
+                    TestExecutor::advance_to(Time::after(500.millis())).await;
 
-                    // The timer should fire now but we don't know when the future will run, so wait
-                    // until the executor has stalled.
-                    let _: Poll<_> =
-                        TestExecutor::poll_until_stalled(future::pending::<()>()).await;
-
+                    // The timer should have fired.
                     assert!(timer_fired.load(Ordering::SeqCst));
+
+                    // The interval timer should have fired once.  Make it fire twice more.
+                    TestExecutor::advance_to(Time::after(2.seconds())).await;
                 }
             )
         };

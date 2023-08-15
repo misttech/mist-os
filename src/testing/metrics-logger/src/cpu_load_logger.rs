@@ -502,7 +502,7 @@ pub mod tests {
         }
 
         fn iterate_task(&mut self, task: &mut Pin<Box<dyn futures::Future<Output = ()>>>) -> bool {
-            let Some(next_time) = self.executor.next_timer() else { return false };
+            let Some(next_time) = fasync::TestExecutor::next_timer() else { return false };
             self.executor.set_fake_time(next_time);
             let _ = self.executor.run_until_stalled(task);
             true

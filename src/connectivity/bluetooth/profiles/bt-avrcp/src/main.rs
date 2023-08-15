@@ -205,7 +205,7 @@ mod tests {
 
         // Running the background task should empty out the executor of things to do.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        assert_eq!(exec.next_timer(), None);
+        assert_eq!(fuchsia_async::TestExecutor::next_timer(), None);
     }
 
     #[fuchsia::test]
@@ -236,6 +236,6 @@ mod tests {
 
         // Running the background task should empty out the executor of things to do.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        assert_eq!(exec.next_timer(), None);
+        assert_eq!(fuchsia_async::TestExecutor::next_timer(), None);
     }
 }

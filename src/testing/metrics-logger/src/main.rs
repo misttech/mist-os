@@ -704,7 +704,7 @@ mod tests {
         // If the server has an active logging task, run until the next log and return true.
         // Otherwise, return false.
         fn iterate_logging_task(&mut self) -> bool {
-            let Some(next_time) = self.executor.next_timer() else { return false };
+            let Some(next_time) = fasync::TestExecutor::next_timer() else { return false };
             self.executor.set_fake_time(next_time);
             assert_eq!(
                 futures::task::Poll::Pending,
