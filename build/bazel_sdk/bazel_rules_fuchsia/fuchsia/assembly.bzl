@@ -9,6 +9,10 @@ load(
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_package_directory.bzl",
+    _fuchsia_package_directory = "fuchsia_package_directory",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_assemble_package.bzl",
     _fuchsia_assemble_package = "fuchsia_assemble_package",
 )
@@ -94,6 +98,7 @@ load(
 # Rules
 assembly_bundle = _assembly_bundle
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package
+fuchsia_package_directory = _fuchsia_package_directory
 fuchsia_assemble_package = _fuchsia_assemble_package
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_virtual_device = _fuchsia_virtual_device
