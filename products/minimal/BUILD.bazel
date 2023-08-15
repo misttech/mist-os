@@ -79,6 +79,7 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_image = ":image.x64",
     product_name = "fuchsia",
+    recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
@@ -102,6 +103,7 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-x64",
     product_image = ":image.qemu-x64",
     product_name = "fuchsia",
+    recovery = "//products/zedboot:qemu-x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )

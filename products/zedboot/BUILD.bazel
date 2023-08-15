@@ -6,7 +6,9 @@ load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
     "fuchsia_product_configuration",
+    "fuchsia_product_image",
 )
+load("//build/bazel/assembly:zedboot_image_args.bzl", "ZEDBOOT_IMAGE_ARGS")
 
 package(default_visibility = [
     "//build/bazel/assembly:__subpackages__",
@@ -38,3 +40,18 @@ fuchsia_product_configuration(
         },
     },
 )
+
+[fuchsia_product_image(
+    name = board,
+    board_config = "//boards:{}".format(board),
+    create_system_mode = ZEDBOOT_IMAGE_ARGS["create_system_mode"],
+    legacy_aib = ZEDBOOT_IMAGE_ARGS["legacy_aib"],
+    platform_aibs = ZEDBOOT_IMAGE_ARGS["platform_aibs"],
+    # TODO(awolter): Use ZEDBOOT_IMAGE_ARGS from zedboot_images_args.bzl when
+    # `configure_fshost: True` is enabled in v/g.
+    product_config = "//products/zedboot",
+) for board in [
+    "x64",
+    "qemu-x64",
+    "vim3",
+]]
