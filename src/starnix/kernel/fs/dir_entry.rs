@@ -251,7 +251,7 @@ impl DirEntry {
         } else {
             // An entry was created. Update the ctime and mtime of this directory.
             self.node.update_ctime_mtime();
-            entry.notify(InotifyMask::CREATE);
+            entry.notify_creation();
             Ok(entry)
         }
     }
@@ -889,6 +889,18 @@ impl DirEntry {
             parent.node.watchers.notify(event_mask, &self.local_name(), self.node.info().mode);
         }
         self.node.watchers.notify(event_mask, &FsString::default(), self.node.info().mode);
+    }
+
+    /// Notifies parents about creation, and notifies current node about link_count change.
+    pub fn notify_creation(&self) {
+        let mode = self.node.info().mode;
+        if Arc::strong_count(&self.node) > 1 {
+            // Notify about link change only if there is already a hardlink.
+            self.node.watchers.notify(InotifyMask::ATTRIB, &FsString::default(), mode);
+        }
+        if let Some(parent) = self.parent() {
+            parent.node.watchers.notify(InotifyMask::CREATE, &self.local_name(), mode);
+        }
     }
 
     /// Notifies watchers on the current node about deletion if this is the

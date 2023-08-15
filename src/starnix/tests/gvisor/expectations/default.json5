@@ -213,7 +213,6 @@
                 "Inotify.SymlinkFollow",
                 "Inotify.UtimesGeneratesAttribEvent",
                 "Inotify.UnmatchedEventsAreDiscarded",
-                "Inotify.LinkGeneratesAttribAndCreateEvents",
                 "Inotify.ControlEvents",
                 "Inotify.KernfsBasic",
                 "Inotify.ExcludeUnlinkInodeEvents",
