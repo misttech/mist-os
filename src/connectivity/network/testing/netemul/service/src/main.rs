@@ -2237,17 +2237,21 @@ mod tests {
     ) {
         // TODO(https://fxbug.dev/124847): Use #[fixture] for this once it integrates
         // well with #[test_case].
-        with_sandbox("start_stop_child_component_errors", |sandbox| async move {
-            let TestRealm { realm } = TestRealm::new(&sandbox, fnetemul::RealmOptions::default());
-            let err = match action {
-                StartStop::Start => realm.start_child_component(moniker),
-                StartStop::Stop => realm.stop_child_component(moniker),
-            }
-            .await
-            .unwrap_or_else(|e| panic!("failed to {:?} child component: {:?}", action, e))
-            .map_err(zx::Status::from_raw);
-            assert_eq!(err, Err(expected_status));
-        })
+        with_sandbox(
+            &format!("{action:?}_child_component_errors_{expected_status}"),
+            |sandbox| async move {
+                let TestRealm { realm } =
+                    TestRealm::new(&sandbox, fnetemul::RealmOptions::default());
+                let err = match action {
+                    StartStop::Start => realm.start_child_component(moniker),
+                    StartStop::Stop => realm.stop_child_component(moniker),
+                }
+                .await
+                .unwrap_or_else(|e| panic!("failed to {:?} child component: {:?}", action, e))
+                .map_err(zx::Status::from_raw);
+                assert_eq!(err, Err(expected_status));
+            },
+        )
         .await
     }
 
