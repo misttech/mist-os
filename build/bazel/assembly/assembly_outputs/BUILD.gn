@@ -31,16 +31,23 @@ if (use_bringup_assembly) {
     bazel_assembled_system_target =
         "${bazel_product_bundle_target}_create_system"
   }
+  verify_images_manifest("verify_recovery") {
+    testonly = true
+    gn_assembled_system_target = recovery_label
+    bazel_assembled_system_target =
+        "${bazel_product_bundle_target}_create_recovery_system"
+  }
 }
 
 group("verifications") {
   testonly = true
   deps = []
-  if (!use_bazel_images_only) {
-    if (use_bringup_assembly) {
-      deps += [ ":verify_bringup" ]
-    } else if (build_info_product == "minimal") {
-      deps += [ ":verify_fuchsia" ]
-    }
+  if (use_bringup_assembly) {
+    deps += [ ":verify_bringup" ]
+  } else if (build_info_product == "minimal") {
+    deps += [
+      ":verify_fuchsia",
+      ":verify_recovery",
+    ]
   }
 }
