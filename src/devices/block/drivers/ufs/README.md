@@ -52,6 +52,7 @@ and provides reliable data transfer through the M-PHY physical layer.
 * Support high speed gear 2
 * Support UFS 4.0 Spec (multi queue)
 * Support multiple platform (exynos, snapdragon, etc.)
+* Support multiple block size (4KB, 8KB, 16KB ...)
 
 ## How to test
 

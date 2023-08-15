@@ -151,6 +151,27 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
   const uint32_t block_size_;
 };
 
+// UFS Specification Version 3.1, section 11.3.8 "READ CAPACITY (10) Command".
+class ScsiReadCapacity10Upiu : public ScsiCommandUpiu {
+ public:
+  explicit ScsiReadCapacity10Upiu() : ScsiCommandUpiu(scsi::Opcode::READ_CAPACITY_10) {
+    scsi_cdb_->obsolete = 0;
+    scsi_cdb_->control = 0;
+  }
+
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kDeviceToHost;
+  }
+
+  uint32_t GetTransferBytes() const override { return sizeof(scsi::ReadCapacity10ParameterData); }
+
+ private:
+  scsi::ReadCapacity10CDB *scsi_cdb_ =
+      reinterpret_cast<scsi::ReadCapacity10CDB *>(GetData<CommandUpiuData>()->cdb);
+  // for test
+  friend class ScsiCommandUpiu;
+};
+
 // UFS Specification Version 3.1, section 11.3.10 "START STOP UNIT Command".
 class ScsiStartStopUnitUpiu : public ScsiCommandUpiu {
  public:

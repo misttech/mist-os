@@ -43,9 +43,15 @@ class ScsiCommandProcessor {
   static zx::result<std::vector<uint8_t>> DefaultRead10Handler(
       UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
       cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
+
   static zx::result<std::vector<uint8_t>> DefaultWrite10Handler(
       UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
       cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
+
+  static zx::result<std::vector<uint8_t>> DefaultReadCapacity10Handler(
+      UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
+      cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
+
   static zx::result<std::vector<uint8_t>> DefaultSynchronizeCache10Handler(
       UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
       cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
@@ -58,6 +64,7 @@ class ScsiCommandProcessor {
   DEF_DEFAULT_HANDLER(scsi::Opcode::REQUEST_SENSE, DefaultRequestSenseHandler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::READ_10, DefaultRead10Handler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::WRITE_10, DefaultWrite10Handler)
+  DEF_DEFAULT_HANDLER(scsi::Opcode::READ_CAPACITY_10, DefaultReadCapacity10Handler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::SYNCHRONIZE_CACHE_10, DefaultSynchronizeCache10Handler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::TEST_UNIT_READY, DefaultTestUnitReadyHandler)
   DEF_DEFAULT_HANDLER_END()

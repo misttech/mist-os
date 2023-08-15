@@ -654,26 +654,26 @@ zx::result<> Ufs::ScanLogicalUnits() {
   }
   ZX_ASSERT(max_luns <= kMaxLun);
 
-  // Alloc a sense data buffer.
+  // Allocate a response data buffer.
   const uint32_t kPageSize = zx_system_get_page_size();
-  zx::vmo sense_data_vmo;
-  if (zx_status_t status = zx::vmo::create(kPageSize, 0, &sense_data_vmo); status != ZX_OK) {
+  zx::vmo data_vmo;
+  if (zx_status_t status = zx::vmo::create(kPageSize, 0, &data_vmo); status != ZX_OK) {
     return zx::error(status);
   }
 
-  zx::unowned_vmo unowned_vmo(sense_data_vmo);
+  zx::unowned_vmo unowned_vmo(data_vmo);
   fzl::VmoMapper mapper;
   zx::pmt pmt;
 
-  // Allocates a buffer for SCSI fixed format sense data.
+  // Allocate a buffer for SCSI response data.
   if (zx_status_t status = mapper.Map(*unowned_vmo, 0, kPageSize); status != ZX_OK) {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-  auto* sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(mapper.start());
-  std::array<zx_paddr_t, 2> sense_data_paddr = {0};
-  if (zx_status_t status =
-          bti_.pin(ZX_BTI_PERM_WRITE, *unowned_vmo, 0, kPageSize, sense_data_paddr.data(), 1, &pmt);
+
+  std::array<zx_paddr_t, 2> response_data_paddr = {0};
+  if (zx_status_t status = bti_.pin(ZX_BTI_PERM_WRITE, *unowned_vmo, 0, kPageSize,
+                                    response_data_paddr.data(), 1, &pmt);
       status != ZX_OK) {
     zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -715,14 +715,44 @@ zx::result<> Ufs::ScanLogicalUnits() {
     block_device.block_size = 1 << unit_descriptor.bLogicalBlockSize;
     block_device.block_count = betoh64(unit_descriptor.qLogicalBlockCount);
 
+    ZX_ASSERT_MSG(block_device.block_size == 4096, "Currently, it only supports a 4KB block size.");
+
+    // Checks for block size consistency.
+    auto read_capacity_upiu = std::make_unique<ScsiReadCapacity10Upiu>();
+    if (auto result =
+            QueueScsiCommand(std::move(read_capacity_upiu), i, response_data_paddr, nullptr);
+        result.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI READ CAPACITY 10 command: %s", result.status_string());
+      return result.take_error();
+    }
+    auto* read_capacity_data = reinterpret_cast<scsi::ReadCapacity10ParameterData*>(mapper.start());
+    const uint32_t block_length_in_bytes = betoh32(read_capacity_data->block_length_in_bytes);
+    if (block_device.block_size != block_length_in_bytes) {
+      zxlogf(WARNING,
+             "The block size(%ld) from the unit descriptor and the block size(%d) from the READ "
+             "CAPACITY are different.",
+             block_device.block_size, block_length_in_bytes);
+    }
+    // TODO(fxbug.dev/124835): If the value of |returned_logical_block_address| is UINT32_MAX, READ
+    // CAPACITY 16 should be used instead of READ CAPACITY 10.
+    const uint32_t returned_logical_block_address =
+        betoh32(read_capacity_data->returned_logical_block_address);
+    if ((block_device.block_count != returned_logical_block_address + 1) &&
+        (returned_logical_block_address != UINT32_MAX)) {
+      zxlogf(WARNING,
+             "The block count(%ld) from the unit descriptor and the block count(%d) from the READ "
+             "CAPACITY are different.",
+             block_device.block_count, returned_logical_block_address + 1);
+    }
     zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", i, block_device.block_size,
            block_device.block_count);
 
     // Verify that the Lun is ready. This command expects a unit attention error.
     auto unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
-    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, sense_data_paddr, nullptr);
+    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, response_data_paddr, nullptr);
         result.is_error()) {
-      if (sense_data->sense_key() == static_cast<uint8_t>(scsi::SenseKey::UNIT_ATTENTION)) {
+      auto* response_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(mapper.start());
+      if (response_data->sense_key() == static_cast<uint8_t>(scsi::SenseKey::UNIT_ATTENTION)) {
         zxlogf(DEBUG, "Expected Unit Attention error: %s", result.status_string());
       } else {
         zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
@@ -735,7 +765,8 @@ zx::result<> Ufs::ScanLogicalUnits() {
     // This command will get sense data, but ignore it for now because our goal is to clear the
     // UAC.
     auto request_sense_upiu = std::make_unique<ScsiRequestSenseUpiu>();
-    if (auto result = QueueScsiCommand(std::move(request_sense_upiu), i, sense_data_paddr, nullptr);
+    if (auto result =
+            QueueScsiCommand(std::move(request_sense_upiu), i, response_data_paddr, nullptr);
         result.is_error()) {
       zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
       return result.take_error();
@@ -743,7 +774,7 @@ zx::result<> Ufs::ScanLogicalUnits() {
 
     // Verify that the Lun is ready. This command expects a success.
     unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
-    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, sense_data_paddr, nullptr);
+    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, response_data_paddr, nullptr);
         result.is_error()) {
       zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
       return result.take_error();

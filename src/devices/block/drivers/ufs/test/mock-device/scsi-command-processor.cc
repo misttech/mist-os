@@ -190,6 +190,27 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
   return zx::ok(std::move(data_buffer));
 }
 
+zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultReadCapacity10Handler(
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
+    cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
+  std::vector<uint8_t> data_buffer(sizeof(scsi::ReadCapacity10ParameterData));
+  auto *read_capacity_data =
+      reinterpret_cast<scsi::ReadCapacity10ParameterData *>(data_buffer.data());
+
+  // |returned_logical_block_address| is a 0-based value.
+  read_capacity_data->returned_logical_block_address =
+      htobe32((kMockTotalDeviceCapacity / kMockBlockSize) - 1);
+  read_capacity_data->block_length_in_bytes = htobe32(kMockBlockSize);
+
+  if (auto status = CopyBufferToPhysicalRegion(mock_device, prdt_upius, data_buffer);
+      status != ZX_OK) {
+    zxlogf(ERROR, "UFS MOCK: scsi command, Failed to CopyBufferToPhysicalRegion");
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(data_buffer));
+}
+
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultSynchronizeCache10Handler(
     UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
