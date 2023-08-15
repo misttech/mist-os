@@ -8,14 +8,19 @@
 #include <endian.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
+#include <lib/zx/vmo.h>
+#include <zircon/types.h>
 
 #include <bitset>
+
+#include <zxtest/zxtest.h>
 
 #include "fake-dma-handler.h"
 #include "query-request-processor.h"
 #include "register-mmio-processor.h"
 #include "scsi-command-processor.h"
 #include "src/devices/block/drivers/ufs/ufs.h"
+#include "src/devices/lib/mmio/test-helper.h"
 #include "transfer-request-processor.h"
 #include "uiccmd-processor.h"
 
@@ -35,7 +40,14 @@ constexpr uint32_t kConnectedDataLanes = 1;
 
 class FakeRegisters final {
  public:
-  FakeRegisters() { std::memset(registers_, 0, RegisterMap::kRegisterSize); }
+  FakeRegisters() {
+    ASSERT_OK(zx::vmo::create(RegisterMap::kRegisterSize, /*options=*/0, &registers_vmo_));
+    ASSERT_OK(registers_vmo_.set_cache_policy(ZX_CACHE_POLICY_UNCACHED));
+    ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+                                         /*vmar_offset=*/0, registers_vmo_,
+                                         /*vmo_offset=*/0, /*len=*/RegisterMap::kRegisterSize,
+                                         reinterpret_cast<zx_vaddr_t *>(&registers_)));
+  }
 
   template <typename T>
   T Read(zx_off_t offs) const {
@@ -49,8 +61,16 @@ class FakeRegisters final {
     *reinterpret_cast<T *>(registers_ + offs) = val;
   }
 
+  zx::vmo GetRegistersVmo() {
+    zx::vmo vmo;
+    zx_status_t status = registers_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+    ZX_ASSERT(status == ZX_OK);
+    return vmo;
+  }
+
  private:
-  uint8_t registers_[RegisterMap::kRegisterSize];
+  zx::vmo registers_vmo_;
+  uint8_t *registers_ = nullptr;
 };
 
 // Simulates a logical unit and its contents.
@@ -83,16 +103,8 @@ class UfsMockDevice {
   ~UfsMockDevice() = default;
 
   fdf::MmioBuffer GetMmioBuffer() {
-    return fdf::MmioBuffer{
-        mmio_buffer_t{
-            .vaddr = FakeMmioPtr(&registers_),
-            .offset = 0,
-            .size = RegisterMap::kRegisterSize,
-            .vmo = ZX_HANDLE_INVALID,
-        },
-        &RegisterMmioProcessor::GetMmioOps(),
-        this,
-    };
+    return fdf_testing::CreateMmioBuffer(registers_.GetRegistersVmo(), ZX_CACHE_POLICY_UNCACHED,
+                                         &RegisterMmioProcessor::GetMmioOps(), this);
   }
 
   zx_status_t AddLun(uint8_t lun);
