@@ -137,8 +137,13 @@
         {{else}}
             {{#if (eq device.cpu.architecture "riscv64")}}
             {{else}}
-            "-soundhw",
-            "{{device.audio.model}}",
+               {{! TODO:(b/289524121) Support audio backend correctly. }}
+               {{#if (eq runtime.engine_type "qemu")}}
+                    "-audiodev", "none,id=snd0",
+               {{else}}
+                   "-soundhw",
+                  "{{device.audio.model}}",
+                {{/if}}
             {{/if}}
         {{/if}}
         {{! Networking goes here }}
