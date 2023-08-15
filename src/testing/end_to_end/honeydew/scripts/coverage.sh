@@ -37,7 +37,7 @@ then
     echo "Activating the virtual environment..."
     source $VENV_PATH/bin/activate
 else
-    echo "Directory '$VENV_PATH' does not exists. Run the 'install.sh' script first..."
+    echo "ERROR: Directory '$VENV_PATH' does not exists. Run the 'install.sh' script first..."
     exit 1
 fi
 

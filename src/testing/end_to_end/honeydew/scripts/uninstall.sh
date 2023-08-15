@@ -17,7 +17,9 @@ VENV_PATH="$VENV_ROOT_PATH/$VENV_NAME"
 # https://stackoverflow.com/questions/1871549/determine-if-python-is-running-inside-virtualenv
 INSIDE_VENV=$(fuchsia-vendored-python -c 'import sys; print ("0" if (sys.base_prefix == sys.prefix) else "1")')
 if [[ "$INSIDE_VENV" == "1" ]]; then
-    echo "Inside a virtual environment. Run 'deactivate' once this script is finished..."
+    echo
+    echo "WARNING: Inside a virtual environment. Run 'deactivate' once this script is finished..."
+    echo
 fi
 
 if [ -d $VENV_PATH ]

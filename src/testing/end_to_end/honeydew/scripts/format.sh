@@ -17,7 +17,9 @@ then
     echo "Activating the virtual environment..."
     source $VENV_PATH/bin/activate
 else
-    echo "Directory '$VENV_PATH' does not exists. Run the 'install.sh' script first..."
+    echo
+    echo "ERROR: Directory '$VENV_PATH' does not exists. Run the 'install.sh' script first..."
+    echo
     exit 1
 fi
 
@@ -44,14 +46,14 @@ mypy --config-file=$HONEYDEW_SRC/pyproject.toml $HONEYDEW_SRC > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo "Code is 'mypy' compliant"
 else
-    echo -e "\n"
-    echo "Code is not 'mypy' compliant!"
-    echo "Please run below command sequence, fix all the issues and then rerun this script"
+    echo
+    echo "ERROR: Code is not 'mypy' compliant!"
+    echo "ERROR: Please run below command sequence, fix all the issues and then rerun this script"
     echo "*************************************"
     echo "$ source $VENV_PATH/bin/activate"
     echo "$ mypy --config-file=$HONEYDEW_SRC/pyproject.toml $HONEYDEW_SRC"
     echo "*************************************"
-    echo -e "\n"
+    echo
     exit 1
 fi
 
@@ -62,14 +64,16 @@ pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/tests/ > /dev/null 2
 if [ $? -eq 0 ]; then
     echo "Code is 'pylint' compliant"
 else
-    echo -e "\n"
-    echo "Code is not 'pylint' compliant!"
-    echo "Please run below command sequence, fix all the issues and then rerun this script"
+    echo
+    echo "ERROR: Code is not 'pylint' compliant!"
+    echo "ERROR: Please run below command sequence, fix all the issues and then rerun this script"
     echo "*************************************"
     echo "$ source $VENV_PATH/bin/activate"
     echo "$ pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/honeydew/"
     echo "$ pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/tests/"
     echo "*************************************"
-    echo -e "\n"
+    echo
     exit 1
 fi
+
+echo "Successfully completed all of the formatting checks"

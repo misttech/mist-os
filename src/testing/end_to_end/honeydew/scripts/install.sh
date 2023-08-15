@@ -16,7 +16,9 @@ VENV_PATH="$VENV_ROOT_PATH/$VENV_NAME"
 # https://stackoverflow.com/questions/1871549/determine-if-python-is-running-inside-virtualenv
 INSIDE_VENV=$(fuchsia-vendored-python -c 'import sys; print ("0" if (sys.base_prefix == sys.prefix) else "1")')
 if [[ "$INSIDE_VENV" == "1" ]]; then
-    echo "Inside a virtual environment. Deactivate it and then run this script..."
+    echo
+    echo "ERROR: Inside a virtual environment. Deactivate it and then run this script..."
+    echo
     exit 1
 fi
 
@@ -53,7 +55,9 @@ python -c "import honeydew"
 if [ $? -eq 0 ]; then
     echo "Successfully installed honeydew"
 else
-    echo "honeydew installation failed. Please try again by following instructions manually"
+    echo
+    echo "ERROR: honeydew installation failed. Please try again by following instructions manually"
+    echo
 fi
 
 echo "Restoring environment..."

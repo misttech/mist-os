@@ -249,13 +249,9 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ```
 
 ## HoneyDew code guidelines
-**Running below shell scripts will automatically ensure you have followed the
-guidelines:**
-1. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
-2. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh --affected`
-3. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`
-   and fix any errors it suggests
-4. Run `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/uninstall.sh`
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/conformance.sh`
+**will automatically ensure you have followed the guidelines. Run this script**
+**and fix any errors it suggests.**
 
 **These guidelines need to be run at the least on the following patchsets:**
 1. Initial patchset just before adding reviewers
