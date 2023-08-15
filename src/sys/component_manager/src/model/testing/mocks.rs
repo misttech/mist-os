@@ -4,6 +4,7 @@
 
 use {
     crate::{
+        bedrock::program::Program,
         builtin::runner::BuiltinRunnerFactory,
         model::{component::WeakComponentInstance, resolver::Resolver, routing::RouteRequest},
     },
@@ -504,7 +505,7 @@ impl MockController {
     /// `ControlMessage`'s into the Vec in the HashMap keyed under the provided
     /// `Koid`. The `stop_response` controls the delay used before taking any
     /// action on the control channel when a request to stop is received. The
-    /// `kill_respone` provides the same control when the a request to kill is
+    /// `kill_response` provides the same control when the a request to kill is
     /// received.
     pub fn new_with_responses(
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
@@ -616,4 +617,10 @@ impl MockController {
         .detach();
         handle
     }
+}
+
+/// Starts a program that does nothing but let us intercept requests to control its lifecycle.
+pub fn mock_program() -> (Program, ServerEnd<fcrunner::ComponentControllerMarker>) {
+    let (controller, server_end) = create_endpoints::<fcrunner::ComponentControllerMarker>();
+    (Program::mock_from_controller(controller), server_end)
 }

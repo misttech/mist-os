@@ -27,6 +27,7 @@ use {
     tracing::{error, info},
 };
 
+mod bedrock;
 mod bootfs;
 mod builtin;
 mod builtin_environment;

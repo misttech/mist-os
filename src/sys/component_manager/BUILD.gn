@@ -109,6 +109,8 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/bedrock/mod.rs",
+    "src/bedrock/program.rs",
     "src/bootfs.rs",
     "src/builtin/arguments.rs",
     "src/builtin/capability.rs",

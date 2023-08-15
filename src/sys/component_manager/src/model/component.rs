@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::bedrock::program::{self, Program},
     crate::framework::controller,
     crate::model::{
         actions::{
@@ -45,10 +46,7 @@ use {
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
-    cm_runner::{
-        builtin::NullRunner, builtin::RemoteRunner, component_controller::ComponentController,
-        NamespaceEntry, Runner,
-    },
+    cm_runner::{builtin::NullRunner, builtin::RemoteRunner, NamespaceEntry, Runner},
     cm_rust::{
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
         OfferDeclCommon, UseDecl,
@@ -57,7 +55,7 @@ use {
     cm_types::Name,
     cm_util::channel,
     config_encoder::ConfigFields,
-    fidl::endpoints::{self, Proxy, ServerEnd},
+    fidl::endpoints::{self, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
@@ -713,7 +711,7 @@ impl ComponentInstance {
                         top_instance.trigger_reboot().await;
                     }
 
-                    // Drop the controller and join on the exit listener. Dropping the controller
+                    // Drop the program and join on the exit listener. Dropping the program
                     // should cause the exit listener to stop waiting for the channel epitaph and
                     // exit.
                     //
@@ -721,7 +719,7 @@ impl ComponentInstance {
                     // even after cancellation future may still run for a short period of time
                     // before getting dropped. If that happens there is a chance of scheduling a
                     // duplicate Stop action.
-                    let _ = runtime.controller.take();
+                    let _ = runtime.program.take();
                     if let Some(exit_listener) = runtime.exit_listener.take() {
                         exit_listener.await;
                     }
@@ -1724,7 +1722,7 @@ pub struct Runtime {
     pub runtime_dir: Option<fio::DirectoryProxy>,
 
     /// Used to interact with the Runner to influence the component's execution.
-    pub controller: Option<ComponentController>,
+    pub program: Option<Program>,
 
     /// Approximates when the component was started.
     pub timestamp: zx::Time,
@@ -1788,7 +1786,6 @@ impl Runtime {
     pub fn start_from(
         outgoing_dir: Option<fio::DirectoryProxy>,
         runtime_dir: Option<fio::DirectoryProxy>,
-        controller: Option<fcrunner::ComponentControllerProxy>,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
@@ -1797,7 +1794,7 @@ impl Runtime {
         Runtime {
             outgoing_dir,
             runtime_dir,
-            controller: controller.map(ComponentController::new),
+            program: None,
             timestamp,
             exit_listener: None,
             binder_server_ends: vec![],
@@ -1812,10 +1809,10 @@ impl Runtime {
     /// the background context attempts to use the WeakComponentInstance to stop the
     /// component.
     pub fn watch_for_exit(&mut self, component: WeakComponentInstance) {
-        if let Some(controller) = &self.controller {
-            let epitaph_fut = controller.wait_for_epitaph();
+        if let Some(program) = &self.program {
+            let terminated_fut = program.on_terminate();
             let exit_listener = fasync::Task::spawn(async move {
-                epitaph_fut.await;
+                terminated_fut.await;
                 if let Ok(component) = component.upgrade() {
                     let mut actions = component.lock_actions().await;
                     let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
@@ -1842,10 +1839,10 @@ impl Runtime {
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
     ) -> Result<ComponentStopOutcome, StopActionError> {
-        // Potentially there is no controller, perhaps because the component
+        // Potentially there is no program, perhaps because the component
         // has no running code. In this case this is a no-op.
-        if let Some(ref controller) = self.controller {
-            stop_component_internal(controller, stop_timer, kill_timer).await
+        if let Some(ref program) = self.program {
+            stop_component_internal(program, stop_timer, kill_timer).await
         } else {
             // TODO(jmatt) Need test coverage
             Ok(ComponentStopOutcome {
@@ -1862,33 +1859,37 @@ impl Runtime {
 }
 
 async fn stop_component_internal<'a, 'b>(
-    controller: &ComponentController,
+    program: &Program,
     stop_timer: BoxFuture<'a, ()>,
     kill_timer: BoxFuture<'b, ()>,
 ) -> Result<ComponentStopOutcome, StopActionError> {
-    match do_runner_stop(controller, stop_timer).await {
+    match do_runner_stop(program, stop_timer).await {
         Some(r) => r,
         None => {
             // We must have hit the stop timeout because calling stop didn't return
             // a result, move to killing the component.
-            do_runner_kill(controller, kill_timer).await
+            do_runner_kill(program, kill_timer).await
         }
     }
 }
 
 async fn do_runner_stop<'a>(
-    controller: &ComponentController,
+    program: &Program,
     stop_timer: BoxFuture<'a, ()>,
 ) -> Option<Result<ComponentStopOutcome, StopActionError>> {
     // Ask the controller to stop the component
-    if let Err(e) = controller.stop() {
-        // There was some problem sending the message, perhaps a
-        // protocol error, but there isn't really a way to recover.
-        return Some(Err(StopActionError::ControllerStopFidlError(e)));
+    if let Err(e) = program.stop() {
+        match e {
+            program::Error::Internal(e) => {
+                // There was some problem sending the message, perhaps a
+                // protocol error, but there isn't really a way to recover.
+                return Some(Err(StopActionError::ControllerStopFidlError(e)));
+            }
+        };
     }
 
     let channel_close = Box::pin(async move {
-        controller.on_closed().await.expect("failed waiting for channel to close");
+        program.on_terminate().await;
     });
 
     // Wait for either the timer to fire or the channel to close
@@ -1896,20 +1897,20 @@ async fn do_runner_stop<'a>(
         Either::Left(((), _channel_close)) => None,
         Either::Right((_timer, _close_result)) => Some(Ok(ComponentStopOutcome {
             request: StopRequestSuccess::Stopped,
-            component_exit_status: controller.wait_for_epitaph().await,
+            component_exit_status: program.on_terminate().await,
         })),
     }
 }
 
 async fn do_runner_kill<'a>(
-    controller: &ComponentController,
+    program: &Program,
     kill_timer: BoxFuture<'a, ()>,
 ) -> Result<ComponentStopOutcome, StopActionError> {
-    match controller.kill() {
+    match program.kill() {
         Ok(()) => {
             // Wait for the controller to close the channel
             let channel_close = Box::pin(async move {
-                controller.on_closed().await.expect("error waiting for channel to close");
+                program.on_terminate().await;
             });
 
             // If the control channel closes first, report the component to be
@@ -1921,14 +1922,18 @@ async fn do_runner_kill<'a>(
                 }),
                 Either::Right((_timer, _close_result)) => Ok(ComponentStopOutcome {
                     request: StopRequestSuccess::Killed,
-                    component_exit_status: controller.wait_for_epitaph().await,
+                    component_exit_status: program.on_terminate().await,
                 }),
             }
         }
         Err(e) => {
-            // There was some problem sending the message, perhaps a
-            // protocol error, but there isn't really a way to recover.
-            Err(StopActionError::ControllerKillFidlError(e))
+            match e {
+                program::Error::Internal(e) => {
+                    // There was some problem sending the message, perhaps a
+                    // protocol error, but there isn't really a way to recover.
+                    Err(StopActionError::ControllerKillFidlError(e))
+                }
+            }
         }
     }
 }
@@ -1942,6 +1947,7 @@ pub mod tests {
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
+                mocks,
                 mocks::{ControlMessage, ControllerActionResponse, MockController},
                 routing_test_helpers::{RoutingTest, RoutingTestBuilder},
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
@@ -1959,9 +1965,8 @@ pub mod tests {
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
         },
         component_id_index::gen_instance_id,
-        fidl::endpoints,
         fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, AsHandleRef, Koid},
+        fuchsia_zircon::{self as zx, Koid},
         futures::lock::Mutex,
         moniker::Moniker,
         routing_test_helpers::component_id_index::make_index_file,
@@ -1973,22 +1978,17 @@ pub mod tests {
     /// Test scenario where we tell the controller to stop the component and
     /// the component stops immediately.
     async fn stop_component_well_behaved_component_stop() {
-        // Create a mock controller which simulates immediately shutting down
+        // Create a mock program which simulates immediately shutting down
         // the component.
+        let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_millis(50);
         let kill_timeout = zx::Duration::from_millis(10);
-        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-        let server_channel_koid = server
-            .as_handle_ref()
-            .basic_info()
-            .expect("failed to get basic info on server channel")
-            .koid;
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
         let requests: Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let controller = MockController::new(server, requests.clone(), server_channel_koid);
+        let controller = MockController::new(server, requests.clone(), program.koid());
         controller.serve();
 
         let stop_timer = Box::pin(fasync::Timer::new(fasync::Time::after(stop_timeout)));
@@ -1996,9 +1996,7 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
-        let client_proxy = client.into_proxy().expect("failed to convert client to proxy");
-        let component = ComponentController::new(client_proxy);
-        match stop_component_internal(&component, stop_timer, kill_timer).await {
+        match stop_component_internal(&program, stop_timer, kill_timer).await {
             Ok(ComponentStopOutcome {
                 request: StopRequestSuccess::Stopped,
                 component_exit_status: zx::Status::OK,
@@ -2012,8 +2010,7 @@ pub mod tests {
         }
 
         let msg_map = requests.lock().await;
-        let msg_list =
-            msg_map.get(&server_channel_koid).expect("No messages received on the channel");
+        let msg_list = msg_map.get(&program.koid()).expect("No messages received on the channel");
 
         // The controller should have only seen a STOP message since it stops
         // the component immediately.
@@ -2024,21 +2021,19 @@ pub mod tests {
     /// Test where the control channel is already closed when we try to stop
     /// the component.
     async fn stop_component_successful_component_already_gone() {
+        let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_millis(100);
         let kill_timeout = zx::Duration::from_millis(1);
-        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
 
         let stop_timer = Box::pin(fasync::Timer::new(fasync::Time::after(stop_timeout)));
         let kill_timer = Box::pin(async move {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
-        let client_proxy = client.into_proxy().expect("failed to convert client to proxy");
-        let component = ComponentController::new(client_proxy);
 
         // Drop the server end so it closes
         drop(server);
-        match stop_component_internal(&component, stop_timer, kill_timer).await {
+        match stop_component_internal(&program, stop_timer, kill_timer).await {
             Ok(ComponentStopOutcome {
                 request: StopRequestSuccess::Stopped,
                 component_exit_status: zx::Status::PEER_CLOSED,
@@ -2058,17 +2053,12 @@ pub mod tests {
     fn stop_component_successful_stop_with_delay() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
 
-        // Create a mock controller which simulates shutting down the component
+        // Create a mock program which simulates shutting down the component
         // after a delay. The delay is much shorter than the period allotted
         // for the component to stop.
+        let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(1);
-        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-        let server_channel_koid = server
-            .as_handle_ref()
-            .basic_info()
-            .expect("failed to get basic info on server channel")
-            .koid;
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
@@ -2078,7 +2068,7 @@ pub mod tests {
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
-            server_channel_koid,
+            program.koid(),
             // stop the component after 60ms
             ControllerActionResponse { close_channel: true, delay: Some(component_stop_delay) },
             ControllerActionResponse { close_channel: true, delay: Some(component_stop_delay) },
@@ -2091,9 +2081,7 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
-        let client_proxy = client.into_proxy().expect("failed to convert client to proxy");
-        let component = ComponentController::new(client_proxy);
-        let mut stop_future = Box::pin(stop_component_internal(&component, stop_timer, kill_timer));
+        let mut stop_future = Box::pin(stop_component_internal(&program, stop_timer, kill_timer));
 
         // Poll the stop component future to where it has asked the controller
         // to stop the component. This should also cause the controller to
@@ -2129,7 +2117,7 @@ pub mod tests {
         let mut test_fut = Box::pin(async {
             let msg_map = requests.lock().await;
             let msg_list =
-                msg_map.get(&server_channel_koid).expect("No messages received on the channel");
+                msg_map.get(&program.koid()).expect("No messages received on the channel");
 
             // The controller should have only seen a STOP message since it stops
             // the component before the timeout is hit.
@@ -2148,14 +2136,9 @@ pub mod tests {
 
         // Create a controller which takes far longer than allowed to stop the
         // component.
+        let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(200);
-        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-        let server_channel_koid = server
-            .as_handle_ref()
-            .basic_info()
-            .expect("failed to get basic info on server channel")
-            .koid;
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
@@ -2168,7 +2151,7 @@ pub mod tests {
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
-            server_channel_koid,
+            program.koid(),
             // Process the stop message, but fail to close the channel. Channel
             // closure is the indication that a component stopped.
             ControllerActionResponse { close_channel: false, delay: Some(stop_resp_delay) },
@@ -2184,9 +2167,7 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
-        let client_proxy = client.into_proxy().expect("failed to convert client to proxy");
-        let component = ComponentController::new(client_proxy);
-        let mut stop_fut = Box::pin(stop_component_internal(&component, stop_timer, kill_timer));
+        let mut stop_fut = Box::pin(stop_component_internal(&program, stop_timer, kill_timer));
 
         // The stop fn has sent the stop message and is now waiting for a response
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut stop_fut));
@@ -2196,7 +2177,7 @@ pub mod tests {
             // Check if the mock controller got all the messages we expected it to get.
             let msg_map = requests.lock().await;
             let msg_list =
-                msg_map.get(&server_channel_koid).expect("No messages received on the channel");
+                msg_map.get(&program.koid()).expect("No messages received on the channel");
             assert_eq!(msg_list, &vec![ControlMessage::Stop]);
         });
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut check_msgs));
@@ -2223,7 +2204,7 @@ pub mod tests {
             // Check if the mock controller got all the messages we expected it to get.
             let msg_map = requests.lock().await;
             let msg_list =
-                msg_map.get(&server_channel_koid).expect("No messages received on the channel");
+                msg_map.get(&program.koid()).expect("No messages received on the channel");
             assert_eq!(msg_list, &vec![ControlMessage::Stop, ControlMessage::Kill]);
         });
 
@@ -2254,14 +2235,9 @@ pub mod tests {
 
         // Create a controller which takes far longer than allowed to stop the
         // component.
+        let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(200);
-        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-        let server_channel_koid = server
-            .as_handle_ref()
-            .basic_info()
-            .expect("failed to get basic info on server channel")
-            .koid;
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
@@ -2271,7 +2247,7 @@ pub mod tests {
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
-            server_channel_koid,
+            program.koid(),
             // Process the stop message, but fail to close the channel. Channel
             // closure is the indication that a component stopped.
             ControllerActionResponse { close_channel: false, delay: None },
@@ -2287,9 +2263,7 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
-        let client_proxy = client.into_proxy().expect("failed to convert client to proxy");
-        let component = ComponentController::new(client_proxy);
-        let mut stop_fut = Box::pin(stop_component_internal(&component, stop_timer, kill_timer));
+        let mut stop_fut = Box::pin(stop_component_internal(&program, stop_timer, kill_timer));
 
         // it should be the case we stall waiting for a response from the
         // controller
@@ -2327,16 +2301,11 @@ pub mod tests {
     fn stop_component_successful_race_with_controller() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
 
-        // Create a controller which takes far longer than allowed to stop the
+        // Create a program which takes far longer than allowed to stop the
         // component.
+        let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_seconds(5);
         let kill_timeout = zx::Duration::from_millis(1);
-        let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-        let server_channel_koid = server
-            .as_handle_ref()
-            .basic_info()
-            .expect("failed to get basic info on server channel")
-            .koid;
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
@@ -2348,7 +2317,7 @@ pub mod tests {
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
-            server_channel_koid,
+            program.koid(),
             // Process the stop message, but fail to close the channel after
             // the timeout of stop_component()
             ControllerActionResponse { close_channel: true, delay: Some(resp_delay) },
@@ -2363,10 +2332,8 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
-        let client_proxy = client.into_proxy().expect("failed to convert client to proxy");
-        let component = ComponentController::new(client_proxy);
-        let epitaph_fut = component.wait_for_epitaph();
-        let mut stop_fut = Box::pin(stop_component_internal(&component, stop_timer, kill_timer));
+        let epitaph_fut = program.on_terminate();
+        let mut stop_fut = Box::pin(stop_component_internal(&program, stop_timer, kill_timer));
 
         // it should be the case we stall waiting for a response from the
         // controller
@@ -2386,7 +2353,7 @@ pub mod tests {
 
             let msg_map = requests.lock().await;
             let msg_list =
-                msg_map.get(&server_channel_koid).expect("No messages received on the channel");
+                msg_map.get(&program.koid()).expect("No messages received on the channel");
 
             assert_eq!(msg_list, &vec![ControlMessage::Stop]);
         });

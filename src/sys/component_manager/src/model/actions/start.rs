@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::bedrock::program::Program,
     crate::framework::controller,
     crate::model::{
         actions::{Action, ActionKey},
@@ -17,13 +18,12 @@ use {
     async_trait::async_trait,
     cm_runner::{NamespaceEntry, Runner, StartInfo},
     config_encoder::ConfigFields,
-    fidl::{
-        endpoints::{create_proxy, ServerEnd},
-        Vmo,
-    },
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl::{endpoints::create_proxy, Vmo},
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
+    fidl_fuchsia_diagnostics_types as fdiagnostics, fidl_fuchsia_io as fio,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
+    fuchsia_zircon as zx,
+    futures::channel::oneshot,
     moniker::Moniker,
     std::sync::Arc,
     tracing::warn,
@@ -75,7 +75,7 @@ impl Action for StartAction {
 struct StartContext {
     runner: Arc<dyn Runner>,
     start_info: StartInfo,
-    controller_server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
+    diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
 }
 
 async fn do_start(
@@ -96,6 +96,8 @@ async fn do_start(
         }
     }
 
+    let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
+
     let result = async move {
         // Resolve the component.
         let component_info = component.resolve().await.map_err(|err|
@@ -110,7 +112,7 @@ async fn do_start(
 
         // Generate the Runtime which will be set in the Execution.
         let checker = component.policy_checker();
-        let (pending_runtime, start_info, controller_server_end, break_on_start) =
+        let (pending_runtime, start_info, break_on_start) =
             make_execution_runtime(
                 &component,
                 &checker,
@@ -129,7 +131,7 @@ async fn do_start(
             StartContext {
                 runner,
                 start_info,
-                controller_server_end,
+                diagnostics_sender,
             },
             component_info.decl,
             pending_runtime,
@@ -140,13 +142,13 @@ async fn do_start(
 
     // Dispatch the Started and the DebugStarted event.
     let (start_context, pending_runtime) = match result {
-        Ok((start_context, component_decl, mut pending_runtime, break_on_start)) => {
+        Ok((start_context, component_decl, pending_runtime, break_on_start)) => {
             component
                 .hooks
                 .dispatch(&Event::new_with_timestamp(
                     component,
                     EventPayload::Started {
-                        runtime: RuntimeInfo::from_runtime(&mut pending_runtime),
+                        runtime: RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver),
                         component_decl,
                     },
                     pending_runtime.timestamp,
@@ -170,18 +172,10 @@ async fn do_start(
         }
     };
 
-    let res = configure_component_runtime(&component, pending_runtime).await;
+    let res = start_component(&component, pending_runtime, start_context).await;
     match res {
         Ok(fsys::StartResult::AlreadyStarted) => {}
-        Ok(fsys::StartResult::Started) => {
-            // It's possible that the component is stopped before getting here. If so, that's fine: the
-            // runner will start the component, but its stop or kill signal will be immediately set on the
-            // component controller.
-            start_context
-                .runner
-                .start(start_context.start_info, start_context.controller_server_end)
-                .await;
-        }
+        Ok(fsys::StartResult::Started) => {}
         Err(ref _e) => {
             // Since we dispatched a start event, dispatch a stop event
             // TODO(fxbug.dev/87507): It is possible this issues Stop after
@@ -195,14 +189,15 @@ async fn do_start(
     res
 }
 
-/// Set the Runtime in the Execution and start the exit water. From component manager's
+/// Set the Runtime in the Execution and start the exit watcher. From component manager's
 /// perspective, this indicates that the component has started. If this returns an error, the
 /// component was shut down and the Runtime is not set, otherwise the function returns the
 /// start context with the runtime set. This function acquires the state and execution locks on
 /// `Component`.
-async fn configure_component_runtime(
+async fn start_component(
     component: &Arc<ComponentInstance>,
     mut pending_runtime: Runtime,
+    start_context: StartContext,
 ) -> Result<fsys::StartResult, StartActionError> {
     let state = component.lock_state().await;
     let mut execution = component.lock_execution().await;
@@ -211,6 +206,9 @@ async fn configure_component_runtime(
         return r;
     }
 
+    let StartContext { runner, start_info, diagnostics_sender } = start_context;
+    pending_runtime.program =
+        Some(Program::start(runner.as_ref(), start_info, diagnostics_sender).await);
     pending_runtime.watch_for_exit(component.as_weak());
     execution.runtime = Some(pending_runtime);
     Ok(fsys::StartResult::Started)
@@ -253,10 +251,7 @@ async fn make_execution_runtime(
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
-) -> Result<
-    (Runtime, StartInfo, ServerEnd<fcrunner::ComponentControllerMarker>, zx::EventPair),
-    StartActionError,
-> {
+) -> Result<(Runtime, StartInfo, zx::EventPair), StartActionError> {
     // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
@@ -312,13 +307,9 @@ async fn make_execution_runtime(
         None
     };
 
-    let (controller, controller_server) =
-        create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
-
     let runtime = Runtime::start_from(
         outgoing_dir,
         runtime_dir,
-        Some(controller),
         start_reason,
         execution_controller_task,
         logger,
@@ -340,7 +331,7 @@ async fn make_execution_runtime(
         break_on_start: Some(break_on_start_left),
     };
 
-    Ok((runtime, start_info, controller_server, break_on_start_right))
+    Ok((runtime, start_info, break_on_start_right))
 }
 
 #[cfg(test)]
@@ -570,8 +561,7 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime =
-                Some(Runtime::start_from(None, None, None, StartReason::Debug, None, None));
+            es.runtime = Some(Runtime::start_from(None, None, StartReason::Debug, None, None));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),

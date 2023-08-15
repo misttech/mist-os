@@ -23,14 +23,14 @@ use {
     },
     cm_types::Name,
     cm_types::Url,
-    fidl::{endpoints, prelude::*},
+    fidl::endpoints,
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkRequestStream,
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_zircon::{self as zx, AsHandleRef, Koid},
+    fuchsia_zircon::{self as zx, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
     moniker::{ChildName, Moniker},
     std::collections::HashSet,
@@ -72,14 +72,8 @@ impl ComponentInfo {
         let koid = {
             let component = component.lock_execution().await;
             let runtime = component.runtime.as_ref().expect("runtime is unexpectedly missing");
-            let controller =
-                runtime.controller.as_ref().expect("controller is unexpectedly missing");
-            let basic_info = controller
-                .as_channel()
-                .basic_info()
-                .expect("error getting basic info about controller channel");
-            // should be the koid of the other side of the channel
-            basic_info.related_koid
+            let program = runtime.program.as_ref().expect("program is unexpectedly missing");
+            program.koid()
         };
 
         ComponentInfo { component, channel_id: koid }

@@ -21,7 +21,7 @@ pub struct ComponentController {
     /// Receiver for epitaphs coming from the connection.
     epitaph_value_recv: Shared<oneshot::Receiver<zx::Status>>,
 
-    /// Receiver for diganostics data coming from an event.
+    /// Receiver for diagnostics data coming from an event.
     diagnostics_value_recv: Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>,
 
     /// The task listening for events.

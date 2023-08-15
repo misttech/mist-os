@@ -262,14 +262,11 @@ pub struct RuntimeInfo {
 }
 
 impl RuntimeInfo {
-    pub fn from_runtime(runtime: &mut Runtime) -> Self {
-        let diagnostics_receiver = Arc::new(Mutex::new(
-            runtime
-                .controller
-                .as_mut()
-                .and_then(|controller| controller.take_diagnostics_receiver()),
-        ));
-
+    pub fn from_runtime(
+        runtime: &Runtime,
+        diagnostics_receiver: oneshot::Receiver<fdiagnostics::ComponentDiagnostics>,
+    ) -> Self {
+        let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
         Self {
             outgoing_dir: clone_dir(runtime.outgoing_dir.as_ref()),
             runtime_dir: clone_dir(runtime.runtime_dir.as_ref()),
