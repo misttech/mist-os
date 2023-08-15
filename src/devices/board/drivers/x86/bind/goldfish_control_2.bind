@@ -4,7 +4,7 @@
 
 composite goldfish_control_2;
 
-using fuchsia.goldfish;
+using fuchsia.goldfish.platform;
 using fuchsia.google.platform;
 using fuchsia.hardware.goldfish.pipe;
 using fuchsia.hardware.goldfish.addressspace;

@@ -1,7 +1,7 @@
 [
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.goldfish.BIND_PROTOCOL.CONTROL"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.goldfish.platform.BIND_PROTOCOL.CONTROL"
         },
         "expected": "match",
         "name": "Right protocol"

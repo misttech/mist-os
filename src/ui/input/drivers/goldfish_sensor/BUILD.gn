@@ -13,7 +13,7 @@ driver_bind_rules("goldfish_sensor-bind") {
   tests = "bind_tests.json"
 
   deps = [
-    "//src/devices/bind/fuchsia.goldfish",
+    "//src/devices/bind/fuchsia.goldfish.platform",
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.hardware.goldfish.pipe",
   ]

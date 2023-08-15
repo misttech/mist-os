@@ -2,6 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.goldfish;
+using fuchsia.goldfish.platform;
 
-fuchsia.BIND_PROTOCOL == fuchsia.goldfish.BIND_PROTOCOL.CONTROL;
+fuchsia.BIND_PROTOCOL == fuchsia.goldfish.platform.BIND_PROTOCOL.CONTROL;
