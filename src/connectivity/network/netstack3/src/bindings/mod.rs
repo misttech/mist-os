@@ -17,6 +17,7 @@ mod filter_worker;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
+mod neighbor_worker;
 mod netdevice_worker;
 mod root_fidl_worker;
 mod routes_fidl_worker;
@@ -906,6 +907,7 @@ enum Service {
     Filter(fidl_fuchsia_net_filter::FilterRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
+    Neighbor(fidl_fuchsia_net_neighbor::ViewRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
     RawSocket(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
     RootInterfaces(fidl_fuchsia_net_root::InterfacesRequestStream),
@@ -983,6 +985,7 @@ impl NetstackSeed {
             .add_fidl_service(Service::Interfaces)
             .add_fidl_service(Service::InterfacesAdmin)
             .add_fidl_service(Service::Filter)
+            .add_fidl_service(Service::Neighbor)
             .add_fidl_service(Service::Verifier);
 
         let inspector = fuchsia_inspect::component::inspector();
@@ -1088,6 +1091,11 @@ impl NetstackSeed {
                         }
                         WorkItem::Incoming(Service::Filter(filter)) => {
                             filter.serve_with(|rs| filter_worker::serve(rs)).await
+                        }
+                        WorkItem::Incoming(Service::Neighbor(neighbor)) => {
+                            neighbor
+                                .serve_with(|rs| neighbor_worker::serve(netstack.clone(), rs))
+                                .await
                         }
                         WorkItem::Incoming(Service::Verifier(verifier)) => {
                             verifier.serve_with(|rs| verifier_worker::serve(rs)).await
