@@ -6,6 +6,7 @@ use fuchsia_zircon as zx;
 use starnix_sync::{InterruptibleEvent, WakeReason};
 use std::{
     collections::HashMap,
+    hash::Hash,
     ops::DerefMut,
     sync::{Arc, Weak},
 };
@@ -20,23 +21,20 @@ use crate::{
 /// Each 32-bit aligned address in an address space can potentially have an associated futex that
 /// userspace can wait upon. This table is a sparse representation that has an actual WaitQueue
 /// only for those addresses that have ever actually had a futex operation performed on them.
-#[derive(Default)]
-pub struct FutexTable {
+pub struct FutexTable<Key: FutexKey> {
     /// The futexes associated with each address in each VMO.
     ///
     /// This HashMap is populated on-demand when futexes are used.
-    state: Mutex<HashMap<FutexKey, Arc<FutexWaitQueue>>>,
+    state: Mutex<HashMap<Key, Arc<FutexWaitQueue>>>,
 }
 
-#[derive(Eq, Hash, PartialEq)]
-struct FutexKey {
-    // No chance of collisions since koids are never reused:
-    // https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#kernel_object_ids
-    koid: zx::Koid,
-    offset: u64,
+impl<Key: FutexKey> Default for FutexTable<Key> {
+    fn default() -> Self {
+        Self { state: Default::default() }
+    }
 }
 
-impl FutexTable {
+impl<Key: FutexKey> FutexTable<Key> {
     /// Wait on the futex at the given address.
     ///
     /// See FUTEX_WAIT.
@@ -48,8 +46,7 @@ impl FutexTable {
         mask: u32,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
-        let (vmo, key) = self.get_vmo_and_key(current_task, addr)?;
-        let offset = key.offset;
+        let (FutexOperand { vmo, offset }, key) = Key::get_operand_and_key(current_task, addr)?;
 
         let event = InterruptibleEvent::new();
         let guard = event.begin_wait();
@@ -81,7 +78,7 @@ impl FutexTable {
         count: usize,
         mask: u32,
     ) -> Result<usize, Errno> {
-        let (_, key) = self.get_vmo_and_key(task, addr)?;
+        let key = Key::get_key(task, addr)?;
         Ok(self.wait_queue_for_key(key).notify(mask as u64, count))
     }
 
@@ -95,8 +92,8 @@ impl FutexTable {
         count: usize,
         new_addr: UserAddress,
     ) -> Result<usize, Errno> {
-        let (_, key) = self.get_vmo_and_key(current_task, addr)?;
-        let (_, new_key) = self.get_vmo_and_key(current_task, new_addr)?;
+        let key = Key::get_key(current_task, addr)?;
+        let new_key = Key::get_key(current_task, new_addr)?;
         let waiters = FutexWaitQueue::default();
         if let Some(old_waiters) = self.state.lock().remove(&key) {
             waiters.take_waiters(&old_waiters);
@@ -106,21 +103,59 @@ impl FutexTable {
         Ok(woken)
     }
 
-    fn get_vmo_and_key(
-        &self,
-        task: &Task,
-        addr: UserAddress,
-    ) -> Result<(Arc<zx::Vmo>, FutexKey), Errno> {
-        let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
-        let koid = vmo.info().map_err(impossible_error)?.koid;
-        Ok((vmo, FutexKey { koid, offset }))
-    }
-
     /// Returns the WaitQueue for a given address.
-    fn wait_queue_for_key(&self, key: FutexKey) -> Arc<FutexWaitQueue> {
+    fn wait_queue_for_key(&self, key: Key) -> Arc<FutexWaitQueue> {
         let mut state = self.state.lock();
         let waiters = state.entry(key).or_default();
         Arc::clone(waiters)
+    }
+}
+
+pub struct FutexOperand {
+    vmo: Arc<zx::Vmo>,
+    offset: u64,
+}
+
+pub trait FutexKey: Sized + Ord + Hash {
+    fn get_key(task: &Task, addr: UserAddress) -> Result<Self, Errno>;
+
+    fn get_operand_and_key(task: &Task, addr: UserAddress) -> Result<(FutexOperand, Self), Errno>;
+}
+
+#[derive(Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct PrivateFutexKey {
+    addr: UserAddress,
+}
+
+impl FutexKey for PrivateFutexKey {
+    fn get_key(_task: &Task, addr: UserAddress) -> Result<Self, Errno> {
+        Ok(PrivateFutexKey { addr })
+    }
+
+    fn get_operand_and_key(task: &Task, addr: UserAddress) -> Result<(FutexOperand, Self), Errno> {
+        let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
+        let key = PrivateFutexKey { addr };
+        Ok((FutexOperand { vmo, offset }, key))
+    }
+}
+
+#[derive(Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct SharedFutexKey {
+    // No chance of collisions since koids are never reused:
+    // https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#kernel_object_ids
+    koid: zx::Koid,
+    offset: u64,
+}
+
+impl FutexKey for SharedFutexKey {
+    fn get_key(task: &Task, addr: UserAddress) -> Result<Self, Errno> {
+        Self::get_operand_and_key(task, addr).map(|(_, key)| key)
+    }
+
+    fn get_operand_and_key(task: &Task, addr: UserAddress) -> Result<(FutexOperand, Self), Errno> {
+        let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
+        let koid = vmo.info().map_err(impossible_error)?.koid;
+        Ok((FutexOperand { vmo, offset }, SharedFutexKey { koid, offset }))
     }
 }
 

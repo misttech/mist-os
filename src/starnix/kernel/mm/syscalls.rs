@@ -321,8 +321,9 @@ fn realtime_deadline_to_monotonic(deadline: timespec) -> Result<zx::Time, Errno>
     Ok(details.mono_to_synthetic.apply_inverse(utc_time))
 }
 
-pub fn sys_futex(
+fn do_futex<Key: FutexKey>(
     current_task: &CurrentTask,
+    futexes: &FutexTable<Key>,
     addr: UserAddress,
     op: u32,
     value: u32,
@@ -330,12 +331,6 @@ pub fn sys_futex(
     addr2: UserAddress,
     value3: u32,
 ) -> Result<usize, Errno> {
-    let futexes = if op & FUTEX_PRIVATE_FLAG != 0 {
-        &current_task.mm.futex
-    } else {
-        &current_task.kernel().shared_futexes
-    };
-
     let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
     let cmd = op & (FUTEX_CMD_MASK as u32);
     match cmd {
@@ -381,6 +376,31 @@ pub fn sys_futex(
             not_implemented!("futex: command 0x{:x} not implemented.", cmd);
             error!(ENOSYS)
         }
+    }
+}
+
+pub fn sys_futex(
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    op: u32,
+    value: u32,
+    utime: UserRef<timespec>,
+    addr2: UserAddress,
+    value3: u32,
+) -> Result<usize, Errno> {
+    if op & FUTEX_PRIVATE_FLAG != 0 {
+        do_futex(current_task, &current_task.mm.futex, addr, op, value, utime, addr2, value3)
+    } else {
+        do_futex(
+            current_task,
+            &current_task.kernel().shared_futexes,
+            addr,
+            op,
+            value,
+            utime,
+            addr2,
+            value3,
+        )
     }
 }
 

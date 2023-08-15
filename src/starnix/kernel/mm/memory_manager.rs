@@ -14,7 +14,7 @@ use crate::{
     fs::*,
     lock::{Mutex, RwLock},
     logging::*,
-    mm::{vmo::round_up_to_system_page_size, FutexTable},
+    mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey},
     task::*,
     types::{range_ext::RangeExt, *},
     vmex_resource::VMEX_RESOURCE,
@@ -1420,7 +1420,7 @@ pub struct MemoryManager {
     pub base_addr: UserAddress,
 
     /// The futexes in this address space.
-    pub futex: FutexTable,
+    pub futex: FutexTable<PrivateFutexKey>,
 
     /// Mutable state for the memory manager.
     pub state: RwLock<MemoryManagerState>,
@@ -1450,7 +1450,7 @@ impl MemoryManager {
         MemoryManager {
             root_vmar,
             base_addr: UserAddress::from_ptr(user_vmar_info.base),
-            futex: FutexTable::default(),
+            futex: FutexTable::<PrivateFutexKey>::default(),
             state: RwLock::new(MemoryManagerState {
                 user_vmar,
                 user_vmar_info,

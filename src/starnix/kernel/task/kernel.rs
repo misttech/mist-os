@@ -33,7 +33,7 @@ use crate::{
     },
     lock::RwLock,
     logging::{log_error, set_zx_name},
-    mm::FutexTable,
+    mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
     task::*,
     types::{DeviceType, Errno, OpenFlags, *},
@@ -132,7 +132,7 @@ pub struct Kernel {
     pub iptables: RwLock<IpTables>,
 
     /// The futexes shared across processes.
-    pub shared_futexes: FutexTable,
+    pub shared_futexes: FutexTable<SharedFutexKey>,
 
     /// The default UTS namespace for all tasks.
     ///
@@ -252,7 +252,7 @@ impl Kernel {
             input_device,
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
-            shared_futexes: Default::default(),
+            shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),
             netstack_devices: Arc::default(),
