@@ -47,7 +47,7 @@ fuchsia_driver_component("parent_component") {
 driver_bind_rules("child_bind") {
   rules = "child-driver.bind"
   bind_output = "child-driver.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.misc" ]
+  deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
 fuchsia_driver("child_driver") {

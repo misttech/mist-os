@@ -5,6 +5,9 @@
 library fuchsia.platform;
 
 extend uint fuchsia.BIND_PROTOCOL {
+  COMPOSITE = 0x07,
+  ROOT = 0x1B,
+  MISC = 0x1C,
   BUS = 84,
   DEVICE = 85,
 };
