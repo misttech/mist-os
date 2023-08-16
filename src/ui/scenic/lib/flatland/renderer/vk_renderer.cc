@@ -597,6 +597,7 @@ bool VkRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
 void VkRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {
   // Called from main thread or Flatland threads.
   TRACE_DURATION("gfx", "flatland::VkRenderer::ReleaseBufferImage");
+  FX_DCHECK(image_id != allocation::kInvalidImageId);
 
   std::scoped_lock lock(lock_);
 

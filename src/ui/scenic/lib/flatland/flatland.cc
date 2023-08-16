@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/gfx/util/validate_eventpair.h"
 #include "src/ui/scenic/lib/scheduling/id.h"
@@ -310,18 +311,18 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
           }
 
           for (auto& image_id : images_to_release) {
-            if (!all_images_to_release->erase(image_id.identifier)) {
+            if (!all_images_to_release->erase(image_id)) {
               // This is harmless, but typically shouldn't happen.  The rare exception is a race
               // when the Flatland session is being torn down, if this runs after the session is
               // destroyed, but before the session's loop/thread is stopped.
               FX_LOGS(WARNING) << "Flatland session << " << session_id
-                               << " did not find expected image " << image_id.identifier
+                               << " did not find expected image " << image_id
                                << " in images_to_release_";
               continue;
             }
 
             for (auto& importer : importer_refs) {
-              importer->ReleaseBufferImage(image_id.identifier);
+              importer->ReleaseBufferImage(image_id);
             }
           }
         });
@@ -789,22 +790,28 @@ void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Re
   clip_regions_[handle] = bounds;
 }
 
-std::vector<allocation::ImageMetadata> Flatland::ProcessDeadTransforms(
+std::vector<allocation::GlobalImageId> Flatland::ProcessDeadTransforms(
     const TransformGraph::TopologyData& data) {
-  std::vector<allocation::ImageMetadata> images_to_release;
+  std::vector<allocation::GlobalImageId> images_to_release;
   for (const auto& dead_handle : data.dead_transforms) {
     matrices_.erase(dead_handle);
 
     // Gather all images corresponding to dead transforms.
     auto image_kv = image_metadatas_.find(dead_handle);
     if (image_kv != image_metadatas_.end()) {
+      const auto image_id = image_kv->second.identifier;
+      image_metadatas_.erase(image_kv);
+
+      // FilledRects do not need to be released.
+      if (image_id == allocation::kInvalidImageId)
+        continue;
+
       // Remember all dead images so that we can release them in the destructor if necessary.
       // Typically this won't be necessary: we'll release them as soon as it is safe (roughly, when
       // the next present takes effect).
-      images_to_release_->insert(image_kv->second.identifier);
+      images_to_release_->insert(image_id);
 
-      images_to_release.push_back(image_kv->second);
-      image_metadatas_.erase(image_kv);
+      images_to_release.push_back(image_id);
     }
   }
 

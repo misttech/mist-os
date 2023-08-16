@@ -246,7 +246,9 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   //     the Flatland session is destroyed before releasing the images)
   //   - returned from this function, so that they can be released as soon as the corresponding
   //     release fence is signaled.
-  std::vector<allocation::ImageMetadata> ProcessDeadTransforms(
+  // The images with allocation::kInvalidImageId correspond to filled rects, which do not need to be
+  // released.
+  std::vector<allocation::GlobalImageId> ProcessDeadTransforms(
       const TransformGraph::TopologyData& data);
 
   // The dispatcher this Flatland instance is running on.

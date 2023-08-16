@@ -24,6 +24,7 @@
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_display.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -5438,6 +5439,19 @@ TEST_F(FlatlandDisplayTest, SimpleSetContent) {
 
   EXPECT_TRUE(parent_viewport_watcher_status.has_value());
   EXPECT_EQ(parent_viewport_watcher_status.value(), ParentViewportStatus::CONNECTED_TO_DISPLAY);
+}
+
+TEST_F(FlatlandTest, CreateAndReleaseFilledRect) {
+  std::shared_ptr<Flatland> flatland = CreateFlatland();
+
+  EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _)).Times(0);
+  EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(allocation::kInvalidImageId))
+      .Times(0);
+  const ContentId kFilledRectId = {1};
+  flatland->CreateFilledRect(kFilledRectId);
+  PRESENT(flatland, true);
+  flatland->ReleaseFilledRect(kFilledRectId);
+  PRESENT(flatland, true);
 }
 
 // TODO(fxbug.dev/76640): other FlatlandDisplayTests that should be written:

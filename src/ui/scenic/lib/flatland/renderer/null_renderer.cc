@@ -120,6 +120,7 @@ bool NullRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
 }
 
 void NullRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {
+  FX_DCHECK(image_id != allocation::kInvalidImageId);
   std::scoped_lock lock(lock_);
   image_map_.erase(image_id);
 }

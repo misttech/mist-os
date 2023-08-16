@@ -423,6 +423,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
 void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image_id) {
   // Called from main thread or Flatland threads.
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ReleaseBufferImage");
+  FX_DCHECK(image_id != allocation::kInvalidImageId);
 
   renderer_->ReleaseBufferImage(image_id);
 
