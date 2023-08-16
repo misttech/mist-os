@@ -356,6 +356,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
     "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
+    "//sdk/lib/driver/testing/cpp:cpp_sdk",
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",
@@ -425,7 +426,6 @@ sdk_molecule("core_testing_deps") {
   deps = [
     "//sdk/fidl:fidl_testing",
     "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
-    "//sdk/lib/driver/testing/cpp:cpp_sdk",
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp/testing:cpp_sdk",
     "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",

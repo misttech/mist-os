@@ -163,9 +163,14 @@
 //sdk/lib/driver/incoming/cpp:cpp_sdk
 //sdk/lib/driver/logging/cpp:cpp_sdk
 //sdk/lib/driver/outgoing/cpp:cpp_sdk
+//sdk/lib/driver/runtime/testing/cpp:cpp_sdk
 //sdk/lib/driver/runtime:driver_runtime_cpp_sdk
+//sdk/lib/driver/runtime:driver_runtime_env_cpp_sdk
+//sdk/lib/driver/runtime:driver_runtime_env_sdk
 //sdk/lib/driver/runtime:driver_runtime_sdk
+//sdk/lib/driver/runtime:driver_runtime_testing_sdk
 //sdk/lib/driver/symbols:symbols_sdk
+//sdk/lib/driver/testing/cpp:cpp_sdk
 //sdk/lib/fdio:fdio_sdk_manifest
 //sdk/lib/fidl/cpp/wire:wire_sdk
 //sdk/lib/fidl/cpp:cpp_base_sdk
@@ -249,6 +254,7 @@
 //zircon/system/ulib/async:async-cpp_sdk
 //zircon/system/ulib/async:async_sdk
 //zircon/system/ulib/inspect:inspect_sdk
+//zircon/system/ulib/sync:sync-cpp_sdk
 //zircon/system/ulib/sync:sync_sdk_manifest
 //zircon/system/ulib/syslog:syslog_sdk_manifest
 //zircon/system/ulib/trace-engine:trace-engine_sdk_manifest

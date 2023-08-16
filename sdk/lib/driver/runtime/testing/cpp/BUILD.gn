@@ -9,7 +9,6 @@ sdk_source_set("cpp") {
   sdk_name = "driver_runtime_testing_cpp"
   include_base = "//sdk"
   public_configs = [ "//sdk/config" ]
-  testonly = true
 
   sources = [
     "internal/default_dispatcher_setting.cc",

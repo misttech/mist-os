@@ -26,7 +26,6 @@ sdk_source_set("cpp") {
   sdk_name = "driver_testing_cpp"
   include_base = "//sdk"
   public_configs = [ "//sdk/config" ]
-  testonly = true
 
   sources = [
     "driver_lifecycle.cc",
