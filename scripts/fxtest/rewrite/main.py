@@ -581,12 +581,17 @@ async def run_all_tests(
 
     tasks = []
 
+    abort_all_tests_event = asyncio.Event()
+
     async def test_executor():
         to_run: execution.TestExecution
         was_non_hermetic: bool = False
 
         while True:
             async with run_condition:
+                if abort_all_tests_event.is_set():
+                    # If we should not execute any more tests, quit.
+                    return
                 while run_state.total_running == max_parallel:
                     await run_condition.wait()
 
@@ -612,13 +617,37 @@ async def run_all_tests(
             try:
                 command_line = " ".join(to_run.command_line())
                 recorder.emit_instruction_message(f"Command: {command_line}")
-                await to_run.run(recorder, flags, test_suite_id)
-                status = event.TestSuiteStatus.PASSED
+                done, pending = await asyncio.wait(
+                    [
+                        asyncio.create_task(to_run.run(recorder, flags, test_suite_id)),
+                        asyncio.create_task(abort_all_tests_event.wait()),
+                    ],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for r in done:
+                    # Re-throw exceptions.
+                    r.result()
+                for r in pending:
+                    # Cancel pending tasks.
+                    r.cancel()
+                if pending:
+                    # Propagate cancellations
+                    await asyncio.wait(pending)
+
+                if abort_all_tests_event.is_set():
+                    status = event.TestSuiteStatus.ABORTED
+                    message = "Test suite aborted due to another failure"
+                else:
+                    status = event.TestSuiteStatus.PASSED
             except execution.TestCouldNotRun as e:
                 status = event.TestSuiteStatus.SKIPPED
                 message = str(e)
             except execution.TestFailed as e:
                 status = event.TestSuiteStatus.FAILED
+                if flags.fail:
+                    # Abort all other running tests, dropping through to the
+                    # following run state code to trigger any waiting executors.
+                    abort_all_tests_event.set()
             finally:
                 recorder.emit_test_suite_ended(test_suite_id, status, message)
 

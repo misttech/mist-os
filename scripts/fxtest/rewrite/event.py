@@ -231,6 +231,9 @@ class TestSuiteStatus(enum.Enum):
     # A test suite was skipped for some reason.
     SKIPPED = "SKIPPED"
 
+    # The test suite execution was aborted due to some condition.
+    ABORTED = "ABORTED"
+
 
 @dataparse
 @dataclass

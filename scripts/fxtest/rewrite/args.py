@@ -28,6 +28,7 @@ class Flags:
 
     random: bool
     limit: int | None
+    fail: bool
 
     output: bool
     simple: bool
@@ -152,6 +153,13 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     )
     execution.add_argument(
         "--limit", type=int, help="Stop execution after this many tests", default=None
+    )
+    execution.add_argument(
+        "-f",
+        "--fail",
+        action="store_true",
+        help="Stop running tests after the first failed test suite. This will abort all tests in progress and end with a failure code.",
+        default=False,
     )
 
     output = parser.add_argument_group("Output Options")

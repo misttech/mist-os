@@ -572,6 +572,8 @@ async def _console_event_loop(
                     label = statusinfo.error_highlight("FAILED", style=flags.style)
                 elif payload.status == event.TestSuiteStatus.SKIPPED:
                     label = statusinfo.highlight("SKIPPED", style=flags.style)
+                elif payload.status == event.TestSuiteStatus.ABORTED:
+                    label = statusinfo.highlight("ABORTED", style=flags.style)
                 else:
                     label = statusinfo.error_highlight(
                         "BUG: UNKNOWN", style=flags.style
