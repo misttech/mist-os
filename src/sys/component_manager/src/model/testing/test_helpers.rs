@@ -26,9 +26,7 @@ use {
     fidl::endpoints,
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::LogSinkRequestStream,
-    fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon::{self as zx, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
@@ -49,10 +47,6 @@ pub fn default_component_decl() -> ComponentDecl {
 
 pub fn component_decl_with_test_runner() -> ComponentDecl {
     ::routing_test_helpers::component_decl_with_test_runner()
-}
-
-pub enum MockServiceRequest {
-    LogSink(LogSinkRequestStream),
 }
 
 pub struct ComponentInfo {

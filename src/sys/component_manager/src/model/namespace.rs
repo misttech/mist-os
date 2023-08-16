@@ -16,19 +16,16 @@ use {
         mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
         verify_instance_in_component_id_index, RouteRequest,
     },
-    cm_logger::scoped::ScopedLogger,
     cm_runner::{namespace::Entry as NamespaceEntry, Namespace},
-    cm_rust::{self, ComponentDecl, UseDecl, UseProtocolDecl},
+    cm_rust::{self, ComponentDecl, UseDecl},
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
         prelude::*,
     },
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::LogSinkMarker,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::BoxFuture,
     std::{collections::HashMap, sync::Arc},
-    tracing::{error, info, warn},
+    tracing::{error, warn},
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
         directory::immutable::simple as pfs, execution_scope::ExecutionScope, path::Path,
@@ -44,16 +41,16 @@ pub async fn create_namespace(
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
     additional_entries: Vec<NamespaceEntry>,
-) -> Result<(Namespace, Option<ScopedLogger>), CreateNamespaceError> {
+) -> Result<Namespace, CreateNamespaceError> {
     let mut namespace = Namespace::new();
     if let Some(package) = package {
         let pkg_dir = fuchsia_fs::directory::clone_no_describe(&package.package_dir, None)
             .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
         add_pkg_directory(&mut namespace, pkg_dir);
     }
-    let logger = add_use_decls(&mut namespace, component, decl).await?;
+    add_use_decls(&mut namespace, component, decl).await?;
     namespace.merge(additional_entries).map_err(CreateNamespaceError::InvalidAdditionalEntries)?;
-    Ok((namespace, logger))
+    Ok(namespace)
 }
 
 /// Adds the package directory to the namespace under the path "/pkg".
@@ -70,7 +67,7 @@ async fn add_use_decls(
     namespace: &mut Namespace,
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
-) -> Result<Option<ScopedLogger>, CreateNamespaceError> {
+) -> Result<(), CreateNamespaceError> {
     // Populate the namespace from uses, using the component manager's namespace.
     // svc_dirs will hold (path,directory) pairs. Each pair holds a path in the
     // component's namespace and a directory that ComponentMgr will host for the component.
@@ -80,7 +77,6 @@ async fn add_use_decls(
     // a channel and then route the channel to the appropriate component's out directory.
     let mut directory_waiters = Vec::new();
 
-    let mut log_sink_decl: Option<UseProtocolDecl> = None;
     for use_ in &decl.uses {
         match use_ {
             cm_rust::UseDecl::Directory(_) => {
@@ -93,9 +89,6 @@ async fn add_use_decls(
                     &s.target_path,
                     component.as_weak(),
                 );
-                if s.source_name == LogSinkMarker::PROTOCOL_NAME {
-                    log_sink_decl = Some(s.clone());
-                }
             }
             cm_rust::UseDecl::Service(s) => {
                 add_service_or_protocol_use(
@@ -136,57 +129,7 @@ async fn add_use_decls(
         task_scope.add_task(waiter).await;
     }
 
-    let logger = log_sink_decl
-        .map(|decl| {
-            let ns = std::mem::replace(&mut namespace.entries, Vec::new());
-            let (ns_, logger) = get_logger_from_ns(ns, &decl);
-            let _ = std::mem::replace(&mut namespace.entries, ns_);
-            logger
-        })
-        .flatten();
-
-    Ok(logger)
-}
-
-/// Given the set of namespace entries and a LogSink protocol's
-/// `UseProtocolDecl`, look through the namespace for where to connect
-/// to the LogSink protocol. The log connection, if any, is stored in the
-/// IncomingNamespace.
-fn get_logger_from_ns(
-    ns: Vec<NamespaceEntry>,
-    log_sink_decl: &UseProtocolDecl,
-) -> (Vec<NamespaceEntry>, Option<ScopedLogger>) {
-    // A new set of namespace entries is returned because when the entry
-    // used to connect to LogSink is found, that entry is consumed. A
-    // matching entry is created and placed in the set of entries returned
-    // by this function. `self` is taken as mutable so the
-    // logger connection can be stored when found.
-    let mut new_ns = vec![];
-    let mut log_entry: Option<(NamespaceEntry, String)> = None;
-    let mut logger = None;
-    // Find namespace directory specified in the log_sink_decl
-    for entry in ns {
-        // Check if this namespace path is a stem of the decl's path
-        if log_entry.is_none() {
-            if let Ok(path_remainder) =
-                is_subpath_of(log_sink_decl.target_path.to_string(), entry.path.to_string())
-            {
-                log_entry = Some((entry, path_remainder));
-                continue;
-            }
-        }
-        new_ns.push(entry);
-    }
-
-    // If we found a matching namespace entry, try to open the log proxy
-    if let Some((mut entry, remaining_path)) = log_entry {
-        let _str = log_sink_decl.target_path.to_string();
-        let (restored_dir, logger_) = get_logger_from_dir(entry.directory, &remaining_path);
-        entry.directory = restored_dir;
-        logger = logger_;
-        new_ns.push(entry);
-    }
-    (new_ns, logger)
+    Ok(())
 }
 
 /// Adds a directory waiter to `waiters` and updates `ns` to contain a handle for the
@@ -420,28 +363,6 @@ fn add_service_or_protocol_use(
     }
 }
 
-/// Determines if the `full` is a subpath of the `stem`. Returns the
-/// remaining portion of the path if `full` us a subpath. Returns Error if
-/// `stem` and `full` are the same.
-fn is_subpath_of(full: String, stem: String) -> Result<String, ()> {
-    let stem_path = std::path::Path::new(&stem);
-    let full_path = std::path::Path::new(&full);
-
-    let remainder = full_path
-        .strip_prefix(stem_path)
-        // Unwrapping the `to_str` conversion should be safe here since we
-        // started with a Unicode value, put it into a path and now are
-        // extracting a portion of that value.
-        .map(|path| path.to_str().unwrap().to_string())
-        .map_err(|_| ())?;
-
-    if remainder.is_empty() {
-        Err(())
-    } else {
-        Ok(remainder)
-    }
-}
-
 /// Serves the pseudo-directories in `svc_dirs` and adds their client ends to the namespace.
 fn serve_and_add_svc_dirs(namespace: &mut Namespace, svc_dirs: HashMap<String, Directory>) {
     for (target_dir_path, pseudo_dir) in svc_dirs {
@@ -456,46 +377,6 @@ fn serve_and_add_svc_dirs(namespace: &mut Namespace, svc_dirs: HashMap<String, D
         );
 
         namespace.add(target_dir_path, client_end);
-    }
-}
-
-/// Given a Directory, connect to the LogSink protocol at the default
-/// location.
-fn get_logger_from_dir(
-    dir: ClientEnd<fio::DirectoryMarker>,
-    at_path: &str,
-) -> (ClientEnd<fio::DirectoryMarker>, Option<ScopedLogger>) {
-    let mut logger = None;
-    match dir.into_proxy() {
-        Ok(dir_proxy) => {
-            match ScopedLogger::from_directory(&dir_proxy, at_path) {
-                Ok(ns_logger) => {
-                    logger = Some(ns_logger);
-                }
-                Err(error) => {
-                    info!(%error, "LogSink.Connect() failed, logs will be attributed to component manager");
-                }
-            }
-
-            // Now that we have the LogSink and socket, put the LogSink
-            // protocol directory back where we found it.
-            (
-                dir_proxy.into_channel().map_or_else(
-                    |error| {
-                        error!(?error, "LogSink proxy could not be converted back to channel");
-                        let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
-                        client
-                    },
-                    |chan| ClientEnd::<fio::DirectoryMarker>::new(chan.into()),
-                ),
-                logger,
-            )
-        }
-        Err(error) => {
-            info!(%error, "Directory client channel could not be turned into proxy");
-            let (client, _server) = create_endpoints::<fio::DirectoryMarker>();
-            (client, logger)
-        }
     }
 }
 
@@ -533,223 +414,4 @@ fn make_dir_with_not_found_logging(
         .detach();
     }));
     new_dir
-}
-
-#[cfg(test)]
-pub mod test {
-    use {
-        super::*,
-        crate::model::testing::test_helpers::MockServiceRequest,
-        cm_rust::{Availability, DependencyType, UseProtocolDecl, UseSource},
-        fidl::endpoints,
-        fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest},
-        fuchsia_component::server::ServiceFs,
-        futures::StreamExt,
-        std::sync::{
-            atomic::{AtomicU8, Ordering},
-            Arc,
-        },
-    };
-
-    #[fuchsia::test]
-    fn test_subpath_handling() {
-        let mut stem = "/".to_string();
-        let mut full = "/".to_string();
-        assert_eq!(is_subpath_of(full, stem), Err(()));
-
-        stem = "/".to_string();
-        full = "/subdir".to_string();
-        assert_eq!(is_subpath_of(full, stem), Ok("subdir".to_string()));
-
-        stem = "/subdir1/subdir2".to_string();
-        full = "/subdir1/file.txt".to_string();
-        assert_eq!(is_subpath_of(full, stem), Err(()));
-
-        stem = "/this/path/has/a/typ0".to_string();
-        full = "/this/path/has/a/typo/not/exclamation/point".to_string();
-        assert_eq!(is_subpath_of(full, stem), Err(()));
-
-        stem = "/subdir1".to_string();
-        full = "/subdir1/subdir2/subdir3/file.txt".to_string();
-        assert_eq!(is_subpath_of(full, stem), Ok("subdir2/subdir3/file.txt".to_string()));
-    }
-
-    #[fuchsia::test]
-    /// Tests that the logger is connected to when it is in a subdirectory of a
-    /// namespace entry.
-    async fn test_logger_at_root_of_entry() {
-        let log_decl = UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "logsink".parse().unwrap(),
-            target_path: "/fuchsia.logger.LogSink".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        };
-
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let mut root_dir = ServiceFs::new_local();
-        root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
-        let _sub_dir = root_dir.dir("subdir");
-        root_dir.serve_connection(dir_server).expect("failed to add serving channel");
-
-        let ns_entries = vec![NamespaceEntry { path: "/".to_string(), directory: dir_client }];
-
-        verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
-    }
-
-    #[fuchsia::test]
-    /// Tests that the logger is connected to when it is in a subdirectory of a
-    /// namespace entry.
-    async fn test_logger_at_subdir_of_entry() {
-        let log_decl = UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "logsink".parse().unwrap(),
-            target_path: "/arbitrary-dir/fuchsia.logger.LogSink".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        };
-
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let mut root_dir = ServiceFs::new_local();
-        let mut svc_dir = root_dir.dir("arbitrary-dir");
-        svc_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
-        let _sub_dir = root_dir.dir("subdir");
-        root_dir.serve_connection(dir_server).expect("failed to add serving channel");
-
-        let ns_entries = vec![NamespaceEntry { path: "/".to_string(), directory: dir_client }];
-
-        verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
-    }
-
-    #[fuchsia::test]
-    async fn test_multiple_namespace_entries() {
-        let log_decl = UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "logsink".parse().unwrap(),
-            target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        };
-
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let mut root_dir = ServiceFs::new_local();
-        root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
-        let _sub_dir = root_dir.dir("subdir");
-        root_dir.serve_connection(dir_server).expect("failed to add serving channel");
-
-        // Create a directory for another namespace entry which we don't
-        // actually expect to be accessed.
-        let (extra_dir_client, extra_dir_server) =
-            endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let mut extra_dir = ServiceFs::new_local();
-        extra_dir.add_fidl_service(MockServiceRequest::LogSink);
-        extra_dir.serve_connection(extra_dir_server).expect("serving channel failed");
-
-        let ns_entries = vec![
-            NamespaceEntry { path: "/svc".to_string(), directory: dir_client },
-            NamespaceEntry { path: "/sv".to_string(), directory: extra_dir_client },
-        ];
-
-        verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, true).await;
-    }
-
-    #[fuchsia::test]
-    async fn test_no_connect_on_empty_namespace() {
-        let log_decl = UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "logsink".parse().unwrap(),
-            target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        };
-
-        let ns_entries = vec![];
-
-        verify_logger_connects_in_namespace(
-            Option::<
-                &mut ServiceFs<fuchsia_component::server::ServiceObjLocal<'_, MockServiceRequest>>,
-            >::None,
-            ns_entries,
-            log_decl,
-            false,
-        )
-        .await;
-    }
-
-    #[fuchsia::test]
-    async fn test_logsink_dir_not_in_namespace() {
-        let log_decl = UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "logsink".parse().unwrap(),
-            target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        };
-
-        let (dir_client, dir_server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let mut root_dir = ServiceFs::new_local();
-        root_dir.add_fidl_service_at(LogSinkMarker::PROTOCOL_NAME, MockServiceRequest::LogSink);
-        root_dir.serve_connection(dir_server).expect("failed to add serving channel");
-
-        let ns_entries =
-            vec![NamespaceEntry { path: "/not-the-svc-dir".to_string(), directory: dir_client }];
-
-        verify_logger_connects_in_namespace(Some(&mut root_dir), ns_entries, log_decl, false).await;
-    }
-
-    /// Verify the expected logger connection behavior and that the logger is
-    /// set or not in the namespace.
-    async fn verify_logger_connects_in_namespace<
-        T: fuchsia_component::server::ServiceObjTrait<Output = MockServiceRequest>,
-    >(
-        root_dir: Option<&mut ServiceFs<T>>,
-        ns_entries: Vec<NamespaceEntry>,
-        proto_decl: UseProtocolDecl,
-        connects: bool,
-    ) {
-        let connection_count = if connects { 1u8 } else { 0u8 };
-
-        // Create a task that will access the namespace by calling
-        // `get_logger_from_ns`. This task won't complete until the VFS backing
-        // the namespace starts responding to requests. This VFS is served by
-        // code in the next stanza.
-        fuchsia_async::Task::spawn(async move {
-            let ns_size = ns_entries.len();
-            let (procesed_ns, logger) = get_logger_from_ns(ns_entries, &proto_decl);
-            assert_eq!(logger.is_some(), connects);
-            assert_eq!(ns_size, procesed_ns.len());
-        })
-        .detach();
-
-        if let Some(dir) = root_dir {
-            // Serve the directory and when the LogSink service is requested
-            // provide a closure that counts number of calls to the ConnectStructured and
-            // WaitForInterestChange methods. Serving stops when the spawned task drops the
-            // IncomingNamespace, which holds the other side of the VFS directory handle.
-            let connect_count = Arc::new(AtomicU8::new(0));
-            dir.for_each_concurrent(10usize, |request: MockServiceRequest| match request {
-                MockServiceRequest::LogSink(mut r) => {
-                    let connect_count2 = connect_count.clone();
-                    async move {
-                        while let Some(Ok(req)) = r.next().await {
-                            match req {
-                                LogSinkRequest::Connect { .. } => {
-                                    panic!("Unexpected call to `Connect`");
-                                }
-                                LogSinkRequest::ConnectStructured { .. } => {
-                                    connect_count2.fetch_add(1, Ordering::SeqCst);
-                                }
-                                LogSinkRequest::WaitForInterestChange { .. } => {
-                                    // ideally we'd also assert this was received but it's racy
-                                    // since the request is sent by the above detached task
-                                }
-                            }
-                        }
-                    }
-                }
-            })
-            .await;
-            assert_eq!(connect_count.load(Ordering::SeqCst), connection_count);
-        }
-    }
 }

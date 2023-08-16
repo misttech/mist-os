@@ -3,27 +3,28 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
-    diagnostics_log::{Publisher, PublisherOptions},
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
+    diagnostics_log::{PublishError, Publisher, PublisherOptions},
+    fidl_fuchsia_logger as flogger,
+    thiserror::Error,
 };
+
+#[derive(Debug, Error)]
+pub enum ScopedLoggerError {
+    #[error("could not create publisher")]
+    PublishError(#[source] PublishError),
+}
 
 pub struct ScopedLogger {
     publisher: Publisher,
 }
 
 impl ScopedLogger {
-    pub fn create(logsink: flogger::LogSinkProxy) -> Result<Self, Error> {
+    pub fn create(logsink: flogger::LogSinkProxy) -> Result<Self, ScopedLoggerError> {
         let publisher = Publisher::new(
             PublisherOptions::default().wait_for_initial_interest(false).use_log_sink(logsink),
-        )?;
+        )
+        .map_err(ScopedLoggerError::PublishError)?;
         Ok(Self { publisher })
-    }
-
-    pub fn from_directory(dir: &fio::DirectoryProxy, path: &str) -> Result<Self, Error> {
-        let sink = connect_to_named_protocol_at_dir_root::<flogger::LogSinkMarker>(dir, path)?;
-        Self::create(sink)
     }
 }
 

@@ -489,7 +489,7 @@ async fn construct_namespace(
     let mut state = instance.lock_state().await;
     match &mut *state {
         InstanceState::Resolved(r) => {
-            let (namespace, _logger) =
+            let namespace =
                 create_namespace(r.package(), &instance, r.decl(), vec![]).await.unwrap();
             Ok(namespace.into())
         }

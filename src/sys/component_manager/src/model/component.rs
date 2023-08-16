@@ -1949,6 +1949,7 @@ pub mod tests {
             testing::{
                 mocks,
                 mocks::{ControlMessage, ControllerActionResponse, MockController},
+                out_dir::OutDir,
                 routing_test_helpers::{RoutingTest, RoutingTestBuilder},
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
@@ -1963,15 +1964,20 @@ pub mod tests {
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
+            ProtocolDeclBuilder,
         },
         component_id_index::gen_instance_id,
-        fuchsia_async as fasync,
+        fidl::endpoints::DiscoverableProtocolMarker,
+        fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, Koid},
         futures::lock::Mutex,
+        futures::{channel::mpsc, StreamExt, TryStreamExt},
         moniker::Moniker,
         routing_test_helpers::component_id_index::make_index_file,
         std::panic,
         std::{boxed::Box, collections::HashMap, str::FromStr, sync::Arc, task::Poll},
+        tracing::info,
+        vfs::service::host,
     };
 
     #[fuchsia::test]
@@ -3357,5 +3363,93 @@ pub mod tests {
                     availability: Availability::Optional,
                 })
         );
+    }
+
+    // Tests that logging in `with_logger_as_default` uses the LogSink routed to the component.
+    #[fuchsia::test]
+    async fn with_logger_as_default_uses_logsink() {
+        const TEST_CHILD_NAME: &str = "child";
+
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .protocol(
+                        ProtocolDeclBuilder::new(flogger::LogSinkMarker::PROTOCOL_NAME)
+                            .path("/svc/fuchsia.logger.LogSink")
+                            .build(),
+                    )
+                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                        source: OfferSource::Self_,
+                        source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target: OfferTarget::static_child(TEST_CHILD_NAME.to_string()),
+                        dependency_type: DependencyType::Strong,
+                        availability: Availability::Required,
+                    }))
+                    .add_lazy_child(TEST_CHILD_NAME)
+                    .build(),
+            ),
+            (
+                TEST_CHILD_NAME,
+                ComponentDeclBuilder::new()
+                    .use_(UseDecl::Protocol(UseProtocolDecl {
+                        source: UseSource::Parent,
+                        source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
+                        dependency_type: DependencyType::Strong,
+                        availability: Availability::Required,
+                    }))
+                    .build(),
+            ),
+        ];
+        let test_topology = ActionsTest::new(components[0].0, components, None).await;
+
+        let (connect_tx, mut connect_rx) = mpsc::unbounded();
+        let serve_logsink = move |mut stream: flogger::LogSinkRequestStream| {
+            let connect_tx = connect_tx.clone();
+            async move {
+                while let Some(request) = stream.try_next().await.expect("failed to serve") {
+                    match request {
+                        flogger::LogSinkRequest::Connect { .. } => {
+                            unimplemented!()
+                        }
+                        flogger::LogSinkRequest::ConnectStructured { .. } => {
+                            connect_tx.unbounded_send(()).unwrap();
+                        }
+                        flogger::LogSinkRequest::WaitForInterestChange { .. } => {
+                            // It's expected that the log publisher calls this, but it's not
+                            // necessary to implement it.
+                        }
+                    }
+                }
+            }
+        };
+
+        // Serve LogSink from the root component.
+        let mut root_out_dir = OutDir::new();
+        root_out_dir.add_entry("/svc/fuchsia.logger.LogSink".parse().unwrap(), host(serve_logsink));
+        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+        let child = test_topology.look_up(vec![TEST_CHILD_NAME].try_into().unwrap()).await;
+
+        // Start the child.
+        ActionSet::register(
+            child.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
+        .await
+        .expect("failed to start child");
+
+        {
+            let execution = child.lock_execution().await;
+            assert!(execution.runtime.is_some());
+        }
+
+        // Log a message using the child's scoped logger.
+        child.with_logger_as_default(|| info!("hello world")).await;
+
+        // Wait for the logger to connect to LogSink.
+        connect_rx.next().await.unwrap();
     }
 }

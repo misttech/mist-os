@@ -13,16 +13,21 @@ use {
         error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::create_namespace,
+        routing::{route_and_open_capability, OpenOptions, RouteRequest},
     },
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
+    cm_logger::scoped::ScopedLogger,
     cm_runner::{NamespaceEntry, Runner, StartInfo},
     config_encoder::ConfigFields,
-    fidl::{endpoints::create_proxy, Vmo},
+    fidl::{
+        endpoints::{create_proxy, DiscoverableProtocolMarker},
+        Vmo,
+    },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
     fidl_fuchsia_diagnostics_types as fdiagnostics, fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
     std::sync::Arc,
@@ -266,13 +271,24 @@ async fn make_execution_runtime(
     }
 
     // Create the component's namespace.
-    let (namespace, logger) =
-        create_namespace(package, component, decl, additional_namespace_entries).await.map_err(
-            |err| StartActionError::CreateNamespaceError {
-                moniker: component.moniker.clone(),
-                err,
-            },
-        )?;
+    let namespace = create_namespace(package, component, decl, additional_namespace_entries)
+        .await
+        .map_err(|err| StartActionError::CreateNamespaceError {
+            moniker: component.moniker.clone(),
+            err,
+        })?;
+
+    let logger = if let Some(logsink_decl) = get_logsink_decl(&decl) {
+        match create_scoped_logger(component, logsink_decl.clone()).await {
+            Ok(logger) => Some(logger),
+            Err(err) => {
+                warn!(moniker = %component.moniker, %err, "Could not create logger for component. Logs will be attributed to component_manager");
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     // Set up channels into/out of the new component. These are absent from non-executable
     // components.
@@ -332,6 +348,33 @@ async fn make_execution_runtime(
     };
 
     Ok((runtime, start_info, break_on_start_right))
+}
+
+/// Returns the UseProtocolDecl for the LogSink protocol, if any.
+fn get_logsink_decl<'a>(decl: &'a cm_rust::ComponentDecl) -> Option<&'a cm_rust::UseProtocolDecl> {
+    decl.uses.iter().find_map(|use_| match use_ {
+        cm_rust::UseDecl::Protocol(decl) => {
+            (decl.source_name == flogger::LogSinkMarker::PROTOCOL_NAME).then_some(decl)
+        }
+        _ => None,
+    })
+}
+
+/// Returns a ScopedLogger attributed to the component, given its use declaration for the
+/// `fuchsia.logger.LogSink` protocol.
+async fn create_scoped_logger(
+    component: &Arc<ComponentInstance>,
+    logsink_decl: cm_rust::UseProtocolDecl,
+) -> Result<ScopedLogger, anyhow::Error> {
+    let (logsink, logsink_server_end) = create_proxy::<flogger::LogSinkMarker>().unwrap();
+    let route_request = RouteRequest::UseProtocol(logsink_decl);
+    let open_options = OpenOptions {
+        flags: fio::OpenFlags::empty(),
+        relative_path: String::new(),
+        server_chan: &mut logsink_server_end.into_channel(),
+    };
+    route_and_open_capability(route_request, component, open_options).await?;
+    Ok(ScopedLogger::create(logsink)?)
 }
 
 #[cfg(test)]
