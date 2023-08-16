@@ -351,6 +351,7 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
       "//src/devices/bind/fuchsia.camerasensor2:fuchsia.camerasensor2_cpp",
       "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
+      "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_cpp",
       "//src/devices/bind/fuchsia.gdc:fuchsia.gdc_cpp",
       "//src/devices/bind/fuchsia.ge2d:fuchsia.ge2d_cpp",
       "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",

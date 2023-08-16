@@ -29,3 +29,9 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   TCA6408A = 0x09,
   TAS5707 = 0x0A,
 };
+
+extend uint fuchsia.BIND_I2C_ADDRESS {
+  INA231_MLB = 0x49,
+  INA231_SPEAKERS = 0x40,
+  INA231_MLB_PROTO = 0x46,
+};

@@ -5,12 +5,12 @@
 library fuchsia.i2c;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 24,
-  IMPL = 25,
+  DEVICE = 0x18,
+  IMPL = 0x19,
 };
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 3,
+  DEVICE = 0x03,
 };
 
 extend uint fuchsia.BIND_I2C_CLASS {
@@ -26,13 +26,8 @@ extend uint fuchsia.BIND_I2C_BUS_ID {
 extend uint fuchsia.BIND_I2C_ADDRESS {
   BACKLIGHT = 0x2C,
   ETH = 0x18,
-  FOCALTECH_TOUCH = 0x38,
   AMBIENTLIGHT = 0x39,
   AUDIO_CODEC = 0x48,
-  GOODIX_TOUCH = 0x5d,
-  TI_INA231_MLB = 0x49,
-  TI_INA231_SPEAKERS = 0x40,
-  TI_INA231_MLB_PROTO = 0x46,
   SHERLOCK = 0x36,
   VIM3 = 0x20,
 };

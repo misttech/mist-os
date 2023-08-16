@@ -6,10 +6,11 @@ composite gt92xx_touch;
 
 using fuchsia.hardware.gpio;
 using fuchsia.i2c;
+using fuchsia.goodix.platform;
 
 primary node "i2c" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
-  fuchsia.BIND_I2C_ADDRESS == fuchsia.i2c.BIND_I2C_ADDRESS.GOODIX_TOUCH;
+  fuchsia.BIND_I2C_ADDRESS == fuchsia.goodix.platform.BIND_I2C_ADDRESS.TOUCH;
 }
 
 node "gpio-int" {

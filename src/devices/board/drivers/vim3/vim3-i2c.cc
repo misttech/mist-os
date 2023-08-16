@@ -13,6 +13,7 @@
 #include <span>
 #include <vector>
 
+#include <bind/fuchsia/focaltech/platform/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -86,7 +87,7 @@ constexpr i2c_channel_t i2c_ee_m3_channels[]{
     },
     // FT5336 touch panel interrupt, used by TS050 touchscreen.
     {
-        .address = bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH,
+        .address = bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH,
         .vid = 0,
         .pid = 0,
         .did = 0,

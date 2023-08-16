@@ -11,3 +11,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_VID {
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   GT6853 = 0x01,
 };
+
+extend uint fuchsia.BIND_I2C_ADDRESS {
+  TOUCH = 0x5d,
+};

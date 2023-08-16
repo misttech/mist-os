@@ -156,7 +156,7 @@ const ddk::BindRule kI2cBindRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                             bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                            bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                            bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 ```
 
@@ -179,7 +179,7 @@ auto i2c_bind_rules = std::vector {
     MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                        bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                       bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                       bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 ```
 
@@ -204,7 +204,7 @@ const device_bind_prop_t kI2cProperties[] = {
     ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                       bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                      bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 ```
 
@@ -220,7 +220,7 @@ rules.
 ```
 auto i2c_properties[] = std::vector {
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                      bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 ```
 
@@ -360,14 +360,14 @@ const ddk::BindRule kI2cBindRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                             bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                            bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                            bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const device_bind_prop_t kI2cProperties[] = {
     ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                       bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                      bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 auto spec = ddk::CompositeNodeSpec(kI2cBindRules, kI2cProperties);
@@ -446,12 +446,12 @@ auto i2c_bind_rules = std::vector {
     MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                        bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                       bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                       bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 auto i2c_properties[] = std::vector {
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                      bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 
@@ -550,7 +550,7 @@ with the following properties in its parent specifications:
 ```
 i2c parent specification properties {
      fuchsia.BIND_FIDL_PROTOCOL: fuchsia.i2c.BIND_FIDL_PROTOCOL_DEVICE,
-     fuchsia.BIND_I2C_ADDRESS: fuchsia.i2c.BIND_I2C_ADDRESS_FOCALTECH_TOUCH,
+     fuchsia.BIND_I2C_ADDRESS: fuchsia.focaltech.platform.BIND_I2C_ADDRESS_TOUCH,
 }
 
 gpio-interrupt parent specification properties {

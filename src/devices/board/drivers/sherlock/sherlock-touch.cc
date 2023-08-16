@@ -13,8 +13,10 @@
 
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/focaltech/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
@@ -24,8 +26,8 @@
 
 namespace sherlock {
 
-const uint32_t kI2cAddressValues[] = {bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH,
-                                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_TI_INA231_SPEAKERS};
+const uint32_t kI2cAddressValues[] = {bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH,
+                                      bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS};
 
 const ddk::BindRule kI2cRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
@@ -37,7 +39,7 @@ const ddk::BindRule kI2cRules[] = {
 const device_bind_prop_t kI2cProperties[] = {
     ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                      bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const ddk::BindRule kInterruptRules[] = {

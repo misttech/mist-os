@@ -7,7 +7,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE",
-                    "fuchsia.BIND_I2C_ADDRESS": "fuchsia.i2c.BIND_I2C_ADDRESS.GOODIX_TOUCH"
+                    "fuchsia.BIND_I2C_ADDRESS": "fuchsia.goodix.platform.BIND_I2C_ADDRESS.TOUCH"
                 }
             }
         ]

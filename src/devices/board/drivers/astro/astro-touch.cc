@@ -15,6 +15,8 @@
 
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/focaltech/platform/cpp/bind.h>
+#include <bind/fuchsia/goodix/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -40,13 +42,13 @@ const ddk::BindRule kFocaltechI2cRules[] = {
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                            bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                            bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const device_bind_prop_t kFocaltechI2cProperties[] = {
     ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                      bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                      bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const ddk::BindRule kGoodixI2cRules[] = {
@@ -54,12 +56,13 @@ const ddk::BindRule kGoodixI2cRules[] = {
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                            bind_fuchsia_i2c::BIND_I2C_ADDRESS_GOODIX_TOUCH),
+                            bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const device_bind_prop_t kGoodixI2cProperties[] = {
     ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_GOODIX_TOUCH),
+    ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                      bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const ddk::BindRule kInterruptRules[] = {

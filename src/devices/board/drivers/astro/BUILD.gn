@@ -248,6 +248,8 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
+    "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_cpp",
+    "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//src/devices/bind/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",

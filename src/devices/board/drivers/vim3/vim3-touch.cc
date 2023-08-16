@@ -18,6 +18,7 @@
 
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/focaltech/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/khadas/platform/cpp/bind.h>
@@ -35,13 +36,13 @@ zx_status_t Vim3::TouchInit() {
                               bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
       ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                              bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                              bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
   };
 
   const device_bind_prop_t kI2cProperties[] = {
       ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
       ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
-                        bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
+                        bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
   };
 
   const ddk::BindRule kInterruptRules[] = {
