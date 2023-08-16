@@ -9,6 +9,7 @@ group("drivers") {
     "aml-dsp/aml-g12-tdm-dsp",
     "aml-g12-pdm:aml-g12-pdm",
     "aml-g12-tdm",
+    "aml-g12-tdm:aml-g12-composite",
     "aml-g12-tdm:aml-g12-tdm-dai",
     "as370-pdm-input",
     "as370-tdm-output",

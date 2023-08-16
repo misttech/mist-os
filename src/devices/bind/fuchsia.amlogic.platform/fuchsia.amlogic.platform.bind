@@ -77,6 +77,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   PDM_USE_DSP = 0x34,
   SPI_NAND = 0x35,
   A1_USB_PHY = 0x36,
+  AUDIO_COMPOSITE = 0x37,
 };
 
 extend uint fuchsia.BIND_REGISTER_ID {

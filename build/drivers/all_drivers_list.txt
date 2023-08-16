@@ -348,6 +348,7 @@
 //src/media/audio/drivers/aml-g12-pdm:aml-g12-pdm-driver
 //src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-dai-driver
 //src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-driver
+//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-driver
 //src/media/audio/drivers/as370-pdm-input:as370-pdm-input-driver
 //src/media/audio/drivers/as370-tdm-output:as370-tdm-output-driver
 //src/media/audio/drivers/codecs/alc5514:alc5514-driver
