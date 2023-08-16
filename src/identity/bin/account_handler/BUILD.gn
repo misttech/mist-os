@@ -98,7 +98,7 @@ fuchsia_package("account_handler_persistent") {
   deps = [
     ":component",
     ":persistent-config",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
     "//src/storage/fxfs-crypt",
   ]
 }
@@ -107,7 +107,7 @@ fuchsia_package("account_handler_ephemeral") {
   deps = [
     ":component",
     ":ephemeral-config",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
     "//src/storage/fxfs-crypt",
   ]
 }
@@ -135,7 +135,7 @@ fuchsia_package("account_handler_persistent_for_test") {
   deps = [
     ":component",
     ":persistent-test-config",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
   ]
 }
 
@@ -143,6 +143,6 @@ fuchsia_package("account_handler_ephemeral_for_test") {
   deps = [
     ":component",
     ":ephemeral-test-config",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
   ]
 }

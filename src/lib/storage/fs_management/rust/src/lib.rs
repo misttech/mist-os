@@ -15,13 +15,11 @@ pub mod format;
 pub mod partition;
 
 use {
-    cstr::cstr,
-    fdio::{spawn_etc, SpawnAction, SpawnOptions},
     fidl_fuchsia_fs_startup::{
         CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
     },
     fuchsia_zircon as zx,
-    std::{ffi::CStr, sync::Arc},
+    std::sync::Arc,
 };
 
 // Re-export errors as public.
@@ -41,31 +39,10 @@ pub const FVM_TYPE_GUID_STR: &str = "49fd7cb8-df15-4e73-b9d9-992070127f0f";
 
 pub const FS_COLLECTION_NAME: &'static str = "fs-collection";
 
-fn launch_process(
-    args: &[&CStr],
-    mut actions: Vec<SpawnAction<'_>>,
-) -> Result<zx::Process, LaunchProcessError> {
-    match spawn_etc(
-        &zx::Handle::invalid().into(),
-        SpawnOptions::CLONE_ALL,
-        args[0],
-        args,
-        None,
-        &mut actions,
-    ) {
-        Ok(process) => Ok(process),
-        Err((status, message)) => Err(LaunchProcessError {
-            args: args.iter().map(|&a| a.to_owned()).collect(),
-            status,
-            message,
-        }),
-    }
-}
-
 #[derive(Clone)]
 pub enum ComponentType {
-    /// Launch the filesystem as a static child, using the configured name in the Mode as the child
-    /// name. If the child doesn't exist, this will fail.
+    /// Launch the filesystem as a static child, using the configured name in the options as the
+    /// child name. If the child doesn't exist, this will fail.
     StaticChild,
 
     /// Launch the filesystem as a dynamic child, in the configured collection. By default, the
@@ -79,80 +56,30 @@ impl Default for ComponentType {
     }
 }
 
-pub enum Mode<'a> {
-    /// Run the filesystem as a legacy binary.
-    /// TODO(fxbug.dev/117437): remove legacy filesystem launching support.
-    Legacy(LegacyConfig<'a>),
+pub struct Options<'a> {
+    /// For static children, the name specifies the name of the child.  For dynamic children, the
+    /// component URL is "#meta/{component-name}.cm".  The library will attempt to connect to a
+    /// static child first, and if that fails, it will launch the filesystem within a collection.
+    component_name: &'a str,
 
-    /// Run the filesystem as a component.
-    Component {
-        /// For static children, the name specifies the name of the child.  For dynamic children,
-        /// the component URL is "#meta/{component-name}.cm".  The library will attempt to connect
-        /// to a static child first, and if that fails, it will launch the filesystem within a
-        /// collection.
-        name: &'a str,
+    /// It should be possible to reuse components after serving them, but it's not universally
+    /// supported.
+    reuse_component_after_serving: bool,
 
-        /// It should be possible to reuse components after serving them, but it's not universally
-        /// supported.
-        reuse_component_after_serving: bool,
+    /// Format options as defined by the startup protocol
+    format_options: FormatOptions,
 
-        /// Format options as defined by the startup protocol
-        format_options: FormatOptions,
+    /// Start options as defined by the startup protocol
+    start_options: StartOptions,
 
-        /// Start options as defined by the startup protocol
-        start_options: StartOptions,
-
-        /// Whether to launch this filesystem as a dynamic or static child.
-        component_type: ComponentType,
-    },
-}
-
-impl<'a> Mode<'a> {
-    // TODO(fxbug.dev/117437): remove legacy run type
-    fn into_legacy_config(self) -> Option<LegacyConfig<'a>> {
-        match self {
-            Mode::Legacy(config) => Some(config),
-            _ => None,
-        }
-    }
-
-    // TODO(fxbug.dev/117437): remove Option when legacy run type is removed
-    fn component_name(&self) -> Option<&str> {
-        match self {
-            Mode::Component { name, .. } => Some(name),
-            _ => None,
-        }
-    }
-
-    // TODO(fxbug.dev/117437): remove Option when legacy run type is removed
-    fn component_type(&self) -> Option<ComponentType> {
-        match self {
-            Mode::Component { component_type, .. } => Some(component_type.clone()),
-            _ => None,
-        }
-    }
-}
-
-// TODO(fxbug.dev/117437): remove legacy run type
-#[derive(Default)]
-pub struct LegacyConfig<'a> {
-    /// Path to the binary.
-    pub binary_path: &'a CStr,
-
-    /// Arguments passed to the binary for all subcommands
-    pub generic_args: Vec<&'a CStr>,
-
-    /// Arguments passed to the binary for formatting
-    pub format_args: Vec<&'a CStr>,
-
-    /// Arguments passed to the binary for mounting
-    pub mount_args: Vec<&'a CStr>,
+    /// Whether to launch this filesystem as a dynamic or static child.
+    component_type: ComponentType,
 }
 
 /// Describes the configuration for a particular filesystem.
 pub trait FSConfig: Send + Sync + 'static {
-    /// Returns the mode in which to run this filesystem.
-    fn mode(&self) -> Mode<'_>;
+    /// Returns the options specifying how to run this filesystem.
+    fn options(&self) -> Options<'_>;
 
     /// Returns a handle for the crypt service (if any).
     fn crypt_client(&self) -> Option<zx::Channel> {
@@ -234,9 +161,9 @@ impl Blobfs {
 }
 
 impl FSConfig for Blobfs {
-    fn mode(&self) -> Mode<'_> {
-        Mode::Component {
-            name: "blobfs",
+    fn options(&self) -> Options<'_> {
+        Options {
+            component_name: "blobfs",
             reuse_component_after_serving: false,
             format_options: FormatOptions {
                 verbose: Some(self.verbose),
@@ -311,9 +238,9 @@ impl Minfs {
 }
 
 impl FSConfig for Minfs {
-    fn mode(&self) -> Mode<'_> {
-        Mode::Component {
-            name: "minfs",
+    fn options(&self) -> Options<'_> {
+        Options {
+            component_name: "minfs",
             reuse_component_after_serving: false,
             format_options: FormatOptions {
                 verbose: Some(self.verbose),
@@ -331,55 +258,6 @@ impl FSConfig for Minfs {
             },
             component_type: self.component_type.clone(),
         }
-    }
-
-    fn disk_format(&self) -> format::DiskFormat {
-        format::DiskFormat::Minfs
-    }
-}
-
-/// MinfsLegacy Filesystem Configuration
-/// MinfsLegacy allows us to launch minfs as a legacy binary
-/// DON'T USE!! This is only for //src/identity (fxbug.dev/114443)
-/// If fields are None or false, they will not be set in arguments.
-#[derive(Clone, Default)]
-pub struct MinfsLegacy {
-    // TODO(xbhatnag): Add support for fvm_data_slices
-    pub verbose: bool,
-    pub readonly: bool,
-    pub fsck_after_every_transaction: bool,
-}
-
-impl MinfsLegacy {
-    /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
-    }
-}
-
-impl FSConfig for MinfsLegacy {
-    fn mode(&self) -> Mode<'_> {
-        Mode::Legacy(LegacyConfig {
-            binary_path: cstr!("/pkg/bin/minfs"),
-            generic_args: {
-                let mut args = vec![];
-                if self.verbose {
-                    args.push(cstr!("--verbose"));
-                }
-                args
-            },
-            mount_args: {
-                let mut args = vec![];
-                if self.readonly {
-                    args.push(cstr!("--readonly"));
-                }
-                if self.fsck_after_every_transaction {
-                    args.push(cstr!("--fsck_after_every_transaction"));
-                }
-                args
-            },
-            ..Default::default()
-        })
     }
 
     fn disk_format(&self) -> format::DiskFormat {
@@ -435,9 +313,9 @@ impl Fxfs {
 }
 
 impl FSConfig for Fxfs {
-    fn mode(&self) -> Mode<'_> {
-        Mode::Component {
-            name: "fxfs",
+    fn options(&self) -> Options<'_> {
+        Options {
+            component_name: "fxfs",
             reuse_component_after_serving: true,
             format_options: FormatOptions { verbose: Some(false), ..Default::default() },
             start_options: StartOptions {
@@ -491,9 +369,9 @@ impl F2fs {
 }
 
 impl FSConfig for F2fs {
-    fn mode(&self) -> Mode<'_> {
-        Mode::Component {
-            name: "f2fs",
+    fn options(&self) -> Options<'_> {
+        Options {
+            component_name: "f2fs",
             reuse_component_after_serving: false,
             format_options: FormatOptions::default(),
             start_options: StartOptions {

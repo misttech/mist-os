@@ -129,13 +129,7 @@ test("fs-management-test") {
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
   ]
-  data_deps = [
-    "//src/storage/bin/blobfs",
-    "//src/storage/bin/f2fs",
-    "//src/storage/bin/minfs",
-    "//src/storage/fuchsia-fatfs:tools",
-    "//src/storage/fxfs",
-  ]
+  data_deps = [ "//src/storage/fuchsia-fatfs:tools" ]
 }
 
 fuchsia_component("fs-management-test-component") {

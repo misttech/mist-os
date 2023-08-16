@@ -19,7 +19,6 @@ rustc_library("fs_management") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/cstr",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -116,7 +115,6 @@ fuchsia_test_package("fs-management-rust-tests") {
     ":open_partition_test-component",
     ":static-child-test-component",
   ]
-  deps = [ "//src/storage/bin/minfs" ]
 }
 
 group("tests") {

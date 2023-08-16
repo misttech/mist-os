@@ -302,7 +302,7 @@ impl DiskManager for DevDiskManager {
 
     fn create_minfs(&self, block_dev: Self::BlockDevice) -> Self::Minfs {
         let DevBlockDevice(controller) = block_dev;
-        Filesystem::new(controller, fs::MinfsLegacy::default())
+        Filesystem::new(controller, fs::Minfs::default())
     }
 
     async fn format_minfs(&self, minfs: &mut Self::Minfs) -> Result<(), DiskError> {

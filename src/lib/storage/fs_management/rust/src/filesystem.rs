@@ -6,12 +6,10 @@
 
 use {
     crate::{
-        error::{CommandError, KillError, QueryError, ShutdownError},
-        launch_process, ComponentType, FSConfig, Mode,
+        error::{KillError, QueryError, ShutdownError},
+        ComponentType, FSConfig, Options,
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
-    cstr::cstr,
-    fdio::SpawnAction,
     fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd},
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
@@ -25,7 +23,6 @@ use {
         connect_to_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
         open_childs_exposed_directory,
     },
-    fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef as _, Process, Signals, Status, Task},
     std::{
         collections::HashMap,
@@ -80,9 +77,8 @@ impl Filesystem {
 
     /// If the filesystem is a currently running component, returns its (relative) moniker.
     pub fn get_component_moniker(&self) -> Option<String> {
-        let component_type = self.config.mode().component_type()?;
-        Some(match component_type {
-            ComponentType::StaticChild => self.config.mode().component_name().unwrap().to_string(),
+        Some(match self.config.options().component_type {
+            ComponentType::StaticChild => self.config.options().component_name.to_string(),
             ComponentType::DynamicChild { .. } => {
                 let component = self.component.as_ref()?;
                 format!("{}:{}", component.collection, component.name)
@@ -99,16 +95,11 @@ impl Filesystem {
     }
 
     async fn get_component_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        let mode = self.config.mode();
-        let component_name = mode
-            .component_name()
-            .expect("BUG: called get_component_exposed_dir when mode was not component");
-        let component_type = mode
-            .component_type()
-            .expect("BUG: called get_component_exposed_dir when mode was not component");
+        let options = self.config.options();
+        let component_name = options.component_name;
         let realm_proxy = connect_to_protocol::<RealmMarker>()?;
 
-        match component_type {
+        match options.component_type {
             ComponentType::StaticChild => open_childs_exposed_directory(component_name, None).await,
             ComponentType::DynamicChild { collection_name } => {
                 if let Some(component) = &self.component {
@@ -173,30 +164,14 @@ impl Filesystem {
     /// Returns [`Err`] if the filesystem process failed to launch or returned a non-zero exit code.
     pub async fn format(&mut self) -> Result<(), Error> {
         let channel = self.device_channel()?;
-        match self.config.mode() {
-            Mode::Component { format_options, .. } => {
-                let exposed_dir = self.get_component_exposed_dir().await?;
-                let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-                proxy.format(channel, &format_options).await?.map_err(Status::from_raw)?;
-            }
-            Mode::Legacy(mut config) => {
-                // SpawnAction is not Send, so make sure it is dropped before any `await`s.
-                let process = {
-                    let mut args = vec![config.binary_path, cstr!("mkfs")];
-                    args.append(&mut config.generic_args);
-                    args.append(&mut config.format_args);
-                    let actions = vec![
-                        // device handle is passed in as a PA_USER0 handle at argument 1
-                        SpawnAction::add_handle(
-                            HandleInfo::new(HandleType::User0, 1),
-                            channel.into(),
-                        ),
-                    ];
-                    launch_process(&args, actions)?
-                };
-                wait_for_successful_exit(process).await?;
-            }
-        }
+
+        let exposed_dir = self.get_component_exposed_dir().await?;
+        let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
+        proxy
+            .format(channel, &self.config().options().format_options)
+            .await?
+            .map_err(Status::from_raw)?;
+
         Ok(())
     }
 
@@ -212,29 +187,9 @@ impl Filesystem {
     /// Returns [`Err`] if the filesystem process failed to launch or returned a non-zero exit code.
     pub async fn fsck(&mut self) -> Result<(), Error> {
         let channel = self.device_channel()?;
-        match self.config.mode() {
-            Mode::Component { .. } => {
-                let exposed_dir = self.get_component_exposed_dir().await?;
-                let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-                proxy.check(channel, CheckOptions).await?.map_err(Status::from_raw)?;
-            }
-            Mode::Legacy(mut config) => {
-                // SpawnAction is not Send, so make sure it is dropped before any `await`s.
-                let process = {
-                    let mut args = vec![config.binary_path, cstr!("fsck")];
-                    args.append(&mut config.generic_args);
-                    let actions = vec![
-                        // device handle is passed in as a PA_USER0 handle at argument 1
-                        SpawnAction::add_handle(
-                            HandleInfo::new(HandleType::User0, 1),
-                            channel.into(),
-                        ),
-                    ];
-                    launch_process(&args, actions)?
-                };
-                wait_for_successful_exit(process).await?;
-            }
-        }
+        let exposed_dir = self.get_component_exposed_dir().await?;
+        let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
+        proxy.check(channel, CheckOptions).await?.map_err(Status::from_raw)?;
         Ok(())
     }
 
@@ -248,37 +203,33 @@ impl Filesystem {
         if self.config.is_multi_volume() {
             bail!("Can't serve a multivolume filesystem; use serve_multi_volume");
         }
-        if let Mode::Component { start_options, reuse_component_after_serving, .. } =
-            self.config.mode()
-        {
-            let exposed_dir = self.get_component_exposed_dir().await?;
-            let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-            proxy.start(self.device_channel()?, start_options).await?.map_err(Status::from_raw)?;
+        let Options { start_options, reuse_component_after_serving, .. } = self.config.options();
 
-            let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
-            exposed_dir.open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::POSIX_EXECUTABLE
-                    | fio::OpenFlags::POSIX_WRITABLE,
-                fio::ModeType::empty(),
-                "root",
-                server_end,
-            )?;
-            let component = self.component.clone();
-            if !reuse_component_after_serving {
-                self.component = None;
-            }
-            Ok(ServingSingleVolumeFilesystem {
-                process: None,
-                _component: component,
-                exposed_dir,
-                root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
-                    .into_proxy()?,
-                binding: None,
-            })
-        } else {
-            self.serve_legacy().await
+        let exposed_dir = self.get_component_exposed_dir().await?;
+        let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
+        proxy.start(self.device_channel()?, start_options).await?.map_err(Status::from_raw)?;
+
+        let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
+        exposed_dir.open(
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::POSIX_EXECUTABLE
+                | fio::OpenFlags::POSIX_WRITABLE,
+            fio::ModeType::empty(),
+            "root",
+            server_end,
+        )?;
+        let component = self.component.clone();
+        if !reuse_component_after_serving {
+            self.component = None;
         }
+        Ok(ServingSingleVolumeFilesystem {
+            process: None,
+            _component: component,
+            exposed_dir,
+            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
+                .into_proxy()?,
+            binding: None,
+        })
     }
 
     /// Serves the filesystem on the block device and returns a [`ServingMultiVolumeFilesystem`]
@@ -292,67 +243,18 @@ impl Filesystem {
         if !self.config.is_multi_volume() {
             bail!("Can't serve_multi_volume a single-volume filesystem; use serve");
         }
-        if let Mode::Component { start_options, .. } = self.config.mode() {
-            let exposed_dir = self.get_component_exposed_dir().await?;
-            let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-            proxy.start(self.device_channel()?, start_options).await?.map_err(Status::from_raw)?;
 
-            Ok(ServingMultiVolumeFilesystem {
-                _component: self.component.clone(),
-                exposed_dir: Some(exposed_dir),
-                volumes: HashMap::default(),
-            })
-        } else {
-            bail!("Can't serve a multivolume filesystem which isn't componentized")
-        }
-    }
+        let exposed_dir = self.get_component_exposed_dir().await?;
+        let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
+        proxy
+            .start(self.device_channel()?, self.config.options().start_options)
+            .await?
+            .map_err(Status::from_raw)?;
 
-    // TODO(fxbug.dev/87511): This is temporarily public so that we can migrate an OOT user.
-    pub async fn serve_legacy(&self) -> Result<ServingSingleVolumeFilesystem, Error> {
-        let (export_root, server_end) = create_proxy::<fio::DirectoryMarker>()?;
-
-        let mode = self.config.mode();
-        let mut config = mode.into_legacy_config().unwrap();
-
-        // SpawnAction is not Send, so make sure it is dropped before any `await`s.
-        let process = {
-            let mut args = vec![config.binary_path, cstr!("mount")];
-            args.append(&mut config.generic_args);
-            args.append(&mut config.mount_args);
-            let actions = vec![
-                // export root handle is passed in as a PA_DIRECTORY_REQUEST handle at argument 0
-                SpawnAction::add_handle(
-                    HandleInfo::new(HandleType::DirectoryRequest, 0),
-                    server_end.into_channel().into(),
-                ),
-                // device handle is passed in as a PA_USER0 handle at argument 1
-                SpawnAction::add_handle(
-                    HandleInfo::new(HandleType::User0, 1),
-                    self.device_channel()?.into(),
-                ),
-            ];
-
-            launch_process(&args, actions)?
-        };
-
-        // Wait until the filesystem is ready to take incoming requests.
-        let (root_dir, server_end) = create_proxy::<fio::DirectoryMarker>()?;
-        export_root.open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE
-                | fio::OpenFlags::POSIX_WRITABLE,
-            fio::ModeType::empty(),
-            "root",
-            server_end.into_channel().into(),
-        )?;
-        let _: Vec<_> = root_dir.query().await?;
-
-        Ok(ServingSingleVolumeFilesystem {
-            process: Some(process),
-            _component: None,
-            exposed_dir: export_root,
-            root_dir,
-            binding: None,
+        Ok(ServingMultiVolumeFilesystem {
+            _component: self.component.clone(),
+            exposed_dir: Some(exposed_dir),
+            volumes: HashMap::default(),
         })
     }
 }
@@ -786,19 +688,6 @@ impl Drop for ServingMultiVolumeFilesystem {
                 let _ = proxy.shutdown();
             }
         }
-    }
-}
-
-async fn wait_for_successful_exit(process: Process) -> Result<(), CommandError> {
-    let _ = OnSignals::new(&process, Signals::PROCESS_TERMINATED)
-        .await
-        .map_err(CommandError::ProcessTerminatedSignal)?;
-
-    let info = process.info().map_err(CommandError::GetProcessReturnCode)?;
-    if info.return_code == 0 {
-        Ok(())
-    } else {
-        Err(CommandError::ProcessNonZeroReturnCode(info.return_code))
     }
 }
 

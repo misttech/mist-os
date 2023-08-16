@@ -133,7 +133,7 @@ if (labels.images == "//build/images/bringup") {
       "//src/devices/sysmem/drivers/sysmem",
       "//src/graphics/display/drivers/coordinator",
       "//src/graphics/display/drivers/virtio-guest:virtio_gpu",
-      "//src/storage/bin/minfs",
+      "//src/storage/bin/minfs:minfs-component",
       "//src/storage/bin/mount",
       "//src/storage/bin/umount",
       "//src/storage/fvm/driver",

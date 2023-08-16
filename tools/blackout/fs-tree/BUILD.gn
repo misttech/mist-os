@@ -35,7 +35,6 @@ rustc_binary("blackout-minfs-tree-target-bin") {
     "//third_party/rust_crates:tracing",
     "//tools/blackout/blackout-target",
   ]
-  data_deps = [ "//src/storage/bin/minfs" ]
   source_root = "src/target.rs"
   sources = [ "src/target.rs" ]
   rustenv = [ "DATA_FILESYSTEM_FORMAT=minfs" ]
@@ -49,7 +48,10 @@ fuchsia_component("blackout-minfs-tree-target-component") {
 
 fuchsia_package("blackout-minfs-tree-target") {
   testonly = true
-  deps = [ ":blackout-minfs-tree-target-component" ]
+  deps = [
+    ":blackout-minfs-tree-target-component",
+    "//src/storage/bin/minfs:minfs-component",
+  ]
 }
 
 rustc_binary("blackout-fxfs-tree-target-bin") {

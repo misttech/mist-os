@@ -169,8 +169,6 @@ test("fvm-integration") {
     "//src/devices/bus/drivers/platform",
     "//src/storage/fvm/driver",
   ]
-
-  data_deps = [ "//src/storage/bin/minfs" ]
 }
 
 fuchsia_test_component("test-component") {
@@ -186,4 +184,5 @@ fuchsia_test_package("fvm-integration-test") {
       max_severity = "ERROR"
     }
   }
+  deps = [ "//src/storage/bin/minfs:minfs-component" ]
 }

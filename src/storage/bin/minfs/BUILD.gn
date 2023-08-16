@@ -6,6 +6,8 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 
+visibility = [ "./*" ]
+
 executable("minfs") {
   sources = [ "main.cc" ]
   deps = [
@@ -21,12 +23,14 @@ executable("minfs") {
 }
 
 fuchsia_component("minfs-component") {
+  visibility += [ "*" ]
   manifest = "meta/minfs.cml"
   component_name = "minfs"
   deps = [ ":minfs" ]
 }
 
 group("minfs-test-component") {
+  visibility += [ "*" ]
   deps = [
     ":minfs-component",
     "//src/lib/storage/fs_management:fs_management_shard",
@@ -65,6 +69,7 @@ fuchsia_test_package("minfs-component-tests") {
 }
 
 group("tests") {
+  visibility += [ "*" ]
   testonly = true
   deps = [ ":minfs-component-tests" ]
 }

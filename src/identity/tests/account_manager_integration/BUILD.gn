@@ -72,7 +72,7 @@ fuchsia_test_package("account_manager_integration_test") {
     "//src/identity/bin/account_manager:account_manager_for_test_component",
     "//src/identity/bin/account_manager:test-config",
     "//src/identity/bin/test_authenticator:test_authenticator_component",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
   ]
   test_components = [ ":account_manager_integration_test_component" ]
 }

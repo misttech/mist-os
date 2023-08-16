@@ -83,7 +83,7 @@ fuchsia_structured_config_rust_lib("password_authenticator_config") {
 fuchsia_package("password_authenticator") {
   deps = [
     ":component",
-    "//src/storage/bin/minfs",
+    "//src/storage/bin/minfs:minfs-component",
   ]
 }
 
