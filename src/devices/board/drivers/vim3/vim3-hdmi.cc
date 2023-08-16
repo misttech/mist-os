@@ -9,6 +9,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
 #include "vim3.h"
@@ -24,6 +25,14 @@ static const std::vector<fpbus::Mmio> hdmi_mmios{
     }},
 };
 
+static const std::vector<fpbus::Smc> kHdmiSmcs{
+    {{
+        .service_call_num_base = ARM_SMC_SERVICE_CALL_NUM_SIP_SERVICE_BASE,
+        .count = 1,
+        .exclusive = false,
+    }},
+};
+
 static const fpbus::Node hdmi_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-hdmi";
@@ -31,6 +40,7 @@ static const fpbus::Node hdmi_dev = []() {
   dev.pid() = PDEV_PID_AMLOGIC_A311D;
   dev.did() = PDEV_DID_AMLOGIC_HDMI;
   dev.mmio() = hdmi_mmios;
+  dev.smc() = kHdmiSmcs;
   return dev;
 }();
 
