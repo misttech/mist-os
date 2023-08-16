@@ -30,7 +30,7 @@ use crate::{
     convert::{BidirectionalConverter, UninstantiableConverter},
     data_structures::id_map::{Entry as IdMapEntry, EntryKey, IdMap},
     device::{self, AnyDevice, DeviceIdContext, Id},
-    error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
+    error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
         device::state::IpDeviceStateIpExt,
         socket::{
@@ -1315,58 +1315,136 @@ where
             }
             SocketState::Bound(state) => match state {
                 BoundSocketState::Listener { state, sharing: _ } => {
+                    /// Possible operations that might be performed, depending
+                    /// on whether the socket state spec supports dual-stack
+                    /// operation and what the bound address looks like.
+                    #[derive(Debug, GenericOverIp)]
+                    enum RemoveOperation<I: Ip + IpExt, DS, NDS> {
+                        /// Bound to the "any" address on both stacks.
+                        DualStackAnyAddr(DS),
+                        /// Bound to a non-dual-stack address only on the
+                        /// current stack.
+                        OnlyCurrentStack(MaybeDualStack<DS, NDS>, Option<SpecifiedAddr<I::Addr>>),
+                        /// Bound to an address only on the other stack.
+                        OnlyOtherStack(DS, Option<SpecifiedAddr<<I::OtherVersion as Ip>::Addr>>),
+                    }
+
                     let ListenerState { addr: ListenerAddr { ip, device }, ip_options } = state;
-                    let dual_stack_context = sync_ctx.dual_stack_context();
-                    let ip = match dual_stack_context {
-                        MaybeDualStack::DualStack(dual_stack) => {
-                            let DualStackListenerIpAddr { addr, identifier } =
-                                dual_stack.converter().convert(ip);
-                            match addr {
-                                DualStackIpAddr::ThisStack(None)
-                                    if dual_stack.dual_stack_enabled(&ip_options) =>
-                                {
-                                    todo!(
-                                        "https://fxbug.dev/21198: implement dual-stack any remove"
+
+                    let (operation, identifier): (RemoveOperation<I, _, _>, _) = match sync_ctx
+                        .dual_stack_context()
+                    {
+                        MaybeDualStack::DualStack(dual_stack_ctx) => {
+                            let DualStackListenerIpAddr { addr: ip, identifier } =
+                                dual_stack_ctx.converter().convert(ip);
+                            let op = match (ip, dual_stack_ctx.dual_stack_enabled(&ip_options)) {
+                                // Dual-stack enabled, bound to unspecified
+                                // address.
+                                (DualStackIpAddr::ThisStack(None), true) => {
+                                    RemoveOperation::DualStackAnyAddr(dual_stack_ctx)
+                                }
+                                // Bound to unspecified address but not enabled
+                                // for dual-stack, so only in the current stack
+                                (DualStackIpAddr::ThisStack(addr @ None), false)
+                                // Bound to a specified address is always in
+                                // only one stack.
+                                | (DualStackIpAddr::ThisStack(addr @ Some(_)), true | false) => {
+                                    RemoveOperation::OnlyCurrentStack(
+                                        MaybeDualStack::DualStack(dual_stack_ctx),
+                                        addr,
                                     )
                                 }
-                                DualStackIpAddr::ThisStack(addr) => {
-                                    ListenerIpAddr { addr, identifier }
+                                // Bound only in the other stack.
+                                (DualStackIpAddr::OtherStack(addr), true | false) => {
+                                    RemoveOperation::OnlyOtherStack(dual_stack_ctx, addr)
                                 }
-                                DualStackIpAddr::OtherStack(_) => {
-                                    todo!("https://fxbug.dev/21198: implement dual-stack remove")
-                                }
-                            }
+                            };
+                            (op, identifier)
                         }
-                        MaybeDualStack::NotDualStack(not_dual) => not_dual.converter().convert(ip),
+                        MaybeDualStack::NotDualStack(non_dual_stack) => {
+                            let ListenerIpAddr { addr: ip, identifier } =
+                                non_dual_stack.converter().convert(ip);
+                            (
+                                RemoveOperation::OnlyCurrentStack(
+                                    MaybeDualStack::NotDualStack(non_dual_stack),
+                                    ip,
+                                ),
+                                identifier,
+                            )
+                        }
                     };
 
-                    DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
-                        sync_ctx,
-                        |_sync_ctx, bound, _allocator| {
-                            let addr = ListenerAddr { ip, device };
-                            bound
-                                .listeners_mut()
-                                .remove(&S::make_receiving_map_id(id), &addr)
-                                .expect("Invalid UDP listener ID");
+                    let bound_ip = match operation {
+                        RemoveOperation::DualStackAnyAddr(dual_stack_ctx) => {
+                            let other_id = dual_stack_ctx.to_other_receiving_id(id.clone());
+                            dual_stack_ctx.with_both_bound_sockets_mut(
+                                |_sync_ctx, bound, other_bound| {
+                                    PairedSocketMapMut::<_, _, S> { bound, other_bound }
+                                        .remove_listener(
+                                            &DualStackUnspecifiedAddr,
+                                            identifier,
+                                            &device,
+                                            &PairedReceivingIds {
+                                                this: S::make_receiving_map_id(id),
+                                                other: other_id,
+                                            },
+                                        )
+                                },
+                            );
+                            None
+                        }
+                        RemoveOperation::OnlyCurrentStack(_, ip) => {
+                            sync_ctx.with_bound_sockets_mut(|_sync_ctx, bound, _allocator| {
+                                BoundStateHandler::<_, S, _>::remove_listener(
+                                    bound,
+                                    &ip,
+                                    identifier,
+                                    &device,
+                                    &S::make_receiving_map_id(id),
+                                )
+                            });
+                            ip
+                        }
+                        RemoveOperation::OnlyOtherStack(dual_stack_ctx, other_ip) => {
+                            let id = dual_stack_ctx.to_other_receiving_id(id);
+                            let ip =
+                                SpecifiedAddr::new(dual_stack_ctx.from_other_ip_addr(
+                                    other_ip.map_or(
+                                        <I::OtherVersion as Ip>::UNSPECIFIED_ADDRESS,
+                                        |a| *a,
+                                    ),
+                                ));
+                            dual_stack_ctx.with_other_bound_sockets_mut(
+                                |_sync_ctx, other_bound| {
+                                    BoundStateHandler::<_, S, _>::remove_listener(
+                                        other_bound,
+                                        &other_ip,
+                                        identifier,
+                                        &device,
+                                        &id,
+                                    )
+                                },
+                            );
+                            ip
+                        }
+                    };
+                    let socket_info = SocketInfo::Listener(ListenerAddr {
+                        ip: ListenerIpAddr { addr: bound_ip, identifier },
+                        device: device.clone(),
+                    });
 
-                            (ip_options, SocketInfo::Listener(addr))
-                        },
-                    )
+                    (ip_options, socket_info)
                 }
-                BoundSocketState::Connected { state, sharing: _ } => {
-                    let ConnState { addr, socket, clear_device_on_disconnect: _, shutdown: _ } =
-                        state;
-                    DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
-                        sync_ctx,
-                        |_sync_ctx, bound, _allocator| {
-                            bound
-                                .conns_mut()
-                                .remove(&S::make_receiving_map_id(id), &addr)
-                                .expect("UDP connection not found");
-                            (socket.into_options(), SocketInfo::Connected(addr))
-                        },
-                    )
-                }
+                BoundSocketState::Connected { state, sharing: _ } => sync_ctx
+                    .with_bound_sockets_mut(|_sync_ctx, bound, _allocator| {
+                        let ConnState { addr, socket, clear_device_on_disconnect: _, shutdown: _ } =
+                            state;
+                        bound
+                            .conns_mut()
+                            .remove(&S::make_receiving_map_id(id), &addr)
+                            .expect("UDP connection not found");
+                        (socket.into_options(), SocketInfo::Connected(addr))
+                    }),
             },
         };
 
@@ -1449,10 +1527,10 @@ where
 
 /// Abstraction for operations over one or two demultiplexing maps.
 trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
-    /// The type of address that can be checked for insertion.
-    type InsertAddr: Clone;
-    /// The type of ID that can be inserted.
-    type InsertId;
+    /// The type of address that can be inserted or removed for listeners.
+    type ListenerAddr: Clone;
+    /// The type of ID that can be inserted or removed.
+    type ReceivingId;
     /// The type of sharing state that can be inserted for listeners.
     type InsertListenerSharingState;
 
@@ -1463,7 +1541,7 @@ trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
     /// local ID, with the provided sharing state; otherwise returns `false`.
     fn is_listener_entry_available(
         &self,
-        addr: Self::InsertAddr,
+        addr: Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         sharing_state: &Self::InsertListenerSharingState,
     ) -> bool;
@@ -1476,12 +1554,23 @@ trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
     /// is returned.
     fn try_insert_listener(
         &mut self,
-        addr: Self::InsertAddr,
+        addr: Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
         sharing: Self::InsertListenerSharingState,
-        id: Self::InsertId,
+        id: Self::ReceivingId,
     ) -> Result<(), LocalAddressError>;
+
+    /// Removes `id` at listener address, assuming it exists.
+    ///
+    /// Panics if `id` does not exit.
+    fn remove_listener(
+        &mut self,
+        addr: &Self::ListenerAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        device: &Option<D>,
+        id: &Self::ReceivingId,
+    );
 }
 
 /// A sentinel type for the unspecified address in a dual-stack context.
@@ -1495,8 +1584,8 @@ struct DualStackUnspecifiedAddr;
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S, D>
     for BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>
 {
-    type InsertAddr = Option<SpecifiedAddr<I::Addr>>;
-    type InsertId =
+    type ListenerAddr = Option<SpecifiedAddr<I::Addr>>;
+    type ReceivingId =
         <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId;
     type InsertListenerSharingState =
         <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ListenerSharingState;
@@ -1520,13 +1609,23 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
 
     fn try_insert_listener(
         &mut self,
-        addr: Self::InsertAddr,
+        addr: Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
         sharing: Self::InsertListenerSharingState,
-        id: Self::InsertId,
+        id: Self::ReceivingId,
     ) -> Result<(), LocalAddressError> {
         try_insert_single_listener(self, addr, identifier, device, sharing, id).map(|_entry| ())
+    }
+
+    fn remove_listener(
+        &mut self,
+        addr: &Self::ListenerAddr,
+        identifier: <<S as DatagramSocketSpec>::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        device: &Option<D>,
+        id: &Self::ReceivingId,
+    ) {
+        remove_single_listener(self, addr, identifier, device, id)
     }
 }
 
@@ -1553,13 +1652,13 @@ struct PairedReceivingIds<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S, D>
     for PairedSocketMapMut<'_, I, D, S>
 {
-    type InsertAddr = DualStackUnspecifiedAddr;
-    type InsertId = PairedReceivingIds<I, D, S>;
+    type ListenerAddr = DualStackUnspecifiedAddr;
+    type ReceivingId = PairedReceivingIds<I, D, S>;
     type InsertListenerSharingState = S::ListenerSharingState;
 
     fn is_listener_entry_available(
         &self,
-        DualStackUnspecifiedAddr: Self::InsertAddr,
+        DualStackUnspecifiedAddr: Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         sharing: &Self::InsertListenerSharingState,
     ) -> bool {
@@ -1575,11 +1674,11 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
 
     fn try_insert_listener(
         &mut self,
-        DualStackUnspecifiedAddr: Self::InsertAddr,
+        DualStackUnspecifiedAddr: Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
         sharing: Self::InsertListenerSharingState,
-        id: Self::InsertId,
+        id: Self::ReceivingId,
     ) -> Result<(), LocalAddressError> {
         let PairedSocketMapMut { bound: this, other_bound: other } = self;
         let PairedReceivingIds { this: this_id, other: other_id } = id;
@@ -1594,6 +1693,19 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
                     }
                 }
             })
+    }
+
+    fn remove_listener(
+        &mut self,
+        DualStackUnspecifiedAddr: &Self::ListenerAddr,
+        identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        device: &Option<D>,
+        id: &PairedReceivingIds<I, D, S>,
+    ) {
+        let PairedSocketMapMut { bound: this, other_bound: other } = self;
+        let PairedReceivingIds { this: this_id, other: other_id } = id;
+        remove_single_listener(this, &None, identifier, device, this_id);
+        remove_single_listener(other, &None, identifier, device, other_id);
     }
 }
 
@@ -1627,6 +1739,26 @@ fn try_insert_single_listener<
         })
 }
 
+fn remove_single_listener<
+    I: IpExt,
+    D: device::WeakId,
+    A: SocketMapAddrSpec,
+    S: DatagramSocketMapSpec<I, D, A>,
+>(
+    bound: &mut BoundSocketMap<I, D, A, S>,
+    addr: &Option<SpecifiedAddr<I::Addr>>,
+    identifier: A::LocalIdentifier,
+    device: &Option<D>,
+    id: &S::ListenerId,
+) {
+    let addr =
+        ListenerAddr { ip: ListenerIpAddr { addr: *addr, identifier }, device: device.clone() };
+    bound
+        .listeners_mut()
+        .remove(id, &addr)
+        .unwrap_or_else(|NotFoundError| panic!("socket ID {:?} not found for {:?}", id, addr))
+}
+
 fn try_pick_identifier<
     I: IpExt,
     S: DatagramSocketSpec,
@@ -1634,7 +1766,7 @@ fn try_pick_identifier<
     BS: BoundStateHandler<I, S, D>,
     C: RngContext,
 >(
-    addr: BS::InsertAddr,
+    addr: BS::ListenerAddr,
     bound: &BS,
     ctx: &mut C,
     sharing: &BS::InsertListenerSharingState,

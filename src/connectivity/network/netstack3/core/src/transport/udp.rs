@@ -6718,8 +6718,9 @@ where {
             }
         }
     }
-    const LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
-    const LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
+    const V4_LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
+    const V4_LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
+    const V6_LOCAL_IP: Ipv6Addr = net_ip_v6!("2201::1");
 
     #[test_case(DualStackBindAddr::Any; "dual-stack")]
     #[test_case(DualStackBindAddr::V4Any; "v4 any")]
@@ -6727,10 +6728,10 @@ where {
     fn dual_stack_delivery(bind_addr: DualStackBindAddr) {
         const REMOTE_IP: Ipv4Addr = ip_v4!("8.8.8.8");
         const REMOTE_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
-        let bind_addr = bind_addr.v6_addr().unwrap_or(LOCAL_IP_MAPPED);
+        let bind_addr = bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED);
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
+                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
                 vec![SpecifiedAddr::new(REMOTE_IP).unwrap()],
             ));
 
@@ -6759,7 +6760,7 @@ where {
             &mut non_sync_ctx,
             FakeDeviceId,
             REMOTE_IP,
-            LOCAL_IP,
+            V4_LOCAL_IP,
             REMOTE_PORT,
             LOCAL_PORT,
             BODY,
@@ -6774,7 +6775,7 @@ where {
                     packets: vec![ReceivedPacket {
                         body: BODY.into(),
                         addr: ReceivedPacketAddrs {
-                            dst_ip: LOCAL_IP_MAPPED,
+                            dst_ip: V4_LOCAL_IP_MAPPED,
                             src_ip: REMOTE_IP_MAPPED,
                             src_port: Some(REMOTE_PORT),
                         }
@@ -6793,7 +6794,7 @@ where {
     fn dual_stack_bind_conflict(bind_addr: DualStackBindAddr, bind_v4_first: bool) {
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
+                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
                 vec![],
             ));
 
@@ -6814,7 +6815,7 @@ where {
                 sync_ctx,
                 non_sync_ctx,
                 v4_listener,
-                SpecifiedAddr::new(LOCAL_IP).map(ZonedAddr::Unzoned),
+                SpecifiedAddr::new(V4_LOCAL_IP).map(ZonedAddr::Unzoned),
                 Some(LOCAL_PORT),
             )
         };
@@ -6823,7 +6824,7 @@ where {
                 sync_ctx,
                 non_sync_ctx,
                 v6_listener,
-                SpecifiedAddr::new(bind_addr.v6_addr().unwrap_or(LOCAL_IP_MAPPED))
+                SpecifiedAddr::new(bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED))
                     .map(ZonedAddr::Unzoned),
                 Some(LOCAL_PORT),
             )
@@ -6844,11 +6845,11 @@ where {
     fn dual_stack_enable(bind_addr: DualStackBindAddr) {
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
+                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
                 vec![],
             ));
 
-        let bind_addr = bind_addr.v6_addr().unwrap_or(LOCAL_IP_MAPPED);
+        let bind_addr = bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED);
         let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
 
         // TODO(https://fxbug.dev/21198): Update this test this once IPv6
@@ -6903,11 +6904,10 @@ where {
 
     #[test]
     fn dual_stack_bind_unassigned_v4_address() {
-        const LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
         const NOT_ASSIGNED_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(LOCAL_IP).unwrap()],
+                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
                 vec![],
             ));
 
@@ -6944,12 +6944,10 @@ where {
     #[test_case(net_ip_v6!("::"), true; "dual stack any")]
     #[test_case(net_ip_v6!("::"), false; "v6 any")]
     #[test_case(net_ip_v6!("::ffff:0.0.0.0"), true; "v4 unspecified")]
-    #[test_case(net_ip_v6!("::ffff:192.168.1.10"), true; "v4 specified")]
-    #[test_case(net_ip_v6!("2201::1"), true; "v6 specified dual stack enabled")]
-    #[test_case(net_ip_v6!("2201::1"), false; "v6 specified dual stack disabled")]
+    #[test_case(V4_LOCAL_IP_MAPPED, true; "v4 specified")]
+    #[test_case(V6_LOCAL_IP, true; "v6 specified dual stack enabled")]
+    #[test_case(V6_LOCAL_IP, false; "v6 specified dual stack disabled")]
     fn dual_stack_get_info(bind_addr: Ipv6Addr, enable_dual_stack: bool) {
-        const V4_LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
-        const V6_LOCAL_IP: Ipv6Addr = net_ip_v6!("2201::1");
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(
                 FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs::<SpecifiedAddr<IpAddr>>(
@@ -6980,13 +6978,72 @@ where {
             ),
             Ok(())
         );
+
         assert_eq!(
             SocketHandler::<Ipv6, _>::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, listener),
             SocketInfo::Listener(ListenerInfo {
                 local_ip: bind_addr.map(ZonedAddr::Unzoned),
-                local_port: LOCAL_PORT
+                local_port: LOCAL_PORT,
             })
         );
+    }
+
+    #[test_case(net_ip_v6!("::"), true; "dual stack any")]
+    #[test_case(net_ip_v6!("::"), false; "v6 any")]
+    #[test_case(net_ip_v6!("::ffff:0.0.0.0"), true; "v4 unspecified")]
+    #[test_case(V4_LOCAL_IP_MAPPED, true; "v4 specified")]
+    #[test_case(V6_LOCAL_IP, true; "v6 specified dual stack enabled")]
+    #[test_case(V6_LOCAL_IP, false; "v6 specified dual stack disabled")]
+    fn dual_stack_remove_listener(bind_addr: Ipv6Addr, enable_dual_stack: bool) {
+        // Ensure that when a socket is removed, it doesn't leave behind state
+        // in the demultiplexing maps. Do this by binding a new socket at the
+        // same address and asserting success.
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(
+                FakeUdpDualStackSyncCtx::with_local_remote_ip_addrs::<SpecifiedAddr<IpAddr>>(
+                    vec![
+                        SpecifiedAddr::new(V4_LOCAL_IP).unwrap().into(),
+                        SpecifiedAddr::new(V6_LOCAL_IP).unwrap().into(),
+                    ],
+                    vec![],
+                ),
+            );
+
+        let mut bind_listener = || {
+            let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+            SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                listener,
+                enable_dual_stack,
+            )
+            .expect("can set dual-stack enabled");
+            let bind_addr = SpecifiedAddr::new(bind_addr);
+            assert_eq!(
+                SocketHandler::<Ipv6, _>::listen_udp(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    listener,
+                    bind_addr.map(ZonedAddr::Unzoned),
+                    Some(LOCAL_PORT),
+                ),
+                Ok(())
+            );
+
+            assert_eq!(
+                SocketHandler::<Ipv6, _>::remove_udp(&mut sync_ctx, &mut non_sync_ctx, listener),
+                SocketInfo::Listener(ListenerInfo {
+                    local_ip: bind_addr.map(ZonedAddr::Unzoned),
+                    local_port: LOCAL_PORT,
+                })
+            );
+        };
+
+        // The first time should succeed because the state is empty.
+        bind_listener();
+        // The second time should succeed because the first removal didn't
+        // leave any state behind.
+        bind_listener();
     }
 
     #[test]
