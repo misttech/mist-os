@@ -6,19 +6,17 @@
     program: {
         runner: "elf",
         binary: "bin/simplest-app-flatland",
-        args: [ "graphical_presenter" ],
+        args: [ "view_provider" ],
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.component.Binder" ],
+            protocol: [ "fuchsia.ui.app.ViewProvider" ],
         },
     ],
     use: [
         {
             protocol: [
-                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
             ],
@@ -26,8 +24,9 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.component.Binder",
+            protocol: [ "fuchsia.ui.app.ViewProvider" ],
             from: "self",
+            to: "parent",
         },
     ],
 }

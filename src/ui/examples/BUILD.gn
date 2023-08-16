@@ -23,6 +23,7 @@ fuchsia_package("flatland-examples") {
     "flatland-view-provider:flatland-view-provider-vulkan",
     "screen_recording:screen_recording_component",
     "simplest-app-flatland",
+    "simplest-app-flatland:simplest-app-flatland-session",
     "simplest_sysmem:simplest_sysmem_component",
   ]
 }

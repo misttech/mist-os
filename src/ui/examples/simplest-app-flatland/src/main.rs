@@ -11,11 +11,11 @@ use {
         GraphicalPresenterMarker, GraphicalPresenterProxy, ViewControllerMarker,
         ViewControllerProxy, ViewSpec,
     },
-    fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as fland,
+    fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp, fidl_fuchsia_ui_composition as fland,
     fidl_fuchsia_ui_pointer as fptr,
     fidl_fuchsia_ui_pointer::EventPhase,
     fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
+    fuchsia_component::{self as component, client::connect_to_protocol},
     fuchsia_scenic::ViewRefPair,
     fuchsia_trace as trace,
     futures::{
@@ -24,6 +24,7 @@ use {
         prelude::*,
     },
     internal_message::InternalMessage,
+    std::env,
     tracing::{error, warn},
 };
 
@@ -32,7 +33,7 @@ const TRANSFORM_ID: fland::TransformId = fland::TransformId { value: 3 };
 
 struct AppModel<'a> {
     flatland: &'a fland::FlatlandProxy,
-    graphical_presenter: &'a GraphicalPresenterProxy,
+    graphical_presenter: Option<GraphicalPresenterProxy>,
     internal_sender: UnboundedSender<InternalMessage>,
     view_controller: Option<ViewControllerProxy>,
     color: fland::ColorRgba,
@@ -42,7 +43,7 @@ struct AppModel<'a> {
 impl<'a> AppModel<'a> {
     fn new(
         flatland: &'a fland::FlatlandProxy,
-        graphical_presenter: &'a GraphicalPresenterProxy,
+        graphical_presenter: Option<GraphicalPresenterProxy>,
         internal_sender: UnboundedSender<InternalMessage>,
     ) -> AppModel<'a> {
         AppModel {
@@ -108,11 +109,49 @@ impl<'a> AppModel<'a> {
             viewport_creation_token: Some(viewport_creation_token),
             ..Default::default()
         };
-        self.graphical_presenter
+
+        let graphical_presenter =
+            self.graphical_presenter.clone().expect("run with graphical_presenter");
+        graphical_presenter
             .present_view(view_spec, None, Some(view_controller_request))
             .await
             .expect("failed to present view")
             .unwrap_or_else(|e| println!("{:?}", e));
+
+        // Listen for updates over channels we just created.
+        Self::spawn_layout_info_watcher(parent_viewport_watcher, self.internal_sender.clone());
+        touch::spawn_touch_source_watcher(touch, self.internal_sender.clone());
+    }
+
+    async fn create_view_with_token_identity(
+        &mut self,
+        view_creation_token: fviews::ViewCreationToken,
+        view_identity: fviews::ViewIdentityOnCreation,
+    ) {
+        // Set up the channel to listen for layout changes.
+        let (parent_viewport_watcher, parent_viewport_watcher_request) =
+            create_proxy::<fland::ParentViewportWatcherMarker>()
+                .expect("failed to create ParentViewportWatcherProxy");
+
+        // Set up the protocols we care about (currently just touch).
+        let (touch, touch_request) =
+            create_proxy::<fptr::TouchSourceMarker>().expect("failed to create TouchSource");
+        let view_bound_protocols =
+            fland::ViewBoundProtocols { touch_source: Some(touch_request), ..Default::default() };
+
+        // Create the view.
+        self.flatland
+            .create_view2(
+                view_creation_token,
+                view_identity,
+                view_bound_protocols,
+                parent_viewport_watcher_request,
+            )
+            .expect("fidl error");
+
+        // TODO(fxbug.dev/104411): `flatland.present()` is required before
+        // calling `present_view()` to avoid scenic deadlock.
+        self.flatland.present(fland::PresentArgs::default()).expect("flatland present");
 
         // Listen for updates over channels we just created.
         Self::spawn_layout_info_watcher(parent_viewport_watcher, self.internal_sender.clone());
@@ -166,6 +205,46 @@ impl<'a> AppModel<'a> {
     }
 }
 
+fn setup_view_provider_fidl_services(sender: UnboundedSender<InternalMessage>) {
+    let view_provider_cb = move |stream: fapp::ViewProviderRequestStream| {
+        let sender = sender.clone();
+        fasync::Task::local(
+            stream
+                .try_for_each(move |req| {
+                    match req {
+                        fapp::ViewProviderRequest::CreateView2 { args, .. } => {
+                            let view_creation_token = args.view_creation_token.unwrap();
+                            // We do not get passed a view ref so create our own.
+                            let view_identity = fviews::ViewIdentityOnCreation::from(
+                                ViewRefPair::new().expect("failed to create ViewRefPair"),
+                            );
+                            sender
+                                .unbounded_send(InternalMessage::CreateView(
+                                    view_creation_token,
+                                    view_identity,
+                                ))
+                                .expect("failed to send InternalMessage.");
+                        }
+                        unhandled_req => {
+                            warn!("Unhandled ViewProvider request: {:?}", unhandled_req);
+                        }
+                    };
+                    future::ok(())
+                })
+                .unwrap_or_else(|e| {
+                    eprintln!("error running TemporaryFlatlandViewProvider server: {:?}", e)
+                }),
+        )
+        .detach()
+    };
+
+    let mut fs = component::server::ServiceFs::new();
+    fs.dir("svc").add_fidl_service(view_provider_cb);
+
+    fs.take_and_serve_directory_handle().expect("failed to serve directory handle");
+    fasync::Task::local(fs.collect()).detach();
+}
+
 fn setup_handle_flatland_events(
     event_stream: fland::FlatlandEventStream,
     sender: UnboundedSender<InternalMessage>,
@@ -195,6 +274,13 @@ fn setup_handle_flatland_events(
 
 #[fuchsia::main]
 async fn main() {
+    // TODO(fxb/81740): remove args once the view_provider refactoring is done.
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 1 || !(args[1] == "view_provider" || args[1] == "graphical_presenter") {
+        error!("Param must be 'view_provider' or 'graphical_presenter', got {:?}", args);
+    }
+    let use_view_provider = if args[1] == "view_provider" { true } else { false };
+
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let (internal_sender, mut internal_receiver) = unbounded::<InternalMessage>();
@@ -203,14 +289,21 @@ async fn main() {
         connect_to_protocol::<fland::FlatlandMarker>().expect("error connecting to Flatland");
     flatland.set_debug_name("Flatland ViewProvider Example").expect("fidl error");
 
-    let graphical_presenter = connect_to_protocol::<GraphicalPresenterMarker>()
-        .expect("error connecting to GraphicalPresenter");
-
     setup_handle_flatland_events(flatland.take_event_stream(), internal_sender.clone());
+    let mut app = if use_view_provider {
+        setup_view_provider_fidl_services(internal_sender.clone());
+        AppModel::new(&flatland, None, internal_sender.clone())
+    } else {
+        let graphical_presenter = connect_to_protocol::<GraphicalPresenterMarker>()
+            .expect("error connecting to GraphicalPresenter");
+        AppModel::new(&flatland, Some(graphical_presenter), internal_sender.clone())
+    };
 
-    let mut app = AppModel::new(&flatland, &graphical_presenter, internal_sender.clone());
     app.init_scene().await;
-    app.create_view().await;
+
+    if !use_view_provider {
+        app.create_view().await;
+    }
 
     let mut present_count = 1;
 
@@ -222,6 +315,9 @@ async fn main() {
           message = internal_receiver.next() => {
             if let Some(message) = message {
               match message {
+                  InternalMessage::CreateView(view_creation_token, view_identity) => {
+                      app.create_view_with_token_identity(view_creation_token, view_identity).await;
+                  }
                   InternalMessage::Relayout { size } => {
                       app.on_relayout(size);
                   }

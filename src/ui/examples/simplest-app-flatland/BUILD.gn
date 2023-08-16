@@ -20,6 +20,7 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
@@ -39,5 +40,11 @@ rustc_binary("bin") {
 fuchsia_component("simplest-app-flatland") {
   component_name = "simplest-app-flatland"
   manifest = "meta/simplest-app-flatland.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_component("simplest-app-flatland-session") {
+  component_name = "simplest-app-flatland-session"
+  manifest = "meta/simplest-app-flatland-session.cml"
   deps = [ ":bin" ]
 }

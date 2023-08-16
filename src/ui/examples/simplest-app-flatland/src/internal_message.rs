@@ -4,13 +4,14 @@
 
 use {
     fidl_fuchsia_math::SizeU, fidl_fuchsia_ui_composition as fland,
-    fidl_fuchsia_ui_pointer::EventPhase,
+    fidl_fuchsia_ui_pointer::EventPhase, fidl_fuchsia_ui_views as fviews,
 };
 
-// Internal event loop messages used by flatland-view-provider-example.  The example communicates
+// Internal event loop messages used by simplest-app-flatland.  The example communicates
 // asynchronously with a number of (mostly Scenic) protocols; InternalMessage helps to centralize
 // the app's responses in a single handler, and thus greatly simplifies control flow.
 pub enum InternalMessage {
+    CreateView(fviews::ViewCreationToken, fviews::ViewIdentityOnCreation),
     OnPresentError { error: fland::FlatlandError },
     OnNextFrameBegin,
     Relayout { size: SizeU },
