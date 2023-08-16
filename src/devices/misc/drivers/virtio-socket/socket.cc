@@ -203,6 +203,10 @@ zx_status_t SocketDevice::Init() {
     return ZX_ERR_NOT_SUPPORTED;
   }
   DriverFeaturesAck(VIRTIO_F_VERSION_1);
+  if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
+    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+    return status;
+  }
 
   // Plan to clean up unless everything goes right.
   auto cleanup = fit::defer([this]() TA_NO_THREAD_SAFETY_ANALYSIS { ReleaseLocked(); });
