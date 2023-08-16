@@ -15,8 +15,6 @@ namespace amlogic_display {
 
 namespace {
 constexpr uint8_t kMaxPllLockAttempt = 3;
-constexpr uint8_t kStv2Sel = 5;
-constexpr uint8_t kStv1Sel = 4;
 constexpr uint32_t kKHZ = 1000;
 
 void DumpPllCfg(const PllConfig& pll_cfg) {
@@ -403,39 +401,6 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
   WRITE32_REG(VPU, L_RGB_COEFF_ADDR, 0x400);
   WRITE32_REG(VPU, L_DITH_CNTL_ADDR, 0x400);
 
-  // DE signal for TTL m8,m8m2
-  WRITE32_REG(VPU, L_OEH_HS_ADDR, lcd_timing_.de_hs_addr);
-  WRITE32_REG(VPU, L_OEH_HE_ADDR, lcd_timing_.de_he_addr);
-  WRITE32_REG(VPU, L_OEH_VS_ADDR, lcd_timing_.de_vs_addr);
-  WRITE32_REG(VPU, L_OEH_VE_ADDR, lcd_timing_.de_ve_addr);
-  // DE signal for TTL m8b
-  WRITE32_REG(VPU, L_OEV1_HS_ADDR, lcd_timing_.de_hs_addr);
-  WRITE32_REG(VPU, L_OEV1_HE_ADDR, lcd_timing_.de_he_addr);
-  WRITE32_REG(VPU, L_OEV1_VS_ADDR, lcd_timing_.de_vs_addr);
-  WRITE32_REG(VPU, L_OEV1_VE_ADDR, lcd_timing_.de_ve_addr);
-
-  // Hsync signal for TTL m8,m8m2
-  if (d.hsync_pol == 0) {
-    WRITE32_REG(VPU, L_STH1_HS_ADDR, lcd_timing_.hs_he_addr);
-    WRITE32_REG(VPU, L_STH1_HE_ADDR, lcd_timing_.hs_hs_addr);
-  } else {
-    WRITE32_REG(VPU, L_STH1_HS_ADDR, lcd_timing_.hs_hs_addr);
-    WRITE32_REG(VPU, L_STH1_HE_ADDR, lcd_timing_.hs_he_addr);
-  }
-  WRITE32_REG(VPU, L_STH1_VS_ADDR, lcd_timing_.hs_vs_addr);
-  WRITE32_REG(VPU, L_STH1_VE_ADDR, lcd_timing_.hs_ve_addr);
-
-  // Vsync signal for TTL m8,m8m2
-  WRITE32_REG(VPU, L_STV1_HS_ADDR, lcd_timing_.vs_hs_addr);
-  WRITE32_REG(VPU, L_STV1_HE_ADDR, lcd_timing_.vs_he_addr);
-  if (d.vsync_pol == 0) {
-    WRITE32_REG(VPU, L_STV1_VS_ADDR, lcd_timing_.vs_ve_addr);
-    WRITE32_REG(VPU, L_STV1_VE_ADDR, lcd_timing_.vs_vs_addr);
-  } else {
-    WRITE32_REG(VPU, L_STV1_VS_ADDR, lcd_timing_.vs_vs_addr);
-    WRITE32_REG(VPU, L_STV1_VE_ADDR, lcd_timing_.vs_ve_addr);
-  }
-
   // DE signal
   WRITE32_REG(VPU, L_DE_HS_ADDR, lcd_timing_.de_hs_addr);
   WRITE32_REG(VPU, L_DE_HE_ADDR, lcd_timing_.de_he_addr);
@@ -453,9 +418,6 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
   WRITE32_REG(VPU, L_VSYNC_HE_ADDR, lcd_timing_.vs_he_addr);
   WRITE32_REG(VPU, L_VSYNC_VS_ADDR, lcd_timing_.vs_vs_addr);
   WRITE32_REG(VPU, L_VSYNC_VE_ADDR, lcd_timing_.vs_ve_addr);
-
-  WRITE32_REG(VPU, L_INV_CNT_ADDR, 0);
-  WRITE32_REG(VPU, L_TCON_MISC_SEL_ADDR, ((1 << kStv1Sel) | (1 << kStv2Sel)));
 
   WRITE32_REG(VPU, VPP_MISC, READ32_REG(VPU, VPP_MISC) & ~(VPP_OUT_SATURATE));
 
