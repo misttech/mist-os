@@ -15,6 +15,7 @@
 #include <zircon/types.h>
 
 #include <fbl/auto_lock.h>
+#include <kernel/deadline.h>
 #include <ktl/span.h>
 #include <object/handle.h>
 #include <object/job_dispatcher.h>
@@ -294,6 +295,107 @@ void FormatHandleRightsMask(zx_rights_t rights, char* buf, size_t buf_len) {
            HasRights(rights, ZX_RIGHT_MANAGE_JOB), HasRights(rights, ZX_RIGHT_MANAGE_PROCESS),
            HasRights(rights, ZX_RIGHT_MANAGE_THREAD), HasRights(rights, ZX_RIGHT_APPLY_PROFILE),
            HasRights(rights, ZX_RIGHT_MANAGE_SOCKET));
+}
+
+struct JobPolicyNameValue {
+  const char* name;
+  uint32_t value;
+};
+
+#define ENTRY(x) \
+  JobPolicyNameValue { #x, x }
+
+constexpr ktl::array<JobPolicyNameValue, ZX_POL_MAX> kJobPolicies = {
+    ENTRY(ZX_POL_BAD_HANDLE),  ENTRY(ZX_POL_WRONG_OBJECT),
+    ENTRY(ZX_POL_VMAR_WX),     ENTRY(ZX_POL_NEW_ANY),
+    ENTRY(ZX_POL_NEW_VMO),     ENTRY(ZX_POL_NEW_CHANNEL),
+    ENTRY(ZX_POL_NEW_EVENT),   ENTRY(ZX_POL_NEW_EVENTPAIR),
+    ENTRY(ZX_POL_NEW_PORT),    ENTRY(ZX_POL_NEW_SOCKET),
+    ENTRY(ZX_POL_NEW_FIFO),    ENTRY(ZX_POL_NEW_TIMER),
+    ENTRY(ZX_POL_NEW_PROCESS), ENTRY(ZX_POL_NEW_PROFILE),
+    ENTRY(ZX_POL_NEW_PAGER),   ENTRY(ZX_POL_AMBIENT_MARK_VMO_EXEC),
+    ENTRY(ZX_POL_NEW_IOB),
+};
+
+static_assert(kJobPolicies.size() == ZX_POL_MAX, "Missing Policy Id");
+
+const char* PolicyActionToString(uint32_t action) {
+  if (action >= ZX_POL_ACTION_MAX) {
+    return "INVALID ACTION";
+  }
+
+  switch (action) {
+    case ZX_POL_ACTION_ALLOW:
+      return "Allow";
+    case ZX_POL_ACTION_DENY:
+      return "Deny";
+    case ZX_POL_ACTION_ALLOW_EXCEPTION:
+      return "Allow+Exception";
+    case ZX_POL_ACTION_DENY_EXCEPTION:
+      return "Deny+Exception";
+    case ZX_POL_ACTION_KILL:
+      return "Kill";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* PolicyOverrideToString(uint32_t override_val) {
+  switch (override_val) {
+    case ZX_POL_OVERRIDE_ALLOW:
+      return "Allow override";
+    case ZX_POL_OVERRIDE_DENY:
+      return "Deny override";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* SlackModeToString(slack_mode mode) {
+  switch (mode) {
+    case TIMER_SLACK_CENTER:
+      return "TIMER_SLACK_CENTER";
+    case TIMER_SLACK_EARLY:
+      return "TIMER_SLACK_EARLY";
+    case TIMER_SLACK_LATE:
+      return "TIMER_SLACK_LATE";
+    default:
+      return "Unknown";
+  }
+}
+
+void DumpJobPolicies(JobDispatcher* job) {
+  char jname[ZX_MAX_NAME_LEN] = {0};
+  [[maybe_unused]] zx_status_t status = job->get_name(jname);
+  DEBUG_ASSERT(status == ZX_OK);
+  printf("job %" PRIu64 " ('%s') Basic Policies:\n", job->get_koid(), jname);
+  printf("%-30s\t%-15s\t%-15s\n", "Policy", "Action", "Override");
+
+  JobPolicy policy = job->GetPolicy();
+
+  for (size_t i = 0; i < kJobPolicies.size(); i++) {
+    uint32_t action = policy.QueryBasicPolicy(kJobPolicies[i].value);
+    uint32_t policy_override = policy.QueryBasicPolicyOverride(kJobPolicies[i].value);
+
+    printf("%-30s\t%-15s\t%-15s\n", kJobPolicies[i].name, PolicyActionToString(action),
+           PolicyOverrideToString(policy_override));
+  }
+
+  printf("Slack Policy:\n");
+  const TimerSlack slack = policy.GetTimerSlack();
+  printf("mode: %s\n", SlackModeToString(slack.mode()));
+  printf("duration: %" PRId64 "ns\n", slack.amount());
+}
+
+void DumpJobPolicies(zx_koid_t id) {
+  auto walker = MakeJobWalker([id](JobDispatcher* job) {
+    if (job->get_koid() != id) {
+      return;
+    }
+
+    DumpJobPolicies(job);
+  });
+  GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
 }
 
 void DumpProcessHandles(zx_koid_t id) {
@@ -1084,6 +1186,7 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     printf("%s ps                : list processes\n", argv[0].str);
     printf("%s ps help           : print header label descriptions for 'ps'\n", argv[0].str);
     printf("%s jobs              : list jobs\n", argv[0].str);
+    printf("%s jobpol <koid>     : print policies for given job\n", argv[0].str);
     printf("%s mwd  <mb>         : memory watchdog\n", argv[0].str);
     printf("%s ht   <pid>        : dump process handles\n", argv[0].str);
     printf("%s ch   <koid>       : dump channels for pid or for all processes,\n", argv[0].str);
@@ -1120,6 +1223,10 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     }
   } else if (strcmp(argv[1].str, "jobs") == 0) {
     DumpJobList();
+  } else if (strcmp(argv[1].str, "jobpol") == 0) {
+    if (argc < 3)
+      goto usage;
+    DumpJobPolicies(argv[2].u);
   } else if (strcmp(argv[1].str, "hwd") == 0) {
     if (argc == 3) {
       hwd_limit = argv[2].u;
