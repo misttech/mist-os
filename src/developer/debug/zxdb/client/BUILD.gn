@@ -160,6 +160,8 @@ static_library("client") {
     "//src/lib/fxl",
     "//src/lib/llvm:LLVMAArch64Desc",
     "//src/lib/llvm:LLVMAArch64Disassembler",
+    "//src/lib/llvm:LLVMRISCVDesc",
+    "//src/lib/llvm:LLVMRISCVDisassembler",
     "//src/lib/llvm:LLVMX86Desc",
     "//src/lib/llvm:LLVMX86Disassembler",
   ]
