@@ -565,12 +565,19 @@ async def run_all_tests(
     run_condition = asyncio.Condition()
     run_state = RunState()
 
+    limit_remaining = len(tests.selected) if flags.limit is None else flags.limit
     for test in tests.selected:
+        if limit_remaining <= 0:
+            recorder.emit_warning_message(
+                f"\nOnly running {flags.limit} tests out of {len(tests.selected)} due to --limit"
+            )
+            break
         exec = execution.TestExecution(test, exec_env)
         if exec.is_hermetic():
             run_state.hermetic_test_queue.put_nowait(exec)
         else:
             run_state.non_hermetic_test_queue.put_nowait(exec)
+        limit_remaining -= 1
 
     tasks = []
 

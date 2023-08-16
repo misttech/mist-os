@@ -27,6 +27,7 @@ class Flags:
     selection: typing.List[str]
 
     random: bool
+    limit: int | None
 
     output: bool
     simple: bool
@@ -148,6 +149,9 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         action="store_true",
         help="Randomize test execution order",
         default=False,
+    )
+    execution.add_argument(
+        "--limit", type=int, help="Stop execution after this many tests", default=None
     )
 
     output = parser.add_argument_group("Output Options")
