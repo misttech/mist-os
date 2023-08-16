@@ -101,9 +101,11 @@ async fn log_main(
                     ..Default::default()
                 })
             },
+            raw: cmd.raw,
+            // TODO(https://fxbug.dev/132262): Remove this when possible.
+            highlight_spam: false,
             since: DeviceOrLocalTimestamp::new(cmd.since.as_ref(), cmd.since_monotonic.as_ref()),
             until: DeviceOrLocalTimestamp::new(cmd.until.as_ref(), cmd.until_monotonic.as_ref()),
-            ..Default::default()
         },
     );
     log_loop(target_collection_proxy, target_query, cmd, formatter, symbolizer).await?;

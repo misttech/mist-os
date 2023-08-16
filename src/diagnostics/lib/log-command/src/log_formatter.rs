@@ -398,6 +398,9 @@ where
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
             LogEntry { data: LogData::SymbolizedTargetLog(mut data, symbolized), .. } => {
+                if !options.raw && symbolized.is_empty() {
+                    return Ok(());
+                }
                 if !options.raw {
                     *data.msg_mut().expect(
                         "if a symbolized message is provided then the payload has a message",
@@ -836,6 +839,22 @@ mod test {
             buffers.stdout.clone().into_string(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: symbolized\n"
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_default_formatter_symbolized_log_message_with_empty_discarded() {
+        let buffers = TestBuffers::default();
+        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let options = LogFormatterOptions::default();
+        let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options);
+        let mut entry = log_entry();
+        entry.data = match entry.data.clone() {
+            LogData::TargetLog(data) => LogData::SymbolizedTargetLog(data, "".into()),
+            _ => unreachable!(),
+        };
+        formatter.push_log(entry).await.unwrap();
+        drop(formatter);
+        assert_eq!(buffers.into_stdout_str().is_empty(), true);
     }
 
     #[fuchsia::test]
