@@ -3,8 +3,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-set -e
-
 # usage: cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh [--affected]
 #
 # Ensures unit test coverage meets Honeydew's coding guideline.
@@ -53,7 +51,14 @@ coverage \
     --pattern "*_test.py"
 
 echo "Generating coverage stats..."
-output=$(coverage report -m --include "$INCLUDE_FILES" | tee /dev/tty)
+output=$(coverage report -m --include "$INCLUDE_FILES")
+# `coverage report` returns non-zero exit code when there is no coverage data to
+# report; ignore those occurrences and only bubble up other failure modes.
+if [[ $? -ne 0 && $output != "No data to report"* ]]; then
+    exit $?
+fi
+echo -e "$output"
+
 
 # Iterate coverage output lines and assert coverage is sufficient on a per-file
 # basis.
