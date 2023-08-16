@@ -5,35 +5,47 @@
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::{
-    api::ConfigError, global_env_context, print_config, set_metrics_status, show_metrics_status,
-    BuildOverride, ConfigLevel, EnvironmentContext,
+    api::ConfigError, print_config, set_metrics_status, show_metrics_status, BuildOverride,
+    ConfigLevel, EnvironmentContext,
 };
 use ffx_config_plugin_args::{
     AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
     EnvCommand, EnvSetCommand, GetCommand, MappingMode, RemoveCommand, SetCommand, SubCommand,
 };
-use ffx_core::ffx_plugin;
+use fho::{FfxMain, FfxTool};
 use serde_json::Value;
 use std::{
     fs::{File, OpenOptions},
     io::Write,
 };
 
-#[ffx_plugin()]
-pub async fn exec_config(config: ConfigCommand) -> Result<()> {
-    let ctx = global_env_context().context("Global environment context")?;
-    let writer = Box::new(std::io::stdout());
-    match &config.sub {
-        SubCommand::Env(env) => exec_env(&ctx, env, writer).await,
-        SubCommand::Get(get_cmd) => exec_get(&ctx, get_cmd, writer).await,
-        SubCommand::Set(set_cmd) => exec_set(&ctx, set_cmd).await,
-        SubCommand::Remove(remove_cmd) => exec_remove(&ctx, remove_cmd).await,
-        SubCommand::Add(add_cmd) => exec_add(&ctx, add_cmd).await,
-        SubCommand::Analytics(analytics_cmd) => exec_analytics(analytics_cmd).await,
+#[derive(FfxTool)]
+pub struct ConfigTool {
+    #[command]
+    config: ConfigCommand,
+    ctx: EnvironmentContext,
+}
+
+fho::embedded_plugin!(ConfigTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ConfigTool {
+    type Writer = fho::SimpleWriter;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        match &self.config.sub {
+            SubCommand::Env(env) => exec_env(&self.ctx, env, writer).await,
+            SubCommand::Get(get_cmd) => exec_get(&self.ctx, get_cmd, writer).await,
+            SubCommand::Set(set_cmd) => exec_set(&self.ctx, set_cmd).await,
+            SubCommand::Remove(remove_cmd) => exec_remove(&self.ctx, remove_cmd).await,
+            SubCommand::Add(add_cmd) => exec_add(&self.ctx, add_cmd).await,
+            SubCommand::Analytics(analytics_cmd) => exec_analytics(analytics_cmd).await,
+        }
+        .map_err(fho::Error::from)
     }
 }
 
-fn output<W: Write + Sync>(mut writer: W, value: Option<Value>) -> Result<()> {
+fn output<W: Write>(mut writer: W, value: Option<Value>) -> Result<()> {
     match value {
         Some(v) => writeln!(writer, "{}", serde_json::to_string_pretty(&v).unwrap())
             .map_err(|e| anyhow!("{}", e)),
@@ -43,7 +55,7 @@ fn output<W: Write + Sync>(mut writer: W, value: Option<Value>) -> Result<()> {
     }
 }
 
-fn output_array<W: Write + Sync>(
+fn output_array<W: Write>(
     mut writer: W,
     values: std::result::Result<Vec<Value>, ConfigError>,
 ) -> Result<()> {
@@ -63,7 +75,7 @@ fn output_array<W: Write + Sync>(
     }
 }
 
-async fn exec_get<W: Write + Sync>(
+async fn exec_get<W: Write>(
     ctx: &EnvironmentContext,
     get_cmd: &GetCommand,
     writer: W,
@@ -107,7 +119,7 @@ async fn exec_add(ctx: &EnvironmentContext, add_cmd: &AddCommand) -> Result<()> 
     add_cmd.query(ctx).add(Value::String(format!("{}", add_cmd.value))).await
 }
 
-async fn exec_env_set<W: Write + Sync>(
+async fn exec_env_set<W: Write>(
     env_context: &EnvironmentContext,
     mut writer: W,
     s: &EnvSetCommand,
@@ -139,7 +151,7 @@ async fn exec_env_set<W: Write + Sync>(
     env.save().await
 }
 
-async fn exec_env<W: Write + Sync>(
+async fn exec_env<W: Write>(
     ctx: &EnvironmentContext,
     env_command: &EnvCommand,
     mut writer: W,
