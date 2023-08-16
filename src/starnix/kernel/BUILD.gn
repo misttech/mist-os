@@ -20,7 +20,7 @@ declare_args() {
   starnix_use_fuchsia_mutex = false
 
   # Wheher to use fuchsia_sync::RwLock instead of parking_lot::RwLock.
-  starnix_use_fuchsia_rwlock = false
+  starnix_use_fuchsia_rwlock = true
 }
 
 group("kernel") {
