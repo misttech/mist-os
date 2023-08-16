@@ -1,9 +1,0 @@
-{
-    "short_description": "Driver Framework example for the new DriverBase library.",
-    "manufacturer": "",
-    "families": [],
-    "models": [],
-    "areas": [
-        "DriverFramework"
-    ]
-}
