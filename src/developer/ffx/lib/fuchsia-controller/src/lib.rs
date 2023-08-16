@@ -281,6 +281,27 @@ pub unsafe extern "C" fn ffx_channel_read(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ffx_socket_create(
+    ctx: *const LibContext,
+    options: u32,
+    out0: *mut zx_types::zx_handle_t,
+    out1: *mut zx_types::zx_handle_t,
+) -> zx_status::Status {
+    let socket_opts = match options {
+        zx_types::ZX_SOCKET_STREAM => fidl::SocketOpts::STREAM,
+        zx_types::ZX_SOCKET_DATAGRAM => fidl::SocketOpts::DATAGRAM,
+        _ => return zx_status::Status::INVALID_ARGS,
+    };
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    ctx.run(LibraryCommand::SocketCreate { options: socket_opts, responder: tx });
+    let (ch0, ch1) = rx.recv().unwrap();
+    unsafe { *out0 = ch0.into_raw() };
+    unsafe { *out1 = ch1.into_raw() };
+    zx_status::Status::OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ffx_socket_write(
     ctx: *const LibContext,
     handle: zx_types::zx_handle_t,

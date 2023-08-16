@@ -52,6 +52,9 @@ extern zx_status_t ffx_channel_write_etc(ffx_lib_context_t* ctx, zx_handle_t han
 extern zx_status_t ffx_channel_read(ffx_lib_context_t* ctx, zx_handle_t handle, char* out_buf,
                                     uint64_t out_len, zx_handle_t* hdls, uint64_t hdls_len,
                                     uint64_t* actual_bytes_count, uint64_t* actual_handles_count);
+
+extern zx_status_t ffx_socket_create(ffx_lib_context_t* ctx, uint32_t options, zx_handle_t* out0,
+                                     zx_handle_t* out1);
 extern zx_status_t ffx_socket_read(ffx_lib_context_t* ctx, zx_handle_t handle, char* out_buf,
                                    uint64_t out_len, uint64_t* bytes_read);
 extern zx_status_t ffx_socket_write(ffx_lib_context_t* ctx, zx_handle_t handle, const char* buf,

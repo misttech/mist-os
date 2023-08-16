@@ -90,6 +90,8 @@ python_c_extension("fuchsia_controller_py") {
     "cpp/abi/macros.h",
     "cpp/abi/mod.cc",
     "cpp/abi/mod.h",
+    "cpp/abi/socket.cc",
+    "cpp/abi/socket.h",
   ]
 
   deps = [
@@ -156,6 +158,7 @@ group("tests") {
       "tests:fuchsia_controller_fidl_client_test",
       "tests:fuchsia_controller_importing_test",
       "tests:fuchsia_controller_isolate_directory_test",
+      "tests:fuchsia_controller_socket_test",
     ]
 
     # TODO(https://fxbug.dev/129633): Re-enable when the corrupt profile header

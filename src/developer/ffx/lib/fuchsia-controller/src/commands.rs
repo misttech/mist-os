@@ -77,6 +77,10 @@ pub(crate) enum LibraryCommand {
         handles: ExtBuffer<zx_types::zx_handle_disposition_t>,
         responder: Responder<zx_status::Status>,
     },
+    SocketCreate {
+        options: fidl::SocketOpts,
+        responder: Responder<(fidl::Socket, fidl::Socket)>,
+    },
     SocketRead {
         lib: Arc<LibContext>,
         socket: fidl::Socket,
@@ -286,6 +290,16 @@ impl LibraryCommand {
                     Err(e) => e,
                 };
                 responder.send(status).unwrap();
+            }
+            Self::SocketCreate { options, responder } => {
+                match options {
+                    fidl::SocketOpts::STREAM => {
+                        responder.send(fidl::Socket::create_stream()).unwrap();
+                    }
+                    fidl::SocketOpts::DATAGRAM => {
+                        responder.send(fidl::Socket::create_datagram()).unwrap();
+                    }
+                };
             }
             Self::SocketRead { lib, socket, mut out_buf, responder } => {
                 let socket = match fidl::AsyncSocket::from_socket(socket) {

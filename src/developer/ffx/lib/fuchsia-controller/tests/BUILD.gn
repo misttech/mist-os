@@ -106,3 +106,10 @@ python_host_test("fuchsia_controller_fidl_channel_test") {
       [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
   deps = [ ":fuchsia_controller_test_data" ]
 }
+
+python_host_test("fuchsia_controller_socket_test") {
+  main_source = "socket.py"
+  libraries =
+      [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
+  deps = [ ":fuchsia_controller_test_data" ]
+}

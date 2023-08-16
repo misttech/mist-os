@@ -167,8 +167,8 @@ PyObject *Channel_read(Channel *self, PyObject *Py_UNUSED(arg)) {
   PyTuple_SET_ITEM(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < actual_handles_count; ++i) {
     zx_handle_t handle = handles[i];
-    auto handle_obj =
-        PyObject_CallFunction(PyObject_Type(reinterpret_cast<PyObject *>(self)), "I", handle);
+    auto handle_obj = PyObject_CallFunction(
+        PyObject_Type(reinterpret_cast<PyObject *>(&(self->super))), "I", handle);
     if (handle_obj == nullptr) {
       return nullptr;
     }

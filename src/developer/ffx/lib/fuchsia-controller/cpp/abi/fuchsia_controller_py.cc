@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #define PY_SSIZE_T_CLEAN
 
 #include <Python.h>
@@ -11,6 +12,7 @@
 #include "isolate_directory.h"
 #include "macros.h"
 #include "mod.h"
+#include "socket.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 extern struct PyModuleDef fuchsia_controller_py;
@@ -236,6 +238,9 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   if (PyType_Ready(&channel::ChannelType) < 0) {
     return nullptr;
   }
+  if (PyType_Ready(&socket::SocketType) < 0) {
+    return nullptr;
+  }
   if (PyType_Ready(&isolate::IsolateDirType) < 0) {
     return nullptr;
   }
@@ -270,6 +275,12 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   if (PyModule_AddObject(m.get(), "Channel", reinterpret_cast<PyObject *>(&channel::ChannelType)) <
       0) {
     Py_DECREF(&channel::ChannelType);
+    return nullptr;
+  }
+  Py_INCREF(&socket::SocketType);
+  if (PyModule_AddObject(m.get(), "Socket", reinterpret_cast<PyObject *>(&socket::SocketType)) <
+      0) {
+    Py_DECREF(&socket::SocketType);
     return nullptr;
   }
   return m.take();

@@ -586,6 +586,8 @@ pub const ZX_CPRNG_DRAW_MAX_LEN: usize = 256;
 pub const ZX_CPRNG_ADD_ENTROPY_MAX_LEN: usize = 256;
 
 // Socket flags and limits.
+pub const ZX_SOCKET_STREAM: u32 = 0;
+pub const ZX_SOCKET_DATAGRAM: u32 = 1 << 0;
 pub const ZX_SOCKET_DISPOSITION_WRITE_DISABLED: u32 = 1 << 0;
 pub const ZX_SOCKET_DISPOSITION_WRITE_ENABLED: u32 = 1 << 1;
 
