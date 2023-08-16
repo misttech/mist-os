@@ -19,6 +19,12 @@ workbench_platform_config = {
     "battery": {
         "enabled": True,
     },
+    "connectivity": {
+        "network": {
+            "networking": "standard",
+            "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:default.json)",
+        },
+    },
     "input": {
         "supported_input_devices": [
             "keyboard",

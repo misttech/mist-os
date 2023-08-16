@@ -4,8 +4,11 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::bail;
-use assembly_config_schema::platform_config::connectivity_config::{
-    NetstackVersion, NetworkingConfig, PlatformConnectivityConfig,
+use assembly_config_schema::{
+    platform_config::connectivity_config::{
+        NetstackVersion, NetworkingConfig, PlatformConnectivityConfig,
+    },
+    FileEntry,
 };
 
 pub(crate) struct ConnectivitySubsystemConfig;
@@ -76,6 +79,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 NetworkingConfig::Basic => {
                     builder.platform_bundle("networking_basic");
                 }
+            }
+
+            if let Some(netcfg_config_path) = &connectivity_config.network.netcfg_config_path {
+                builder.package("netcfg").config_data(FileEntry {
+                    source: netcfg_config_path.clone(),
+                    destination: "default.json".into(),
+                })?;
             }
 
             // The use of netstack3 can be forcibly required by the board,

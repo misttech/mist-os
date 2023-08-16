@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the connectivity area.
@@ -28,7 +29,7 @@ pub struct PlatformNetworkConfig {
     pub netstack_version: NetstackVersion,
 
     #[serde(default)]
-    pub netcfg_config: NetcfgConfig,
+    pub netcfg_config_path: Option<Utf8PathBuf>,
 }
 
 /// Network stack version to use.
@@ -39,22 +40,6 @@ pub enum NetstackVersion {
     #[default]
     Netstack2,
     Netstack3,
-}
-
-/// Which netcfg configuration to use.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum NetcfgConfig {
-    /// The default network configuration.
-    #[default]
-    Default,
-
-    /// An unspecified network configuration.
-    ///
-    /// Product owners are expected to specify the configuration for
-    /// netcfg some other way when this value is used.
-    // TODO(https://fxbug.dev/132060): Remove this.
-    Unspecified,
 }
 
 /// Which networking type to use (standard or basic).
