@@ -47,4 +47,3 @@ line_length = 80
 # Reference at https://mypy.readthedocs.io/en/stable/config_file.html#example-pyproject-toml
 # Needed because dependency modules such as mobly are not pip installed
 ignore_missing_imports = true
-python_version = "3.8"
