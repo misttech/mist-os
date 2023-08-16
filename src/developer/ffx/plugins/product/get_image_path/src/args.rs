@@ -64,11 +64,15 @@ pub struct GetImagePathCommand {
 
     /// the slot where image will be located in.
     #[argh(option)]
-    pub slot: Slot,
+    pub slot: Option<Slot>,
 
     /// the type of image.
     #[argh(option)]
-    pub image_type: ImageType,
+    pub image_type: Option<ImageType>,
+
+    /// the type of bootloader.
+    #[argh(option, short = 'b')]
+    pub bootloader: Option<String>,
 
     /// return relative path or not
     #[argh(switch, short = 'r')]
