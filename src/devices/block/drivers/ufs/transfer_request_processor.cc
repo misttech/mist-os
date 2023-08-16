@@ -36,14 +36,13 @@ void FillPrdt(PhysicalRegionDescriptionTableEntry *prdt,
 
 template <>
 std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommandUpiu>(
-    ScsiCommandUpiu &request, uint8_t slot, std::unique_ptr<scsi_xfer> xfer,
-    uint16_t response_offset, uint16_t response_length) {
+    ScsiCommandUpiu &request, const uint8_t slot, const scsi_xfer *xfer,
+    const uint16_t response_offset, const uint16_t response_length) {
   ZX_ASSERT(xfer != nullptr);
 
   const uint32_t data_transfer_length = std::min(request.GetTransferBytes(), kMaxPrdtDataLength);
 
   request.GetHeader().lun = xfer->lun;
-  request.GetHeader().task_tag = slot;  // Record the slot number to |task_tag| for debugging.
   request.SetExpectedDataTransferLength(data_transfer_length);
 
   // Prepare PRDT(physical region description table).
@@ -86,12 +85,6 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
     zxlogf(TRACE,
            "6. SCSI: PRDT prdt_offset = %hu, prdt_length_in_bytes = %u, prdt_entry_count = %u",
            prdt_offset, prdt_length_in_bytes, prdt_entry_count);
-  }
-
-  {
-    std::lock_guard lock(request_list_lock_);
-    RequestSlot &request_slot = request_list_.GetSlot(slot);
-    request_slot.xfer = std::move(xfer);
   }
 
   return {prdt_offset, prdt_entry_count};

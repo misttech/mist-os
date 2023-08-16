@@ -150,6 +150,14 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRead10Handler(
   uint8_t lun = command_upiu.header.lun;
   ScsiRead10Upiu read10_command(command_upiu, kMockBlockSize);
 
+  if (betoh32(command_upiu.expected_data_transfer_length) != read10_command.GetTransferBytes()) {
+    zxlogf(ERROR,
+           "UFS MOCK: scsi READ(10) command, expected_data_transfer_length(%d) and "
+           "transfer_length(%d) are different.",
+           betoh32(command_upiu.expected_data_transfer_length), read10_command.GetTransferBytes());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   std::vector<uint8_t> data_buffer(read10_command.GetTransferBytes());
 
   if (auto status = mock_device.BufferRead(lun, data_buffer.data(),
@@ -172,6 +180,14 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   uint8_t lun = command_upiu.header.lun;
   ScsiWrite10Upiu write10_command(command_upiu, kMockBlockSize);
+
+  if (betoh32(command_upiu.expected_data_transfer_length) != write10_command.GetTransferBytes()) {
+    zxlogf(ERROR,
+           "UFS MOCK: scsi WRTIE(10) command, expected_data_transfer_length(%d) and "
+           "transfer_length(%d) are different.",
+           betoh32(command_upiu.expected_data_transfer_length), write10_command.GetTransferBytes());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
   std::vector<uint8_t> data_buffer(write10_command.GetTransferBytes());
 

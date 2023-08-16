@@ -59,15 +59,14 @@ class TransferRequestProcessor : public RequestProcessor {
 
   template <class RequestType>
   std::tuple<uint16_t, uint32_t> PreparePrdt(RequestType &request, uint8_t slot,
-                                             std::unique_ptr<scsi_xfer> xfer,
-                                             uint16_t response_offset, uint16_t response_length) {
+                                             const scsi_xfer *xfer, uint16_t response_offset,
+                                             uint16_t response_length) {
     return {0, 0};
   }
 
   template <>
   std::tuple<uint16_t, uint32_t> PreparePrdt<ScsiCommandUpiu>(ScsiCommandUpiu &request,
-                                                              uint8_t slot,
-                                                              std::unique_ptr<scsi_xfer> xfer,
+                                                              uint8_t slot, const scsi_xfer *xfer,
                                                               uint16_t response_offset,
                                                               uint16_t response_length);
 
@@ -86,6 +85,11 @@ class TransferRequestProcessor : public RequestProcessor {
                            xfer.value()->start_lba, "length", xfer.value()->block_count);
     }
 
+    // Record the slot number to |task_tag| for debugging.
+    request.GetHeader().task_tag = slot;
+    auto [prdt_offset, prdt_entry_count] = PreparePrdt<RequestType>(
+        request, slot, (is_scsi ? xfer->get() : nullptr), response_offset, response_length);
+
     // Copy request and prepare response.
     void *response;
     {
@@ -102,14 +106,11 @@ class TransferRequestProcessor : public RequestProcessor {
       memset(request_list_.GetDescriptorBuffer<uint8_t>(slot) + response_offset, 0,
              response_length);
       response = request_list_.GetDescriptorBuffer(slot, response_offset);
+
+      if (is_scsi) {
+        request_slot.xfer = std::move(xfer.value());
+      }
     }
-
-    // Record the slot number to |task_tag| for debugging.
-    request.GetHeader().task_tag = slot;
-
-    auto [prdt_offset, prdt_entry_count] =
-        PreparePrdt<RequestType>(request, slot, (is_scsi ? std::move(xfer.value()) : nullptr),
-                                 response_offset, response_length);
 
     if (zx::result<> result = FillDescriptorAndSendRequest(
             slot, request.GetDataDirection(), response_offset, response_length, prdt_offset,
