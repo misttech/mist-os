@@ -59,12 +59,12 @@ async fn cmd_impl(
 
     // Run `doctor` on the new component to expose any routing problems.
     let route_validator = connect_to_route_validator(&rcs_proxy).await?;
-    let route_report = validate_routes(&route_validator, args.moniker.clone()).await?;
+    let route_report = validate_routes(&route_validator, &args.moniker.clone()).await?;
     // If any of the RouteReport objects indicate an error, output the full report.
     if route_report.iter().any(|r| r.error_summary.is_some()) {
         write!(&mut writer, "\n\n")?;
         writeln!(&mut writer, "WARNING: your component may not run correctly due to some required capabilities not being available:\n")?;
-        write_result_table(&route_report, &mut writer)?;
+        write_result_table(&args.moniker, &route_report, &mut writer)?;
     }
 
     if args.follow_logs {

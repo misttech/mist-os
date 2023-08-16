@@ -177,10 +177,18 @@ pub enum RoutingError {
         capability_type: String,
     },
 
-    #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
+    #[error(
+        "`{}` was not offered to `{}` by parent. For more, run `ffx component doctor {moniker}`.",
+        capability_id,
+        moniker
+    )]
     OfferFromParentNotFound { moniker: Moniker, capability_id: String },
 
-    #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
+    #[error(
+        "`{}` was not offered to `{}` by parent. For more, run `ffx component doctor {moniker}`.",
+        capability_id,
+        moniker
+    )]
     StorageFromParentNotFound { moniker: Moniker, capability_id: String },
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
@@ -194,7 +202,7 @@ pub enum RoutingError {
     OfferFromCollectionNotFound { collection: String, moniker: Moniker, capability: Name },
 
     #[error(
-        "`{}` was not exposed to `{}` from child `#{}`.",
+        "`{}` was not exposed to `{}` from child `#{}`. For more, run `ffx component doctor {moniker}`.",
         capability_id,
         moniker,
         child_moniker
@@ -239,7 +247,7 @@ pub enum RoutingError {
     ExposeFromCollectionNotFound { collection: String, moniker: Moniker, capability: Name },
 
     #[error(
-        "`{}` was not exposed to `{}` from child `#{}`.",
+        "`{}` was not exposed to `{}` from child `#{}`. For more, run `ffx component doctor {moniker}`.",
         capability_id,
         moniker,
         child_moniker
@@ -258,7 +266,7 @@ pub enum RoutingError {
     ExposeFromFrameworkNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
-        "`{}` was not exposed to `{}` from child `#{}`.",
+        "`{}` was not exposed to `{}` from child `#{}`. For more, run `ffx component doctor {moniker}`.",
         capability_id,
         moniker,
         child_moniker

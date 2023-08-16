@@ -9,6 +9,7 @@ use {
     },
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
+    moniker::Moniker,
 };
 
 pub async fn doctor_cmd_print<W: std::io::Write>(
@@ -20,11 +21,13 @@ pub async fn doctor_cmd_print<W: std::io::Write>(
     let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
     writeln!(writer, "Moniker: {}", &moniker)?;
 
-    let reports = validate_routes(&route_validator, moniker).await?;
-    write_result_table(&reports, writer)
+    let reports = validate_routes(&route_validator, &moniker).await?;
+    write_result_table(&moniker, &reports, writer)?;
+    Ok(())
 }
 
 pub fn write_result_table<W: std::io::Write>(
+    moniker: &Moniker,
     reports: &Vec<RouteReport>,
     mut writer: W,
 ) -> Result<()> {
@@ -34,6 +37,15 @@ pub fn write_result_table<W: std::io::Write>(
 
     expose_table.print(&mut writer)?;
     writeln!(writer, "")?;
+
+    let mut error_capabilities =
+        reports.iter().filter(|r| r.error_summary.is_some()).map(|r| &r.capability).peekable();
+    if error_capabilities.peek().is_some() {
+        writeln!(writer, "For further diagnosis, try:\n")?;
+        for cap in error_capabilities {
+            writeln!(writer, "  $ ffx component route {} {}", moniker, cap)?;
+        }
+    }
     Ok(())
 }
 
@@ -43,5 +55,5 @@ pub async fn doctor_cmd_serialized(
     realm_query: fsys::RealmQueryProxy,
 ) -> Result<Vec<RouteReport>> {
     let moniker = get_cml_moniker_from_query(&query, &realm_query).await?;
-    validate_routes(&route_validator, moniker).await
+    validate_routes(&route_validator, &moniker).await
 }

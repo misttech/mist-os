@@ -1149,7 +1149,7 @@ impl ErrorNotFoundFromParent for DebugRegistration {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::EnvironmentFromParentNotFound {
             moniker,
-            capability_name: capability_name,
+            capability_name,
             capability_type: DebugRegistration::TYPE.to_string(),
         }
     }
@@ -1164,7 +1164,7 @@ impl ErrorNotFoundInChild for DebugRegistration {
         RoutingError::EnvironmentFromChildExposeNotFound {
             moniker,
             child_moniker,
-            capability_name: capability_name,
+            capability_name,
             capability_type: DebugRegistration::TYPE.to_string(),
         }
     }

@@ -65,7 +65,7 @@ impl TryFrom<fsys::DeclType> for DeclType {
 /// indicates a routing error.
 pub async fn validate_routes(
     route_validator: &fsys::RouteValidatorProxy,
-    moniker: Moniker,
+    moniker: &Moniker,
 ) -> Result<Vec<RouteReport>> {
     let reports = match route_validator.validate(&moniker.to_string()).await? {
         Ok(reports) => reports,
@@ -164,7 +164,7 @@ mod test {
         );
 
         let mut reports =
-            validate_routes(&validator, Moniker::parse_str("test").unwrap()).await.unwrap();
+            validate_routes(&validator, &Moniker::parse_str("test").unwrap()).await.unwrap();
         assert_eq!(reports.len(), 1);
 
         let report = reports.remove(0);
@@ -188,7 +188,7 @@ mod test {
         );
 
         let mut reports =
-            validate_routes(&validator, Moniker::parse_str("test").unwrap()).await.unwrap();
+            validate_routes(&validator, &Moniker::parse_str("test").unwrap()).await.unwrap();
         assert_eq!(reports.len(), 1);
 
         let report = reports.remove(0);
@@ -202,7 +202,7 @@ mod test {
         let validator = route_validator("test", vec![]);
 
         let reports =
-            validate_routes(&validator, Moniker::parse_str("test").unwrap()).await.unwrap();
+            validate_routes(&validator, &Moniker::parse_str("test").unwrap()).await.unwrap();
         assert!(reports.is_empty());
     }
 
@@ -216,7 +216,7 @@ mod test {
             ],
         );
 
-        let result = validate_routes(&validator, Moniker::parse_str("test").unwrap()).await;
+        let result = validate_routes(&validator, &Moniker::parse_str("test").unwrap()).await;
         assert!(result.is_err());
     }
 }
