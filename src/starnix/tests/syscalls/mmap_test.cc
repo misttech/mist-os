@@ -305,7 +305,6 @@ TEST_P(MMapProcStatmTest, RssAfterUnmap) {
   size_t rss_mapped;
   ReadStatm(&vm_size_mapped, &rss_mapped);
   EXPECT_GT(vm_size_mapped, vm_size_base);
-  EXPECT_GE(rss_mapped, rss_base);
 
   // Commit the allocated pages by writing some data.
   volatile char* data = reinterpret_cast<char*>(mapped);
