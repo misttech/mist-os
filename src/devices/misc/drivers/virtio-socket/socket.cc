@@ -504,6 +504,7 @@ void SocketDevice::NotifyAndCleanupConLocked(fbl::RefPtr<Connection> conn) {
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
     [[maybe_unused]] auto _ = callbacks_->Rst(conn->GetKey().addr);
   }
+  SendOpLocked(conn, VIRTIO_VSOCK_OP_RST);
   CleanupConLocked(conn);
 }
 
