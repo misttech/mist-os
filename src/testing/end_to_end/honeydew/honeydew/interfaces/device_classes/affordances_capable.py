@@ -10,6 +10,8 @@ from typing import Callable
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.affordances.ui import screenshot
+from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.utils import properties
 
@@ -63,6 +65,20 @@ class RebootCapableDevice(abc.ABC):
         """
 
 
+class ScreenshotCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    screenshot affordance."""
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def screenshot(self) -> screenshot.Screenshot:
+        """Returns a screenshot affordance object.
+
+        Returns:
+            screenshot.Screenshot object
+        """
+
+
 class SessionCapableDevice(abc.ABC):
     """Abstract base class to be implemented by a device which supports the
     session affordance."""
@@ -88,4 +104,18 @@ class TracingCapableDevice(abc.ABC):
 
         Returns:
             tracing.Tracing object
+        """
+
+
+class UserInputCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    user input affordance."""
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def user_input(self) -> user_input.UserInput:
+        """Returns a user_input affordance object.
+
+        Returns:
+            user_input.UserInput object
         """

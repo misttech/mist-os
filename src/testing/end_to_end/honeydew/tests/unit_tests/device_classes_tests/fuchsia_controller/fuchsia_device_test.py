@@ -118,6 +118,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.RebootCapableDevice)
 
+    def test_fuchsia_device_is_screenshot_capable(self) -> None:
+        """Test case to make sure fuchsia device is screenshot capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.ScreenshotCapableDevice)
+
     def test_fuchsia_device_is_session_capable(self) -> None:
         """Test case to make sure fuchsia device is session capable"""
         self.assertIsInstance(
@@ -127,6 +132,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Test case to make sure fuchsia device is tracing capable"""
         self.assertIsInstance(
             self.fd_obj, affordances_capable.TracingCapableDevice)
+
+    def test_fuchsia_device_is_user_input_capable(self) -> None:
+        """Test case to make sure fuchsia device is user_input capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.UserInputCapableDevice)
 
     # List all the tests related to public methods in alphabetical order
     def test_close(self) -> None:

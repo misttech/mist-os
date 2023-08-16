@@ -11,6 +11,8 @@ from honeydew import custom_types
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.affordances.ui import screenshot
+from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.utils import properties
@@ -105,6 +107,15 @@ class FuchsiaDevice(abc.ABC):
 
     @properties.Affordance
     @abc.abstractmethod
+    def screenshot(self) -> screenshot.Screenshot:
+        """Returns a screenshot affordance object.
+
+        Returns:
+            screenshot.Screenshot object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
     def session(self) -> session.Session:
         """Returns a session affordance object.
 
@@ -119,6 +130,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             tracing.Tracing object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def user_input(self) -> user_input.UserInput:
+        """Returns a user_input affordance object.
+
+        Returns:
+            user_input.UserInput object
         """
 
     # List all the public methods in alphabetical order

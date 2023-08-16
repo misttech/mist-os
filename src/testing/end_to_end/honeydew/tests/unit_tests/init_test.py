@@ -434,7 +434,7 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.get_all_affordances() for a SL4F based
         device."""
         expected_affordances: List[str] = [
-            "bluetooth_gap", "session", "tracing"
+            "bluetooth_gap", "screenshot", "session", "tracing", "user_input"
         ]
 
         self.assertEqual(
@@ -454,7 +454,7 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
         based device."""
         expected_affordances: List[str] = [
-            "bluetooth_gap", "session", "tracing"
+            "bluetooth_gap", "screenshot", "session", "tracing", "user_input"
         ]
 
         self.assertEqual(

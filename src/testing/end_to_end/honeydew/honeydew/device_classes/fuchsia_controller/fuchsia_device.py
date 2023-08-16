@@ -21,10 +21,16 @@ from honeydew import errors
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth import \
     bluetooth_gap as bluetooth_gap_fc
+from honeydew.affordances.fuchsia_controller.ui import \
+    screenshot as screenshot_fc
+from honeydew.affordances.fuchsia_controller.ui import \
+    user_input as user_input_fc
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
+from honeydew.interfaces.affordances.ui import screenshot
+from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
@@ -81,7 +87,9 @@ def _connect_device_proxy(
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
-                    affordances_capable.TracingCapableDevice):
+                    affordances_capable.ScreenshotCapableDevice,
+                    affordances_capable.TracingCapableDevice,
+                    affordances_capable.UserInputCapableDevice):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
 
@@ -120,6 +128,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         return bluetooth_gap_fc.BluetoothGap()
 
     @properties.Affordance
+    def screenshot(self) -> screenshot.Screenshot:
+        """Returns a screenshot affordance object.
+
+        Returns:
+            screenshot.Screenshot object
+        """
+        return screenshot_fc.Screenshot()
+
+    @properties.Affordance
     def tracing(self) -> tracing.Tracing:
         """Returns a tracing affordance object.
 
@@ -127,6 +144,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             tracing.Tracing object
         """
         return tracing_fc.Tracing()
+
+    @properties.Affordance
+    def user_input(self) -> user_input.UserInput:
+        """Returns an user input affordance object.
+
+        Returns:
+            user_input.UserInput object
+        """
+        return user_input_fc.UserInput()
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

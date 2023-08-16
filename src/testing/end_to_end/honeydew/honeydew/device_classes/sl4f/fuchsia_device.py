@@ -13,10 +13,16 @@ from honeydew import custom_types
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
 from honeydew.affordances.sl4f.bluetooth import \
     bluetooth_gap as bluetooth_gap_sl4f
+from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
+from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
+from honeydew.interfaces.affordances.ui import \
+    screenshot as screenshot_interface
+from honeydew.interfaces.affordances.ui import \
+    user_input as user_input_interface
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import sl4f as sl4f_transport
@@ -42,7 +48,9 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
+                    affordances_capable.ScreenshotCapableDevice,
                     affordances_capable.TracingCapableDevice,
+                    affordances_capable.UserInputCapableDevice,
                     transports_capable.SL4FCapableDevice):
     """FuchsiaDevice abstract base class implementation using SL4F.
 
@@ -96,6 +104,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             reboot_affordance=self)
 
     @properties.Affordance
+    def screenshot(self) -> screenshot_interface.Screenshot:
+        """Returns a screenshot affordance object.
+
+        Returns:
+            screenshot.Screenshot object
+        """
+        return screenshot_sl4f.Screenshot()
+
+    @properties.Affordance
     def tracing(self) -> tracing_interface.Tracing:
         """Returns a tracing affordance object.
 
@@ -106,6 +123,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             device_name=self.device_name,
             sl4f=self.sl4f,
             reboot_affordance=self)
+
+    @properties.Affordance
+    def user_input(self) -> user_input_interface.UserInput:
+        """Returns an user input affordance object.
+
+        Returns:
+            user_input.UserInput object
+        """
+        return user_input_sl4f.UserInput()
 
     # List all the public methods in alphabetical order
     def close(self) -> None:
