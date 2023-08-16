@@ -164,9 +164,6 @@ group("tests") {
   testonly = true
 
   if (has_board) {
-    # TODO(https://fxbug.dev/131958): Re-enabled when fixed in coverage.
-    if (!is_coverage) {
-      deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
-    }
+    deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
   }
 }
