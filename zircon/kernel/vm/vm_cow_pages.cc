@@ -747,6 +747,13 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
   DEBUG_ASSERT(!is_hidden_locked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
+  // Upgrade clone type, if possible.
+  if (type == CloneType::SnapshotAtLeastOnWrite) {
+    if (!is_snapshot_at_least_on_write_supported()) {
+      type = CloneType::Snapshot;
+    }
+  }
+
   // All validation *must* be performed here prior to construction the VmCowPages, as the
   // destructor for VmCowPages may acquire the lock, which we are already holding.
 
