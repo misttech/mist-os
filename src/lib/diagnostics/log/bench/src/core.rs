@@ -42,28 +42,34 @@ fn write_log_benchmark<F, S>(
     bencher: &mut criterion::Bencher,
     socket: Option<zx::Socket>,
     subscriber: S,
-    logging_fn: F,
+    mut logging_fn: F,
 ) where
     F: FnMut() -> (),
     S: Subscriber + Send + Sync,
 {
-    // This thread constantly reads from the socket to attempt to minimize the number of dropped
-    // logs from the benchmark.
-    let reader_thread = std::thread::spawn(move || {
-        let mut executor = fasync::LocalExecutor::new();
-        let Some(socket) = socket else {
-            return;
-        };
-        executor.run_singlethreaded(async move {
-            let socket = fasync::Socket::from_socket(socket).expect("create async socket");
-            let mut stream = socket.as_datagram_stream();
-            while let Some(result) = stream.next().await {
-                let _ = criterion::black_box(result);
-            }
-        });
+    tracing::subscriber::with_default(subscriber, || {
+        if let Some(socket) = socket {
+            let mut buf = vec![0; 2048];
+            bencher.iter_batched(
+                || {
+                    // Drain the socket
+                    loop {
+                        match socket.read(&mut buf) {
+                            Ok(_) => {}
+                            Err(zx::Status::SHOULD_WAIT) => break,
+                            Err(s) => panic!("Unexpected status {}", s),
+                        }
+                    }
+                },
+                |_| logging_fn(),
+                // Limiting the batch size to 100 should prevent the socket from running out of
+                // space.
+                criterion::BatchSize::NumIterations(100),
+            )
+        } else {
+            bencher.iter(logging_fn);
+        }
     });
-    tracing::subscriber::with_default(subscriber, || bencher.iter(logging_fn));
-    reader_thread.join().expect("join thread");
 }
 
 // The benchmarks below measure the time it takes to write a log message when calling a macro
