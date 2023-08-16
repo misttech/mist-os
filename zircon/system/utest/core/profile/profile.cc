@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/standalone-test/standalone.h>
 #include <lib/zx/job.h>
 #include <lib/zx/pager.h>
@@ -394,6 +395,10 @@ TEST(MemoryPriorityProfile, ApplyProfile) {
   ASSERT_OK(pager.create_vmo(0, port, 0, zx_system_get_page_size(), &pager_vmo));
   zx_vaddr_t addr;
   ASSERT_OK(zx::vmar::root_self()->map(0, 0, pager_vmo, 0, zx_system_get_page_size(), &addr));
+  auto unmap = fit::defer([&addr]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, zx_system_get_page_size());
+  });
 
   // Helper to supply pages to the VMO. Since these pages are reclaimable there is a small chance
   // that they get evicted during the execution of the test so we re-supply at a few different
