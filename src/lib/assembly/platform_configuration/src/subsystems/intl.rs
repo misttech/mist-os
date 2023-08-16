@@ -24,6 +24,11 @@ impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
                     .icu_platform_bundle("intl_services_small")
                     .context("while configuring the 'small Intl' subsystem")?;
             }
+            Type::SmallWithTimezone => {
+                builder
+                    .icu_platform_bundle("intl_services_small_with_timezone")
+                    .context("while configuring the 'small Intl with timezone' subsystem")?;
+            }
             Type::None => { /* Skip the bundle altogether. */ }
         };
 

@@ -2234,6 +2234,31 @@ icu_assembly_input_bundle("intl_services_small") {
   ]
 }
 
+# Assembly may select at most one bundle with `intl_services` name prefix.
+icu_assembly_input_bundle("intl_services_small_with_timezone") {
+  icu_base_packages = [
+    "//src/intl/intl_services:pkg_small",
+    "//src/intl/time_zone_info_service:pkg",
+  ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [
+                    "//src/intl/intl_services/meta/intl_small.core_shard.cml",
+                    "//src/intl/time_zone_info_service/meta/time-zone-info-service.core_shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 icu_assembly_input_bundle("setui") {
   icu_base_packages = [ "//src/settings/service:setui_service" ]
 
