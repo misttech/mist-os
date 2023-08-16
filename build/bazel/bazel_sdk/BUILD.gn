@@ -193,7 +193,10 @@ group("tests") {
   if (!sdk_inside_idk_sub_build) {
     deps = [
       ":bazel_sdk_tests",
-      ":bazel_sdk_tests_idk",
+      # DO NOT INCLUDE bazel_sdk_tests_idk here to avoid making all core builds
+      # longer than necessary (https://fxbug.dev/132279). It is still possible
+      # to invoke the target manually during local development though.
+      # ":bazel_sdk_tests_idk",
     ]
   }
 }
