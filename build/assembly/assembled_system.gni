@@ -717,6 +717,10 @@ template("assembled_system") {
   }
 
   if (!_skip_fshost_validator) {
+    configc_tool_target = "//tools/configc($host_toolchain)"
+    configc_tool_path = get_label_info(configc_tool_target, "root_out_dir")
+    configc_tool_path += "/configc"
+
     python_action("${labels.fshost_validator}") {
       forward_variables_from(invoker,
                              [
@@ -726,7 +730,7 @@ template("assembled_system") {
       deps = [
         ":${labels.fshost}",
         ":${labels.product_assembler}",
-        "//tools/configc($host_toolchain)",
+        configc_tool_target,
       ]
       outputs = [ "$target_out_dir/${labels.fshost_validator}.txt" ]
       depfile = "$target_out_dir/$target_name.d"
@@ -735,7 +739,7 @@ template("assembled_system") {
         "--output",
         rebase_path(outputs[0], root_build_dir),
         "--configc-bin",
-        "host-tools/configc",
+        rebase_path(configc_tool_path, root_build_dir),
         "--gn-fshost-component",
         rebase_path("${target_out_dir}/cml/${labels.fshost}.manifest/fshost.cm",
                     root_build_dir),
