@@ -34,19 +34,6 @@
 #include <fbl/algorithm.h>
 #include <zxtest/zxtest.h>
 
-#if defined(__x86_64__)
-#include <cpuid.h>
-namespace {
-// See fxbug.dev/66978.
-bool IsQemuTcg() {
-  uint32_t eax;
-  uint32_t name[3];
-  __cpuid(0x40000000, eax, name[0], name[1], name[2]);
-  return !memcmp(reinterpret_cast<const char *>(name), "TCGTCGTCGTCG", sizeof(name));
-}
-}  // namespace
-#endif
-
 #include "helpers.h"
 
 namespace {
@@ -256,15 +243,6 @@ TEST(VmoTestCase, MapRead) {
 //
 // See fxbug.dev/66978 for more details.
 TEST(VmoTestCase, ParallelWriteAndDecommit) {
-  // TODO(fxbug.dev/66978): This test triggers a QEMU TCG bug on x86. Once the bug is fixed, the
-  // test should be renabled for this configuration.
-#if defined(__x86_64__)
-  if (IsQemuTcg()) {
-    printf("skipping test when running on QEMU TCG x86 (fxbug.dev/66978)\n");
-    return;
-  }
-#endif
-
   constexpr size_t kVmoSize = 8 * (1UL << 30);
 
   zx::vmo vmo;
