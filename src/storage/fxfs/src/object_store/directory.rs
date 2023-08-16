@@ -774,11 +774,14 @@ mod tests {
                 directory::{replace_child, Directory, ReplacedChild},
                 object_record::Timestamp,
                 transaction::{Options, TransactionHandler},
+                volume::root_volume,
                 HandleOptions, LockKey, ObjectDescriptor, ObjectStore,
             },
         },
         assert_matches::assert_matches,
         fidl_fuchsia_io as fio,
+        fxfs_insecure_crypto::InsecureCrypt,
+        std::sync::Arc,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };
 
@@ -1869,5 +1872,62 @@ mod tests {
         assert_eq!(properties.modification_time, now);
         assert_eq!(properties.posix_attributes.unwrap().gid, 2);
         assert_eq!(properties.posix_attributes.unwrap().mode, 0);
+    }
+
+    #[fuchsia::test]
+    async fn write_to_directory_attribute_creates_keys() {
+        let device = DeviceHolder::new(FakeDevice::new(16384, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let crypt = Arc::new(InsecureCrypt::new());
+
+        {
+            let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
+            let store = root_volume
+                .new_volume("vol", Some(crypt.clone()))
+                .await
+                .expect("new_volume failed");
+            let mut transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                    Options::default(),
+                )
+                .await
+                .expect("new transaction failed");
+            let root_directory = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+            let directory = root_directory
+                .create_child_dir(&mut transaction, "foo", None)
+                .await
+                .expect("create_child_dir failed");
+            transaction.commit().await.expect("commit failed");
+
+            directory.handle.write_attr(1, b"bar").await.expect("write_attr failed");
+        }
+
+        filesystem.close().await.expect("Close failed");
+        let device = filesystem.take_device().await;
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device).await.expect("open failed");
+
+        {
+            let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
+            let volume = root_volume.volume("vol", Some(crypt)).await.expect("volume failed");
+            let root_directory = Directory::open(&volume, volume.root_directory_object_id())
+                .await
+                .expect("open failed");
+            let directory = Directory::open(
+                &volume,
+                root_directory.lookup("foo").await.expect("lookup failed").expect("not found").0,
+            )
+            .await
+            .expect("open failed");
+            let mut buffer = directory.handle.allocate_buffer(10);
+            assert_eq!(directory.handle.read(1, 0, buffer.as_mut()).await.expect("read failed"), 3);
+            assert_eq!(&buffer.as_slice()[..3], b"bar");
+        }
+
+        filesystem.close().await.expect("Close failed");
     }
 }

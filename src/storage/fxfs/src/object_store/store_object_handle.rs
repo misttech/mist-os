@@ -12,12 +12,14 @@ use {
         object_store::{
             allocator::Allocator,
             extent_record::{Checksums, ExtentKey, ExtentValue},
+            object_manager::ObjectManager,
             object_record::{
-                AttributeKey, ExtendedAttributeValue, ObjectAttributes, ObjectKey, ObjectKeyData,
-                ObjectValue, PosixAttributes, Timestamp,
+                AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectKey,
+                ObjectKeyData, ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{
-                LockKey, Mutation, ObjectStoreMutation, Options, ReadGuard, Transaction,
+                AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
+                ReadGuard, Transaction,
             },
             HandleOptions, HandleOwner, ObjectStore,
         },
@@ -30,7 +32,7 @@ use {
         stream::{FuturesOrdered, FuturesUnordered},
         try_join, TryStreamExt,
     },
-    fxfs_crypto::XtsCipherSet,
+    fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet},
     std::{
         cmp::min,
         ops::{Bound, Range},
@@ -516,6 +518,89 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         })
     }
 
+    async fn get_or_create_keys(
+        &self,
+        transaction: &mut Transaction<'_>,
+    ) -> Result<Option<Arc<XtsCipherSet>>, Error> {
+        let store = self.store();
+        Ok(match self.encryption {
+            Encryption::None => None,
+            Encryption::CachedKeys => {
+                // Fast path: try and get keys from the cache.
+                if let Some(keys) = store.key_manager.get(self.object_id).await? {
+                    return Ok(Some(keys));
+                }
+
+                // Next, see if the keys are already created.
+                if let Some(item) = store.tree.find(&ObjectKey::keys(self.object_id)).await? {
+                    if let ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)) = item.value {
+                        return Ok(Some(
+                            store
+                                .key_manager
+                                .get_or_insert(
+                                    self.object_id,
+                                    &store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
+                                    async { Ok(keys) },
+                                    false,
+                                )
+                                .await?,
+                        ));
+                    } else {
+                        return Err(anyhow!(FxfsError::Inconsistent).context("get_or_create_keys"));
+                    }
+                }
+
+                // Proceed to create the key.  The transaction holds the required locks.
+                let (key, unwrapped_key) = store
+                    .crypt()
+                    .ok_or_else(|| anyhow!("No crypt!"))?
+                    .create_key(self.object_id, KeyPurpose::Data)
+                    .await?;
+
+                // Arrange for the key to be added to the cache when (and if) the transaction
+                // commits.
+                struct UnwrappedKeys {
+                    object_id: u64,
+                    unwrapped_keys: Arc<XtsCipherSet>,
+                }
+
+                impl AssociatedObject for UnwrappedKeys {
+                    fn will_apply_mutation(
+                        &self,
+                        _mutation: &Mutation,
+                        object_id: u64,
+                        manager: &ObjectManager,
+                    ) {
+                        manager.store(object_id).unwrap().key_manager.insert(
+                            self.object_id,
+                            self.unwrapped_keys.clone(),
+                            /* permanent: */ false,
+                        );
+                    }
+                }
+
+                let unwrapped_keys = Arc::new(XtsCipherSet::new(&vec![(0, unwrapped_key)]));
+
+                transaction.add_with_object(
+                    store.store_object_id(),
+                    Mutation::insert_object(
+                        ObjectKey::keys(self.object_id),
+                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys(vec![(0, key)]))),
+                    ),
+                    AssocObj::Owned(Box::new(UnwrappedKeys {
+                        object_id: self.object_id,
+                        unwrapped_keys: unwrapped_keys.clone(),
+                    })),
+                );
+
+                Some(unwrapped_keys)
+            }
+            Encryption::PermanentKeys => {
+                Some(store.key_manager.get(self.object_id).await?.unwrap())
+            }
+        })
+    }
+
     pub async fn read(
         &self,
         attribute_id: u64,
@@ -730,10 +815,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         Ok(Some(buffer.as_slice().into()))
     }
 
-    // Writes potentially unaligned data at `device_offset` and returns checksums if requested. The
-    // data will be encrypted if necessary.
-    // `buf` is mutable as an optimization, since the write may require encryption, we can encrypt
-    // the buffer in-place rather than copying to another buffer if the write is already aligned.
+    /// Writes potentially unaligned data at `device_offset` and returns checksums if requested.
+    /// The data will be encrypted if necessary.  `buf` is mutable as an optimization, since the
+    /// write may require encryption, we can encrypt the buffer in-place rather than copying to
+    /// another buffer if the write is already aligned.
+    ///
+    /// NOTE: This will not create keys if they are missing (it will fail with an error if that
+    /// happens to be the case).
     pub async fn write_at(
         &self,
         attribute_id: u64,
@@ -783,7 +871,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         let store_id = store.store_object_id();
 
-        if let Some(keys) = self.get_keys().await? {
+        if let Some(keys) = self.get_or_create_keys(transaction).await? {
             let mut slice = buf.as_mut_slice();
             for r in ranges {
                 let l = r.end - r.start;
