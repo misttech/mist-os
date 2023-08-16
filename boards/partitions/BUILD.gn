@@ -60,6 +60,7 @@ generated_partitions_config("x64") {
 
 generated_partitions_config("arm64") {
   forward_variables_from(_gigaboot, "*")
+  forward_variables_from(_standard_names, "*")
   hw_revision = "arm64"
 }
 
