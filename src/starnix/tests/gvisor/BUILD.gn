@@ -271,17 +271,11 @@ gvisor_benchmarks = [
 ]
 
 expect_includes("gvisor_benchmark") {
-  includes = [
-    "//src/starnix/tests/starnix_test.shard.cml",
-    "meta/gvisor_container.shard.cml",
-  ]
+  includes = [ "//src/starnix/tests/starnix_test.shard.cml" ]
 }
 
 expect_includes("gvisor_test_with_expectations") {
-  includes = [
-    "//src/starnix/tests/starnix_test_with_expectations.shard.cml",
-    "meta/gvisor_container.shard.cml",
-  ]
+  includes = [ "//src/starnix/tests/starnix_test_with_expectations.shard.cml" ]
 }
 
 test_runfiles = [
@@ -316,12 +310,7 @@ group("gvisor_runfiles") {
 }
 
 group("container_resources") {
-  deps = [
-    ":gvisor_runfiles",
-    "//src/starnix/containers:data_tmp_target",
-    "//src/starnix/containers:default_init",
-    "//src/starnix/containers/debian:system_image",
-  ]
+  deps = [ ":gvisor_runfiles" ]
 }
 
 # Creates a fuchsia_test_component for a gVisor binary.
@@ -509,9 +498,10 @@ foreach(benchmark_name, gvisor_benchmarks) {
 
 template("gvisor_with_expectations_test_package") {
   fuchsia_test_with_expectations_package(target_name) {
-    deps = [ ":container_resources" ]
+    deps = [ ":gvisor_runfiles" ]
 
     subpackages = starnix_test_subpackages
+    subpackages += [ "//src/starnix/containers/debian:debian_package" ]
 
     forward_variables_from(invoker, [ "test_components" ])
 
@@ -554,7 +544,7 @@ gvisor_with_expectations_test_package("starnix_gvisor_tests_on_fxfs") {
 }
 
 fuchsia_test_package("starnix_gvisor_benchmarks") {
-  deps = [ ":container_resources" ]
+  deps = [ ":gvisor_runfiles" ]
 
   test_components = []
 
@@ -563,6 +553,7 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
   }
 
   subpackages = starnix_test_subpackages
+  subpackages += [ "//src/starnix/containers/debian:debian_package" ]
 
   # Set environments to none so infra doesn't run these benchmarks.
   # These benchmarks are run as a part of:

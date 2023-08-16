@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/lib/testing/expectation/meta/client.shard.cml",
-        "//src/starnix/tests/gvisor/meta/gvisor_container.shard.cml",
+        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
         "//src/starnix/tests/starnix_test_with_expectations.shard.cml",
     ],
     program: {
