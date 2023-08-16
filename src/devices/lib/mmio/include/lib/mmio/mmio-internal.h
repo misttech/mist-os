@@ -12,17 +12,7 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-__BEGIN_CDECLS
-
-typedef struct {
-  // |vaddr| points to the content starting at |offset| in |vmo|.
-  MMIO_PTR void* vaddr;
-  zx_off_t offset;
-  size_t size;
-  zx_handle_t vmo;
-} mmio_buffer_t;
-
-__END_CDECLS
+#include "mmio-ops.h"
 
 #ifdef __cplusplus
 
@@ -35,22 +25,6 @@ __END_CDECLS
 #endif
 
 namespace fdf::internal {
-
-struct MmioBufferOps {
-  uint8_t (*Read8)(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs);
-  uint16_t (*Read16)(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs);
-  uint32_t (*Read32)(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs);
-  uint64_t (*Read64)(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs);
-  void (*ReadBuffer)(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs, void* buffer,
-                     size_t size);
-
-  void (*Write8)(const void* ctx, const mmio_buffer_t& mmio, uint8_t val, zx_off_t offs);
-  void (*Write16)(const void* ctx, const mmio_buffer_t& mmio, uint16_t val, zx_off_t offs);
-  void (*Write32)(const void* ctx, const mmio_buffer_t& mmio, uint32_t val, zx_off_t offs);
-  void (*Write64)(const void* ctx, const mmio_buffer_t& mmio, uint64_t val, zx_off_t offs);
-  void (*WriteBuffer)(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs, const void* buffer,
-                      size_t size);
-};
 
 template <typename T>
 static MMIO_PTR volatile T* GetAddr(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {

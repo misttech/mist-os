@@ -17,7 +17,7 @@ namespace fdf {
 class MmioView : public MmioBuffer {
  public:
   MmioView(const mmio_buffer_t& mmio, zx_off_t offset,
-           const internal::MmioBufferOps* ops = &internal::kDefaultOps, const void* ctx = nullptr)
+           const MmioBufferOps* ops = &internal::kDefaultOps, const void* ctx = nullptr)
       : MmioBuffer(
             mmio_buffer_t{
                 .vaddr = static_cast<MMIO_PTR uint8_t*>(mmio.vaddr) + offset,
@@ -30,7 +30,7 @@ class MmioView : public MmioBuffer {
   }
 
   MmioView(const mmio_buffer_t& mmio, zx_off_t offset, size_t size,
-           const internal::MmioBufferOps* ops = &internal::kDefaultOps, const void* ctx = nullptr)
+           const MmioBufferOps* ops = &internal::kDefaultOps, const void* ctx = nullptr)
       : MmioBuffer(
             mmio_buffer_t{
                 .vaddr = static_cast<MMIO_PTR uint8_t*>(mmio.vaddr) + offset,

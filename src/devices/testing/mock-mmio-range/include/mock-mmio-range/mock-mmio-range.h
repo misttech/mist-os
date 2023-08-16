@@ -121,7 +121,7 @@ class MockMmioRange {
   }
 
   fdf::MmioBuffer GetMmioBuffer() {
-    static constexpr fdf::internal::MmioBufferOps kMockMmioOps = {
+    static constexpr fdf::MmioBufferOps kMockMmioOps = {
         .Read8 = MockMmioRange::Read8,
         .Read16 = MockMmioRange::Read16,
         .Read32 = MockMmioRange::Read32,

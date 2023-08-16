@@ -28,7 +28,7 @@ class RegisterMmioProcessor {
   RegisterMmioProcessor& operator=(const RegisterMmioProcessor&&) = delete;
   explicit RegisterMmioProcessor(UfsMockDevice& mock_device) : mock_device_(mock_device) {}
 
-  static const fdf::internal::MmioBufferOps& GetMmioOps() { return kMmioOps; }
+  static const fdf::MmioBufferOps& GetMmioOps() { return kMmioOps; }
 
   static void NoOpHandler(UfsMockDevice& mock_device, uint32_t value);
   static void DefaultISHandler(UfsMockDevice& mock_device, uint32_t value);
@@ -87,7 +87,7 @@ class RegisterMmioProcessor {
   static void Write32(const void* ctx, const mmio_buffer_t& mmio, uint32_t value, zx_off_t offset);
   static uint32_t Read32(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs);
 
-  static constexpr fdf::internal::MmioBufferOps kMmioOps = {
+  static constexpr fdf::MmioBufferOps kMmioOps = {
       .Read8 = Read8,
       .Read16 = Read16,
       .Read32 = Read32,

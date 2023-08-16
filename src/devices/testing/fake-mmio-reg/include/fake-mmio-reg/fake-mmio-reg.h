@@ -126,7 +126,7 @@ class FakeMmioRegRegion {
     reg_region[offs + mmio.offset].Write(val);
   }
 
-  static constexpr fdf::internal::MmioBufferOps kFakeMmioOps = {
+  static constexpr fdf::MmioBufferOps kFakeMmioOps = {
       .Read8 = Read8,
       .Read16 = Read16,
       .Read32 = Read32,

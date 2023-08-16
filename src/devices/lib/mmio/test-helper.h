@@ -22,8 +22,7 @@ namespace fdf_testing {
 // have no unmigrated users touching MmioBufferOps.
 [[maybe_unused]] static fdf::MmioBuffer CreateMmioBuffer(
     size_t size, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED,
-    const ::fdf::internal::MmioBufferOps* ops = &::fdf::internal::kDefaultOps,
-    void* ctx = nullptr) {
+    const ::fdf::MmioBufferOps* ops = &::fdf::internal::kDefaultOps, void* ctx = nullptr) {
   zx::vmo vmo;
   ZX_ASSERT(zx::vmo::create(/*size=*/size, 0, &vmo) == ZX_OK);
   mmio_buffer_t mmio{};
@@ -33,8 +32,7 @@ namespace fdf_testing {
 
 [[maybe_unused]] static fdf::MmioBuffer CreateMmioBuffer(
     zx::vmo vmo, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED,
-    const ::fdf::internal::MmioBufferOps* ops = &::fdf::internal::kDefaultOps,
-    void* ctx = nullptr) {
+    const ::fdf::MmioBufferOps* ops = &::fdf::internal::kDefaultOps, void* ctx = nullptr) {
   zx_info_vmo_t info{};
   ZX_ASSERT(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), /*actual_count=*/0, /*avail_count=*/0) ==
             ZX_OK);

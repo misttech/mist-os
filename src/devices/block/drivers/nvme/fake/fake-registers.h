@@ -105,7 +105,7 @@ class FakeRegisters {
   void Write32(uint32_t val, zx_off_t offs);
   uint32_t Read32(zx_off_t offs);
 
-  static constexpr fdf::internal::MmioBufferOps kMmioOps = {
+  static constexpr fdf::MmioBufferOps kMmioOps = {
       .Read8 = Read8,
       .Read16 = Read16,
       .Read32 = Read32,

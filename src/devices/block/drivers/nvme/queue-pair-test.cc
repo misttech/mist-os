@@ -66,7 +66,7 @@ class QueuePairTest : public zxtest::Test {
   STUB_IO_OP(8)
 #undef STUB_IO_OP
 
-  static constexpr fdf::internal::MmioBufferOps kMmioOps = {
+  static constexpr fdf::MmioBufferOps kMmioOps = {
       .Read8 = Read8,
       .Read16 = Read16,
       .Read32 = Read32,

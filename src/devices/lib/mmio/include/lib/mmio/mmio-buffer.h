@@ -7,6 +7,7 @@
 
 #include <lib/mmio-ptr/mmio-ptr.h>
 #include <lib/mmio/mmio-internal.h>
+#include <lib/mmio/mmio-ops.h>
 #include <lib/mmio/mmio-pinned-buffer.h>
 #include <zircon/assert.h>
 #include <zircon/process.h>
@@ -54,7 +55,7 @@ class MmioBuffer {
   MmioBuffer(const MmioBuffer&) = delete;
   MmioBuffer& operator=(const MmioBuffer&) = delete;
 
-  MmioBuffer(mmio_buffer_t mmio, const internal::MmioBufferOps* ops = &internal::kDefaultOps,
+  MmioBuffer(mmio_buffer_t mmio, const MmioBufferOps* ops = &internal::kDefaultOps,
              const void* ctx = nullptr)
       : mmio_(mmio), ops_(ops), ctx_(ctx) {
     ZX_ASSERT(mmio_.vaddr != nullptr);
@@ -261,7 +262,7 @@ class MmioBuffer {
 
  protected:
   mmio_buffer_t mmio_;
-  const internal::MmioBufferOps* ops_;
+  const MmioBufferOps* ops_;
   const void* ctx_;
 
   template <typename T>
