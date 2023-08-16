@@ -9,7 +9,6 @@ use std::num::ParseIntError;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-#[allow(dead_code)]
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Test Pilot")]
 pub struct CommandLineArgs {

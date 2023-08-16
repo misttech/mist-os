@@ -8,31 +8,43 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/sdk/sdk_host_tool.gni")
 
-rustc_binary("test_pilot") {
-  name = "test_pilot"
-  with_unit_tests = true
-  edition = "2021"
+if (is_host) {
+  rustc_binary("test_pilot") {
+    name = "test_pilot"
+    with_unit_tests = true
+    edition = "2021"
 
-  deps = [
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:structopt",
-  ]
+    deps = [
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:async-io",
+      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:serde",
+      "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:structopt",
+      "//third_party/rust_crates:thiserror",
+    ]
 
-  test_deps = [ "//third_party/rust_crates:tempfile" ]
+    test_deps = [
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:assert_matches",
+      "//third_party/rust_crates:rand",
+      "//third_party/rust_crates:tempfile",
+    ]
 
-  sources = [
-    "src/main.rs",
-    "src/opts.rs",
-    "src/test_config.rs",
-  ]
-}
+    sources = [
+      "src/errors.rs",
+      "src/main.rs",
+      "src/opts.rs",
+      "src/run_tests.rs",
+      "src/test_config.rs",
+    ]
+  }
 
-sdk_host_tool("test_pilot_sdk") {
-  category = "private"
-  output_name = "test_pilot"
-  deps = [ ":test_pilot" ]
+  sdk_host_tool("test_pilot_sdk") {
+    category = "private"
+    output_name = "test_pilot"
+    deps = [ ":test_pilot" ]
+  }
 }
 
 install_host_tools("install") {
