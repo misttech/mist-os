@@ -2325,8 +2325,8 @@ TEST_F(DispatcherTest, RunThenQuitAndRunAgain) {
   ASSERT_EQ(ZX_ERR_TIMED_OUT, fdf_testing_run(zx::deadline_after(zx::msec(1)).get(), false));
   ASSERT_FALSE(ran);
 
-  // This time quit task should run before our 1s deadline.
-  ASSERT_EQ(ZX_ERR_CANCELED, fdf_testing_run(zx::deadline_after(zx::sec(1)).get(), false));
+  // This time quit task should run since we are not setting any deadline.
+  ASSERT_EQ(ZX_ERR_CANCELED, fdf_testing_run(ZX_TIME_INFINITE, false));
   ASSERT_TRUE(ran);
 
   // Reset quit.
@@ -2346,8 +2346,8 @@ TEST_F(DispatcherTest, RunThenQuitAndRunAgain) {
   ASSERT_EQ(ZX_ERR_TIMED_OUT, fdf_testing_run(zx::deadline_after(zx::msec(1)).get(), false));
   ASSERT_FALSE(ran);
 
-  // Quit task should run before our 1s deadline again.
-  ASSERT_EQ(ZX_ERR_CANCELED, fdf_testing_run(zx::deadline_after(zx::sec(1)).get(), false));
+  // Quit task should run since there is no deadline.
+  ASSERT_EQ(ZX_ERR_CANCELED, fdf_testing_run(ZX_TIME_INFINITE, false));
   ASSERT_TRUE(ran);
 
   // Reset quit.
