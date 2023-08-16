@@ -7,10 +7,14 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use super::{BindingsNonSyncCtxImpl, Ctx, DeviceIdExt};
-use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
+use super::{devices::DeviceSpecificInfo, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt};
+use fuchsia_inspect::ArrayProperty as _;
+use net_types::{
+    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
+    Witness as _,
+};
 use netstack3_core::{device::DeviceId, ip, transport::tcp};
-use std::{borrow::Cow, num::NonZeroU16, ops::Deref};
+use std::{borrow::Cow, num::NonZeroU16, ops::Deref, string::ToString as _};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
@@ -124,5 +128,44 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     ip::forwarding::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
     ip::forwarding::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
     let Visitor(inspector) = visitor;
+    inspector
+}
+
+pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
+    let inspector = fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
+    let Ctx { sync_ctx: _, non_sync_ctx } = ctx;
+    non_sync_ctx.devices.with_devices(|devices| {
+        for ref device in devices {
+            let id = device.external_state().static_common_info().binding_id;
+            inspector.root().record_child(format!("{id}"), |node| {
+                node.record_string("Name", &device.external_state().static_common_info().name);
+                node.record_uint("InterfaceId", id.into());
+                device.external_state().with_common_info(|info| {
+                    node.record_bool("AdminEnabled", info.admin_enabled);
+                    node.record_uint("MTU", info.mtu.get().into());
+                    let ip_addresses =
+                        node.create_string_array("IpAddresses", info.addresses.len());
+                    for (j, address) in info.addresses.keys().enumerate() {
+                        ip_addresses.set(j, address.get().to_string());
+                    }
+                    node.record(ip_addresses);
+                });
+                match device.external_state() {
+                    DeviceSpecificInfo::Netdevice(info) => {
+                        node.record_bool("Loopback", false);
+                        node.record_child("NetworkDevice", |node| {
+                            node.record_string("MacAddress", info.mac.get().to_string());
+                            info.with_dynamic_info(|dyn_info| {
+                                node.record_bool("PhyUp", dyn_info.phy_up);
+                            });
+                        });
+                    }
+                    DeviceSpecificInfo::Loopback(_info) => {
+                        node.record_bool("Loopback", true);
+                    }
+                }
+            })
+        }
+    });
     inspector
 }

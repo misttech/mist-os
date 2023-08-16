@@ -1541,6 +1541,64 @@ async fn inspect_ns3_routes(name: &str) {
 }
 
 #[netstack_test]
+async fn inspect_ns3_devices(name: &str) {
+    type N = netstack_testing_common::realms::Netstack3;
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let network = sandbox.create_network("net").await.expect("failed to create network");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+
+    // Install netdevice device so that non-Loopback device Inspect properties can be asserted upon.
+    const NETDEV_NAME: &str = "test-eth";
+    let max_frame_size = netemul::DEFAULT_MTU
+        + u16::try_from(ETHERNET_HDR_LEN_NO_TAG)
+            .expect("should fit ethernet header length in a u16");
+    let netdev = realm
+        .join_network_with(
+            &network,
+            "netdev-ep",
+            netemul::new_endpoint_config(max_frame_size, Some(fidl_mac!("02:00:00:00:00:01"))),
+            netemul::InterfaceConfig { name: Some(NETDEV_NAME.into()), metric: None },
+        )
+        .await
+        .expect("failed to join network with netdevice endpoint");
+    netdev
+        .add_address_and_subnet_route(fidl_subnet!("192.168.0.1/24"))
+        .await
+        .expect("configure address");
+
+    let data = get_inspect_data(&realm, "netstack", "root", "fuchsia.inspect.Tree")
+        .await
+        .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+        "Devices": {
+            "1": {
+                Name: "lo",
+                InterfaceId: 1u64,
+                AdminEnabled: true,
+                MTU: 65536u64,
+                Loopback: true,
+                IpAddresses: Vec::<String>::new(),
+            },
+            "2": {
+                Name: NETDEV_NAME,
+                InterfaceId: 2u64,
+                AdminEnabled: true,
+                MTU: u64::from(netemul::DEFAULT_MTU),
+                Loopback: false,
+                IpAddresses: vec!["192.168.0.1".to_string()],
+                NetworkDevice: {
+                    MacAddress: "2:0:0:0:0:1",
+                    PhyUp: true,
+                },
+            }
+        }
+    })
+}
+
+#[netstack_test]
 async fn inspect_for_sampler<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");

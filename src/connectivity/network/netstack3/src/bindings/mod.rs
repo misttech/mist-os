@@ -998,6 +998,10 @@ impl NetstackSeed {
         let _routes = inspector.root().create_lazy_child("Routes", move || {
             futures::future::ok(inspect::routes(&mut routes_ctx.clone())).boxed()
         });
+        let devices_ctx = netstack.ctx.clone();
+        let _devices = inspector.root().create_lazy_child("Devices", move || {
+            futures::future::ok(inspect::devices(&devices_ctx)).boxed()
+        });
 
         let services = fs.take_and_serve_directory_handle().context("directory handle")?;
 
