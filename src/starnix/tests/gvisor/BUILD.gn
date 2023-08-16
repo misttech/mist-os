@@ -184,6 +184,7 @@ gvisor_tests = [
   "truncate_test",
   "tuntap_hostinet_test",
   "udp_bind_test",
+  "udp_socket_test",
   "unlink_test",
   "unshare_test",
   "utimes_test",

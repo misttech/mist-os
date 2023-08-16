@@ -796,6 +796,29 @@
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
 
+                // udp_socket_test
+                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/0",
+                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/2",
+                "AllInetTests/UdpSocketTest.Disconnect/*",
+                "AllInetTests/UdpSocketTest.DisconnectAfterBind/*",
+                "AllInetTests/UdpSocketTest.DisconnectAfterBindToAny/*",
+                "AllInetTests/UdpSocketTest.DisconnectAfterBindToUnspecAndConnect/*",
+                "AllInetTests/UdpSocketTest.DisconnectAfterConnectAnyWithPort/*",
+                "AllInetTests/UdpSocketTest.DisconnectAfterConnectWithoutBind/*",
+                "AllInetTests/UdpSocketTest.Fionread/*",
+                "AllInetTests/UdpSocketTest.FIONREADShutdown/*",
+                "AllInetTests/UdpSocketTest.FIONREADWriteShutdown/*",
+                "AllInetTests/UdpSocketTest.FIONREADZeroLengthPacket/*",
+                "AllInetTests/UdpSocketTest.FIONREADZeroLengthWriteShutdown/*",
+                "AllInetTests/UdpSocketTest.ReceiveAfterDisconnect/*",
+                "AllInetTests/UdpSocketTest.RecvErrorConnRefused/*",
+                "AllInetTests/UdpSocketTest.RecvErrorConnRefusedOtherAFSockOpt/*",
+                "AllInetTests/UdpSocketTest.SetSocketDetachFilter/*",
+                "AllInetTests/UdpSocketTest.SoTimestamp/*",
+                "AllInetTests/UdpSocketTest.TimestampIoctl/*",
+                "AllInetTests/UdpSocketTest.TimestampIoctlNothingRead/*",
+                "AllInetTests/UdpSocketTest.TimestampIoctlPersistence/*",
+
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
@@ -942,6 +965,7 @@
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnect*/*",
                 "AllInetTests/SimpleTcpSocketTest.Shutdown*ConnectingSocket/*",
+                "AllInetTests/UdpSocketTest.RecvBufLimits/*",
                 "ExceptionTest.IOAccessFault",
                 "FcntlTest.SetFdO_ASYNC",
                 "MountTest.BindToSelf",
@@ -967,6 +991,11 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
+
+                // socket_udp_test - hanging tests.
+                "AllInetTests/UdpSocketTest.ReadShutdown/*",
+                "AllInetTests/UdpSocketTest.ReadShutdownDifferentThread/*",
+                "AllInetTests/UdpSocketTest.ErrorQueue/*",
 
                 // TODO(fxbug.dev/114813): Re-enable once CLONE_VM | CLONE_THREAD is implemented
                 "Waiters/WaitAnyChildTest.CloneSIGCHLD/*",
