@@ -610,11 +610,14 @@ void SocketDevice::ConnectionSocketSignalled(zx_status_t status, const zx_packet
   if (conn->IsShuttingDown()) {
     return;
   }
+  if (signal->observed & ZX_SOCKET_READABLE) {
+    ContinueTxLocked(false, conn);
+    return;
+  }
   if (signal->observed & ZX_SOCKET_PEER_CLOSED) {
     NotifyAndCleanupConLocked(conn);
     return;
   }
-  ContinueTxLocked(false, conn);
 }
 
 void SocketDevice::UpdateCidLocked() {
