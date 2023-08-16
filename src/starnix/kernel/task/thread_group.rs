@@ -248,7 +248,11 @@ impl ThreadGroup {
             leader,
             signal_actions,
             drop_notifier: Default::default(),
-            limits: Mutex::new(Default::default()),
+            // A child process created via fork(2) inherits its parent's
+            // resource limits.  Resource limits are preserved across execve(2).
+            limits: Mutex::new(
+                parent.as_ref().map(|p| p.base.limits.lock().clone()).unwrap_or(Default::default()),
+            ),
             next_seccomp_filter_id: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),

@@ -718,6 +718,9 @@ impl Task {
             new_process_writer.parent = Some(init_task.thread_group.clone());
             init_writer.children.insert(task.id, Arc::downgrade(&task.thread_group));
         }
+        // A child process created via fork(2) inherits its parent's
+        // resource limits.  Resource limits are preserved across execve(2).
+        *task.thread_group.limits.lock() = init_task.thread_group.limits.lock().clone();
         Ok(task)
     }
 
@@ -2140,5 +2143,23 @@ mod test {
         assert!(current_task.creds().has_capability(CAP_SYS_ADMIN));
         current_task.set_creds(Credentials::with_ids(1, 1));
         assert!(!current_task.creds().has_capability(CAP_SYS_ADMIN));
+    }
+
+    #[::fuchsia::test]
+    async fn test_clone_rlimit() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let prev_fsize = current_task.thread_group.get_rlimit(Resource::FSIZE);
+        assert_ne!(prev_fsize, 10);
+        current_task
+            .thread_group
+            .limits
+            .lock()
+            .set(Resource::FSIZE, rlimit { rlim_cur: 10, rlim_max: 100 });
+        let current_fsize = current_task.thread_group.get_rlimit(Resource::FSIZE);
+        assert_eq!(current_fsize, 10);
+
+        let child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let child_fsize = child_task.thread_group.get_rlimit(Resource::FSIZE);
+        assert_eq!(child_fsize, 10)
     }
 }

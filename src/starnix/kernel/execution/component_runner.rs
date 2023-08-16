@@ -22,7 +22,6 @@ use crate::{
     auth::Credentials,
     execution::{
         container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
-        set_rlimits,
     },
     fs::{fuchsia::RemoteFs, *},
     logging::{log_error, log_info},
@@ -117,9 +116,6 @@ pub async fn start_component(
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
     release_on_error!(current_task, &(), {
-        let rlimits = get_program_strvec(&start_info, "rlimits").cloned().unwrap_or_default();
-        set_rlimits(&current_task, &rlimits)?;
-
         let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
         let cwd = current_task
             .lookup_path(

@@ -106,6 +106,7 @@ impl Resource {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ResourceLimits {
     values: HashMap<Resource, rlimit>,
 }
