@@ -14,7 +14,7 @@
 #![no_std]
 #![deny(missing_docs)]
 
-use core::convert::Infallible as Never;
+use core::{convert::Infallible as Never, task::Poll};
 
 /// An extension trait adding functionality to [`Result`].
 pub trait ResultExt<T, E> {
@@ -41,13 +41,53 @@ pub trait PollExt<T> {
     fn is_ready_checked<TT: sealed::EqType<T>>(&self) -> bool;
 }
 
-impl<T> PollExt<T> for core::task::Poll<T> {
+impl<T> PollExt<T> for Poll<T> {
     fn is_ready_checked<TT: sealed::EqType<T>>(&self) -> bool {
-        core::task::Poll::is_ready(self)
+        Poll::is_ready(self)
     }
 }
 
 /// A trait providing unreachability assertion enforced by the type system.
+///
+/// # Example
+/// ```
+/// use core::convert::Infallible as Never;
+///
+/// /// Provides guaranteed winning lottery numbers.
+/// trait LotteryOracle {
+///   fn get_winning_number(&self) -> u32;
+/// }
+///
+/// // Might return a thing that gives winning lottery numbers.
+/// fn try_get_lottery_oracle() -> Option<impl LotteryOracle> {
+///   // This function always returns `None` but we still need a type that
+///   // the option _could_ hold.
+///
+///   /// Uninstantiable type that implements [`LotteryOracle`].
+///   struct UninstantiableOracle(Never);
+///
+///   /// Enable use with [`UnreachableExt`].
+///   impl AsRef<Never> for UninstantiableOracle {
+///     fn as_ref(&self) -> Never {
+///       &self.0
+///     }
+///   }
+///
+///   /// Trivial implementation that can't actually be used.
+///   impl LotteryOracle for UninstantiableOracle {
+///     fn get_winning_number(&self) -> u32 {
+///       self.uninstantiable_unreachable()
+///     }
+///   }
+///
+///   Option::<UninstantiableOracle>::None
+/// }
+/// ```
+///
+/// # Implementing
+///
+/// This trait is blanket-implemented for any type that can be used to construct
+/// an instance of [`Never`]. To use it, simply implement [`AsRef<Never>`].
 pub trait UnreachableExt: sealed::Sealed {
     /// A method that can't be called.
     ///
