@@ -191,6 +191,7 @@ source_set("ddktl") {
     "//src/devices/misc/drivers/test:*",
     "//src/devices/misc/drivers/test-parent:*",
     "//src/devices/misc/drivers/virtio-rng:*",
+    "//src/devices/misc/drivers/virtio-socket:*",
     "//src/devices/ml/drivers/aml-nna:*",
     "//src/devices/ml/drivers/as370-nna:*",
     "//src/devices/ml/drivers/usb-harriet:*",
