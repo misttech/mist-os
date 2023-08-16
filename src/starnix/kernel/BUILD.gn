@@ -17,7 +17,7 @@ declare_args() {
   starnix_disable_tracing = false
 
   # Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
-  starnix_use_fuchsia_mutex = false
+  starnix_use_fuchsia_mutex = true
 
   # Wheher to use fuchsia_sync::RwLock instead of parking_lot::RwLock.
   starnix_use_fuchsia_rwlock = true
