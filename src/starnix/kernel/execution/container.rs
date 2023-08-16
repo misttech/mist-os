@@ -81,7 +81,10 @@ fn get_config_from_component_start_info(
     mut start_info: frunner::ComponentStartInfo,
 ) -> ConfigWrapper {
     let get_strvec = |key| {
-        get_program_strvec(&start_info, key).map(|value| value.to_owned()).unwrap_or_default()
+        get_program_strvec(&start_info, key)
+            .unwrap_or_default()
+            .map(|value| value.to_owned())
+            .unwrap_or_default()
     };
 
     let get_string = |key| get_program_string(&start_info, key).unwrap_or_default().to_owned();

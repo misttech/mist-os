@@ -89,7 +89,7 @@ impl ElfProgramConfig {
 
         Ok(ElfProgramConfig {
             binary: runner::get_program_binary_from_dict(&program)?,
-            args: runner::get_program_args_from_dict(&program),
+            args: runner::get_program_args_from_dict(&program)?,
             notify_lifecycle_stop,
             ambient_mark_vmo_exec: runner::get_bool(program, VMEX_KEY)?,
             main_process_critical: runner::get_bool(program, CRITICAL_KEY)?,
@@ -166,39 +166,6 @@ mod tests {
             Arc::new(SecurityPolicy::default());
     }
 
-    macro_rules! assert_error_is_invalid_value {
-        ($result:expr, $expected_key:expr) => {
-            assert_matches!(
-                $result,
-                Err(ProgramError::Parse(StartInfoProgramError::InvalidValue(key, _, _)))
-                if key == $expected_key
-            );
-        };
-    }
-
-    macro_rules! assert_error_is_invalid_type {
-        ($result:expr, $expected_key:expr) => {
-            assert_matches!(
-                $result,
-                Err(ProgramError::Parse(StartInfoProgramError::InvalidType(key)))
-                if key == $expected_key
-            );
-        };
-    }
-
-    macro_rules! assert_error_is_disallowed_job_policy {
-        ($result:expr, $expected_policy:expr) => {
-            assert_matches!(
-                $result,
-                Err(ProgramError::Policy(PolicyError::JobPolicyDisallowed {
-                    policy,
-                    ..
-                }))
-                if policy == $expected_policy
-            );
-        };
-    }
-
     #[test_case("forward_stdout_to", new_string("log"), ElfProgramConfig { stdout_sink: StreamSink::Log, ..default_valid_config()} ; "when_stdout_log")]
     #[test_case("forward_stdout_to", new_string("none"), ElfProgramConfig { stdout_sink: StreamSink::None, ..default_valid_config()} ; "when_stdout_none")]
     #[test_case("forward_stderr_to", new_string("log"), ElfProgramConfig { stderr_sink: StreamSink::Log, ..default_valid_config()} ; "when_stderr_log")]
@@ -243,7 +210,14 @@ mod tests {
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker);
 
-        assert_error_is_disallowed_job_policy!(actual, policy);
+        assert_matches!(
+            actual,
+            Err(ProgramError::Policy(PolicyError::JobPolicyDisallowed {
+                policy: p,
+                ..
+            }))
+            if p == policy
+        );
     }
 
     #[test_case("lifecycle.stop_event", new_string("invalid") ; "for_stop_event")]
@@ -257,7 +231,11 @@ mod tests {
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker);
 
-        assert_error_is_invalid_value!(actual, key);
+        assert_matches!(
+            actual,
+            Err(ProgramError::Parse(StartInfoProgramError::InvalidValue(k, _, _)))
+            if k == key
+        );
     }
 
     #[test_case("lifecycle.stop_event", new_empty_vec() ; "for_stop_event")]
@@ -276,7 +254,11 @@ mod tests {
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker);
 
-        assert_error_is_invalid_type!(actual, key);
+        assert_matches!(
+            actual,
+            Err(ProgramError::Parse(StartInfoProgramError::InvalidType(k)))
+            if k == key
+        );
     }
 
     fn default_valid_config() -> ElfProgramConfig {

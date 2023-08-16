@@ -187,7 +187,7 @@ fn component_is_test(start_info: &fcrunner::ComponentStartInfo) -> bool {
     // The dart runner identifies tests using an --is_test=true argument passed in via the program
     // definition.
     const TEST_ARG: &str = "--is_test=true";
-    let args = runner::get_program_args(start_info);
+    let args = runner::get_program_args(start_info).unwrap_or_default();
     args.iter().any(|arg| arg == TEST_ARG)
 }
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::run_component_features;
-use ::runner::{get_program_string, get_program_strvec};
+use ::runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
@@ -95,19 +95,20 @@ pub async fn start_component(
     };
 
     let resolve_program_strvec = |key| {
-        get_program_strvec(&start_info, key)
-            .map(|args: &Vec<String>| {
-                args.iter()
-                    .map(|arg| CString::new(resolve_template(arg)))
-                    .collect::<Result<Vec<CString>, _>>()
+        get_program_strvec(&start_info, key)?
+            .unwrap_or(&vec![])
+            .iter()
+            .map(|arg| {
+                CString::new(resolve_template(arg))
+                    .map_err(|_| StartInfoProgramError::InvalidStrVec(key.to_string()))
             })
-            .unwrap_or(Ok(vec![]))
+            .collect::<Result<Vec<CString>, _>>()
     };
 
     let args = resolve_program_strvec("args")?;
     let environ = resolve_program_strvec("environ")?;
     let component_features =
-        get_program_strvec(&start_info, "features").cloned().unwrap_or_default();
+        get_program_strvec(&start_info, "features")?.cloned().unwrap_or_default();
 
     let binary_path = get_program_string(&start_info, "binary")
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
@@ -131,7 +132,7 @@ pub async fn start_component(
 
         let uid = get_program_string(&start_info, "uid").unwrap_or("42").parse()?;
         let mut credentials = Credentials::with_ids(uid, uid);
-        if let Some(caps) = get_program_strvec(&start_info, "capabilities") {
+        if let Some(caps) = get_program_strvec(&start_info, "capabilities")? {
             let mut capabilities = Capabilities::empty();
             for cap in caps {
                 capabilities |= cap.parse()?;
@@ -142,7 +143,7 @@ pub async fn start_component(
         }
         current_task.set_creds(credentials);
 
-        if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {
+        if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts")? {
             for mount in local_mounts.iter() {
                 let (mount_point, child_fs) =
                     create_filesystem_from_spec(current_task.kernel(), &pkg, mount)?;

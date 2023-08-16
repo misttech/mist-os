@@ -206,7 +206,8 @@ impl Component {
             .ok_or_else(|| ComponentError::InvalidUrl)?
             .to_string();
 
-        let args = runner::get_program_args(&start_info);
+        let args = runner::get_program_args(&start_info)
+            .map_err(|e| ComponentError::InvalidArgs(url.clone(), e.into()))?;
         validate_args(&args).map_err(|e| ComponentError::InvalidArgs(url.clone(), e.into()))?;
 
         let binary = runner::get_program_binary(&start_info)
