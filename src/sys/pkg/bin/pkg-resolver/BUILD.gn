@@ -233,6 +233,7 @@ fuchsia_structured_config_values("eng_config_values_from_gn") {
   cm_label = ":manifest"
 
   values = structured_config_values
+  values.delivery_blob_fallback = false
 }
 
 group("tests") {
