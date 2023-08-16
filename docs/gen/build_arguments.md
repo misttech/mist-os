@@ -8385,6 +8385,19 @@ Use link time optimization (LTO).
 
 From //build/config/lto/config.gni:7
 
+### use_network_unified_binary
+
+Use the unified network Rust binary.
+
+This flag controls compiling network-related Rust components into a single
+binary. Its purpose is to allow one-shot transition between the build modes
+and accelerate build times locally once the default is to use unified
+binaries.
+
+**Current value (from the default):** `false`
+
+From //src/connectivity/network/unified_binary/network_unified_binary.gni:16
+
 ### use_null_vulkan_on_host
 
 TODO(liyl): Currently non-x64 platforms don't have Vulkan support,
