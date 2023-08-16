@@ -5,9 +5,9 @@
 library fuchsia.sysmem;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 118,
+  DEVICE = 0x76,
 };
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 9,
+  DEVICE = 0x09,
 };

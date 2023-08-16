@@ -12,9 +12,9 @@ driver_bind_rules("ufs_bind") {
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.hardware.sysmem",
     "//src/devices/bind/fuchsia.pci",
     "//src/devices/bind/fuchsia.pci.massstorage",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

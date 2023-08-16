@@ -81,7 +81,6 @@ template("simple_fuchsia_driver") {
     tests = "${driver_name}_bind_tests.json"
 
     deps = [
-      "//src/devices/bind/fuchsia.hardware.sysmem",
       "//src/devices/bind/fuchsia.pci",
       "//src/devices/bind/fuchsia.sysmem",
     ]

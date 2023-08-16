@@ -12,9 +12,9 @@ driver_bind_rules("ahci_bind") {
   tests = "tests.json"
   deps = [
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.hardware.sysmem",
     "//src/devices/bind/fuchsia.pci",
     "//src/devices/bind/fuchsia.pci.massstorage",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 fuchsia_driver("ahci-driver") {

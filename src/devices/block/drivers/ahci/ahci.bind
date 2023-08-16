@@ -5,7 +5,7 @@
 composite ahci;
 
 using fuchsia.acpi;
-using fuchsia.hardware.sysmem;
+using fuchsia.sysmem;
 using fuchsia.pci;
 using fuchsia.pci.massstorage;
 
@@ -17,7 +17,7 @@ primary node "pci" {
 }
 
 optional node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 
 optional node "acpi" {

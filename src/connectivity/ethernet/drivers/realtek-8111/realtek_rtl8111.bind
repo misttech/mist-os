@@ -5,7 +5,7 @@
 composite realtek_rtl8111;
 
 using fuchsia.acpi;
-using fuchsia.hardware.sysmem;
+using fuchsia.sysmem;
 using fuchsia.pci;
 
 primary node "pci" {
@@ -16,7 +16,7 @@ primary node "pci" {
 }
 
 optional node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 
 optional node "acpi" {
