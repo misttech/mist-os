@@ -35,7 +35,7 @@ even pass extra arguments using `-- <extra_args>`.
 To run the suite against `@fuchsia_sdk`:
 
 ```
-# Prepare the @fuchsia_sdk repository. Only needed once.
+# Prepare the @fuchsia_sdk repository. Only needed once per `jiri update`
 fx build generate_fuchsia_sdk_repository
 
 # Run the full test suite
@@ -67,6 +67,9 @@ Finally, it is possible, **on Linux only**, to directly invoke `bazel test`
 in this directory after some necessary preparation, i.e. for running against
 the `@fuchsia_sdk` repository:
 
+- After each `jiri update`, run `bazel clean --expunge` to ensure no stale
+  external repositories will be used.
+
 - Run `fx build generate_fuchsia_sdk_repository` to populate pre-requisites
   from a Fuchsia checkout.
 
@@ -87,6 +90,9 @@ fx build generate_fuchsia_sdk_repository
 export LOCAL_FUCHSIA_PLATFORM_BUILD=$(fx get-build-dir)
 cd build/bazel_sdk/tests
 
+# Run this once, and then after each `jiri update`
+bazel clean --expunge
+
 # Run the test suite, customize options if needed.
 bazel test --config=fuchsia_x64 :tests
 ```
@@ -94,5 +100,5 @@ bazel test --config=fuchsia_x64 :tests
 To run against a local IDK, define `LOCAL_FUCHSIA_IDK_DIRECTORY` instead
 in your environment before invoking `bazel test ...` as above.
 
-These last methods does not work on macOS because the WORKSPACE.bazel hard-codes
+This last method does not work on macOS because the WORKSPACE.bazel hard-codes
 linux-specific paths to host prebuilt binaries (https://fxbug.dev/124321).
