@@ -12,6 +12,7 @@
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
 namespace amlogic_display {
@@ -104,8 +105,19 @@ zx_status_t HdmiHost::HostOn() {
   // enable clk81 (needed for HDMI module and a bunch of other modules)
   HhiGclkMpeg2Reg::Get().ReadFrom(&(*hhi_mmio_)).set_clk81_en(1).WriteTo(&(*hhi_mmio_));
 
-  // power up HDMI Memory (bits 15:8)
-  HhiMemPdReg0::Get().ReadFrom(&(*hhi_mmio_)).set_hdmi(0).WriteTo(&(*hhi_mmio_));
+  // TODO(fxbug.com/132123): HDMI memory was supposed to be powered on during
+  // the VPU power sequence. The AMLogic-supplied bringup code pauses for 5us
+  // between each bit flip.
+  auto memory_power0 = MemoryPower0::Get().ReadFrom(&hhi_mmio_.value());
+  memory_power0.set_hdmi_memory0_powered_off(false);
+  memory_power0.set_hdmi_memory1_powered_off(false);
+  memory_power0.set_hdmi_memory2_powered_off(false);
+  memory_power0.set_hdmi_memory3_powered_off(false);
+  memory_power0.set_hdmi_memory4_powered_off(false);
+  memory_power0.set_hdmi_memory5_powered_off(false);
+  memory_power0.set_hdmi_memory6_powered_off(false);
+  memory_power0.set_hdmi_memory7_powered_off(false);
+  memory_power0.WriteTo(&hhi_mmio_.value());
 
   auto res = hdmi_->Reset(1);  // only supports 1 display for now
   if ((res.status() != ZX_OK) || res->is_error()) {

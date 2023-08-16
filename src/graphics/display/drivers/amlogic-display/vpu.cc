@@ -5,13 +5,18 @@
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/time.h>
 #include <zircon/errors.h>
+
+#include <cstdint>
 
 #include <ddktl/device.h>
 
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
@@ -46,23 +51,6 @@ constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInp
 
 }  // namespace
 
-// AOBUS Register
-#define AOBUS_GEN_PWR_SLEEP0 (0x03a << 2)
-
-// The AO (Always On) power domain is described in A311D datasheet section
-// 8.2.1 "Top Level Power Domains", which gives an overview of all power
-// domains.  The EE (Everything Else) abbreviation is decoded in the
-// AO_RTI_PWR_CNTL_REG0 register documentation, in A311D datasheet section 8.2.5
-// "Power/Isolation/Memory Power Down Register Summary".
-//
-// S912 datasheet section 17 "Power Domain" presents similar information in more
-// depth. The S912 also has AO / EE / CPU power domains, and the main difference
-// from our supported chips is the lack of an A72 CPU complex. In particular,
-// it's helpful to compare the following figures:
-// * S912: Figure III.17.1 "Power Domain" vs A311D: Figure 8-2 "Power Domain"
-// * S912: Table III.17.1 "Power on Sequence of Different Power Domains" vs
-//   A311D: Table 8-2 with the same title
-
 // EE Reset registers on the CBUS (regular power-gated config registers domain).
 //
 // A311D datasheet section 8.8.2.1 "Register Description" > "EE Reset" describes
@@ -90,9 +78,6 @@ constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInp
 
 #define READ32_HHI_REG(a) hhi_mmio_->Read32(a)
 #define WRITE32_HHI_REG(a, v) hhi_mmio_->Write32(v, a)
-
-#define READ32_AOBUS_REG(a) aobus_mmio_->Read32(a)
-#define WRITE32_AOBUS_REG(a, v) aobus_mmio_->Write32(v, a)
 
 #define READ32_RESET_REG(a) reset_mmio_->Read32(a)
 #define WRITE32_RESET_REG(a, v) reset_mmio_->Write32(v, a)
@@ -292,80 +277,90 @@ void Vpu::ConfigureClock() {
   WRITE32_REG(VPU, VPU_WRARB_MODE_L2C1, 0x20000);
 }
 
-// The power gates documented in A311D datasheet Section 8.7.5 "Register
-// Description", entries for HHI_VPU_MEM_PD_REG0, HHI_VPU_MEM_PD_REG1,
-// HHI_VPU_MEM_PD_REG2
+namespace {
 
-/*
- *  Power Table
- *  <vpu module>          <register>           <bit> <len>
- *  {VPU_VIU_OSD1,        HHI_VPU_MEM_PD_REG0,   0,   2},
- *  {VPU_VIU_OSD2,        HHI_VPU_MEM_PD_REG0,   2,   2},
- *  {VPU_VIU_VD1,         HHI_VPU_MEM_PD_REG0,   4,   2},
- *  {VPU_VIU_VD2,         HHI_VPU_MEM_PD_REG0,   6,   2},
- *  {VPU_VIU_CHROMA,      HHI_VPU_MEM_PD_REG0,   8,   2},
- *  {VPU_VIU_OFIFO,       HHI_VPU_MEM_PD_REG0,  10,   2},
- *  {VPU_VIU_SCALE,       HHI_VPU_MEM_PD_REG0,  12,   2},
- *  {VPU_VIU_OSD_SCALE,   HHI_VPU_MEM_PD_REG0,  14,   2},
- *  {VPU_VIU_VDIN0,       HHI_VPU_MEM_PD_REG0,  16,   2},
- *  {VPU_VIU_VDIN1,       HHI_VPU_MEM_PD_REG0,  18,   2},
- *  {VPU_VIU_SRSCL,       HHI_VPU_MEM_PD_REG0,  20,   2},
- *  {VPU_AFBC_DEC1,       HHI_VPU_MEM_PD_REG0,  22,   2},
- *  {VPU_VIU_DI_SCALE,    HHI_VPU_MEM_PD_REG0,  24,   2},
- *  {VPU_DI_PRE,          HHI_VPU_MEM_PD_REG0,  26,   2},
- *  {VPU_DI_POST,         HHI_VPU_MEM_PD_REG0,  28,   2},
- *  {VPU_SHARP,           HHI_VPU_MEM_PD_REG0,  30,   2},
- *  {VPU_VIU2_OSD1,       HHI_VPU_MEM_PD_REG1,   0,   2},
- *  {VPU_VIU2_OFIFO,      HHI_VPU_MEM_PD_REG1,   2,   2},
- *  {VPU_VKSTONE,         HHI_VPU_MEM_PD_REG1,   4,   2},
- *  {VPU_DOLBY_CORE3,     HHI_VPU_MEM_PD_REG1,   6,   2},
- *  {VPU_DOLBY0,          HHI_VPU_MEM_PD_REG1,   8,   2},
- *  {VPU_DOLBY1A,         HHI_VPU_MEM_PD_REG1,  10,   2},
- *  {VPU_DOLBY1B,         HHI_VPU_MEM_PD_REG1,  12,   2},
- *  {VPU_VPU_ARB,         HHI_VPU_MEM_PD_REG1,  14,   2},
- *  {VPU_AFBC_DEC,        HHI_VPU_MEM_PD_REG1,  16,   2},
- *  {VPU_VD2_SCALE,       HHI_VPU_MEM_PD_REG1,  18,   2},
- *  {VPU_VENCP,           HHI_VPU_MEM_PD_REG1,  20,   2},
- *  {VPU_VENCL,           HHI_VPU_MEM_PD_REG1,  22,   2},
- *  {VPU_VENCI,           HHI_VPU_MEM_PD_REG1,  24,   2},
- *  {VPU_VD2_OSD2_SCALE,  HHI_VPU_MEM_PD_REG1,  30,   2},
- *  {VPU_VIU_WM,          HHI_VPU_MEM_PD_REG2,   0,   2},
- *  {VPU_VIU_OSD3,        HHI_VPU_MEM_PD_REG2,   4,   2},
- *  {VPU_VIU_OSD4,        HHI_VPU_MEM_PD_REG2,   6,   2},
- *  {VPU_MAIL_AFBCD,      HHI_VPU_MEM_PD_REG2,   8,   2},
- *  {VPU_VD1_SCALE,       HHI_VPU_MEM_PD_REG2,  10,   2},
- *  {VPU_OSD_BLD34,       HHI_VPU_MEM_PD_REG2,  12,   2},
- *  {VPU_PRIME_DOLBY_RAM, HHI_VPU_MEM_PD_REG2,  14,   2},
- *  {VPU_VD2_OFIFO,       HHI_VPU_MEM_PD_REG2,  16,   2},
- *  {VPU_RDMA,            HHI_VPU_MEM_PD_REG2,  30,   2},
- */
+template <typename RegisterType>
+void SetPowerBits(fdf::MmioBuffer& mmio, bool powered_on, int begin_bit_index, int end_bit_index) {
+  // TODO(fxbug.com/132123): AMLogic-supplied software flips each bit
+  // individually, with a 5us delay between flips. The power sequences in the
+  // datasheets have no mention of individual bits, and seem to suggest setting
+  // each register to its final value in one operation. Carry out an experiment
+  // to document if the datasheet sequences work, as the AMLogic software may
+  // cater to older chips.  Document the result either way.
+  RegisterType power_register = RegisterType::Get().ReadFrom(&mmio);
+  const uint32_t bit_value = powered_on ? 0 : 1;
+  for (int bit_index = begin_bit_index; bit_index < end_bit_index; ++bit_index) {
+    const uint32_t bit_mask = bit_value << bit_index;
+    power_register.set_reg_value(power_register.reg_value() & ~bit_mask).WriteTo(&mmio);
+    zx::nanosleep(zx::deadline_after(zx::usec(5)));
+  }
+}
+
+template <typename RegisterType>
+void SetPowerUnits(fdf::MmioBuffer& mmio, bool powered_on, int begin_unit_index,
+                   int end_unit_index) {
+  // TODO(fxbug.com/132123): AMLogic-supplied software flips each unit
+  // individually, with a 5us delay between flips. The power sequences in the
+  // datasheets have no mention of individual bits, and seem to suggest setting
+  // each register to its final value in one operation. Carry out an experiment
+  // to document if the datasheet sequences work, as the AMLogic software may
+  // cater to older chips.  Document the result either way.
+  RegisterType power_register = RegisterType::Get().ReadFrom(&mmio);
+  const MemoryPowerDomainMode mode =
+      powered_on ? MemoryPowerDomainMode::kPoweredOn : MemoryPowerDomainMode::kPoweredOff;
+  for (int unit_index = begin_unit_index; unit_index < end_unit_index; ++unit_index) {
+    const uint32_t unit_mask = static_cast<uint32_t>(mode) << unit_index;
+    power_register.set_reg_value(power_register.reg_value() & ~unit_mask).WriteTo(&mmio);
+    zx::nanosleep(zx::deadline_after(zx::usec(5)));
+  }
+}
+
+}  // namespace
+
 void Vpu::PowerOn() {
   ZX_DEBUG_ASSERT(initialized_);
-  SET_BIT32(AOBUS, AOBUS_GEN_PWR_SLEEP0, 0, 8, 1);  // [8] power on
 
-  // power up memories
-  for (int i = 0; i < 32; i += 2) {
-    SET_BIT32(HHI, HHI_VPU_MEM_PD_REG0, 0, i, 2);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  for (int i = 0; i < 32; i += 2) {
-    SET_BIT32(HHI, HHI_VPU_MEM_PD_REG1, 0, i, 2);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, 0, 0, 2);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  for (int i = 4; i < 18; i += 2) {
-    SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, 0, i, 2);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, 0, 30, 2);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
+  // Implements the power sequences documented below.
+  //
+  // A311D datasheet Section 8.2.3 "EE Top Level Power Modes", Table 8-6 "Power
+  //     Sequence of VPU", page 88
+  // S905D3 datasheet Section 6.2.3.2 "EE Top Level Power Modes" > "VPU",
+  //     Table 6-3 "Power & Global Clock Control Summary", page 75
+  // S905D2 datasheet Section 6.2.3 "EE Top Level Power Modes", Table 6-4 "Power
+  //     Sequence of EE Domain", page 84
 
-  for (int i = 8; i < 16; i++) {
-    SET_BIT32(HHI, HHI_MEM_PD_REG0, 0, i, 1);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  zx_nanosleep(zx_deadline_after(ZX_USEC(20)));
+  auto general_power = AlwaysOnGeneralPowerSleep::Get().ReadFrom(&aobus_mmio_.value());
+  general_power.set_vpu_hdmi_powered_off(false).WriteTo(&aobus_mmio_.value());
+
+  // TODO(fxbug.com/132123): The A311D power sequence waits for bits 9-8 in
+  // `AlwaysOnGeneralPowerAck`here. The S905D3 and S905D2 power sequences only
+  // wait for bit 8 in the same register. AMLogic-supplied bringup code uses a
+  // hard-coded 20us timeout instead.
+
+  SetPowerUnits<VpuMemoryPower0>(hhi_mmio_.value(), /*powered_on=*/true, 0, 16);
+  SetPowerUnits<VpuMemoryPower1>(hhi_mmio_.value(), /*powered_on=*/true, 0, 16);
+
+  // The S905D2 power sequence does not include `VpuMemoryPower2`. However, the
+  // datasheet has a register-level reference for it, which indicates that all
+  // fields outside of `vpp_watermark_power` are unused. So, the sequence below
+  // is harmless on S905D2.
+  //
+  // The A311D power sequence lists bits 0-31 of `VpuMemoryPower2`. We follow
+  // the AMLogic-supplied bringup code, which only flips the bits below.
+
+  // TODO(fxbug.com/132123): The S905D3 power sequence and AMLogic-supplied
+  // bringup code flips bits 0-31 of `VpuMemoryPower2`.
+  SetPowerUnits<VpuMemoryPower2>(hhi_mmio_.value(), /*powered_on=*/true, 0, 1);
+  SetPowerUnits<VpuMemoryPower2>(hhi_mmio_.value(), /*powered_on=*/true, 2, 9);
+  SetPowerUnits<VpuMemoryPower2>(hhi_mmio_.value(), /*powered_on=*/true, 15, 16);
+
+  // TODO(fxbug.com/132123): The S905D3 power sequence also flips bits 0-31 of
+  // registers `VpuMemoryPower3` and `VpuMemoryPower4`. The AMLogic-supplied
+  // bringup code flips bits 0-31 of `VpuMemoryPower3` and bits 0-3 of
+  // `VpuMemoryPower4`.
+
+  SetPowerBits<MemoryPower0>(hhi_mmio_.value(), /*powered_on=*/true, 8, 16);
+  zx::nanosleep(zx::deadline_after(zx::usec(20)));
 
   // Reset VIU + VENC
   // Reset VENCI + VENCP + VADC + VENCL
@@ -377,8 +372,15 @@ void Vpu::PowerOn() {
                ((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)));
   CLEAR_MASK32(RESET, RESET7_LEVEL, (1 << 7));
 
-  // Remove VPU_HDMI ISO
-  SET_BIT32(AOBUS, AOBUS_GEN_PWR_SLEEP0, 0, 9, 1);  // [9] VPU_HDMI
+  // TODO(fxbug.com/132123): The A311D and S905D3 power sequences disable output
+  // isolation after VPU power ACK, and before changing the VPU memory power
+  // registers. The AMLogic-supplied bringup code disables isolation after
+  // completing the reset sequence.
+
+  // TODO(fxbug.com/132123): The S905D3 power sequence and AMLogic-supplied
+  // bringup code configure VPU/HDMI isolation in the
+  // `AlwaysOnGeneralPowerIsolation` register instead.
+  general_power.set_vpu_hdmi_isolation_enabled_s905d2_a311d(false).WriteTo(&aobus_mmio_.value());
 
   // release Reset
   SET_MASK32(RESET, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
@@ -393,37 +395,37 @@ void Vpu::PowerOn() {
 
 void Vpu::PowerOff() {
   ZX_DEBUG_ASSERT(initialized_);
-  // Power down VPU_HDMI
-  // Enable Isolation
-  SET_BIT32(AOBUS, AOBUS_GEN_PWR_SLEEP0, 1, 9, 1);  // ISO
-  zx_nanosleep(zx_deadline_after(ZX_USEC(20)));
 
-  // power down memories
-  for (int i = 0; i < 32; i += 2) {
-    SET_BIT32(HHI, HHI_VPU_MEM_PD_REG0, 0x3, i, 2);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  for (int i = 0; i < 32; i += 2) {
-    SET_BIT32(HHI, HHI_VPU_MEM_PD_REG1, 0x3, i, 2);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, 0x3, 0, 2);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  for (int i = 4; i < 18; i += 2) {
-    SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, 0x3, i, 2);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, 0x3, 30, 2);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
+  // Implements the steps in Table 8-6 "Power Sequence of VPU" in A311D
+  // datasheet Section 8.2.3 "EE Top Level Power Modes", in reverse order.
 
-  for (int i = 8; i < 16; i++) {
-    SET_BIT32(HHI, HHI_MEM_PD_REG0, 0x1, i, 1);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
-  }
-  zx_nanosleep(zx_deadline_after(ZX_USEC(20)));
+  auto general_power = AlwaysOnGeneralPowerSleep::Get().ReadFrom(&aobus_mmio_.value());
+  general_power.set_vpu_hdmi_isolation_enabled_s905d2_a311d(true).WriteTo(&aobus_mmio_.value());
+  zx::nanosleep(zx::deadline_after(zx::usec(20)));
 
-  // Power down VPU domain
-  SET_BIT32(AOBUS, AOBUS_GEN_PWR_SLEEP0, 1, 8, 1);  // PDN
+  // TODO(fxbug.com/132123): The memories are powered down in exactly the same
+  // order as powering up. If the order doesn't matter, we can unify the code.
+
+  SetPowerUnits<VpuMemoryPower0>(hhi_mmio_.value(), /*powered_on=*/false, 0, 16);
+  SetPowerUnits<VpuMemoryPower1>(hhi_mmio_.value(), /*powered_on=*/false, 0, 16);
+
+  // The S905D2 power sequence does not include `VpuMemoryPower2`. However, the
+  // datasheet has a register-level reference for it, which indicates that all
+  // fields outside of `vpp_watermark_power` are unused. So, the sequence below
+  // is harmless on S905D2.
+
+  SetPowerUnits<VpuMemoryPower2>(hhi_mmio_.value(), /*powered_on=*/false, 0, 1);
+  SetPowerUnits<VpuMemoryPower2>(hhi_mmio_.value(), /*powered_on=*/false, 2, 9);
+  SetPowerUnits<VpuMemoryPower2>(hhi_mmio_.value(), /*powered_on=*/false, 15, 16);
+
+  SetPowerBits<MemoryPower0>(hhi_mmio_.value(), /*powered_on=*/false, 8, 16);
+  zx::nanosleep(zx::deadline_after(zx::usec(20)));
+
+  // TODO(fxbug.com/132123): The A311D power sequence waits for bits 9-8 in
+  // `AlwaysOnGeneralPowerAck`here. The S905D3 and S905D2 power sequences only
+  // wait for bit 8 in the same register.
+
+  general_power.set_vpu_hdmi_powered_off(true).WriteTo(&aobus_mmio_.value());
 
   VideoAdvancedPeripheralBusClockControl::Get()
       .ReadFrom(&*hhi_mmio_)
@@ -434,8 +436,11 @@ void Vpu::PowerOff() {
 
 void Vpu::AfbcPower(bool power_on) {
   ZX_DEBUG_ASSERT(initialized_);
-  SET_BIT32(HHI, HHI_VPU_MEM_PD_REG2, power_on ? 0 : 3, 8, 2);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
+  auto vpu_memory_power2 = VpuMemoryPower2::Get().ReadFrom(&hhi_mmio_.value());
+  vpu_memory_power2.set_mali_afbc_decoder_power(power_on ? MemoryPowerDomainMode::kPoweredOn
+                                                         : MemoryPowerDomainMode::kPoweredOff);
+  vpu_memory_power2.WriteTo(&hhi_mmio_.value());
+  zx::nanosleep(zx::deadline_after(zx::usec(5)));
 }
 
 zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t stride) {
@@ -560,8 +565,12 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
       .set_canvas_idx(canvas_idx)
       .WriteTo(&(*vpu_mmio_));
 
-  // enable vdin memory power
-  SET_BIT32(HHI, HHI_VPU_MEM_PD_REG0, 0, 18, 2);
+  // TODO(fxbug.com/132123): This seems unnecessary. Vpu::PowerOn() already
+  // enables both `vdin0_memory_power` and `vdin1_memory_power`. The
+  // AMLogic-supplied bringup code waits 5us after flipping a power gate.
+  auto vpu_memory_power0 = VpuMemoryPower0::Get().ReadFrom(&(*hhi_mmio_));
+  vpu_memory_power0.set_vdin1_memory_power(MemoryPowerDomainMode::kPoweredOn)
+      .WriteTo(&(*hhi_mmio_));
 
   // Capture state is now in IDLE mode
   capture_state_ = CAPTURE_IDLE;

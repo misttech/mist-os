@@ -113,6 +113,7 @@ test("amlogic-display-test") {
   sources = [
     "amlogic-display-test.cc",
     "clock-regs-test.cc",
+    "power-regs-test.cc",
     "video-input-regs-test.cc",
     "vout-test.cc",
   ]

@@ -19,10 +19,6 @@
 #define HHI_MIPI_CNTL0 (0x000 << 2)
 #define HHI_MIPI_CNTL1 (0x001 << 2)
 #define HHI_MIPI_CNTL2 (0x002 << 2)
-#define HHI_MEM_PD_REG0 (0x040 << 2)
-#define HHI_VPU_MEM_PD_REG0 (0x041 << 2)
-#define HHI_VPU_MEM_PD_REG1 (0x042 << 2)
-#define HHI_VPU_MEM_PD_REG2 (0x04d << 2)
 #define HHI_GCLK_MPEG2 (0x052 << 2)
 #define HHI_VID_PLL_CLK_DIV (0x068 << 2)
 #define HHI_VDAC_CNTL0_G12A (0x0bb << 2)
@@ -293,18 +289,6 @@ class HhiVidPllClkDivReg : public hwreg::RegisterBase<HhiVidPllClkDivReg, uint32
   DEF_FIELD(14, 0, shift_preset);
 
   static auto Get() { return hwreg::RegisterAddr<HhiVidPllClkDivReg>(HHI_VID_PLL_CLK_DIV); }
-};
-
-class HhiMemPdReg0 : public hwreg::RegisterBase<HhiMemPdReg0, uint32_t> {
- public:
-  // Memory PD
-  DEF_FIELD(21, 20, axi_srame);
-  DEF_FIELD(19, 18, apical_gdc);
-  DEF_FIELD(15, 8, hdmi);
-  DEF_FIELD(5, 4, audio);
-  DEF_FIELD(3, 2, ethernet);
-
-  static auto Get() { return hwreg::RegisterAddr<HhiMemPdReg0>(HHI_MEM_PD_REG0); }
 };
 
 class HhiGclkMpeg2Reg : public hwreg::RegisterBase<HhiGclkMpeg2Reg, uint32_t> {
