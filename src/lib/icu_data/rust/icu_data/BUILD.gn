@@ -28,7 +28,7 @@ icu_rustc_library("icu_data") {
   icu_test_deps = [ "//third_party/rust_crates:rust_icu_uenum" ]
   test_deps = [ "//third_party/rust_crates:assert_matches" ]
 
-  icu_non_rust_deps = [ "../../cpp:icu_data_cpp" ]
+  icu_non_rust_deps = [ "//src/lib/icu_data/cpp:cpp" ]
 
   sources = [ "src/lib.rs" ]
 }
