@@ -87,6 +87,7 @@ group("tests") {
     "net-cli:tests",
     "netcfg:tests",
     "netlink:tests",
+    "stack-migration:tests",
 
     # Ensure this target doesn't rot. This dependency can be removed if the
     # target becomes load bearing elsewhere.

@@ -18,6 +18,7 @@ fn main() {
         "netcfg_basic" => netcfg_basic::main(),
         "netstack3" => netstack3::main().expect("netstack3 exited with an error"),
         "reachability" => reachability::main(),
+        "stack_migration" => stack_migration::main(),
         x => panic!("unknown binary {x}"),
     }
 }
