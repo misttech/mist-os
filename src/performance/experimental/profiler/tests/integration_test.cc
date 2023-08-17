@@ -108,13 +108,11 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
       }},
   }};
 
-  fuchsia_cpu_profiler::TargetConfig target_config{{
-      .task = fuchsia_cpu_profiler::Task::WithThread(info.koid),
-  }};
-
+  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
+      std::vector{fuchsia_cpu_profiler::Task::WithThread(info.koid)});
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .targets = std::vector{target_config},
+      .target = target_config,
   }};
 
   auto config_response = client->Configure({{
@@ -168,13 +166,12 @@ TEST(ProfilerIntegrationTest, NewThreads) {
   }};
 
   // We'll sample ourself.
-  fuchsia_cpu_profiler::TargetConfig target_config{{
-      .task = fuchsia_cpu_profiler::Task::WithProcess(info.koid),
-  }};
+  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
+      std::vector{fuchsia_cpu_profiler::Task::WithProcess(info.koid)});
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .targets = std::vector{target_config},
+      .target = target_config,
   }};
 
   auto config_response = client->Configure({{
@@ -241,13 +238,12 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
   }};
 
   // We'll sample ourself by our job id
-  fuchsia_cpu_profiler::TargetConfig target_config{{
-      .task = fuchsia_cpu_profiler::Task::WithJob(info.koid),
-  }};
+  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
+      std::vector{fuchsia_cpu_profiler::Task::WithJob(info.koid)});
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .targets = std::vector{target_config},
+      .target = target_config,
   }};
 
   auto config_response = client->Configure({{
@@ -318,13 +314,12 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
   }};
 
   // We'll sample ourself by our job id
-  fuchsia_cpu_profiler::TargetConfig target_config{{
-      .task = fuchsia_cpu_profiler::Task::WithJob(info.koid),
-  }};
+  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
+      std::vector{fuchsia_cpu_profiler::Task::WithJob(info.koid)});
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .targets = std::vector{target_config},
+      .target = target_config,
   }};
 
   // Launch an additional process before starting
@@ -419,13 +414,12 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
   }};
 
   // We'll sample ourself by our job id
-  fuchsia_cpu_profiler::TargetConfig target_config{{
-      .task = fuchsia_cpu_profiler::Task::WithJob(info.koid),
-  }};
+  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
+      std::vector{fuchsia_cpu_profiler::Task::WithJob(info.koid)});
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .targets = std::vector{target_config},
+      .target = target_config,
   }};
 
   auto config_response = client->Configure({{

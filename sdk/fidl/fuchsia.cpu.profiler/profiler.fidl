@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 library fuchsia.cpu.profiler;
 using zx;
+using fuchsia.component;
+using fuchsia.url;
 
 /// Curated set of platform independent IDs
 type CounterId = flexible enum : uint8 {
     /// A counter increments each nanosecond
     NANOSECONDS = 0;
-    /// A counter increments each cpu cyle
+    /// A counter increments each cpu cycle
     CYCLES = 1;
     /// A counter increments on each instruction retired
     INSTRUCTIONS_RETIRED = 2;
@@ -71,19 +73,44 @@ type Sample = table {
     2: counters vector<Counter>:64;
 };
 
-/// The profiling target(s).
+/// An adhoc set of running tasks to attach to.
 type Task = flexible union {
-    /// Profile a procces and all threads assocated with it
+    /// Profile a process and all threads associated with it
     1: process zx.Koid;
     /// Profile a single thread
     2: thread zx.Koid;
-    /// Profile a job and all processes and threads assocated with it
+    /// Profile a job and all processes and threads associated with it
     3: job zx.Koid;
 };
 
-type TargetConfig = table {
-    /// The profiling target
-    1: task Task;
+/// A test to launch and attach to
+type TestConfig = table {
+    /// The url of the test to launch
+    1: url fuchsia.url.Url;
+    /// Test case filters to limit the test run to
+    2: filters vector<string:MAX>:MAX;
+    /// Optional realm in which the test will be run
+    3: realm string:fuchsia.component.MAX_MONIKER_LENGTH;
+};
+
+/// A component to optionally launch and attach to
+type ComponentConfig = table {
+    /// The url of the component to launch
+    1: url fuchsia.url.Url;
+
+    /// If a component exists with the given moniker, attach to it, else launch
+    /// the component specified by the given url at the moniker
+    2: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+};
+
+/// A target may be an adhoc set of tasks, or one defined by a component/test
+type TargetConfig = flexible union {
+    /// An adhoc set of threads/processes/jobs
+    1: tasks vector<Task>:64;
+    /// Profile a component and all tasks it launches
+    2: component ComponentConfig;
+    /// Profile a test and all tasks it launches
+    3: test TestConfig;
 };
 
 /// Profiling information about the profile itself
@@ -97,11 +124,11 @@ type SamplingConfig = table {
     3: sample Sample;
 };
 
-/// When a config has multiple SamplingConfigs or multiple TargetConfigs, the
-/// session applies each SamplingConfig to each TargetConfig.
+/// When a config has multiple SamplingConfigs, the session applies each
+/// SamplingConfig to the TargetConfig.
 type Config = table {
     1: configs vector<SamplingConfig>:64;
-    2: targets vector<TargetConfig>:64;
+    2: target TargetConfig;
 };
 
 @discoverable

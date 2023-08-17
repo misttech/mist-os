@@ -29,7 +29,7 @@ impl FfxMain for ProfilerTool {
     }
 }
 
-fn gather_targets(opts: &args::Start) -> Result<Vec<fidl_fuchsia_cpu_profiler::TargetConfig>> {
+fn gather_targets(opts: &args::Start) -> Result<fidl_fuchsia_cpu_profiler::TargetConfig> {
     if !opts.monikers.is_empty() {
         ffx_bail!("Monikers are not supported yet. Try a pid or tid instead.");
     }
@@ -39,9 +39,8 @@ fn gather_targets(opts: &args::Start) -> Result<Vec<fidl_fuchsia_cpu_profiler::T
         .map(|&id| profiler::Task::Job(id))
         .chain(opts.pids.iter().map(|&id| profiler::Task::Process(id)))
         .chain(opts.tids.iter().map(|&id| profiler::Task::Thread(id)))
-        .map(|e| profiler::TargetConfig { task: Some(e), ..Default::default() })
         .collect();
-    Ok(tasks)
+    Ok(profiler::TargetConfig::Tasks(tasks))
 }
 
 pub async fn profiler(
@@ -51,10 +50,10 @@ pub async fn profiler(
 ) -> Result<()> {
     match cmd.sub_cmd {
         ProfilerSubCommand::Start(opts) => {
-            let targets = gather_targets(&opts)?;
+            let target = gather_targets(&opts)?;
             let profiler_config = profiler::Config {
                 configs: Some(vec![]),
-                targets: Some(targets),
+                target: Some(target),
                 ..Default::default()
             };
 
@@ -133,9 +132,11 @@ mod tests {
             output: String::from("output_file"),
             print_stats: false,
         };
-        let targets = gather_targets(&args);
-        assert!(targets.is_ok());
-        assert!(targets.unwrap().len() == 9);
+        let target = gather_targets(&args);
+        match target {
+            Ok(fidl_fuchsia_cpu_profiler::TargetConfig::Tasks(vec)) => assert!(vec.len() == 9),
+            _ => assert!(false),
+        }
 
         let empty_args = args::Start {
             pids: vec![],
@@ -148,7 +149,10 @@ mod tests {
         };
 
         let empty_targets = gather_targets(&empty_args);
-        assert!(empty_targets.is_ok());
-        assert!(empty_targets.unwrap().is_empty());
+
+        match empty_targets {
+            Ok(fidl_fuchsia_cpu_profiler::TargetConfig::Tasks(vec)) => assert!(vec.is_empty()),
+            _ => assert!(false),
+        }
     }
 }
