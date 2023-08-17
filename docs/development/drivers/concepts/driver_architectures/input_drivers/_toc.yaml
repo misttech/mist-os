@@ -8,3 +8,5 @@
 toc:
 - title: "Fuchsia input drivers"
   path: /docs/development/drivers/concepts/driver_architectures/input_drivers/input.md
+- title: "Input report reader library"
+  path: /docs/development/drivers/concepts/driver_architectures/input_drivers/input_report_reader.md
