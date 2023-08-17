@@ -3,30 +3,32 @@
 // found in the LICENSE file.
 {
     include: [
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
     ],
+    program: {
+        binary: "bin/battery_manager_test_cpp",
+    },
     children: [
-        {
-            name: "test_driver",
-            url: "#meta/battery_manager_test_driver.cm",
-        },
         {
             name: "battery_manager",
             url: "#meta/battery_manager.cm",
         },
     ],
-    offer: [
+    use: [
         {
             protocol: "fuchsia.power.battery.BatteryManager",
             from: "#battery_manager",
-            to: "#test_driver",
         },
     ],
-    expose: [
+    offer: [
         {
-            protocol: "fuchsia.test.Suite",
-            from: "#test_driver",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: "#battery_manager",
         },
     ],
 }

@@ -57,13 +57,8 @@ fuchsia_test_package("battery-manager-tests") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":battery-manager-tests" ]
-
-  if (current_cpu != "riscv64") {
-    public_deps += [
-      # The Go toolchain does not support RISC-V.
-      # TODO(fxbug.dev/129728): Implement the test in a supported language.
-      "tests:battery-manager-gotests",
-    ]
-  }
+  public_deps = [
+    ":battery-manager-tests",
+    "tests:battery-manager-integration-tests",
+  ]
 }

@@ -3,45 +3,35 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/go/go_library.gni")
-import("//build/go/go_test.gni")
-import("//build/go/toolchain.gni")
+import("//build/test.gni")
 
-go_library("battery_manager_lib") {
+executable("bin") {
+  output_name = "battery_manager_test_cpp"
+  sources = [ "integration_test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_go($go_toolchain)",
-    "//src/lib/component",
-    "//src/lib/syslog/go",
+    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/sys/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
   ]
-
-  sources = [ "battery_manager_test.go" ]
-}
-
-go_test("battery_manager_go_test") {
-  library = ":battery_manager_lib"
-}
-
-fuchsia_component("battery_manager_test_driver") {
   testonly = true
-  manifest = "meta/battery_manager_test_driver.cml"
-  deps = [ ":battery_manager_go_test" ]
 }
 
-fuchsia_component("battery_manager_test") {
+fuchsia_component("battery_manager_integration_test_component_cpp") {
   testonly = true
-  component_name = "battery_manager_test"
+  component_name = "battery_manager_integration_test"
   manifest = "meta/battery_manager_test.cml"
+  deps = [ ":bin" ]
 }
 
-fuchsia_test_package("battery-manager-gotests") {
-  test_components = [ ":battery_manager_test" ]
+fuchsia_test_package("battery-manager-integration-tests") {
+  package_name = "battery_namanger_integration_test"
+  test_components = [ ":battery_manager_integration_test_component_cpp" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  deps = [
-    ":battery_manager_test_driver",
-    "//src/power/battery-manager:battery_manager",
-  ]
+  deps = [ "//src/power/battery-manager:battery_manager" ]
 }
