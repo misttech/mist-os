@@ -1138,6 +1138,7 @@ impl FileOps for RemoteFileObject {
         _length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
+        trace_duration!(trace_category_starnix_mm!(), "RemoteFileGetVmo");
         let has_execute = prot.contains(ProtectionFlags::EXEC);
         let vmar_flags = prot.to_vmar_flags() - zx::VmarFlags::PERM_EXECUTE;
         // TODO(tbodt): Consider caching the VMO handle instead of getting a new one on each call.

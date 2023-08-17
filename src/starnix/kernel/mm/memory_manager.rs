@@ -277,6 +277,7 @@ fn map_in_vmar(
     prot_flags: ProtectionFlags,
     options: MappingOptions,
 ) -> Result<UserAddress, Errno> {
+    trace_duration!(trace_category_starnix_mm!(), "MapInVmar");
     let base_addr = UserAddress::from_ptr(vmar_info.base);
     let (vmar_offset, vmar_extra_flags) = match addr {
         DesiredAddress::Any if options.contains(MappingOptions::LOWER_32BIT) => {
@@ -298,11 +299,15 @@ fn map_in_vmar(
 
     let vmar_flags = prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
 
-    let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
+    let mut map_result = {
+        trace_duration!(trace_category_starnix_mm!(), "VmarMapSyscall");
+        vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags)
+    };
 
     // Retry mapping if the target address was a Hint.
     if map_result.is_err() {
         if let DesiredAddress::Hint(_) = addr {
+            trace_duration!(trace_category_starnix_mm!(), "VmarMapSyscallRetry");
             let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
             map_result = vmar.map(0, vmo, vmo_offset, length, vmar_flags);
         }

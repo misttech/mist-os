@@ -18,6 +18,9 @@ use fuchsia_zircon as zx;
 // The trace category used for starnix-related traces.
 fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
 
+// The trace category used for memory manager related traces.
+fuchsia_trace::string_name_macro!(trace_category_starnix_mm, "starnix:mm");
+
 // The trace category used to enable task runtime args on trace durations.
 fuchsia_trace::string_name_macro!(trace_category_starnix_task_runtime, "starnix:task_runtime");
 
