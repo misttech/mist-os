@@ -19,6 +19,7 @@ rustc_test("bin") {
     "//src/lib/icu_data/rust/icu_data",
     "//third_party/rust_crates:rust_icu_ucal",
   ]
+  non_rust_deps = [ "//src/lib/icu:lib" ]
 
   sources = [ "src/lib.rs" ]
 }

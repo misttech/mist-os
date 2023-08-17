@@ -155,6 +155,9 @@ user_platform_aib_names =
       # UI
       "ui",
       "ui_user_and_userdebug",
+      "ui_user_and_userdebug.icu_default_${icu_git_info.default}",
+      "ui_user_and_userdebug.icu_latest_${icu_git_info.latest}",
+      "ui_user_and_userdebug.icu_stable_${icu_git_info.stable}",
       "ui_package_user_and_userdebug",
 
       # Drivers
@@ -223,6 +226,9 @@ eng_only_platform_aib_names =
 
       # UI
       "ui_eng",
+      "ui_eng.icu_default_${icu_git_info.default}",
+      "ui_eng.icu_latest_${icu_git_info.latest}",
+      "ui_eng.icu_stable_${icu_git_info.stable}",
       "ui_package_eng",
 
       # Example AIB

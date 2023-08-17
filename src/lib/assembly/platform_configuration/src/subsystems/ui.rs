@@ -18,12 +18,12 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             (false, _) => return Ok(()),
             (true, BuildType::Eng) => {
                 builder.platform_bundle("ui");
-                builder.platform_bundle("ui_eng");
+                builder.icu_platform_bundle("ui_eng")?;
                 builder.platform_bundle("ui_package_eng");
             }
             (true, _) => {
                 builder.platform_bundle("ui");
-                builder.platform_bundle("ui_user_and_userdebug");
+                builder.icu_platform_bundle("ui_user_and_userdebug")?;
                 builder.platform_bundle("ui_package_user_and_userdebug");
             }
         }

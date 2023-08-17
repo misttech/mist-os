@@ -2000,14 +2000,17 @@ assembly_input_bundle("ui") {
 # feature_set_levels: minimal
 # build-types: eng
 #
-assembly_input_bundle("ui_eng") {
+icu_assembly_input_bundle("ui_eng") {
+  icu_cache_packages = [
+    "//src/ui/a11y/bin/a11y_manager:a11y-manager",
+
+    "//src/ui/bin/scene_manager:scene_manager",
+  ]
   cache_packages = [
     "//src/graphics/display/bin/coordinator-connector",
-    "//src/ui/a11y/bin/a11y_manager:a11y-manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/scenic:scenic_pkg",
     "//src/ui/bin/virtual_keyboard_manager",
-    "//src/ui/bin/scene_manager",
   ]
 }
 
@@ -2016,14 +2019,17 @@ assembly_input_bundle("ui_eng") {
 # feature_set_levels: minimal
 # build-types: user, userdebug
 #
-assembly_input_bundle("ui_user_and_userdebug") {
+icu_assembly_input_bundle("ui_user_and_userdebug") {
+  icu_base_packages = [
+    "//src/ui/a11y/bin/a11y_manager:a11y-manager",
+
+    "//src/ui/bin/scene_manager:scene_manager",
+  ]
   base_packages = [
     "//src/graphics/display/bin/coordinator-connector",
-    "//src/ui/a11y/bin/a11y_manager:a11y-manager",
     "//src/ui/bin/text:text_manager",
     "//src/ui/scenic:scenic_pkg",
     "//src/ui/bin/virtual_keyboard_manager",
-    "//src/ui/bin/scene_manager",
   ]
 }
 
