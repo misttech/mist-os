@@ -189,57 +189,6 @@ compiled_action("invoke_cmldoc") {
   deps = [ "//tools/cmc($host_toolchain)" ]
 }
 
-# Set up targets and files for sdk_documentation and build_api_module.
-ref_docs = [
-  {
-    target = ":invoke_clidoc"
-    file = "clidoc_out.tar.gz"
-  },
-  {
-    target = ":invoke_cmldoc"
-    file = "cmldoc_out/index.md"
-  },
-  {
-    target = ":invoke_fidldoc"
-    file = "fidldoc.zip"
-  },
-  {
-    target = ":invoke_helpdoc"
-    file = "helpdoc_out.tar.gz"
-  },
-  {
-    target = "//bundles:create_all_drivers_doc"
-    file = "all_drivers_doc.yaml"
-  },
-  {
-    target = "//sdk/lib/fdio:docs"
-    file = "fdio.zip"
-  },
-]
-
-ref_doc_files = []
-ref_doc_targets = []
-foreach(ref_doc, ref_docs) {
-  out_dir = get_label_info(ref_doc.target, "target_out_dir")
-  ref_doc_file_prefix = ref_doc.file
-
-  # TODO(https://fxbug.dev/103315) to move drivers doc to output_dir.
-  # Unlike other ref docs, drivers docs uses gen_dir instead of output_dir
-  if (ref_doc_file_prefix == "all_drivers_doc.yaml") {
-    gen_dir = get_label_info(ref_doc.target, "target_gen_dir")
-    ref_doc_file_path = "$gen_dir/$ref_doc_file_prefix"
-  } else {
-    ref_doc_file_path = "$out_dir/$ref_doc_file_prefix"
-  }
-  ref_doc_files += [
-    {
-      source = ref_doc_file_path
-      dest = "docs/$ref_doc_file_prefix"
-    },
-  ]
-  ref_doc_targets += [ ref_doc.target ]
-}
-
 # This exposes relevant reference doc paths for infra to upload.
 #
 # Type: list(scope)
@@ -280,7 +229,54 @@ foreach(ref_doc, ref_docs) {
 build_api_module("generated_docs") {
   testonly = true
   data_keys = [ "generated_docset" ]
-  deps = ref_doc_targets
+  deps = [
+    ":invoke_clidoc",
+    ":invoke_cmldoc",
+    ":invoke_fidldoc",
+    ":invoke_helpdoc",
+    "//bundles:create_all_drivers_doc",
+    "//sdk/lib/fdio:docs",
+  ]
+}
+
+# Set up targets and files for sdk_documentation
+
+sdk_docs = [
+  {
+    target = ":invoke_clidoc"
+    file = "clidoc_out.tar.gz"
+  },
+  {
+    target = ":invoke_cmldoc"
+    file = "cmldoc_out/index.md"
+  },
+  {
+    target = ":invoke_fidldoc"
+    file = "fidldoc.zip"
+  },
+  {
+    target = ":invoke_helpdoc"
+    file = "helpdoc_out.tar.gz"
+  },
+  {
+    target = "//sdk/lib/fdio:docs"
+    file = "fdio.zip"
+  },
+]
+
+sdk_doc_files = []
+sdk_doc_targets = []
+foreach(sdk_doc, sdk_docs) {
+  src_dir = get_label_info(sdk_doc.target, "target_out_dir")
+  sdk_doc_file = sdk_doc.file
+
+  sdk_doc_files += [
+    {
+      source = "$src_dir/$sdk_doc_file"
+      dest = "docs/$sdk_doc_file"
+    },
+  ]
+  sdk_doc_targets += [ sdk_doc.target ]
 }
 
 sdk_documentation("ref_docs_sdk") {
@@ -288,8 +284,8 @@ sdk_documentation("ref_docs_sdk") {
   testonly = true
   category = "partner"
 
-  files = ref_doc_files
-  non_sdk_deps = ref_doc_targets
+  files = sdk_doc_files
+  non_sdk_deps = sdk_doc_targets
 }
 
 group("tests") {
