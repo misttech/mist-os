@@ -1,7 +1,7 @@
 # Copyright 2016 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import("//build/icu/icu_shared_library.gni")
+import("//build/icu/icu_group.gni")
 import("//build/icu/icu_source_set.gni")
 import("//build/icu/third_party_icu_headers.gni")
 
@@ -27,6 +27,6 @@ icu_source_set("cpp") {
   public_deps = [ "//zircon/system/ulib/zx" ]
 }
 
-icu_shared_library("icu_data_cpp") {
-  icu_deps = [ ":cpp" ]
+icu_group("icu_data_cpp") {
+  icu_public_deps = [ ":cpp" ]
 }

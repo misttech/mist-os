@@ -48,12 +48,13 @@ template("icu_rustc_library") {
       forward_variables_from(invoker,
                              "*",
                              [
-                               "visibility",
-                               "testonly",
+                               "icu_data_deps",
                                "icu_deps",
                                "icu_non_rust_deps",
+                               "icu_public_deps",
                                "icu_test_deps",
-                               "icu_data_deps",
+                               "testonly",
+                               "visibility",
                                "with_unit_tests",
                              ])
       forward_variables_from(invoker,
@@ -90,6 +91,17 @@ template("icu_rustc_library") {
         }
       }
 
+      if (defined(invoker.icu_public_deps)) {
+        if (!defined(public_deps)) {
+          public_deps = []
+        }
+
+        foreach(icu_dep, invoker.icu_public_deps) {
+          _relabel = get_label_info(icu_dep, "label_no_toolchain")
+          public_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
+        }
+      }
+
       if (defined(invoker.icu_test_deps)) {
         if (!defined(test_deps)) {
           test_deps = []
@@ -120,14 +132,13 @@ template("icu_rustc_library") {
         configs -= [ "//src/lib/icu:version" ]
       }
 
+      if (!defined(non_rust_deps)) {
+        non_rust_deps = []
+      }
+      non_rust_deps += icu_fixup_deps + _flavored_icu_deps
+      non_rust_deps -= icu_fixup_deps
+
       if (defined(invoker.icu_non_rust_deps)) {
-        if (!defined(non_rust_deps)) {
-          non_rust_deps = []
-        }
-
-        non_rust_deps += icu_fixup_deps + _flavored_icu_deps
-        non_rust_deps -= icu_fixup_deps
-
         foreach(icu_dep, invoker.icu_non_rust_deps) {
           _relabel = get_label_info(icu_dep, "label_no_toolchain")
           non_rust_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
@@ -149,6 +160,7 @@ template("icu_rustc_library") {
                              "visibility",
                              "testonly",
                              "icu_deps",
+                             "icu_public_deps",
                              "icu_non_rust_deps",
                              "icu_test_deps",
                              "icu_data_deps",
@@ -159,29 +171,41 @@ template("icu_rustc_library") {
                              "testonly",
                            ])
 
+    # See icu_rustc_binary.gni for detailed comments.
     if (defined(invoker.icu_deps)) {
       if (!defined(deps)) {
         deps = []
       }
       deps += invoker.icu_deps
     }
-    if (defined(invoker.icu_non_rust_deps)) {
-      if (!defined(non_rust_deps)) {
-        non_rust_deps = []
+
+    if (defined(invoker.icu_public_deps)) {
+      if (!defined(public_deps)) {
+        public_deps = []
       }
-      non_rust_deps += invoker.icu_non_rust_deps
+      public_deps += invoker.icu_public_deps
     }
+
     if (defined(invoker.icu_test_deps)) {
       if (!defined(test_deps)) {
         test_deps = []
       }
       test_deps += invoker.icu_test_deps
     }
+
     if (defined(invoker.icu_data_deps)) {
       if (!defined(data_deps)) {
         data_deps = []
       }
       data_deps += invoker.icu_data_deps
+    }
+
+    if (!defined(non_rust_deps)) {
+      non_rust_deps = []
+    }
+    non_rust_deps += icu_fixup_deps_no_testonly
+    if (defined(invoker.icu_non_rust_deps)) {
+      non_rust_deps += invoker.icu_non_rust_deps
     }
   }
 }

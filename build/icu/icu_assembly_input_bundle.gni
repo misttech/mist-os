@@ -11,6 +11,8 @@ import("config.gni")  # icu_flavors
 #
 #   - icu_base_packages: same as `base_packages` from assembly_input_bundle,
 #     but needs ICU adaptation.
+#   - icu_cache_packages: same as `cache_packages` from assembly_input_bundle,
+#     but needs ICU adaptation.
 #   - all other args are the same as in `assembly_input_bundle`
 #
 # Refer to icu_source_set.gni for detailed comments on some constructs below,
@@ -19,7 +21,12 @@ template("icu_assembly_input_bundle") {
   foreach(icu_flavor, icu_flavors) {
     assembly_input_bundle(
         "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
-      forward_variables_from(invoker, "*", [ "icu_base_packages" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "icu_base_packages",
+                               "icu_cache_packages",
+                             ])
 
       if (defined(invoker.icu_base_packages)) {
         if (!defined(base_packages)) {
@@ -31,13 +38,28 @@ template("icu_assembly_input_bundle") {
         }
       }
 
+      if (defined(invoker.icu_cache_packages)) {
+        if (!defined(cache_packages)) {
+          cache_packages = []
+        }
+
+        foreach(icu_cache_package, invoker.icu_cache_packages) {
+          cache_packages += [ "${icu_cache_package}.icu_${icu_flavor.name}_${icu_flavor.commit_id}" ]
+        }
+      }
+
       # Add ICU variations of other parameters if needed.
     }
   }
 
   # Also produce the unflavored input bundle.
   assembly_input_bundle("${target_name}") {
-    forward_variables_from(invoker, "*", [ "icu_base_packages" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "icu_base_packages",
+                             "icu_cache_packages",
+                           ])
 
     if (defined(invoker.icu_base_packages)) {
       if (!defined(base_packages)) {
@@ -46,6 +68,16 @@ template("icu_assembly_input_bundle") {
 
       foreach(icu_base_package, invoker.icu_base_packages) {
         base_packages += [ "${icu_base_package}" ]
+      }
+    }
+
+    if (defined(invoker.icu_cache_packages)) {
+      if (!defined(cache_packages)) {
+        cache_packages = []
+      }
+
+      foreach(icu_cache_package, invoker.icu_cache_packages) {
+        cache_packages += [ "${icu_cache_package}" ]
       }
     }
 

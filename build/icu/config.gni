@@ -43,12 +43,12 @@ icu_flavors = [
 # The unflavored dependencies that must be replaced with flavored ones when
 # compiling flavored targets.  Defined because the correct contents are
 # annoying to remember but must be specified exactly.
-icu_fixup_deps = [
+icu_fixup_deps_no_testonly = [
   "//src/lib/icu:data",
-  "//src/lib/icu:icu",
   "//src/lib/icu:icudtl",
   "//src/lib/icu:lib",
 ]
+icu_fixup_deps = icu_fixup_deps_no_testonly + [ "//src/lib/icu:icu" ]
 
 # These can not be directly inserted in the assignments of
 # `icu_flavor_major_versions` below, that is a GN limitation.

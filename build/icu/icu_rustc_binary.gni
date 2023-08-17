@@ -36,6 +36,9 @@ template("_common") {
                              "visibility",
                              "icu_deps",
                              "icu_public_deps",
+                             "icu_non_rust_deps",
+                             "icu_test_deps",
+                             "icu_data_deps",
                            ])
     forward_variables_from(invoker,
                            [
@@ -77,16 +80,58 @@ template("_common") {
       }
     }
 
-    if (defined(invoker.icu_non_rust_deps)) {
-      if (!defined(non_rust_deps)) {
-        non_rust_deps = []
+    if (defined(invoker.icu_public_deps)) {
+      if (!defined(deps)) {
+        public_deps = []
       }
 
-      non_rust_deps += icu_fixup_deps + _flavored_icu_deps
-      non_rust_deps -= icu_fixup_deps
+      foreach(icu_dep, invoker.icu_public_deps) {
+        public_deps += [ "${icu_dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
+      }
+    }
 
+    if (defined(invoker.icu_test_deps)) {
+      if (!defined(test_deps)) {
+        test_deps = []
+      }
+
+      foreach(icu_dep, invoker.icu_test_deps) {
+        _relabel = get_label_info(icu_dep, "label_no_toolchain")
+        test_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
+      }
+    }
+
+    if (defined(invoker.icu_data_deps)) {
+      if (!defined(data_deps)) {
+        data_deps = []
+      }
+
+      foreach(icu_dep, invoker.icu_data_deps) {
+        _relabel = get_label_info(icu_dep, "label_no_toolchain")
+        data_deps += [ "${_relabel}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
+      }
+    }
+
+    if (!defined(configs)) {
+      configs = []
+    }
+
+    configs += [
+      "//src/lib/icu:version",
+      "//src/lib/icu:version_${icu_flavor.name}",
+    ]
+    configs -= [ "//src/lib/icu:version" ]
+
+    if (!defined(non_rust_deps)) {
+      non_rust_deps = []
+    }
+
+    non_rust_deps += icu_fixup_deps + _flavored_icu_deps
+    non_rust_deps -= icu_fixup_deps
+
+    if (defined(invoker.icu_non_rust_deps)) {
       foreach(icu_dep, invoker.icu_non_rust_deps) {
-        deps += [ "${icu_dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
+        non_rust_deps += [ "${icu_dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
       }
     }
   }
@@ -144,10 +189,13 @@ template("icu_rustc_binary") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "icu_data_deps",
+                             "icu_deps",
+                             "icu_non_rust_deps",
+                             "icu_public_deps",
+                             "icu_test_deps",
                              "testonly",
                              "visibility",
-                             "icu_deps",
-                             "icu_public_deps",
                            ])
     forward_variables_from(invoker,
                            [
@@ -155,17 +203,45 @@ template("icu_rustc_binary") {
                              "visibility",
                            ])
 
+    # For a normal target, just copy to a regular parameter.
     if (defined(invoker.icu_deps)) {
       if (!defined(deps)) {
         deps = []
       }
       deps += invoker.icu_deps
     }
+
     if (defined(invoker.icu_public_deps)) {
       if (!defined(public_deps)) {
         public_deps = []
       }
       public_deps += invoker.icu_public_deps
+    }
+
+    if (defined(invoker.icu_test_deps)) {
+      if (!defined(test_deps)) {
+        test_deps = []
+      }
+      test_deps += invoker.icu_test_deps
+    }
+
+    if (defined(invoker.icu_data_deps)) {
+      if (!defined(data_deps)) {
+        data_deps = []
+      }
+      data_deps += invoker.icu_data_deps
+    }
+
+    # A binary must be linked against the ICU library here, since deps are
+    # not guaranteeed to propagate that requirement.
+    if (!defined(non_rust_deps)) {
+      non_rust_deps = []
+    }
+
+    # We know that we need ICU libraries to be linked here.
+    non_rust_deps += icu_fixup_deps_no_testonly
+    if (defined(invoker.icu_non_rust_deps)) {
+      non_rust_deps += invoker.icu_non_rust_deps
     }
   }
 }
