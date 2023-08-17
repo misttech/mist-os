@@ -527,6 +527,23 @@ async fn blobs_protected_from_gc_during_get(gc_protection: GcProtection) {
     let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
     assert!(env.blobfs.list_blobs().unwrap().is_superset(&to_be_fetched_hashes));
 
+    // Without the protection gc should delete all the blobs.
+    match gc_protection {
+        GcProtection::Retained => {
+            crate::replace_retained_packages(&env.proxies.retained_packages, &[]).await
+        }
+        GcProtection::Dynamic => {
+            // This has the same name as the originally protected package, so will evict it from
+            // the dynamic index, and it does not have any blobs in common.
+            let evictor = PackageBuilder::new("superpackage").build().await.unwrap();
+            assert!(to_be_fetched_hashes.is_disjoint(&evictor.list_blobs().unwrap()));
+            let _: fio::DirectoryProxy =
+                crate::get_and_verify_package(&env.proxies.package_cache, &evictor).await;
+        }
+    }
+    let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
+    assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&to_be_fetched_hashes));
+
     let () = env.stop().await;
 }
 
@@ -536,6 +553,6 @@ async fn blobs_protected_from_gc_during_get_by_retained_index() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn subpackage_blobs_protected_from_gc_by_dynamic_index() {
+async fn blobs_protected_from_gc_during_get_by_dynamic_index() {
     let () = blobs_protected_from_gc_during_get(GcProtection::Dynamic).await;
 }
