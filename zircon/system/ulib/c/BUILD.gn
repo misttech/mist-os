@@ -266,8 +266,8 @@ if (zircon_toolchain == false) {
     configs += [ "//build/config/zircon:static-libc++" ]
 
     if (!is_gcc && current_cpu == "riscv64" &&
-        toolchain_variant.tags + [ "instrumentation-runtime" ] -
-        [ "instrumentation-runtime" ] != toolchain_variant.tags) {
+        toolchain_variant.tags + [ "instrumented" ] - [ "instrumented" ] !=
+        toolchain_variant.tags) {
       # TODO(fxbug.dev/121817): There is no R_RISCV_GLOB_DAT and instead
       # R_RISCV_64 is used for all GOT relocs; this means that they all must be
       # presumed to have potentially nonzero addends that matter.  The ld.so
@@ -278,7 +278,8 @@ if (zircon_toolchain == false) {
       # anyway).  However, with instrumentation that makes runtime outcalls
       # that number can increase quite a lot.  So when building with such
       # instrumentation, stick to DT_RELA format where the addend-saving hack
-      # is not required at all.
+      # is not required at all.  The profile instrumentation doesn't use
+      # outcalls but happens to increase the number of relocs too.
       ldflags = [ "-Wl,-z,rela" ]
     }
   }
