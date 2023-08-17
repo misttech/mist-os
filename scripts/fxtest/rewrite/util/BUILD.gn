@@ -18,6 +18,7 @@ if (is_host) {
       "__init__.py",
       "arg_option.py",
       "command.py",
+      "signals.py",
     ]
   }
 

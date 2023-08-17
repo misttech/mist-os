@@ -4,12 +4,16 @@
 
 import argparse
 import asyncio
+import multiprocessing
 import os
-from tempfile import TemporaryDirectory
+import signal
+import tempfile
+import typing
 import unittest
 
 from util import arg_option
 from util import command
+import util.signals
 
 
 class TestArgOptions(unittest.TestCase):
@@ -87,7 +91,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         We create a file in a temporary directory and simply assert that `ls`
         prints that file as output.
         """
-        with TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, "temp-file.txt"), "w") as f:
                 f.write("hello world")
 
@@ -108,7 +112,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         We create a temporary directory and try to `ls` a file we know does not
         exist. `ls` should print to stderr and report an error return code.
         """
-        with TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory() as td:
             cmd = await command.AsyncCommand.create(
                 "ls", os.path.join(td, "does-not-exist")
             )
@@ -124,7 +128,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         through `sed` to change the word "temp" to "temporary" and assert on
         the new output.
         """
-        with TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, "temp-file.txt"), "w") as f:
                 f.write("hello world")
 
@@ -184,6 +188,49 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             command.AsyncCommandError,
             lambda: asyncio.run(command.AsyncCommand.create("..........")),
         )
+
+
+class TestSignals(unittest.TestCase):
+    def test_async_signal_handler(self):
+        """Test that registered signal handlers work appropriately."""
+
+        multiprocessing.set_start_method("fork", force=True)
+
+        output_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(output_directory.cleanup)
+        output_file_name = os.path.join(output_directory.name, "output.txt")
+
+        def main(output_file_name: str):
+            async def internal_main():
+                os.kill(os.getpid(), signal.SIGTERM)
+                await asyncio.sleep(120)
+
+            asyncio.set_event_loop(asyncio.new_event_loop())
+            loop = asyncio.get_event_loop()
+
+            fut = asyncio.ensure_future(internal_main())
+
+            def write_output():
+                with open(output_file_name, "a") as f:
+                    f.write("Handler printed message\n")
+                fut.cancel()
+
+            util.signals.register_on_terminate_signal(write_output)
+            try:
+                loop.run_until_complete(fut)
+            except asyncio.CancelledError:
+                with open(output_file_name, "a") as f:
+                    f.write("Cancelled\n")
+
+        proc = multiprocessing.Process(target=main, args=(output_file_name,))
+        proc.start()
+        proc.join()
+
+        lines: typing.List[str]
+        with open(output_file_name, "r") as f:
+            lines = [line.strip() for line in f.readlines()]
+
+        self.assertListEqual(lines, ["Handler printed message", "Cancelled"])
 
 
 if __name__ == "__main__":

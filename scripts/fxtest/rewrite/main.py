@@ -14,7 +14,6 @@ import json
 import os
 import random
 import re
-import signal
 import sys
 import typing
 
@@ -31,6 +30,7 @@ import termout
 import test_list_file
 import tests_json_file
 import util.command as command
+import util.signals
 
 
 def main():
@@ -38,26 +38,12 @@ def main():
     # Set up the event loop to catch termination signals (i.e. Ctrl+C), and
     # cancel the main task when they are received.
     fut = asyncio.ensure_future(async_main(args.parse_args()))
-    register_on_terminate_signal(fut.cancel)
+    util.signals.register_on_terminate_signal(fut.cancel)
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(fut)
     except asyncio.CancelledError:
         print("\n\nReceived interrupt, exiting")
-
-
-def register_on_terminate_signal(fn: typing.Callable):
-    """Run a callable when a termination signal is caught by this program.
-
-    When either SIGTERM or SIGINT is caught by this program, call
-    the given function.
-
-    Args:
-        fn (typing.Callable): The function to call.
-    """
-    loop = asyncio.get_event_loop()
-    for s in [signal.SIGTERM, signal.SIGINT]:
-        loop.add_signal_handler(s, fn)
 
 
 async def async_main(flags: args.Flags):
