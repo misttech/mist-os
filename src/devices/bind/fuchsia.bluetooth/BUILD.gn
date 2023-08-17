@@ -6,4 +6,5 @@ import("//build/bind/bind.gni")
 
 bind_library("fuchsia.bluetooth") {
   source = "fuchsia.bluetooth.bind"
+  sdk_category = "partner"
 }
