@@ -18,9 +18,14 @@ namespace inspector {
 
 namespace {
 
-constexpr const char* kHelperPath = "/pkg/bin/gwp-asan-test-helper";
+constexpr const char* kUseAfterFree = "/pkg/bin/gwp-asan-test-use-after-free";
+constexpr const char* kDoubleFreePath = "/pkg/bin/gwp-asan-test-double-free";
+constexpr const char* kInvalidFreePath = "/pkg/bin/gwp-asan-test-invalid-free";
+constexpr const char* kBufferOverflowPath = "/pkg/bin/gwp-asan-test-buffer-overflow";
+constexpr const char* kBufferUnderflowPath = "/pkg/bin/gwp-asan-test-buffer-underflow";
 
-void launch_proc_and_wait_for_exception(zx::job* test_job, zx::process* test_process,
+void launch_proc_and_wait_for_exception(const char* path, zx::job* test_job,
+                                        zx::process* test_process,
                                         zx_exception_report_t* exception_report) {
   // Create a job and attach an exception channel.
   ASSERT_OK(zx::job::create(*zx::job::default_job(), 0, test_job));
@@ -28,15 +33,15 @@ void launch_proc_and_wait_for_exception(zx::job* test_job, zx::process* test_pro
   ASSERT_OK(test_job->create_exception_channel(0, &exception_channel));
 
   // Spawn the helper process.
-  const char* argv[] = {kHelperPath, nullptr};
+  const char* argv[] = {path, nullptr};
   const char* envp[] = {
       "SCUDO_OPTIONS="
       "GWP_ASAN_Enabled=true:GWP_ASAN_SampleRate=1:GWP_ASAN_MaxSimultaneousAllocations=512",
       nullptr};
 
   char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
-  ASSERT_OK(fdio_spawn_etc(test_job->get(), FDIO_SPAWN_CLONE_ALL, kHelperPath, argv, envp, 0,
-                           nullptr, test_process->reset_and_get_address(), err_msg),
+  ASSERT_OK(fdio_spawn_etc(test_job->get(), FDIO_SPAWN_CLONE_ALL, path, argv, envp, 0, nullptr,
+                           test_process->reset_and_get_address(), err_msg),
             "%s", err_msg);
 
   // Wait for the helper to crash or the process to terminate.
@@ -69,7 +74,7 @@ TEST(GwpAsanTest, GwpAsanException) {
   zx::job test_job;
   zx::process test_process;
   zx_exception_report_t exception_report;
-  launch_proc_and_wait_for_exception(&test_job, &test_process, &exception_report);
+  launch_proc_and_wait_for_exception(kUseAfterFree, &test_job, &test_process, &exception_report);
   auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
 
   GwpAsanInfo info;
@@ -88,7 +93,7 @@ TEST(GwpAsanTest, GwpAsanOOMException) {
   zx::job test_job;
   zx::process test_process;
   zx_exception_report_t exception_report;
-  launch_proc_and_wait_for_exception(&test_job, &test_process, &exception_report);
+  launch_proc_and_wait_for_exception(kUseAfterFree, &test_job, &test_process, &exception_report);
   auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
 
   ASSERT_EQ(ZX_EXCP_FATAL_PAGE_FAULT, exception_report.header.type);
@@ -99,6 +104,74 @@ TEST(GwpAsanTest, GwpAsanOOMException) {
   GwpAsanInfo info;
   ASSERT_TRUE(inspector_get_gwp_asan_info(test_process, exception_report, &info));
   ASSERT_EQ(nullptr, info.error_type);
+}
+
+// TODO(https://fxbug.dev/132347): Enable once the crash is correctly detected.
+TEST(GwpAsanTest, DISABLED_GwpAsanDoubleFree) {
+  if constexpr (!HAS_GWP_ASAN) {
+    return;
+  }
+
+  zx::job test_job;
+  zx::process test_process;
+  zx_exception_report_t exception_report;
+  launch_proc_and_wait_for_exception(kDoubleFreePath, &test_job, &test_process, &exception_report);
+  auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
+
+  GwpAsanInfo info;
+  ASSERT_TRUE(inspector_get_gwp_asan_info(test_process, exception_report, &info));
+  ASSERT_EQ(gwp_asan::ErrorToString(gwp_asan::Error::DOUBLE_FREE), info.error_type);
+}
+
+// TODO(https://fxbug.dev/132347): Enable once the crash is correctly detected.
+TEST(GwpAsanTest, DISABLED_GwpAsanInvalidFree) {
+  if constexpr (!HAS_GWP_ASAN) {
+    return;
+  }
+
+  zx::job test_job;
+  zx::process test_process;
+  zx_exception_report_t exception_report;
+  launch_proc_and_wait_for_exception(kInvalidFreePath, &test_job, &test_process, &exception_report);
+  auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
+
+  GwpAsanInfo info;
+  ASSERT_TRUE(inspector_get_gwp_asan_info(test_process, exception_report, &info));
+  ASSERT_EQ(gwp_asan::ErrorToString(gwp_asan::Error::INVALID_FREE), info.error_type);
+}
+
+TEST(GwpAsanTest, GwpAsanBufferOverflow) {
+  if constexpr (!HAS_GWP_ASAN) {
+    return;
+  }
+
+  zx::job test_job;
+  zx::process test_process;
+  zx_exception_report_t exception_report;
+  launch_proc_and_wait_for_exception(kBufferOverflowPath, &test_job, &test_process,
+                                     &exception_report);
+  auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
+
+  GwpAsanInfo info;
+  ASSERT_TRUE(inspector_get_gwp_asan_info(test_process, exception_report, &info));
+  ASSERT_EQ(gwp_asan::ErrorToString(gwp_asan::Error::BUFFER_OVERFLOW), info.error_type);
+}
+
+TEST(GwpAsanTest, GwpAsanBufferUnderflow) {
+  if constexpr (!HAS_GWP_ASAN) {
+    return;
+  }
+
+  zx::job test_job;
+  zx::process test_process;
+  zx_exception_report_t exception_report;
+  launch_proc_and_wait_for_exception(kBufferUnderflowPath, &test_job, &test_process,
+                                     &exception_report);
+  auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
+
+  GwpAsanInfo info;
+  ASSERT_TRUE(inspector_get_gwp_asan_info(test_process, exception_report, &info));
+  ASSERT_EQ(gwp_asan::ErrorToString(gwp_asan::Error::BUFFER_UNDERFLOW), info.error_type);
 }
 
 }  // namespace

@@ -18,7 +18,7 @@
 
 namespace {
 
-constexpr const char* kHelperPath = "/pkg/bin/gwp-asan-test-helper";
+constexpr const char* kHelperPath = "/pkg/bin/gwp-asan-test-use-after-free";
 
 TEST(GwpAsanTest, HandleGwpAsanException) {
   if constexpr (!HAS_GWP_ASAN) {

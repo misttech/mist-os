@@ -25,7 +25,13 @@ test("inspector-gwp-asan-test") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-  data_deps = [ "//zircon/system/ulib/c/test:gwp-asan-test-helper" ]
+  data_deps = [
+    "//zircon/system/ulib/c/test:gwp-asan-test-buffer-overflow",
+    "//zircon/system/ulib/c/test:gwp-asan-test-buffer-underflow",
+    "//zircon/system/ulib/c/test:gwp-asan-test-double-free",
+    "//zircon/system/ulib/c/test:gwp-asan-test-invalid-free",
+    "//zircon/system/ulib/c/test:gwp-asan-test-use-after-free",
+  ]
 }
 
 fuchsia_unittest_package("inspector-gwp-asan-test-pkg") {

@@ -233,19 +233,45 @@ test("gwp-asan-test") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-  data_deps = [ ":gwp-asan-test-helper" ]
+  data_deps = [ ":gwp-asan-test-use-after-free" ]
 }
 
-executable("gwp-asan-test-helper") {
-  testonly = true
-  sources = [ "gwp-asan-test-helper.cc" ]
+template("executable_with_backtrace") {
+  executable(target_name) {
+    forward_variables_from(invoker, "*")
 
-  # Enable frame pointer for backtrace.
-  configs += [
-    "//build/config:frame_pointers",
-    "//build/config:default_frame_pointers",
-  ]
-  configs -= [ "//build/config:default_frame_pointers" ]
+    # Enable frame pointer for backtrace.
+    configs += [
+      "//build/config:frame_pointers",
+      "//build/config:default_frame_pointers",
+    ]
+    configs -= [ "//build/config:default_frame_pointers" ]
+  }
+}
+
+executable_with_backtrace("gwp-asan-test-use-after-free") {
+  testonly = true
+  sources = [ "gwp-asan-test-use-after-free.cc" ]
+}
+
+executable_with_backtrace("gwp-asan-test-double-free") {
+  testonly = true
+  sources = [ "gwp-asan-test-double-free.cc" ]
+}
+
+executable_with_backtrace("gwp-asan-test-invalid-free") {
+  testonly = true
+  sources = [ "gwp-asan-test-invalid-free.cc" ]
+}
+
+executable_with_backtrace("gwp-asan-test-buffer-overflow") {
+  testonly = true
+  sources = [ "gwp-asan-test-buffer-overflow.cc" ]
+}
+
+executable_with_backtrace("gwp-asan-test-buffer-underflow") {
+  testonly = true
+  sources = [ "gwp-asan-test-buffer-underflow.cc" ]
 }
 
 fuchsia_unittest_package("gwp-asan-test-pkg") {
