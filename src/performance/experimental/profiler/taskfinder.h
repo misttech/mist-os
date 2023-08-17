@@ -7,6 +7,7 @@
 
 #include <lib/zx/handle.h>
 #include <lib/zx/result.h>
+#include <lib/zx/task.h>
 
 #include <set>
 #include <vector>
@@ -17,7 +18,15 @@
 // for based on koids.
 class TaskFinder : TaskEnumerator {
  public:
-  zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> FindHandles();
+  struct FoundTasks {
+    std::vector<std::pair<zx_koid_t, zx::job>> jobs;
+    std::vector<std::pair<zx_koid_t, zx::process>> processes;
+    std::vector<std::pair<zx_koid_t, zx::thread>> threads;
+
+    bool empty() const { return jobs.empty() && processes.empty() && threads.empty(); }
+  };
+
+  zx::result<FoundTasks> FindHandles();
   // Each of these methods visits the corresponding task type. If any On*()
   // method returns a value other than ZX_OK, the enumeration stops. See
   // |task_callback_t| for a description of parameters.
@@ -43,7 +52,7 @@ class TaskFinder : TaskEnumerator {
   std::set<zx_koid_t> threads_;
   std::set<zx_koid_t> processes_;
 
-  std::vector<std::pair<zx_koid_t, zx::handle>> found_handles_;
+  FoundTasks found_tasks_;
 };
 
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_TASKFINDER_H_

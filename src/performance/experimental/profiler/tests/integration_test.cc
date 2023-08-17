@@ -453,3 +453,83 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
 
   process.kill();
 }
+
+// Monitor a component via moniker. Since we're running in the test realm, we only have access to
+// our children components.
+TEST(ProfilerIntegrationTest, ComponentByMoniker) {
+  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  ASSERT_TRUE(client_end.is_ok());
+  const fidl::SyncClient client{std::move(*client_end)};
+
+  zx::socket in_socket;
+  zx::socket outgoing_socket;
+
+  ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
+  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
+      .period = 1000000,
+      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
+          fuchsia_cpu_profiler::CounterId::kNanoseconds),
+      .sample = fuchsia_cpu_profiler::Sample{{
+          .callgraph =
+              fuchsia_cpu_profiler::CallgraphConfig{
+                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
+          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
+      }},
+  }};
+
+  fuchsia_cpu_profiler::TargetConfig target_config =
+      fuchsia_cpu_profiler::TargetConfig::WithComponent(
+          fuchsia_cpu_profiler::ComponentConfig{{.moniker = "demo_target"}});
+
+  fuchsia_cpu_profiler::TargetConfig no_such_target_config =
+      fuchsia_cpu_profiler::TargetConfig::WithComponent(
+          fuchsia_cpu_profiler::ComponentConfig{{.moniker = "doesntexist"}});
+
+  fuchsia_cpu_profiler::Config no_such_moniker_config{{
+      .configs = std::vector{sampling_config},
+      .target = no_such_target_config,
+  }};
+
+  fuchsia_cpu_profiler::Config demo_target_config{{
+      .configs = std::vector{sampling_config},
+      .target = target_config,
+  }};
+
+  zx::socket outgoing_socket2;
+  zx_status_t duplicate_result = outgoing_socket.duplicate(ZX_RIGHT_SAME_RIGHTS, &outgoing_socket2);
+  ASSERT_EQ(ZX_OK, duplicate_result);
+
+  auto bad_config_response = client->Configure({{
+      .output = std::move(outgoing_socket2),
+      .config = no_such_moniker_config,
+  }});
+  EXPECT_TRUE(bad_config_response.is_error());
+  EXPECT_TRUE(bad_config_response.error_value().is_domain_error());
+  EXPECT_EQ(bad_config_response.error_value().domain_error(),
+            fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration);
+
+  auto config_response = client->Configure({{
+      .output = std::move(outgoing_socket),
+      .config = demo_target_config,
+  }});
+
+  ASSERT_TRUE(config_response.is_ok());
+
+  auto start_response = client->Start({{.buffer_results = true}});
+  ASSERT_TRUE(start_response.is_ok());
+
+  // Get Some samples
+  sleep(1);
+
+  auto stop_response = client->Stop();
+  ASSERT_TRUE(stop_response.is_ok());
+  ASSERT_TRUE(stop_response.value().samples_collected().has_value());
+  ASSERT_GT(stop_response.value().samples_collected().value(), size_t{10});
+  auto [pids, tids] = GetOutputKoids(std::move(in_socket));
+  auto reset_response = client->Reset();
+  ASSERT_TRUE(reset_response.is_ok());
+
+  // We should have only one thread and one process
+  EXPECT_EQ(tids.size(), size_t{1});
+  EXPECT_EQ(pids.size(), size_t{1});
+}

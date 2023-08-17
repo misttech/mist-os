@@ -19,6 +19,10 @@
                 "fuchsia.logger.Log",
             ],
         },
+        {
+            protocol: "fuchsia.sys2.RealmQuery.root",
+            availability: "optional",
+        },
     ],
     expose: [
         {

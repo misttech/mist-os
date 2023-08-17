@@ -25,6 +25,11 @@
             to: "#profiler",
         },
         {
+            protocol: [ "fuchsia.sys2.RealmQuery.root" ],
+            from: "parent",
+            to: "#profiler",
+        },
+        {
             storage: [ "tmp" ],
             from: "self",
             to: "#profiler",

@@ -189,16 +189,17 @@ zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process proc
 zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
                                                         cpp20::span<const zx_koid_t> ancestry) {
   size_t num_child_jobs;
-  zx_status_t status = job.get_info(ZX_INFO_JOB_CHILDREN, nullptr, 0, nullptr, &num_child_jobs);
-  if (status != ZX_OK) {
+  if (zx_status_t status = job.get_info(ZX_INFO_JOB_CHILDREN, nullptr, 0, nullptr, &num_child_jobs);
+      status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "failed to query number of job children";
     return zx::error(status);
   }
 
   zx_info_handle_basic_t info;
-  zx_status_t info_res = job.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (info_res != ZX_OK) {
-    FX_PLOGS(ERROR, info_res) << "failed to make process_target";
+  if (zx_status_t status =
+          job.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "failed to make process_target";
     return zx::error(status);
   }
   zx_koid_t job_id = info.koid;
@@ -211,24 +212,25 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
   std::unordered_map<zx_koid_t, profiler::JobTarget> child_job_targets;
   if (num_child_jobs > 0) {
     zx_koid_t child_jobs[num_child_jobs];
-    status = job.get_info(ZX_INFO_JOB_CHILDREN, child_jobs, sizeof(child_jobs), nullptr, nullptr);
-    if (status != ZX_OK) {
+    if (zx_status_t status =
+            job.get_info(ZX_INFO_JOB_CHILDREN, child_jobs, sizeof(child_jobs), nullptr, nullptr);
+        status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "failed to get job children";
       return zx::error(status);
     }
 
     for (zx_koid_t child_koid : child_jobs) {
       zx::job child_job;
-      zx_status_t res = job.get_child(child_koid, ZX_DEFAULT_JOB_RIGHTS, &child_job);
-      if (status != ZX_OK) {
-        FX_PLOGS(ERROR, res) << "failed to get job: " << child_koid;
+      if (zx_status_t status = job.get_child(child_koid, ZX_DEFAULT_JOB_RIGHTS, &child_job);
+          status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "failed to get job: " << child_koid;
         return zx::error(status);
       }
       zx::result<profiler::JobTarget> child_job_target =
           MakeJobTarget(std::move(child_job), child_job_ancestry);
       if (child_job_target.is_error()) {
         FX_PLOGS(ERROR, child_job_target.status_value()) << "failed to make job_target";
-        return zx::error(status);
+        return child_job_target.take_error();
       }
       child_job_target->ancestry = child_job_ancestry;
       child_job_targets.try_emplace(child_koid, std::move(*child_job_target));
@@ -236,25 +238,26 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
   }
 
   size_t num_processes;
-  status = job.get_info(ZX_INFO_JOB_PROCESSES, nullptr, 0, nullptr, &num_processes);
-  if (status != ZX_OK) {
+  if (zx_status_t status = job.get_info(ZX_INFO_JOB_PROCESSES, nullptr, 0, nullptr, &num_processes);
+      status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "failed to query number of job processes";
     return zx::error(status);
   }
   std::unordered_map<zx_koid_t, profiler::ProcessTarget> process_targets;
   if (num_processes > 0) {
     zx_koid_t processes[num_processes];
-    status = job.get_info(ZX_INFO_JOB_PROCESSES, processes, sizeof(processes), nullptr, nullptr);
-    if (status != ZX_OK) {
+    if (zx_status_t status =
+            job.get_info(ZX_INFO_JOB_PROCESSES, processes, sizeof(processes), nullptr, nullptr);
+        status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "failed to get job processes";
       return zx::error(status);
     }
 
     for (zx_koid_t process_koid : processes) {
       zx::process process;
-      zx_status_t res = job.get_child(process_koid, ZX_DEFAULT_PROCESS_RIGHTS, &process);
-      if (status != ZX_OK) {
-        FX_PLOGS(ERROR, res) << "failed to get process: " << process_koid;
+      if (zx_status_t status = job.get_child(process_koid, ZX_DEFAULT_PROCESS_RIGHTS, &process);
+          status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "failed to get process: " << process_koid;
         return zx::error(status);
       }
       zx::result<profiler::ProcessTarget> process_target =
@@ -262,7 +265,7 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
 
       if (process_target.is_error()) {
         FX_PLOGS(ERROR, process_target.status_value()) << "failed to make process_target";
-        return zx::error(status);
+        return process_target.take_error();
       }
       process_targets.try_emplace(process_koid, std::move(*process_target));
     }

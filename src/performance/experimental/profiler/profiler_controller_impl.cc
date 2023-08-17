@@ -5,6 +5,8 @@
 #include "profiler_controller_impl.h"
 
 #include <elf.h>
+#include <fidl/fuchsia.sys2/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/handle.h>
@@ -38,6 +40,119 @@
 #include "targets.h"
 #include "taskfinder.h"
 
+zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&& tasks) {
+  for (auto&& [koid, job] : tasks.jobs) {
+    zx::result<profiler::JobTarget> job_target = profiler::MakeJobTarget(std::move(job));
+    if (job_target.is_error()) {
+      // A job might exit in the time between us walking the tree and attempting to find its
+      // children. Skip it in this case.
+      continue;
+    }
+    if (zx::result res = tree.AddJob(std::move(*job_target)); res.is_error()) {
+      FX_PLOGS(ERROR, res.status_value()) << "Failed to add job target";
+      return res;
+    }
+  }
+
+  for (auto&& [koid, process] : tasks.processes) {
+    zx_info_handle_basic_t handle_info;
+    if (process.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr,
+                         nullptr) != ZX_OK) {
+      // A process might exit in the time between us walking the tree and attempting to find its
+      // children. Skip it in this case.
+      continue;
+    }
+    zx::result<profiler::ProcessTarget> process_target =
+        profiler::MakeProcessTarget(std::move(process));
+    if (process_target.is_error()) {
+      continue;
+    }
+
+    if (zx::result res = tree.AddProcess(std::move(*process_target)); res.is_error()) {
+      FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
+      return res;
+    }
+  }
+  for (auto&& [koid, thread] : tasks.threads) {
+    zx_info_handle_basic_t handle_info;
+    if (thread.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr,
+                        nullptr) != ZX_OK) {
+      continue;
+    }
+
+    // If we have a thread, we need to know what its parent process is
+    // and then get a handle to it. Unfortunately, the "easiest" way to
+    // do this is to walk the job tree again.
+    TaskFinder finder;
+    finder.AddProcess(handle_info.related_koid);
+    zx::result<TaskFinder::FoundTasks> found_tasks = finder.FindHandles();
+    if (found_tasks.is_error()) {
+      continue;
+    }
+    if (found_tasks->processes.size() != 1) {
+      FX_LOGS(ERROR) << "Found the wrong number of processes for thread: " << thread.get();
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    auto [pid, process] = std::move(found_tasks->processes[0]);
+
+    profiler::ProcessTarget process_target{std::move(process), pid,
+                                           std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
+    elf_search::ForEachModule(process_target.handle,
+                              [&process_target](const elf_search::ModuleInfo& info) {
+                                process_target.unwinder_data->modules.emplace_back(
+                                    info.vaddr, &process_target.unwinder_data->memory,
+                                    unwinder::Module::AddressMode::kProcess);
+                              });
+
+    if (zx::result<> res = tree.AddProcess(std::move(process_target)); res.is_error()) {
+      // If the process already exists, then we'll just append to the existing one below
+      if (res.status_value() != ZX_ERR_ALREADY_EXISTS) {
+        FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
+        return res;
+      }
+    }
+
+    if (zx::result res = tree.AddThread(pid, profiler::ThreadTarget{std::move(thread), koid});
+        res.is_error()) {
+      FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread target: " << koid;
+      return res;
+    }
+  }
+  return zx::ok();
+}
+
+zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>& directory) {
+  zx::result<fidl::Endpoints<fuchsia_io::File>> endpoints =
+      fidl::CreateEndpoints<fuchsia_io::File>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  fit::result<fidl::OneWayStatus> res = directory->Open(
+      {{.flags = fuchsia_io::OpenFlags::kRightReadable,
+        .mode = {},
+        .path = "elf/job_id",
+        .object = fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel())}});
+  if (res.is_error()) {
+    return zx::error(ZX_ERR_IO);
+  }
+
+  fidl::SyncClient<fuchsia_io::File> job_id_file{std::move(endpoints->client)};
+  fidl::Result<fuchsia_io::File::Read> read_res =
+      job_id_file->Read({{.count = fuchsia_io::kMaxTransferSize}});
+  if (read_res.is_error()) {
+    return zx::error(ZX_ERR_IO);
+  }
+  std::string job_id_str(reinterpret_cast<const char*>(read_res->data().data()),
+                         read_res->data().size());
+
+  char* end;
+  zx_koid_t job_id = std::strtoull(job_id_str.c_str(), &end, 10);
+  if (end != job_id_str.c_str() + job_id_str.size()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  return zx::ok(job_id);
+}
+
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
   if (state_ != ProfilingState::Unconfigured) {
@@ -59,10 +174,10 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
   // We're given pids/tids/jobids for each of our targets. We'll need handles to each of these
   // targets in order to suspend them and read their memory. We'll walk the root job tree looking
   // for anything that has a koid that matches the ones we've been given.
+  TaskFinder finder;
   switch (request.config()->target()->Which()) {
     case fuchsia_cpu_profiler::TargetConfig::Tag::kTasks: {
-      TaskFinder finder;
-      for (auto t : request.config()->target()->tasks().value()) {
+      for (auto& t : request.config()->target()->tasks().value()) {
         switch (t.Which()) {
           case fuchsia_cpu_profiler::Task::Tag::kProcess:
             finder.AddProcess(t.process().value());
@@ -79,148 +194,85 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                 fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
             return;
         }
-
-        zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> handles_result =
-            finder.FindHandles();
-        if (handles_result.is_error()) {
-          FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
-          completer.Reply(
-              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-          return;
-        }
-        if (handles_result->empty()) {
-          FX_LOGS(ERROR) << "Found " << handles_result->size() << " relevant handles";
-          completer.Reply(
-              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-          return;
-        }
-
-        targets_.Clear();
-        for (auto&& [koid, handle] : *handles_result) {
-          zx_info_handle_basic_t info;
-          zx_status_t res =
-              handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-          if (res != ZX_OK) {
-            FX_PLOGS(ERROR, res) << "Failed to get info about handle: " << koid;
-            completer.Reply(
-                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-            return;
-          }
-          switch (info.type) {
-            case ZX_OBJ_TYPE_PROCESS: {
-              zx::process process{std::move(handle)};
-              zx_info_handle_basic_t handle_info;
-              zx_status_t res = process.get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
-                                                 sizeof(handle_info), nullptr, nullptr);
-              if (res != ZX_OK) {
-                FX_PLOGS(ERROR, res) << "Failed to get info about handle: " << handle.get();
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-              zx::result<ProcessTarget> process_target = MakeProcessTarget(std::move(process));
-              if (process_target.is_error()) {
-                FX_PLOGS(ERROR, res) << "Failed to make a process target";
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-
-              if (zx::result res = targets_.AddProcess(std::move(*process_target));
-                  res.is_error()) {
-                FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-              break;
-            }
-            case ZX_OBJ_TYPE_JOB: {
-              zx::result<JobTarget> job_target = MakeJobTarget(zx::job{std::move(handle)});
-              if (job_target.is_error()) {
-                FX_PLOGS(ERROR, res) << "Failed to make a job target";
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-              if (zx::result res = targets_.AddJob(std::move(*job_target)); res.is_error()) {
-                FX_PLOGS(ERROR, res.status_value()) << "Failed to add job target";
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-              break;
-            }
-            case ZX_OBJ_TYPE_THREAD: {
-              // If we have a thread, we need to know what its parent process is
-              // and then get a handle to it. Unfortunately, the "easiest" way to
-              // do this is to walk the job tree again.
-              zx::thread thread{std::move(handle)};
-              TaskFinder finder;
-              finder.AddProcess(info.related_koid);
-              zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> handles_result =
-                  finder.FindHandles();
-              if (handles_result.is_error()) {
-                FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-              if (handles_result->size() != 1) {
-                FX_LOGS(ERROR) << "Found the wrong number of processes for thread: "
-                               << thread.get();
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-              auto [pid, process] = std::move((*handles_result)[0]);
-
-              ProcessTarget process_target{zx::process{std::move(process)}, pid,
-                                           std::unordered_map<zx_koid_t, ThreadTarget>{}};
-              elf_search::ForEachModule(*zx::unowned_process{process_target.handle.get()},
-                                        [&process_target](const elf_search::ModuleInfo& info) {
-                                          process_target.unwinder_data->modules.emplace_back(
-                                              info.vaddr, &process_target.unwinder_data->memory,
-                                              unwinder::Module::AddressMode::kProcess);
-                                        });
-
-              if (zx::result<> res = targets_.AddProcess(std::move(process_target));
-                  res.is_error()) {
-                // If the process already exists, then we'll just append to the existing one below
-                if (res.status_value() != ZX_ERR_ALREADY_EXISTS) {
-                  FX_PLOGS(ERROR, res.status_value()) << "Failed to add process target";
-                  completer.Reply(fit::error(
-                      fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                  return;
-                }
-              }
-
-              if (zx::result res = targets_.AddThread(pid, ThreadTarget{std::move(thread), koid});
-                  res.is_error()) {
-                FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread target: " << koid;
-                completer.Reply(
-                    fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-                return;
-              }
-
-              break;
-            }
-            default:
-              FX_LOGS(ERROR) << "Got unknown handle_type: " << info.type;
-              completer.Reply(
-                  fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-              return;
-          }
-        }
       }
       break;
     }
-    case fuchsia_cpu_profiler::TargetConfig::Tag::kComponent:
+    case fuchsia_cpu_profiler::TargetConfig::Tag::kComponent: {
+      if (!request.config()->target()->component()->moniker()) {
+        completer.Reply(
+            fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+        return;
+      }
+      // We've been asked to attach to an existing component by moniker. To do this, we ask
+      // RealmQuery to get the component's RuntimeDirectory, then read that to get the component's
+      // job id. Once we have the job id, we can add it to the TargetTree.
+      zx::result<fidl::ClientEnd<fuchsia_sys2::RealmQuery>> client_end =
+          component::Connect<fuchsia_sys2::RealmQuery>("/svc/fuchsia.sys2.RealmQuery.root");
+      if (client_end.is_error()) {
+        FX_LOGS(WARNING)
+            << "Unable to connect to RealmQuery. Attaching by moniker isn't supported!";
+        completer.Reply(
+            fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+        return;
+      }
+      zx::result<fidl::Endpoints<fuchsia_io::Directory>> directory_endpoints =
+          fidl::CreateEndpoints<fuchsia_io::Directory>();
+      if (directory_endpoints.is_error()) {
+        FX_LOGS(WARNING) << "Unable to create directory endpoints";
+        completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
+        return;
+      }
+      fidl::SyncClient<fuchsia_io::Directory> directory_client{
+          std::move(directory_endpoints->client)};
+      fidl::SyncClient realm_query_client{std::move(*client_end)};
+
+      fidl::Result<fuchsia_sys2::RealmQuery::Open> open_result = realm_query_client->Open({{
+          .moniker = *request.config()->target()->component()->moniker(),
+          .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
+          .flags = fuchsia_io::OpenFlags::kRightReadable,
+          .mode = {},
+          .path = ".",
+          .object = fidl::ServerEnd<fuchsia_io::Node>{directory_endpoints->server.TakeChannel()},
+      }});
+      if (open_result.is_error()) {
+        FX_LOGS(WARNING) << "Unable to open the runtime directory of "
+                         << *request.config()->target()->component()->moniker() << ": "
+                         << open_result.error_value();
+        completer.Reply(
+            fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+        return;
+      }
+      zx::result<zx_koid_t> job_id = ReadElfJobId(directory_client);
+      if (job_id.is_error()) {
+        FX_LOGS(WARNING) << "Unable to read component directory";
+        completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
+        return;
+      }
+      finder.AddJob(*job_id);
+      break;
+    }
     case fuchsia_cpu_profiler::TargetConfig::Tag::kTest:
     default:
       completer.Reply(
           fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
       return;
+  }
+
+  zx::result<TaskFinder::FoundTasks> handles_result = finder.FindHandles();
+  if (handles_result.is_error()) {
+    FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
+    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+    return;
+  }
+  if (handles_result->empty()) {
+    FX_LOGS(ERROR) << "Found no relevant handles";
+    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+    return;
+  }
+
+  targets_.Clear();
+  if (PopulateTargets(targets_, std::move(*handles_result)).is_error()) {
+    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
   }
 
   state_ = ProfilingState::Stopped;

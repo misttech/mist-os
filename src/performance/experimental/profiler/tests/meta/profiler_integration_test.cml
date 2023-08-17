@@ -15,6 +15,11 @@
             name: "profiler",
             url: "#meta/profiler.cm",
         },
+        {
+            name: "demo_target",
+            url: "#meta/demo_target.cm",
+            startup: "eager",
+        },
     ],
     use: [
         {
@@ -32,6 +37,12 @@
                 "fuchsia.logger.Log",
             ],
             from: "parent",
+            to: [ "#profiler" ],
+        },
+        {
+            protocol: "fuchsia.sys2.RealmQuery",
+            from: "framework",
+            as: "fuchsia.sys2.RealmQuery.root",
             to: [ "#profiler" ],
         },
     ],

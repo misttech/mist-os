@@ -29,6 +29,7 @@ fuchsia_test_package("profiler_integration_test") {
   test_components = [ ":profiler_integration_test_component" ]
   deps = [
     "//src/performance/experimental/profiler:profiler_component",
+    "//src/performance/experimental/profiler/tests/demo_target:demo_target_component",
 
     # Include some executables for the tests to launch
     "//src/performance/experimental/profiler/tests/demo_target:bin",

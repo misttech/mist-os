@@ -18,6 +18,8 @@ source_set("lib") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/syslog/cpp",

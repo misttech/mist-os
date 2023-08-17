@@ -4,24 +4,28 @@
 
 #include "taskfinder.h"
 
-zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> TaskFinder::FindHandles() {
+#include <lib/zx/job.h>
+#include <lib/zx/process.h>
+#include <lib/zx/thread.h>
+
+zx::result<TaskFinder::FoundTasks> TaskFinder::FindHandles() {
   auto status = WalkRootJobTree();
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(std::move(found_handles_));
+  return zx::ok(std::move(found_tasks_));
 }
 // Each of these methods visits the corresponding task type. If any On*()
 // method returns a value other than ZX_OK, the enumeration stops. See
 // |task_callback_t| for a description of parameters.
 zx_status_t TaskFinder::OnJob(int depth, zx_handle_t job, zx_koid_t koid, zx_koid_t parent_koid) {
   if (jobs_.find(koid) != jobs_.end()) {
-    zx::handle dup;
-    zx_status_t result = zx::unowned_handle(job)->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    zx::job dup;
+    zx_status_t result = zx::unowned_job(job)->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
     if (result != ZX_OK) {
       return result;
     }
-    found_handles_.emplace_back(koid, std::move(dup));
+    found_tasks_.jobs.emplace_back(koid, std::move(dup));
   }
   return ZX_OK;
 }
@@ -29,12 +33,12 @@ zx_status_t TaskFinder::OnJob(int depth, zx_handle_t job, zx_koid_t koid, zx_koi
 zx_status_t TaskFinder::OnProcess(int depth, zx_handle_t process, zx_koid_t koid,
                                   zx_koid_t parent_koid) {
   if (processes_.find(koid) != processes_.end()) {
-    zx::handle dup;
-    zx_status_t result = zx::unowned_handle(process)->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    zx::process dup;
+    zx_status_t result = zx::unowned_process(process)->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
     if (result != ZX_OK) {
       return result;
     }
-    found_handles_.emplace_back(koid, std::move(dup));
+    found_tasks_.processes.emplace_back(koid, std::move(dup));
   }
   return ZX_OK;
 }
@@ -42,12 +46,12 @@ zx_status_t TaskFinder::OnProcess(int depth, zx_handle_t process, zx_koid_t koid
 zx_status_t TaskFinder::OnThread(int depth, zx_handle_t process, zx_koid_t koid,
                                  zx_koid_t parent_koid) {
   if (threads_.find(koid) != threads_.end()) {
-    zx::handle dup;
-    zx_status_t result = zx::unowned_handle(process)->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    zx::thread dup;
+    zx_status_t result = zx::unowned_thread(process)->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
     if (result != ZX_OK) {
       return result;
     }
-    found_handles_.emplace_back(koid, std::move(dup));
+    found_tasks_.threads.emplace_back(koid, std::move(dup));
   }
   return ZX_OK;
 }
