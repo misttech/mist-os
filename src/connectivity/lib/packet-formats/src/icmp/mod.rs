@@ -246,7 +246,7 @@ impl<B> MessageBody<B> for () {
 #[derive(Debug)]
 pub struct OriginalPacket<B>(B);
 
-impl<B: ByteSlice + Deref<Target = [u8]>> OriginalPacket<B> {
+impl<B: ByteSlice> OriginalPacket<B> {
     /// Returns the the body of the original packet.
     pub fn body<I: IcmpIpExt>(&self) -> &[u8] {
         // TODO(joshlf): Can these debug_asserts be triggered by external input?
