@@ -43,6 +43,8 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
     ArmGenericTimerInit(arch_handoff.generic_timer_driver.value());
   }
 
+  // Initialize psci before the other power drivers, as they may decide to
+  // override the psci's power registration.
   if (arch_handoff.psci_driver) {
     PsciInit(arch_handoff.psci_driver.value());
   }

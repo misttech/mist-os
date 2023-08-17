@@ -45,16 +45,16 @@ inline uint64_t modify_register_via_smc(uintptr_t phys_addr, uint32_t mask, uint
   return res.x0;
 }
 
-void motmot_reboot(enum reboot_flags flags) {
+void motmot_reboot(power_reboot_flags flags) {
   uint64_t result;
 
   switch (flags) {
-    case REBOOT_BOOTLOADER:
-    case REBOOT_RECOVERY:
+    case power_reboot_flags::REBOOT_BOOTLOADER:
+    case power_reboot_flags::REBOOT_RECOVERY:
       dprintf(INFO, "Motmot does not support rebooting into recover or bootloader yet.\n");
       __FALLTHROUGH;
 
-    case REBOOT_NORMAL:
+    case power_reboot_flags::REBOOT_NORMAL:
       dprintf(INFO, "Sending reboot command via SMC\n");
       result = modify_register_via_smc(SYSTEM_CONFIGURATION_REG, SWRESET_SYSTEM, SWRESET_SYSTEM);
       modify_register_via_smc(SYSTEM_CONFIGURATION_REG, SWRESET_SYSTEM, SWRESET_SYSTEM);

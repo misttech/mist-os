@@ -11,6 +11,7 @@
 
 #include <arch/arm64/smccc.h>
 #include <dev/psci.h>
+#include <pdev/power.h>
 
 #define LOCAL_TRACE 0
 
@@ -57,12 +58,12 @@ uint32_t psci_get_feature(uint32_t psci_call) {
   return (uint32_t)do_psci_call(PSCI64_PSCI_FEATURES, psci_call, 0, 0);
 }
 
-void psci_system_reset(enum reboot_flags flags) {
+void psci_system_reset(power_reboot_flags flags) {
   uint64_t* args = reboot_args;
 
-  if (flags == REBOOT_BOOTLOADER) {
+  if (flags == power_reboot_flags::REBOOT_BOOTLOADER) {
     args = reboot_bootloader_args;
-  } else if (flags == REBOOT_RECOVERY) {
+  } else if (flags == power_reboot_flags::REBOOT_RECOVERY) {
     args = reboot_recovery_args;
   }
 
@@ -103,6 +104,16 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     result = psci_get_feature(PSCI64_CPU_OFF);
     dprintf(INFO, "\tPSCI64_CPU_OFF %#x\n", result);
   }
+
+  // Register with the pdev power driver.
+  static const pdev_power_ops psci_ops = {
+      .reboot = psci_system_reset,
+      .shutdown = psci_system_off,
+      .cpu_off = psci_cpu_off,
+      .cpu_on = psci_cpu_on,
+  };
+
+  pdev_register_power(&psci_ops);
 }
 
 #include <lib/console.h>
@@ -120,7 +131,7 @@ static int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   if (!strcmp(argv[1].str, "system_reset")) {
-    psci_system_reset(REBOOT_NORMAL);
+    psci_system_reset(power_reboot_flags::REBOOT_NORMAL);
   } else if (!strcmp(argv[1].str, "system_off")) {
     psci_system_off();
   } else if (!strcmp(argv[1].str, "cpu_on")) {

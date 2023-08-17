@@ -11,18 +11,14 @@
 
 #include <dev/power.h>
 
-__BEGIN_CDECLS
-
 // power interface
 struct pdev_power_ops {
-  void (*reboot)(enum reboot_flags flags);
-  void (*shutdown)(void);
-  uint32_t (*cpu_off)(void);
-  uint32_t (*cpu_on)(uint64_t mpid, paddr_t entry);
+  void (*reboot)(power_reboot_flags flags);
+  void (*shutdown)();
+  uint32_t (*cpu_off)();
+  uint32_t (*cpu_on)(uint64_t hw_cpu_id, paddr_t entry);
 };
 
-void pdev_register_power(const struct pdev_power_ops* ops);
-
-__END_CDECLS
+void pdev_register_power(const pdev_power_ops* ops);
 
 #endif  // ZIRCON_KERNEL_DEV_PDEV_POWER_INCLUDE_PDEV_POWER_H_

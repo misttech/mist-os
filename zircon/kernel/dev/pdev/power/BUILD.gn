@@ -14,7 +14,4 @@ source_set("power") {
   sources = [ "power.cc" ]
   public_deps = [ ":headers" ]
   deps = [ "//zircon/kernel/lib/arch" ]
-  if (current_cpu == "arm64") {
-    deps += [ "//zircon/kernel/dev/psci" ]
-  }
 }

@@ -14,5 +14,8 @@ library_headers("headers") {
 source_set("psci") {
   sources = [ "psci.cc" ]
   public_deps = [ ":headers" ]
-  deps = [ "//zircon/kernel/lib/console" ]
+  deps = [
+    "//zircon/kernel/dev/pdev/power",
+    "//zircon/kernel/lib/console",
+  ]
 }

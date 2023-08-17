@@ -69,8 +69,6 @@ uint32_t psci_cpu_on(uint64_t mpid, paddr_t entry);
 uint32_t psci_get_affinity_info(uint64_t cluster, uint64_t cpuid);
 
 void psci_system_off();
-
-/* called from assembly, mark as C external */
-extern "C" void psci_system_reset(enum reboot_flags flags);
+void psci_system_reset(power_reboot_flags flags);
 
 #endif  // ZIRCON_KERNEL_DEV_PSCI_INCLUDE_DEV_PSCI_H_

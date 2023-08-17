@@ -32,12 +32,12 @@ static constexpr uint32_t kDwDdtTorrInitValue = 0;
 // used to kick the watchdog
 static constexpr uint32_t kDwWdtCrrRestartValue = 0x76;
 
-static void as370_reboot(enum reboot_flags flags) {
+static void as370_reboot(power_reboot_flags flags) {
   auto kWdWdt0Cr_virt = periph_paddr_to_vaddr(kDwWdt0Cr);
   auto kWdWdt0Torr_virt = periph_paddr_to_vaddr(kDwWdt0Torr);
   auto kWdWdt0Crr_virt = periph_paddr_to_vaddr(kDwWdt0Crr);
 
-  LTRACEF("flags %d\n", flags);
+  LTRACEF("flags %u\n", static_cast<uint32_t>(flags));
 
   // TODO(fxbug.dev/34426): Handle REBOOT_BOOTLOADER and REBOOT_RECOVERY cases.
   writel(kDwWdtCrEnable | kDwWdtCrRpl8Pclk, kWdWdt0Cr_virt);

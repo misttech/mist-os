@@ -91,7 +91,7 @@ void riscv64_sbi_early_init() {
 
   // Register with the pdev power driver.
   static const pdev_power_ops sbi_ops = {
-      .reboot = [](reboot_flags flags) { sbi_reset(); },
+      .reboot = [](power_reboot_flags flags) { sbi_reset(); },
       .shutdown = []() { sbi_shutdown(); },
       // Null the cpu on/off with default hooks and use sbi directly for now.
       // Their api isn't expressive enough for the sbi arguments.

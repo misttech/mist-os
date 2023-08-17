@@ -594,13 +594,13 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
   TRACEF("suggested_action %u, reason %u, halt_on_panic %d\n", suggested_action,
          static_cast<unsigned int>(reason), halt_on_panic);
   if (suggested_action == HALT_ACTION_REBOOT) {
-    power_reboot(REBOOT_NORMAL);
+    power_reboot(power_reboot_flags::REBOOT_NORMAL);
     printf("reboot failed\n");
   } else if (suggested_action == HALT_ACTION_REBOOT_BOOTLOADER) {
-    power_reboot(REBOOT_BOOTLOADER);
+    power_reboot(power_reboot_flags::REBOOT_BOOTLOADER);
     printf("reboot-bootloader failed\n");
   } else if (suggested_action == HALT_ACTION_REBOOT_RECOVERY) {
-    power_reboot(REBOOT_RECOVERY);
+    power_reboot(power_reboot_flags::REBOOT_RECOVERY);
     printf("reboot-recovery failed\n");
   } else if (suggested_action == HALT_ACTION_SHUTDOWN) {
     power_shutdown();
@@ -612,7 +612,7 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
     Thread::Current::GetBacktrace(bt);
     bt.Print();
     if (!halt_on_panic) {
-      power_reboot(REBOOT_NORMAL);
+      power_reboot(power_reboot_flags::REBOOT_NORMAL);
       printf("reboot failed\n");
     }
 #if ENABLE_PANIC_SHELL
