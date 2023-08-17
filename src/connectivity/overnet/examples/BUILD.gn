@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 
+assert(is_host)
+
 group("examples") {
   testonly = true
   deps = [
@@ -14,65 +16,7 @@ group("examples") {
   ]
 }
 
-fuchsia_test_component("device-name-provider-client") {
-  manifest = "meta/device-name-provider-client.cml"
-  deps = [ "//src/bringup/bin/device-name-provider" ]
-}
-
-fuchsia_test_component("device-name-provider-server") {
-  manifest = "meta/device-name-provider-server.cml"
-  deps = [ "//src/bringup/bin/device-name-provider" ]
-}
-
-fuchsia_test_component("overnet_echo_test") {
-  manifest = "meta/overnet-echo-test.cml"
-  deps = [
-    "echo:server",
-    "echo:test-driver",
-  ]
-}
-
-fuchsia_test_component("overnet_interface_passing_test") {
-  manifest = "meta/overnet-interface-passing-test.cml"
-  deps = [
-    "interface_passing:server",
-    "interface_passing:test-driver",
-  ]
-}
-
-fuchsia_test_component("overnet_socket_passing_test") {
-  manifest = "meta/overnet-socket-passing-test.cml"
-  deps = [
-    "socket_passing:server",
-    "socket_passing:test-driver",
-  ]
-}
-
-fuchsia_test_component("overnet_event_pair_test") {
-  manifest = "meta/overnet-event-pair-test.cml"
-  deps = [
-    "event_pair:server",
-    "event_pair:test-driver",
-  ]
-}
-
-fuchsia_test_package("overnet-examples-tests") {
-  test_components = [
-    ":overnet_echo_test",
-    ":overnet_interface_passing_test",
-    ":overnet_socket_passing_test",
-    ":overnet_event_pair_test",
-  ]
-  deps = [
-    ":device-name-provider-client",
-    ":device-name-provider-server",
-    "//src/connectivity/network/mdns/service:component",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
-    "//src/connectivity/overnet/overnetstack:component-with-udp",
-  ]
-}
-
 group("tests") {
   testonly = true
-  deps = [ ":overnet-examples-tests" ]
+  deps = []
 }

@@ -7,7 +7,6 @@ import("//build/config.gni")
 group("overnet") {
   testonly = true
   deps = [
-    "examples",
     "lib",
     "tools",
   ]
@@ -23,7 +22,7 @@ group("tests_no_e2e") {
   assert_no_deps = e2e_test_libs
 
   deps = [
-    "examples:tests",
+    "examples:tests($host_toolchain)",
     "lib:tests",
     "overnetstack:tests",
     "tests:tests_no_e2e",
