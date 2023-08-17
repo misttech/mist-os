@@ -28,15 +28,20 @@ group("tests") {
 source_set("common_srcs") {
   configs += [ "//build/config:all_source" ]
   sources = [
+    "device.cc",
+    "device.h",
     "gpu.cc",
+    "gpu.h",
     "virtio-abi.cc",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_driver",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//src/devices/bus/lib/virtio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fsl",
     "//zircon/system/ulib/sysmem-version",
   ]
@@ -48,14 +53,10 @@ fuchsia_driver("virtio_gpu-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "gpu_driver.cc" ]
   deps = [
     ":common_srcs",
     ":virtio_gpu_bind",
     "//sdk/lib/syslog/cpp:backend",
-    "//src/devices/bus/lib/virtio",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
   ]
 }
 

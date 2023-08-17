@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/virtio_gpu.so",
         bind: "meta/bind/virtio_gpu_bind.bindbc",
         colocate: "false",
-        compat: "driver/virtio_gpu.so",
     },
     use: [
         { service: "fuchsia.hardware.pci.Service" },
