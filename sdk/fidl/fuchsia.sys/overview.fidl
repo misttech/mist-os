@@ -1,5 +1,13 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=7)
+
+/// # Deprecation
+///
+/// The Components v1 framework, which serves uses these protocols, has been
+/// removed from the Fuchsia platform in https://fxrev.dev/874963 and
+/// https://fxrev.dev/874960.
+///
+/// Use Component Framework v2 and its APIs in fuchsia.component.* instead.
+@available(added=7, removed=14)
 library fuchsia.sys;
