@@ -108,10 +108,7 @@ rustc_library("trace-provider") {
   name = "fuchsia_trace_provider"
   edition = "2021"
   source_root = "trace-provider/src/lib.rs"
-  non_rust_deps = [
-    ":rust-trace-provider",
-    "//zircon/system/ulib/trace-provider",
-  ]
+  non_rust_deps = [ ":rust-trace-provider" ]
 
   sources = [ "trace-provider/src/lib.rs" ]
 }
