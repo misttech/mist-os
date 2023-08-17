@@ -7,6 +7,7 @@
 
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devicetree/manager.h>
+#include <lib/driver/devicetree/visitors/default.h>
 #include <lib/zx/result.h>
 
 #include <optional>
@@ -22,6 +23,7 @@ class ExampleBoard : public fdf::DriverBase {
 
  private:
   std::optional<fdf_devicetree::Manager> manager_;
+  fdf_devicetree::DefaultVisitors<> default_visitors_;
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
 };
 

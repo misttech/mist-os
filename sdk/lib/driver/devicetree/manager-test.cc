@@ -297,7 +297,8 @@ TEST_F(ManagerTest, TestPropertyCallback) {
 
 TEST_F(ManagerTest, TestPublishesSimpleNode) {
   Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
-  ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
+  DefaultVisitors<> default_visitors;
+  ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
   DoPublish(manager);
   ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
@@ -320,7 +321,8 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
 
 TEST_F(ManagerTest, TestMmioProperty) {
   Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
-  ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
+  DefaultVisitors<> default_visitors;
+  ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
   DoPublish(manager);
 
@@ -342,7 +344,8 @@ TEST_F(ManagerTest, TestMmioProperty) {
 
 TEST_F(ManagerTest, TestBtiProperty) {
   Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
-  ASSERT_EQ(ZX_OK, manager.Walk(manager.default_visitor()).status_value());
+  DefaultVisitors<> default_visitors;
+  ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
   DoPublish(manager);
 

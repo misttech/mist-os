@@ -21,7 +21,7 @@ zx::result<> ExampleBoard::Start() {
 
   manager_.emplace(std::move(*manager));
 
-  auto status = manager_->Walk(manager_->default_visitor());
+  auto status = manager_->Walk(default_visitors_);
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to walk the device tree: %s", status.status_string());
     return status.take_error();

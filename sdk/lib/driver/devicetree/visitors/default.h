@@ -50,7 +50,16 @@ class MultiVisitor : public Visitor {
   std::array<std::unique_ptr<Visitor>, sizeof...(Visitors)> visitors_;
 };
 
-using DefaultVisitor = MultiVisitor<BindPropertyVisitor, MmioVisitor, BtiVisitor>;
+// Set of visitors to parse basic devicetree properties like bind property,
+// MMIO register properties etc., of each node and publish the properties to
+// |fdf_devicetree::Node|. This can be extended to include driver specific
+// visitors.
+//     Example:
+//           DefaultVisitors<MyDriverVisitor> visitors;
+//           devicetree_manager.Walk(visitors);
+template <typename... AdditionalVisitors>
+using DefaultVisitors =
+    MultiVisitor<BindPropertyVisitor, MmioVisitor, BtiVisitor, AdditionalVisitors...>;
 
 }  // namespace fdf_devicetree
 

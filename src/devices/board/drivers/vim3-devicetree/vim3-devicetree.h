@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "sdk/lib/driver/devicetree/manager.h"
+#include "sdk/lib/driver/devicetree/visitors/default.h"
 
 namespace vim3_dt {
 
@@ -23,6 +24,7 @@ class Vim3Devicetree : public fdf::DriverBase {
 
  private:
   std::optional<fdf_devicetree::Manager> manager_;
+  fdf_devicetree::DefaultVisitors<> visitors_;
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
 };
 

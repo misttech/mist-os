@@ -21,7 +21,7 @@ zx::result<> Vim3Devicetree::Start() {
 
   manager_.emplace(std::move(*manager));
 
-  zx::result<> status = manager_->Walk(manager_->default_visitor());
+  zx::result<> status = manager_->Walk(visitors_);
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to walk the device tree: %s", status.status_string());
     return status.take_error();
