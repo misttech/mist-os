@@ -27,24 +27,12 @@ pub type MappedMutexGuard<'a, T> = parking_lot::MappedMutexGuard<'a, T>;
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// In release, either use parking_lot::Mutex or fuchsia_sync::Mutex depending on use_fuchsia_rwlock
-//
-// TODO(fxbug.dev/88603): Use fuchsia_sync all the time.
-#[cfg(all(not(any(test, debug_assertions)), use_fuchsia_rwlock))]
+#[cfg(not(any(test, debug_assertions)))]
 pub type RwLock<T> = fuchsia_sync::RwLock<T>;
-#[cfg(all(not(any(test, debug_assertions)), use_fuchsia_rwlock))]
+#[cfg(not(any(test, debug_assertions)))]
 pub type RwLockReadGuard<'a, T> = fuchsia_sync::RwLockReadGuard<'a, T>;
-#[cfg(all(not(any(test, debug_assertions)), use_fuchsia_rwlock))]
+#[cfg(not(any(test, debug_assertions)))]
 pub type RwLockWriteGuard<'a, T> = fuchsia_sync::RwLockWriteGuard<'a, T>;
-#[cfg(all(not(any(test, debug_assertions)), not(use_fuchsia_rwlock)))]
-pub type RwLock<T> = parking_lot::RwLock<T>;
-#[cfg(all(not(any(test, debug_assertions)), not(use_fuchsia_rwlock)))]
-pub type RwLockReadGuard<'a, T> = parking_lot::RwLockReadGuard<'a, T>;
-#[cfg(all(not(any(test, debug_assertions)), not(use_fuchsia_rwlock)))]
-pub type RwLockWriteGuard<'a, T> = parking_lot::RwLockWriteGuard<'a, T>;
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(any(test, debug_assertions))]
 type RawTracingMutex = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncMutex>;
