@@ -135,7 +135,8 @@ def fuchsia_product_configuration(
         json_config = None,
         base_packages = None,
         cache_packages = None,
-        base_driver_packages = None):
+        base_driver_packages = None,
+        **kwarg):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
 
     Args:
@@ -162,6 +163,7 @@ def fuchsia_product_configuration(
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.
+        **kwarg: Common bazel rule args passed through to the implementation rule.
     """
 
     if not json_config:
@@ -176,4 +178,5 @@ def fuchsia_product_configuration(
         base_packages = base_packages,
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
+        **kwarg,
     )
