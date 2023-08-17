@@ -230,6 +230,7 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     info.blocks = usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX) / BYTES_PER_BLOCK;
     info.blksize = BYTES_PER_BLOCK;
     info.link_count = attrs.link_count.try_into().unwrap_or(std::usize::MAX);
+    info.time_modify = zx::Time::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
 }
 
 fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
@@ -1899,6 +1900,106 @@ mod test {
             assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
         })
         .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_time_modify_persists() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        let last_modified = fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns: Arc<Namespace> = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let child = ns
+                .root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            // Write to file (this should update mtime (time_modify))
+            let file = child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+            // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
+            // underlying filesystem
+            let time_before_write = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+            let written = file
+                .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                .expect("write failed");
+            assert_eq!(written, write_bytes.len());
+            let last_modified = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            assert!(last_modified > time_before_write);
+            last_modified
+        })
+        .await;
+
+        // Tear down the kernel and open the file again. Check that modification time is when we
+        // last modified the contents of the file
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+        let (kernel, current_task) = create_kernel_and_task();
+        let refreshed_modified_time = fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let child = ns
+                .root()
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+            let last_modified = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            last_modified
+        })
+        .await;
+        assert_eq!(last_modified, refreshed_modified_time);
 
         fixture.close().await;
     }
