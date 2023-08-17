@@ -1955,7 +1955,7 @@ impl<Key: ReadItemKey> FileWaiter<Key> {
 
             let ready_items = self.ready_items.clone();
             let handler = Box::new(move |observed: FdEvents| {
-                ready_items.lock().push(ReadyItem::<Key> { key, events: observed });
+                ready_items.lock().push(ReadyItem::<Key> { key, events: observed & sought_events });
             });
 
             file.wait_async(current_task, &self.waiter, sought_events, handler);

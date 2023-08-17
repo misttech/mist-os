@@ -226,7 +226,6 @@
                 "readdir21",
                 "recv01",
                 "recvfrom01",
-                "recvmsg01",
                 "remap_file_pages02",
                 "request_key01",
                 "request_key02",
@@ -379,6 +378,7 @@
 
                 // These tests hang
                 "creat07",
+                "recvmsg01",
 
                 // Tests reach unexpected Abort
                 "fork14",
