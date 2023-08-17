@@ -7,6 +7,8 @@ pub mod task {
     use std::future::Future;
     use std::pin::Pin;
 
+    use futures::FutureExt;
+
     /// A handle to a task.
     ///
     /// A task can be polled for the output of the future it is executing. A
@@ -14,7 +16,10 @@ pub mod task {
     /// task, call the cancel() method. To run a task to completion without
     /// retaining the Task handle, call the detach() method.
     #[derive(Debug)]
-    pub struct Task<T>(async_executor::Task<T>);
+    pub struct Task<T> {
+        task: tokio::task::JoinHandle<T>,
+        abort_on_drop: bool,
+    }
 
     impl<T: 'static> Task<T> {
         /// Spawn a new `Send` task onto the current executor.
@@ -27,7 +32,7 @@ pub mod task {
         where
             T: Send,
         {
-            Self(super::executor::spawn(fut))
+            Self { task: tokio::task::spawn(fut), abort_on_drop: true }
         }
 
         /// Spawn a new non-`Send` task onto the single threaded executor.
@@ -37,17 +42,29 @@ pub mod task {
         /// `local` may panic if not called in the context of a local executor
         /// (e.g. within a call to `run` or `run_singlethreaded`).
         pub fn local<'a>(fut: impl Future<Output = T> + 'static) -> Self {
-            Self(super::executor::local(fut))
+            Self { task: tokio::task::spawn_local(fut), abort_on_drop: true }
         }
 
         /// detach the Task handle. The contained future will be polled until completion.
-        pub fn detach(self) {
-            self.0.detach()
+        pub fn detach(mut self) {
+            self.abort_on_drop = false;
         }
 
         /// cancel a task and wait for cancellation to complete.
-        pub async fn cancel(self) -> Option<T> {
-            self.0.cancel().await
+        pub async fn cancel(mut self) -> Option<T> {
+            self.task.abort();
+            let res = (&mut self.task).await;
+
+            match res {
+                Ok(value) => Some(value),
+                Err(err) => {
+                    if err.is_panic() {
+                        // Propagate panic
+                        std::panic::resume_unwind(err.into_panic());
+                    }
+                    None
+                }
+            }
         }
     }
 
@@ -56,7 +73,29 @@ pub mod task {
 
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             use futures_lite::FutureExt;
-            self.0.poll(cx)
+            match self.task.poll(cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Err(err)) => {
+                    if err.is_panic() {
+                        // Propagate panic
+                        std::panic::resume_unwind(err.into_panic());
+                    } else {
+                        // All codepaths for canceling/aborting a task consume said task.
+                        // It will not be polled afterwards, and if it is there's something very
+                        // wrong going on.
+                        unreachable!("Task was polled after being cancelled");
+                    }
+                }
+                Poll::Ready(Ok(v)) => Poll::Ready(v),
+            }
+        }
+    }
+
+    impl<T> Drop for Task<T> {
+        fn drop(&mut self) {
+            if self.abort_on_drop {
+                self.task.abort();
+            }
         }
     }
 
@@ -85,13 +124,12 @@ pub mod task {
     pub fn unblock<T: 'static + Send>(
         f: impl 'static + Send + FnOnce() -> T,
     ) -> impl 'static + Send + Future<Output = T> {
-        blocking::unblock(f)
+        tokio::task::spawn_blocking(f).map(|res| res.unwrap())
     }
 }
 
 pub mod executor {
     use crate::runtime::WakeupTime;
-    use easy_parallel::Parallel;
     use std::future::Future;
 
     pub use std::time::Duration;
@@ -103,28 +141,6 @@ pub mod executor {
             self
         }
     }
-
-    pub(crate) fn spawn<T: 'static>(
-        fut: impl Future<Output = T> + Send + 'static,
-    ) -> async_executor::Task<T>
-    where
-        T: Send,
-    {
-        GLOBAL.spawn(fut)
-    }
-
-    pub(crate) fn local<T>(fut: impl Future<Output = T> + 'static) -> async_executor::Task<T>
-    where
-        T: 'static,
-    {
-        LOCAL.with(|local| local.spawn(fut))
-    }
-
-    thread_local! {
-        static LOCAL: async_executor::LocalExecutor<'static> = async_executor::LocalExecutor::new();
-    }
-
-    static GLOBAL: async_executor::Executor<'_> = async_executor::Executor::new();
 
     /// A multi-threaded executor.
     ///
@@ -148,24 +164,12 @@ pub mod executor {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            let (signal, shutdown) = async_channel::unbounded::<()>();
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(self.num_threads)
+                .build()
+                .expect("Could not start tokio runtime on current thread");
 
-            let (_, res) = Parallel::new()
-                .each(0..self.num_threads, |_| {
-                    LOCAL.with(|local| {
-                        let _ = async_io::block_on(local.run(GLOBAL.run(shutdown.recv())));
-                    })
-                })
-                .finish(|| {
-                    LOCAL.with(|local| {
-                        async_io::block_on(local.run(GLOBAL.run(async {
-                            let res = main_future.await;
-                            drop(signal);
-                            res
-                        })))
-                    })
-                });
-            res
+            rt.block_on(main_future)
         }
     }
 
@@ -188,7 +192,10 @@ pub mod executor {
         where
             F: Future,
         {
-            LOCAL.with(|local| async_io::block_on(GLOBAL.run(local.run(main_future))))
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .expect("Could not start tokio runtime on current thread");
+            tokio::task::LocalSet::new().block_on(&rt, main_future)
         }
     }
 
