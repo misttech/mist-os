@@ -252,6 +252,12 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 **will automatically ensure you have followed the guidelines. Run this script**
 **and fix any errors it suggests.**
 
+Once the script has completed successfully, it will print output similar to the
+following:
+```shell
+INFO: Honeydew code has passed all of the conformance steps
+```
+
 **These guidelines need to be run at the least on the following patchsets:**
 1. Initial patchset just before adding reviewers
 2. Final patchset just before merging the CL
