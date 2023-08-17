@@ -19,7 +19,7 @@ pub fn build_process_selector(
     match (by_name, by_koid) {
         (Some(selected_name), None) => Ok(fheapdump_client::ProcessSelector::ByName(selected_name)),
         (None, Some(selected_koid)) => Ok(fheapdump_client::ProcessSelector::ByKoid(selected_koid)),
-        _ => anyhow::bail!("Please use either --by-name or --by-koid"),
+        _ => ffx_bail!("Please use either --by-name or --by-koid"),
     }
 }
 
