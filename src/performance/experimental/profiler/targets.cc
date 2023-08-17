@@ -131,8 +131,9 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
     return zx::error(status);
   }
   if (num_threads < 1) {
-    FX_LOGS(ERROR) << "failed to get any threads associated with the process";
-    return zx::error(ZX_ERR_BAD_STATE);
+    // A job or process in early initialization may not have threads yet.
+    // That's okay, we'll attach to them when they are created.
+    return zx::ok(std::vector<zx_koid_t>{});
   }
 
   zx_koid_t threads[num_threads];

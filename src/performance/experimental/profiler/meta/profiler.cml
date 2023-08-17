@@ -20,7 +20,13 @@
             ],
         },
         {
-            protocol: "fuchsia.sys2.RealmQuery.root",
+            protocol: [
+                "fuchsia.sys2.LifecycleController",
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmQuery.root",
+            ],
+
+            // Optional, since integration tests aren't able to provide this capability
             availability: "optional",
         },
     ],

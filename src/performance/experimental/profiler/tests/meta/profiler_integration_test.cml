@@ -21,6 +21,12 @@
             startup: "eager",
         },
     ],
+    collections: [
+        {
+            name: "launchpad",
+            durability: "transient",
+        },
+    ],
     use: [
         {
             protocol: "fuchsia.cpu.profiler.Session",
@@ -44,6 +50,12 @@
             from: "framework",
             as: "fuchsia.sys2.RealmQuery.root",
             to: [ "#profiler" ],
+        },
+        {
+            protocol: "fuchsia.sys2.LifecycleController",
+            from: "framework",
+            as: "fuchsia.sys2.LifecycleController.root",
+            to: "#profiler",
         },
     ],
 }

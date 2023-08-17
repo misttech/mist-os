@@ -35,6 +35,7 @@ fuchsia_test_package("profiler_integration_test") {
     "//src/performance/experimental/profiler/tests/demo_target:bin",
     "//src/performance/experimental/profiler/tests/thread_spawner",
   ]
+  subpackages = [ "demo_target" ]
 
   test_specs = {
     parallel = 1

@@ -12,6 +12,7 @@
 #include <lib/zx/thread.h>
 #include <zircon/compiler.h>
 
+#include "component.h"
 #include "sampler.h"
 #include "targets.h"
 
@@ -42,6 +43,7 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
   ProfilingState state_ = ProfilingState::Unconfigured;
 
   TargetTree targets_;
+  std::unique_ptr<Component> component_target_;
 };
 }  // namespace profiler
 

@@ -43,7 +43,9 @@ void MakeWork() {
 
 std::pair<std::set<zx_koid_t>, std::set<zx_koid_t>> GetOutputKoids(zx::socket sock) {
   std::string contents;
-  fsl::BlockingCopyToString(std::move(sock), &contents);
+  if (!fsl::BlockingCopyToString(std::move(sock), &contents)) {
+    return std::make_pair(std::set<zx_koid_t>(), std::set<zx_koid_t>());
+  }
 
   std::stringstream ss;
   ss << contents;
@@ -532,4 +534,55 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
   // We should have only one thread and one process
   EXPECT_EQ(tids.size(), size_t{1});
   EXPECT_EQ(pids.size(), size_t{1});
+}
+
+TEST(ProfilerIntegrationTest, LaunchedComponent) {
+  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  ASSERT_TRUE(client_end.is_ok());
+  const fidl::SyncClient client{std::move(*client_end)};
+
+  zx::socket in_socket, outgoing_socket;
+  ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
+
+  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
+      .period = 1000000,
+      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
+          fuchsia_cpu_profiler::CounterId::kNanoseconds),
+      .sample = fuchsia_cpu_profiler::Sample{{
+          .callgraph =
+              fuchsia_cpu_profiler::CallgraphConfig{
+                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
+          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
+      }},
+  }};
+
+  fuchsia_cpu_profiler::TargetConfig target_config =
+      fuchsia_cpu_profiler::TargetConfig::WithComponent(fuchsia_cpu_profiler::ComponentConfig{{
+          .url = "demo_target#meta/demo_target.cm",
+          .moniker = "./launchpad:demo_target",
+      }});
+
+  fuchsia_cpu_profiler::Config config{{
+      .configs = std::vector{sampling_config},
+      .target = target_config,
+  }};
+
+  auto config_response = client->Configure({{
+      .output = std::move(outgoing_socket),
+      .config = config,
+  }});
+  ASSERT_TRUE(config_response.is_ok());
+
+  auto start_response = client->Start({{.buffer_results = true}});
+  ASSERT_TRUE(start_response.is_ok());
+  // Get Some samples
+  sleep(1);
+
+  auto stop_response = client->Stop();
+  ASSERT_TRUE(stop_response.is_ok());
+  ASSERT_TRUE(stop_response.value().samples_collected().has_value());
+  EXPECT_GT(stop_response.value().samples_collected().value(), size_t{10});
+
+  auto reset_response = client->Reset();
+  ASSERT_TRUE(reset_response.is_ok());
 }

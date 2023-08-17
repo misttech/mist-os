@@ -30,10 +30,22 @@ impl FfxMain for ProfilerTool {
 }
 
 fn gather_targets(opts: &args::Start) -> Result<fidl_fuchsia_cpu_profiler::TargetConfig> {
-    if let Some(moniker) = &opts.moniker {
+    if let Some(url) = &opts.url {
         if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
             ffx_bail!(
-                "Target both a component and specific jobs/processes/threads is not supported"
+                "Targeting both a component and specific jobs/processes/threads is not supported"
+            )
+        }
+        let component_config = profiler::ComponentConfig {
+            url: Some(url.clone()),
+            moniker: opts.moniker.clone(),
+            ..Default::default()
+        };
+        Ok(profiler::TargetConfig::Component(component_config))
+    } else if let Some(moniker) = &opts.moniker {
+        if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
+            ffx_bail!(
+                "Targeting both a component and specific jobs/processes/threads is not supported"
             )
         }
         let component_config =
@@ -138,6 +150,7 @@ mod tests {
             pids: vec![1, 2, 3],
             tids: vec![4, 5, 6],
             job_ids: vec![7, 8, 9],
+            url: None,
             moniker: None,
             duration: None,
             output: String::from("output_file"),
@@ -154,6 +167,7 @@ mod tests {
             tids: vec![],
             job_ids: vec![],
             moniker: None,
+            url: None,
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
@@ -167,6 +181,7 @@ mod tests {
             tids: vec![],
             job_ids: vec![],
             moniker: Some(String::from("core/test")),
+            url: None,
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
@@ -176,6 +191,7 @@ mod tests {
             tids: vec![1],
             job_ids: vec![],
             moniker: Some(String::from("core/test")),
+            url: None,
             duration: None,
             output: String::from("output_file"),
             print_stats: false,
@@ -185,6 +201,7 @@ mod tests {
             tids: vec![],
             job_ids: vec![1],
             moniker: Some(String::from("core/test")),
+            url: None,
             duration: None,
             output: String::from("output_file"),
             print_stats: false,

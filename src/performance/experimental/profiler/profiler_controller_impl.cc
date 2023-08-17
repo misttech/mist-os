@@ -5,6 +5,7 @@
 #include "profiler_controller_impl.h"
 
 #include <elf.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.sys2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/result.h>
@@ -153,6 +154,42 @@ zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>
   return zx::ok(job_id);
 }
 
+zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
+  zx::result<fidl::ClientEnd<fuchsia_sys2::RealmQuery>> client_end =
+      component::Connect<fuchsia_sys2::RealmQuery>("/svc/fuchsia.sys2.RealmQuery.root");
+  if (client_end.is_error()) {
+    FX_LOGS(WARNING) << "Unable to connect to RealmQuery. Attaching by moniker isn't supported!";
+    return client_end.take_error();
+  }
+  zx::result<fidl::Endpoints<fuchsia_io::Directory>> directory_endpoints =
+      fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (directory_endpoints.is_error()) {
+    FX_LOGS(WARNING) << "Unable to create directory endpoints";
+    return directory_endpoints.take_error();
+  }
+  fidl::SyncClient<fuchsia_io::Directory> directory_client{std::move(directory_endpoints->client)};
+  fidl::SyncClient realm_query_client{std::move(*client_end)};
+
+  fidl::Result<fuchsia_sys2::RealmQuery::Open> open_result = realm_query_client->Open({{
+      .moniker = moniker,
+      .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
+      .flags = fuchsia_io::OpenFlags::kRightReadable,
+      .mode = {},
+      .path = ".",
+      .object = fidl::ServerEnd<fuchsia_io::Node>{directory_endpoints->server.TakeChannel()},
+  }});
+  if (open_result.is_error()) {
+    FX_LOGS(WARNING) << "Unable to open the runtime directory of " << moniker << ": "
+                     << open_result.error_value();
+    return zx::error(ZX_ERR_BAD_PATH);
+  }
+  zx::result<zx_koid_t> job_id = ReadElfJobId(directory_client);
+  if (job_id.is_error()) {
+    FX_LOGS(WARNING) << "Unable to read component directory";
+  }
+  return job_id;
+}
+
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
   if (state_ != ProfilingState::Unconfigured) {
@@ -198,57 +235,57 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       break;
     }
     case fuchsia_cpu_profiler::TargetConfig::Tag::kComponent: {
-      if (!request.config()->target()->component()->moniker()) {
-        completer.Reply(
-            fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-        return;
-      }
-      // We've been asked to attach to an existing component by moniker. To do this, we ask
-      // RealmQuery to get the component's RuntimeDirectory, then read that to get the component's
-      // job id. Once we have the job id, we can add it to the TargetTree.
-      zx::result<fidl::ClientEnd<fuchsia_sys2::RealmQuery>> client_end =
-          component::Connect<fuchsia_sys2::RealmQuery>("/svc/fuchsia.sys2.RealmQuery.root");
-      if (client_end.is_error()) {
-        FX_LOGS(WARNING)
-            << "Unable to connect to RealmQuery. Attaching by moniker isn't supported!";
-        completer.Reply(
-            fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-        return;
-      }
-      zx::result<fidl::Endpoints<fuchsia_io::Directory>> directory_endpoints =
-          fidl::CreateEndpoints<fuchsia_io::Directory>();
-      if (directory_endpoints.is_error()) {
-        FX_LOGS(WARNING) << "Unable to create directory endpoints";
-        completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
-        return;
-      }
-      fidl::SyncClient<fuchsia_io::Directory> directory_client{
-          std::move(directory_endpoints->client)};
-      fidl::SyncClient realm_query_client{std::move(*client_end)};
+      if (request.config()->target()->component()->url().has_value()) {
+        std::string url = request.config()->target()->component()->url().value();
+        std::string moniker;
+        if (request.config()->target()->component()->moniker().has_value()) {
+          moniker = request.config()->target()->component()->moniker().value();
+        } else {
+          // Default to core/ffx-laboratory
+          const std::string parent_moniker = "./core";
+          const std::string collection = "ffx-laboratory";
 
-      fidl::Result<fuchsia_sys2::RealmQuery::Open> open_result = realm_query_client->Open({{
-          .moniker = *request.config()->target()->component()->moniker(),
-          .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
-          .flags = fuchsia_io::OpenFlags::kRightReadable,
-          .mode = {},
-          .path = ".",
-          .object = fidl::ServerEnd<fuchsia_io::Node>{directory_endpoints->server.TakeChannel()},
-      }});
-      if (open_result.is_error()) {
-        FX_LOGS(WARNING) << "Unable to open the runtime directory of "
-                         << *request.config()->target()->component()->moniker() << ": "
-                         << open_result.error_value();
+          // url: fuchsia-pkg://fuchsia.com/package#meta/component.cm
+          const size_t name_start = url.find_last_of('/');
+          const size_t name_end = url.find_last_of('.');
+          if (name_start == std::string::npos || name_end == std::string::npos) {
+            FX_LOGS(ERROR) << "Invalid url: " << url;
+            completer.Reply(
+                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+            return;
+          }
+          // name: component
+          const std::string name = url.substr(name_start + 1, name_end - (name_start + 1));
+          moniker = "./core/ffx-laboratory:" + name;
+        }
+
+        zx::result<std::unique_ptr<profiler::Component>> res =
+            profiler::Component::Create(dispatcher_, url, std::move(moniker));
+        if (res.is_error()) {
+          FX_PLOGS(INFO, res.error_value())
+              << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
+          completer.Reply(
+              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+          return;
+        }
+        component_target_ = std::move(*res);
+      } else if (request.config()->target()->component()->moniker()) {
+        // We've been asked to attach to an existing component by moniker. To do this, we ask
+        // RealmQuery to get the component's RuntimeDirectory, then read that to get the component's
+        // job id. Once we have the job id, we can add it to the TargetTree.
+        zx::result<zx_koid_t> job_id =
+            MonikerToJobId(*request.config()->target()->component()->moniker());
+        if (job_id.is_error()) {
+          completer.Reply(
+              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+          return;
+        }
+        finder.AddJob(*job_id);
+      } else {
         completer.Reply(
             fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
         return;
       }
-      zx::result<zx_koid_t> job_id = ReadElfJobId(directory_client);
-      if (job_id.is_error()) {
-        FX_LOGS(WARNING) << "Unable to read component directory";
-        completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
-        return;
-      }
-      finder.AddJob(*job_id);
       break;
     }
     case fuchsia_cpu_profiler::TargetConfig::Tag::kTest:
@@ -258,21 +295,27 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       return;
   }
 
-  zx::result<TaskFinder::FoundTasks> handles_result = finder.FindHandles();
-  if (handles_result.is_error()) {
-    FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
-    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-    return;
-  }
-  if (handles_result->empty()) {
-    FX_LOGS(ERROR) << "Found no relevant handles";
-    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-    return;
-  }
+  if (!component_target_) {
+    zx::result<TaskFinder::FoundTasks> handles_result = finder.FindHandles();
+    if (handles_result.is_error()) {
+      FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
+      completer.Reply(
+          fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+      return;
+    }
+    if (handles_result->empty()) {
+      FX_LOGS(ERROR) << "Found no relevant handles";
+      completer.Reply(
+          fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+      return;
+    }
 
-  targets_.Clear();
-  if (PopulateTargets(targets_, std::move(*handles_result)).is_error()) {
-    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+    targets_.Clear();
+    if (PopulateTargets(targets_, std::move(*handles_result)).is_error()) {
+      completer.Reply(
+          fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+      return;
+    }
   }
 
   state_ = ProfilingState::Stopped;
@@ -288,6 +331,41 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 
   sampler_ = std::make_unique<Sampler>(dispatcher_, std::move(targets_));
   targets_.Clear();
+  if (component_target_) {
+    if (zx::result<> res = component_target_->Start(); res.is_error()) {
+      completer.Close(res.error_value());
+      return;
+    }
+    std::string moniker = component_target_->Moniker();
+    zx::result<zx_koid_t> job_id = MonikerToJobId(moniker);
+    if (job_id.is_error()) {
+      completer.Close(job_id.error_value());
+      return;
+    }
+    TaskFinder tf;
+    tf.AddJob(*job_id);
+    zx::result<TaskFinder::FoundTasks> handles = tf.FindHandles();
+    if (handles.is_error()) {
+      FX_PLOGS(ERROR, handles.error_value()) << "Failed to find handle for: " << moniker;
+      return;
+    }
+    for (auto& [koid, handle] : handles->jobs) {
+      if (koid == job_id) {
+        zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
+        if (target.is_error()) {
+          FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
+          return;
+        }
+        zx::result<> target_result = sampler_->AddTarget(std::move(*target));
+        if (target_result.is_error()) {
+          FX_PLOGS(ERROR, target_result.error_value()) << "Failed to add target for: " << moniker;
+          return;
+        }
+        break;
+      }
+    }
+  };
+
   zx::result<> start_res = sampler_->Start();
   if (start_res.is_error()) {
     Reset();
@@ -311,6 +389,16 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
   if (modules.is_error()) {
     completer.Close(modules.status_value());
+  }
+
+  if (component_target_) {
+    if (zx::result<> res = component_target_->Stop(); res.is_error()) {
+      FX_PLOGS(WARNING, res.error_value()) << "Failed to stop launched components";
+    }
+
+    if (zx::result<> res = component_target_->Destroy(); res.is_error()) {
+      FX_PLOGS(WARNING, res.error_value()) << "Failed to destroy launched components";
+    }
   }
 
   if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {

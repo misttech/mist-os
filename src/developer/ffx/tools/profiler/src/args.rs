@@ -22,7 +22,12 @@ pub enum ProfilerSubCommand {
 /// Record a profile.
 #[argh(subcommand, name = "start")]
 pub struct Start {
-    /// moniker to profile
+    /// url of a component to launch and profile
+    #[argh(option)]
+    pub url: Option<String>,
+
+    /// moniker of a component to attach to and profile. If specified in combination with `--url`,
+    /// will attempt to launch the component at the given moniker.
     #[argh(option)]
     pub moniker: Option<String>,
 
