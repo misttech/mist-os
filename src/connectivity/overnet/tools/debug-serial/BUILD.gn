@@ -1,0 +1,41 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  name = "debug_serial"
+  with_unit_tests = true
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//src/connectivity/overnet/lib/hoist",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [ "src/main.rs" ]
+}
+
+fuchsia_package_with_single_component("debug-serial") {
+  manifest = "meta/debug-serial.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_unittest_package("debug-serial-tests") {
+  deps = [ ":bin_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":debug-serial-tests" ]
+}

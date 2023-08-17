@@ -123,6 +123,10 @@
             environment: "#core-env",
         },
         {
+            name: "debug_serial",
+            url: "fuchsia-pkg://fuchsia.com/debug-serial#meta/debug-serial.cm",
+        },
+        {
             name: "pkg-resolver",
             url: "fuchsia-pkg://fuchsia.com/pkg-resolver#meta/pkg-resolver.cm",
         },
@@ -170,6 +174,11 @@
             from: "#cobalt",
             to: "#network",
             dependency: "weak",
+        },
+        {
+            protocol: [ "fuchsia.kernel.DebugResource" ],
+            from: "parent",
+            to: "#debug_serial",
         },
         {
             protocol: [ "fuchsia.ui.activity.Provider" ],

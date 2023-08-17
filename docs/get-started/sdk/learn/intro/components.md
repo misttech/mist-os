@@ -50,6 +50,7 @@ You should see output similar to the (truncated) list below:
 /core
 /core/activity
 ...
+/core/debug_serial
 /core/detect
 /core/font_provider
 /core/log-stats

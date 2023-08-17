@@ -154,6 +154,11 @@
             from: "#overnetstack",
             to: "#sshd-host",
         },
+        {
+            protocol: "fuchsia.hardware.serial.DeviceProxy",
+            from: "#debug_serial",
+            to: "#sshd-host",
+        },
 
         // Used by component + iquery shell tool, in use for bringup.
         {
