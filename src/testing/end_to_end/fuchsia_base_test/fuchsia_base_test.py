@@ -8,6 +8,7 @@ import enum
 import logging
 from typing import Dict, List
 
+from honeydew import custom_types
 from honeydew import transports
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import base_test
@@ -55,10 +56,15 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         It does the following things:
             * Stores the current test case path into self.test_case_path
+            * Logs a info message onto device that test case has started.
         """
         self.test_case_path: str = \
             f"{self.log_path}/{self.current_test_info.name}"
         self._health_check()
+        self._log_message_to_devices(
+            message=f"Started executing '{self.current_test_info.name}' " \
+                    f"Lacewing test case...",
+            level=custom_types.LEVEL.INFO)
 
     def teardown_test(self) -> None:
         """teardown_test is called once after running each test.
@@ -67,9 +73,14 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             * Takes snapshot of all the fuchsia devices and stores it under
               test case directory if `snapshot_on` test param is set to
               "teardown_test"
+            * Logs a info message onto device that test case has ended.
         """
         if self.snapshot_on == SnapshotOn.TEARDOWN_TEST:
             self._collect_snapshot(directory=self.test_case_path)
+        self._log_message_to_devices(
+            message=f"Finished executing '{self.current_test_info.name}' " \
+                    f"Lacewing test case...",
+            level=custom_types.LEVEL.INFO)
 
     def teardown_class(self) -> None:
         """teardown_class is called once after running all tests.
@@ -241,6 +252,22 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             return True
 
         return False
+
+    def _log_message_to_devices(
+            self, message: str, level: custom_types.LEVEL) -> None:
+        """Log message in all the Fuchsia devices.
+
+        Args:
+            message: Message that need to logged.
+            level: Log message level.
+        """
+        for fx_device in self.fuchsia_devices:
+            try:
+                fx_device.log_message_to_device(message, level)
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.warning(
+                    "Unable to log message '%s' on '%s'", message,
+                    fx_device.device_name)
 
     def _process_user_params(self) -> None:
         """Reads, processes and stores the test params used by this module."""
