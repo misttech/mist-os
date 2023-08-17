@@ -14,36 +14,26 @@ use fuchsia_zircon::Status;
 use installer::{BootloaderType, InstallationPaths};
 use recovery_util::block::BlockDevice;
 
-// Use some relatively unique log string here so codesearch finds this.
-const LOG_PREFIX: &str = "[fastboot_rust]";
-
-// Converts a raw c-string into a &str for Rust, or None if the c-string was NULL.
+// Converts a raw c-string into a Rust String, or None if the c-string was NULL.
 //
-// Takes in a reference-to-pointer so that we can indicate lifetimes. It's not strictly correct
-// because the lifetime of the actual c-string storage isn't tied to the lifetime of the pointer
-// (we could drop the pointer early, or try to store the pointer somewhere and return) but it's
-// the closest we can get. It's better than 'static because in that case the compiler would allow
-// you to just keep the resulting &str around forever; at least this way you have to keep the
-// source pointer around too which hopefully signals to the programmer that something is fishy.
-//
-// Safety: the returned str is only valid as long as the underlying c-string contents are. Do
-// not return back to the C caller while still holding the pointer or the resulting reference.
-fn to_slice<'a>(c_str: &'a *const c_char) -> Option<&'a str> {
+// Making a String copies the data, but we do our work in a separate thread so we need a copy
+// anyway to be able to move the string over.
+fn to_string(c_str: *const c_char) -> Option<String> {
     if c_str.is_null() {
         return None;
     }
 
     // Safety: we've checked that the pointer is non-NULL and the C caller is required to meet the
     // remaining safety requirements given by `install_from_usb()`.
-    unsafe { CStr::from_ptr(*c_str) }.to_str().ok()
+    unsafe { CStr::from_ptr(c_str) }.to_str().map(String::from).ok()
 }
 
 // Converts a Rust error to Zircon Status.
 // We don't own anyhow::Error or Status so can't directly implement From<> or Into<>.
 fn to_status(error: anyhow::Error) -> Status {
     // We can't easily convert an arbitrary string into a meaningful Zircon error code, so
-    // we print the string for debugging and just report an internal error.
-    eprintln!("{LOG_PREFIX} Error: {error}");
+    // we log the string for debugging and just report an internal error.
+    tracing::warn!("{error}");
     Status::INTERNAL
 }
 
@@ -76,12 +66,35 @@ pub extern "C" fn install_from_usb(source: *const c_char, destination: *const c_
 
     // This function just handles C/Rust conversion and async execution so the internals can be pure
     // async Rust.
-    let result = LocalExecutor::new().run_singlethreaded(install_from_usb_internal(
-        to_slice(&source),
-        to_slice(&destination),
-        &Dependencies::default(),
-    ));
-    Status::from(result).into_raw()
+    tracing::trace!("Starting install_from_usb()");
+
+    // To handle async, this code spins up a separate thread with a new LocalExecutor. There may be
+    // a better way to do this, but these other methods failed:
+    //   1. New LocalExecutor on this thread - runtime panic, LocalExecutors are per-thread
+    //      singletons and some components (in particular fastboot-tcp) may have already created
+    //      one on this thread.
+    //   2. futures::executor::block_on() - runtime deadlock, this appears to be able to handle
+    //      a single async call but the installer library runs concurrent async via
+    //      futures::future::try_join_all() which deadlocks.
+    let source = to_string(source);
+    let destination = to_string(destination);
+    let func = move || {
+        LocalExecutor::new().run_singlethreaded(install_from_usb_internal(
+            source,
+            destination,
+            &Dependencies::default(),
+        ))
+    };
+    let thread_result = std::thread::spawn(func).join();
+    tracing::trace!("install_from_usb() result = {thread_result:?}");
+
+    match thread_result {
+        Ok(result) => Status::from(result).into_raw(),
+        Err(thread_panic) => {
+            tracing::error!("install_from_usb thread panic: {thread_panic:?}");
+            Status::INTERNAL.into_raw()
+        }
+    }
 }
 
 // Dependency injection for testing.
@@ -127,11 +140,18 @@ impl Dependencies {
 
 // Internal Rust entry point.
 async fn install_from_usb_internal(
-    source: Option<&str>,
-    destination: Option<&str>,
+    source: Option<String>,
+    destination: Option<String>,
     dependencies: &Dependencies,
 ) -> Result<(), Status> {
-    let installation_paths = get_installation_paths(source, destination, dependencies).await?;
+    tracing::trace!(
+        "Starting install_from_usb_internal(), source = {source:?}, dest = {destination:?}"
+    );
+
+    let installation_paths =
+        get_installation_paths(source.as_deref(), destination.as_deref(), dependencies).await?;
+    tracing::trace!("Installation paths: {installation_paths:?}");
+
     (dependencies.do_install)(installation_paths).await.map_err(to_status)
 }
 
@@ -147,7 +167,10 @@ async fn get_installation_paths(
     // For now we don't care about coreboot, just hardcode EFI.
     let bootloader_type = BootloaderType::Efi;
 
+    tracing::trace!("Looking for block devices");
     let block_devices = (dependencies.get_block_devices)().await.map_err(to_status)?;
+    tracing::trace!("Got block devices {block_devices:?}");
+
     let install_source = match requested_source {
         // If a particular block device was requested, use it (or error out if not found).
         Some(device_path) => block_devices
@@ -177,14 +200,17 @@ async fn get_installation_paths(
         return Err(Status::INVALID_ARGS);
     }
 
-    Ok(InstallationPaths {
+    let paths = InstallationPaths {
         install_source: Some(install_source.clone()),
         install_target: Some(install_target.clone()),
         bootloader_type: Some(bootloader_type),
         // I don't think this is currently used - see if we can delete it.
         install_destinations: Vec::new(),
         available_disks: block_devices,
-    })
+    };
+    tracing::trace!("Found installation paths: {paths:?}");
+
+    Ok(paths)
 }
 
 #[cfg(test)]
@@ -285,14 +311,14 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_to_slice() {
+    fn test_to_string() {
         let c_string = CString::new("test string").unwrap();
-        assert_eq!(to_slice(&c_string.as_ptr()).unwrap(), c_string.to_str().unwrap());
+        assert_eq!(to_string(c_string.as_ptr()).unwrap(), "test string");
     }
 
     #[fuchsia::test]
-    fn test_to_slice_null() {
-        assert!(to_slice(&null()).is_none());
+    fn test_to_string_null() {
+        assert!(to_string(null()).is_none());
     }
 
     #[fuchsia::test]
@@ -402,5 +428,23 @@ mod tests {
         let deps = Dependencies::test();
 
         assert!(install_from_usb_internal(None, None, &deps).await.is_ok());
+    }
+
+    #[fuchsia::test]
+    fn test_install_from_usb_fail_sync() {
+        // Test the top-level API in a sync context.
+        // We expect it to fail, this is primarily to ensure our async calls work.
+        let source = CString::new("foo").unwrap();
+        let dest = CString::new("bar").unwrap();
+        assert!(install_from_usb(source.as_ptr(), dest.as_ptr()) != Status::OK.into_raw());
+    }
+
+    #[fuchsia::test]
+    async fn test_install_from_usb_fail_async() {
+        // Test the top-level API in an async context.
+        // We expect it to fail, this is primarily to ensure our async calls work.
+        let source = CString::new("foo").unwrap();
+        let dest = CString::new("bar").unwrap();
+        assert!(install_from_usb(source.as_ptr(), dest.as_ptr()) != Status::OK.into_raw());
     }
 }

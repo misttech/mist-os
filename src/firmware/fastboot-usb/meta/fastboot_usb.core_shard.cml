@@ -13,6 +13,7 @@
         {
             protocol: [
                 "fuchsia.fshost.Admin",
+                "fuchsia.fshost.BlockWatcher",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",

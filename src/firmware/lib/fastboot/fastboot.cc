@@ -25,6 +25,7 @@
 #include "lib/zx/result.h"
 #include "payload-streamer.h"
 #include "sparse_format.h"
+#include "src/firmware/lib/fastboot/rust/ffi_c/bindings.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -109,6 +110,10 @@ const std::vector<Fastboot::CommandEntry>& Fastboot::GetCommandTable() {
       {
           .name = "oem init-partition-tables",
           .cmd = &Fastboot::OemInitPartitionTables,
+      },
+      {
+          .name = "oem install-from-usb",
+          .cmd = &Fastboot::OemInstallFromUsb,
       },
       {
           .name = "oem wipe-partition-tables",
@@ -743,6 +748,38 @@ zx::result<> Fastboot::OemInitPartitionTables(const std::string& command, Transp
                         zx::error(status));
   }
 
+  return SendResponse(ResponseType::kOkay, "", transport);
+}
+
+zx::result<> Fastboot::OemInstallFromUsb(const std::string& command, Transport* transport) {
+  // Command format: oem install-from-usb [source [destination]].
+  // Source and/or destination can be the string "default" in order to use the default target.
+  //
+  // Note: source/destination aren't really usable at the moment because the path names will
+  // often be too large to fit in the fastboot packet. Example paths from a NUC11:
+  //   * "/dev/sys/platform/pt/PC00/bus/00:14.0/00:14.0/xhci/usb-bus/001/001/ifc-000/ums/scsi-disk-0-0/block"
+  //   * "/dev/sys/platform/pt/PC00/bus/01:00.0/01:00.0/nvme/namespace-1/block"
+  // We'll need to implement some sort of substring matching to make this actually useful.
+  // Probably also a way to list the current disks so the user doesn't have to magically know this
+  // entire string.
+  std::vector<std::string_view> args =
+      fxl::SplitString(command, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+
+  // Make a copy of any arg we need to pass because they must be null-terminated c-strings.
+  std::string source, dest;
+  if (args.size() > 2 && args[2] != "default") {
+    source = args[2];
+  }
+  if (args.size() > 3 && args[3] != "default") {
+    dest = args[3];
+  }
+
+  zx_status_t status = install_from_usb(source.empty() ? nullptr : source.c_str(),
+                                        dest.empty() ? nullptr : dest.c_str());
+  if (status != ZX_OK) {
+    return SendResponse(ResponseType::kFail, "Failed to install from USB", transport,
+                        zx::error(status));
+  }
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 

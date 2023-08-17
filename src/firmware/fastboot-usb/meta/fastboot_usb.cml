@@ -30,6 +30,7 @@
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.fshost.Admin",
+                "fuchsia.fshost.BlockWatcher",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
             ],

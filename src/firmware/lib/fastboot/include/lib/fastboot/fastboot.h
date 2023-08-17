@@ -59,6 +59,7 @@ class __EXPORT Fastboot : public FastbootBase {
   zx::result<> Continue(const std::string &command, Transport *transport);
   zx::result<> OemAddStagedBootloaderFile(const std::string &command, Transport *transport);
   zx::result<> OemInitPartitionTables(const std::string &command, Transport *transport);
+  zx::result<> OemInstallFromUsb(const std::string &command, Transport *transport);
   zx::result<> OemWipePartitionTables(const std::string &command, Transport *transport);
 
   zx::result<fidl::WireSyncClient<fuchsia_paver::Paver>> ConnectToPaver();
