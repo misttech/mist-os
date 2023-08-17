@@ -18,6 +18,7 @@ zx_library("mmio") {
     "lib/mmio/mmio.h",
     "lib/mmio/mmio-buffer.h",
     "lib/mmio/mmio-internal.h",
+    "lib/mmio/mmio-ops.h",
     "lib/mmio/mmio-pinned-buffer.h",
     "lib/mmio/mmio-view.h",
   ]
