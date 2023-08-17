@@ -407,12 +407,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
 }
 
 impl<I: icmp::IcmpIpExt> icmp::IcmpContext<I> for BindingsNonSyncCtxImpl {
-    fn receive_icmp_error(
-        &mut self,
-        _conn: icmp::IcmpConnId<I>,
-        _seq_num: u16,
-        _err: I::ErrorCode,
-    ) {
+    fn receive_icmp_error(&mut self, _conn: icmp::SocketId<I>, _seq_num: u16, _err: I::ErrorCode) {
         unimplemented!("TODO(https://fxbug.dev/125482): implement ICMP sockets")
     }
 }
@@ -420,7 +415,7 @@ impl<I: icmp::IcmpIpExt> icmp::IcmpContext<I> for BindingsNonSyncCtxImpl {
 impl<I: icmp::IcmpIpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for BindingsNonSyncCtxImpl {
     fn receive_icmp_echo_reply(
         &mut self,
-        _conn: icmp::IcmpConnId<I>,
+        _conn: icmp::SocketId<I>,
         _src_ip: I::Addr,
         _dst_ip: I::Addr,
         _id: u16,

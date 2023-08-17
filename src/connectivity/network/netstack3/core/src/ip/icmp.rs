@@ -4,13 +4,8 @@
 
 //! The Internet Control Message Protocol (ICMP).
 
-use core::{
-    convert::TryInto as _,
-    fmt::Debug,
-    num::{NonZeroU8, NonZeroUsize},
-};
+use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
 use net_types::{
@@ -47,9 +42,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{CounterContext, InstantContext},
-    data_structures::{
-        id_map::IdMap, id_map_collection::IdMapCollectionKey, token_bucket::TokenBucket,
-    },
+    data_structures::{id_map::IdMap, token_bucket::TokenBucket},
     device::FrameDestination,
     ip::{
         device::{
@@ -292,32 +285,19 @@ pub(crate) struct IcmpAddr<A: IpAddress> {
     icmp_id: u16,
 }
 
-/// An identifier for an unbound ICMP socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct IcmpUnboundId<I: Ip>(usize, IpVersionMarker<I>);
+/// An identifier for an ICMP socket.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
 
-impl<I: Ip> IcmpUnboundId<I> {
-    fn new(id: usize) -> IcmpUnboundId<I> {
-        IcmpUnboundId(id, IpVersionMarker::default())
+impl<I: Ip> SocketId<I> {
+    fn new(id: usize) -> SocketId<I> {
+        SocketId(id, IpVersionMarker::default())
     }
 }
 
-impl<I: Ip> Into<usize> for IcmpUnboundId<I> {
+impl<I: Ip> Into<usize> for SocketId<I> {
     fn into(self) -> usize {
         let Self(id, _marker) = self;
-        id
-    }
-}
-
-impl<I: Ip> IdMapCollectionKey for IcmpUnboundId<I> {
-    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
-
-    fn get_variant(&self) -> usize {
-        0
-    }
-
-    fn get_id(&self) -> usize {
-        let Self(id, _marker) = *self;
         id
     }
 }
@@ -338,41 +318,6 @@ where
             remote_addr: *conn.ip.remote_ip(),
             icmp_id: conn.icmp_id,
         }
-    }
-}
-
-/// The ID identifying an ICMP connection.
-///
-/// When a new ICMP connection is added, it is given a unique `IcmpConnId`.
-/// These are opaque `usize`s which are intentionally allocated as densely as
-/// possible around 0, making it possible to store any associated data in a
-/// `Vec` indexed by the ID. `IcmpConnId` implements `Into<usize>`.
-#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq, Hash)]
-pub struct IcmpConnId<I: Ip>(usize, IpVersionMarker<I>);
-
-impl<I: Ip> IcmpConnId<I> {
-    fn new(id: usize) -> IcmpConnId<I> {
-        IcmpConnId(id, IpVersionMarker::default())
-    }
-}
-
-impl<I: Ip> Into<usize> for IcmpConnId<I> {
-    fn into(self) -> usize {
-        let Self(id, _marker) = self;
-        id
-    }
-}
-
-impl<I: Ip> IdMapCollectionKey for IcmpConnId<I> {
-    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
-
-    fn get_variant(&self) -> usize {
-        0
-    }
-
-    fn get_id(&self) -> usize {
-        let Self(id, _marker) = *self;
-        id
     }
 }
 
@@ -643,7 +588,7 @@ pub trait IcmpContext<I: IcmpIpExt> {
     /// `seq_num` is the sequence number of the original echo request that
     /// triggered the error, and `err` is the specific error identified by the
     /// incoming ICMP error message.
-    fn receive_icmp_error(&mut self, conn: IcmpConnId<I>, seq_num: u16, err: I::ErrorCode);
+    fn receive_icmp_error(&mut self, conn: SocketId<I>, seq_num: u16, err: I::ErrorCode);
 }
 
 /// The context required by the ICMP layer in order to deliver packets on ICMP
@@ -652,7 +597,7 @@ pub trait BufferIcmpContext<I: IcmpIpExt, B: BufferMut>: IcmpContext<I> {
     /// Receives an ICMP echo reply.
     fn receive_icmp_echo_reply(
         &mut self,
-        conn: IcmpConnId<I>,
+        conn: SocketId<I>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
@@ -923,7 +868,7 @@ where
             }) {
                 let seq = echo_request.message().seq();
                 ctx.increment_debug_counter("IcmpContext::receive_icmp_error");
-                IcmpContext::receive_icmp_error(ctx, IcmpConnId::new(conn), seq, err);
+                IcmpContext::receive_icmp_error(ctx, SocketId::new(conn), seq, err);
             } else {
                 trace!("IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for nonexistent ICMP echo socket; either the socket responsible has since been removed, or the error message was sent in error or corrupted");
             }
@@ -2747,7 +2692,7 @@ fn receive_icmp_echo_reply<
             }) {
                 trace!("receive_icmp_echo_reply: Received echo reply for local socket");
                 ctx.receive_icmp_echo_reply(
-                    IcmpConnId::new(conn),
+                    SocketId::new(conn),
                     src_ip.get(),
                     dst_ip.get(),
                     id,
@@ -2788,7 +2733,7 @@ fn receive_icmp_echo_reply<
 pub fn send_icmpv4_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    conn: IcmpConnId<Ipv4>,
+    conn: SocketId<Ipv4>,
     seq_num: u16,
     body: B,
 ) -> Result<(), (B, IpSockSendError)> {
@@ -2804,7 +2749,7 @@ pub fn send_icmpv4_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B
 pub fn send_icmpv6_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    conn: IcmpConnId<Ipv6>,
+    conn: SocketId<Ipv6>,
     seq_num: u16,
     body: B,
 ) -> Result<(), (B, IpSockSendError)> {
@@ -2819,7 +2764,7 @@ fn send_icmp_echo_request_inner<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    conn: IcmpConnId<I>,
+    conn: SocketId<I>,
     seq_num: u16,
     body: B,
 ) -> Result<(), (B, IpSockSendError)>
@@ -2867,7 +2812,7 @@ pub enum IcmpSockCreationError {
 /// Creates a new unbound ICMPv4 socket.
 pub fn create_icmpv4_unbound<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
-) -> IcmpUnboundId<Ipv4> {
+) -> SocketId<Ipv4> {
     create_icmpv4_unbound_inner(&mut Locked::new(sync_ctx))
 }
 
@@ -2876,16 +2821,16 @@ pub fn create_icmpv4_unbound<NonSyncCtx: NonSyncContext>(
 // the public API.
 fn create_icmpv4_unbound_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
     sync_ctx: &mut SC,
-) -> IcmpUnboundId<Ipv4> {
+) -> SocketId<Ipv4> {
     InnerIcmpContext::with_icmp_sockets_mut(sync_ctx, |sockets| {
-        IcmpUnboundId::new(sockets.unbound.push(()))
+        SocketId::new(sockets.unbound.push(()))
     })
 }
 
 /// Creates a new unbound ICMPv6 socket.
 pub fn create_icmpv6_unbound<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
-) -> IcmpUnboundId<Ipv6> {
+) -> SocketId<Ipv6> {
     create_icmpv6_unbound_inner(&mut Locked::new(sync_ctx))
 }
 
@@ -2894,9 +2839,9 @@ pub fn create_icmpv6_unbound<NonSyncCtx: NonSyncContext>(
 // the public API.
 fn create_icmpv6_unbound_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
     sync_ctx: &mut SC,
-) -> IcmpUnboundId<Ipv6> {
+) -> SocketId<Ipv6> {
     InnerIcmpContext::with_icmp_sockets_mut(sync_ctx, |sockets| {
-        IcmpUnboundId::new(sockets.unbound.push(()))
+        SocketId::new(sockets.unbound.push(()))
     })
 }
 
@@ -2904,10 +2849,10 @@ fn create_icmpv6_unbound_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C
 ///
 /// # Panics
 ///
-/// Panics if `id` is not a valid [`IcmpUnboundId`].
+/// Panics if `id` is not a valid [`SocketId`].
 pub fn remove_icmpv4_unbound<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
-    id: IcmpUnboundId<Ipv4>,
+    id: SocketId<Ipv4>,
 ) {
     remove_icmpv4_unbound_inner(&mut Locked::new(sync_ctx), id)
 }
@@ -2917,7 +2862,7 @@ pub fn remove_icmpv4_unbound<NonSyncCtx: NonSyncContext>(
 // the public API.
 fn remove_icmpv4_unbound_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
     sync_ctx: &mut SC,
-    id: IcmpUnboundId<Ipv4>,
+    id: SocketId<Ipv4>,
 ) {
     assert_eq!(
         InnerIcmpContext::with_icmp_sockets_mut(sync_ctx, |sockets| sockets
@@ -2933,10 +2878,10 @@ fn remove_icmpv4_unbound_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C
 ///
 /// # Panics
 ///
-/// Panics if `id` is not a valid [`IcmpUnboundId`].
+/// Panics if `id` is not a valid [`SocketId`].
 pub fn remove_icmpv6_unbound<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
-    id: IcmpUnboundId<Ipv6>,
+    id: SocketId<Ipv6>,
 ) {
     remove_icmpv6_unbound_inner(&mut Locked::new(sync_ctx), id)
 }
@@ -2946,7 +2891,7 @@ pub fn remove_icmpv6_unbound<NonSyncCtx: NonSyncContext>(
 // the public API.
 fn remove_icmpv6_unbound_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
     sync_ctx: &mut SC,
-    id: IcmpUnboundId<Ipv6>,
+    id: SocketId<Ipv6>,
 ) {
     assert_eq!(
         InnerIcmpContext::with_icmp_sockets_mut(sync_ctx, |sockets| sockets
@@ -2969,15 +2914,15 @@ fn remove_icmpv6_unbound_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C
 ///
 /// # Panics
 ///
-/// Panics if `id` is an invalid [`IcmpUnboundId`].
+/// Panics if `id` is an invalid [`SocketId`].
 pub fn connect_icmpv4<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    id: IcmpUnboundId<Ipv4>,
+    id: SocketId<Ipv4>,
     local_addr: Option<SpecifiedAddr<Ipv4Addr>>,
     remote_addr: SpecifiedAddr<Ipv4Addr>,
     icmp_id: u16,
-) -> Result<IcmpConnId<Ipv4>, IcmpSockCreationError> {
+) -> Result<SocketId<Ipv4>, IcmpSockCreationError> {
     connect_icmpv4_inner(&mut Locked::new(sync_ctx), ctx, id, local_addr, remote_addr, icmp_id)
 }
 
@@ -2987,11 +2932,11 @@ pub fn connect_icmpv4<NonSyncCtx: NonSyncContext>(
 fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    id: IcmpUnboundId<Ipv4>,
+    id: SocketId<Ipv4>,
     local_addr: Option<SpecifiedAddr<Ipv4Addr>>,
     remote_addr: SpecifiedAddr<Ipv4Addr>,
     icmp_id: u16,
-) -> Result<IcmpConnId<Ipv4>, IcmpSockCreationError> {
+) -> Result<SocketId<Ipv4>, IcmpSockCreationError> {
     let ip = sync_ctx
         .new_ip_socket(ctx, None, local_addr, remote_addr, Ipv4Proto::Icmp, DefaultSendOptions)
         .map_err(|(e, DefaultSendOptions {})| e)?;
@@ -3011,15 +2956,15 @@ fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
 ///
 /// # Panics
 ///
-/// Panics if `id` is an invalid [`IcmpUnboundId`].
+/// Panics if `id` is an invalid [`SocketId`].
 pub fn connect_icmpv6<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    id: IcmpUnboundId<Ipv6>,
+    id: SocketId<Ipv6>,
     local_addr: Option<SpecifiedAddr<Ipv6Addr>>,
     remote_addr: SpecifiedAddr<Ipv6Addr>,
     icmp_id: u16,
-) -> Result<IcmpConnId<Ipv6>, IcmpSockCreationError> {
+) -> Result<SocketId<Ipv6>, IcmpSockCreationError> {
     connect_icmpv6_inner(&mut Locked::new(sync_ctx), ctx, id, local_addr, remote_addr, icmp_id)
 }
 
@@ -3029,11 +2974,11 @@ pub fn connect_icmpv6<NonSyncCtx: NonSyncContext>(
 fn connect_icmpv6_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    id: IcmpUnboundId<Ipv6>,
+    id: SocketId<Ipv6>,
     local_addr: Option<SpecifiedAddr<Ipv6Addr>>,
     remote_addr: SpecifiedAddr<Ipv6Addr>,
     icmp_id: u16,
-) -> Result<IcmpConnId<Ipv6>, IcmpSockCreationError> {
+) -> Result<SocketId<Ipv6>, IcmpSockCreationError> {
     let ip = sync_ctx
         .new_ip_socket(ctx, None, local_addr, remote_addr, Ipv6Proto::Icmpv6, DefaultSendOptions)
         .map_err(|(e, DefaultSendOptions {})| e)?;
@@ -3045,17 +2990,17 @@ fn connect_icmpv6_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
 fn connect_icmp_inner<I: IcmpIpExt + IpExt, D>(
     unbound: &mut IdMap<()>,
     conns: &mut ConnSocketMap<IcmpAddr<I::Addr>, IcmpConn<IpSock<I, D, DefaultSendOptions>>>,
-    id: IcmpUnboundId<I>,
+    id: SocketId<I>,
     remote_addr: SpecifiedAddr<I::Addr>,
     icmp_id: u16,
     ip: IpSock<I, D, DefaultSendOptions>,
-) -> Result<IcmpConnId<I>, IcmpSockCreationError> {
+) -> Result<SocketId<I>, IcmpSockCreationError> {
     let addr = IcmpAddr { local_addr: *ip.local_ip(), remote_addr, icmp_id };
     if conns.get_id_by_addr(&addr).is_some() {
         return Err(IcmpSockCreationError::SockAddrConflict);
     }
     unbound.remove(id.into()).expect("invalid ICMP unbound ID");
-    Ok(IcmpConnId::new(conns.insert(addr, IcmpConn { icmp_id, ip })))
+    Ok(SocketId::new(conns.insert(addr, IcmpConn { icmp_id, ip })))
 }
 
 #[cfg(test)]
@@ -3111,12 +3056,12 @@ mod tests {
             local_addr: Option<SpecifiedAddr<Self::Addr>>,
             remote_addr: SpecifiedAddr<Self::Addr>,
             icmp_id: u16,
-        ) -> Result<IcmpConnId<Self>, IcmpSockCreationError>;
+        ) -> Result<SocketId<Self>, IcmpSockCreationError>;
 
         fn send_icmp_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
             sync_ctx: &SyncCtx<NonSyncCtx>,
             ctx: &mut NonSyncCtx,
-            conn: IcmpConnId<Self>,
+            conn: SocketId<Self>,
             seq_num: u16,
             body: B,
         ) -> Result<(), IpSockSendError>;
@@ -3129,7 +3074,7 @@ mod tests {
             local_addr: Option<SpecifiedAddr<Ipv4Addr>>,
             remote_addr: SpecifiedAddr<Ipv4Addr>,
             icmp_id: u16,
-        ) -> Result<IcmpConnId<Ipv4>, IcmpSockCreationError> {
+        ) -> Result<SocketId<Ipv4>, IcmpSockCreationError> {
             let unbound = create_icmpv4_unbound(sync_ctx);
             connect_icmpv4(sync_ctx, ctx, unbound, local_addr, remote_addr, icmp_id)
         }
@@ -3137,7 +3082,7 @@ mod tests {
         fn send_icmp_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
             sync_ctx: &SyncCtx<NonSyncCtx>,
             ctx: &mut NonSyncCtx,
-            conn: IcmpConnId<Ipv4>,
+            conn: SocketId<Ipv4>,
             seq_num: u16,
             body: B,
         ) -> Result<(), IpSockSendError> {
@@ -3152,7 +3097,7 @@ mod tests {
             local_addr: Option<SpecifiedAddr<Ipv6Addr>>,
             remote_addr: SpecifiedAddr<Ipv6Addr>,
             icmp_id: u16,
-        ) -> Result<IcmpConnId<Ipv6>, IcmpSockCreationError> {
+        ) -> Result<SocketId<Ipv6>, IcmpSockCreationError> {
             let unbound = create_icmpv6_unbound(sync_ctx);
             connect_icmpv6(sync_ctx, ctx, unbound, local_addr, remote_addr, icmp_id)
         }
@@ -3160,7 +3105,7 @@ mod tests {
         fn send_icmp_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
             sync_ctx: &SyncCtx<NonSyncCtx>,
             ctx: &mut NonSyncCtx,
-            conn: IcmpConnId<Ipv6>,
+            conn: SocketId<Ipv6>,
             seq_num: u16,
             body: B,
         ) -> Result<(), IpSockSendError> {
@@ -3920,7 +3865,7 @@ mod tests {
     // The arguments to `BufferIcmpContext::receive_icmp_echo_reply`.
     #[allow(unused)] // TODO(joshlf): Remove once we access these fields.
     struct ReceiveIcmpEchoReply<I: Ip> {
-        conn: IcmpConnId<I>,
+        conn: SocketId<I>,
         seq_num: u16,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -3931,7 +3876,7 @@ mod tests {
     // The arguments to `IcmpContext::receive_icmp_error`.
     #[derive(Debug, PartialEq)]
     struct ReceiveIcmpSocketErrorArgs<I: IcmpIpExt> {
-        conn: IcmpConnId<I>,
+        conn: SocketId<I>,
         seq_num: u16,
         err: I::ErrorCode,
     }
@@ -4068,7 +4013,7 @@ mod tests {
             impl IcmpContext<$ip> for $outer_non_sync_ctx {
                 fn receive_icmp_error(
                     &mut self,
-                    conn: IcmpConnId<$ip>,
+                    conn: SocketId<$ip>,
                     seq_num: u16,
                     err: <$ip as IcmpIpExt>::ErrorCode,
                 ) {
@@ -4081,7 +4026,7 @@ mod tests {
             impl<B: BufferMut> BufferIcmpContext<$ip, B> for $outer_non_sync_ctx {
                 fn receive_icmp_echo_reply(
                     &mut self,
-                    conn: IcmpConnId<$ip>,
+                    conn: SocketId<$ip>,
                     src_ip: <$ip as Ip>::Addr,
                     dst_ip: <$ip as Ip>::Addr,
                     id: u16,
@@ -4330,7 +4275,7 @@ mod tests {
         /// The error message will be sent from `FAKE_CONFIG_V4.remote_ip` to
         /// `FAKE_CONFIG_V4.local_ip`. Before the message is sent, an ICMP
         /// socket will be established with the ID `ICMP_ID`, and
-        /// `test_receive_icmpv4_error_helper` will assert that its `IcmpConnId`
+        /// `test_receive_icmpv4_error_helper` will assert that its `SocketId`
         /// is 0. This allows the caller to craft the `original_packet` so that
         /// it should be delivered to this socket.
         fn test_receive_icmpv4_error_helper<
@@ -4365,7 +4310,7 @@ mod tests {
                     ICMP_ID
                 )
                 .unwrap(),
-                IcmpConnId::new(0)
+                SocketId::new(0)
             );
 
             <IcmpIpTransportContext as BufferIpTransportContext<Ipv4, _, _, _>>::receive_ip_packet(
@@ -4440,11 +4385,7 @@ mod tests {
                 assert_eq!(sync_ctx.get_ref().inner.receive_icmp_error, [err]);
                 assert_eq!(
                     non_sync_ctx.state().receive_icmp_socket_error,
-                    [ReceiveIcmpSocketErrorArgs {
-                        conn: IcmpConnId::new(0),
-                        seq_num: SEQ_NUM,
-                        err
-                    }]
+                    [ReceiveIcmpSocketErrorArgs { conn: SocketId::new(0), seq_num: SEQ_NUM, err }]
                 );
             },
         );
@@ -4463,11 +4404,7 @@ mod tests {
                 assert_eq!(sync_ctx.get_ref().inner.receive_icmp_error, [err]);
                 assert_eq!(
                     non_sync_ctx.state().receive_icmp_socket_error,
-                    [ReceiveIcmpSocketErrorArgs {
-                        conn: IcmpConnId::new(0),
-                        seq_num: SEQ_NUM,
-                        err
-                    }]
+                    [ReceiveIcmpSocketErrorArgs { conn: SocketId::new(0), seq_num: SEQ_NUM, err }]
                 );
             },
         );
@@ -4488,11 +4425,7 @@ mod tests {
                 assert_eq!(sync_ctx.get_ref().inner.receive_icmp_error, [err]);
                 assert_eq!(
                     non_sync_ctx.state().receive_icmp_socket_error,
-                    [ReceiveIcmpSocketErrorArgs {
-                        conn: IcmpConnId::new(0),
-                        seq_num: SEQ_NUM,
-                        err
-                    }]
+                    [ReceiveIcmpSocketErrorArgs { conn: SocketId::new(0), seq_num: SEQ_NUM, err }]
                 );
             },
         );
@@ -4652,7 +4585,7 @@ mod tests {
         /// The error message will be sent from `FAKE_CONFIG_V6.remote_ip` to
         /// `FAKE_CONFIG_V6.local_ip`. Before the message is sent, an ICMP
         /// socket will be established with the ID `ICMP_ID`, and
-        /// `test_receive_icmpv6_error_helper` will assert that its `IcmpConnId`
+        /// `test_receive_icmpv6_error_helper` will assert that its `SocketId`
         /// is 0. This allows the caller to craft the `original_packet` so that
         /// it should be delivered to this socket.
         fn test_receive_icmpv6_error_helper<
@@ -4686,7 +4619,7 @@ mod tests {
                     ICMP_ID
                 )
                 .unwrap(),
-                IcmpConnId::new(0)
+                SocketId::new(0)
             );
 
             <IcmpIpTransportContext as BufferIpTransportContext<Ipv6, _, _, _>>::receive_ip_packet(
@@ -4759,11 +4692,7 @@ mod tests {
                 assert_eq!(sync_ctx.get_ref().inner.receive_icmp_error, [err]);
                 assert_eq!(
                     non_sync_ctx.state().receive_icmp_socket_error,
-                    [ReceiveIcmpSocketErrorArgs {
-                        conn: IcmpConnId::new(0),
-                        seq_num: SEQ_NUM,
-                        err
-                    }]
+                    [ReceiveIcmpSocketErrorArgs { conn: SocketId::new(0), seq_num: SEQ_NUM, err }]
                 );
             },
         );
@@ -4782,11 +4711,7 @@ mod tests {
                 assert_eq!(sync_ctx.get_ref().inner.receive_icmp_error, [err]);
                 assert_eq!(
                     non_sync_ctx.state().receive_icmp_socket_error,
-                    [ReceiveIcmpSocketErrorArgs {
-                        conn: IcmpConnId::new(0),
-                        seq_num: SEQ_NUM,
-                        err
-                    }]
+                    [ReceiveIcmpSocketErrorArgs { conn: SocketId::new(0), seq_num: SEQ_NUM, err }]
                 );
             },
         );
@@ -4807,11 +4732,7 @@ mod tests {
                 assert_eq!(sync_ctx.get_ref().inner.receive_icmp_error, [err]);
                 assert_eq!(
                     non_sync_ctx.state().receive_icmp_socket_error,
-                    [ReceiveIcmpSocketErrorArgs {
-                        conn: IcmpConnId::new(0),
-                        seq_num: SEQ_NUM,
-                        err
-                    }]
+                    [ReceiveIcmpSocketErrorArgs { conn: SocketId::new(0), seq_num: SEQ_NUM, err }]
                 );
             },
         );

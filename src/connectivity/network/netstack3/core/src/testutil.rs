@@ -61,7 +61,7 @@ use crate::{
     },
     ip::{
         device::{IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
-        icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
+        icmp::{BufferIcmpContext, IcmpContext, IcmpIpExt},
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent,
     },
@@ -172,8 +172,8 @@ pub(crate) mod benchmarks {
 #[derive(Default)]
 /// Non-sync context state held by [`FakeNonSyncCtx`].
 pub struct FakeNonSyncCtxState {
-    icmpv4_replies: HashMap<IcmpConnId<Ipv4>, Vec<(u16, Vec<u8>)>>,
-    icmpv6_replies: HashMap<IcmpConnId<Ipv6>, Vec<(u16, Vec<u8>)>>,
+    icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<(u16, Vec<u8>)>>,
+    icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<(u16, Vec<u8>)>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeNonSyncCtx>>,
     pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
 }
@@ -301,7 +301,10 @@ impl FakeNonSyncCtx {
 
     /// Takes all the received ICMP replies for a given `conn`.
     #[cfg(test)]
-    pub(crate) fn take_icmp_replies<I: Ip>(&mut self, conn: IcmpConnId<I>) -> Vec<(u16, Vec<u8>)> {
+    pub(crate) fn take_icmp_replies<I: Ip>(
+        &mut self,
+        conn: crate::ip::icmp::SocketId<I>,
+    ) -> Vec<(u16, Vec<u8>)> {
         I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
             (IpInvariant(self), conn),
             |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv4_replies.remove(&conn)),
@@ -1057,7 +1060,12 @@ impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for Fake
 }
 
 impl<I: IcmpIpExt> IcmpContext<I> for FakeNonSyncCtx {
-    fn receive_icmp_error(&mut self, _conn: IcmpConnId<I>, _seq_num: u16, _err: I::ErrorCode) {
+    fn receive_icmp_error(
+        &mut self,
+        _conn: crate::ip::icmp::SocketId<I>,
+        _seq_num: u16,
+        _err: I::ErrorCode,
+    ) {
         unimplemented!()
     }
 }
@@ -1065,7 +1073,7 @@ impl<I: IcmpIpExt> IcmpContext<I> for FakeNonSyncCtx {
 impl<B: BufferMut> BufferIcmpContext<Ipv4, B> for FakeNonSyncCtx {
     fn receive_icmp_echo_reply(
         &mut self,
-        conn: IcmpConnId<Ipv4>,
+        conn: crate::ip::icmp::SocketId<Ipv4>,
         _src_ip: Ipv4Addr,
         _dst_ip: Ipv4Addr,
         _id: u16,
@@ -1081,7 +1089,7 @@ impl<B: BufferMut> BufferIcmpContext<Ipv4, B> for FakeNonSyncCtx {
 impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
     fn receive_icmp_echo_reply(
         &mut self,
-        conn: IcmpConnId<Ipv6>,
+        conn: crate::ip::icmp::SocketId<Ipv6>,
         _src_ip: Ipv6Addr,
         _dst_ip: Ipv6Addr,
         _id: u16,
