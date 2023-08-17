@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 
 import argparse
+import contextlib
+import io
 import shutil
 import subprocess
 import tempfile
@@ -123,17 +125,76 @@ class DiffLogsTests(unittest.TestCase):
         self.assertEqual(status, 0)
 
 
+class LookupOutputFileDigestTests(unittest.TestCase):
+
+    def test_output_path_not_found(self):
+        empty_log = log_pb2.LogDump()
+        log = reproxy_logs.ReproxyLog(empty_log)
+        args = argparse.Namespace(
+            log=Path('foo.rrpl'),
+            path=Path('output/does/not/exist.o'),
+        )
+        with mock.patch.object(reproxy_logs, 'parse_log',
+                               return_value=log) as mock_parse:
+            self.assertEqual(reproxy_logs.lookup_output_file_digest(args), 1)
+
+    def test_output_path_found(self):
+        record = log_pb2.LogRecord()
+        path1 = 'obj/aaa.o'
+        path2 = 'obj/bbb.o'
+        digest1 = 'ababababa/111'
+        digest2 = 'efefefefe/222'
+        file_digests = [(path1, digest1), (path2, digest2)]
+        for path, digest in file_digests:
+            record.command.output.output_files.append(path)
+            record.remote_metadata.output_file_digests[path] = digest
+
+        log_dump = log_pb2.LogDump(records=[record])
+        log = reproxy_logs.ReproxyLog(log_dump)
+
+        for path, digest in file_digests:
+            args = argparse.Namespace(
+                log=Path('foo.rrpl'),
+                path=Path(path),
+            )
+            with mock.patch.object(reproxy_logs, 'parse_log',
+                                   return_value=log) as mock_parse:
+                result = io.StringIO()
+                with contextlib.redirect_stdout(result):
+                    self.assertEqual(
+                        reproxy_logs.lookup_output_file_digest(args), 0)
+                self.assertEqual(result.getvalue(), digest + '\n')
+
+
 class MainTests(unittest.TestCase):
 
     def test_diff(self):
         empty_log = log_pb2.LogDump()
         empty_logs = [reproxy_logs.ReproxyLog(empty_log)] * 2
-        with mock.patch.object(reproxy_logs, 'diff_logs',
-                               return_value=0) as mock_diff:
-            with mock.patch.object(reproxy_logs, 'parse_logs',
-                                   return_value=empty_logs) as mock_multi_parse:
-                status = reproxy_logs.main(['diff', 'left.rrpl', 'right.rrpl'])
+        with mock.patch.object(reproxy_logs, 'parse_logs',
+                               return_value=empty_logs) as mock_multi_parse:
+            status = reproxy_logs.main(['diff', 'left.rrpl', 'right.rrpl'])
+
         self.assertEqual(status, 0)
+        mock_multi_parse.assert_called()
+
+    def test_output_file_digest(self):
+        record = log_pb2.LogRecord()
+        path1 = 'obj/aaa.o'
+        digest1 = 'ababababa/111'
+        record.command.output.output_files.append(path1)
+        record.remote_metadata.output_file_digests[path1] = digest1
+
+        log_dump = log_pb2.LogDump(records=[record])
+        log = reproxy_logs.ReproxyLog(log_dump)
+
+        with mock.patch.object(reproxy_logs, 'parse_log',
+                               return_value=log) as mock_multi_parse:
+            status = reproxy_logs.main(
+                ['output_file_digest', '--log', 'log.rrpl', '--path', path1])
+
+        self.assertEqual(status, 0)
+        mock_multi_parse.assert_called_once()
 
 
 if __name__ == '__main__':

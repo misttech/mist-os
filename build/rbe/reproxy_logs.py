@@ -31,8 +31,8 @@ def msg(text: str):
 class ReproxyLog(object):
     """Contains a LogDump proto and indexes information internally.
 
-  The output_file paths used are relative to the working dir.
-  """
+    The output_file paths used are relative to the working dir.
+    """
 
     def __init__(self, log_dump: log_pb2.LogDump):
         self._proto: log_pb2.LogDump = log_dump
@@ -132,12 +132,25 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
     # Otherwise, this is assumed to be a .rrpl or .rpl file.
     # Copy it to a cached location.
     tmpdir = Path(os.environ.get('TMPDIR', '/tmp'))
-    readable_hash = hashlib.sha256(path.read_bytes()).hexdigest()
-    cached_log_dir = tmpdir / 'action_diff_py' / 'cache' / readable_hash
+
+    stdin_path = Path('-')
+
+    if path == stdin_path:
+        log_contents = sys.stdin.read().encode()
+    else:
+        log_contents = path.read_bytes()
+
+    readable_hash = hashlib.sha256(log_contents).hexdigest()
+    cached_log_dir = tmpdir / 'reproxy_logs_py' / 'cache' / readable_hash
     if verbose:
         msg(f'Copying log to {cached_log_dir} for logdump processing.')
     cached_log_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(path, cached_log_dir)
+
+    if path == stdin_path:
+        (cached_log_dir / 'reproxy_from_stdin.rrpl').write_bytes(log_contents)
+    else:
+        shutil.copy2(path, cached_log_dir)
+
     return cached_log_dir
 
 
@@ -249,6 +262,26 @@ def diff_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def lookup_output_file_digest(args: argparse.Namespace) -> int:
+    log = parse_log(
+        log_path=args.log,
+        reclient_bindir=fuchsia.RECLIENT_BINDIR,
+        verbose=False,
+    )
+
+    path = args.path
+    try:
+        action_record = log.records_by_output_file[path]
+    except KeyError:
+        msg(f"No record with output {path} found.")
+        return 1
+
+    digest = action_record.remote_metadata.output_file_digests[str(path)]
+    # lookup must succeed by construction, else would have failed above
+    print(digest)
+    return 0
+
+
 def _main_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
@@ -261,6 +294,8 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(required=True)
+
+    # command: diff
     diff_parser = subparsers.add_parser('diff', help='diff --help')
     diff_parser.set_defaults(func=diff_logs)
     diff_parser.add_argument(
@@ -270,6 +305,28 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         nargs=2,
     )
+
+    # command: output_file_digest
+    output_file_digest_parser = subparsers.add_parser(
+        'output_file_digest',
+        help='prints the digest of a remote action output file',
+    )
+    output_file_digest_parser.set_defaults(func=lookup_output_file_digest)
+    output_file_digest_parser.add_argument(
+        "--log",
+        type=Path,
+        help="reproxy log (.rpl or .rrpl)",
+        metavar="REPROXY_LOG",
+        required=True,
+    )
+    output_file_digest_parser.add_argument(
+        "--path",
+        type=Path,
+        help="Path under the build output directory to lookup.",
+        metavar="OUTPUT_PATH",
+        required=True,
+    )
+
     return parser
 
 
