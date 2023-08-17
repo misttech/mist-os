@@ -331,15 +331,8 @@ impl<T, L> Locked<&T, L> {
 
     /// Narrow the type on which locks can be acquired.
     ///
-    /// This allows scoping down the state on which locks are acquired. This is
-    /// safe because
-    ///   1. the lock ordering does not take the type being locked into
-    ///      account, so there's no danger of lock ordering being different for
-    ///      `T` and `R`,
-    ///   2. because the new `&R` references a part of the original `&S`, so it
-    ///      can't allow access to a different locking domain, and
-    ///   3. the returned `Locked` instance borrows `self` mutably so it can't
-    ///      be used until the new instance is dropped.
+    /// Like `cast_with`, but with `AsRef` instead of using a callable function.
+    /// The same safety arguments apply.
     pub fn cast<R>(&mut self) -> Locked<&R, L>
     where
         T: AsRef<R>,
@@ -349,8 +342,19 @@ impl<T, L> Locked<&T, L> {
 
     /// Narrow the type on which locks can be acquired.
     ///
-    /// Like `cast`, but with a callable function instead of using `AsRef`. The
-    /// same safety arguments apply.
+    /// This allows scoping down the state on which locks are acquired. This is
+    /// safe because
+    ///   1. the locked wrapper does not take the type `T` being locked into
+    ///      account, so there's no danger of lock ordering being different for
+    ///      `T` and some other type `R`,
+    ///   2. because the new `&R` references a part of the original `&T`, any
+    ///      state that was lockable from `&T` was lockable from `&R`, and
+    ///   3. the returned `Locked` instance borrows `self` mutably so it can't
+    ///      be used until the new instance is dropped.
+    ///
+    /// This method provides a flexible way to access some state held within the
+    /// protected instance of `T` by scoping down to an individual field, or
+    /// infallibly indexing into a `Vec`, slice, or map.
     pub fn cast_with<R>(&mut self, f: impl FnOnce(&T) -> &R) -> Locked<&R, L> {
         let Self(t, PhantomData) = self;
         Locked(f(t), PhantomData)
@@ -384,7 +388,10 @@ impl<T, L> Locked<&T, L> {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Mutex, MutexGuard};
+    use std::{
+        ops::Deref,
+        sync::{Mutex, MutexGuard},
+    };
 
     mod lock_levels {
         //! Lock ordering tree:
@@ -398,18 +405,20 @@ mod test {
         pub enum B {}
         pub enum C {}
         pub enum D {}
+        pub enum E {}
 
         impl LockAfter<Unlocked> for A {}
         impl_lock_after!(A => B);
         impl_lock_after!(B => C);
         impl_lock_after!(B => D);
+        impl_lock_after!(D => E);
     }
 
     use crate::{
         lock::{LockFor, UnlockedAccess},
         Locked,
     };
-    use lock_levels::{A, B, C, D};
+    use lock_levels::{A, B, C, D, E};
 
     /// Data type with multiple locked fields.
     #[derive(Default)]
@@ -418,6 +427,7 @@ mod test {
         b: Mutex<u16>,
         c: Mutex<u64>,
         d: Mutex<u128>,
+        e: Vec<Mutex<usize>>,
         u: usize,
     }
 
@@ -453,10 +463,19 @@ mod test {
         }
     }
 
+    impl LockFor<E> for Mutex<usize> {
+        type Data = usize;
+        type Guard<'l> = MutexGuard<'l, usize>;
+        fn lock(&self) -> Self::Guard<'_> {
+            self.lock().unwrap()
+        }
+    }
+
     #[derive(Debug)]
     struct NotPresent;
 
     enum UnlockedUsize {}
+    enum UnlockedELen {}
 
     impl UnlockedAccess<UnlockedUsize> for Data {
         type Data = usize;
@@ -464,6 +483,24 @@ mod test {
 
         fn access(&self) -> Self::Guard<'_> {
             &self.u
+        }
+    }
+
+    struct DerefWrapper<T>(T);
+
+    impl<T> Deref for DerefWrapper<T> {
+        type Target = T;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl UnlockedAccess<UnlockedELen> for Data {
+        type Data = usize;
+        type Guard<'l> = DerefWrapper<usize>;
+
+        fn access(&self) -> Self::Guard<'_> {
+            DerefWrapper(self.e.len())
         }
     }
 
@@ -489,5 +526,21 @@ mod test {
         let a = locked.lock::<A>();
         assert_eq!(u, &34);
         assert_eq!(&*a, &15);
+    }
+
+    /// Demonstrate how [`Locked::cast_with`] can be used to index into a `Vec`.
+    #[test]
+    fn cast_with_for_indexing_into_sub_field_state() {
+        let data = Data { e: (0..10).map(Mutex::new).collect(), ..Data::default() };
+
+        let mut locked = Locked::new(&data);
+        for i in 0..*locked.unlocked_access::<UnlockedELen>() {
+            // Use cast_with to select an individual lock from the list.
+            let mut locked_element = locked.cast_with(|data| &data.e[i]);
+            let mut item = locked_element.lock::<E>();
+
+            assert_eq!(*item, i);
+            *item = i + 1;
+        }
     }
 }
