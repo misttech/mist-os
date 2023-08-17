@@ -13,7 +13,7 @@ declare_args() {
   # binary. Its purpose is to allow one-shot transition between the build modes
   # and accelerate build times locally once the default is to use unified
   # binaries.
-  use_network_unified_binary = false
+  use_network_unified_binary = true
 }
 
 # Defines a renamed binary based on network_unified_binary.
