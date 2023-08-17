@@ -121,6 +121,9 @@ where
         (dict_client_end.into_handle(), Some(fut.boxed()))
     }
 
+    /// Convert this [Dict] capability into [Open] by recursively converting the entries
+    /// to [Open], then building a VFS directory where each entry is a remote VFS node.
+    /// The resulting [Open] capability will speak `fuchsia.io/Directory` when remoted.
     fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
         let dir = pfs::simple();
         for (key, value) in self.entries.into_iter() {

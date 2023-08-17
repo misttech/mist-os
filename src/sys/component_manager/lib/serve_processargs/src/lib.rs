@@ -39,6 +39,10 @@ pub enum Delivery {
     /// provided path. The difference between [Delivery::NamespacedObject] and
     /// [Delivery::NamespaceEntry] is that the former will create a namespace entry at the parent
     /// directory.
+    ///
+    /// For example, installing a `sandbox::Open` at "/data" will result in a namespace entry
+    /// at "/data". A request will be sent to the capability when the user writes to the
+    /// namespace entry.
     NamespaceEntry(cm_types::Path),
 
     /// Installs the Zircon handle representation of this capability at the processargs slot
@@ -90,10 +94,11 @@ pub fn add_to_processargs(
     visit_map(delivery_map, Box::new(dict), &mut |cap: AnyCapability, delivery: &Delivery| {
         match delivery {
             Delivery::NamespacedObject(path) => {
-                namespace.add(cap, path).map_err(DeliveryError::NamespaceError)
+                namespace.add_object(cap, path).map_err(DeliveryError::NamespaceError)
             }
-            // TODO: implement namespace entry
-            Delivery::NamespaceEntry(_) => todo!(),
+            Delivery::NamespaceEntry(path) => {
+                namespace.add_entry(cap, path).map_err(DeliveryError::NamespaceError)
+            }
             Delivery::Handle(info) => {
                 processargs.add_handles(once(translate_handle(cap, info, &mut futures)?));
                 Ok(())
@@ -184,7 +189,9 @@ mod test_util {
         fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
         fuchsia_zircon::HandleBased,
         sandbox::{Handle, Open},
-        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, service},
+        vfs::{
+            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path, service,
+        },
     };
 
     pub struct Receiver(pub async_channel::Receiver<Handle>);
@@ -212,23 +219,41 @@ mod test_util {
 
         (open, Receiver(receiver))
     }
+
+    pub fn open() -> (Open, async_channel::Receiver<(Path, zx::Channel)>) {
+        let (sender, receiver) = async_channel::unbounded::<(Path, zx::Channel)>();
+        let open_fn = move |scope: ExecutionScope,
+                            _flags: fio::OpenFlags,
+                            relative_path: Path,
+                            server_end: zx::Channel| {
+            let sender = sender.clone();
+            scope.spawn(async move {
+                sender.send((relative_path, server_end)).await.unwrap();
+            })
+        };
+        let open = Open::new(open_fn, fio::DirentType::Directory, fio::OpenFlags::DIRECTORY);
+
+        (open, receiver)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+
     use {
         super::*,
         anyhow::Result,
         assert_matches::assert_matches,
-        fidl::endpoints::Proxy,
+        fidl::endpoints::{Proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
         fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time},
+        futures::TryStreamExt,
         maplit::hashmap,
         namespace::{ignore_not_found as ignore, NamespaceError},
         std::str::FromStr,
-        test_util::multishot,
+        test_util::{multishot, open},
     };
 
     #[fuchsia::test]
@@ -432,7 +457,7 @@ mod tests {
     /// requests. The other is disconnected from the receiver, which should close all incoming
     /// connections to that protocol.
     #[fuchsia::test]
-    async fn test_namespace_end_to_end() -> Result<()> {
+    async fn test_namespace_object_end_to_end() -> Result<()> {
         let (open, receiver) = multishot();
         let peer_closed_open = multishot().0;
 
@@ -487,6 +512,70 @@ mod tests {
         drop(dir);
         drop(processargs);
         fut.await;
+        Ok(())
+    }
+
+    /// Install an `Open` capability at "/data". Test that opening "/data/abc" means the
+    /// open capability receives a request to open the current node, and the server endpoint
+    /// in that request has buffered an open request for "abc". This replicates what
+    /// component_manager does for directory capabilities.
+    #[test]
+    fn test_namespace_entry_end_to_end() -> Result<()> {
+        use futures::task::Poll;
+        let mut exec = fasync::TestExecutor::new();
+        let (open, receiver) = open();
+
+        let mut processargs = ProcessArgs::new();
+        let mut dict = Dict::new();
+        dict.entries.insert("data".to_string(), Box::new(open));
+        let delivery_map = hashmap! {
+            "data".to_string() => DeliveryMapEntry::Delivery(
+                Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())
+            ),
+        };
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        let fut = fasync::Task::spawn(fut);
+
+        assert_eq!(processargs.handles.len(), 0);
+        assert_eq!(processargs.namespace_entries.len(), 1);
+        let entry = processargs.namespace_entries.pop().unwrap();
+        assert_eq!(entry.path.to_str().unwrap(), "/data");
+
+        // No request yet. Not until we write to the client endpoint.
+        assert_matches!(exec.run_until_stalled(&mut receiver.recv()), Poll::Pending);
+
+        let dir = entry.directory.into_proxy().unwrap();
+        let dir = dir.into_channel().unwrap().into_zx_channel();
+        let (client_end, server_end) = zx::Channel::create();
+
+        // Test that the flags are passed correctly.
+        let flags_for_abc = fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE;
+        fdio::open_at(&dir, "abc", flags_for_abc, server_end).unwrap();
+
+        // Capability is opened with "." and a `server_end`.
+        let (relative_path, server_end) = exec.run_singlethreaded(&mut receiver.recv()).unwrap();
+        assert!(relative_path.is_dot());
+
+        // Verify there is an open message for "abc" with `flags_for_abc` on `server_end`.
+        let server_end: ServerEnd<fio::DirectoryMarker> = server_end.into();
+        let mut stream = server_end.into_stream().unwrap();
+        let request = exec.run_singlethreaded(&mut stream.try_next()).unwrap().unwrap();
+        assert_matches!(
+            &request,
+            fio::DirectoryRequest::Open { flags, path, .. }
+            if path == "abc" && *flags == flags_for_abc
+        );
+
+        let client_end = fasync::Channel::from_channel(client_end.into()).unwrap();
+        assert_matches!(exec.run_until_stalled(&mut client_end.on_closed()), Poll::Pending);
+        // Drop the request, including the server endpoint.
+        drop(request);
+        // Client should observe that the server endpoint was dropped.
+        exec.run_singlethreaded(&mut client_end.on_closed()).unwrap();
+
+        drop(dir);
+        drop(processargs);
+        exec.run_singlethreaded(fut);
         Ok(())
     }
 
