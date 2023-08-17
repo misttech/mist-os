@@ -10,6 +10,8 @@ static_library("expr") {
     "abi_arm64.cc",
     "abi_arm64.h",
     "abi_null.h",
+    "abi_riscv64.cc",
+    "abi_riscv64.h",
     "abi_x64.cc",
     "abi_x64.h",
     "bitfield.cc",

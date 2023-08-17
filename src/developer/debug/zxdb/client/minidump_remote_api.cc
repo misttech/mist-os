@@ -12,10 +12,9 @@
 #include "src/developer/debug/ipc/decode_exception.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/unwinder_support.h"
-#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/shared/register_id.h"
 #include "src/developer/debug/zxdb/common/err.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/unwinder/unwind.h"
 #include "third_party/crashpad/src/snapshot/memory_map_region_snapshot.h"
@@ -239,6 +238,24 @@ void PopulateRegistersX86_64(const crashpad::CPUContextX86_64& ctx,
   }
 }
 
+void PopulateRegistersRISCV64General(const crashpad::CPUContextRISCV64& ctx,
+                                     std::vector<debug::RegisterValue>* output) {
+  AddReg(RegisterID::kRiscv64_pc, ctx.pc, output);
+  for (size_t i = 0; i < std::size(ctx.regs); i++) {
+    uint32_t reg_id = static_cast<uint32_t>(RegisterID::kRiscv64_ra) + i;
+    AddReg(static_cast<RegisterID>(reg_id), ctx.regs[i], output);
+  }
+}
+
+void PopulateRegistersRISCV64(const crashpad::CPUContextRISCV64& ctx,
+                              const debug_ipc::ReadRegistersRequest& request,
+                              debug_ipc::ReadRegistersReply* reply) {
+  for (const RegisterCategory cat : request.categories) {
+    if (cat == RegisterCategory::kGeneral)
+      PopulateRegistersRISCV64General(ctx, &reply->registers);
+  }
+}
+
 }  // namespace
 
 MinidumpRemoteAPI::MinidumpRemoteAPI(Session* session) : session_(session) {
@@ -362,6 +379,9 @@ void MinidumpRemoteAPI::Hello(const debug_ipc::HelloRequest& request,
     case crashpad::CPUArchitecture::kCPUArchitectureX86_64:
       reply.arch = debug::Arch::kX64;
       break;
+    case crashpad::CPUArchitecture::kCPUArchitectureRISCV64:
+      reply.arch = debug::Arch::kRiscv64;
+      break;
     default:
       break;
   }
@@ -458,6 +478,19 @@ void MinidumpRemoteAPI::Attach(const debug_ipc::AttachRequest& request,
         exception_notification.exception.arch.x64.cr2 = exception->Codes()[3];
         exception_notification.exception.valid = true;
 
+        break;
+      }
+      case crashpad::CPUArchitecture::kCPUArchitectureRISCV64: {
+        exception_notification.type = debug_ipc::DecodeRiscv64Exception(exception->Exception());
+
+        // The |codes| vector is populated in this order:
+        //  [0] = zircon exception (this is the same as |ExceptionSnapshot.Exception()|)
+        //  [1] = cause (this is the same as |ExceptionSnapshot.ExceptionInfo()|)
+        //  [2] = tval
+        //
+        // See //third_party/crashpad/src/snapshot/fuchsia/exception_snapshot_fuchsia.cc
+        exception_notification.exception.arch.riscv64.cause = exception->Codes()[1];
+        exception_notification.exception.arch.riscv64.tval = exception->Codes()[2];
         break;
       }
       default:
@@ -632,6 +665,9 @@ void MinidumpRemoteAPI::ReadRegisters(
     case crashpad::CPUArchitecture::kCPUArchitectureX86_64:
       PopulateRegistersX86_64(*context.x86_64, request, &reply);
       break;
+    case crashpad::CPUArchitecture::kCPUArchitectureRISCV64:
+      PopulateRegistersRISCV64(*context.riscv64, request, &reply);
+      break;
     default:
       ErrNoArch(std::move(cb));
       return;
@@ -721,6 +757,13 @@ void MinidumpRemoteAPI::ThreadStatus(
       for (int i = 6; i < static_cast<int>(unwinder::RegisterID::kX64_last); i++) {
         regs.Set(static_cast<unwinder::RegisterID>(i),
                  reinterpret_cast<uint64_t*>(context.x86_64)[i]);
+      }
+      break;
+    case crashpad::CPUArchitecture::kCPUArchitectureRISCV64:
+      regs = unwinder::Registers(unwinder::Registers::Arch::kRiscv64);
+      regs.SetPC(context.riscv64->pc);
+      for (size_t i = 0; i < std::size(context.riscv64->regs); i++) {
+        regs.Set(static_cast<unwinder::RegisterID>(i + 1), context.riscv64->regs[i]);
       }
       break;
     default:

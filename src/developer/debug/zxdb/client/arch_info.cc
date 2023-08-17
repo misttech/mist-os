@@ -16,6 +16,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 #include "src/developer/debug/zxdb/expr/abi_arm64.h"
+#include "src/developer/debug/zxdb/expr/abi_riscv64.h"
 #include "src/developer/debug/zxdb/expr/abi_x64.h"
 
 namespace zxdb {
@@ -66,8 +67,13 @@ Err ArchInfo::Init(debug::Arch arch, uint64_t page_size) {
       triple_name_ = "aarch64";
       processor_name_ = "generic";
       break;
-    default:
-      FX_NOTREACHED();
+    case debug::Arch::kRiscv64:
+      abi_ = std::make_shared<AbiRiscv64>();
+      is_fixed_instr_ = false;
+      max_instr_len_ = 4;
+      instr_align_ = 2;
+      triple_name_ = "riscv64";
+      processor_name_ = "generic";
       break;
   }
 

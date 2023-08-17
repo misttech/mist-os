@@ -423,6 +423,7 @@ Err Session::SetArch(debug::Arch arch, uint64_t page_size) {
   if (!arch_err.has_error()) {
     arch_ = arch;
   } else {
+    LOGS(Error) << "Fail to init ArchInfo: " << arch_err.msg();
     // Rollback to default-initialized ArchInfo;
     arch_info_ = std::make_unique<ArchInfo>();
   }

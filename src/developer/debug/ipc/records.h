@@ -131,6 +131,12 @@ struct ExceptionRecord {
       uint32_t esr;
       uint64_t far;
     } arm64;
+
+    // Exception record for RISC-V 64.
+    struct {
+      uint64_t cause;
+      uint64_t tval;
+    } riscv64;
   } arch;
 
   ExceptionStrategy strategy = ExceptionStrategy::kNone;

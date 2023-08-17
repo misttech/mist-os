@@ -160,4 +160,9 @@ ExceptionType DecodeArm64Exception(uint32_t code,
   return decoded_type;
 }
 
+ExceptionType DecodeRiscv64Exception(uint32_t code) {
+  // RV64 doesn't support single-stepping/hardware breakpoints/watchpoints yet.
+  return DecodeZircon(code);
+}
+
 }  // namespace debug_ipc

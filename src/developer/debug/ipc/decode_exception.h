@@ -31,6 +31,7 @@ ExceptionType DecodeX64Exception(uint32_t code,
                                  fit::function<std::optional<X64DebugRegs>()> fetch_debug_regs);
 ExceptionType DecodeArm64Exception(uint32_t code,
                                    fit::function<std::optional<uint32_t>()> fetch_esr);
+ExceptionType DecodeRiscv64Exception(uint32_t code);
 
 }  // namespace debug_ipc
 

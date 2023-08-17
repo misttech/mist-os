@@ -716,12 +716,15 @@ SpecialRegisterType GetSpecialRegisterType(RegisterID id) {
   switch (id) {
     case RegisterID::kX64_rip:
     case RegisterID::kARMv8_pc:
+    case RegisterID::kRiscv64_pc:
       return SpecialRegisterType::kIP;
     case RegisterID::kX64_rsp:
     case RegisterID::kARMv8_sp:
+    case RegisterID::kRiscv64_sp:
       return SpecialRegisterType::kSP;
     case RegisterID::kX64_fsbase:
     case RegisterID::kARMv8_tpidr:
+    case RegisterID::kRiscv64_tp:
       return SpecialRegisterType::kTP;
     default:
       return SpecialRegisterType::kNone;
@@ -751,7 +754,9 @@ bool IsGeneralRegister(RegisterID id) {
   return (static_cast<uint32_t>(id) >= static_cast<uint32_t>(kARMv8GeneralBegin) &&
           static_cast<uint32_t>(id) <= static_cast<uint32_t>(kARMv8GeneralEnd)) ||
          (static_cast<uint32_t>(id) >= static_cast<uint32_t>(kX64GeneralBegin) &&
-          static_cast<uint32_t>(id) <= static_cast<uint32_t>(kX64GeneralEnd));
+          static_cast<uint32_t>(id) <= static_cast<uint32_t>(kX64GeneralEnd)) ||
+         (static_cast<uint32_t>(id) >= static_cast<uint32_t>(kRiscv64GeneralBegin) &&
+          static_cast<uint32_t>(id) <= static_cast<uint32_t>(kRiscv64GeneralEnd));
 }
 
 const char* RegisterCategoryToString(RegisterCategory cat) {
