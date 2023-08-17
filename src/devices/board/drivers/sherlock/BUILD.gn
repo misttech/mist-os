@@ -170,8 +170,10 @@ driver_bind_rules("sherlock-ot-radio-bind") {
   tests = "bind-tests/sherlock-ot-radio-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.t931",
+    "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.nordic.platform",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.spi",
   ]
 }

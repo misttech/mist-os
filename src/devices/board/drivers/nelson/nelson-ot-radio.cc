@@ -17,32 +17,15 @@ namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 constexpr uint32_t device_id = kOtDeviceNrf52811;
-static const device_metadata_t nrf52811_radio_metadata[] = {
-    {
+
+static const std::vector<fpbus::Metadata> kNrf52811RadioMetadata{
+    {{
         .type = DEVICE_METADATA_PRIVATE,
-        .data = &device_id,
-        .length = sizeof(device_id),
-    },
+        .data =
+            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&device_id),
+                                 reinterpret_cast<const uint8_t*>(&device_id) + sizeof(device_id)),
+    }},
 };
-
-static constexpr zx_device_prop_t props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_NELSON},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_OT_RADIO},
-};
-
-static composite_device_desc_t composite_dev = []() {
-  composite_device_desc_t desc = {};
-  desc.props = props;
-  desc.props_count = std::size(props);
-  desc.fragments = nrf52811_radio_fragments;
-  desc.fragments_count = std::size(nrf52811_radio_fragments);
-  desc.primary_fragment = "spi";
-  desc.spawn_colocated = true;
-  desc.metadata_list = nrf52811_radio_metadata;
-  desc.metadata_count = std::size(nrf52811_radio_metadata);
-  return desc;
-}();
 
 }  // namespace
 
@@ -56,11 +39,31 @@ zx_status_t Nelson::OtRadioInit() {
   gpio_impl_.SetAltFunction(S905D3_GPIOZ(1), 0);  // Boot mode
   gpio_impl_.ConfigOut(S905D3_GPIOZ(1), 1);
 
-  if (zx_status_t status = DdkAddComposite("nrf52811-radio", &composite_dev); status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite OtRadio(dev) failed: %s", __func__,
-           zx_status_get_string(status));
-    return status;
+  fpbus::Node dev;
+  dev.name() = "nrf52811-radio";
+  dev.vid() = PDEV_VID_GENERIC;
+  dev.pid() = PDEV_PID_NELSON;
+  dev.did() = PDEV_DID_OT_RADIO;
+  dev.metadata() = kNrf52811RadioMetadata;
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('RDIO');
+  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddComposite(
+      fidl::ToWire(fidl_arena, dev),
+      platform_bus_composite::MakeFidlFragment(fidl_arena, nrf52811_radio_fragments,
+                                               std::size(nrf52811_radio_fragments)),
+      "spi");
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
+           result.status_string());
+    return result.status();
   }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add nrf52811-radio composite to platform device: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
   return ZX_OK;
 }
 

@@ -297,9 +297,14 @@ zx_status_t OtRadioDevice::Init() {
   if (status != ZX_OK || sizeof(device_id) != actual) {
     status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_id, sizeof(device_id),
                                  &actual);
-    if (status != ZX_OK || sizeof(device_id) != actual) {
-      zxlogf(ERROR, "ot-radio: failed to read metadata");
-      return status == ZX_OK ? ZX_ERR_INTERNAL : status;
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to get metadata: %s", zx_status_get_string(status));
+      return status;
+    }
+    if (sizeof(device_id) != actual) {
+      zxlogf(ERROR, "ot-radio: Failed to get metadata: Expected %lu but actual is %lu bytes",
+             sizeof(device_id), actual);
+      return ZX_ERR_INTERNAL;
     }
   }
 
