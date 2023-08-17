@@ -221,6 +221,8 @@ template("assembled_system") {
   assert(defined(invoker.product_assembly_config_label),
          "Need to define product_assembly_config_label")
   assert(defined(invoker.board_config), "Need to define board_config")
+  assert(defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost,
+         "use_assembly_fshost must be set to true")
 
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
