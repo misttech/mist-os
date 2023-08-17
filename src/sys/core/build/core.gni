@@ -27,19 +27,6 @@ template("core_realm_definition") {
     shard_deps = []
   }
 
-  # TODO(fxbug.dev/105101): remove all dart runners when Dart is
-  # extracted from fuchsia.git into an external repository.
-  _without_dart_runners = shard_deps
-  _without_dart_runners += [ "//src/dart:dart_runner_core_shard" ]
-  _without_dart_runners -= [ "//src/dart:dart_runner_core_shard" ]
-  if (shard_deps != _without_dart_runners) {
-    # The dart_runner_core_shard was added to the shard deps, which
-    # defines the `laboratory-env`. Ensure the default developer env is
-    # not also included.
-    shard_deps += [ "//src/developer:default-laboratory-env-core-shard" ]
-    shard_deps -= [ "//src/developer:default-laboratory-env-core-shard" ]
-  }
-
   generated_file_target = "${target_name}"
   generated_file(generated_file_target) {
     forward_variables_from(invoker,

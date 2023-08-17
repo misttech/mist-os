@@ -30,16 +30,6 @@ legacy_cache_package_labels += [
   "//src/graphics/display/testing/fake-coordinator-connector",
 ]
 
-# End to end (E2E) The `fuchsia.fidl_microbenchmarks.dart` require the dart runner.
-core_realm_shards += [ "//src/dart:dart_runner_core_shard" ]
-
-# Build with both JIT and AOT non-product dart runners. JIT is used for debug
-# builds, and AOT is used for release builds.
-legacy_base_package_labels += [
-  "//src/dart:dart_jit",
-  "//src/dart:dart_aot",
-]
-
 # Used by Chromium tests, such as //src/chromium:tests.
 # Although deps in the individual tests ensures these are available in Fuchsia
 # infrastructure, Chromium infrastructure runs such tests run on this image,
@@ -62,12 +52,7 @@ core_realm_shards += [
 
 # Add cfv2 sl4f to base.
 core_realm_shards += [ "//src/testing/sl4f:sl4f_terminal_core_shard" ]
-legacy_base_package_labels += [
-  "//src/sys/bin/start_sl4f",
-
-  # TODO(https://fxbug.dev/107904) remove once dart version flatland test removed.
-  "//src/ui/tools/tiles",
-]
+legacy_base_package_labels += [ "//src/sys/bin/start_sl4f" ]
 
 # Add Test UI Stack for use in tests.
 # TODO(fxbug.dev/105105): Remove once we migrate client usage to subpackages.
