@@ -2850,12 +2850,12 @@ mod tests {
 
     struct FakeSingleStackConverter;
 
-    impl<A: IpAddress, LI> BidirectionalConverter<DualStackListenerIpAddr<A, LI>>
+    impl<A: IpAddress, LI>
+        BidirectionalConverter<DualStackListenerIpAddr<A, LI>, ListenerIpAddr<A, LI>>
         for FakeSingleStackConverter
     where
         A::Version: TestIpExt,
     {
-        type Output = ListenerIpAddr<A, LI>;
         fn convert_back(&self, b: ListenerIpAddr<A, LI>) -> DualStackListenerIpAddr<A, LI> {
             let ListenerIpAddr { addr, identifier } = b;
             DualStackListenerIpAddr { addr: DualStackIpAddr::ThisStack(addr), identifier }

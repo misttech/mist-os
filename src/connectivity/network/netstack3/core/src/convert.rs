@@ -4,7 +4,7 @@
 
 //! General utilities for converting types.
 
-use core::{convert::Infallible as Never, marker::PhantomData};
+use core::convert::Infallible as Never;
 
 use explicit::UnreachableExt as _;
 
@@ -38,40 +38,32 @@ impl<'s, T: Clone> OwnedOrCloned<T> for &'s T {
 /// related types. It has two blanket implementations: `()` for identity
 /// conversions, i.e. `Input=Output`, and [`UninstantiableConverter`] as an
 /// uninstantiable type that implements the trait for any input and output.
-pub(crate) trait BidirectionalConverter<Input> {
-    /// The output type for the given `Input` type.
-    ///
-    /// An instance of this type is produced by `convert` and consumed by
-    /// `convert_back`.
-    type Output;
-
+pub(crate) trait BidirectionalConverter<Input, Output> {
     /// Converts an instance of `Input` into an instance of `Output`.
-    fn convert(&self, a: Input) -> Self::Output;
+    fn convert(&self, a: Input) -> Output;
 
     /// Converts an instance of `Output` into an instance of `Input`.
-    fn convert_back(&self, b: Self::Output) -> Input;
+    fn convert_back(&self, b: Output) -> Input;
 }
 
-impl<I> BidirectionalConverter<I> for () {
-    type Output = I;
-    fn convert_back(&self, value: I) -> Self::Output {
+impl<I> BidirectionalConverter<I, I> for () {
+    fn convert_back(&self, value: I) -> I {
         value
     }
-    fn convert(&self, value: I) -> Self::Output {
+    fn convert(&self, value: I) -> I {
         value
     }
 }
 
-pub(crate) struct UninstantiableConverter<Output>(Never, PhantomData<Output>);
+pub(crate) struct UninstantiableConverter(Never);
 
-impl<Output> AsRef<Never> for UninstantiableConverter<Output> {
+impl AsRef<Never> for UninstantiableConverter {
     fn as_ref(&self) -> &Never {
         &self.0
     }
 }
 
-impl<I, O> BidirectionalConverter<I> for UninstantiableConverter<O> {
-    type Output = O;
+impl<I, O> BidirectionalConverter<I, O> for UninstantiableConverter {
     fn convert_back(&self, _: O) -> I {
         self.uninstantiable_unreachable()
     }

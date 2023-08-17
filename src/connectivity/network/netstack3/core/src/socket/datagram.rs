@@ -599,10 +599,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
     /// [`DualStackListenerIpAddr`].
     type Converter: BidirectionalConverter<
         S::ListenerIpAddr<I>,
-        Output = DualStackListenerIpAddr<
-            I::Addr,
-            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-        >,
+        DualStackListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
     >;
 
     /// Returns an instance of a type that implements [`BidirectionalConverter`]
@@ -682,7 +679,7 @@ pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramS
     /// [``ListenerIpAddr`].
     type Converter: BidirectionalConverter<
         S::ListenerIpAddr<I>,
-        Output = ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+        ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
     >;
 
     /// Returns an instance of a type that implements [`BidirectionalConverter`]
@@ -804,9 +801,7 @@ impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
 impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     NonDualStackDatagramBoundStateContext<I, C, S> for UninstantiableContext<I, S, P>
 {
-    type Converter = UninstantiableConverter<
-        ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-    >;
+    type Converter = UninstantiableConverter;
     fn converter(&self) -> Self::Converter {
         self.uninstantiable_unreachable()
     }
@@ -823,9 +818,7 @@ where
         self.uninstantiable_unreachable()
     }
 
-    type Converter = UninstantiableConverter<
-        DualStackListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-    >;
+    type Converter = UninstantiableConverter;
     fn converter(&self) -> Self::Converter {
         self.uninstantiable_unreachable()
     }
