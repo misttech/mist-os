@@ -11,7 +11,12 @@ use alloc::{
     },
     vec::Vec,
 };
-use core::{fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroU8};
+use core::{
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    num::{NonZeroU32, NonZeroU8},
+};
 
 #[cfg(test)]
 use assert_matches::assert_matches;
@@ -39,6 +44,19 @@ const MAX_MULTICAST_SOLICIT: u8 = 3;
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
 const MAX_UNICAST_SOLICIT: u8 = 3;
+
+/// The maximum amount of time between retransmissions of neighbor probe
+/// messages as defined in [RFC 7048 section 4].
+///
+/// [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
+const MAX_RETRANS_TIMER: NonZeroDuration =
+    const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(60));
+
+/// The exponential backoff factor for retransmissions of multicast neighbor
+/// probe messages as defined in [RFC 7048 section 4].
+///
+/// [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
+const BACKOFF_MULTIPLE: NonZeroU32 = const_unwrap::const_unwrap_option(NonZeroU32::new(3));
 
 const MAX_PENDING_FRAMES: usize = 10;
 
@@ -83,9 +101,11 @@ enum NeighborState<D: LinkDevice> {
 }
 
 /// The state of a dynamic entry in the neighbor cache within the Neighbor
-/// Unreachability Detection state machine, defined in [RFC 4861 section 7.3.2].
+/// Unreachability Detection state machine, defined in [RFC 4861 section 7.3.2]
+/// and [RFC 7048 section 3].
 ///
 /// [RFC 4861 section 7.3.2]: https://tools.ietf.org/html/rfc4861#section-7.3.2
+/// [RFC 7048 section 3]: https://tools.ietf.org/html/rfc7048#section-3
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DynamicNeighborState<D: LinkDevice> {
     /// Address resolution is being performed on the entry.
@@ -130,6 +150,51 @@ pub(crate) enum DynamicNeighborState<D: LinkDevice> {
     /// every RetransTimer milliseconds until a reachability confirmation is
     /// received.
     Probe(Probe<D>),
+
+    /// Similarly to the `Probe` state, a reachability confirmation is actively
+    /// sought by retransmitting probes; however, probes are multicast to the
+    /// solicited-node multicast address, using a timeout with exponential
+    /// backoff, rather than unicast to the cached link address. Also, probes
+    /// are only transmitted as long as packets continue to be sent to the
+    /// neighbor.
+    Unreachable(Unreachable<D>),
+}
+
+fn schedule_timer_if_should_retransmit<I, D, DeviceId, SC, C>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &DeviceId,
+    neighbor: SpecifiedAddr<I::Addr>,
+    event: NudEvent,
+    counter: &mut Option<NonZeroU8>,
+) -> bool
+where
+    I: Ip,
+    D: LinkDevice,
+    DeviceId: StrongId,
+    C: NonSyncNudContext<I, D, DeviceId>,
+    SC: NudConfigContext<I>,
+{
+    match counter {
+        Some(c) => {
+            *counter = NonZeroU8::new(c.get() - 1);
+            let retransmit_timeout = sync_ctx.retransmit_timeout();
+            assert_eq!(
+                ctx.schedule_timer(
+                    retransmit_timeout.get(),
+                    NudTimerId {
+                        device_id: device_id.clone(),
+                        lookup_addr: neighbor,
+                        event,
+                        _marker: PhantomData
+                    },
+                ),
+                None
+            );
+            true
+        }
+        None => false,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -174,6 +239,31 @@ impl Incomplete {
             transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - 1),
             pending_frames: [frame].into(),
         }
+    }
+
+    fn schedule_timer_if_should_retransmit<I, D, DeviceId, SC, C>(
+        &mut self,
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        device_id: &DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    ) -> bool
+    where
+        I: Ip,
+        D: LinkDevice,
+        DeviceId: StrongId,
+        C: NonSyncNudContext<I, D, DeviceId>,
+        SC: NudConfigContext<I>,
+    {
+        let Self { transmit_counter, pending_frames: _ } = self;
+        schedule_timer_if_should_retransmit(
+            sync_ctx,
+            ctx,
+            device_id,
+            neighbor,
+            NudEvent::RetransmitMulticastProbe,
+            transmit_counter,
+        )
     }
 
     fn queue_packet<B, S>(&mut self, body: S) -> Result<(), S>
@@ -323,6 +413,203 @@ pub(crate) struct Probe<D: LinkDevice> {
     transmit_counter: Option<NonZeroU8>,
 }
 
+impl<D: LinkDevice> Probe<D> {
+    fn schedule_timer_if_should_retransmit<I, DeviceId, SC, C>(
+        &mut self,
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        device_id: &DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    ) -> bool
+    where
+        I: Ip,
+        DeviceId: StrongId,
+        C: NonSyncNudContext<I, D, DeviceId>,
+        SC: NudConfigContext<I>,
+    {
+        let Self { link_address: _, transmit_counter } = self;
+        schedule_timer_if_should_retransmit(
+            sync_ctx,
+            ctx,
+            device_id,
+            neighbor,
+            NudEvent::RetransmitUnicastProbe,
+            transmit_counter,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Unreachable<D: LinkDevice> {
+    link_address: D::Address,
+    mode: UnreachableMode,
+}
+
+/// The dynamic neighbor state specific to the UNREACHABLE state as defined in
+/// [RFC 7048].
+///
+/// When a neighbor entry transitions to UNREACHABLE, the netstack will stop
+/// actively retransmitting probes if no packets are being sent to the neighbor.
+///
+/// If packets are sent through the neighbor, the netstack will continue to
+/// retransmit multicast probes, but with exponential backoff on the timer,
+/// based on the `BACKOFF_MULTIPLE` and clamped at `MAX_RETRANS_TIMER`.
+///
+/// [RFC 7048]: https://tools.ietf.org/html/rfc7048
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnreachableMode {
+    WaitingForPacketSend,
+    Backoff { probes_sent: NonZeroU32, packet_sent: bool },
+}
+
+impl UnreachableMode {
+    /// The amount of time to wait before transmitting another multicast probe
+    /// to the cached link address, based on how many probes we have transmitted
+    /// so far, as defined in [RFC 7048 section 4].
+    ///
+    /// [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
+    fn next_backoff_retransmit_timeout<I, SC>(&self, sync_ctx: &mut SC) -> NonZeroDuration
+    where
+        I: Ip,
+        SC: NudConfigContext<I>,
+    {
+        let probes_sent = match self {
+            UnreachableMode::Backoff { probes_sent, packet_sent: _ } => probes_sent,
+            UnreachableMode::WaitingForPacketSend => {
+                panic!("cannot calculate exponential backoff in state {self:?}")
+            }
+        };
+        // TODO(https://fxbug.dev/35185): vary this retransmit timeout by some random
+        // "jitter factor" to avoid synchronization of transmissions from different
+        // hosts.
+        (sync_ctx.retransmit_timeout() * BACKOFF_MULTIPLE.saturating_pow(probes_sent.get()))
+            .min(MAX_RETRANS_TIMER)
+    }
+}
+
+impl<D: LinkDevice> Unreachable<D> {
+    fn handle_timer<I, DeviceId, SC, C>(
+        &mut self,
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        device_id: &DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    ) -> Option<TransmitProbe<D::Address>>
+    where
+        I: Ip,
+        DeviceId: StrongId,
+        C: NonSyncNudContext<I, D, DeviceId>,
+        SC: NudConfigContext<I>,
+    {
+        let Self { link_address: _, mode } = self;
+        match mode {
+            UnreachableMode::WaitingForPacketSend => {
+                panic!(
+                    "timer should not have fired in UNREACHABLE while waiting for packet send; got \
+                    a retransmit multicast probe event for {neighbor} on {device_id}",
+                );
+            }
+            UnreachableMode::Backoff { probes_sent, packet_sent } => {
+                if *packet_sent {
+                    // It is all but guaranteed that we will never end up transmitting u32::MAX
+                    // probes, given the retransmit timeout backs off to MAX_RETRANS_TIMER (1 minute
+                    // by default), and u32::MAX minutes is over 8,000 years. By then we almost
+                    // certainly would have garbage-collected the neighbor entry.
+                    //
+                    // But we do a saturating add just to be safe.
+                    *probes_sent = probes_sent.saturating_add(1);
+                    *packet_sent = false;
+
+                    let duration = mode.next_backoff_retransmit_timeout(sync_ctx);
+                    assert_eq!(
+                        ctx.schedule_timer(
+                            duration.into(),
+                            NudTimerId {
+                                device_id: device_id.clone(),
+                                lookup_addr: neighbor,
+                                event: NudEvent::RetransmitMulticastProbe,
+                                _marker: PhantomData,
+                            }
+                        ),
+                        None
+                    );
+
+                    Some(TransmitProbe::Multicast)
+                } else {
+                    *mode = UnreachableMode::WaitingForPacketSend;
+
+                    None
+                }
+            }
+        }
+    }
+
+    /// Advance the UNREACHABLE state machine based on a packet being queued for
+    /// transmission.
+    ///
+    /// Returns whether a multicast neighbor probe should be sent as a result.
+    fn handle_packet_queued_to_send<I, DeviceId, SC, C>(
+        &mut self,
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        device_id: &DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    ) -> bool
+    where
+        I: Ip,
+        DeviceId: StrongId,
+        C: NonSyncNudContext<I, D, DeviceId>,
+        SC: NudConfigContext<I>,
+    {
+        let Self { link_address: _, mode } = self;
+        match mode {
+            UnreachableMode::WaitingForPacketSend => {
+                // We already transmitted MAX_MULTICAST_SOLICIT probes to the neighbor
+                // without confirmation, but now a packet is being sent to that neighbor, so
+                // we are resuming transmission of probes for as long as packets continue to
+                // be sent to the neighbor. Instead of retransmitting on a fixed timeout,
+                // use exponential backoff per [RFC 7048 section 4]:
+                //
+                //   If an implementation transmits more than MAX_UNICAST_SOLICIT/
+                //   MAX_MULTICAST_SOLICIT packets, then it SHOULD use the exponential
+                //   backoff of the retransmit timer.  This is to avoid any significant
+                //   load due to a steady background level of retransmissions from
+                //   implementations that retransmit a large number of Neighbor
+                //   Solicitations (NS) before discarding the NCE.
+                //
+                // [RFC 7048 section 4]: https://tools.ietf.org/html/rfc7048#section-4
+                let probes_sent = NonZeroU32::new(1).unwrap();
+                *mode = UnreachableMode::Backoff { probes_sent, packet_sent: false };
+
+                let duration = mode.next_backoff_retransmit_timeout(sync_ctx);
+                assert_eq!(
+                    ctx.schedule_timer(
+                        duration.into(),
+                        NudTimerId {
+                            device_id: device_id.clone(),
+                            lookup_addr: neighbor,
+                            event: NudEvent::RetransmitMulticastProbe,
+                            _marker: PhantomData,
+                        }
+                    ),
+                    None
+                );
+
+                // Transmit a multicast probe.
+                true
+            }
+            UnreachableMode::Backoff { probes_sent: _, packet_sent } => {
+                // We are in the exponential backoff phase of sending probes. Make a note
+                // that a packet was sent since the last transmission so that we will send
+                // another when the timer fires.
+                *packet_sent = true;
+
+                false
+            }
+        }
+    }
+}
+
 impl<D: LinkDevice> DynamicNeighborState<D> {
     fn cancel_timer<I, C, DeviceId>(
         &mut self,
@@ -387,6 +674,25 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
                     "probe entry for {neighbor} should have had a timer",
                 );
             }
+            DynamicNeighborState::Unreachable(Unreachable { link_address: _, mode }) => {
+                // A timer should be scheduled iff a packet was recently sent to the neighbor
+                // and we are retransmitting probes with exponential backoff.
+                match mode {
+                    UnreachableMode::WaitingForPacketSend => {}
+                    UnreachableMode::Backoff { probes_sent: _, packet_sent: _ } => {
+                        assert_ne!(
+                            ctx.cancel_timer(NudTimerId {
+                                device_id: device_id.clone(),
+                                lookup_addr: neighbor,
+                                event: NudEvent::RetransmitMulticastProbe,
+                                _marker: PhantomData,
+                            }),
+                            None,
+                            "unreachable entry for {neighbor} in {mode:?} should have had a timer",
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -411,7 +717,8 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
             DynamicNeighborState::Reachable(_)
             | DynamicNeighborState::Stale(_)
             | DynamicNeighborState::Delay(_)
-            | DynamicNeighborState::Probe(_) => {}
+            | DynamicNeighborState::Probe(_)
+            | DynamicNeighborState::Unreachable(_) => {}
         }
     }
 
@@ -481,6 +788,11 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
         // transmission.
     }
 
+    /// Handle a packet being queued for transmission: either queue it as a
+    /// pending packet for an unresolved neighbor, or send it to the cached link
+    /// address, and advance the NUD state machine accordingly.
+    ///
+    /// Returns whether a multicast neighbor probe should be sent as a result.
     fn handle_packet_queued_to_send<B, I, C, SC, S>(
         &mut self,
         sync_ctx: &mut SC,
@@ -488,7 +800,7 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
         device_id: &SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<bool, S>
     where
         B: BufferMut,
         I: Ip,
@@ -497,7 +809,11 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
         S: Serializer<Buffer = B>,
     {
         match self {
-            DynamicNeighborState::Incomplete(incomplete) => incomplete.queue_packet(body),
+            DynamicNeighborState::Incomplete(incomplete) => {
+                incomplete.queue_packet(body)?;
+
+                Ok(false)
+            }
             // Send the IP packet while holding the NUD lock to prevent a potential
             // ordering violation.
             //
@@ -515,12 +831,24 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
                 let delay @ Delay { link_address } = entry.enter_delay(ctx, device_id, neighbor);
                 *self = DynamicNeighborState::Delay(delay);
 
-                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, link_address, body)
+                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, link_address, body)?;
+
+                Ok(false)
             }
             DynamicNeighborState::Reachable(Reachable { link_address })
             | DynamicNeighborState::Delay(Delay { link_address })
             | DynamicNeighborState::Probe(Probe { link_address, transmit_counter: _ }) => {
-                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, *link_address, body)
+                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, *link_address, body)?;
+
+                Ok(false)
+            }
+            DynamicNeighborState::Unreachable(unreachable) => {
+                let Unreachable { link_address, mode: _ } = unreachable;
+                sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, *link_address, body)?;
+
+                let do_multicast_solicit =
+                    unreachable.handle_packet_queued_to_send(sync_ctx, ctx, device_id, neighbor);
+                Ok(do_multicast_solicit)
             }
         }
     }
@@ -550,7 +878,8 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
             DynamicNeighborState::Reachable(Reachable { link_address: current })
             | DynamicNeighborState::Stale(Stale { link_address: current })
             | DynamicNeighborState::Delay(Delay { link_address: current })
-            | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ }) => {
+            | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ })
+            | DynamicNeighborState::Unreachable(Unreachable { link_address: current, mode: _ }) => {
                 current != &link_address
             }
         };
@@ -599,7 +928,8 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
             DynamicNeighborState::Reachable(Reachable { link_address: current })
             | DynamicNeighborState::Stale(Stale { link_address: current })
             | DynamicNeighborState::Delay(Delay { link_address: current })
-            | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ }) => {
+            | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ })
+            | DynamicNeighborState::Unreachable(Unreachable { link_address: current, mode: _ }) => {
                 let updated_link_address = current != &link_address;
 
                 match (solicited_flag, updated_link_address, override_flag) {
@@ -625,9 +955,11 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
                         DynamicNeighborState::Reachable(Reachable { link_address }) => {
                             Some(NewState::Stale { link_address: *link_address })
                         }
+                        // Ignore the advertisement and do not update the cache.
                         DynamicNeighborState::Stale(_)
                         | DynamicNeighborState::Delay(_)
-                        | DynamicNeighborState::Probe(_) => None,
+                        | DynamicNeighborState::Probe(_)
+                        | DynamicNeighborState::Unreachable(_) => None,
                         // The INCOMPLETE state was already handled in the outer match.
                         DynamicNeighborState::Incomplete(_) => unreachable!(),
                     },
@@ -933,6 +1265,11 @@ pub(crate) trait BufferNudHandler<B: BufferMut, I: Ip, D: LinkDevice, C>:
     ) -> Result<(), S>;
 }
 
+enum TransmitProbe<A> {
+    Multicast,
+    Unicast(A),
+}
+
 impl<
         I: Ip,
         D: LinkDevice + core::fmt::Debug,
@@ -945,74 +1282,61 @@ impl<
         ctx: &mut C,
         NudTimerId { device_id, lookup_addr, event, _marker }: NudTimerId<I, D, SC::DeviceId>,
     ) {
-        enum Action<A> {
-            MulticastProbe,
-            UnicastProbe(A),
-        }
-
         let action = self.with_nud_state_mut(&device_id, |NudState { neighbors }, sync_ctx| {
             let mut entry = match neighbors.entry(lookup_addr) {
                 Entry::Occupied(entry) => entry,
                 Entry::Vacant(_) => panic!("timer fired for invalid entry"),
             };
 
-            let mut should_retransmit = |counter: &mut Option<NonZeroU8>, event| match counter {
-                Some(c) => {
-                    *counter = NonZeroU8::new(c.get() - 1);
-                    let retransmit_timeout = sync_ctx.retransmit_timeout();
-                    assert_eq!(
-                        ctx.schedule_timer(
-                            retransmit_timeout.get(),
-                            NudTimerId {
-                                device_id: device_id.clone(),
-                                lookup_addr,
-                                event,
-                                _marker: PhantomData
-                            },
-                        ),
-                        None
-                    );
-                    true
-                }
-                None => false,
-            };
-
             match entry.get_mut() {
-                NeighborState::Dynamic(DynamicNeighborState::Incomplete(Incomplete {
-                    transmit_counter,
-                    pending_frames: _,
-                })) => {
+                NeighborState::Dynamic(DynamicNeighborState::Incomplete(incomplete)) => {
                     assert_eq!(event, NudEvent::RetransmitMulticastProbe);
 
-                    if should_retransmit(transmit_counter, NudEvent::RetransmitMulticastProbe) {
-                        Some(Action::MulticastProbe)
+                    if incomplete.schedule_timer_if_should_retransmit(
+                        sync_ctx,
+                        ctx,
+                        &device_id,
+                        lookup_addr,
+                    ) {
+                        Some(TransmitProbe::Multicast)
                     } else {
-                        // Failed to complete neighbor resolution and no more probes to
-                        // send. Subsequent traffic to this neighbor will recreate the entry and
-                        // restart address resolution.
+                        // Failed to complete neighbor resolution and no more probes to send.
+                        // Subsequent traffic to this neighbor will recreate the entry and restart
+                        // address resolution.
                         //
-                        // TODO(https://fxbug.dev/35185): transition to UNREACHABLE.
+                        // TODO(http://fxbug.dev/132349): consider retaining this neighbor entry in
+                        // a sentinel `Failed` state, equivalent to its having been discarded except
+                        // for debugging/observability purposes.
                         let _: NeighborState<D> = entry.remove();
                         None
                     }
                 }
-                NeighborState::Dynamic(DynamicNeighborState::Probe(Probe {
-                    transmit_counter,
-                    link_address,
-                })) => {
+                NeighborState::Dynamic(DynamicNeighborState::Probe(probe)) => {
                     assert_eq!(event, NudEvent::RetransmitUnicastProbe);
 
-                    if should_retransmit(transmit_counter, NudEvent::RetransmitUnicastProbe) {
-                        Some(Action::UnicastProbe(*link_address))
+                    let Probe { link_address, transmit_counter: _ } = probe;
+                    let link_address = *link_address;
+                    if probe.schedule_timer_if_should_retransmit(
+                        sync_ctx,
+                        ctx,
+                        &device_id,
+                        lookup_addr,
+                    ) {
+                        Some(TransmitProbe::Unicast(link_address))
                     } else {
-                        // Failed to complete neighbor resolution and no more probes to
-                        // send. Subsequent traffic to this neighbor will recreate the entry and
-                        // restart address resolution.
-                        //
-                        // TODO(https://fxbug.dev/35185): transition to UNREACHABLE.
-                        let _: NeighborState<D> = entry.remove();
+                        *entry.get_mut() = NeighborState::Dynamic(
+                            DynamicNeighborState::Unreachable(Unreachable {
+                                link_address,
+                                mode: UnreachableMode::WaitingForPacketSend,
+                            }),
+                        );
+
                         None
                     }
+                }
+                NeighborState::Dynamic(DynamicNeighborState::Unreachable(unreachable)) => {
+                    assert_eq!(event, NudEvent::RetransmitMulticastProbe);
+                    unreachable.handle_timer(sync_ctx, ctx, &device_id, lookup_addr)
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
                     link_address,
@@ -1027,10 +1351,8 @@ impl<
                     //   state changes from REACHABLE to STALE.
                     //
                     // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
-                    let _: NeighborState<D> =
-                        entry.insert(NeighborState::Dynamic(DynamicNeighborState::Stale(Stale {
-                            link_address,
-                        })));
+                    *entry.get_mut() =
+                        NeighborState::Dynamic(DynamicNeighborState::Stale(Stale { link_address }));
 
                     None
                 }
@@ -1045,10 +1367,9 @@ impl<
                     // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
                     let probe @ Probe { link_address, transmit_counter: _ } =
                         delay.enter_probe(sync_ctx, ctx, &device_id, lookup_addr);
-                    let _: NeighborState<D> =
-                        entry.insert(NeighborState::Dynamic(DynamicNeighborState::Probe(probe)));
+                    *entry.get_mut() = NeighborState::Dynamic(DynamicNeighborState::Probe(probe));
 
-                    Some(Action::UnicastProbe(link_address))
+                    Some(TransmitProbe::Unicast(link_address))
                 }
                 state @ (NeighborState::Static(_)
                 | NeighborState::Dynamic(DynamicNeighborState::Stale(_))) => {
@@ -1058,10 +1379,10 @@ impl<
         });
 
         match action {
-            Some(Action::MulticastProbe) => {
+            Some(TransmitProbe::Multicast) => {
                 self.send_neighbor_solicitation(ctx, &device_id, lookup_addr, None);
             }
-            Some(Action::UnicastProbe(link_addr)) => {
+            Some(TransmitProbe::Unicast(link_addr)) => {
                 self.send_neighbor_solicitation(ctx, &device_id, lookup_addr, Some(link_addr));
             }
             None => {}
@@ -1190,6 +1511,10 @@ impl<
                             | DynamicNeighborState::Probe(Probe {
                                 link_address,
                                 transmit_counter: _,
+                            })
+                            | DynamicNeighborState::Unreachable(Unreachable {
+                                link_address,
+                                mode: _,
                             }),
                         ) => NeighborLinkAddr::Resolved(link_address.clone()),
                         NeighborState::Dynamic(DynamicNeighborState::Incomplete(_)) => {
@@ -1217,7 +1542,7 @@ impl<
         lookup_addr: SpecifiedAddr<I::Addr>,
         body: S,
     ) -> Result<(), S> {
-        let do_solicit =
+        let do_multicast_solicit =
             self.with_nud_state_mut_and_buf_ctx(device_id, |NudState { neighbors }, sync_ctx| {
                 match neighbors.entry(lookup_addr) {
                     Entry::Vacant(e) => {
@@ -1251,24 +1576,26 @@ impl<
                                     *link_address,
                                     body,
                                 )?;
+
+                                Ok(false)
                             }
                             NeighborState::Dynamic(e) => {
-                                e.handle_packet_queued_to_send(
+                                let do_multicast_solicit = e.handle_packet_queued_to_send(
                                     sync_ctx,
                                     ctx,
                                     device_id,
                                     lookup_addr,
                                     body,
                                 )?;
+
+                                Ok(do_multicast_solicit)
                             }
                         }
-
-                        Ok(false)
                     }
                 }
             })?;
 
-        if do_solicit {
+        if do_multicast_solicit {
             self.send_neighbor_solicitation(
                 ctx,
                 &device_id,
@@ -1492,6 +1819,9 @@ mod tests {
                 NeighborState::Dynamic(
                     DynamicNeighborState::Reachable (Reachable { link_address })
                     | DynamicNeighborState::Stale (Stale { link_address })
+                    | DynamicNeighborState::Delay (Delay { link_address })
+                    | DynamicNeighborState::Probe (Probe { link_address, transmit_counter: _ })
+                    | DynamicNeighborState::Unreachable (Unreachable { link_address, mode: _ })
                 )
                 | NeighborState::Static(link_address)
             )) => {
@@ -1533,17 +1863,32 @@ mod tests {
                         event: NudEvent::RetransmitUnicastProbe,
                         _marker: PhantomData,
                     },
-                    ctx.now()
-                        + sync_ctx.with_nud_state_mut(
-                            &FakeLinkDeviceId,
-                            |_: &mut NudState<_, _>, config| {
-                                <FakeConfigContext as NudConfigContext<I>>::retransmit_timeout(
-                                    config,
-                                )
-                                .get()
-                            },
-                        ),
+                    ctx.now() + sync_ctx.inner.get_ref().retrans_timer.get(),
                 )])
+            }
+            NeighborState::Dynamic(DynamicNeighborState::Unreachable(Unreachable {
+                link_address: _,
+                mode,
+            })) => {
+                let instant = match mode {
+                    UnreachableMode::WaitingForPacketSend => None,
+                    mode @ UnreachableMode::Backoff { .. } => {
+                        let duration =
+                            mode.next_backoff_retransmit_timeout::<I, _>(sync_ctx.inner.get_mut());
+                        Some(ctx.now() + duration.get())
+                    }
+                };
+                if let Some(instant) = instant {
+                    ctx.timer_ctx().assert_timers_installed([(
+                        NudTimerId {
+                            device_id: FakeLinkDeviceId,
+                            lookup_addr,
+                            event: NudEvent::RetransmitUnicastProbe,
+                            _marker: PhantomData,
+                        },
+                        instant,
+                    )])
+                }
             }
             NeighborState::Dynamic(DynamicNeighborState::Stale { .. })
             | NeighborState::Static(_) => ctx.timer_ctx().assert_no_timers_installed(),
@@ -1732,6 +2077,37 @@ mod tests {
         }
     }
 
+    fn init_unreachable_neighbor<I: Ip + TestIpExt>(
+        sync_ctx: &mut FakeCtxImpl<I>,
+        non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
+        link_address: FakeLinkAddress,
+    ) {
+        init_probe_neighbor(sync_ctx, non_sync_ctx, link_address, false);
+        let retransmit_timeout = sync_ctx.inner.retransmit_timeout();
+        for _ in 0..MAX_UNICAST_SOLICIT {
+            assert_neighbor_probe_sent(sync_ctx, Some(LINK_ADDR1));
+            assert_eq!(
+                non_sync_ctx.trigger_timers_for(
+                    retransmit_timeout.into(),
+                    handle_timer_helper_with_sc_ref_mut(sync_ctx, TimerHandler::handle_timer),
+                ),
+                [NudTimerId {
+                    device_id: FakeLinkDeviceId,
+                    lookup_addr: I::LOOKUP_ADDR1,
+                    event: NudEvent::RetransmitUnicastProbe,
+                    _marker: PhantomData,
+                }]
+            );
+        }
+        assert_neighbor_state(
+            sync_ctx,
+            DynamicNeighborState::Unreachable(Unreachable {
+                link_address,
+                mode: UnreachableMode::WaitingForPacketSend,
+            }),
+        );
+    }
+
     #[derive(Debug, Clone, Copy)]
     enum InitialState {
         Incomplete,
@@ -1739,6 +2115,7 @@ mod tests {
         Reachable,
         Delay,
         Probe,
+        Unreachable,
     }
 
     fn init_neighbor_in_state<I: Ip + TestIpExt>(
@@ -1762,6 +2139,9 @@ mod tests {
             }
             InitialState::Probe => {
                 init_probe_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1, true);
+            }
+            InitialState::Unreachable => {
+                init_unreachable_neighbor(sync_ctx, non_sync_ctx, LINK_ADDR1);
             }
         }
         assert_matches!(sync_ctx.outer.nud.neighbors.get(&I::LOOKUP_ADDR1),
@@ -1912,6 +2292,8 @@ mod tests {
     #[test_case(InitialState::Delay, false; "delay with same address")]
     #[test_case(InitialState::Probe, true; "probe with different address")]
     #[test_case(InitialState::Probe, false; "probe with same address")]
+    #[test_case(InitialState::Unreachable, true; "unreachable with different address")]
+    #[test_case(InitialState::Unreachable, false; "unreachable with same address")]
     fn transition_to_stale_on_probe_with_different_address<I: Ip + TestIpExt>(
         initial_state: InitialState,
         update_link_address: bool,
@@ -1954,6 +2336,8 @@ mod tests {
     #[test_case(InitialState::Delay, false; "delay with override flag not set")]
     #[test_case(InitialState::Probe, true; "probe with override flag set")]
     #[test_case(InitialState::Probe, false; "probe with override flag not set")]
+    #[test_case(InitialState::Unreachable, true; "unreachable with override flag set")]
+    #[test_case(InitialState::Unreachable, false; "unreachable with override flag not set")]
     fn transition_to_reachable_on_solicited_confirmation_same_address<I: Ip + TestIpExt>(
         initial_state: InitialState,
         override_flag: bool,
@@ -1989,6 +2373,7 @@ mod tests {
     #[test_case(InitialState::Stale; "stale")]
     #[test_case(InitialState::Delay; "delay")]
     #[test_case(InitialState::Probe; "probe")]
+    #[test_case(InitialState::Unreachable; "unreachable")]
     fn transition_to_stale_on_unsolicited_override_confirmation_with_different_address<
         I: Ip + TestIpExt,
     >(
@@ -2029,6 +2414,8 @@ mod tests {
     #[test_case(InitialState::Delay, false; "delay with override flag not set")]
     #[test_case(InitialState::Probe, true; "probe with override flag set")]
     #[test_case(InitialState::Probe, false; "probe with override flag not set")]
+    #[test_case(InitialState::Unreachable, true; "unreachable with override flag set")]
+    #[test_case(InitialState::Unreachable, false; "unreachable with override flag not set")]
     fn noop_on_unsolicited_confirmation_with_same_address<I: Ip + TestIpExt>(
         initial_state: InitialState,
         override_flag: bool,
@@ -2062,6 +2449,7 @@ mod tests {
     #[test_case(InitialState::Stale; "stale")]
     #[test_case(InitialState::Delay; "delay")]
     #[test_case(InitialState::Probe; "probe")]
+    #[test_case(InitialState::Unreachable; "unreachable")]
     fn transition_to_reachable_on_solicited_override_confirmation_with_different_address<
         I: Ip + TestIpExt,
     >(
@@ -2158,6 +2546,8 @@ mod tests {
     #[test_case(InitialState::Delay, false; "delay unsolicited")]
     #[test_case(InitialState::Probe, true; "probe solicited")]
     #[test_case(InitialState::Probe, false; "probe unsolicited")]
+    #[test_case(InitialState::Unreachable, true; "unreachable solicited")]
+    #[test_case(InitialState::Unreachable, false; "unreachable unsolicited")]
     fn noop_on_non_override_confirmation_with_different_address<I: Ip + TestIpExt>(
         initial_state: InitialState,
         solicited_flag: bool,
@@ -2288,6 +2678,149 @@ mod tests {
             non_sync_ctx.now() + sync_ctx.inner.get_ref().retrans_timer.get(),
         )]);
         assert_neighbor_probe_sent(&mut sync_ctx, Some(LINK_ADDR1));
+    }
+
+    #[ip_test]
+    fn unreachable_probes_with_exponential_backoff_while_packets_sent<I: Ip + TestIpExt>() {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+
+        init_unreachable_neighbor(&mut sync_ctx, &mut non_sync_ctx, LINK_ADDR1);
+
+        let retrans_timer = sync_ctx.inner.retransmit_timeout().get();
+        let timer_id = NudTimerId {
+            device_id: FakeLinkDeviceId,
+            lookup_addr: I::LOOKUP_ADDR1,
+            event: NudEvent::RetransmitMulticastProbe,
+            _marker: PhantomData,
+        };
+
+        // No multicast probes should be transmitted even after the retransmit timeout.
+        assert_eq!(
+            non_sync_ctx.trigger_timers_for(
+                retrans_timer,
+                handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+            ),
+            []
+        );
+        assert_eq!(sync_ctx.inner.take_frames(), []);
+
+        // Send a packet and ensure that we also transmit a multicast probe.
+        const BODY: u8 = 0x33;
+        assert_eq!(
+            BufferNudHandler::send_ip_packet_to_neighbor(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &FakeLinkDeviceId,
+                I::LOOKUP_ADDR1,
+                Buf::new([BODY], ..),
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            sync_ctx.inner.take_frames(),
+            [
+                (FakeNudMessageMeta::IpFrame { dst_link_address: LINK_ADDR1 }, vec![BODY]),
+                (
+                    FakeNudMessageMeta::NeighborSolicitation {
+                        lookup_addr: I::LOOKUP_ADDR1,
+                        remote_link_addr: /* multicast */ None,
+                    },
+                    Vec::new()
+                )
+            ]
+        );
+
+        let next_backoff_timer = |sync_ctx: &mut FakeCtxImpl<I>, probes_sent| {
+            UnreachableMode::Backoff {
+                probes_sent: NonZeroU32::new(probes_sent).unwrap(),
+                packet_sent: /* unused */ false,
+            }
+            .next_backoff_retransmit_timeout::<I, _>(sync_ctx.inner.get_mut())
+            .get()
+        };
+
+        const ITERATIONS: u8 = 2;
+        for i in 1..ITERATIONS {
+            let probes_sent = u32::from(i);
+
+            // Send another packet before the retransmit timer expires: only the packet
+            // should be sent (not a probe), and the `packet_sent` flag should be set.
+            assert_eq!(
+                BufferNudHandler::send_ip_packet_to_neighbor(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    &FakeLinkDeviceId,
+                    I::LOOKUP_ADDR1,
+                    Buf::new([BODY + i], ..),
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                sync_ctx.inner.take_frames(),
+                [(FakeNudMessageMeta::IpFrame { dst_link_address: LINK_ADDR1 }, vec![BODY + i])]
+            );
+
+            // Fast forward until the current retransmit timer should fire, taking
+            // exponential backoff into account. Another multicast probe should be
+            // transmitted and a new timer should be scheduled (backing off further) because
+            // a packet was recently sent.
+            assert_eq!(
+                non_sync_ctx.trigger_timers_for(
+                    next_backoff_timer(&mut sync_ctx, probes_sent),
+                    handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+                ),
+                [timer_id]
+            );
+            assert_neighbor_probe_sent(&mut sync_ctx, /* multicast */ None);
+            non_sync_ctx.timer_ctx().assert_timers_installed([(
+                timer_id,
+                non_sync_ctx.now() + next_backoff_timer(&mut sync_ctx, probes_sent + 1),
+            )]);
+        }
+
+        // If no more packets are sent, no multicast probes should be transmitted even
+        // after the next backoff timer expires.
+        let current_timer = next_backoff_timer(&mut sync_ctx, u32::from(ITERATIONS));
+        assert_eq!(
+            non_sync_ctx.trigger_timers_for(
+                current_timer,
+                handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+            ),
+            [timer_id]
+        );
+        assert_eq!(sync_ctx.inner.take_frames(), []);
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+
+        // Finally, if another packet is sent, we resume transmitting multicast probes
+        // and "reset" the exponential backoff.
+        assert_eq!(
+            BufferNudHandler::send_ip_packet_to_neighbor(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &FakeLinkDeviceId,
+                I::LOOKUP_ADDR1,
+                Buf::new([BODY], ..),
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            sync_ctx.inner.take_frames(),
+            [
+                (FakeNudMessageMeta::IpFrame { dst_link_address: LINK_ADDR1 }, vec![BODY]),
+                (
+                    FakeNudMessageMeta::NeighborSolicitation {
+                        lookup_addr: I::LOOKUP_ADDR1,
+                        remote_link_addr: /* multicast */ None,
+                    },
+                    Vec::new()
+                )
+            ]
+        );
+        non_sync_ctx.timer_ctx().assert_timers_installed([(
+            timer_id,
+            non_sync_ctx.now() + next_backoff_timer(&mut sync_ctx, 1),
+        )]);
     }
 
     #[ip_test]
@@ -2541,64 +3074,37 @@ mod tests {
         );
     }
 
-    enum SolicitState {
-        Incomplete,
-        Probe,
-    }
-
     #[ip_test]
-    #[test_case(SolicitState::Incomplete; "solicitation failure in incomplete")]
-    #[test_case(SolicitState::Probe; "solicitation failure in probe")]
-    fn solicitation_failure<I: Ip + TestIpExt>(initial_state: SolicitState) {
+    fn solicitation_failure_in_incomplete<I: Ip + TestIpExt>() {
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(sync_ctx.inner.take_frames(), []);
 
-        let pending_frames = match initial_state {
-            SolicitState::Incomplete => {
-                Some(init_incomplete_neighbor(&mut sync_ctx, &mut non_sync_ctx, false))
-            }
-            SolicitState::Probe => {
-                init_probe_neighbor(&mut sync_ctx, &mut non_sync_ctx, LINK_ADDR1, false);
-                None
-            }
-        };
+        let pending_frames = init_incomplete_neighbor(&mut sync_ctx, &mut non_sync_ctx, false);
 
-        let (event, iterations, remote_link_addr) = match initial_state {
-            SolicitState::Incomplete => {
-                (NudEvent::RetransmitMulticastProbe, MAX_MULTICAST_SOLICIT, None)
-            }
-            SolicitState::Probe => {
-                (NudEvent::RetransmitUnicastProbe, MAX_UNICAST_SOLICIT, Some(LINK_ADDR1))
-            }
-        };
         let timer_id = NudTimerId {
             device_id: FakeLinkDeviceId,
             lookup_addr: I::LOOKUP_ADDR1,
-            event,
+            event: NudEvent::RetransmitMulticastProbe,
             _marker: PhantomData,
         };
-        for i in 1..=iterations {
+        for i in 1..=MAX_MULTICAST_SOLICIT {
             let FakeConfigContext { retrans_timer } = &sync_ctx.inner.get_ref();
             let retrans_timer = retrans_timer.get();
 
-            let expected_state = match initial_state {
-                SolicitState::Incomplete => DynamicNeighborState::Incomplete(Incomplete {
+            assert_neighbor_state(
+                &sync_ctx,
+                DynamicNeighborState::Incomplete(Incomplete {
                     transmit_counter: NonZeroU8::new(MAX_MULTICAST_SOLICIT - i),
-                    pending_frames: pending_frames.clone().unwrap(),
+                    pending_frames: pending_frames.clone(),
                 }),
-                SolicitState::Probe => DynamicNeighborState::Probe(Probe {
-                    transmit_counter: NonZeroU8::new(MAX_UNICAST_SOLICIT - i),
-                    link_address: LINK_ADDR1,
-                }),
-            };
-            assert_neighbor_state(&sync_ctx, expected_state);
+            );
 
             non_sync_ctx
                 .timer_ctx()
                 .assert_timers_installed([(timer_id, non_sync_ctx.now() + ONE_SECOND.get())]);
-            assert_neighbor_probe_sent(&mut sync_ctx, remote_link_addr);
+            assert_neighbor_probe_sent(&mut sync_ctx, /* multicast */ None);
 
             assert_eq!(
                 non_sync_ctx.trigger_timers_for(
@@ -2609,8 +3115,60 @@ mod tests {
             );
         }
 
-        let FakeNudContext { nud } = &sync_ctx.outer;
-        assert_eq!(nud.neighbors, HashMap::new());
+        // The neighbor entry should have been removed.
+        assert_eq!(sync_ctx.outer.nud.neighbors, HashMap::new());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(sync_ctx.inner.take_frames(), []);
+    }
+
+    #[ip_test]
+    fn solicitation_failure_in_probe<I: Ip + TestIpExt>() {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(sync_ctx.inner.take_frames(), []);
+
+        init_probe_neighbor(&mut sync_ctx, &mut non_sync_ctx, LINK_ADDR1, false);
+
+        let timer_id = NudTimerId {
+            device_id: FakeLinkDeviceId,
+            lookup_addr: I::LOOKUP_ADDR1,
+            event: NudEvent::RetransmitUnicastProbe,
+            _marker: PhantomData,
+        };
+        for i in 1..=MAX_UNICAST_SOLICIT {
+            let FakeConfigContext { retrans_timer } = &sync_ctx.inner.get_ref();
+            let retrans_timer = retrans_timer.get();
+
+            assert_neighbor_state(
+                &sync_ctx,
+                DynamicNeighborState::Probe(Probe {
+                    transmit_counter: NonZeroU8::new(MAX_UNICAST_SOLICIT - i),
+                    link_address: LINK_ADDR1,
+                }),
+            );
+
+            non_sync_ctx
+                .timer_ctx()
+                .assert_timers_installed([(timer_id, non_sync_ctx.now() + ONE_SECOND.get())]);
+            assert_neighbor_probe_sent(&mut sync_ctx, Some(LINK_ADDR1));
+
+            assert_eq!(
+                non_sync_ctx.trigger_timers_for(
+                    retrans_timer,
+                    handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+                ),
+                [timer_id]
+            );
+        }
+
+        assert_neighbor_state(
+            &sync_ctx,
+            DynamicNeighborState::Unreachable(Unreachable {
+                link_address: LINK_ADDR1,
+                mode: UnreachableMode::WaitingForPacketSend,
+            }),
+        );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(sync_ctx.inner.take_frames(), []);
     }
@@ -2721,6 +3279,8 @@ mod tests {
                 NeighborLinkAddr::Resolved(LINK_ADDR1); "delay neighbor")]
     #[test_case(Some(InitialState::Probe),
                 NeighborLinkAddr::Resolved(LINK_ADDR1); "probe neighbor")]
+    #[test_case(Some(InitialState::Unreachable),
+                NeighborLinkAddr::Resolved(LINK_ADDR1); "unreachable neighbor")]
     fn resolve_link_addr<I: Ip + TestIpExt>(
         initial_neighbor_state: Option<InitialState>,
         expected_result: NeighborLinkAddr<FakeLinkAddress>,
