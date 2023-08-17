@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async/cpp/sequence_checker.h>
-
-#include <sdk/lib/async_patterns/cpp/internal/receiver_base.h>
+#include <lib/async_patterns/cpp/internal/receiver_base.h>
 
 namespace async_patterns::internal {
 

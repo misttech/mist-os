@@ -5,11 +5,10 @@
 #ifndef LIB_ASYNC_PATTERNS_CPP_CALLBACK_H_
 #define LIB_ASYNC_PATTERNS_CPP_CALLBACK_H_
 
+#include <lib/async_patterns/cpp/internal/task_queue.h>
+#include <lib/async_patterns/cpp/sendable.h>
 #include <lib/fit/function.h>
 #include <zircon/assert.h>
-
-#include <sdk/lib/async_patterns/cpp/internal/task_queue.h>
-#include <sdk/lib/async_patterns/cpp/sendable.h>
 
 namespace async_patterns {
 
