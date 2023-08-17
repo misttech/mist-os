@@ -411,11 +411,11 @@ pub struct FxVolumeAndRoot {
 
 impl FxVolumeAndRoot {
     pub async fn new<T: From<Directory<FxVolume>> + RootDir>(
-        parent: Weak<VolumesDirectory>,
+        _parent: Weak<VolumesDirectory>,
         store: Arc<ObjectStore>,
         unique_id: u64,
     ) -> Result<Self, Error> {
-        let volume = Arc::new(FxVolume::new(parent, store, unique_id)?);
+        let volume = Arc::new(FxVolume::new(Weak::new(), store, unique_id)?);
         let root_object_id = volume.store().root_directory_object_id();
         let root_dir = Directory::open(&volume, root_object_id).await?;
         let root = Arc::<T>::new(root_dir.into()) as Arc<dyn RootDir>;
