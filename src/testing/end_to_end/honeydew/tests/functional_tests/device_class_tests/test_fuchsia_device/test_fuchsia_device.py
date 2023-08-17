@@ -20,6 +20,12 @@ from honeydew.interfaces.device_classes import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+# Note - Following destructive APIs in FuchsiaDevice class should have its own
+# test class to make sure failure of those destructive APIs does not impact
+# the rest of the non-destructive APIs tests:
+# * `reboot()` - Test class is @ <>/end_to_end/examples/test_soft_reboot/
+# * `power_cycle()`
+
 
 # pylint: disable=pointless-statement
 class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -103,10 +109,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.log_message_to_device(
             message="This is a test INFO message",
             level=custom_types.LEVEL.INFO)
-
-    def test_reboot(self) -> None:
-        """Test case for reboot()"""
-        self.device.reboot()
 
     def test_snapshot(self) -> None:
         """Test case for snapshot()"""
