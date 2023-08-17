@@ -7818,14 +7818,6 @@ Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
 
 From //src/starnix/kernel/BUILD.gn:20
 
-### starnix_use_fuchsia_rwlock
-
-Wheher to use fuchsia_sync::RwLock instead of parking_lot::RwLock.
-
-**Current value (from the default):** `true`
-
-From //src/starnix/kernel/BUILD.gn:23
-
 ### target_cpu
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
@@ -8374,7 +8366,7 @@ binary. Its purpose is to allow one-shot transition between the build modes
 and accelerate build times locally once the default is to use unified
 binaries.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/connectivity/network/unified_binary/network_unified_binary.gni:16
 
