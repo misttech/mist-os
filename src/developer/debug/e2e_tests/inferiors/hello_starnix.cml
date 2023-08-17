@@ -6,7 +6,7 @@
 // starnix components cannot be launched from /core/ffx-laboratory due to insufficient capabilities.
 {
     include: [
-        "//src/starnix/containers/debian/meta/debian_container.shard.cml",
+        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
         "//src/starnix/tests/starnix_test.shard.cml",
     ],
     program: {

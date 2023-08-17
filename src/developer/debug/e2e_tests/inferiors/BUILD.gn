@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 # Declare an inferior with a default manifest.
 template("inferior") {
@@ -153,11 +154,7 @@ fuchsia_package("zxdb_e2e_inferiors") {
   ]
 
   # Starnix
-  deps += [
-    ":hello_starnix",
-    "//src/starnix/containers:data_tmp_target",
-    "//src/starnix/containers:default_init",
-    "//src/starnix/containers/debian:system_image",
-  ]
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  deps += [ ":hello_starnix" ]
+  subpackages = starnix_test_subpackages +
+                [ "//src/starnix/containers/debian:debian_package" ]
 }

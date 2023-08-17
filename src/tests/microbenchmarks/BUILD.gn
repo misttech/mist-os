@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/testing/host_test.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//zircon/vdso/vdso.gni")
 
 # This can be built as a Fuchsia executable or as a host executable.
@@ -244,38 +245,26 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     test_type = "starnix"
   }
 
-  group("container_resources") {
-    deps = [
-      "//src/starnix/containers:data_tmp_target",
-      "//src/starnix/containers:default_init",
-      "//src/starnix/containers/debian:system_image",
-    ]
-  }
-
   fuchsia_test_package("starnix_microbenchmarks_unittestmode") {
     test_components = [ ":starnix_microbenchmarks_component" ]
 
     if (target_cpu == "x64") {
-      subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+      subpackages = starnix_test_subpackages +
+                    [ "//src/starnix/containers/debian:debian_package" ]
     }
 
-    deps = [
-      ":container_resources",
-      "//src/lib/testing/expectation:expectation_comparer",
-    ]
+    deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
   }
 
   fuchsia_shell_package("starnix_microbenchmarks_perftestmode") {
     testonly = true
 
     if (target_cpu == "x64") {
-      subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+      subpackages = starnix_test_subpackages +
+                    [ "//src/starnix/containers/debian:debian_package" ]
     }
 
-    deps = [
-      ":container_resources",
-      ":starnix_microbenchmarks_component",
-    ]
+    deps = [ ":starnix_microbenchmarks_component" ]
 
     # This package intentionally contains many non-Fuchia ELF binaries that
     # are not under /data/, and some of them are even unstripped, so disable

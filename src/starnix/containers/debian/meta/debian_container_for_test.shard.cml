@@ -8,7 +8,7 @@
     },
     children: [
         {
-            name: "test_container",
+            name: "container",
             url: "debian#meta/debian_container.cm",
             environment: "#starnix_runner_env",
         },
@@ -16,7 +16,7 @@
     use: [
         {
             protocol: "fuchsia.component.runner.ComponentRunner",
-            from: "#test_container",
+            from: "#container",
         },
     ],
 }
