@@ -530,6 +530,10 @@ void trace_context::SwitchRollingBufferLocked(uint32_t prev_wrapped_count,
   rolling_buffer_full_mark_[next_buffer].store(0, std::memory_order_relaxed);
   header_->rolling_data_end[next_buffer] = 0;
 
+  // Update the number of records dropped at each switch, so that trace_manager
+  // can react to dropped records as they happen.
+  header_->num_records_dropped = num_records_dropped();
+
   // Do this last: After this tracing resumes in the new buffer.
   uint64_t new_offset_plus_counter = MakeOffsetPlusCounter(0, new_wrapped_count);
   // This store is marked memory_order_release to ensure that a thread observing

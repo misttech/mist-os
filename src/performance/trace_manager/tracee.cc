@@ -255,9 +255,9 @@ void Tracee::OnFifoReadable(async_dispatcher_t* dispatcher, async::WaitBase* wai
         uint32_t wrapped_count = packet.data32;
         uint64_t durable_data_end = packet.data64;
         // Schedule the write with the main async loop.
-        FX_VLOGS(2) << "Buffer save request from " << *bundle_
-                    << ", wrapped_count=" << wrapped_count << ", durable_data_end=0x" << std::hex
-                    << durable_data_end;
+        FX_LOGS(INFO) << "Buffer save request from " << *bundle_
+                      << ", wrapped_count=" << wrapped_count << ", durable_data_end=0x" << std::hex
+                      << durable_data_end;
         async::PostTask(dispatcher_, [weak = weak_ptr_factory_.GetWeakPtr(), wrapped_count,
                                       durable_data_end] {
           if (weak) {
@@ -328,9 +328,9 @@ bool Tracee::VerifyBufferHeader(const trace::internal::BufferHeaderReader* heade
 
 TransferStatus Tracee::DoWriteChunk(const zx::socket& socket, uint64_t vmo_offset, uint64_t size,
                                     const char* name, bool by_size) const {
-  FX_VLOGS(2) << *bundle_ << ": Writing chunk for " << name << ": vmo offset 0x" << std::hex
-              << vmo_offset << ", size 0x" << std::hex << size
-              << (by_size ? ", by-size" : ", by-record");
+  FX_LOGS(INFO) << *bundle_ << ": Writing chunk for " << name << ": vmo offset 0x" << std::hex
+                << vmo_offset << ", size 0x" << std::hex << size
+                << (by_size ? ", by-size" : ", by-record");
 
   // TODO(dje): Loop on smaller buffer.
   // Better yet, be able to pass the entire vmo to the socket (still need to
@@ -352,7 +352,7 @@ TransferStatus Tracee::DoWriteChunk(const zx::socket& socket, uint64_t vmo_offse
   if (!by_size) {
     uint64_t words_written = GetBufferWordsWritten(buffer.data(), size_in_words);
     bytes_written = trace::WordsToBytes(words_written);
-    FX_VLOGS(2) << "By-record -> " << bytes_written << " bytes";
+    FX_LOGS(INFO) << "By-record -> " << bytes_written << " bytes";
   } else {
     bytes_written = size;
   }
@@ -502,7 +502,8 @@ TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
   if ((header->buffering_mode() == TRACE_BUFFERING_MODE_ONESHOT &&
        header->rolling_data_end(0) > kInitRecordSizeBytes) ||
       ((header->buffering_mode() != TRACE_BUFFERING_MODE_ONESHOT) &&
-       header->durable_data_end() > kInitRecordSizeBytes)) {
+       header->durable_data_end() > kInitRecordSizeBytes) ||
+      header->buffering_mode() == TRACE_BUFFERING_MODE_STREAMING) {
     FX_LOGS(INFO) << *bundle_ << " trace stats";
     FX_LOGS(INFO) << "Wrapped count: " << header->wrapped_count();
     FX_LOGS(INFO) << "# records dropped: " << header->num_records_dropped();
@@ -579,6 +580,8 @@ bool Tracee::DoTransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
     return false;
   }
 
+  FX_LOGS(INFO) << "Dropped records: " << header->num_records_dropped();
+
   // Don't use |header.durable_data_end| here, we want the value at the time
   // the message was sent.
   if (durable_data_end < kInitRecordSizeBytes || durable_data_end > header->durable_buffer_size() ||
@@ -615,8 +618,8 @@ bool Tracee::DoTransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
 }
 
 void Tracee::NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end) {
-  FX_VLOGS(2) << "Buffer saved for " << *bundle_ << ", wrapped_count=" << wrapped_count
-              << ", durable_data_end=" << durable_data_end;
+  FX_LOGS(INFO) << "Buffer saved for " << *bundle_ << ", wrapped_count=" << wrapped_count
+                << ", durable_data_end=" << durable_data_end;
   trace_provider_packet_t packet{};
   packet.request = TRACE_PROVIDER_BUFFER_SAVED;
   packet.data32 = wrapped_count;
