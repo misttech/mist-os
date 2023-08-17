@@ -39,7 +39,8 @@ var (
 	genIntermediateFile = flag.String("gen_intermediate_file", "", "Path to intermediate serialized gen struct.")
 	pruneTargets        = flag.String("prune_targets", "", "Flag for filtering out targets from the dependency tree. Targets separated by comma.")
 
-	checkURLs = flag.Bool("check_urls", false, "Flag for enabling checks for license URLs.")
+	checkURLs            = flag.Bool("check_urls", false, "Flag for enabling checks for license URLs.")
+	overwriteReadmeFiles = flag.Bool("overwrite_readme_files", false, "Flag for enabling README.fuchsia file overwites.")
 
 	outputLicenseFile = flag.Bool("output_license_file", true, "Flag for enabling template expansions.")
 	runAnalysis       = flag.Bool("run_analysis", true, "Flag for enabling license analysis and 'result' package tests.")
@@ -144,6 +145,7 @@ func mainImpl() error {
 	ConfigVars["{PRUNE_TARGETS}"] = string(pruneTargetsJSON)
 
 	ConfigVars["{CHECK_URLS}"] = strconv.FormatBool(*checkURLs)
+	ConfigVars["{OVERWRITE_README_FILES}"] = strconv.FormatBool(*overwriteReadmeFiles)
 
 	// target
 	if flag.NArg() > 1 {

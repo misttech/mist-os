@@ -4,12 +4,12 @@
   "malformedLines": [],
   "licenseInfo": [
     {
-      "licenseFilePath": "license.txt",
+      "licenseFile": "license.txt",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "https://github.com/foo/bar/blob/master/license.txt"
     },
     {
-      "licenseFilePath": "COPYING",
+      "licenseFile": "COPYING",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "https://github.com/foo/bar/blob/master/COPYING"
     }

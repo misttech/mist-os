@@ -1,17 +1,17 @@
 {
   "name": "rust",
   "malformedLines": [],
-  "url": "https://fuchsia.googlesource.com/fuchsia/+/hash/third_party/rust_crates/testdata/rust",
+  "url": "https://fuchsia.googlesource.com/fuchsia/+/${GIT_REVISION}/third_party/rust_crates/testdata/rust",
   "licenseInfo": [
     {
-      "licenseFilePath": "LICENSE.txt",
+      "licenseFile": "LICENSE.txt",
       "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://fuchsia.googlesource.com/fuchsia/+/hash/third_party/rust_crates/testdata/rust/LICENSE.txt"
+      "licenseFileURL": "https://fuchsia.googlesource.com/fuchsia/+/${GIT_REVISION}/third_party/rust_crates/testdata/rust/LICENSE.txt"
     },
     {
-      "licenseFilePath": "COPYING",
+      "licenseFile": "COPYING",
       "licenseFileFormat": "Single License File",
-      "licenseFileURL": "https://fuchsia.googlesource.com/fuchsia/+/hash/third_party/rust_crates/testdata/rust/COPYING"
+      "licenseFileURL": "https://fuchsia.googlesource.com/fuchsia/+/${GIT_REVISION}/third_party/rust_crates/testdata/rust/COPYING"
     }
   ]
 }
