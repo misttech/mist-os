@@ -213,8 +213,8 @@ async fn failed_resolve_stops_fetching_blobs() {
     let (record, history) = responder::Record::new();
 
     let (fail_content_blobs, unblock) = responder::FailOneThenTemporarilyBlock::new();
-    let first_meta_far_http_path = format!("/blobs/{}", pkg_many_failing_content_blobs.hash());
-    let second_meta_far_http_path = format!("/blobs/{}", pkg_only_meta_far_different_hash.hash());
+    let first_meta_far_http_path = format!("/blobs/1/{}", pkg_many_failing_content_blobs.hash());
+    let second_meta_far_http_path = format!("/blobs/1/{}", pkg_only_meta_far_different_hash.hash());
     let fail_content_blobs = responder::Filter::new(
         move |req: &hyper::Request<hyper::Body>| {
             req.uri().path() != first_meta_far_http_path
@@ -287,6 +287,7 @@ async fn delivery_blob_not_available_no_fallback() {
     let pkg = make_pkg_with_extra_blobs("delivery_blob", 1).await;
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .delivery_blob_type(None)
             .add_package(&pkg)
             .build()
             .await

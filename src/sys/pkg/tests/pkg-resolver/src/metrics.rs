@@ -52,7 +52,7 @@ async fn verify_resolve_emits_cobalt_events_with_metric_id(
     responder: Option<impl HttpResponder>,
     expected_resolve_result: Result<(), fidl_fuchsia_pkg::ResolveError>,
     metric_id: u32,
-    expected_events: Vec<impl AsEventCodes>,
+    expected_events: Vec<impl AsEventCodes + std::fmt::Debug>,
 ) {
     let env = TestEnvBuilder::new().build().await;
     let repo = Arc::new(
@@ -286,7 +286,7 @@ async fn pkg_resolver_fetch_blob_success() {
 async fn pkg_resolver_fetch_blob_failure() {
     let pkg = PackageBuilder::new("just_meta_far").build().await.expect("created pkg");
     let responder = responder::ForPath::new(
-        format!("/blobs/{}", pkg.hash()),
+        format!("/blobs/1/{}", pkg.hash()),
         responder::StaticResponseCode::server_error(),
     );
 
@@ -411,8 +411,8 @@ mod pkg_resolver_blob_fetch {
             // turns them into a 500 and closes the connection. That results in flakiness when we can
             // request faster than the connection is removed from the pool.
             (101, 101, 2, Http1xx),
-            // We're not sending a body, so we expect a C-L issue rather than Success.
-            (200, 200, 1, ContentLengthMismatch),
+            // We're not sending a body, so we expect a Truncate issue rather than Success.
+            (200, 200, 1, Truncate),
             (201, 299, 2, Http2xx),
         ]; "status_ranges_101_2xx")]
     #[test_case(&[
@@ -463,7 +463,7 @@ mod pkg_resolver_blob_fetch {
 
     async fn verify_status_ranges(test_table: &[StatusTest]) {
         let pkg = PackageBuilder::new("just_meta_far").build().await.expect("created pkg");
-        let env = TestEnvBuilder::new().build().await;
+        let env = TestEnvBuilder::new().delivery_blob_fallback(false).build().await;
         let repo = Arc::new(
             RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
                 .add_package(&pkg)
@@ -478,7 +478,7 @@ mod pkg_resolver_blob_fetch {
             .server()
             .bind_to_addr(Ipv4Addr::LOCALHOST)
             .response_overrider(responder::ForPath::new(
-                format!("/blobs/{}", pkg.hash()),
+                format!("/blobs/1/{}", pkg.hash()),
                 responder,
             ))
             .start()
@@ -487,7 +487,7 @@ mod pkg_resolver_blob_fetch {
 
         let mut statuses = Vec::new();
 
-        for ent in test_table.iter() {
+        for ent in test_table {
             for code in ent.min_code..=ent.max_code {
                 response_code.set(code);
                 let _ = env.resolve_package(&pkg_url).await;

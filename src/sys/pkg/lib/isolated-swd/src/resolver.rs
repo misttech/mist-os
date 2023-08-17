@@ -250,7 +250,6 @@ pub mod tests {
         let repo = Arc::new(
             RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
                 .add_package(&package)
-                .delivery_blob_type(1)
                 .build()
                 .await
                 .context("Building repo")

@@ -7,13 +7,8 @@
 use {
     crate::{package::Package, serve::ServedRepositoryBuilder},
     anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_ext::{
         MirrorConfig, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
-    },
-    fuchsia_fs::{
-        directory::{self, open_directory, open_file, readdir},
-        file::{read, write},
     },
     fuchsia_merkle::Hash,
     fuchsia_repo::{repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::PmRepository},
@@ -21,7 +16,7 @@ use {
     maybe_owned::MaybeOwned,
     serde::Deserialize,
     std::{
-        collections::{BTreeMap, BTreeSet, HashMap},
+        collections::{BTreeMap, BTreeSet},
         fs::{self, File},
         io::{self, Read},
         path::PathBuf,
@@ -32,11 +27,17 @@ use {
 };
 
 /// A builder to simplify construction of TUF repositories containing Fuchsia packages.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RepositoryBuilder<'a> {
     packages: Vec<MaybeOwned<'a, Package>>,
     repodir: Option<PathBuf>,
     delivery_blob_type: Option<u32>,
+}
+
+impl<'a> Default for RepositoryBuilder<'a> {
+    fn default() -> Self {
+        Self { packages: vec![], repodir: None, delivery_blob_type: Some(1) }
+    }
 }
 
 impl<'a> RepositoryBuilder<'a> {
@@ -59,8 +60,8 @@ impl<'a> RepositoryBuilder<'a> {
     /// Set the type of delivery blob to generate, if set, in addition to exposing the blobs at
     /// "/blobs/", the repo will also expose an appropriately modified copy of each blob at
     /// "/blobs/{type}/".
-    pub fn delivery_blob_type(mut self, delivery_blob_type: u32) -> Self {
-        self.delivery_blob_type = Some(delivery_blob_type);
+    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<u32>) -> Self {
+        self.delivery_blob_type = delivery_blob_type;
         self
     }
 
@@ -207,7 +208,8 @@ impl Repository {
     /// Removes the specified from the repository.
     pub fn purge_blobs(&self, blobs: impl Iterator<Item = Hash>) {
         for blob in blobs {
-            fs::remove_file(self.dir.path().join(format!("repository/blobs/{blob}"))).unwrap()
+            fs::remove_file(self.dir.path().join(format!("repository/blobs/{blob}"))).unwrap();
+            fs::remove_file(self.dir.path().join(format!("repository/blobs/1/{blob}"))).unwrap();
         }
     }
 
@@ -225,6 +227,22 @@ impl Repository {
         fs::read(
             self.dir.path().join(format!("repository/blobs/{delivery_blob_type}/{merkle_root}")),
         )
+    }
+
+    /// Overwrites the delivery blob to uncompressed version from an uncompressed blob that is
+    /// already in the repository, returns the size of the delivery blob.
+    pub fn overwrite_uncompressed_delivery_blob(
+        &self,
+        merkle_root: &Hash,
+    ) -> Result<usize, io::Error> {
+        let blob = self.read_blob(merkle_root)?;
+        let delivery_blob =
+            delivery_blob::Type1Blob::generate(&blob, delivery_blob::CompressionMode::Never);
+        let () = fs::write(
+            self.dir.path().join(format!("repository/blobs/1/{merkle_root}")),
+            &delivery_blob,
+        )?;
+        Ok(delivery_blob.len())
     }
 
     /// Returns the path of the base of the repository.
@@ -322,110 +340,6 @@ impl Repository {
     pub fn server(self: Arc<Self>) -> ServedRepositoryBuilder {
         ServedRepositoryBuilder::new(self)
     }
-
-    /// Copies the repository files to `dst` with a layout like that used by locally attached
-    /// repositories (which are used by e.g. the pkg-local-mirror component). `dst` must have
-    /// `OPEN_RIGHT_WRITABLE`.
-    ///
-    /// The layout looks like:
-    ///   ./FORMAT_VERSION
-    ///   ./blobs/
-    ///       00/00000000000000000000000000000000000000000000000000000000000000
-    ///       ...
-    ///       ff/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ///   ./repository_metadata/
-    ///       ${url.host()}/
-    ///           root.json
-    ///           ...
-    pub async fn copy_local_repository_to_dir(
-        &self,
-        dst: &fio::DirectoryProxy,
-        url: &RepositoryUrl,
-    ) {
-        let src = directory::open_in_namespace(
-            self.dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-
-        let version = open_file(
-            dst,
-            "FORMAT_VERSION",
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .unwrap();
-        write(&version, "loose").await.unwrap();
-
-        // Copy the blobs. Blobs are named after their hashes and (in the target layout) partitioned
-        // into subdirectories named after the first two hex characters of their hashes.
-        let blobs =
-            open_directory(dst, "blobs", fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-                .await
-                .unwrap();
-        let src_blobs =
-            open_directory(&src, "repository/blobs", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
-        let mut blob_sub_dirs = HashMap::new();
-        for dirent in readdir(&src_blobs).await.unwrap() {
-            let sub_dir_name = &dirent.name[..2];
-            let sub_dir = blob_sub_dirs.entry(sub_dir_name.to_owned()).or_insert_with(|| {
-                fuchsia_fs::directory::open_directory_no_describe(
-                    &blobs,
-                    sub_dir_name,
-                    fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-                )
-                .unwrap()
-            });
-
-            let src_blob =
-                open_file(&src_blobs, &dirent.name, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
-            let contents = read(&src_blob).await.unwrap();
-            let blob = open_file(
-                sub_dir,
-                &dirent.name[2..],
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .await
-            .unwrap();
-            write(&blob, contents).await.unwrap();
-        }
-
-        // Copy the metadata.
-        let src_metadata =
-            open_directory(&src, "repository", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
-        let repository_metadata = open_directory(
-            dst,
-            "repository_metadata",
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .unwrap();
-        let hostname_dir = open_directory(
-            &repository_metadata,
-            url.host(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .unwrap();
-
-        for dirent in readdir(&src_metadata).await.unwrap() {
-            if dirent.kind == fuchsia_fs::directory::DirentKind::File {
-                let src_metadata =
-                    open_file(&src_metadata, &dirent.name, fio::OpenFlags::RIGHT_READABLE)
-                        .await
-                        .unwrap();
-                let contents = read(&src_metadata).await.unwrap();
-                let metadata = open_file(
-                    &hostname_dir,
-                    &dirent.name,
-                    fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-                )
-                .await
-                .unwrap();
-                write(&metadata, contents).await.unwrap();
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -438,7 +352,7 @@ mod tests {
     async fn test_repo_builder() {
         let same_contents = b"same contents";
         let repo = RepositoryBuilder::new()
-            .delivery_blob_type(1)
+            .delivery_blob_type(Some(1))
             .add_package(
                 PackageBuilder::new("rolldice")
                     .add_resource_at("bin/rolldice", "#!/boot/bin/sh\necho 4\n".as_bytes())
@@ -527,45 +441,5 @@ mod tests {
         }
 
         Ok(())
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn local_mirror_dir() {
-        let repo = RepositoryBuilder::new()
-            .add_package(PackageBuilder::new("test").build().await.unwrap())
-            .build()
-            .await
-            .unwrap();
-        let local_repodir = tempfile::tempdir().unwrap();
-
-        repo.copy_local_repository_to_dir(
-            &directory::open_in_namespace(
-                local_repodir.path().to_str().unwrap(),
-                fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .unwrap(),
-            &"fuchsia-pkg://repo.example.org".parse().unwrap(),
-        )
-        .await;
-
-        let repo_config =
-            repo.make_repo_config("fuchsia-pkg://fuchsia.com".parse().unwrap(), None, true);
-        assert_eq!(repo_config.mirrors().len(), 0);
-        assert!(repo_config.use_local_mirror());
-        assert_eq!(
-            repo_config.repo_url(),
-            &"fuchsia-pkg://fuchsia.com".parse::<RepositoryUrl>().unwrap()
-        );
-
-        assert_eq!(fs::read(local_repodir.path().join("FORMAT_VERSION")).unwrap(), b"loose");
-        assert!(local_repodir
-            .path()
-            .join("repository_metadata/repo.example.org/1.root.json")
-            .exists());
-
-        assert!(local_repodir
-            .path()
-            .join("blobs/ad/82977cb53c9724b65f6a69cc2110796fe778ed168e2c25b2dbe797e7527a09")
-            .exists());
     }
 }

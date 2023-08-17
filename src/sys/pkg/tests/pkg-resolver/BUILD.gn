@@ -132,6 +132,7 @@ rustc_test("resolve_propagates_blobfs_failure") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/storage/delivery_blob",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
@@ -202,6 +203,7 @@ rustc_test("resolve_succeeds") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/http-uri-ext",
+    "//src/lib/storage/delivery_blob",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/metrics:cobalt_sw_delivery_registry_rustlib",
@@ -426,7 +428,7 @@ fuchsia_component_manifest("pkg-resolver-manifest") {
 fuchsia_structured_config_values("pkg-resolver-config") {
   cm_label = ":pkg-resolver-manifest"
   values = {
-    fetch_delivery_blob = false
+    fetch_delivery_blob = true
     delivery_blob_fallback = true
 
     # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
@@ -486,7 +488,6 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
 
     # Isolated, low-deps netstack
     "//src/connectivity/network/netstack:component",
-    "//src/storage/tools/blobfs-compression",
     "//src/sys/pkg/bin/system-update-committer:component",
   ]
   test_specs = {

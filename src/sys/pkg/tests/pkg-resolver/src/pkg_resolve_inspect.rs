@@ -57,7 +57,7 @@ async fn initial_inspect_state() {
                 blob_header_timeout_seconds: 30u64,
                 blob_body_timeout_seconds: 30u64,
                 blob_download_resumption_attempts_limit: 50u64,
-                blob_type: "Uncompressed",
+                blob_type: "Delivery",
                 delivery_blob_fallback: true,
                 queue: {},
             },
@@ -196,7 +196,8 @@ async fn package_and_blob_queues() {
             .unwrap(),
     );
 
-    let meta_far_blob_path = format!("/blobs/{}", pkg.hash());
+    let meta_far_delivery_size = repo.read_delivery_blob(1, pkg.hash()).unwrap().len();
+    let meta_far_blob_path = format!("/blobs/1/{}", pkg.hash());
 
     let flake_first_attempt = responder::ForPath::new(
         meta_far_blob_path.clone(),
@@ -272,7 +273,7 @@ async fn package_and_blob_queues() {
                             "2": {
                                 state: "read http body",
                                 state_ts: AnyProperty,
-                                expected_size_bytes: 12288u64,
+                                expected_size_bytes: meta_far_delivery_size as u64,
                                 bytes_written: 0u64,
                             }
                         }

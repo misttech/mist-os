@@ -239,7 +239,7 @@ where
     (
         BlobFsWithFileCreateOverride {
             wrapped: blobfs,
-            target: (pkg_merkle.into(), failing_file),
+            target: (delivery_blob::delivery_blob_path(pkg_merkle), failing_file),
             system_image,
         },
         pkg,
@@ -261,7 +261,7 @@ where
     (
         BlobFsWithFileCreateOverride {
             wrapped: blobfs,
-            target: (blob_merkle.into(), failing_file),
+            target: (delivery_blob::delivery_blob_path(blob_merkle), failing_file),
             system_image,
         },
         pkg,

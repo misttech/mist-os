@@ -1015,7 +1015,7 @@ impl<B: Blobfs> TestEnv<B> {
     pub async fn assert_count_events(
         &self,
         expected_metric_id: u32,
-        expected_event_codes: Vec<impl AsEventCodes>,
+        expected_event_codes: Vec<impl AsEventCodes + std::fmt::Debug>,
     ) {
         let actual_events = self
             .mocks
@@ -1031,17 +1031,15 @@ impl<B: Blobfs> TestEnv<B> {
             "event count different than expected, actual_events: {actual_events:?}"
         );
 
-        for (event, expected_codes) in actual_events
-            .into_iter()
-            .zip(expected_event_codes.into_iter().map(|c| c.as_event_codes()))
-        {
+        for (event, expected_codes) in actual_events.into_iter().zip(expected_event_codes) {
             assert_matches!(
                 event,
                 MetricEvent {
                     metric_id,
                     event_codes,
                     payload: MetricEventPayload::Count(1),
-                } if metric_id == expected_metric_id && event_codes == expected_codes
+                } if metric_id == expected_metric_id && event_codes == expected_codes.as_event_codes(),
+                "expected metric id: {expected_metric_id}, expected codes: {expected_codes:?}",
             )
         }
     }

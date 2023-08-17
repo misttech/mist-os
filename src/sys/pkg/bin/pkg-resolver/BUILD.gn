@@ -200,7 +200,9 @@ fuchsia_structured_config_rust_lib("config_lib") {
 
 # LINT.IfChange
 structured_config_values = {
-  fetch_delivery_blob = false
+  # TODO(fxbug.dev/124299) support other delivery blob types in pkg-resolver.
+  assert(delivery_blob_type == 1)
+  fetch_delivery_blob = true
   delivery_blob_fallback = true
 
   # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
@@ -216,12 +218,6 @@ structured_config_values = {
 }
 
 # LINT.ThenChange(/src/sys/pkg/tests/pkg-resolver/BUILD.gn)
-
-if (delivery_blob_type != false) {
-  # TODO(fxbug.dev/124299) support other delivery blob types in pkg-resolver.
-  assert(delivery_blob_type == 1)
-  structured_config_values.fetch_delivery_blob = true
-}
 
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"

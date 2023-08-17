@@ -6,17 +6,13 @@ use {
     cobalt_sw_delivery_registry as metrics,
     fuchsia_pkg_testing::{
         serve::{responder, HttpRange},
-        Package, PackageBuilder, RepositoryBuilder,
+        PackageBuilder, RepositoryBuilder,
     },
     futures::future::{BoxFuture, FutureExt as _},
     hyper::{Body, Response},
     lib::{TestEnvBuilder, EMPTY_REPO_PATH, FILE_SIZE_LARGE_ENOUGH_TO_TRIGGER_HYPER_BATCHING},
     std::{convert::TryInto as _, sync::Arc},
 };
-
-fn meta_far_size(pkg: &Package) -> u64 {
-    pkg.meta_far().unwrap().metadata().unwrap().len()
-}
 
 fn for_range_requests<T: fuchsia_pkg_testing::serve::HttpResponder>(
     responder: T,
@@ -44,7 +40,7 @@ async fn single_blob_resume_success() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.hash());
+    let path_to_override = format!("/blobs/1/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -53,6 +49,7 @@ async fn single_blob_resume_success() {
             .await
             .unwrap(),
     );
+    let meta_far_delivery_size = repo.overwrite_uncompressed_delivery_blob(pkg.hash()).unwrap();
 
     let get_responder = for_not_range_requests(responder::ForPath::new(
         path_to_override.clone(),
@@ -90,7 +87,7 @@ async fn single_blob_resume_success() {
     let range: HttpRange =
         history[0].headers().get(http::header::RANGE).unwrap().try_into().unwrap();
     assert!(range.first_byte_pos() > 0);
-    assert_eq!(range.last_byte_pos() + 1, meta_far_size(&pkg));
+    assert_eq!(range.last_byte_pos() + 1, meta_far_delivery_size as u64);
 
     env.stop().await;
 }
@@ -106,7 +103,7 @@ async fn two_blob_resume_success() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.hash());
+    let path_to_override = format!("/blobs/1/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -115,6 +112,7 @@ async fn two_blob_resume_success() {
             .await
             .unwrap(),
     );
+    let meta_far_delivery_size = repo.overwrite_uncompressed_delivery_blob(pkg.hash()).unwrap();
 
     let get_responder = for_not_range_requests(responder::ForPath::new(
         path_to_override.clone(),
@@ -158,12 +156,11 @@ async fn two_blob_resume_success() {
     let range0: HttpRange =
         history[0].headers().get(http::header::RANGE).unwrap().try_into().unwrap();
     assert!(range0.first_byte_pos() > 0);
-    let meta_far_size = meta_far_size(&pkg);
-    assert_eq!(range0.last_byte_pos() + 1, meta_far_size);
+    assert_eq!(range0.last_byte_pos() + 1, meta_far_delivery_size as u64);
     let range1: HttpRange =
         history[1].headers().get(http::header::RANGE).unwrap().try_into().unwrap();
     assert!(range1.first_byte_pos() > range0.first_byte_pos());
-    assert_eq!(range1.last_byte_pos() + 1, meta_far_size);
+    assert_eq!(range1.last_byte_pos() + 1, meta_far_delivery_size as u64);
 
     env.stop().await;
 }
@@ -193,7 +190,7 @@ async fn resume_validates_content_range() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.hash());
+    let path_to_override = format!("/blobs/1/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -202,9 +199,9 @@ async fn resume_validates_content_range() {
             .await
             .unwrap(),
     );
+    let _size = repo.overwrite_uncompressed_delivery_blob(pkg.hash()).unwrap();
 
-    let get_responder =
-        responder::ForPath::new(path_to_override.clone(), responder::OneByteShortThenError);
+    let get_responder = responder::ForPath::new(path_to_override, responder::OneByteShortThenError);
 
     let served_repository = repo
         .server()
@@ -281,7 +278,7 @@ async fn resume_validates_content_length() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.hash());
+    let path_to_override = format!("/blobs/1/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -290,9 +287,10 @@ async fn resume_validates_content_length() {
             .await
             .unwrap(),
     );
+    let _size = repo.overwrite_uncompressed_delivery_blob(pkg.hash()).unwrap();
 
     let get_responder = responder::ForPath::new(
-        path_to_override.clone(),
+        path_to_override,
         responder::NBytesThenError::new(FILE_SIZE_LARGE_ENOUGH_TO_TRIGGER_HYPER_BATCHING),
     );
 
@@ -336,7 +334,7 @@ async fn resume_validates_206_status() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.hash());
+    let path_to_override = format!("/blobs/1/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -345,9 +343,9 @@ async fn resume_validates_206_status() {
             .await
             .unwrap(),
     );
+    let _size = repo.overwrite_uncompressed_delivery_blob(pkg.hash()).unwrap();
 
-    let get_responder =
-        responder::ForPath::new(path_to_override.clone(), responder::OneByteShortThenError);
+    let get_responder = responder::ForPath::new(path_to_override, responder::OneByteShortThenError);
 
     let served_repository = repo
         .server()
@@ -391,7 +389,7 @@ async fn resume_enforces_max_resumption_limit() {
         .await
         .unwrap();
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
-    let path_to_override = format!("/blobs/{}", pkg.hash());
+    let path_to_override = format!("/blobs/1/{}", pkg.hash());
 
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -400,9 +398,10 @@ async fn resume_enforces_max_resumption_limit() {
             .await
             .unwrap(),
     );
+    let _size = repo.overwrite_uncompressed_delivery_blob(pkg.hash()).unwrap();
 
     let get_responder = responder::ForPath::new(
-        path_to_override.clone(),
+        path_to_override,
         responder::NBytesThenError::new(FILE_SIZE_LARGE_ENOUGH_TO_TRIGGER_HYPER_BATCHING),
     );
 

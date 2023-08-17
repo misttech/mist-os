@@ -438,11 +438,11 @@ async fn handles_429_responses() {
     let served_repository = repo
         .server()
         .response_overrider(responder::ForPath::new(
-            format!("/blobs/{}", pkg1.hash()),
+            format!("/blobs/1/{}", pkg1.hash()),
             responder::ForRequestCount::new(2, responder::StaticResponseCode::too_many_requests()),
         ))
         .response_overrider(responder::ForPath::new(
-            format!("/blobs/{}", pkg2.meta_contents().unwrap().contents()["data/bar"]),
+            format!("/blobs/1/{}", pkg2.meta_contents().unwrap().contents()["data/bar"]),
             responder::ForRequestCount::new(2, responder::StaticResponseCode::too_many_requests()),
         ))
         .start()
@@ -601,7 +601,7 @@ async fn test_concurrent_blob_writes() {
     // Create the responder and the channel to communicate with it
     let (blocking_responder, unblocking_closure_receiver) = responder::BlockResponseBodyOnce::new();
     let blocking_responder =
-        responder::ForPath::new(format!("/blobs/{}", duplicate_blob_merkle), blocking_responder);
+        responder::ForPath::new(format!("/blobs/1/{}", duplicate_blob_merkle), blocking_responder);
 
     // Construct the repo
     let env = TestEnvBuilder::new().build().await;
@@ -631,7 +631,10 @@ async fn test_concurrent_blob_writes() {
     // Wait for duplicate blob to be truncated -- we know it is truncated when we get a
     // permission denied error when trying to update the blob in blobfs.
     let blobfs_dir = env.blobfs.root_dir().expect("blobfs has root dir");
-    while blobfs_dir.update_file(Path::new(&duplicate_blob_merkle), 0).is_ok() {
+    while blobfs_dir
+        .update_file(Path::new(&delivery_blob::delivery_blob_path(&duplicate_blob_merkle)), 0)
+        .is_ok()
+    {
         fasync::Timer::new(Duration::from_millis(10)).await;
     }
 
@@ -642,7 +645,10 @@ async fn test_concurrent_blob_writes() {
         resolve_package(&resolver_proxy_2, &"fuchsia-pkg://test/package2");
 
     // Wait for the unique blob to exist in blobfs.
-    while blobfs_dir.update_file(Path::new(&unique_blob_merkle), 0).is_ok() {
+    while blobfs_dir
+        .update_file(Path::new(&delivery_blob::delivery_blob_path(&unique_blob_merkle)), 0)
+        .is_ok()
+    {
         fasync::Timer::new(Duration::from_millis(10)).await;
     }
 
@@ -700,7 +706,7 @@ async fn dedup_concurrent_content_blob_fetches() {
             .contents()
             .values()
             .chain(pkg2_meta_contents.contents().values())
-            .map(|blob| format!("/blobs/{}", blob).into())
+            .map(|blob| format!("/blobs/1/{}", blob).into())
             .collect::<HashSet<_>>()
     };
     let (request_responder, mut incoming_requests) = responder::BlockResponseHeaders::new();
@@ -821,7 +827,7 @@ async fn verify_concurrent_resolve() {
     let pkg1_url = "fuchsia-pkg://test/first_concurrent_resolve_pkg";
     let pkg2_url = "fuchsia-pkg://test/second_concurrent_resolve_pkg";
 
-    let path = format!("/blobs/{}", pkg1.content_blob_files().next().unwrap().merkle);
+    let path = format!("/blobs/1/{}", pkg1.content_blob_files().next().unwrap().merkle);
     let (blocker, mut chan) = responder::BlockResponseHeaders::new();
     let responder = responder::ForPath::new(path, blocker);
 
@@ -930,34 +936,6 @@ async fn superpackage() {
 }
 
 #[fuchsia::test]
-async fn fetch_delivery_blob() {
-    let env = TestEnvBuilder::new().fetch_delivery_blob(true).build().await;
-
-    let pkg = make_pkg_with_extra_blobs("fetch_delivery_blob", 1).await;
-    let repo = Arc::new(
-        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
-            .add_package(&pkg)
-            .delivery_blob_type(1)
-            .build()
-            .await
-            .unwrap(),
-    );
-    let served_repository = Arc::clone(&repo).server().start().unwrap();
-
-    let repo_url = "fuchsia-pkg://test".parse().unwrap();
-    let repo_config = served_repository.make_repo_config(repo_url);
-
-    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-
-    let (resolved_pkg, _resolved_context) =
-        env.resolve_package("fuchsia-pkg://test/fetch_delivery_blob").await.unwrap();
-
-    pkg.verify_contents(&resolved_pkg).await.unwrap();
-
-    env.stop().await;
-}
-
-#[fuchsia::test]
 async fn fetch_delivery_blob_fallback() {
     let env =
         TestEnvBuilder::new().fetch_delivery_blob(true).delivery_blob_fallback(true).build().await;
@@ -965,6 +943,7 @@ async fn fetch_delivery_blob_fallback() {
     let pkg = make_pkg_with_extra_blobs("delivery_blob_fallback", 1).await;
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .delivery_blob_type(None)
             .add_package(&pkg)
             .build()
             .await
@@ -999,7 +978,6 @@ async fn fxblob() {
     let repo = Arc::new(
         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
             .add_package(&pkg)
-            .delivery_blob_type(1)
             .build()
             .await
             .unwrap(),
