@@ -1,6 +1,70 @@
-# Functional test execution in Local mode
+# HoneyDew Functional tests
+
+Every single HoneyDew’s Host-(Fuchsia)Target interaction API should have a
+minimum of one functional test case that aims to ensure that the API works as
+intended (that is, `<device>.reboot()` actually reboots Fuchsia device)
+which can’t be ensured using unit test cases.
 
 [TOC]
+
+## Which PRODUCT and BOARD to use
+Running a functional test case requires a Fuchsia device. Since there can be
+many different Fuchsia `<BOARD>`s that can support multiple `<PRODUCT>`
+configurations, we will use the following approach in deciding which
+`<PRODUCT>` and `<BOARD>` to use to run a given functional test:
+
+`<PRODUCT>`
+* By default use the lowest possible `<PRODUCT>` configuration that the
+corresponding functional test requires.
+* For example,
+  * to run `trace` affordance test cases, `core` can be used
+  * to run `session` affordance test cases, `terminal` need to be used (as
+    `core` does not support it)
+
+`<BOARD>`
+* By default, run the test on femu unless the test can’t be verified using femu
+(because femu does not yet support the functionality that corresponding
+functional test needs). For example, bluetooth functional tests can’t be run on
+femu
+* Else, run on NUC hardware if that test can be verified using NUC
+* Else, run on VIM3 hardware if that test can be verified using VIM3
+* Run on actual Fuchsia product only if
+  * None of the above conditions work
+  * If a specific Host-(Fuchsia)Target interaction API (say `<device>.reboot()`)
+    has a special implementation for this particular product that requires
+    explicit verification
+* Special cases - If a Host-(Fuchsia)Target interaction API has multiple
+  implementations then ensure all the different implementations have been
+  verified using whatever device type is needed
+
+## CQ VS CI vs FYI
+Use the following approach in deciding whether to run the test case in CQ/CI/FYI:
+* Any test case that can be run using Emulator will be first run in FYI.
+  After 200 consecutive successful runs, test case will be promoted to CQ.
+* Any test case that can be run using hardware (NUC, VIM3 etc) will be run in
+  FYI and will remain in FYI. (We are exploring options on gradually promoting
+  these tests from FYI to CI but at the moment these tests will remain in FYI)
+
+Based on this we have created the following:
+* Test case build groups:
+  * `emulator_tests` - Group of test cases that will be run in CQ on emulator.
+  * `emulator_tests_fyi` - Group of test cases that will be run in FYI on emulator.
+  * `nuc_tests_fyi` - Group of test cases that will be run in FYI on NUC.
+  * `vim3_tests_fyi` - Group of test cases that will be run in FYI on VIM3.
+  * `terminal_emulator_tests_fyi` - Group of test cases that will be run in FYI on emulator build using terminal.
+  * format: `[Optional <PRODUCT>]_<BOARD>_tests_[ |fyi|ci]`, where
+    * specifying `<PRODUCT>` is optional but recommended when tets case group is
+      created for a specific `<PRODUCT>` configuration
+    * if group is for "CQ" then no postfix is needed but for other stages,
+      postfix is necessary (`_fyi` or `_ci`)
+* Builders:
+  * `core.qemu-x64-debug-pye2e` - CQ builder to run `emulator_tests` test group
+  * `core.qemu-x64-debug-pye2e-staging` - FYI builder to run `emulator_tests_fyi` test group
+  * `core.x64-debug-pye2e-staging` - FYI builder to run `nuc_tests_fyi` test group
+  * `core.vim3-debug-pye2e-staging` - FYI builder to run `vim3_tests_fyi` test group
+  * format: `<PRODUCT>.<BOARD>-debug-pye2e-[ |staging|ci]`, where
+    * if builder is for "CQ" then no postfix is needed but for other stages,
+      postfix is necessary (`-staging` or `-ci`)
 
 ## Setup
 1. Ensure device type that you want to run the test on (will be listed in

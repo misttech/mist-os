@@ -3,11 +3,16 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  # Group of test cases that will be run in CQ on emulator.
+  # Before adding a test case to this group, it first should be added to
+  # `emulator_tests_fyi` group and wait for 200 consecutive successful runs to
+  # make sure test case is stable and does not break CQ.
   group("emulator_tests") {
     testonly = true
     public_deps = [ "test_tracing:tracing_test($host_toolchain)" ]
   }
 
+  # Group of test cases that will be run in FYI on emulator.
   group("emulator_tests_fyi") {
     testonly = true
     public_deps = [
@@ -16,15 +21,17 @@ if (is_host) {
     ]
   }
 
-  group("terminal_tests_fyi") {
+  # Group of test cases that will be run in FYI on emulator build using terminal.
+  group("terminal_emulator_tests_fyi") {
     testonly = true
     public_deps = [
       # TODO(b/294272164): session functional test can only run on terminal
-      # product. Use `terminal_tests_fyi` to avoid it run on CQ.
+      # product. Use `terminal_emulator_tests_fyi` to avoid it run on CQ.
       "test_session:session_test($host_toolchain)",
     ]
   }
 
+  # Group containing all of the HoneyDew device affordances functional test cases.
   group("tests") {
     testonly = true
     public_deps = [

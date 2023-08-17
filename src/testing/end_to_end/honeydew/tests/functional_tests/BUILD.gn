@@ -3,6 +3,10 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  # Group of test cases that will be run in CQ on emulator.
+  # Before adding a test case to this group, it first should be added to
+  # `emulator_tests_fyi` group and wait for 200 consecutive successful runs to
+  # make sure test case is stable and does not break CQ.
   group("emulator_tests") {
     testonly = true
     public_deps = [
@@ -11,6 +15,7 @@ if (is_host) {
     ]
   }
 
+  # Group of test cases that will be run in FYI on emulator.
   group("emulator_tests_fyi") {
     testonly = true
     public_deps = [
@@ -20,16 +25,19 @@ if (is_host) {
     ]
   }
 
+  # Group of test cases that will be run in FYI on NUC.
   group("nuc_tests_fyi") {
     testonly = true
     public_deps = [ "device_class_tests:nuc_tests_fyi" ]
   }
 
+  # Group of test cases that will be run in FYI on VIM3.
   group("vim3_tests_fyi") {
     testonly = true
     public_deps = [ "device_class_tests:vim3_tests_fyi" ]
   }
 
+  # Group containing all of the HoneyDew functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
