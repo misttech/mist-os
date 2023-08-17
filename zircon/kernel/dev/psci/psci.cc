@@ -88,21 +88,43 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
   if (major >= 1 && major != 0xffff) {
     // query features
     dprintf(INFO, "PSCI supported features:\n");
-    result = psci_get_feature(PSCI64_SYSTEM_OFF);
-    dprintf(INFO, "\tPSCI64_SYSTEM_OFF %#x\n", result);
-    result = psci_get_feature(PSCI64_SYSTEM_RESET);
-    dprintf(INFO, "\tPSCI64_SYSTEM_RESET %#x\n", result);
-    result = psci_get_feature(PSCI64_SYSTEM_RESET2);
-    dprintf(INFO, "\tPSCI64_SYSTEM_RESET2 %#x\n", result);
-    if (result == 0) {
+
+    auto probe_feature = [](uint32_t feature, const char* feature_name) -> bool {
+      uint32_t result = psci_get_feature(feature);
+      if (static_cast<int32_t>(result) < 0) {
+        // Not supported
+        return false;
+      }
+      dprintf(INFO, "\t%s\n", feature_name);
+      return true;
+    };
+
+    probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND");
+    probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
+    probe_feature(PSCI64_CPU_ON, "CPU_ON");
+    probe_feature(PSCI64_AFFINITY_INFO, "CPU_AFFINITY_INFO");
+    probe_feature(PSCI64_MIGRATE, "CPU_MIGRATE");
+    probe_feature(PSCI64_MIGRATE_INFO_TYPE, "CPU_MIGRATE_INFO_TYPE");
+    probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "CPU_MIGRATE_INFO_UP_CPU");
+    probe_feature(PSCI64_SYSTEM_OFF, "SYSTEM_OFF");
+    probe_feature(PSCI64_SYSTEM_RESET, "SYSTEM_RESET");
+    bool supported = probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2");
+    if (supported) {
       // Prefer RESET2 if present. It explicitly supports arguments, but some vendors have
       // extended RESET to behave the same way.
       reset_command = PSCI64_SYSTEM_RESET2;
     }
-    result = psci_get_feature(PSCI64_CPU_ON);
-    dprintf(INFO, "\tPSCI64_CPU_ON %#x\n", result);
-    result = psci_get_feature(PSCI64_CPU_OFF);
-    dprintf(INFO, "\tPSCI64_CPU_OFF %#x\n", result);
+    probe_feature(PSCI64_CPU_FREEZE, "CPU_FREEZE");
+    probe_feature(PSCI64_CPU_DEFAULT_SUSPEND, "CPU_DEFAULT_SUSPEND");
+    probe_feature(PSCI64_NODE_HW_STATE, "CPU_NODE_HW_STATE");
+    probe_feature(PSCI64_SYSTEM_SUSPEND, "CPU_SYSTEM_SUSPEND");
+    probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE");
+    probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "CPU_PSCI_STAT_RESIDENCY");
+    probe_feature(PSCI64_PSCI_STAT_COUNT, "CPU_PSCI_STAT_COUNT");
+    probe_feature(PSCI64_MEM_PROTECT, "CPU_MEM_PROTECT");
+    probe_feature(PSCI64_MEM_PROTECT_RANGE, "CPU_MEM_PROTECT_RANGE");
+
+    probe_feature(PSCI64_SMCCC_VERSION, "PSCI64_SMCCC_VERSION");
   }
 
   // Register with the pdev power driver.

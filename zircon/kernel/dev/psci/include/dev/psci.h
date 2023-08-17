@@ -14,6 +14,7 @@
 #include <arch/arm64/mp.h>
 #include <dev/power.h>
 
+// Known PSCI calls as of PSCI 1.2, Document DEN0022E
 #define PSCI64_PSCI_VERSION (0x84000000)
 #define PSCI64_CPU_SUSPEND (0xC4000001)
 #define PSCI64_CPU_OFF (0x84000002)
@@ -33,6 +34,8 @@
 #define PSCI64_PSCI_SET_SUSPEND_MODE (0x8400000F)
 #define PSCI64_PSCI_STAT_RESIDENCY (0xC4000010)
 #define PSCI64_PSCI_STAT_COUNT (0xC4000011)
+#define PSCI64_MEM_PROTECT (0x84000013)
+#define PSCI64_MEM_PROTECT_RANGE (0xC4000014)
 
 // See: "Firmware interfaces for mitigating cache speculation vulnerabilities"
 //      "System Software on Arm Systems"
