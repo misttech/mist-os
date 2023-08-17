@@ -16,6 +16,7 @@
 #include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/nvme/registers.h"
+#include "src/devices/lib/mmio/test-helper.h"
 
 namespace fake_nvme {
 
@@ -32,16 +33,8 @@ class FakeRegisters {
   FakeRegisters();
 
   fdf::MmioBuffer GetBuffer() {
-    return fdf::MmioBuffer{
-        mmio_buffer_t{
-            .vaddr = FakeMmioPtr(this),
-            .offset = 0,
-            .size = nvme::NVME_REG_DOORBELL_BASE + 0x100,
-            .vmo = ZX_HANDLE_INVALID,
-        },
-        &kMmioOps,
-        this,
-    };
+    return fdf_testing::CreateMmioBuffer(nvme::NVME_REG_DOORBELL_BASE + 0x100,
+                                         ZX_CACHE_POLICY_UNCACHED, &kMmioOps, this);
   }
 
   void SetCallbacks(NvmeRegisterCallbacks* callbacks) { callbacks_ = callbacks; }

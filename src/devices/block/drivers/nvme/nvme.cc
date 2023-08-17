@@ -251,7 +251,7 @@ void Nvme::QueueIoCommand(IoCommand* io_cmd) {
 void Nvme::DdkRelease() {
   zxlogf(DEBUG, "Releasing driver.");
   driver_shutdown_ = true;
-  if (mmio_.get_vmo() != ZX_HANDLE_INVALID) {
+  if (pci_.is_valid()) {
     pci_.SetBusMastering(false);
   }
   irq_.destroy();  // Make irq_.wait() in IrqLoop() return ZX_ERR_CANCELED.
