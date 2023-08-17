@@ -22,9 +22,9 @@ pub enum ProfilerSubCommand {
 /// Record a profile.
 #[argh(subcommand, name = "start")]
 pub struct Start {
-    /// monikers to profile
+    /// moniker to profile
     #[argh(option)]
-    pub monikers: Vec<String>,
+    pub moniker: Option<String>,
 
     /// pids to profile
     #[argh(option)]
