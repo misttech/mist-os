@@ -57,7 +57,10 @@ impl fmt::Display for PackageSizeInfos<'_> {
             share_column_width,
         )
         .unwrap();
-        self.0.iter().for_each(|p| {
+        let mut refs = self.0.iter().collect::<Vec<&_>>();
+        // Sorted names are easier to diff.
+        refs.sort_by_key(|a| a.name.as_str());
+        refs.iter().for_each(|p| {
             writeln!(
                 f,
                 "{0: <5$}  {1: >6$}  {2: >7$}  {3: >8$} {4: >9$}",
@@ -74,7 +77,10 @@ impl fmt::Display for PackageSizeInfos<'_> {
             )
             .unwrap();
             let mut merkle_set: HashSet<String> = HashSet::new();
-            p.blobs.iter().for_each(|b| {
+            let mut refs = p.blobs.iter().collect::<Vec<&_>>();
+            // Sorted paths are easier to diff.
+            refs.sort_by_key(|a| a.path_in_package.as_str());
+            refs.iter().for_each(|b| {
                 writeln!(
                     f,
                     "{0: <5$}  {1: >6$}  {2: >7$}  {3: >8$} {4: >9$}",

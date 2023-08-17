@@ -10,6 +10,11 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 
 assert(is_host)
 
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_assembly_test" ]
+}
+
 ffx_plugin("ffx_assembly") {
   version = "0.1.0"
   edition = "2021"

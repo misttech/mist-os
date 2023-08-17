@@ -875,17 +875,17 @@ mod tests {
         let blobfs_contents = create_blobfs_contents();
         let package_sizes = calculate_package_sizes(&blobfs_contents)?;
         let expected_output = r#"Package                                                      Merkle        Size     Proportional Size Share
-test_cache_package                                                          120                   110      
-   bin/defg                                              7ddff81674          20                    10     2
-   lib/ghij                                              8cb3466c6e          60                    60     1
-   abcd/                                                 eabdb84d26          40                    40     1
 test_base_package                                                            65                    55      
-   bin/def                                               7ddff81674          20                    10     2
-   lib/ghi                                               8cb3466c6e          30                    30     1
    abc/                                                  eabdb84d26          10                    10     1
    abc/dupe_file1                                        fffff84d26           5                     5     1
    abc/dupe_file2*                                       fffff84d26           5                     5     1
    abc/dupe_file3*                                       fffff84d26           5                     5     1
+   bin/def                                               7ddff81674          20                    10     2
+   lib/ghi                                               8cb3466c6e          30                    30     1
+test_cache_package                                                          120                   110      
+   abcd/                                                 eabdb84d26          40                    40     1
+   bin/defg                                              7ddff81674          20                    10     2
+   lib/ghij                                              8cb3466c6e          60                    60     1
 
 * indicates that this blob is a duplicate within this package and it therefore does not contribute to the overall package size
 "#;
