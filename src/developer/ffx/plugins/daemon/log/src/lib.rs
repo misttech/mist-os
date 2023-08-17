@@ -4,9 +4,9 @@
 
 use anyhow::{Context, Result};
 use errors::ffx_bail;
-use ffx_config::get;
-use ffx_core::ffx_plugin;
+use ffx_config::EnvironmentContext;
 use ffx_daemon_log_args::LogCommand;
+use fho::{FfxContext, FfxMain, FfxTool};
 use notify::Watcher;
 use std::{
     collections::VecDeque,
@@ -18,34 +18,47 @@ use std::{
 };
 use tracing::error;
 
-#[ffx_plugin()]
-pub async fn daemon(cmd: LogCommand) -> Result<()> {
-    if !get("log.enabled").await? {
-        ffx_bail!("Logging is not enabled.");
-    }
-    let mut log_path: PathBuf = get("log.dir").await?;
-    log_path.push("ffx.daemon.log");
-    let mut log_file = LogFile::new(&log_path);
+#[derive(FfxTool)]
+pub struct DaemonLogTool {
+    #[command]
+    cmd: LogCommand,
+    ctx: EnvironmentContext,
+}
 
-    let stdout = io::stdout();
-    let mut out = stdout.lock();
+fho::embedded_plugin!(DaemonLogTool);
 
-    if let Some(line_count) = cmd.line_count {
-        log_file.write_all_tail(&mut out, line_count)?;
-    } else {
-        log_file.write_all(&mut out)?;
-    }
+#[async_trait::async_trait(?Send)]
+impl FfxMain for DaemonLogTool {
+    type Writer = fho::SimpleWriter;
 
-    if cmd.follow {
-        let (_watcher, rx) = LogWatcher::new(&log_path)?;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        if !self.ctx.get("log.enabled").await.bug()? {
+            ffx_bail!("Logging is not enabled.");
+        }
+        let mut log_path: PathBuf = self.ctx.get("log.dir").await.bug()?;
+        log_path.push("ffx.daemon.log");
+        let mut log_file = LogFile::new(&log_path);
 
-        loop {
-            rx.recv().unwrap();
+        let stdout = io::stdout();
+        let mut out = stdout.lock();
+
+        if let Some(line_count) = self.cmd.line_count {
+            log_file.write_all_tail(&mut out, line_count)?;
+        } else {
             log_file.write_all(&mut out)?;
         }
-    }
 
-    Ok(())
+        if self.cmd.follow {
+            let (_watcher, rx) = LogWatcher::new(&log_path)?;
+
+            loop {
+                rx.recv().unwrap();
+                log_file.write_all(&mut out)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 struct LogFile<'a> {
