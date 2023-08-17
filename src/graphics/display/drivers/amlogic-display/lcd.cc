@@ -274,11 +274,6 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<co
   lcd->gpio_.Bind(std::move(gpio));
 
   lcd->enabled_ = already_enabled;
-  if (already_enabled) {
-    zxlogf(INFO, "LCD Enabled by Bootloader. Skipping panel init");
-  } else {
-    lcd->Enable();
-  }
 
   return zx::ok(std::move(lcd));
 }
