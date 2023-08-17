@@ -619,11 +619,12 @@ impl VolumesDirectory {
 mod tests {
     use {
         crate::fuchsia::{testing::open_file_checked, volumes_directory::VolumesDirectory},
-        fidl::endpoints::{create_request_stream, ServerEnd},
+        fidl::endpoints::{create_proxy, create_request_stream, ServerEnd},
         fidl_fuchsia_fs::AdminMarker,
         fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy},
         fidl_fuchsia_io as fio, fuchsia, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
+        fuchsia_fs::file,
         fuchsia_zircon::Status,
         futures::join,
         fxfs::{
@@ -637,7 +638,7 @@ mod tests {
         fxfs_insecure_crypto::InsecureCrypt,
         rand::Rng as _,
         std::{
-            sync::{Arc, Weak},
+            sync::{atomic::Ordering, Arc, Weak},
             time::Duration,
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -685,6 +686,58 @@ mod tests {
             .err()
             .expect("Creating existing encrypted volume should fail");
         assert!(FxfsError::AlreadyExists.matches(&error));
+    }
+
+    #[fuchsia::test]
+    async fn test_dirty_pages_accumulate_in_parent() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let crypt = Arc::new(InsecureCrypt::new()) as Arc<dyn Crypt>;
+        let vol = volumes_directory
+            .create_and_mount_volume("encrypted", Some(crypt.clone()), false)
+            .await
+            .expect("create encrypted volume failed");
+        let old_dirty = volumes_directory.pager_dirty_bytes_count.load(Ordering::SeqCst);
+
+        let new_dirty = {
+            let (root, server_end) =
+                create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+            vol.root().clone().open(
+                vol.volume().scope().clone(),
+                fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE,
+                Path::dot(),
+                ServerEnd::new(server_end.into_channel()),
+            );
+
+            let f = open_file_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo",
+            )
+            .await;
+            let buf = vec![0xaa as u8; 8192];
+            file::write(&f, buf.as_slice()).await.expect("Write");
+            // It's important to check the dirty bytes before closing the file, as closing can
+            // trigger a flush.
+            volumes_directory.pager_dirty_bytes_count.load(Ordering::SeqCst)
+        };
+        assert_ne!(old_dirty, new_dirty);
+
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
+        filesystem.close().await.expect("close filesystem failed");
     }
 
     #[fuchsia::test]
