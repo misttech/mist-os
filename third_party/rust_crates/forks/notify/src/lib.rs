@@ -4,7 +4,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! notify = "5.0.0"
+//! notify = "5.2.0"
 //! ```
 //! 
 //! If you want debounced events, see [notify-debouncer-mini](https://github.com/notify-rs/notify/tree/main/notify-debouncer-mini)
@@ -23,7 +23,7 @@
 //! Events are serialisable via [serde](https://serde.rs) if the `serde` feature is enabled:
 //!
 //! ```toml
-//! notify = { version = "5.0.0", features = ["serde"] }
+//! notify = { version = "5.2.0", features = ["serde"] }
 //! ```
 //! 
 //! ### Crossbeam-Channel & Tokio
@@ -34,7 +34,7 @@
 //! You can disable crossbeam-channel, letting notify fallback to std channels via
 //! 
 //! ```toml
-//! notify = { version = "5.0.0", default-features = false, feature=["macos_kqueue"] }
+//! notify = { version = "5.2.0", default-features = false, features = ["macos_kqueue"] }
 //! // Alternatively macos_fsevent instead of macos_kqueue
 //! ```
 //! Note the `macos_kqueue` requirement here, otherwise no backend is available on macos.
@@ -72,7 +72,7 @@
 //! ### Linux: Bad File Descriptor / No space left on device
 //! 
 //! This may be the case of running into the max-files watched limits of your user or system.
-//! (Files also includes folders.) Note that for recusive watched folder each file and folder inside counts towards the limit.
+//! (Files also includes folders.) Note that for recursive watched folders each file and folder inside counts towards the limit.
 //! 
 //! You may increase this limit in linux via
 //! ```sh
@@ -184,7 +184,7 @@ pub(crate) fn bounded<T>(cap: usize) -> (BoundSender<T>, Receiver<T>) {
 
 #[cfg(all(target_os = "macos", not(feature = "macos_kqueue")))]
 pub use crate::fsevent::FsEventWatcher;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use crate::inotify::INotifyWatcher;
 #[cfg(any(
     target_os = "freebsd",
@@ -201,7 +201,7 @@ pub use windows::ReadDirectoryChangesWatcher;
 
 #[cfg(all(target_os = "macos", not(feature = "macos_kqueue")))]
 pub mod fsevent;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod inotify;
 #[cfg(any(
     target_os = "freebsd",
@@ -339,7 +339,7 @@ pub trait Watcher {
 }
 
 /// The recommended `Watcher` implementation for the current platform
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub type RecommendedWatcher = INotifyWatcher;
 /// The recommended `Watcher` implementation for the current platform
 #[cfg(all(target_os = "macos", not(feature = "macos_kqueue")))]
@@ -359,6 +359,7 @@ pub type RecommendedWatcher = KqueueWatcher;
 /// The recommended `Watcher` implementation for the current platform
 #[cfg(not(any(
     target_os = "linux",
+    target_os = "android",
     target_os = "macos",
     target_os = "windows",
     target_os = "freebsd",

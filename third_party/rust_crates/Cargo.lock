@@ -197,7 +197,7 @@ dependencies = [
  "slab",
  "socket2",
  "waker-fn",
- "windows-sys",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]
@@ -2254,7 +2254,7 @@ dependencies = [
  "libc",
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "windows-sys",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]
@@ -2388,7 +2388,7 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "notify"
-version = "5.0.0"
+version = "5.2.0"
 dependencies = [
  "bitflags",
  "filetime",
@@ -2398,7 +2398,7 @@ dependencies = [
  "libc",
  "mio 0.8.5",
  "walkdir",
- "winapi",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -2636,7 +2636,7 @@ dependencies = [
  "libc",
  "redox_syscall 0.2.13",
  "smallvec 1.8.0",
- "windows-sys",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]
@@ -4968,6 +4968,10 @@ version = "0.48.0"
 [[package]]
 name = "windows-sys"
 version = "0.42.0"
+
+[[package]]
+name = "windows-sys"
+version = "0.45.0"
 
 [[package]]
 name = "xattr"

@@ -520,7 +520,7 @@ group("nom_locate") {
 
 if (!(current_os == "fuchsia")) {
   group("notify") {
-    public_deps = [ ":notify-v5_0_0" ]
+    public_deps = [ ":notify-v5_2_0" ]
   }
 }
 
@@ -6447,10 +6447,10 @@ rust_library("normalize-line-endings-v0_3_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("notify-v5_0_0") {
+rust_library("notify-v5_2_0") {
   crate_name = "notify"
   crate_root = "//third_party/rust_crates/forks/notify/src/lib.rs"
-  output_name = "notify-e7989c525a45b70f"
+  output_name = "notify-fabf86cf74fe990b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -6462,7 +6462,7 @@ rust_library("notify-v5_0_0") {
     deps += [ ":kqueue-v1_0_7" ]
     deps += [ ":mio-v0_8_5" ]
   }
-  if (current_os == "linux") {
+  if (current_os == "linux" || false) {
     deps += [ ":inotify-v0_9_3" ]
     deps += [ ":mio-v0_8_5" ]
   }
@@ -6470,7 +6470,7 @@ rust_library("notify-v5_0_0") {
     deps += [ ":fsevent-sys-v4_0_0" ]
   }
   if (false) {
-    deps += [ ":winapi-v0_3_9" ]
+    deps += [ ":windows-sys-v0_45_0" ]
   }
 
   rustenv = []
@@ -6478,8 +6478,8 @@ rust_library("notify-v5_0_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=e7989c525a45b70f",
-    "-Cextra-filename=-e7989c525a45b70f",
+    "-Cmetadata=fabf86cf74fe990b",
+    "-Cextra-filename=-fabf86cf74fe990b",
     "--cfg=feature=\"fsevent-sys\"",
     "--cfg=feature=\"macos_fsevent\"",
   ]
@@ -12935,7 +12935,7 @@ rust_library("windows-v0_48_0") {
 
 rust_library("windows-sys-v0_42_0") {
   crate_name = "windows_sys"
-  crate_root = "//third_party/rust_crates/empty/windows-sys/src/lib.rs"
+  crate_root = "//third_party/rust_crates/empty/windows-sys-0.42.0/src/lib.rs"
   output_name = "windows_sys-c774e6555c42216d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -12956,6 +12956,32 @@ rust_library("windows-sys-v0_42_0") {
     "--cfg=feature=\"Win32_System_LibraryLoader\"",
     "--cfg=feature=\"Win32_System_Pipes\"",
     "--cfg=feature=\"Win32_System_SystemServices\"",
+    "--cfg=feature=\"Win32_System_WindowsProgramming\"",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("windows-sys-v0_45_0") {
+  crate_name = "windows_sys"
+  crate_root = "//third_party/rust_crates/empty/windows-sys-0.45.0/src/lib.rs"
+  output_name = "windows_sys-30ea8465d1683669"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=30ea8465d1683669",
+    "-Cextra-filename=-30ea8465d1683669",
+    "--cfg=feature=\"Win32_Foundation\"",
+    "--cfg=feature=\"Win32_Security\"",
+    "--cfg=feature=\"Win32_Storage_FileSystem\"",
+    "--cfg=feature=\"Win32_System_IO\"",
+    "--cfg=feature=\"Win32_System_Threading\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
   ]
 

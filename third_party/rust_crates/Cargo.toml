@@ -284,7 +284,7 @@ indoc = "1.0.3"
 # TODO(fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
 mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
-notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
+notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.58", features = ["span-locations"] }
 pulldown-cmark = "0.6.0"
@@ -341,7 +341,8 @@ wepoll-ffi = { path = "empty/wepoll-ffi" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
-windows-sys = { path = "empty/windows-sys" }
+windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
+windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 async-io = { path = "forks/async-io" }
