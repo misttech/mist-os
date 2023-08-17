@@ -115,6 +115,10 @@ source_set("bootstrap") {
   public_deps = [
     ":headers",
     "//src/lib/elfldltl",
+
+    # TODO(fxbug.dev/130542): This gets users of bootstrap.h the config that
+    # plumbs the HAVE_LLVM_PROFDATA predefine used there.
+    "//src/lib/llvm-profdata",
   ]
 }
 
@@ -219,25 +223,23 @@ shared_library("ld-startup") {
     configs += [ "//build/config:no_profile" ]
   }
 
-  if (is_fuchsia) {
-    output_path = "$root_out_dir/lib$target_name.so"
+  output_path = "$root_out_dir/lib$target_name.so"
 
-    metadata = {
-      distribution_entries = [
-        {
-          destination = "lib/${toolchain_variant.libprefix}$abi_soname"
-          source = rebase_path(output_path, root_build_dir)
-          label = get_label_info(target_name, "label_with_toolchain")
-        },
-      ]
+  metadata = {
+    distribution_entries = [
+      {
+        destination = "lib/${toolchain_variant.libprefix}$abi_soname"
+        source = rebase_path(output_path, root_build_dir)
+        label = get_label_info(target_name, "label_with_toolchain")
+      },
+    ]
 
-      # This is collected by test:ld-startup-test-switches.rsp.  The
-      # user_basic_redirect may wind up in a different variant than the one
-      # requested, if the test's variant isn't available in user.basic, so we
-      # don't know statically which libprefix the test should load from.
-      ld_startup_test_switches =
-          [ "'-DLD_STARTUP_TEST_LIBPREFIX=\"${toolchain_variant.libprefix}\"'" ]
-    }
+    # This is collected by test:ld-startup-test-switches.rsp.  The
+    # user_basic_redirect may wind up in a different variant than the one
+    # requested, if the test's variant isn't available in user.basic, so we
+    # don't know statically which libprefix the test should load from.
+    ld_startup_test_switches =
+        [ "'-DLD_STARTUP_TEST_LIBPREFIX=\"${toolchain_variant.libprefix}\"'" ]
   }
 }
 

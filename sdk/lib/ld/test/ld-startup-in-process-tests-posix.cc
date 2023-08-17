@@ -21,6 +21,8 @@
 namespace ld::testing {
 namespace {
 
+constexpr std::string_view kLibprefix = LD_STARTUP_TEST_LIBPREFIX;
+
 constexpr size_t kStackSize = 64 << 10;
 
 // This is actually defined in assembly code with internal linkage.
@@ -86,7 +88,7 @@ __asm__(
 
 }  // namespace
 
-const std::string kLdStartupName{ld::abi::kInterp};
+const std::string kLdStartupName = std::string(kLibprefix) + std::string(ld::abi::kInterp);
 
 struct LdStartupInProcessTests::AuxvBlock {
   ld::Auxv vdso = {

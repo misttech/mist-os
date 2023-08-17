@@ -24,6 +24,8 @@ using LoadTypes = ::testing::Types<
 // tests also need a loader service to get ld.so.1 itself.
 #if 0  // def __Fuchsia__
     ld::testing::LdStartupCreateProcessTests<>,
+#endif
+#ifndef __Fuchsia__
     ld::testing::LdStartupSpawnProcessTests,
 #endif
     ld::testing::LdStartupInProcessTests>;

@@ -124,7 +124,7 @@ StartupModule* LoadExecutable(Diagnostics& diag, StartupData& startup, ScratchAl
   return main_executable;
 }
 
-void ProtectData(Diagnostics& diag, size_t page_size) {
+[[maybe_unused]] void ProtectData(Diagnostics& diag, size_t page_size) {
   auto [data_start, data_size] = DataBounds(page_size);
   if (mprotect(reinterpret_cast<void*>(data_start), data_size, PROT_READ) != 0) [[unlikely]] {
     diag.SystemError("cannot mprotect dynamic linker data pages", elfldltl::PosixError{errno});
@@ -211,9 +211,11 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
 
   main_executable->RelocateRelative(diag);
 
-  // Now that startup is completed, protect not only the RELRO, but also all
-  // the data and bss.
-  ProtectData(diag, startup.page_size);
+  if constexpr (kProtectData) {
+    // Now that startup is completed, protect not only the RELRO, but also all
+    // the data and bss.
+    ProtectData(diag, startup.page_size);
+  }
 
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);

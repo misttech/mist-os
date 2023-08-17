@@ -111,34 +111,40 @@ source_set("test-chdir-guard") {
   ]
 }
 
-if (is_host) {
+if (!is_fuchsia) {
   # For host tests, the test binaries must be packaged in host_test_data() at
   # the expected path where elfldltl::testing::GetTestLib will find them.
-
   test_tc = ""
-  test_shlib_tc = ""
-  test_shlib_out_dir = root_out_dir
-
   if (is_linux) {
     # The linux_$cpu (vs host_$cpu) handles shared libraries.
     test_tc = "(//build/toolchain:linux_$current_cpu)"
-    test_shlib_tc = "(//build/toolchain:linux_$current_cpu-shared)"
-    test_shlib_out_dir = get_label_info(":here$test_shlib_tc", "root_out_dir")
   }
 
   group("load-test-data") {
     testonly = true
-    deps = [
-      ":ld-startup.test-data",
-      "modules$test_tc",
-    ]
+    deps = [ "modules$test_tc" ]
   }
 
-  host_test_data("ld-startup.test-data") {
-    visibility = [ "./*" ]
-    deps = [ "..:ld-startup$test_shlib_tc" ]
-    sources = [ "$test_shlib_out_dir/libld-startup.so" ]
-    outputs = [ "$root_out_dir/test_data/elfldltl/ld.so.1" ]
+  # This is reached via data_deps from the test_executable() targets in
+  # modules/ where they will be instantiated in the same toolchain via variant
+  # selection as the test, so that ld.so.1 gets the right libprefix.
+  if (current_toolchain != shlib_toolchain) {
+    # host_test_data() adds a dep on $target_name(${toolchain_variant.base}),
+    # which drops the shlib qualifier, so there is an extra dependency on this
+    # target that shouldn't really exist.  It's crucial that the real target in
+    # $shlib_toolchain be the one reached via data_deps in modules.
+    group("ld-startup.test-data") {
+      visibility = [ "./*" ]
+      testonly = true
+    }
+  } else {
+    host_out_dir = get_label_info(".($host_toolchain)", "root_out_dir")
+    host_test_data("ld-startup.test-data") {
+      visibility = [ "./*" ]
+      deps = [ "..:ld-startup" ]
+      sources = [ "$root_out_dir/libld-startup.so" ]
+      outputs = [ "$host_out_dir/test_data/elfldltl/${toolchain_variant.libprefix}ld.so.1" ]
+    }
   }
 } else {
   # On Fuchsia these are just included in /pkg/... implicitly by dint of being
@@ -154,10 +160,7 @@ if (is_host) {
     # rewrite their manifest entries to use /pkg/lib/test/... instead.
     prefix = "lib/test"
 
-    deps = [
-      ":modules.basic",
-      "..:ld-startup.basic",
-    ]
+    deps = [ ":modules.basic" ]
 
     # Make this manifest itself an input for collections via deps on this.
     outputs = [ "$target_gen_dir/$target_name.json" ]
@@ -175,5 +178,13 @@ if (is_host) {
     visibility = [ ":*" ]
     testonly = true
     public_deps = [ "modules" ]
+  }
+
+  # The dependency on this should already be in the user.basic environment
+  # because it comes from modules:test-executable, which is reached via the
+  # modules.basic redirect above.
+  group("ld-startup.test-data") {
+    testonly = true
+    public_deps = [ "..:ld-startup" ]
   }
 }

@@ -65,23 +65,6 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
   return result;
 }
 
-// TODO(fxbug.dev/130542): After LlvmProfdata:UseCounters, functions will load
-// the new value of __llvm_profile_counter_bias and use it. However, functions
-// already in progress will use a cached value from before it changed. This
-// means they'll still be pointing into the data segment and updating the old
-// counters there. So they'd crash with write faults if it were protected.
-// There may be a way to work around this by having uninstrumented functions
-// call instrumented functions such that the tail return path of any frame live
-// across the transition is uninstrumented. Note that each function will
-// resample even if that function is inlined into a caller that itself will
-// still be using the stale pointer. However, in the long run we expect to move
-// from the relocatable-counters design to a new design where the counters are
-// in a separate "bss-like" location that we arrange to be in a separate VMO
-// created by the program loader. If we do that, then this issue won't arise,
-// so we might not get around to making protecting the data compatible with
-// profdata instrumentation before it's moot.
-constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
-
 [[maybe_unused]] void ProtectData(Diagnostics& diag, size_t page_size, zx::vmar self) {
   auto [data_start, data_size] = DataBounds(page_size);
   zx_status_t status = self.protect(ZX_VM_PERM_READ, data_start, data_size);

@@ -137,7 +137,8 @@ class SpawnPlan {
     };
 
     if (!::testing::Test::HasFailure()) {
-      EXPECT_EQ(execve(executable.c_str(), ArgvPtrs(argv).data(), nullptr), 0);
+      EXPECT_EQ(execve(executable.c_str(), ArgvPtrs(argv).data(), nullptr), 0)
+          << "execve: " << executable << ": " << strerror(errno);
     }
     fflush(nullptr);
     _exit(127);
