@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
+#include <fuchsia/ui/test/input/cpp/fidl.h>
 
 #include <fstream>
 #include <iostream>
@@ -12,7 +13,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <rapidjson/document.h>
-#include <test/inputsynthesis/cpp/fidl.h>
 
 #include "lib/zx/clock.h"
 #include "lib/zx/time.h"
@@ -264,10 +264,19 @@ TYPED_TEST(VirtioGpuTest, TextInputChangesConsole) {
   SaveScreenshot("input-state1", screenshot1);
 
   // Type a key, which should update the display.
-  auto input_synthesis =
-      this->GetEnclosedGuest().template ConnectToService<test::inputsynthesis::Text>();
+  auto input_registry =
+      this->GetEnclosedGuest().template ConnectToService<fuchsia::ui::test::input::Registry>();
+  fuchsia::ui::test::input::KeyboardPtr keyboard;
+  bool keyboard_registered = false;
+  fuchsia::ui::test::input::RegistryRegisterKeyboardRequest request;
+  request.set_device(keyboard.NewRequest());
+  input_registry->RegisterKeyboard(std::move(request), [&]() { keyboard_registered = true; });
+  this->RunLoopUntil([&] { return keyboard_registered; }, zx::deadline_after(kGpuTestTimeout));
   bool input_injected = false;
-  input_synthesis->Send("a", [&input_injected]() { input_injected = true; });
+  fuchsia::ui::test::input::KeyboardSimulateUsAsciiTextEntryRequest text_request;
+  text_request.set_text("a");
+  keyboard->SimulateUsAsciiTextEntry(std::move(text_request),
+                                     [&input_injected]() { input_injected = true; });
   this->RunLoopUntil([&] { return input_injected; }, zx::deadline_after(kGpuTestTimeout));
 
   // Take another screenshot.

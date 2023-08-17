@@ -256,8 +256,8 @@ executable("virtualization_gpu_tests") {
     "lib:lib",
     "lib:periodic_logger",
     "lib:test_main",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//src/lib/ui/input-synthesis:test.inputsynthesis_hlcpp",
     "//third_party/googletest:gmock",
     "//third_party/rapidjson",
   ]
@@ -295,8 +295,8 @@ executable("virtualization_input_tests") {
     "lib",
     "lib:guest_console",
     "lib:test_main",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//src/lib/ui/input-synthesis:test.inputsynthesis_hlcpp",
   ]
 }
 
