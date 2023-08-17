@@ -112,6 +112,13 @@
         },
         {
             protocol: [
+                "fuchsia.vsock.Connector"
+            ],
+            from: "#vsock",
+            to: "#session-manager",
+        },
+        {
+            protocol: [
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
             ],

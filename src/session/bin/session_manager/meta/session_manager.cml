@@ -384,6 +384,7 @@
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
+                "fuchsia.vsock.Connector",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
