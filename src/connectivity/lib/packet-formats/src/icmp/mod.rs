@@ -33,8 +33,8 @@ use core::convert::{TryFrom, TryInto};
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::mem;
-use core::ops::Deref;
 
+use derivative::Derivative;
 use internet_checksum::Checksum;
 use net_types::ip::{Ip, IpAddress, Ipv4, Ipv6};
 use packet::records::options::{Options, OptionsImpl};
@@ -178,59 +178,47 @@ impl<B: ByteSlice> IcmpPacketType<B, Ipv4> for Icmpv4Packet<B> {}
 
 impl<B: ByteSlice> IcmpPacketType<B, Ipv6> for Icmpv6Packet<B> {}
 
-// TODO(joshlf): Once we have generic associated types, refactor this so that we
-// don't have to bind B ahead of time. Removing that requirement would make some
-// APIs (in particular, IcmpPacketBuilder) simpler by removing the B parameter
-// from them as well.
+/// Empty message.
+#[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
+#[derivative(Default(bound = ""))]
+pub struct EmptyMessage<B>(core::marker::PhantomData<B>);
 
 /// `MessageBody` represents the parsed body of the ICMP packet.
 ///
-/// - For messages that expect no body, the `MessageBody` is of type `()`.
+/// - For messages that expect no body, the `MessageBody` is of type `EmptyMessage`.
 /// - For NDP messages, the `MessageBody` is of the type `ndp::Options`.
 /// - For all other messages, the `MessageBody` will be of the type
 ///   `OriginalPacket`, which is a thin wrapper around `B`.
-pub trait MessageBody<B>: Sized {
-    /// Whether or not a message body is expected in an ICMP packet.
-    const EXPECTS_BODY: bool = true;
+pub trait MessageBody: Sized {
+    /// The underlying byteslice.
+    type B: ByteSlice;
 
     /// Parse the MessageBody from the provided bytes.
-    fn parse(bytes: B) -> ParseResult<Self>
-    where
-        B: ByteSlice;
+    fn parse(bytes: Self::B) -> ParseResult<Self>;
 
     /// The length of the underlying buffer.
-    fn len(&self) -> usize
-    where
-        B: ByteSlice;
+    fn len(&self) -> usize;
 
     /// Is the body empty?
     ///
     /// `b.is_empty()` is equivalent to `b.len() == 0`.
-    fn is_empty(&self) -> bool
-    where
-        B: ByteSlice,
-    {
+    fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Return the underlying bytes.
-    fn bytes(&self) -> &[u8]
-    where
-        B: Deref<Target = [u8]>;
+    fn bytes(&self) -> &[u8];
 }
 
-impl<B> MessageBody<B> for () {
-    const EXPECTS_BODY: bool = false;
+impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
+    type B = B;
 
-    fn parse(bytes: B) -> ParseResult<()>
-    where
-        B: ByteSlice,
-    {
+    fn parse(bytes: B) -> ParseResult<Self> {
         if !bytes.is_empty() {
             return debug_err!(Err(ParseError::Format), "unexpected message body");
         }
 
-        Ok(())
+        Ok(EmptyMessage::default())
     }
 
     fn len(&self) -> usize {
@@ -257,53 +245,42 @@ impl<B: ByteSlice> OriginalPacket<B> {
     }
 }
 
-impl<B> MessageBody<B> for OriginalPacket<B> {
+impl<B: ByteSlice> MessageBody for OriginalPacket<B> {
+    type B = B;
+
     fn parse(bytes: B) -> ParseResult<OriginalPacket<B>> {
         Ok(OriginalPacket(bytes))
     }
 
-    fn len(&self) -> usize
-    where
-        B: ByteSlice,
-    {
+    fn len(&self) -> usize {
         self.0.len()
     }
 
-    fn bytes(&self) -> &[u8]
-    where
-        B: Deref<Target = [u8]>,
-    {
+    fn bytes(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl<B, O: for<'a> OptionsImpl<'a>> MessageBody<B> for Options<B, O> {
-    fn parse(bytes: B) -> ParseResult<Options<B, O>>
-    where
-        B: ByteSlice,
-    {
+impl<B: ByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
+    type B = B;
+    fn parse(bytes: B) -> ParseResult<Options<B, O>> {
         Self::parse(bytes).map_err(|_e| debug_err!(ParseError::Format, "unable to parse options"))
     }
 
-    fn len(&self) -> usize
-    where
-        B: ByteSlice,
-    {
+    fn len(&self) -> usize {
         self.bytes().len()
     }
 
-    fn bytes(&self) -> &[u8]
-    where
-        B: Deref<Target = [u8]>,
-    {
+    fn bytes(&self) -> &[u8] {
         self.bytes()
     }
 }
 
 /// An ICMP message.
-pub trait IcmpMessage<I: IcmpIpExt, B: ByteSlice>:
-    Sized + Copy + FromBytes + AsBytes + Unaligned
-{
+pub trait IcmpMessage<I: IcmpIpExt>: Sized + Copy + FromBytes + AsBytes + Unaligned {
+    /// Whether or not a message body is expected in an ICMP packet.
+    const EXPECTS_BODY: bool = true;
+
     /// The type of codes used with this message.
     ///
     /// The ICMP header includes an 8-bit "code" field. For a given message
@@ -313,7 +290,7 @@ pub trait IcmpMessage<I: IcmpIpExt, B: ByteSlice>:
     type Code: Into<u8> + Copy + Debug;
 
     /// The type of the body used with this message.
-    type Body: MessageBody<B>;
+    type Body<B: ByteSlice>: MessageBody<B = B>;
 
     /// The type corresponding to this message type.
     ///
@@ -373,13 +350,13 @@ unsafe impl<M: AsBytes + Unaligned> AsBytes for Header<M> {
 /// [`IcmpPacket`] provides a [`FromRaw`] implementation that can be used to
 /// validate an [`IcmpPacketRaw`].
 #[derive(Debug)]
-pub struct IcmpPacketRaw<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> {
+pub struct IcmpPacketRaw<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> {
     header: Ref<B, Header<M>>,
     message_body: B,
     _marker: PhantomData<I>,
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacketRaw<I, B, M> {
+impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     /// Get the ICMP message.
     pub fn message(&self) -> &M {
         &self.header.message
@@ -391,9 +368,9 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacketRaw<I, B, M> {
 /// An `IcmpPacket` shares its underlying memory with the byte slice it was
 /// parsed from, meaning that no copying or extra allocation is necessary.
 #[derive(Debug)]
-pub struct IcmpPacket<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> {
+pub struct IcmpPacket<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> {
     header: Ref<B, Header<M>>,
-    message_body: M::Body,
+    message_body: M::Body<B>,
     _marker: PhantomData<I>,
 }
 
@@ -410,7 +387,7 @@ impl<A: IpAddress> IcmpParseArgs<A> {
     }
 }
 
-impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>> ParsablePacket<B, ()>
+impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, ()>
     for IcmpPacketRaw<I, B, M>
 {
     type Error = ParseError;
@@ -431,7 +408,7 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>> ParsablePacket<B, ()>
     }
 }
 
-impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>>
+impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>>
     FromRaw<IcmpPacketRaw<I, B, M>, IcmpParseArgs<I::Addr>> for IcmpPacket<I, B, M>
 {
     type Error = ParseError;
@@ -441,7 +418,7 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>>
         args: IcmpParseArgs<I::Addr>,
     ) -> ParseResult<Self> {
         let IcmpPacketRaw { header, message_body, _marker } = raw;
-        if !M::Body::EXPECTS_BODY && !message_body.is_empty() {
+        if !M::EXPECTS_BODY && !message_body.is_empty() {
             return debug_err!(Err(ParseError::Format), "unexpected message body");
         }
         let _: M::Code = M::code_from_u8(header.prefix.code).ok_or_else(debug_err_fn!(
@@ -459,7 +436,7 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>>
     }
 }
 
-impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>> ParsablePacket<B, IcmpParseArgs<I::Addr>>
+impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, IcmpParseArgs<I::Addr>>
     for IcmpPacket<I, B, M>
 {
     type Error = ParseError;
@@ -473,14 +450,14 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I, B>> ParsablePacket<B, IcmpPar
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacket<I, B, M> {
+impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
     /// Get the ICMP message.
     pub fn message(&self) -> &M {
         &self.header.message
     }
 
     /// Get the ICMP body.
-    pub fn body(&self) -> &M::Body {
+    pub fn body(&self) -> &M::Body<B> {
         &self.message_body
     }
 
@@ -494,17 +471,12 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacket<I, B, M> {
     }
 
     /// Construct a builder with the same contents as this packet.
-    pub fn builder(&self, src_ip: I::Addr, dst_ip: I::Addr) -> IcmpPacketBuilder<I, B, M> {
+    pub fn builder(&self, src_ip: I::Addr, dst_ip: I::Addr) -> IcmpPacketBuilder<I, M> {
         IcmpPacketBuilder { src_ip, dst_ip, code: self.code(), msg: *self.message() }
     }
 }
 
-fn compute_checksum_fragmented<
-    I: IcmpIpExt,
-    B: ByteSlice,
-    BB: packet::Fragment,
-    M: IcmpMessage<I, B>,
->(
+fn compute_checksum_fragmented<I: IcmpIpExt, BB: packet::Fragment, M: IcmpMessage<I>>(
     header: &Header<M>,
     message_body: &FragmentedByteSlice<'_, BB>,
     src_ip: I::Addr,
@@ -530,7 +502,7 @@ fn compute_checksum_fragmented<
     Some(c.checksum())
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacket<I, B, M> {
+impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
     /// Compute the checksum, including the checksum field itself.
     ///
     /// `compute_checksum` returns `None` if the version is IPv6 and the total
@@ -546,7 +518,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacket<I, B, M> {
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B, Body = OriginalPacket<B>>>
+impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, Body<B> = OriginalPacket<B>>>
     IcmpPacket<I, B, M>
 {
     /// Get the body of the packet that caused this ICMP message.
@@ -572,7 +544,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B, Body = OriginalPacket<B>>>
     }
 }
 
-impl<B: ByteSlice, M: IcmpMessage<Ipv4, B, Body = OriginalPacket<B>>> IcmpPacket<Ipv4, B, M> {
+impl<B: ByteSlice, M: IcmpMessage<Ipv4, Body<B> = OriginalPacket<B>>> IcmpPacket<Ipv4, B, M> {
     /// Attempt to partially parse the original packet as an IPv4 packet.
     ///
     /// `f` will be invoked on the result of calling `Ipv4PacketRaw::parse` on
@@ -586,7 +558,7 @@ impl<B: ByteSlice, M: IcmpMessage<Ipv4, B, Body = OriginalPacket<B>>> IcmpPacket
     }
 }
 
-impl<B: ByteSlice, M: IcmpMessage<Ipv6, B, Body = OriginalPacket<B>>> IcmpPacket<Ipv6, B, M> {
+impl<B: ByteSlice, M: IcmpMessage<Ipv6, Body<B> = OriginalPacket<B>>> IcmpPacket<Ipv6, B, M> {
     /// Attempt to partially parse the original packet as an IPv6 packet.
     ///
     /// `f` will be invoked on the result of calling `Ipv6PacketRaw::parse` on
@@ -600,7 +572,7 @@ impl<B: ByteSlice, M: IcmpMessage<Ipv6, B, Body = OriginalPacket<B>>> IcmpPacket
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B, Body = ndp::Options<B>>> IcmpPacket<I, B, M> {
+impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, Body<B> = ndp::Options<B>>> IcmpPacket<I, B, M> {
     /// Get the pared list of NDP options from the ICMP message.
     pub fn ndp_options(&self) -> &ndp::Options<B> {
         &self.message_body
@@ -609,21 +581,21 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B, Body = ndp::Options<B>>> I
 
 /// A builder for ICMP packets.
 #[derive(Debug)]
-pub struct IcmpPacketBuilder<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> {
+pub struct IcmpPacketBuilder<I: IcmpIpExt, M: IcmpMessage<I>> {
     src_ip: I::Addr,
     dst_ip: I::Addr,
     code: M::Code,
     msg: M,
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacketBuilder<I, B, M> {
+impl<I: IcmpIpExt, M: IcmpMessage<I>> IcmpPacketBuilder<I, M> {
     /// Construct a new `IcmpPacketBuilder`.
     pub fn new<S: Into<I::Addr>, D: Into<I::Addr>>(
         src_ip: S,
         dst_ip: D,
         code: M::Code,
         msg: M,
-    ) -> IcmpPacketBuilder<I, B, M> {
+    ) -> IcmpPacketBuilder<I, M> {
         IcmpPacketBuilder { src_ip: src_ip.into(), dst_ip: dst_ip.into(), code, msg }
     }
 }
@@ -631,9 +603,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> IcmpPacketBuilder<I, B, M
 // TODO(joshlf): Figure out a way to split body and non-body message types by
 // trait and implement PacketBuilder for some and InnerPacketBuilder for others.
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> PacketBuilder
-    for IcmpPacketBuilder<I, B, M>
-{
+impl<I: IcmpIpExt, M: IcmpMessage<I>> PacketBuilder for IcmpPacketBuilder<I, M> {
     fn constraints(&self) -> PacketConstraints {
         // The maximum body length constraint to make sure the body length
         // doesn't overflow the 32-bit length field in the pseudo-header used
@@ -661,7 +631,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, B>> PacketBuilder
         let mut prefix = &mut target.header;
 
         assert!(
-            M::Body::EXPECTS_BODY || message_body.is_empty(),
+            M::EXPECTS_BODY || message_body.is_empty(),
             "body provided for message that doesn't take a body"
         );
         // SECURITY: Use _zero constructors to ensure we zero memory to prevent
@@ -722,7 +692,7 @@ mod tests {
 
         let reference_header = Header {
             prefix: HeaderPrefix {
-                msg_type: <IcmpEchoRequest as IcmpMessage<Ipv4, &[u8]>>::TYPE.into(),
+                msg_type: <IcmpEchoRequest as IcmpMessage<Ipv4>>::TYPE.into(),
                 code: 0,
                 checksum: [0, 0],
             },
@@ -741,7 +711,7 @@ mod tests {
 
         // Test that a properly-sized header is rejected if the message type is wrong.
         let mut header = reference_header;
-        header.prefix.msg_type = <IcmpEchoReply as IcmpMessage<Ipv4, &[u8]>>::TYPE.into();
+        header.prefix.msg_type = <IcmpEchoReply as IcmpMessage<Ipv4>>::TYPE.into();
         let mut buf = header.as_bytes();
         assert_eq!(
             buf.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoRequest>>().unwrap_err(),

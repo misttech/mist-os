@@ -217,7 +217,7 @@ fn serialize_neighbor_solictation(
 
     let snmc = src_ip.to_solicited_node_address();
     [].into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, &[u8], _>::new(
+        .encapsulate(IcmpPacketBuilder::<_, _>::new(
             net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
             snmc.get(),
             IcmpUnusedCode,

@@ -827,7 +827,7 @@ pub(crate) enum IcmpIpTransportContext {}
 impl<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>, SC: InnerIcmpContext<I, C>>
     IpTransportContext<I, C, SC> for IcmpIpTransportContext
 where
-    IcmpEchoRequest: for<'a> IcmpMessage<I, &'a [u8]>,
+    IcmpEchoRequest: IcmpMessage<I>,
 {
     fn receive_icmp_error(
         sync_ctx: &mut SC,
@@ -912,7 +912,7 @@ impl<
                     // TODO(joshlf): Do something if send_icmp_reply returns an
                     // error?
                     let _ = send_icmp_reply(sync_ctx, ctx,Some(device), remote_ip, local_ip, |src_ip| {
-                        buffer.encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+                        buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                             src_ip,
                             remote_ip,
                             code,
@@ -966,7 +966,7 @@ impl<
                         // TODO(joshlf): Do something if send_icmp_reply returns
                         // an error?
                         let _ = send_icmp_reply(sync_ctx, ctx, Some(device), remote_ip, local_ip, |src_ip| {
-                            buffer.encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+                            buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                                 src_ip,
                                 remote_ip,
                                 IcmpUnusedCode,
@@ -1094,7 +1094,7 @@ pub(crate) fn send_ndp_packet<
     C,
     SC: BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
     S: Serializer<Buffer = EmptyBuf>,
-    M: IcmpMessage<Ipv6, &'static [u8]>,
+    M: IcmpMessage<Ipv6>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1118,7 +1118,7 @@ pub(crate) fn send_ndp_packet<
             proto: Ipv6Proto::Icmpv6,
             mtu: None,
         },
-        body.encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+        body.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),
             dst_ip.get(),
             code,
@@ -1644,7 +1644,7 @@ impl<
                         remote_ip.into_specified(),
                         local_ip,
                         |src_ip| {
-                            buffer.encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                            buffer.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                                 src_ip,
                                 remote_ip,
                                 code,
@@ -1782,7 +1782,7 @@ fn receive_icmpv4_error<
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
     SC: InnerBufferIcmpv4Context<C, B>,
     BB: ByteSlice,
-    M: IcmpMessage<Ipv4, BB, Body = OriginalPacket<BB>>,
+    M: IcmpMessage<Ipv4, Body<BB> = OriginalPacket<BB>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1825,7 +1825,7 @@ fn receive_icmpv6_error<
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
     SC: InnerBufferIcmpv6Context<C, B>,
     BB: ByteSlice,
-    M: IcmpMessage<Ipv6, BB, Body = OriginalPacket<BB>>,
+    M: IcmpMessage<Ipv6, Body<BB> = OriginalPacket<BB>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2449,7 +2449,7 @@ const SEND_ICMPV4_ERROR_MESSAGE_COUNTER_NAME: &'static str = "send_icmpv4_error_
 
 fn send_icmpv4_error_message<
     B: BufferMut,
-    M: IcmpMessage<Ipv4, &'static [u8]>,
+    M: IcmpMessage<Ipv4>,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
     SC: InnerBufferIcmpv4Context<C, B>,
 >(
@@ -2489,7 +2489,7 @@ fn send_icmpv4_error_message<
             Ipv4Proto::Icmp,
             DefaultSendOptions,
             |local_ip| {
-                original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+                original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                     local_ip,
                     original_src_ip,
                     code,
@@ -2506,7 +2506,7 @@ const SEND_ICMPV6_ERROR_MESSAGE_COUNTER_NAME: &'static str = "send_icmpv6_error_
 
 fn send_icmpv6_error_message<
     B: BufferMut,
-    M: IcmpMessage<Ipv6, &'static [u8]>,
+    M: IcmpMessage<Ipv6>,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
     SC: InnerBufferIcmpv6Context<C, B>,
 >(
@@ -2542,12 +2542,8 @@ fn send_icmpv6_error_message<
             Ipv6Proto::Icmpv6,
             DefaultSendOptions,
             |local_ip| {
-                let icmp_builder = IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
-                    local_ip,
-                    original_src_ip,
-                    code,
-                    message,
-                );
+                let icmp_builder =
+                    IcmpPacketBuilder::<Ipv6, _>::new(local_ip, original_src_ip, code, message);
 
                 // Per RFC 4443, body contains as much of the original body as
                 // possible without exceeding IPv6 minimum MTU.
@@ -2769,7 +2765,7 @@ fn send_icmp_echo_request_inner<
     body: B,
 ) -> Result<(), (B, IpSockSendError)>
 where
-    IcmpEchoRequest: for<'a> IcmpMessage<I, &'a [u8], Code = IcmpUnusedCode>,
+    IcmpEchoRequest: IcmpMessage<I, Code = IcmpUnusedCode>,
 {
     // TODO(joshlf): Come up with a better approach to the lifetimes issues than
     // cloning the entire socket.
@@ -2785,7 +2781,7 @@ where
         .send_ip_packet(
             ctx,
             &conn.ip,
-            body.encapsulate(IcmpPacketBuilder::<I, &[u8], _>::new(
+            body.encapsulate(IcmpPacketBuilder::<I, _>::new(
                 conn.ip.local_ip().get(),
                 conn.ip.remote_ip().get(),
                 IcmpUnusedCode,
@@ -3139,7 +3135,7 @@ mod tests {
     fn test_receive_ip_packet<
         I: TestIpExt + IcmpIpExt,
         C: PartialEq + Debug,
-        M: for<'a> IcmpMessage<I, &'a [u8], Code = C> + PartialEq + Debug,
+        M: IcmpMessage<I, Code = C> + PartialEq + Debug,
         PBF: FnOnce(&mut <I as packet_formats::ip::IpExt>::PacketBuilder),
         SSBF: FnOnce(&mut StackStateBuilder),
         F: for<'a> FnOnce(&IcmpPacket<I, &'a [u8], M>),
@@ -3222,18 +3218,17 @@ mod tests {
 
         fn test<I: TestIpExt + IcmpIpExt>(assert_counters: &[&str])
         where
-            IcmpEchoRequest: for<'a> IcmpMessage<I, &'a [u8], Code = IcmpUnusedCode>,
+            IcmpEchoRequest: IcmpMessage<I, Code = IcmpUnusedCode>,
             IcmpEchoReply: for<'a> IcmpMessage<
                 I,
-                &'a [u8],
                 Code = IcmpUnusedCode,
-                Body = OriginalPacket<&'a [u8]>,
+                Body<&'a [u8]> = OriginalPacket<&'a [u8]>,
             >,
         {
             let req = IcmpEchoRequest::new(0, 0);
             let req_body = &[1, 2, 3, 4];
             let mut buffer = Buf::new(req_body.to_vec(), ..)
-                .encapsulate(IcmpPacketBuilder::<I, &[u8], _>::new(
+                .encapsulate(IcmpPacketBuilder::<I, _>::new(
                     I::FAKE_CONFIG.remote_ip.get(),
                     I::FAKE_CONFIG.local_ip.get(),
                     IcmpUnusedCode,
@@ -3264,7 +3259,7 @@ mod tests {
 
         let req = Icmpv4TimestampRequest::new(1, 2, 3);
         let mut buffer = Buf::new(Vec::new(), ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                 FAKE_CONFIG_V4.remote_ip,
                 FAKE_CONFIG_V4.local_ip,
                 IcmpUnusedCode,
@@ -3354,7 +3349,7 @@ mod tests {
             original_packet_len: usize,
         ) where
             IcmpDestUnreachable:
-                for<'a> IcmpMessage<I, &'a [u8], Code = C, Body = OriginalPacket<&'a [u8]>>,
+                for<'a> IcmpMessage<I, Code = C, Body<&'a [u8]> = OriginalPacket<&'a [u8]>>,
         {
             let mut buffer = Buf::new(vec![0; 128], ..)
                 .encapsulate(UdpPacketBuilder::new(
@@ -4280,7 +4275,7 @@ mod tests {
         /// it should be delivered to this socket.
         fn test_receive_icmpv4_error_helper<
             C: Debug,
-            M: for<'a> IcmpMessage<Ipv4, &'a [u8], Code = C> + Debug,
+            M: IcmpMessage<Ipv4, Code = C> + Debug,
             F: Fn(&Fakev4Ctx),
         >(
             original_packet: &mut [u8],
@@ -4354,7 +4349,7 @@ mod tests {
         // be delivered to the socket created in
         // `test_receive_icmpv4_error_helper`.
         let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                 FAKE_CONFIG_V4.local_ip,
                 FAKE_CONFIG_V4.remote_ip,
                 IcmpUnusedCode,
@@ -4590,7 +4585,7 @@ mod tests {
         /// it should be delivered to this socket.
         fn test_receive_icmpv6_error_helper<
             C: Debug,
-            M: for<'a> IcmpMessage<Ipv6, &'a [u8], Code = C> + Debug,
+            M: IcmpMessage<Ipv6, Code = C> + Debug,
             F: Fn(&Fakev6Ctx),
         >(
             original_packet: &mut [u8],
@@ -4663,7 +4658,7 @@ mod tests {
         // should be delivered to the socket created in
         // `test_receive_icmpv6_error_helper`.
         let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 FAKE_CONFIG_V6.local_ip,
                 FAKE_CONFIG_V6.remote_ip,
                 IcmpUnusedCode,

@@ -469,9 +469,9 @@ fn serialize_icmp_echo_reply<I>(buf: packet::Buf<Vec<u8>>, reply: IcmpEchoReply)
 where
     I: packet_formats::icmp::IcmpIpExt,
     <I as Ip>::Addr: From<SpecifiedAddr<<I as Ip>::Addr>>,
-    IcmpEchoReply: IcmpMessage<I, &'static [u8], Code = IcmpUnusedCode>,
+    IcmpEchoReply: IcmpMessage<I, Code = IcmpUnusedCode>,
 {
-    buf.encapsulate(IcmpPacketBuilder::<I, &'static [u8], _>::new(
+    buf.encapsulate(IcmpPacketBuilder::<I, _>::new(
         I::LOOPBACK_ADDRESS,
         I::LOOPBACK_ADDRESS,
         IcmpUnusedCode,

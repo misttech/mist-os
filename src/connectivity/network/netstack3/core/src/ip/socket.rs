@@ -1846,7 +1846,7 @@ mod tests {
     ) where
         for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>,
-        IcmpEchoReply: IcmpMessage<I, &'static [u8], Code = IcmpUnusedCode>,
+        IcmpEchoReply: IcmpMessage<I, Code = IcmpUnusedCode>,
     {
         set_logger_for_test();
 
@@ -1929,7 +1929,7 @@ mod tests {
         let reply = IcmpEchoRequest::new(0, 0).reply();
         let body = &[1, 2, 3, 4];
         let buffer = Buf::new(body.to_vec(), ..)
-            .encapsulate(IcmpPacketBuilder::<I, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 expected_from_ip.get(),
                 to_ip.get(),
                 IcmpUnusedCode,

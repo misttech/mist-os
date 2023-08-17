@@ -116,7 +116,7 @@ fn reply_if_echo_request(
             .then(|| {
                 icmp_body
                     .into_serializer()
-                    .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv4, &[u8], _>::new(
+                    .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv4, _>::new(
                         dst_ip,
                         src_ip,
                         IcmpUnusedCode,
@@ -166,7 +166,7 @@ fn reply_if_echo_request(
             .then(|| {
                 icmp_body
                     .into_serializer()
-                    .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv6, &[u8], _>::new(
+                    .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv6, _>::new(
                         dst_ip,
                         src_ip,
                         IcmpUnusedCode,

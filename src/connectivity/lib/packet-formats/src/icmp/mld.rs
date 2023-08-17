@@ -177,7 +177,8 @@ impl<B: ByteSlice> Mldv2ReportBody<B> {
     }
 }
 
-impl<B: ByteSlice> MessageBody<B> for Mldv2ReportBody<B> {
+impl<B: ByteSlice> MessageBody for Mldv2ReportBody<B> {
+    type B = B;
     fn parse(bytes: B) -> ParseResult<Self> {
         let (header, bytes) =
             Ref::<_, Mldv2ReportMessageHeader>::new_from_prefix(bytes).ok_or(ParseError::Format)?;
@@ -246,8 +247,8 @@ pub trait Mldv1MessageType {
 }
 
 /// The trait for all ICMPv6 messages holding MLDv1 messages.
-pub trait IcmpMldv1MessageType<B: ByteSlice>:
-    Mldv1MessageType + IcmpMessage<Ipv6, B, Code = IcmpUnusedCode>
+pub trait IcmpMldv1MessageType:
+    Mldv1MessageType + IcmpMessage<Ipv6, Code = IcmpUnusedCode>
 {
 }
 
@@ -338,7 +339,8 @@ impl<B: ByteSlice> Deref for Mldv1Body<B> {
     }
 }
 
-impl<B: ByteSlice> MessageBody<B> for Mldv1Body<B> {
+impl<B: ByteSlice> MessageBody for Mldv1Body<B> {
+    type B = B;
     fn parse(bytes: B) -> ParseResult<Self> {
         Ref::new(bytes).map_or(Err(ParseError::Format), |body| Ok(Mldv1Body(body)))
     }
@@ -359,7 +361,7 @@ macro_rules! impl_mldv1_message {
             type MaxRespDelay = $resp_code;
             type GroupAddr = $group_addr;
         }
-        impl<B: ByteSlice> IcmpMldv1MessageType<B> for $msg {}
+        impl IcmpMldv1MessageType for $msg {}
     };
 }
 
@@ -430,10 +432,7 @@ mod tests {
     };
     use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions};
 
-    fn serialize_to_bytes<
-        B: ByteSlice + Debug,
-        M: IcmpMessage<Ipv6, B> + Mldv1MessageType + Debug,
-    >(
+    fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv6> + Mldv1MessageType + Debug>(
         src_ip: Ipv6Addr,
         dst_ip: Ipv6Addr,
         icmp: &IcmpPacket<Ipv6, B, M>,
@@ -460,7 +459,7 @@ mod tests {
     }
 
     fn test_parse_and_serialize<
-        M: for<'a> IcmpMessage<Ipv6, &'a [u8]> + Mldv1MessageType + Debug,
+        M: IcmpMessage<Ipv6> + Mldv1MessageType + Debug,
         F: FnOnce(&Ipv6Packet<&[u8]>),
         G: for<'a> FnOnce(&IcmpPacket<Ipv6, &'a [u8], M>),
     >(
@@ -482,7 +481,7 @@ mod tests {
         assert_eq!(&data[..], orig_req);
     }
 
-    fn serialize_to_bytes_with_builder<B: ByteSlice + Debug, M: IcmpMldv1MessageType<B> + Debug>(
+    fn serialize_to_bytes_with_builder<M: IcmpMldv1MessageType + Debug>(
         src_ip: Ipv6Addr,
         dst_ip: Ipv6Addr,
         msg: M,
@@ -533,7 +532,7 @@ mod tests {
 
     fn check_icmp<
         B: ByteSlice,
-        M: IcmpMessage<Ipv6, B, Body = Mldv1Body<B>> + Mldv1MessageType + Debug,
+        M: IcmpMessage<Ipv6, Body<B> = Mldv1Body<B>> + Mldv1MessageType + Debug,
     >(
         icmp: &IcmpPacket<Ipv6, B, M>,
         max_resp_code: u16,
@@ -599,7 +598,7 @@ mod tests {
     fn test_mld_serialize_and_parse_query() {
         use crate::icmp::mld::MulticastListenerQuery;
         use crate::testdata::mld_router_query::*;
-        let bytes = serialize_to_bytes_with_builder::<&[u8], _>(
+        let bytes = serialize_to_bytes_with_builder::<_>(
             SRC_IP,
             DST_IP,
             MulticastListenerQuery,
@@ -622,7 +621,7 @@ mod tests {
     fn test_mld_serialize_and_parse_report() {
         use crate::icmp::mld::MulticastListenerReport;
         use crate::testdata::mld_router_report::*;
-        let bytes = serialize_to_bytes_with_builder::<&[u8], _>(
+        let bytes = serialize_to_bytes_with_builder::<_>(
             SRC_IP,
             DST_IP,
             MulticastListenerReport,
@@ -645,7 +644,7 @@ mod tests {
     fn test_mld_serialize_and_parse_done() {
         use crate::icmp::mld::MulticastListenerDone;
         use crate::testdata::mld_router_done::*;
-        let bytes = serialize_to_bytes_with_builder::<&[u8], _>(
+        let bytes = serialize_to_bytes_with_builder::<_>(
             SRC_IP,
             DST_IP,
             MulticastListenerDone,

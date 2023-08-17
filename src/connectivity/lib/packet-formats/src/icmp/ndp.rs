@@ -1316,7 +1316,7 @@ mod tests {
             [options::NdpOptionBuilder::SourceLinkLayerAddress(&SOURCE_LINK_LAYER_ADDRESS)];
         let serialized = OptionSequenceBuilder::new(option_builders.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,
@@ -1347,7 +1347,7 @@ mod tests {
 
         let serialized = []
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,
@@ -1477,7 +1477,7 @@ mod tests {
         ];
         let serialized = OptionSequenceBuilder::new(option_builders.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,
@@ -1537,7 +1537,7 @@ mod tests {
         const DST_IP: Ipv6Addr =
             Ipv6Addr::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17]);
         let serialized = packet::EmptyBuf
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 SRC_IP,
                 DST_IP,
                 IcmpUnusedCode,

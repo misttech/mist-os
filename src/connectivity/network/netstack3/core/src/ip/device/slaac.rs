@@ -2681,7 +2681,7 @@ mod tests {
         let options = &[NdpOptionBuilder::PrefixInformation(p)];
         OptionSequenceBuilder::new(options.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,

@@ -40,7 +40,7 @@ pub const MESSAGE_TTL: u8 = 255;
 /// transmitted to the fake endpoint's network.
 pub async fn write_message<
     B: ByteSlice + Debug,
-    M: IcmpMessage<net_types::ip::Ipv6, B, Code = IcmpUnusedCode> + Debug,
+    M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpUnusedCode> + Debug,
 >(
     src_mac: net_types::ethernet::Mac,
     dst_mac: net_types::ethernet::Mac,
@@ -52,7 +52,7 @@ pub async fn write_message<
 ) -> crate::Result {
     let ser = OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, B, _>::new(src_ip, dst_ip, IcmpUnusedCode, message))
+        .encapsulate(IcmpPacketBuilder::<_, _>::new(src_ip, dst_ip, IcmpUnusedCode, message))
         .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, MESSAGE_TTL, Ipv6Proto::Icmpv6))
         .encapsulate(EthernetFrameBuilder::new(
             src_mac,

@@ -15,6 +15,7 @@ _common_deps = [
   "//src/lib/const-unwrap",
   "//src/lib/network/packet",
   "//third_party/rust_crates:arrayvec",
+  "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:zerocopy",

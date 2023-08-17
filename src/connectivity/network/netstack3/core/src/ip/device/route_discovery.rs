@@ -712,7 +712,7 @@ mod tests {
         let options = options.iter().chain(more_specific_route_opt.as_ref());
         OptionSequenceBuilder::new(options)
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,

@@ -3955,7 +3955,7 @@ mod tests {
 
         match [src_ip, dst_ip].into() {
             IpAddr::V4([src_ip, dst_ip]) => body
-                .encapsulate(IcmpPacketBuilder::<Ipv4, &mut [u8], IcmpDestUnreachable>::new(
+                .encapsulate(IcmpPacketBuilder::<Ipv4, IcmpDestUnreachable>::new(
                     dst_ip,
                     src_ip,
                     Icmpv4DestUnreachableCode::FragmentationRequired,
@@ -3967,7 +3967,7 @@ mod tests {
                 .serialize_vec_outer()
                 .unwrap(),
             IpAddr::V6([src_ip, dst_ip]) => body
-                .encapsulate(IcmpPacketBuilder::<Ipv6, &mut [u8], Icmpv6PacketTooBig>::new(
+                .encapsulate(IcmpPacketBuilder::<Ipv6, Icmpv6PacketTooBig>::new(
                     dst_ip,
                     src_ip,
                     IcmpUnusedCode,
@@ -4312,7 +4312,7 @@ mod tests {
         let frame_dst = FrameDestination::Individual { local: true };
 
         let ic_config = Ipv4::FAKE_CONFIG;
-        let icmp_builder = IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+        let icmp_builder = IcmpPacketBuilder::<Ipv4, _>::new(
             ic_config.remote_ip,
             ic_config.local_ip,
             IcmpUnusedCode,
@@ -4357,7 +4357,7 @@ mod tests {
         let frame_dst = FrameDestination::Individual { local: true };
 
         let ic_config = Ipv6::FAKE_CONFIG;
-        let icmp_builder = IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+        let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
             ic_config.remote_ip,
             ic_config.local_ip,
             IcmpUnusedCode,

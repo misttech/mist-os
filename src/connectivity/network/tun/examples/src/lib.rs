@@ -385,7 +385,7 @@ mod helpers {
         let alice_ip = ip_v4(config.alice_subnet.addr);
         let bob_ip = ip_v4(config.bob_ip);
         packet::Buf::new(&mut ECHO_PAYLOAD.to_vec()[..], ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                 bob_ip,
                 alice_ip,
                 IcmpUnusedCode,

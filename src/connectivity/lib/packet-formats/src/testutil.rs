@@ -210,7 +210,7 @@ pub fn parse_ip_packet<I: IpExt>(
 pub fn parse_icmp_packet<
     I: IcmpIpExt,
     C,
-    M: for<'a> IcmpMessage<I, &'a [u8], Code = C>,
+    M: IcmpMessage<I, Code = C>,
     F: for<'a> FnOnce(&IcmpPacket<I, &'a [u8], M>),
 >(
     mut buf: &[u8],
@@ -260,7 +260,7 @@ pub fn parse_ip_packet_in_ethernet_frame<I: IpExt>(
 pub fn parse_icmp_packet_in_ip_packet_in_ethernet_frame<
     I: IpExt,
     C,
-    M: for<'a> IcmpMessage<I, &'a [u8], Code = C>,
+    M: IcmpMessage<I, Code = C>,
     F: for<'a> FnOnce(&IcmpPacket<I, &'a [u8], M>),
 >(
     buf: &[u8],

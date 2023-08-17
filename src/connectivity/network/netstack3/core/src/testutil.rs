@@ -1333,14 +1333,12 @@ mod tests {
                 |_| {
                     let req = IcmpEchoRequest::new(0, 0);
                     let req_body = &[1, 2, 3, 4];
-                    Buf::new(req_body.to_vec(), ..).encapsulate(
-                        IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
-                            FAKE_CONFIG_V4.local_ip,
-                            FAKE_CONFIG_V4.remote_ip,
-                            IcmpUnusedCode,
-                            req,
-                        ),
-                    )
+                    Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+                        FAKE_CONFIG_V4.local_ip,
+                        FAKE_CONFIG_V4.remote_ip,
+                        IcmpUnusedCode,
+                        req,
+                    ))
                 },
                 None,
             )
@@ -1506,14 +1504,12 @@ mod tests {
                 |_| {
                     let req = IcmpEchoRequest::new(0, 0);
                     let req_body = &[1, 2, 3, 4];
-                    Buf::new(req_body.to_vec(), ..).encapsulate(
-                        IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
-                            FAKE_CONFIG_V4.local_ip,
-                            FAKE_CONFIG_V4.remote_ip,
-                            IcmpUnusedCode,
-                            req,
-                        ),
-                    )
+                    Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+                        FAKE_CONFIG_V4.local_ip,
+                        FAKE_CONFIG_V4.remote_ip,
+                        IcmpUnusedCode,
+                        req,
+                    ))
                 },
                 None,
             )

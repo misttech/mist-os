@@ -370,7 +370,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
     test_case: ForwardingTestCase<I>,
 ) where
     IcmpEchoRequest:
-        for<'a> IcmpMessage<I, &'a [u8], Code = IcmpUnusedCode, Body = OriginalPacket<&'a [u8]>>,
+        for<'a> IcmpMessage<I, Code = IcmpUnusedCode, Body<&'a [u8]> = OriginalPacket<&'a [u8]>>,
     I::Addr: NetTypesIpAddressExt,
 {
     const TTL: u8 = 64;
@@ -466,7 +466,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
     let mut icmp_body = [1, 2, 3, 4, 5, 6, 7, 8];
 
     let ser = packet::Buf::new(&mut icmp_body, ..)
-        .encapsulate(IcmpPacketBuilder::<I, _, _>::new(
+        .encapsulate(IcmpPacketBuilder::<I, _>::new(
             src_ip,
             dst_ip,
             IcmpUnusedCode,

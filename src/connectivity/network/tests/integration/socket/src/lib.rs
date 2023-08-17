@@ -2106,7 +2106,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let src_ip = Ipv4Addr::new(BOB_ADDR_V4.addr);
     let dst_ip = Ipv4Addr::new(ALICE_ADDR_V4.addr);
     let packet = packet::Buf::new(&mut payload[..], ..)
-        .encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+        .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
             src_ip,
             dst_ip,
             IcmpUnusedCode,
@@ -2178,7 +2178,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let src_ip = Ipv6Addr::from_bytes(BOB_ADDR_V6.addr);
     let dst_ip = Ipv6Addr::from_bytes(ALICE_ADDR_V6.addr);
     let packet = packet::Buf::new(&mut payload[..], ..)
-        .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
             IcmpUnusedCode,
@@ -3238,7 +3238,7 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
                 };
                 let mut body = eth.body().to_vec();
                 let icmp_error = packet::Buf::new(&mut body, ..)
-                    .encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+                    .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                         v4_packet.dst_ip(),
                         v4_packet.src_ip(),
                         code,
@@ -3340,7 +3340,7 @@ async fn tcp_icmp_error_v6<N: Netstack>(name: &str, code: Icmpv6DestUnreachableC
                 };
                 let mut body = eth.body().to_vec();
                 let icmp_error = packet::Buf::new(&mut body, ..)
-                    .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                    .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                         v6_packet.dst_ip(),
                         v6_packet.src_ip(),
                         code,

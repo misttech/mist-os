@@ -51,7 +51,7 @@ pub mod testutil {
     ) -> Buf<Vec<u8>> {
         OptionSequenceBuilder::new([NdpOptionBuilder::TargetLinkLayerAddress(&mac.bytes())].iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,
@@ -78,7 +78,7 @@ pub mod testutil {
     ) -> Buf<Vec<u8>> {
         OptionSequenceBuilder::new([NdpOptionBuilder::SourceLinkLayerAddress(&mac.bytes())].iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,
@@ -340,9 +340,12 @@ mod tests {
         // Let's try to ping the remote device from the local device:
         let req = IcmpEchoRequest::new(0, 0);
         let req_body = &[1, 2, 3, 4];
-        let body = Buf::new(req_body.to_vec(), ..).encapsulate(
-            IcmpPacketBuilder::<Ipv6, &[u8], _>::new(local_ip(), remote_ip(), IcmpUnusedCode, req),
-        );
+        let body = Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            local_ip(),
+            remote_ip(),
+            IcmpUnusedCode,
+            req,
+        ));
         // Manually assigning the addresses.
         net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
             add_ip_addr_subnet(
@@ -1053,7 +1056,7 @@ mod tests {
 
         let icmpv6_packet_buf = OptionSequenceBuilder::new(options.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
                 IcmpUnusedCode,
@@ -1081,7 +1084,7 @@ mod tests {
     fn test_receiving_router_advertisement_validity_check() {
         fn router_advertisement_message(src_ip: Ipv6Addr, dst_ip: Ipv6Addr) -> Buf<Vec<u8>> {
             EmptyBuf
-                .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                     src_ip,
                     dst_ip,
                     IcmpUnusedCode,
@@ -1157,7 +1160,7 @@ mod tests {
             let src_ip: Ipv6Addr = src_ip.get();
 
             let icmpv6_packet_buf = EmptyBuf
-                .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                     src_ip,
                     Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
                     IcmpUnusedCode,
@@ -1223,7 +1226,7 @@ mod tests {
             let options = &[NdpOptionBuilder::Mtu(mtu)];
             OptionSequenceBuilder::new(options.iter())
                 .into_serializer()
-                .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                     src_ip,
                     dst_ip,
                     IcmpUnusedCode,
@@ -1771,7 +1774,7 @@ mod tests {
         let options = &[NdpOptionBuilder::PrefixInformation(p)];
         OptionSequenceBuilder::new(options.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpUnusedCode,

@@ -239,7 +239,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
         msg_type: GmpMessageType<MldProtocolSpecific>,
     ) {
         let result = match msg_type {
-            GmpMessageType::Report(MldProtocolSpecific) => send_mld_packet::<_, _, &[u8], _>(
+            GmpMessageType::Report(MldProtocolSpecific) => send_mld_packet::<_, _, _>(
                 self,
                 ctx,
                 device,
@@ -248,7 +248,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
                 group_addr,
                 (),
             ),
-            GmpMessageType::Leave => send_mld_packet::<_, _, &[u8], _>(
+            GmpMessageType::Leave => send_mld_packet::<_, _, _>(
                 self,
                 ctx,
                 device,
@@ -409,8 +409,7 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>>
 fn send_mld_packet<
     C: MldNonSyncContext<SC::DeviceId>,
     SC: MldContext<C>,
-    B: ByteSlice,
-    M: IcmpMldv1MessageType<B>,
+    M: IcmpMldv1MessageType,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -624,7 +623,7 @@ mod tests {
             resp_time.try_into().unwrap(),
         )
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, &[u8], _>::new(
+        .encapsulate(IcmpPacketBuilder::<_, _>::new(
             router_addr,
             MY_IP,
             IcmpUnusedCode,
@@ -655,7 +654,7 @@ mod tests {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
         let mut buffer = Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr)
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<_, &[u8], _>::new(
+            .encapsulate(IcmpPacketBuilder::<_, _>::new(
                 router_addr,
                 MY_IP,
                 IcmpUnusedCode,

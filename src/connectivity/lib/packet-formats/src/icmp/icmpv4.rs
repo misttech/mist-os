@@ -295,7 +295,7 @@ mod tests {
     use crate::icmp::{IcmpMessage, MessageBody};
     use crate::ipv4::{Ipv4Header, Ipv4Packet, Ipv4PacketBuilder};
 
-    fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv4, B> + Debug>(
+    fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv4> + Debug>(
         src_ip: Ipv4Addr,
         dst_ip: Ipv4Addr,
         icmp: &IcmpPacket<Ipv4, B, M>,
@@ -313,7 +313,7 @@ mod tests {
     }
 
     fn test_parse_and_serialize<
-        M: for<'a> IcmpMessage<Ipv4, &'a [u8]> + Debug,
+        M: IcmpMessage<Ipv4> + Debug,
         F: for<'a> FnOnce(&IcmpPacket<Ipv4, &'a [u8], M>),
     >(
         mut req: &[u8],
