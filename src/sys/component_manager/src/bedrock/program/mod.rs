@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cm_runner::{Namespace, NamespaceError, Runner};
+use cm_runner::{Namespace, Runner};
 use fidl::endpoints;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -122,15 +122,6 @@ pub enum Error {
     Internal(fidl::Error),
 }
 
-#[derive(Debug, Error)]
-pub enum StartInfoError {
-    #[error("resolved_url is not set")]
-    MissingResolvedUrl,
-
-    #[error("invalid namespace")]
-    NamespaceError(#[source] NamespaceError),
-}
-
 /// Information and capabilities used to start a program.
 pub struct StartInfo {
     /// The resolved URL of the component.
@@ -200,30 +191,6 @@ pub struct StartInfo {
     /// they drop the other side of the eventpair, which is sent in the payload of
     /// the DebugStarted event in fuchsia.component.events.
     pub break_on_start: Option<zx::EventPair>,
-}
-
-impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
-    type Error = StartInfoError;
-
-    fn try_from(start_info: fcrunner::ComponentStartInfo) -> Result<Self, Self::Error> {
-        let resolved_url =
-            start_info.resolved_url.ok_or_else(|| StartInfoError::MissingResolvedUrl)?;
-        let namespace = start_info.ns.map_or_else(
-            || Ok(Namespace::default()),
-            |ns| Namespace::try_from(ns).map_err(StartInfoError::NamespaceError),
-        )?;
-
-        Ok(Self {
-            resolved_url,
-            program: start_info.program.unwrap_or_else(|| fdata::Dictionary::default()),
-            namespace,
-            outgoing_dir: start_info.outgoing_dir,
-            runtime_dir: start_info.runtime_dir,
-            numbered_handles: start_info.numbered_handles.unwrap_or_else(|| Vec::new()),
-            encoded_config: start_info.encoded_config,
-            break_on_start: start_info.break_on_start,
-        })
-    }
 }
 
 impl From<StartInfo> for fcrunner::ComponentStartInfo {
