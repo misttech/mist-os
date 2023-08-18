@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "driver_logger_harness.h"
 #include "mock/mock_bus_mapper.h"
 #include "mock/mock_mmio.h"
 #include "platform_mmio.h"
@@ -41,7 +42,12 @@ class TestConnectionOwner : public FakeConnectionOwnerBase {
 
 static constexpr uint64_t kMemoryAttributes = 0x8848u;
 
-TEST(AddressManager, MultipleAtoms) {
+class AddressManagerTest : public testing::Test {
+  void SetUp() override { logger_harness_ = DriverLoggerHarness::Create(); }
+  std::unique_ptr<DriverLoggerHarness> logger_harness_;
+};
+
+TEST_F(AddressManagerTest, MultipleAtoms) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
   FakeOwner owner(reg_io.get());
   AddressManager address_manager(&owner, 8);
@@ -87,7 +93,7 @@ TEST(AddressManager, MultipleAtoms) {
   EXPECT_EQ(1u, atom3->address_slot_mapping()->slot_number());
 }
 
-TEST(AddressManager, PreferUnused) {
+TEST_F(AddressManagerTest, PreferUnused) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
   FakeOwner owner(reg_io.get());
   AddressManager address_manager(&owner, 8);
@@ -108,7 +114,7 @@ TEST(AddressManager, PreferUnused) {
   EXPECT_EQ(1u, atom2->address_slot_mapping()->slot_number());
 }
 
-TEST(AddressManager, ReuseSlot) {
+TEST_F(AddressManagerTest, ReuseSlot) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
   FakeOwner owner(reg_io.get());
 
@@ -154,7 +160,7 @@ TEST(AddressManager, ReuseSlot) {
             as_regs.TranslationTable().ReadFrom(reg_io.get()).reg_value());
 }
 
-TEST(AddressManager, FlushAddressRange) {
+TEST_F(AddressManagerTest, FlushAddressRange) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
   FakeOwner owner(reg_io.get());
   auto mapper = std::unique_ptr<MockBusMapper>();

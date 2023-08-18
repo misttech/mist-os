@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 
+#include "driver_logger_harness.h"
 #include "magma_vendor_queries.h"
 #include "mock/mock_bus_mapper.h"
 #include "mock/mock_mmio.h"
@@ -440,33 +441,26 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void MaliProtocol() {
-    fdf_testing::DriverRuntime runtime;
-    fdf::UnownedSynchronizedDispatcher test_dispatcher = runtime.StartBackgroundDispatcher();
+    auto driver = MsdArmDriver::Create();
+    auto parent = std::make_unique<FakeParentDevice>();
+    auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
+    ASSERT_TRUE(device);
+    EXPECT_FALSE(device->IsProtectedModeSupported());
 
-    ASSERT_EQ(ZX_OK,
-              fdf::RunOnDispatcherSync(test_dispatcher->async_dispatcher(), [&]() {
-                auto driver = MsdArmDriver::Create();
-                auto parent = std::make_unique<FakeParentDevice>();
-                auto device =
-                    driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
-                ASSERT_TRUE(device);
-                EXPECT_FALSE(device->IsProtectedModeSupported());
+    ArmMaliServer server;
+    libsync::Completion server_completion;
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
+    ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
 
-                ArmMaliServer server;
-                libsync::Completion server_completion;
-                auto dispatcher = fdf::SynchronizedDispatcher::Create(
-                    {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
-                ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
-
-                auto parent_with_protocol =
-                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
-                device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
-                                                        std::make_unique<MockBusMapper>());
-                EXPECT_TRUE(device->IsProtectedModeSupported());
-                dispatcher->ShutdownAsync();
-                server_completion.Wait();
-                device.reset();
-              }).status_value());
+    auto parent_with_protocol =
+        std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
+    device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
+                                            std::make_unique<MockBusMapper>());
+    EXPECT_TRUE(device->IsProtectedModeSupported());
+    dispatcher->ShutdownAsync();
+    server_completion.Wait();
+    device.reset();
   }
 
   void ResetOnStart() {
@@ -480,35 +474,29 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ProtectedCallbacks() {
-    fdf_testing::DriverRuntime runtime;
-    fdf::UnownedSynchronizedDispatcher test_dispatcher = runtime.StartBackgroundDispatcher();
-
     auto driver = MsdArmDriver::Create();
     ArmMaliServer server;
     server.use_protected_mode_callbacks_ = true;
     libsync::Completion server_completion;
-    ASSERT_EQ(ZX_OK,
-              fdf::RunOnDispatcherSync(test_dispatcher->async_dispatcher(), [&]() {
-                auto dispatcher = fdf::SynchronizedDispatcher::Create(
-                    {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
-                ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
+    ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
 
-                auto parent_with_protocol =
-                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
-                auto device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
-                                                             std::make_unique<MockBusMapper>());
-                ASSERT_TRUE(device);
-                EXPECT_TRUE(device->IsProtectedModeSupported());
-                EXPECT_TRUE(server.got_start_exit_protected_mode_);
-                EXPECT_TRUE(device->exiting_protected_mode_flag_);
-                device->HandleResetInterrupt();
-                EXPECT_FALSE(device->exiting_protected_mode_flag_);
-                EXPECT_TRUE(server.got_finish_exit_protected_mode_);
-                // Callbacks should have been used instead of a soft stop command.
-                EXPECT_EQ(0u, device->register_io_->Read32(registers::GpuCommand::kOffset));
-                dispatcher->ShutdownAsync();
-                server_completion.Wait();
-              }).status_value());
+    auto parent_with_protocol =
+        std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
+    auto device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
+                                                 std::make_unique<MockBusMapper>());
+    ASSERT_TRUE(device);
+    EXPECT_TRUE(device->IsProtectedModeSupported());
+    EXPECT_TRUE(server.got_start_exit_protected_mode_);
+    EXPECT_TRUE(device->exiting_protected_mode_flag_);
+    device->HandleResetInterrupt();
+    EXPECT_FALSE(device->exiting_protected_mode_flag_);
+    EXPECT_TRUE(server.got_finish_exit_protected_mode_);
+    // Callbacks should have been used instead of a soft stop command.
+    EXPECT_EQ(0u, device->register_io_->Read32(registers::GpuCommand::kOffset));
+    dispatcher->ShutdownAsync();
+    server_completion.Wait();
   }
 
   void DevicePropertiesQuery() {
@@ -541,52 +529,57 @@ class TestNonHardwareMsdArmDevice {
   }
 };
 
-TEST(NonHardwareMsdArmDevice, MockDump) {
+class NonHardwareMsdArmDevice : public testing::Test {
+  void SetUp() override { logger_harness_ = DriverLoggerHarness::Create(); }
+  std::unique_ptr<DriverLoggerHarness> logger_harness_;
+};
+
+TEST_F(NonHardwareMsdArmDevice, MockDump) {
   TestNonHardwareMsdArmDevice test;
   test.MockDump();
 }
 
-TEST(NonHardwareMsdArmDevice, ProcessRequest) {
+TEST_F(NonHardwareMsdArmDevice, ProcessRequest) {
   TestNonHardwareMsdArmDevice test;
   test.ProcessRequest();
 }
 
-TEST(NonHardwareMsdArmDevice, HangTimerRequest) {
+TEST_F(NonHardwareMsdArmDevice, HangTimerRequest) {
   TestNonHardwareMsdArmDevice test;
   test.HangTimerRequest();
 }
 
-TEST(NonHardwareMsdArmDevice, MockExecuteAtom) {
+TEST_F(NonHardwareMsdArmDevice, MockExecuteAtom) {
   TestNonHardwareMsdArmDevice test;
   test.MockExecuteAtom();
 }
 
-TEST(NonHardwareMsdArmDevice, MockInitializeQuirks) {
+TEST_F(NonHardwareMsdArmDevice, MockInitializeQuirks) {
   TestNonHardwareMsdArmDevice test;
   test.MockInitializeQuirks();
 }
 
-TEST(NonHardwareMsdArmDevice, Inspect) {
+TEST_F(NonHardwareMsdArmDevice, Inspect) {
   TestNonHardwareMsdArmDevice test;
   test.Inspect();
 }
 
-TEST(NonHardwareMsdArmDevice, MaliProtocol) {
+TEST_F(NonHardwareMsdArmDevice, MaliProtocol) {
   TestNonHardwareMsdArmDevice test;
   test.MaliProtocol();
 }
 
-TEST(NonHardwareMsdArmDevice, ResetOnStart) {
+TEST_F(NonHardwareMsdArmDevice, ResetOnStart) {
   TestNonHardwareMsdArmDevice test;
   test.ResetOnStart();
 }
 
-TEST(NonHardwareMsdArmDevice, ProtectedCallbacks) {
+TEST_F(NonHardwareMsdArmDevice, ProtectedCallbacks) {
   TestNonHardwareMsdArmDevice test;
   test.ProtectedCallbacks();
 }
 
-TEST(NonHardwareMsdArmDevice, DevicePropertiesQuery) {
+TEST_F(NonHardwareMsdArmDevice, DevicePropertiesQuery) {
   TestNonHardwareMsdArmDevice test;
   test.DevicePropertiesQuery();
 }

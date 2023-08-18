@@ -7,6 +7,7 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <zircon/assert.h>
 
 #include "magma_util/macros.h"
 #include "platform_logger.h"
@@ -24,7 +25,8 @@ fit::deferred_callback InitializePlatformLoggerForDFv2(fdf::Logger* logger, std:
 
 void PlatformLogger::LogVa(LogLevel level, const char* file, int line, const char* fmt,
                            va_list args) {
-  MAGMA_DASSERT(g_logger);
+  // Don't use MAGMA_DASSERT here since it calls into PlatformLogger:LogVa again.
+  ZX_DEBUG_ASSERT(g_logger);
   switch (level) {
     case PlatformLogger::LOG_ERROR:
       g_logger->logvf(FUCHSIA_LOG_ERROR, g_tag.c_str(), file, line, fmt, args);

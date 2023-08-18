@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "driver_logger_harness.h"
 #include "mock/mock_bus_mapper.h"
 #include "msd.h"
 #include "msd_defs.h"
@@ -1318,122 +1319,127 @@ class TestConnection {
   }
 };
 
-TEST(TestConnection, MapUnmap) {
+class ConnectionTest : public testing::Test {
+  void SetUp() override { logger_harness_ = DriverLoggerHarness::Create(); }
+  std::unique_ptr<DriverLoggerHarness> logger_harness_;
+};
+
+TEST_F(ConnectionTest, MapUnmap) {
   TestConnection test;
   test.MapUnmap();
 }
 
-TEST(TestConnection, CommitMemory) {
+TEST_F(ConnectionTest, CommitMemory) {
   TestConnection test;
   test.CommitMemory();
 }
 
-TEST(TestConnection, CommitDecommitMemory) {
+TEST_F(ConnectionTest, CommitDecommitMemory) {
   TestConnection test;
   test.CommitDecommitMemory();
 }
 
-TEST(TestConnection, CommitLargeBuffer) {
+TEST_F(ConnectionTest, CommitLargeBuffer) {
   TestConnection test;
   test.CommitLargeBuffer();
 }
 
-TEST(TestConnection, Notification) {
+TEST_F(ConnectionTest, Notification) {
   TestConnection test;
   test.Notification();
 }
 
-TEST(TestConnection, CoalescedNotification) {
+TEST_F(ConnectionTest, CoalescedNotification) {
   TestConnection test;
   test.DestructionNotification();
 }
 
-TEST(TestConnection, DestructionNotification) {
+TEST_F(ConnectionTest, DestructionNotification) {
   TestConnection test;
   test.DestructionNotification();
 }
 
-TEST(TestConnection, SoftwareAtom) {
+TEST_F(ConnectionTest, SoftwareAtom) {
   TestConnection test;
   test.SoftwareAtom();
 }
 
-TEST(TestConnection, GrowableMemory) {
+TEST_F(ConnectionTest, GrowableMemory) {
   TestConnection test;
   test.GrowableMemory();
 }
 
-TEST(TestConnection, FlushRegion) {
+TEST_F(ConnectionTest, FlushRegion) {
   TestConnection test;
   test.FlushRegion();
 }
 
-TEST(TestConnection, FlushUncachedRegion) {
+TEST_F(ConnectionTest, FlushUncachedRegion) {
   TestConnection test;
   test.FlushUncachedRegion();
 }
 
-TEST(TestConnection, PhysicalToVirtual) {
+TEST_F(ConnectionTest, PhysicalToVirtual) {
   TestConnection test;
   test.PhysicalToVirtual();
 }
 
-TEST(TestConnection, DeregisterConnection) {
+TEST_F(ConnectionTest, DeregisterConnection) {
   TestConnection test;
   test.DeregisterConnection();
 }
 
-TEST(TestConnection, ContextCount) {
+TEST_F(ConnectionTest, ContextCount) {
   TestConnection test;
   test.ContextCount();
 }
 
-TEST(TestConnection, JitAddressSpaceAllocate) {
+TEST_F(ConnectionTest, JitAddressSpaceAllocate) {
   TestConnection test;
   test.JitAddressSpaceAllocate();
 }
 
-TEST(TestConnection, JitParseAllocate) {
+TEST_F(ConnectionTest, JitParseAllocate) {
   TestConnection test;
   test.JitParseAllocate();
 }
 
-TEST(TestConnection, JitParseFree) {
+TEST_F(ConnectionTest, JitParseFree) {
   TestConnection test;
   test.JitParseFree();
 }
 
-TEST(TestConnection, JitAllocateNormal) {
+TEST_F(ConnectionTest, JitAllocateNormal) {
   TestConnection test;
   test.JitAllocateNormal();
 }
 
-TEST(TestConnection, JitAllocateWriteCombining) {
+TEST_F(ConnectionTest, JitAllocateWriteCombining) {
   TestConnection test;
   test.JitAllocateWriteCombining();
 }
 
-TEST(TestConnection, JitAllocateReuseChoice) {
+TEST_F(ConnectionTest, JitAllocateReuseChoice) {
   TestConnection test;
   test.JitAllocateWriteCombining();
 }
 
-TEST(TestConnection, JitAllocateInvalidCommitSize) {
+TEST_F(ConnectionTest, JitAllocateInvalidCommitSize) {
   TestConnection test;
   test.JitAllocateInvalidCommitSize();
 }
 
-TEST(TestConnection, JitAllocateInvalidWriteAddress) {
+TEST_F(ConnectionTest, JitAllocateInvalidWriteAddress) {
   TestConnection test;
   test.JitAllocateInvalidWriteAddress();
 }
 
-TEST(TestConnection, MemoryPressure) {
+TEST_F(ConnectionTest, MemoryPressure) {
   TestConnection test;
   test.MemoryPressure();
 }
 
-TEST(TestConnection, FailAllAllocation) {
+TEST_F(ConnectionTest, FailAllAllocation) {
   TestConnection test;
   test.FailAllAllocation();
 }

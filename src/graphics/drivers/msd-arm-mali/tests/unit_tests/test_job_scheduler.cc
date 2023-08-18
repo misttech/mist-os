@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include "driver_logger_harness.h"
 #include "mock/mock_bus_mapper.h"
 #include "platform_port.h"
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
@@ -834,44 +835,53 @@ class TestJobScheduler {
   }
 };
 
-TEST(JobScheduler, RunBasic) { TestJobScheduler().TestRunBasic(); }
+class JobSchedulerTest : public testing::Test {
+  void SetUp() override { logger_harness_ = DriverLoggerHarness::Create(); }
+  std::unique_ptr<DriverLoggerHarness> logger_harness_;
+};
 
-TEST(JobScheduler, RunSlot2) { TestJobScheduler().TestRunSlot2(); }
+TEST_F(JobSchedulerTest, RunBasic) { TestJobScheduler().TestRunBasic(); }
 
-TEST(JobScheduler, CancelJob) { TestJobScheduler().TestCancelJob(); }
+TEST_F(JobSchedulerTest, RunSlot2) { TestJobScheduler().TestRunSlot2(); }
 
-TEST(JobScheduler, JobDependencies) { TestJobScheduler().TestJobDependencies(); }
+TEST_F(JobSchedulerTest, CancelJob) { TestJobScheduler().TestCancelJob(); }
 
-TEST(JobScheduler, DataDependency) { TestJobScheduler().TestDataDependency(); }
+TEST_F(JobSchedulerTest, JobDependencies) { TestJobScheduler().TestJobDependencies(); }
 
-TEST(JobScheduler, Timeout) { TestJobScheduler().TestTimeout(); }
+TEST_F(JobSchedulerTest, DataDependency) { TestJobScheduler().TestDataDependency(); }
 
-TEST(JobScheduler, Semaphores) { TestJobScheduler().TestSemaphores(); }
+TEST_F(JobSchedulerTest, Timeout) { TestJobScheduler().TestTimeout(); }
 
-TEST(JobScheduler, SemaphoreTimeout) { TestJobScheduler().TestSemaphoreTimeout(); }
+TEST_F(JobSchedulerTest, Semaphores) { TestJobScheduler().TestSemaphores(); }
 
-TEST(JobScheduler, CancelNull) { TestJobScheduler().TestCancelNull(); }
+TEST_F(JobSchedulerTest, SemaphoreTimeout) { TestJobScheduler().TestSemaphoreTimeout(); }
 
-TEST(JobScheduler, MultipleSlots) { TestJobScheduler().TestMultipleSlots(); }
+TEST_F(JobSchedulerTest, CancelNull) { TestJobScheduler().TestCancelNull(); }
 
-TEST(JobScheduler, Priorities) { TestJobScheduler().TestPriorities(); }
+TEST_F(JobSchedulerTest, MultipleSlots) { TestJobScheduler().TestMultipleSlots(); }
 
-TEST(JobScheduler, Preemption) { TestJobScheduler().TestPreemption(false, false); }
+TEST_F(JobSchedulerTest, Priorities) { TestJobScheduler().TestPriorities(); }
 
-TEST(JobScheduler, PreemptionNormalCompletion) { TestJobScheduler().TestPreemption(true, false); }
+TEST_F(JobSchedulerTest, Preemption) { TestJobScheduler().TestPreemption(false, false); }
 
-TEST(JobScheduler, PreemptionEqualPriority) { TestJobScheduler().TestPreemption(false, true); }
+TEST_F(JobSchedulerTest, PreemptionNormalCompletion) {
+  TestJobScheduler().TestPreemption(true, false);
+}
 
-TEST(JobScheduler, PreemptionNormalCompletionEqualPriority) {
+TEST_F(JobSchedulerTest, PreemptionEqualPriority) {
+  TestJobScheduler().TestPreemption(false, true);
+}
+
+TEST_F(JobSchedulerTest, PreemptionNormalCompletionEqualPriority) {
   TestJobScheduler().TestPreemption(true, true);
 }
 
-TEST(JobScheduler, DumpStatus) { TestJobScheduler().TestDumpStatus(); }
+TEST_F(JobSchedulerTest, DumpStatus) { TestJobScheduler().TestDumpStatus(); }
 
-TEST(JobScheduler, ProtectedRunSlot0) { TestJobScheduler().TestProtectedAtomRun(0); }
+TEST_F(JobSchedulerTest, ProtectedRunSlot0) { TestJobScheduler().TestProtectedAtomRun(0); }
 
-TEST(JobScheduler, ProtectedRunSlot1) { TestJobScheduler().TestProtectedAtomRun(1); }
+TEST_F(JobSchedulerTest, ProtectedRunSlot1) { TestJobScheduler().TestProtectedAtomRun(1); }
 
-TEST(JobScheduler, ProtectedMode) { TestJobScheduler().TestProtectedMode(); }
+TEST_F(JobSchedulerTest, ProtectedMode) { TestJobScheduler().TestProtectedMode(); }
 
-TEST(JobScheduler, ProtectedPriority) { TestJobScheduler().TestProtectedPriority(); }
+TEST_F(JobSchedulerTest, ProtectedPriority) { TestJobScheduler().TestProtectedPriority(); }
