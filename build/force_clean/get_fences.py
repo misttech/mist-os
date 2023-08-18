@@ -29,6 +29,9 @@ def print_fences():
     print(
         "After fxr/829176, assembly complains that host_tools.modular manifest cannot be found (http://fxbug.dev/124905)."
     )
+    print(
+        "After fxr/898958, assembly complains about fshost equivalence in zedboot even though zedboot should not be built in user/userdebug."
+    )
     pass
 
 
