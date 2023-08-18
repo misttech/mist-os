@@ -4,6 +4,7 @@
 
 import("//build/dart/dart_library.gni")
 import("//build/dart/test.gni")
+import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
 
@@ -173,6 +174,29 @@ foreach(test, shard_test_list) {
   }
 }
 
+lacewing_test_list = [ "flatland_benchmark" ]
+
+if (is_host) {
+  foreach(test_name, lacewing_test_list) {
+    python_mobly_test("py_$test_name") {
+      main_source = "test/$test_name.py"
+      libraries = [
+        "//src/testing/end_to_end/honeydew",
+        "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+      ]
+
+      local_config_source =
+          "//src/testing/end_to_end/examples/testbeds/One-FEmu.yaml"
+
+      environments = [
+        atlas_env,
+        nuc_env,
+        vim3_env,
+      ]
+    }
+  }
+}
+
 if (is_host) {
   metric_files = [
     "fuchsia.archivist.formatter.txt",
@@ -319,6 +343,10 @@ group("test") {
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]
+  }
+
+  foreach(target_name, lacewing_test_list) {
+    deps += [ ":py_$target_name($host_toolchain)" ]
   }
 }
 

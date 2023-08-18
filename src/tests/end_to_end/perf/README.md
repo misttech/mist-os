@@ -4,7 +4,9 @@ This directory contains performance tests. In many cases, the code in this
 directory is just an [SL4F] wrapper (that is, Dart code using the SL4F
 framework) for a test that is located elsewhere in the Fuchsia source tree.
 
-This directory contains the following performance tests:
+Check the [instructions][instructions] to run these test locally.
+
+This directory contains the following performance tests written in Dart:
 
 *   `audio_mixer_profiler_test` - SL4F wrapper for profiling the different
     steps in the audio mixing process.
@@ -39,6 +41,13 @@ This directory contains the following performance tests:
     [Inspect] operations, such as creating and deleting nodes and updating
     properties.
 
+This directory contains the following performance test written in Python using
+Lacewing:
+
+*   `py_flatland_benchmark` - Tests the performance of Flatland's
+    end-to-end present latency, measured by tracing flow events, for minimal
+    Flatland client (`flatland-view-provider`).
+
 You can view the test results from CI builds in [Chromeperf][chromeperf].
 
 <!-- Reference links -->
@@ -47,3 +56,4 @@ You can view the test results from CI builds in [Chromeperf][chromeperf].
 [Inspect]: /docs/development/inspect/README.md
 [fuchsia_microbenchmarks]: /src/tests/microbenchmarks
 [chromeperf]: /docs/development/performance/chromeperf_user_guide.md
+[instructions]: /docs/development/performance/running_performance_tests.md
