@@ -10,7 +10,10 @@ import("//build/rust/rustc_test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":base-resolver-as-a-component-resolver-tests" ]
+  deps = [
+    ":base-resolver-as-a-component-resolver-tests",
+    ":base-resolver-as-a-component-resolver-tests-fxblob",
+  ]
 }
 
 rustc_test("integration_test_bin") {
@@ -35,8 +38,47 @@ fuchsia_component("integration-test") {
 }
 
 fuchsia_test_component("root") {
-  manifest = "meta/root.cml"
+  manifest = "meta/root-blobfs.cml"
   test_type = "system"
+}
+
+fuchsia_test_component("root_fxblob") {
+  manifest = "meta/root-fxblob.cml"
+  test_type = "system"
+}
+
+rustc_binary("fake_dependencies_fxblob_bin") {
+  edition = "2021"
+  testonly = true
+  name = "base_resolver_fake_dependencies_fxblob_bin"
+  source_root = "fake_dependencies.rs"
+  deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/storage/vfs/rust:vfs",
+    "//src/storage/fxfs:fxfs_component",
+    "//src/sys/pkg/lib/fuchsia-hash",
+    "//src/sys/pkg/lib/fuchsia-pkg-testing",
+    "//src/sys/pkg/lib/system-image",
+    "//src/sys/pkg/testing/blobfs-ramdisk",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+  features = [ "use_fxblob" ]
+  sources = [ "fake_dependencies.rs" ]
+}
+
+fuchsia_component("fake-dependencies-fxblob") {
+  testonly = true
+  manifest = "meta/fake-dependencies-fxblob.cml"
+  deps = [
+    ":fake_dependencies_fxblob_bin",
+    "//src/storage/testing:storage_driver_test_realm",
+    "//src/sys/pkg/bin/pm:pm_bin",
+  ]
 }
 
 rustc_binary("fake_dependencies_bin") {
@@ -63,7 +105,7 @@ rustc_binary("fake_dependencies_bin") {
 
 fuchsia_component("fake-dependencies") {
   testonly = true
-  manifest = "meta/fake-dependencies.cml"
+  manifest = "meta/fake-dependencies-blobfs.cml"
   deps = [
     ":fake_dependencies_bin",
     "//src/storage/testing:storage_driver_test_realm",
@@ -153,7 +195,20 @@ fuchsia_test_package("base-resolver-as-a-component-resolver-tests") {
     ":integration-test",
     ":mock-component",
     ":mock-superpackage-component",
-    "//src/sys/base-resolver:base-resolver-component",
+    "//src/sys/base-resolver:component-and-config-cpp-blobfs",
+  ]
+
+  subpackages = [ ":subpackaged-component" ]
+}
+
+fuchsia_test_package("base-resolver-as-a-component-resolver-tests-fxblob") {
+  test_components = [ ":root_fxblob" ]
+  deps = [
+    ":fake-dependencies-fxblob",
+    ":integration-test",
+    ":mock-component",
+    ":mock-superpackage-component",
+    "//src/sys/base-resolver:component-and-config-fxblob",
   ]
 
   subpackages = [ ":subpackaged-component" ]

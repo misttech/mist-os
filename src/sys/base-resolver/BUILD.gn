@@ -8,6 +8,7 @@ import("//build/dist/component_manifest_resources.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 group("base-resolver") {
   testonly = true
@@ -30,11 +31,13 @@ rustc_binary("bin") {
   configs += [ "//build/config/rust:bootfs" ]
 
   deps = [
+    ":config_lib",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -75,10 +78,66 @@ component_manifest_resources("root-manifest") {
   sources = [ "meta/base-resolver.cml" ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "base-resolver"
+  manifest = "meta/base-resolver.cml"
+}
+
+fuchsia_structured_config_values("config_values_from_gn") {
+  cm_label = ":manifest"
+  values = {
+    use_fxblob = fxfs_blob
+  }
+  visibility = [ ":*" ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn-fxblob") {
+  cm_label = ":manifest"
+  values = {
+    use_fxblob = true
+  }
+  visibility = [ ":*" ]
+}
+
+group("component-and-config-fxblob") {
+  public_deps = [
+    ":base-resolver-component",
+    ":config_values_from_gn-fxblob",
+  ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
+  cm_label = ":manifest"
+  values = {
+    use_fxblob = false
+  }
+  visibility = [ ":*" ]
+}
+
+group("component-and-config-cpp-blobfs") {
+  public_deps = [
+    ":base-resolver-component",
+    ":config_values_from_gn-cpp-blobfs",
+  ]
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  cm_label = ":manifest"
+  name = "base_resolver_config"
+  visibility = [ ":*" ]
+}
+
 fuchsia_component("base-resolver-component") {
   component_name = "base-resolver"
   manifest = "meta/base-resolver.cml"
   deps = [ ":bin" ]
+}
+
+group("production-component-and-config") {
+  public_deps = [
+    ":base-resolver-component",
+    ":config_values_from_gn",
+  ]
 }
 
 fuchsia_unittest_package("base-resolver-tests") {
@@ -98,6 +157,7 @@ fuchsia_unittest_package("base-resolver-tests") {
 bootfs_files_for_assembly("bootfs") {
   deps = [
     ":bin",
+    ":config_values_from_gn",
     ":root-manifest",
   ]
 }

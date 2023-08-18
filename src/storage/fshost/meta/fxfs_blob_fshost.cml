@@ -37,8 +37,8 @@
             path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
         },
         {
-            protocol: "fuchsia.fxfs.ReadBlob",
-            path: "/fs/blob/svc/fuchsia.fxfs.ReadBlob",
+            protocol: "fuchsia.fxfs.BlobReader",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
         },
     ],
     use: [
@@ -115,7 +115,7 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.fxfs.ReadBlob",
+            protocol: "fuchsia.fxfs.BlobReader",
             from: "self",
             availability: "same_as_target",
         },

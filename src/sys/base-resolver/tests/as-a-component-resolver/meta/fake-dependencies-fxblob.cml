@@ -1,0 +1,30 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/sys/base-resolver/tests/as-a-component-resolver/meta/fake-dependencies-base.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/base_resolver_fake_dependencies_fxblob_bin",
+    },
+    capabilities: [
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            path: "/fxfs-svc/fuchsia.fxfs.BlobCreator",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            path: "/fxfs-svc/fuchsia.fxfs.BlobReader",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "self",
+        },
+    ],
+}

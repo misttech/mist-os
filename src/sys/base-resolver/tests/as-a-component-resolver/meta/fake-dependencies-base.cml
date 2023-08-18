@@ -1,4 +1,4 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -9,10 +9,6 @@
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
-    program: {
-        runner: "elf",
-        binary: "bin/base_resolver_fake_dependencies_bin",
-    },
     capabilities: [
         { protocol: "fuchsia.boot.Arguments" },
         {
@@ -28,13 +24,6 @@
             from: "parent",
             rights: [ "r*" ],
             path: "/the-subpackage",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.kernel.VmexResource",
-            from: "parent",
-            to: "#fs-collection",
         },
     ],
     expose: [

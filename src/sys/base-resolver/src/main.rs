@@ -6,7 +6,7 @@ use {
     anyhow::{self, Context as _},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_pkg as fpkg, fuchsia_inspect as finspect,
     futures::{future::TryFutureExt as _, stream::StreamExt as _},
     std::collections::HashMap,
     tracing::error,
@@ -19,13 +19,16 @@ mod package;
 #[fuchsia::main]
 async fn main() -> anyhow::Result<()> {
     tracing::info!("started");
+    let config = base_resolver_config::Config::take_from_startup_handle();
+    let inspector = finspect::Inspector::default();
+    inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
 
-    let blobfs = blobfs::Client::builder()
-        .readable()
-        .executable()
+    let builder = blobfs::Client::builder().readable().executable();
+    let blobfs = if config.use_fxblob { builder.use_reader() } else { builder }
         .build()
         .await
         .context("creating blobfs client")?;
+
     let base_packages = determine_base_packages(
         &blobfs,
         &fuchsia_component::client::connect_to_protocol::<fboot::ArgumentsMarker>()

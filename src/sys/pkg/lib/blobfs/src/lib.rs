@@ -14,7 +14,7 @@ use {
     futures::{stream, StreamExt as _},
     std::{collections::HashSet, sync::Arc},
     thiserror::Error,
-    tracing::{error, warn},
+    tracing::{error, info, warn},
     vfs::{
         common::send_on_open_with_error, directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope, path::Path,
@@ -130,12 +130,15 @@ impl ClientBuilder {
             Reader::DontUse => None,
             Reader::Use { use_vmex } => {
                 if use_vmex {
-                    let client = fuchsia_component::client::connect_to_protocol::<
+                    if let Ok(client) = fuchsia_component::client::connect_to_protocol::<
                         fidl_fuchsia_kernel::VmexResourceMarker,
-                    >()
-                    .map_err(BlobfsError::ConnectToVmexResource)?;
-                    let vmex = client.get().await?;
-                    vmo_blob::init_vmex_resource(vmex).map_err(BlobfsError::InitVmexResource)?;
+                    >() {
+                        if let Ok(vmex) = client.get().await {
+                            info!("Got vmex resource");
+                            vmo_blob::init_vmex_resource(vmex)
+                                .map_err(BlobfsError::InitVmexResource)?;
+                        }
+                    }
                 }
                 Some(
                     fuchsia_component::client::connect_to_protocol::<ffxfs::BlobReaderMarker>()

@@ -34,7 +34,14 @@
             path: "/blob",
         },
         {
-            protocol: [ "fuchsia.boot.Arguments" ],
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.kernel.VmexResource",
+            ],
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            availability: "optional",
         },
     ],
     expose: [
@@ -54,4 +61,9 @@
             from: "self",
         },
     ],
+    config: {
+        // If true, base-resolver will use the fuchsia.fxfs.BlobReader to read blobs. Otherwise,
+        // base-resolver will use the /blob directory.
+        use_fxblob: { type: "bool" },
+    },
 }

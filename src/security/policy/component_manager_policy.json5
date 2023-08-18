@@ -302,6 +302,7 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/fshost/blobfs",
+                    "/bootstrap/base_resolver",
 
                     // TODO(fxbug.dev/122055): Remove once merkle verification happens
                     // out-of-process.

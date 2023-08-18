@@ -537,7 +537,10 @@
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],
             from: "parent",
-            to: "#fshost",
+            to: [
+                "#base_resolver",
+                "#fshost",
+            ],
         },
         {
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
@@ -1057,6 +1060,12 @@
             protocol: "fuchsia.fxfs.BlobCreator",
             from: "#fshost",
             to: "#pkg-cache",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "#fshost",
+            to: "#base_resolver",
             availability: "optional",
         },
         {

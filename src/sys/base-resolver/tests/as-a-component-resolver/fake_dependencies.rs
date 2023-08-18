@@ -3,13 +3,24 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::DiscoverableProtocolMarker as _, fidl_fuchsia_boot as fboot,
-    fidl_fuchsia_io as fio, futures::stream::TryStreamExt as _, tracing::info,
-    vfs::directory::entry::DirectoryEntry as _,
+    fidl::endpoints::DiscoverableProtocolMarker as _,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
+    futures::stream::TryStreamExt as _,
+    tracing::info,
+    vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
 };
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &'static str = "bin/pkgsvr+";
+
+// When this feature is enabled, the base-resolver integration tests will start Fxblob.
+#[cfg(feature = "use_fxblob")]
+static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation = blobfs_ramdisk::Implementation::Fxblob;
+
+// When this feature is not enabled, the base-resolver integration tests will start cpp Blobfs.
+#[cfg(not(feature = "use_fxblob"))]
+static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation =
+    blobfs_ramdisk::Implementation::CppBlobfs;
 
 #[fuchsia::main]
 async fn main() {
@@ -26,7 +37,11 @@ async fn main() {
         .build()
         .await
         .expect("build system_image package");
-    let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.expect("start blobfs");
+    let blobfs = blobfs_ramdisk::BlobfsRamdisk::builder()
+        .implementation(BLOB_IMPLEMENTATION)
+        .start()
+        .await
+        .unwrap();
     let () = system_image.write_to_blobfs(&blobfs).await;
     let () = this_pkg.write_to_blobfs_ignore_subpackages(&blobfs).await;
     let the_subpackage = fuchsia_pkg_testing::Package::from_dir("/the-subpackage").await.unwrap();
@@ -44,6 +59,15 @@ async fn main() {
         "blob" =>
             vfs::remote::remote_dir(blobfs.root_dir_proxy().expect("get blobfs root dir")),
     };
+
+    if BLOB_IMPLEMENTATION == blobfs_ramdisk::Implementation::Fxblob {
+        out_dir
+            .add_entry(
+                "fxfs-svc",
+                vfs::remote::remote_dir(blobfs.svc_dir().expect("get blobfs svc dir").unwrap()),
+            )
+            .unwrap();
+    }
 
     let scope = vfs::execution_scope::ExecutionScope::new();
     out_dir.open(

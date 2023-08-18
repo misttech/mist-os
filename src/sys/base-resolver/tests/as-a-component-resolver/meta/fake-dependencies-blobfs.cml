@@ -1,0 +1,17 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/sys/base-resolver/tests/as-a-component-resolver/meta/fake-dependencies-base.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/base_resolver_fake_dependencies_bin",
+    },
+    offer: [
+        {
+            protocol: "fuchsia.kernel.VmexResource",
+            from: "parent",
+            to: "#fs-collection",
+        },
+    ],
+}

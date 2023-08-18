@@ -22,6 +22,15 @@ static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &'static str = "bin/pkgsvr+";
 static SHELL_COMMANDS_BIN_PATH: &'static str = "shell-commands-bin";
 
+// When this feature is enabled, the base-resolver integration tests will start Fxblob.
+#[cfg(feature = "use_fxblob")]
+static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation = blobfs_ramdisk::Implementation::Fxblob;
+
+// When this feature is not enabled, the base-resolver integration tests will start cpp Blobfs.
+#[cfg(not(feature = "use_fxblob"))]
+static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation =
+    blobfs_ramdisk::Implementation::CppBlobfs;
+
 trait BootArgumentsStreamHandler: Send + Sync {
     fn handle_stream(&self, stream: fboot::ArgumentsRequestStream) -> BoxFuture<'static, ()>;
 }
@@ -45,7 +54,8 @@ impl TestEnvBuilder {
             .build()
             .await;
 
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let blobfs =
+            BlobfsRamdisk::builder().implementation(BLOB_IMPLEMENTATION).start().await.unwrap();
         let () = system_image.write_to_blobfs(&blobfs).await;
         for pkg in static_packages {
             let () = pkg.write_to_blobfs(&blobfs).await;
@@ -99,6 +109,61 @@ impl TestEnvBuilder {
             )
             .await
             .unwrap();
+
+        builder.init_mutable_config_from_package(&resolver).await.unwrap();
+        match BLOB_IMPLEMENTATION {
+            blobfs_ramdisk::Implementation::Fxblob => {
+                builder.set_config_value_bool(&resolver, "use_fxblob", true).await.unwrap();
+
+                let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
+                let service_reflector = builder
+                    .add_local_child(
+                        "service_reflector",
+                        move |handles| {
+                            let out_dir = vfs::pseudo_directory! {
+                                "blob-svc" => svc_dir.clone(),
+                            };
+                            let scope = vfs::execution_scope::ExecutionScope::new();
+                            let () = out_dir.open(
+                                scope.clone(),
+                                fio::OpenFlags::RIGHT_READABLE
+                                    | fio::OpenFlags::RIGHT_WRITABLE
+                                    | fio::OpenFlags::RIGHT_EXECUTABLE,
+                                vfs::path::Path::dot(),
+                                handles.outgoing_dir.into_channel().into(),
+                            );
+                            async move {
+                                scope.wait().await;
+                                Ok(())
+                            }
+                            .boxed()
+                        },
+                        ChildOptions::new(),
+                    )
+                    .await
+                    .unwrap();
+
+                builder
+                    .add_route(
+                        Route::new()
+                            .capability(
+                                Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>().path(
+                                    format!(
+                                        "/blob-svc/{}",
+                                        fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME
+                                    ),
+                                ),
+                            )
+                            .from(&service_reflector)
+                            .to(&resolver),
+                    )
+                    .await
+                    .unwrap();
+            }
+            blobfs_ramdisk::Implementation::CppBlobfs => {
+                builder.set_config_value_bool(&resolver, "use_fxblob", false).await.unwrap();
+            }
+        }
 
         builder
             .add_route(
