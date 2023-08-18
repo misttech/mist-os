@@ -94,6 +94,7 @@ foreach(target, archive_targets + fastboot_targets + paver_targets) {
     testonly = true
     outputs = [ _archive_manifest_file ]
     output_conversion = "json"
+    walk_keys = [ "images_barrier" ]
     data_keys = [ "images" ]
     deps = target.deps
   }
