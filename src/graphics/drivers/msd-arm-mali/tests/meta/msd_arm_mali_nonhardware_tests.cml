@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
+        "sys/testing/gtest_runner.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
