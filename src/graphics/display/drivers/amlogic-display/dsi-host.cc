@@ -28,44 +28,57 @@ constexpr cpp20::span<const uint8_t> kEmptySequenceSpan = {kEmptySequence, 0};
 
 // Convenience function for building PanelConfigs. Most op sequences are shared
 // between panel types.
-constexpr PanelConfig MakeConfig(const char* name, cpp20::span<const uint8_t> init_seq) {
-  return {name,
-          init_seq,
-          {lcd_shutdown_sequence, std::size(lcd_shutdown_sequence)},
-          {lcd_power_on_sequence, std::size(lcd_power_on_sequence)},
-          {lcd_power_off_sequence, std::size(lcd_power_off_sequence)}};
+constexpr PanelConfig MakeConfigForAstroSherlockNelson(const char* name,
+                                                       cpp20::span<const uint8_t> init_seq) {
+  return {.name = name,
+          .dsi_on = init_seq,
+          .dsi_off = {lcd_shutdown_sequence, std::size(lcd_shutdown_sequence)},
+          .power_on = {kLcdPowerOnSequenceForAstroSherlockNelson,
+                       std::size(kLcdPowerOnSequenceForAstroSherlockNelson)},
+          .power_off = {kLcdPowerOffSequenceForAstroSherlockNelson,
+                        std::size(kLcdPowerOffSequenceForAstroSherlockNelson)}};
 }
+
+constexpr PanelConfig kVim3Ts050PanelConfig = {
+    .name = "MTF050FHDI_03",
+    .dsi_on = {lcd_init_sequence_MTF050FHDI_03, std::size(lcd_init_sequence_MTF050FHDI_03)},
+    .dsi_off = {lcd_shutdown_sequence, std::size(lcd_shutdown_sequence)},
+    .power_on = {kLcdPowerOnSequenceForVim3Ts050, std::size(kLcdPowerOnSequenceForVim3Ts050)},
+    .power_off = {kLcdPowerOffSequenceForVim3Ts050, std::size(kLcdPowerOffSequenceForVim3Ts050)},
+};
 
 // LINT.IfChange
 /// Panel type IDs are compact. This array should be updated when
 /// <lib/device-protocol/display-panel.h> is.
-PanelConfig kPanelConfig[] = {
-    MakeConfig("TV070WSM_FT",
-               {lcd_init_sequence_TV070WSM_FT, std::size(lcd_init_sequence_TV070WSM_FT)}),
-    MakeConfig("P070ACB_FT",
-               {lcd_init_sequence_P070ACB_FT, std::size(lcd_init_sequence_P070ACB_FT)}),
-    MakeConfig("TV101WXM_FT",
-               {lcd_init_sequence_TV101WXM_FT, std::size(lcd_init_sequence_TV101WXM_FT)}),
-    MakeConfig("G101B158_FT",
-               {lcd_init_sequence_G101B158_FT, std::size(lcd_init_sequence_G101B158_FT)}),
+constexpr PanelConfig kPanelConfig[] = {
+    MakeConfigForAstroSherlockNelson(
+        "TV070WSM_FT", {lcd_init_sequence_TV070WSM_FT, std::size(lcd_init_sequence_TV070WSM_FT)}),
+    MakeConfigForAstroSherlockNelson(
+        "P070ACB_FT", {lcd_init_sequence_P070ACB_FT, std::size(lcd_init_sequence_P070ACB_FT)}),
+    MakeConfigForAstroSherlockNelson(
+        "TV101WXM_FT", {lcd_init_sequence_TV101WXM_FT, std::size(lcd_init_sequence_TV101WXM_FT)}),
+    MakeConfigForAstroSherlockNelson(
+        "G101B158_FT", {lcd_init_sequence_G101B158_FT, std::size(lcd_init_sequence_G101B158_FT)}),
     // ILI9881C & ST7701S are not supported
-    MakeConfig("ILI9881C", kEmptySequenceSpan),
-    MakeConfig("ST7701S", kEmptySequenceSpan),
-    MakeConfig("TV080WXM_FT",
-               {lcd_init_sequence_TV080WXM_FT, std::size(lcd_init_sequence_TV080WXM_FT)}),
-    MakeConfig("TV101WXM_FT_9365",
-               {lcd_init_sequence_TV101WXM_FT_9365, std::size(lcd_init_sequence_TV101WXM_FT_9365)}),
-    MakeConfig("TV070WSM_FT_9365",
-               {lcd_init_sequence_TV070WSM_FT_9365, std::size(lcd_init_sequence_TV070WSM_FT_9365)}),
-    MakeConfig("KD070D82_FT",
-               {lcd_init_sequence_KD070D82_FT, std::size(lcd_init_sequence_KD070D82_FT)}),
-    MakeConfig("KD070D82_FT_9365",
-               {lcd_init_sequence_KD070D82_FT_9365, std::size(lcd_init_sequence_KD070D82_FT_9365)}),
-    MakeConfig("TV070WSM_ST7703I",
-               {lcd_init_sequence_TV070WSM_ST7703I, std::size(lcd_init_sequence_TV070WSM_ST7703I)}),
-    MakeConfig("MTF050FHDI_03",
-               {lcd_init_sequence_MTF050FHDI_03, std::size(lcd_init_sequence_MTF050FHDI_03)}),
-
+    MakeConfigForAstroSherlockNelson("ILI9881C", kEmptySequenceSpan),
+    MakeConfigForAstroSherlockNelson("ST7701S", kEmptySequenceSpan),
+    MakeConfigForAstroSherlockNelson(
+        "TV080WXM_FT", {lcd_init_sequence_TV080WXM_FT, std::size(lcd_init_sequence_TV080WXM_FT)}),
+    MakeConfigForAstroSherlockNelson(
+        "TV101WXM_FT_9365",
+        {lcd_init_sequence_TV101WXM_FT_9365, std::size(lcd_init_sequence_TV101WXM_FT_9365)}),
+    MakeConfigForAstroSherlockNelson(
+        "TV070WSM_FT_9365",
+        {lcd_init_sequence_TV070WSM_FT_9365, std::size(lcd_init_sequence_TV070WSM_FT_9365)}),
+    MakeConfigForAstroSherlockNelson(
+        "KD070D82_FT", {lcd_init_sequence_KD070D82_FT, std::size(lcd_init_sequence_KD070D82_FT)}),
+    MakeConfigForAstroSherlockNelson(
+        "KD070D82_FT_9365",
+        {lcd_init_sequence_KD070D82_FT_9365, std::size(lcd_init_sequence_KD070D82_FT_9365)}),
+    MakeConfigForAstroSherlockNelson(
+        "TV070WSM_ST7703I",
+        {lcd_init_sequence_TV070WSM_ST7703I, std::size(lcd_init_sequence_TV070WSM_ST7703I)}),
+    kVim3Ts050PanelConfig,
 };
 // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
 

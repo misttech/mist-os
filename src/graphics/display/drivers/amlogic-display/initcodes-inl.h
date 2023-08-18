@@ -12,16 +12,47 @@
 namespace amlogic_display {
 
 // clang-format off
-constexpr PowerOp lcd_power_on_sequence[] = {
+constexpr PowerOp kLcdPowerOnSequenceForAstroSherlockNelson[] = {
     { kPowerOpGpio, 1, 0, 200 }, // This op is an upstream bug.
     { kPowerOpSignal, 0, 0, 0 },
     { kPowerOpExit, 0, 0, 0 },
 };
 
-constexpr PowerOp lcd_power_off_sequence[] = {
+constexpr PowerOp kLcdPowerOffSequenceForAstroSherlockNelson[] = {
     { kPowerOpSignal, 0, 0, 5 },
     { kPowerOpGpio, 0, 0, 20 },
     { kPowerOpGpio, 1, 1, 100 },  // This op is an upstream bug
+    { kPowerOpExit, 0, 0, 0 },
+};
+
+constexpr PowerOp kLcdPowerOnSequenceForVim3Ts050[] = {
+    // In order to power on the MTF050FHDI panel (used by Khadas TS050
+    // touchscreen), the "LCD_RESET" pin must be set to high first, and then
+    // set to low for at least 9us to initiate the reset procedure, and finally
+    // set to high.  Within 10ms after the rising edge the display is reset to
+    // its initial condition loaded from ROM.
+    //
+    // The sleep time used here is from Khadas-provided bringup code.
+    //
+    // Microtech MTF050FHDI-03 Specification Sheet, Version 1.0, dated July 7,
+    // 2015, page 11.
+    { kPowerOpGpio, 0, 1, /*sleep_ms=*/ 10 },
+    { kPowerOpGpio, 0, 0, /*sleep_ms=*/ 10 },
+    { kPowerOpGpio, 0, 1, /*sleep_ms=*/ 10 },
+    { kPowerOpSignal, 0, 0, 0 },
+    { kPowerOpExit, 0, 0, 0 },
+};
+
+constexpr PowerOp kLcdPowerOffSequenceForVim3Ts050[] = {
+    { kPowerOpSignal, 0, 0, /*sleep_ms=*/ 5 },
+    // Enter the reset state; the display will be blank (black) while in this
+    // state.
+    //
+    // The 0ms sleep time used here is from Khadas-provided bringup code.
+    //
+    // Microtech MTF050FHDI-03 Specification Sheet, Version 1.0, dated July 7,
+    // 2015, page 11.
+    { kPowerOpGpio, 0, 0, /*sleep_ms=*/ 0 },
     { kPowerOpExit, 0, 0, 0 },
 };
 
