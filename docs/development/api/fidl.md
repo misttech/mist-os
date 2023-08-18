@@ -620,12 +620,12 @@ guide your decision making:
    `FrobinateResult` struct defined above contains values that are always null
    at the same time when `error` is not `MyError.OK`.
 
-### Should I use `string` or `bytes`?
+### Should I use `string` or `vector<byte>`?
 
 In FIDL, `string` data must be valid UTF-8, which means strings can represent
 sequences of Unicode code points but cannot represent arbitrary binary data.  In
-contrast, `bytes` or `array<uint8>` can represent arbitrary binary data and do
-not imply Unicode.
+contrast, `vector<byte>` or `array<byte, N>` can represent arbitrary binary
+data and do not imply Unicode.
 
 Use `string` for text data:
 
@@ -642,14 +642,14 @@ Use `string` for text data:
  * Use `string` to represent HTTP methods because HTTP methods are comprised of
    a fixed selection of characters that are always valid UTF-8.
 
-Use `bytes` or `array<uint8>` for small non-text data:
+Use `vector<byte>` or `array<byte, N>` for small non-text data:
 
- * Use `bytes` for HTTP header fields because HTTP header fields do not
+ * Use `vector<byte>` for HTTP header fields because HTTP header fields do not
    specify an encoding and therefore cannot necessarily be represented in UTF-8.
 
- * Use `array<uint8, 6>` for MAC addresses because MAC address are binary data.
+ * Use `array<byte, 6>` for MAC addresses because MAC address are binary data.
 
- * Use `array<uint8, 16>` for UUIDs because UUIDs are (almost!) arbitrary binary
+ * Use `array<byte, 16>` for UUIDs because UUIDs are (almost!) arbitrary binary
    data.
 
 Use shared-memory primitives for blobs:
