@@ -1101,68 +1101,66 @@ zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
   return ZX_OK;
 }
 
-// TODO(payamm): make sure unbind/release are called if we return error
-zx_status_t AmlogicDisplay::Bind() {
-  root_node_ = inspector_.GetRoot().CreateChild("amlogic-display");
-  fbl::AllocChecker ac;
-  vout_ = fbl::make_unique_checked<Vout>(&ac);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+zx_status_t AmlogicDisplay::InitializeHdmiVout() {
+  auto hdmi_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_hdmi::Service::Device>("hdmi");
+  if (hdmi_client.is_error()) {
+    zxlogf(ERROR, "Failed to connect to hdmi FIDL protocol: %s", hdmi_client.status_string());
+    return hdmi_client.status_value();
   }
-  SetFormatSupportCheck(
-      [](fuchsia_images2::wire::PixelFormat format) { return IsFormatSupported(format); });
 
-  {
-    display_panel_t display_info;
-    size_t actual;
-    switch (zx_status_t status = device_get_metadata(parent_, DEVICE_METADATA_DISPLAY_CONFIG,
-                                                     &display_info, sizeof(display_info), &actual);
-            status) {
-      case ZX_ERR_NOT_FOUND: {
-        auto hdmi_client =
-            DdkConnectFragmentFidlProtocol<fuchsia_hardware_hdmi::Service::Device>("hdmi");
-        if (hdmi_client.is_error()) {
-          zxlogf(ERROR, "Failed to connect to hdmi FIDL protocol: %s", hdmi_client.status_string());
-          return hdmi_client.status_value();
-        }
-
-        // If configuration is missing, init HDMI.
-        if (zx_status_t status = vout_->InitHdmi(parent_, std::move(*hdmi_client));
-            status != ZX_OK) {
-          zxlogf(ERROR, "Could not initialize HDMI Vout device: %s", zx_status_get_string(status));
-          return status;
-        }
-        break;
-      }
-      case ZX_OK:
-        if (actual != sizeof(display_info)) {
-          zxlogf(ERROR, "Could not get display panel metadata %zu/%zu", actual,
-                 sizeof(display_info));
-          return ZX_ERR_INTERNAL;
-        }
-        zxlogf(INFO, "Provided Display Info: %d x %d with panel type %d", display_info.width,
-               display_info.height, display_info.panel_type);
-        {
-          fbl::AutoLock lock(&display_mutex_);
-          if (zx_status_t status = vout_->InitDsi(parent_, display_info.panel_type,
-                                                  display_info.width, display_info.height);
-              status != ZX_OK) {
-            zxlogf(ERROR, "Could not initialize DSI Vout device: %s", zx_status_get_string(status));
-            return status;
-          }
-          display_attached_ = true;
-        }
-
-        root_node_.CreateUint("input_panel_type", display_info.panel_type, &inspector_);
-        break;
-      default:
-        zxlogf(ERROR, "Could not get display panel metadata: %s", zx_status_get_string(status));
-        return status;
-    }
+  if (zx_status_t status = vout_->InitHdmi(parent_, std::move(*hdmi_client)); status != ZX_OK) {
+    zxlogf(ERROR, "Could not initialize HDMI Vout device: %s", zx_status_get_string(status));
+    return status;
   }
-  root_node_.CreateUint("panel_type", vout_->panel_type(), &inspector_);
+
   root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
+  return ZX_OK;
+}
 
+zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
+  zxlogf(INFO, "Provided Display Info: %d x %d with panel type %d", panel_info.width,
+         panel_info.height, panel_info.panel_type);
+  {
+    fbl::AutoLock lock(&display_mutex_);
+    if (zx_status_t status =
+            vout_->InitDsi(parent_, panel_info.panel_type, panel_info.width, panel_info.height);
+        status != ZX_OK) {
+      zxlogf(ERROR, "Could not initialize DSI Vout device: %s", zx_status_get_string(status));
+      return status;
+    }
+    display_attached_ = true;
+  }
+
+  root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
+  root_node_.CreateUint("panel_type", vout_->panel_type(), &inspector_);
+  root_node_.CreateUint("input_panel_type", panel_info.panel_type, &inspector_);
+  return ZX_OK;
+}
+
+zx_status_t AmlogicDisplay::InitializeVout() {
+  ZX_ASSERT(vout_ != nullptr);
+
+  display_panel_t panel_info;
+  size_t actual;
+  zx_status_t status = device_get_metadata(parent_, DEVICE_METADATA_DISPLAY_CONFIG, &panel_info,
+                                           sizeof(panel_info), &actual);
+  if (status == ZX_ERR_NOT_FOUND) {
+    return InitializeHdmiVout();
+  }
+
+  if (status == ZX_OK) {
+    if (actual != sizeof(panel_info)) {
+      zxlogf(ERROR, "Could not get display panel metadata %zu/%zu", actual, sizeof(panel_info));
+      return ZX_ERR_INTERNAL;
+    }
+    return InitializeMipiDsiVout(panel_info);
+  }
+
+  zxlogf(ERROR, "Could not get display panel metadata: %s", zx_status_get_string(status));
+  return status;
+}
+
+zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   if (zx_status_t status = ddk::PDevFidl::FromFragment(parent_, &pdev_); status != ZX_OK) {
     zxlogf(ERROR, "Could not get PDEV protocol: %s", zx_status_get_string(status));
     return status;
@@ -1198,33 +1196,47 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
+  // Map VD1_WR Interrupt (used for capture)
+  if (zx_status_t status = pdev_.GetInterrupt(IRQ_VD1_WR, 0, &vd1_wr_irq_); status != ZX_OK) {
+    zxlogf(ERROR, "Could not map vd1 wr interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
+}
+
+zx_status_t AmlogicDisplay::InitializeSysmemAllocator() {
+  ZX_ASSERT(sysmem_.is_valid());
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
+    return endpoints.status_value();
+  }
+  auto& [client, server] = endpoints.value();
+  auto status = sysmem_->ConnectServer(std::move(endpoints->server));
+  if (!status.ok()) {
+    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s", status.status_string());
+    return status.status();
+  }
+  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+
+  std::string debug_name = fxl::StringPrintf("amlogic-display[%lu]", fsl::GetCurrentProcessKoid());
+  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
+      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+  if (!set_debug_status.ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    return set_debug_status.status();
+  }
+  return ZX_OK;
+}
+
+zx_status_t AmlogicDisplay::StartVsyncInterruptHandlerThread() {
   auto start_thread = [](void* arg) { return static_cast<AmlogicDisplay*>(arg)->VSyncThread(); };
   if (int status = thrd_create_with_name(&vsync_thread_, start_thread, this, "vsync_thread");
       status != 0) {
     zxlogf(ERROR, "Could not create vsync_thread: %s", zx_status_get_string(status));
     return status;
   }
-
-  // Map VD1_WR Interrupt (used for capture)
-  if (zx_status_t status = pdev_.GetInterrupt(IRQ_VD1_WR, 0, &vd1_wr_irq_); status != ZX_OK) {
-    zxlogf(ERROR, "Could not map vd1 wr interrupt: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  auto vd_thread = [](void* arg) { return static_cast<AmlogicDisplay*>(arg)->CaptureThread(); };
-  if (int status = thrd_create_with_name(&capture_thread_, vd_thread, this, "capture_thread");
-      status != 0) {
-    zxlogf(ERROR, "Could not create capture_thread: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  if (vout_->supports_hpd()) {
-    if (zx_status_t status = SetupHotplugDisplayDetection(); status != ZX_OK) {
-      zxlogf(ERROR, "Cannot set up hotplug display: %s", zx_status_get_string(status));
-      return status;
-    }
-  }
-
   // Set scheduler role for vsync thread.
   {
     const char* role_name = "fuchsia.graphics.display.drivers.amlogic-display.vsync";
@@ -1234,29 +1246,68 @@ zx_status_t AmlogicDisplay::Bind() {
       zxlogf(ERROR, "Failed to apply role: %s", zx_status_get_string(status));
     }
   }
+  return ZX_OK;
+}
 
-  // Set sysmem allocator client.
-  {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-    if (!endpoints.is_ok()) {
-      zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-      return endpoints.status_value();
-    }
-    auto& [client, server] = endpoints.value();
-    auto status = sysmem_->ConnectServer(std::move(endpoints->server));
-    if (!status.ok()) {
-      zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s", status.status_string());
-      return status.status();
-    }
-    sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+zx_status_t AmlogicDisplay::StartDisplayCaptureInterruptHandlerThread() {
+  auto vd_thread = [](void* arg) { return static_cast<AmlogicDisplay*>(arg)->CaptureThread(); };
+  if (int status = thrd_create_with_name(&capture_thread_, vd_thread, this, "capture_thread");
+      status != 0) {
+    zxlogf(ERROR, "Could not create capture_thread: %s", zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
+}
 
-    std::string debug_name =
-        fxl::StringPrintf("amlogic-display[%lu]", fsl::GetCurrentProcessKoid());
-    auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-        fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
-    if (!set_debug_status.ok()) {
-      zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
-      return set_debug_status.status();
+// TODO(payamm): make sure unbind/release are called if we return error
+zx_status_t AmlogicDisplay::Bind() {
+  SetFormatSupportCheck(
+      [](fuchsia_images2::wire::PixelFormat format) { return IsFormatSupported(format); });
+
+  // Set up inspect first, since other components may add inspect children
+  // during initialization.
+  root_node_ = inspector_.GetRoot().CreateChild("amlogic-display");
+
+  zx_status_t status = GetCommonProtocolsAndResources();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Cannot get common protocols resources from parent devices: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  fbl::AllocChecker ac;
+  vout_ = fbl::make_unique_checked<Vout>(&ac);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  status = InitializeVout();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Cannot initalize Vout: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = InitializeSysmemAllocator();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Cannot initialize sysmem allocator: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = StartVsyncInterruptHandlerThread();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Cannot start Vsync interrupt handler threads: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = StartDisplayCaptureInterruptHandlerThread();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Cannot start Vsync interrupt handler threads: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  if (vout_->supports_hpd()) {
+    if (zx_status_t status = SetupHotplugDisplayDetection(); status != ZX_OK) {
+      zxlogf(ERROR, "Cannot set up hotplug display: %s", zx_status_get_string(status));
+      return status;
     }
   }
 

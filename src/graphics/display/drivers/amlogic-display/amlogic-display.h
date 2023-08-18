@@ -92,7 +92,11 @@ class AmlogicDisplay
 
   ~AmlogicDisplay();
 
-  // This function is called from the c-bind function upon driver matching
+  // Acquires parent resources, sets up display submodules, and binds itself to
+  // the device node.
+  //
+  // Must be called once and only once by the device manager (via the Create()
+  // factory method) during the driver lifetime.
   zx_status_t Bind();
 
   // Required functions needed to implement Display Controller Protocol
@@ -164,8 +168,68 @@ class AmlogicDisplay
   int HpdThread();
   void PopulatePanelType() TA_REQ(display_mutex_);
 
-  // Sets up the hotlpug display detection hardware interrupts and starts the
-  // interrupt handler thread.
+  // TODO(fxbug.dev/132267): Currently, AmlogicDisplay has a multi-step
+  // initialization procedure when the device manager binds the driver to the
+  // device node. This makes the initialization stateful and hard to maintain
+  // (submodules may have dependencies on initialization). Instead, it's
+  // preferred to turn the initialization procedure into a builder pattern,
+  // where resources are acquired before the device is created, and the device
+  // is guaranteed to be ready at creation time.
+
+  // Acquires the common protocols (pdev, sysmem and amlogic-canvas) and
+  // resources (Vsync interrupts, capture interrupts and BTIs) from the parent
+  // nodes.
+  //
+  // Must be called once and only once per driver binding procedure, before
+  // the protocols / resources mentioned above being used.
+  zx_status_t GetCommonProtocolsAndResources();
+
+  // Must be called once and only once per driver binding procedure.
+  //
+  // `GetCommonProtocolsAndResources()` must be called to acquire sysmem
+  // protocol before this is called.
+  zx_status_t InitializeSysmemAllocator();
+
+  // Initializes the video output (Vout) hardware submodule of the Video
+  // Processing Unit. The type of display (MIPI-DSI or HDMI) is based on the
+  // panel metadata provided by the board driver.
+  //
+  // Must be called once and only once per driver binding procedure.
+  // `vout_` must be already allocated and not yet initialized.
+  zx_status_t InitializeVout();
+
+  // A helper initializing the video output (Vout) hardware submodule for
+  // MIPI-DSI displays.
+  //
+  // `vout_` must be already allocated and not yet initialized.
+  zx_status_t InitializeMipiDsiVout(display_panel_t panel_info);
+
+  // A helper initializing the video output (Vout) hardware submodule for HDMI
+  // displays.
+  //
+  // `vout_` must be already allocated and not yet initialized.
+  zx_status_t InitializeHdmiVout();
+
+  // Starts the Vsync interrupt handler thread.
+  //
+  // Must be called once and only once per driver binding procedure.
+  //  `GetCommonProtocolsAndResources()` must be called to acquire the Vsync
+  // interrupt before this is called.
+  zx_status_t StartVsyncInterruptHandlerThread();
+
+  // Starts the display capture interrupt handler thread.
+  //
+  // Must be called once and only once per driver binding procedure.
+  //  `GetCommonProtocolsAndResources()` must be called to acquire the display
+  // capture interrupt before this is called.
+  zx_status_t StartDisplayCaptureInterruptHandlerThread();
+
+  // Acquires the hotplug display detection hardware resources (GPIO protocol
+  // and interrupt for the hotplug detection GPIO pin) from parent nodes, and
+  // starts the interrupt handler thread.
+  //
+  // Must be called once and only once per driver binding procedure, if display
+  // hotplug is supported.
   zx_status_t SetupHotplugDisplayDetection();
 
   // This function enables the display hardware. This function is disruptive and causes
