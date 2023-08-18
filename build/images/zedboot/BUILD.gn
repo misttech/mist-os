@@ -16,11 +16,6 @@ import("//build/product.gni")
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
-if (has_board) {
-  assert(board_information_for_assembly != false,
-         "Need to define board_information_for_assembly")
-}
-
 _product_config = "//products/zedboot:zedboot_no_fshost"
 if (zedboot_product_assembly_config_label != false) {
   _product_config = zedboot_product_assembly_config_label
@@ -44,6 +39,7 @@ assembled_system("zedboot_assembly") {
       assembly_fshost && zedboot_product_assembly_config_label != false
   product_assembly_config_label = _product_config
   board_config = board_information_for_assembly
+  board_config_label = board_configuration_label
 
   base_packages = []
 

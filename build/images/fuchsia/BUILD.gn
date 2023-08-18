@@ -150,7 +150,7 @@ if (is_fuchsia) {
 
     product_assembly_config_label = fuchsia_product_assembly_config_label
     board_config = board_information_for_assembly
-
+    board_config_label = board_configuration_label
     cmdline_deps = [ "//build/input:bootfs" ]
 
     base_packages = [
@@ -250,8 +250,6 @@ if (is_fuchsia) {
   if (has_board) {
     assert(partitions_config_label != false,
            "Need to define partitions_config_label")
-    assert(board_information_for_assembly != false,
-           "Need to define board_information_for_assembly for cuckoo tests")
     _partitions_config = partitions_config_label
   }
   _partitions_config_file =

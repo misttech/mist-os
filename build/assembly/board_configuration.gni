@@ -1,0 +1,313 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/group_with_inputs.gni")
+import("//build/python/python_action.gni")
+
+# Creates the assembly Board configuration file, and it's main Hardware Support
+# Bundle, which respectively provide information about the board and components
+# and drivers which are to be included by assembly when assembling a product for
+# this board.
+#
+# NOTE: This template DOES NOT use GN metadata, all labels for packages must be
+# the actual target that creates the package.
+#
+# Parameters
+#
+#  Board
+#
+#  provided_features (optional)
+#    [list, strings] A list of strings which are named features, capabilities,
+#    or requirements that are used by assembly to include optional portions of
+#    the platform, or to indicate that the board provides (or its drivers
+#    provide).
+#
+#    Examples:
+#      - `fuchsia::network_require_netstack3` - netstack3 (implemented in Rust)
+#        must be used on this board, and not netstack2 (implemented in Go).
+#
+#      - `fuchsia::wlan_softmac` - used to tell assembly that this board uses a
+#        "soft MAC" wifi driver.
+#
+#      - `fuchsia::wlan_fullmac` - used to tell assembly that this board uses a
+#        wifi driver that implements the full MAC itself.
+#
+#    The list if valid strings is currently an unstable API between boards and
+#    assembly and can change at any time.
+#
+#  filesystems (optional)
+#    [scope] A GN scope that describes configuration to use for various
+#    different filesystems in order to use them with this board.  This doesn't
+#    trigger the creation of these filesystems, but rather is board-specific
+#    information that's needed to correctly create those filesystems when they
+#    are requested by the product.
+#
+#    NOTE:  This template converts GN paths for vbmeta keys into the correctly
+#    rebased form automatically.
+#
+#  verify_against (optional)
+#    [GN file path] A static file to compare against the output of this
+#    template.
+#
+#  Main Hardware Support Bundle
+#
+#   drivers (optional)
+#     [list, GN scopes] A list of GN scopes that hold the driver packages to
+#     include. Packages listed will be included automatically in the specified
+#     package set.
+#
+#     The scope must have the following fields:
+#      - `package_target` pointing to the GN target of the fuchsia_package
+#      - `package_set` naming the appropriate set for the package, which is one
+#         of the following:
+#           - base
+#           - bootfs
+#      - `driver_components` containing a list of relative paths to driver
+#        components provided by the package, e.g. "meta/driver.cm"
+#
+#     Example:
+#
+#     {
+#       package_target = "//path/to/package:target"
+#       package_set = "base"
+#       driver_components = [ "meta/my_driver" ]
+#     }
+#
+#  Outputs
+#    A directory structure and manifest
+#
+#   manifest path:
+#     $target_out_dir/$target_name/hardware_support_bundle.json
+#
+#     or if the defaults are overridden:
+#     $bundle_dir/$name/hardware_support_bundle.json
+#
+#
+# GN usual meanings
+#  testonly, visibility
+#
+template("board_configuration") {
+  bundles_dir = target_out_dir
+
+  board_name = target_name
+  if (defined(invoker.name)) {
+    board_name = invoker.name
+  }
+
+  labels = {
+    main_target = target_name
+
+    # Intermediate groups of deps
+    driver_packages = "${target_name}.driver_packages"
+
+    # Intermediate Files
+    base_info = "${target_name}.base_info"
+    driver_packages_list = "${target_name}.driver_packages.list"
+
+    bazel_inputs = "${target_name}_bazel_inputs"
+
+    kernel_cmdline = "${target_name}.kernel_cmdline"
+  }
+
+  files = {
+    # The directory where the board configuration file and main hardware support
+    # bundle contents are written to.  This is named for the target, not the
+    # name of the board, if passed in differently.
+    board_configuration_dir = "${bundles_dir}/${target_name}"
+
+    # The "official" output board configuration file
+    board_configuration = "${board_configuration_dir}/board_configuration.json"
+
+    # The files that we create as book-keeping between our tasks.
+    depfile = "${board_configuration_dir}.d"
+
+    _gen_files = "${target_gen_dir}/${target_name}"
+
+    # Intermediate Files
+    base_info = "${_gen_files}.base_info.json"
+    driver_packages_list = "${_gen_files}.driver_packages.list"
+
+    # The output path for the generated file which collects kernel cmdline
+    # arguments.
+    kernel_cmdline = "${board_configuration_dir}.kernel_cmdline"
+  }
+
+  creation_deps = []
+
+  # Check the 'filesystems' parameter for any vbmeta keys.  If found, add them
+  # as 'inputs' to a group_with_inputs() for vbmeta, and rebase them from GN
+  # file-paths to the appropriate form that will be needed by assembly.
+  if (defined(invoker.filesystems)) {
+    _filesystems = invoker.filesystems
+    if (defined(_filesystems.vbmeta)) {
+      _vbmeta = _filesystems.vbmeta
+      _vbmeta_rebased = {
+      }
+      _vbmeta_inputs = []
+      if (defined(_vbmeta.key)) {
+        _vbmeta_inputs += [ _vbmeta.key ]
+        _vbmeta_rebased.key = rebase_path(_vbmeta.key, root_build_dir)
+      }
+      if (defined(_vbmeta.key_metadata)) {
+        _vbmeta_inputs += [ _vbmeta.key_metadata ]
+        _vbmeta_rebased.key_metadata =
+            rebase_path(_vbmeta.key_metadata, root_build_dir)
+      }
+
+      if (_vbmeta_inputs != []) {
+        # create a group to validate that the keys exist, and make them part of
+        # the transitive deps of any assembly that uses this board.
+        group_with_inputs("${target_name}.vbmeta") {
+          inputs = _vbmeta_inputs
+
+          # keys currently need to be source files.
+          deps = []
+        }
+        creation_deps += [ ":${target_name}.vbmeta" ]
+      }
+
+      if (_vbmeta_rebased != {
+          }) {
+        # replace the vbmeta field of _filesystems with one that contains the
+        # rebased file.
+        _filesystems.vbmeta = {
+        }
+        _filesystems.vbmeta = _vbmeta_rebased
+      }
+    }
+  }
+
+  # Iterate over any provided drivers, and add them to the board config's main
+  # HSB, validating that they are package targets using a group_with_inputs().
+  #
+  if (defined(invoker.drivers) && invoker.drivers != []) {
+    # The list of package dependencies
+    _package_targets = []
+
+    # The driver manifest entries for creating the main hsb with
+    _manifest_entries = []
+
+    # The list of package manifest files, for validating that the package
+    # targets are all actually package targets.
+    _package_manifests = []
+
+    foreach(details, invoker.drivers) {
+      assert(defined(details.package_target),
+             "A target must be defined for each driver package.")
+      assert(defined(details.package_set),
+             "A package set to place the driver in must be specified.")
+      assert(defined(details.driver_components),
+             "driver_components must be specified for driver targets")
+
+      # add the label to the list of package labels to use as dependencies
+      _package_targets += [ details.package_target ]
+
+      # calculate the path to the package manifest for this label
+      _package_out_dir =
+          get_label_info(details.package_target, "target_out_dir")
+      _package_name = get_label_info(details.package_target, "name")
+      _manifest_path =
+          "${_package_out_dir}/${_package_name}/package_manifest.json"
+      _package_manifests += [ _manifest_path ]
+
+      _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
+      _manifest_entries += [
+        {
+          package_target = _manifest_path_rebased
+          package_set = details.package_set
+          driver_components = details.driver_components
+        },
+      ]
+    }
+
+    group_with_inputs(labels.driver_packages) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":${labels.driver_packages_list}" ]
+      inputs = _package_manifests
+      deps = _package_targets
+    }
+
+    # Generate the list of driver packages, for handing off to the hsb creator
+    generated_file(labels.driver_packages_list) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":${labels.main_target}" ]
+
+      deps = [ ":${labels.driver_packages}" ]
+
+      outputs = [ "${files.driver_packages_list}" ]
+      output_conversion = "json"
+
+      contents = _manifest_entries
+    }
+    creation_deps += [ ":${labels.driver_packages_list}" ]
+  }
+
+  generated_file(labels.base_info) {
+    forward_variables_from(invoker, [ "testonly" ])
+    visibility = [
+      ":${labels.main_target}",
+      ":${labels.main_target}.verify",
+    ]
+
+    outputs = [ files.base_info ]
+    output_conversion = "json"
+
+    contents = {
+      name = board_name
+
+      if (defined(_filesystems)) {
+        filesystems = _filesystems
+      }
+
+      forward_variables_from(invoker, [ "provided_features" ])
+    }
+  }
+
+  if (defined(invoker.verify_against)) {
+    # If a file is specified to verify the generated one against, then do so.
+    python_action("${target_name}.verify") {
+      forward_variables_from(invoker, [ "testonly" ])
+
+      depfile = "${target_gen_dir}/${target_name}.d"
+
+      inputs = [
+        files.base_info,
+        invoker.verify_against,
+      ]
+      outputs = [ "${target_out_dir}/${target_name}.diff" ]
+
+      deps = [ ":${labels.base_info}" ]
+
+      binary_label = "//build/bazel/assembly/board_configurations:verify_board_configuration"
+      args = [
+        "--generated_board_config",
+        rebase_path(inputs[0], root_build_dir),
+        "--generated_root_dir",
+        ".",
+        "--golden_json5",
+        rebase_path(inputs[1], root_build_dir),
+        "--golden_root_dir",
+        ".",
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+        "--output",
+        rebase_path(outputs[0], root_build_dir),
+      ]
+    }
+    creation_deps += [ ":${target_name}.verify" ]
+  }
+
+  # TODO:  Replace this with a generation of the bundle that includes the
+  # drivers.
+  copy(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = creation_deps + [ ":${labels.base_info}" ]
+    sources = [ files.base_info ]
+    outputs = [ files.board_configuration ]
+  }
+}

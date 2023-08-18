@@ -49,8 +49,12 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 # Product Assembly parameters:
 #
-#   board_config (required)
-#     [label] A board config file.
+#   board_config (deprecated; required if board_config_label is not used)
+#     [GN file path] A board config file.
+#
+#   board_config_label (required if board_config is not used)
+#     [label] The board_configuration() target to use as the board to assemble the
+#     product for.
 #
 #   product_assembly_config_label (required)
 #     [label] A label for the product assembly config, should be a
@@ -220,8 +224,19 @@ template("assembled_system") {
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
   assert(defined(invoker.product_assembly_config_label),
          "Need to define product_assembly_config_label")
-  assert(defined(invoker.board_config), "Need to define board_config")
 
+  # One of these is necessary in order to _run_ assembly, but some of the
+  # builders have configurations that don't define any board, yet also end up
+  # with targets that are defined, but unbuilt, which depend on assembly.  So we
+  # skip the assert in that situation, and try to make this template tolerant of
+  # being processed in a case where a board isn't defined, but we know that it
+  # will fail at build time.
+  if (has_board) {
+    assert((defined(invoker.board_config) && invoker.board_config != false) ||
+               (defined(invoker.board_config_label) &&
+                    invoker.board_config_label != false),
+           "One of 'board_config' or 'board_config_label' must be defined.")
+  }
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
     _generate_fvm = invoker.generate_fvm
@@ -365,6 +380,14 @@ template("assembled_system") {
         "${_namespace}.validation_legacy_assembly_input_bundle"
 
     product_assembly_config = invoker.product_assembly_config_label
+
+    # This is defined here to save against needing to check against
+    # invoker.board_config_label being false elsewhere in this template.  It can
+    # just be checked for having been defined.
+    if (defined(invoker.board_config_label) &&
+        invoker.board_config_label != false) {
+      board_config_label = invoker.board_config_label
+    }
   }
 
   # Intermediate files produced for Image Assembly.
@@ -377,7 +400,19 @@ template("assembled_system") {
     image_assembly_inputs =
         "$target_out_dir/${_namespace}.image_assembly_inputs"
 
-    board_config = invoker.board_config
+    # 'files.board_config' will not be defined if it these don't exist.  That's
+    # ok, and is checked for when constructing the product assembly action.
+    # Assembly will fail without it, but this template is still being invoked in
+    # configurations that don't define a board.
+    if (defined(labels.board_config_label)) {
+      board_config =
+          get_label_info(labels.board_config_label, "target_out_dir") + "/" +
+          get_label_info(labels.board_config_label, "name") +
+          "/board_configuration.json"
+    } else if (defined(invoker.board_config) && invoker.board_config != false) {
+      # Only consider board_config if board_config_label is not provided.
+      board_config = invoker.board_config
+    }
 
     outdir = "$target_out_dir/$_namespace"
     gendir = "$outdir/gen"
@@ -685,13 +720,15 @@ template("assembled_system") {
                files.product_assembly_config,
              ] + files.platform_common_aibs
 
-    # _board_config can be false for builds without a board (sdk builds).
-    if (files.board_config != false) {
+    if (defined(files.board_config)) {
       args += [
         "--board-info",
         rebase_path(files.board_config, root_build_dir),
       ]
       inputs += [ files.board_config ]
+    }
+    if (defined(labels.board_config_label)) {
+      deps += [ labels.board_config_label ]
     }
 
     outputs = [ files.regenerated_image_assembly_config ]

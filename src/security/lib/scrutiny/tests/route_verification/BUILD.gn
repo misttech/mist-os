@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/update_package.gni")
@@ -42,7 +43,6 @@ if (is_fuchsia) {
   }
 
   files = {
-    board_config = "$target_out_dir/fuchsia.board_config.json"
     partitions_config = "$target_out_dir/partitions_config.json"
 
     outdir = target_out_dir + "/assembly"
@@ -59,15 +59,11 @@ if (is_fuchsia) {
     product_bundle = target_out_dir + "/product_bundle"
   }
 
-  generated_file("board_config") {
-    outputs = [ files.board_config ]
-    output_conversion = "json"
-    contents = {
-      name = "test"
-      filesystems = {
-        fvm = {
-          sparse_output = {
-          }
+  board_configuration("board_config") {
+    name = "test"
+    filesystems = {
+      fvm = {
+        sparse_output = {
         }
       }
     }
@@ -106,8 +102,7 @@ if (is_fuchsia) {
     skip_fshost_validator = true
 
     product_assembly_config_label = ":product_assembly_config"
-    board_config = files.board_config
-    deps = [ ":board_config" ]
+    board_config_label = ":board_config"
 
     # Needed for scrutiny to find root.cm and other component config.
     bootfs_labels = [ "//build/input:bootfs" ]

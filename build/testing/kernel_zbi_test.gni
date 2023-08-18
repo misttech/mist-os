@@ -44,11 +44,6 @@ template("_cuckoo_kernel_zbi_test") {
   assert(current_toolchain == default_toolchain)
   assert(defined(invoker.kernel_zbi))
 
-  if (has_board) {
-    assert(board_information_for_assembly != false,
-           "Need to define board_information_for_assembly for cuckoo tests")
-  }
-
   cuckoo_target_name = target_name
 
   assembly_kernel_zbi = invoker.kernel_zbi
@@ -78,6 +73,7 @@ template("_cuckoo_kernel_zbi_test") {
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
     board_config = board_information_for_assembly
+    board_config_label = board_configuration_label
     allow_eng_platform_bundle_use = true
     use_assembly_fshost = true
 

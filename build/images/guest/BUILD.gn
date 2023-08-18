@@ -57,11 +57,6 @@ if (labels.images == "//build/images/bringup") {
 } else {
   # In all other builds, define the guest assembly.
 
-  if (has_board) {
-    assert(board_information_for_assembly != false,
-           "Need to define board_information_for_assembly for cuckoo tests")
-  }
-
   # Guest's specific core realm (not based on core_realm_shards).
   core_realm_definition("core") {
     testonly = true
@@ -103,6 +98,7 @@ if (labels.images == "//build/images/bringup") {
     image_name = "fuchsia"
     product_assembly_config_label = ":product_assembly_config"
     board_config = board_information_for_assembly
+    board_config_label = board_configuration_label
     use_assembly_fshost = true
 
     # As `:product_assembly_config` specifies an `eng` build-type, the assembly

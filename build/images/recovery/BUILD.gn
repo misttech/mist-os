@@ -36,11 +36,6 @@ if (is_fuchsia) {
   assert(current_toolchain == default_toolchain,
          "//build/images/* are only valid in the Fuchsia toolchain")
 
-  if (has_board) {
-    assert(board_information_for_assembly != false,
-           "Need to define board_information_for_assembly for cuckoo tests")
-  }
-
   # Parameters shared between recovery-eng and recovery-installer
   recovery_base = {
     testonly = true
@@ -57,6 +52,7 @@ if (is_fuchsia) {
       generate_fxfs = !bootfs_only
     }
     board_config = board_information_for_assembly
+    board_config_label = board_configuration_label
     fshost_config = board_fshost_config
 
     include_component_id_index = true
@@ -387,6 +383,7 @@ if (is_fuchsia) {
 
     product_assembly_config_label = ":for-fdr"
     board_config = board_information_for_assembly
+    board_config_label = board_configuration_label
     fshost_config = board_fshost_config
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]

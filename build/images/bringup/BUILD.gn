@@ -41,8 +41,6 @@ files = {
 
 _partitions_config = "//boards/partitions:default"
 if (has_board) {
-  assert(board_information_for_assembly != false,
-         "board_information_for_assembly must be defined for the build")
   assert(partitions_config_label != false,
          "Need to define partitions_config_label")
   _partitions_config = partitions_config_label
@@ -93,6 +91,7 @@ bringup_base = {
 
   product_assembly_config_label = ":product_assembly_config"
   board_config = board_information_for_assembly
+  board_config_label = board_configuration_label
   use_bringup_platform_bundles_only = true
 
   use_assembly_fshost = true

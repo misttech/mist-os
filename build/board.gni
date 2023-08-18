@@ -100,6 +100,9 @@ declare_args() {
   # BoardInformation file for use with Product Assembly
   board_information_for_assembly = false
 
+  # The label for the board configuration target to use with Product Assembly
+  board_configuration_label = false
+
   # Whether or not the board supports emulator/physical devices.
   # This is used to determine if product bundle metadata should generate a
   # physical/virtual device spec or both.

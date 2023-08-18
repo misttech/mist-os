@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/components/fuchsia_package.gni")
@@ -25,17 +26,12 @@ if (is_fuchsia) {
     outputs = [ "empty/{{source_file_part}}" ]
   }
 
-  _board_config = "$target_out_dir/board_config.json"
-  generated_file("board_config") {
-    outputs = [ _board_config ]
-    output_conversion = "json"
-    contents = {
-      name = "test"
-      filesystems = {
-        fvm = {
-          slice_size = 1048576
-          sparse_output = {
-          }
+  board_configuration("board_config") {
+    name = "test"
+    filesystems = {
+      fvm = {
+        slice_size = 1048576
+        sparse_output = {
         }
       }
     }
@@ -92,8 +88,7 @@ if (is_fuchsia) {
     testonly = true
     generate_fvm = true
     product_assembly_config_label = ":product_config"
-    board_config = _board_config
-    deps = [ ":board_config" ]
+    board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
     use_assembly_fshost = true
 
@@ -114,8 +109,7 @@ if (is_fuchsia) {
     testonly = true
     generate_fvm = true
     product_assembly_config_label = ":product_config_recovery"
-    board_config = _board_config
-    deps = [ ":board_config" ]
+    board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
     use_assembly_fshost = true
 

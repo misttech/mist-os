@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/package_list.gni")
 import("//build/assembly/product_assembly_configuration.gni")
@@ -304,29 +305,25 @@ template("assemble_security_pkg_test_system") {
                             "//src/sys/pkg/bin/system-update-committer:enable_reboot_on_verification_failure",
                           ] + invoker.base_packages
 
-  generated_file(labels.board_config) {
-    outputs = [ files.board_config ]
-    output_conversion = "json"
-    contents = {
-      name = "test"
-      filesystems = {
-        zbi = {
-          compression = "zstd.max"
+  board_configuration(labels.board_config) {
+    name = "test"
+    filesystems = {
+      zbi = {
+        compression = "zstd.max"
+      }
+      fvm = {
+        slice_size = 1048576
+        sparse_output = {
         }
-        fvm = {
-          slice_size = 1048576
-          sparse_output = {
-          }
-        }
-        fxfs = {
-        }
+      }
+      fxfs = {
+      }
 
-        if (defined(invoker.fvm_truncate_to_length)) {
-          fvm.truncate_to_length = invoker.fvm_truncate_to_length
-        }
-        if (defined(invoker.assembly_fxfs_image_size_bytes)) {
-          fxfs.size_bytes = invoker.assembly_fxfs_image_size_bytes
-        }
+      if (defined(invoker.fvm_truncate_to_length)) {
+        fvm.truncate_to_length = invoker.fvm_truncate_to_length
+      }
+      if (defined(invoker.assembly_fxfs_image_size_bytes)) {
+        fxfs.size_bytes = invoker.assembly_fxfs_image_size_bytes
       }
     }
   }
@@ -343,8 +340,7 @@ template("assemble_security_pkg_test_system") {
       product_assembly_config_label = ":${labels.product_config_fxfs}"
     }
 
-    board_config = files.board_config
-    deps = [ ":${labels.board_config}" ]
+    board_config_label = ":${labels.board_config}"
     use_bringup_platform_bundles_only = true
     use_assembly_fshost = true
 

@@ -1,0 +1,25 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/board_configuration.gni")
+
+board_configuration("arm64") {
+  verify_against = "board_information.json5"
+
+  provided_features = []
+
+  filesystems = {
+    vbmeta = {
+      key = "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
+      key_metadata = "//third_party/android/platform/external/avb/test/data/atx_metadata.bin"
+    }
+    fvm = {
+      blobfs = {
+        size_checker_maximum_bytes = 5216665600
+      }
+      sparse_output = {
+      }
+    }
+  }
+}

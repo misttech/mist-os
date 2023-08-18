@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/config.gni")
@@ -43,15 +44,11 @@ if (is_fuchsia) {
     outputs = [ "path/to/version" ]
   }
 
-  generated_file("board_config") {
-    outputs = [ files.board_config ]
-    output_conversion = "json"
-    contents = {
-      name = "test"
-      filesystems = {
-        fvm = {
-          sparse_output = {
-          }
+  board_configuration("board_config") {
+    name = "test"
+    filesystems = {
+      fvm = {
+        sparse_output = {
         }
       }
     }
@@ -88,8 +85,7 @@ if (is_fuchsia) {
     ]
 
     product_assembly_config_label = ":assembly_config"
-    board_config = files.board_config
-    deps = [ ":board_config" ]
+    board_config_label = ":board_config"
   }
 
   product_bundle("product_bundle") {
