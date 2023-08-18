@@ -16,7 +16,7 @@ use {
     ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
     anyhow::Error,
     async_trait::async_trait,
-    cm_runner::{builtin::RemoteRunner, Runner, StartInfo},
+    cm_runner::{builtin::RemoteRunner, Runner},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_component::client as fclient,
@@ -171,7 +171,7 @@ impl BuiltinRunnerFactory for RealmBuilderRunner {
 impl Runner for RealmBuilderRunner {
     async fn start(
         &self,
-        start_info: StartInfo,
+        start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
         self.remote_runner.start(start_info, server_end).await;

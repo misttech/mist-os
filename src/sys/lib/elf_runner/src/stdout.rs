@@ -338,11 +338,9 @@ mod tests {
     }
 
     async fn write_to_syslog_or_panic(
-        namespace: cm_runner::Namespace,
+        ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
         message: &[u8],
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/131717): Runner lib should accept cm_runner::Namespace directly
-        let ns_entries: Vec<fcrunner::ComponentNamespaceEntry> = namespace.into();
         let ns = ComponentNamespace::try_from(ns_entries)
             .context("Failed to create ComponentNamespace")?;
         let logger = create_namespace_logger(&ns).context("Failed to create ScopedLogger")?;

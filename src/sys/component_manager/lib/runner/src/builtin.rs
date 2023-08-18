@@ -3,15 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::{Runner, StartInfo},
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl::prelude::*,
+    crate::Runner, async_trait::async_trait, fidl::endpoints::ServerEnd, fidl::prelude::*,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
-    fuchsia_async as fasync,
-    futures::stream::StreamExt,
-    thiserror::Error,
-    tracing::error,
+    fuchsia_async as fasync, futures::stream::StreamExt, thiserror::Error, tracing::warn,
 };
 
 /// A null runner for components without a runtime environment.
@@ -25,7 +19,7 @@ pub struct NullRunner {}
 impl Runner for NullRunner {
     async fn start(
         &self,
-        _start_info: StartInfo,
+        _start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
         spawn_null_controller_server(
@@ -88,12 +82,12 @@ impl RemoteRunner {
 impl Runner for RemoteRunner {
     async fn start(
         &self,
-        start_info: StartInfo,
+        start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
-        let resolved_url = start_info.resolved_url.clone();
-        if let Err(e) = self.client.start(start_info.into(), server_end) {
-            error!(url=%resolved_url, error=%e, "Failed to call runner to start component");
+        let resolved_url = start_info.resolved_url.clone().unwrap_or(String::new());
+        if let Err(e) = self.client.start(start_info, server_end) {
+            warn!(url=%resolved_url, error=%e, "Failed to call runner to start component");
         }
     }
 }
@@ -101,27 +95,21 @@ impl Runner for RemoteRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Namespace;
-    use fidl::endpoints::{self, create_endpoints, Proxy};
-    use fidl_fuchsia_data as fdata;
-    use fidl_fuchsia_io as fio;
+    use fidl::endpoints::{self, Proxy};
 
     #[fuchsia::test]
     async fn test_null_runner() {
         let null_runner = NullRunner {};
         let (client, server) = endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
-        let (_runtime, runtime_dir) = create_endpoints::<fio::DirectoryMarker>();
         null_runner
             .start(
-                StartInfo {
-                    resolved_url: "".to_string(),
-                    program: fdata::Dictionary::default(),
-                    namespace: Namespace::default(),
+                fcrunner::ComponentStartInfo {
+                    resolved_url: None,
+                    program: None,
+                    ns: None,
                     outgoing_dir: None,
-                    runtime_dir: Some(runtime_dir),
-                    numbered_handles: vec![],
-                    encoded_config: None,
-                    break_on_start: None,
+                    runtime_dir: None,
+                    ..Default::default()
                 },
                 server,
             )

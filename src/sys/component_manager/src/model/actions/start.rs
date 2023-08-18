@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::bedrock::program::Program,
+    crate::bedrock::program::{Program, StartInfo},
     crate::framework::controller,
     crate::model::{
         actions::{Action, ActionKey},
@@ -18,7 +18,7 @@ use {
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
-    cm_runner::{NamespaceEntry, Runner, StartInfo},
+    cm_runner::{NamespaceEntry, Runner},
     config_encoder::ConfigFields,
     fidl::{
         endpoints::{create_proxy, DiscoverableProtocolMarker},

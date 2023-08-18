@@ -13,19 +13,17 @@ use {
         capability_source::InternalCapability, config::SecurityPolicy, policy::ScopedPolicyChecker,
     },
     async_trait::async_trait,
-    cm_runner::{Runner, StartInfo},
+    cm_runner::Runner,
     cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::stream::TryStreamExt,
     std::{
         path::PathBuf,
         sync::{Arc, Weak},
     },
-    tracing::{error, warn},
 };
 
 /// Trait for built-in runner services. Wraps the generic Runner trait to provide a
@@ -123,21 +121,6 @@ impl CapabilityProvider for RunnerCapabilityProvider {
                 while let Ok(Some(request)) = stream.try_next().await {
                     let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
                         request;
-                    let start_info = match StartInfo::try_from(start_info) {
-                        Ok(start_info) => start_info,
-                        Err(err) => {
-                            error!(error = %err, "Failed to start component, invalid ComponentStartInfo");
-                            let epitaph = zx::Status::from_raw(
-                                i32::try_from(fcomponent::Error::InvalidArguments.into_primitive())
-                                    .unwrap(),
-                            );
-                            controller
-                                .close_with_epitaph(epitaph)
-                                .unwrap_or_else(|error| warn!(%error, "failed to send epitaph"));
-                            return;
-                        }
-                    };
-
                     runner.start(start_info, controller).await;
                 }
             })

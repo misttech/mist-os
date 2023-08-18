@@ -283,7 +283,7 @@ struct MockRunnerInner {
     namespaces: HashMap<String, Arc<Mutex<Namespace>>>,
 
     /// Functions for serving the `outgoing` and `runtime` directories
-    /// of a given compoment. When a component is started, these
+    /// of a given component. When a component is started, these
     /// functions will be called with the server end of the directories.
     outgoing_host_fns: HashMap<String, Arc<HostFn>>,
     runtime_host_fns: HashMap<String, Arc<HostFn>>,
@@ -400,13 +400,13 @@ impl BuiltinRunnerFactory for MockRunner {
 impl Runner for MockRunner {
     async fn start(
         &self,
-        start_info: cm_runner::StartInfo,
+        start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
         let outgoing_host_fn;
         let runtime_host_fn;
         let runner_requests;
-        let resolved_url = start_info.resolved_url;
+        let resolved_url = start_info.resolved_url.unwrap();
 
         // The koid is the only unique piece of information we have about a
         // component start request. Two start requests for the same component
@@ -435,9 +435,10 @@ impl Runner for MockRunner {
             runner_requests = state.runner_requests.clone();
 
             // Create a namespace for the component.
-            state
-                .namespaces
-                .insert(resolved_url.clone(), Arc::new(Mutex::new(start_info.namespace)));
+            state.namespaces.insert(
+                resolved_url.clone(),
+                Arc::new(Mutex::new(start_info.ns.unwrap().try_into().unwrap())),
+            );
 
             let abort_handle =
                 MockController::new(server_end, runner_requests, channel_koid).serve();
