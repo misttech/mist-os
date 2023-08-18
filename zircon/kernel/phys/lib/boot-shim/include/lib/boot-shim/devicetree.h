@@ -29,6 +29,7 @@
 #include <stdio.h>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -84,6 +85,48 @@ class DevicetreeItemBase {
  private:
   FILE* log_;
   const char* shim_name_;
+};
+
+// Helper class for decoding interrupt cells and obtaining IRQ numbers.
+class DevicetreeIrqResolver {
+ public:
+  constexpr DevicetreeIrqResolver() = default;
+  explicit constexpr DevicetreeIrqResolver(devicetree::ByteView bytes) : interrupt_bytes_(bytes) {}
+
+  // Attempts to either resolve |interrupt-parent| property from the |decoder| hierarchy
+  // or find the |interrupt-controller| along the way.
+  //
+  // On success with a return value |true|, the |interrupt-controller| node has been resolved,
+  // On success with a return value |false|,the |interrupt-parent| was resolved but the
+  // |interrupt-controller| has not. On failure, a malformed node or property has been encountered
+  // and no further actions can be performed.
+  fit::result<fit::failed, bool> ResolveIrqController(const devicetree::PropertyDecoder& decoder);
+
+  // Obtains the IRQ number from the interrupt described by the |index|-th element in the interrupt
+  // property.
+  std::optional<uint32_t> GetIrqNumber(size_t index) const {
+    ZX_ASSERT(irq_resolver_);
+    const size_t entry_size = *interrupt_cells_ * sizeof(uint32_t);
+    return irq_resolver_(interrupt_bytes_.subspan(index * entry_size, entry_size),
+                         *interrupt_cells_);
+  }
+
+  // May only be called after resolving the IRQ Controller, see |ResolveIrqController()|.
+  size_t num_entries() const {
+    ZX_ASSERT(interrupt_cells_);
+    return interrupt_bytes_.size() / *interrupt_cells_;
+  }
+
+  // Returns whether additional scans are required to resolve the |interrupt_parent|.
+  // This is only meaningful if |ResolveIrqController| return |ScanState::kActive|.
+  bool NeedsInterruptParent() const { return !error_ && interrupt_parent_ && !irq_resolver_; }
+
+ private:
+  fit::inline_function<std::optional<uint32_t>(devicetree::ByteView, uint32_t)> irq_resolver_;
+  devicetree::ByteView interrupt_bytes_;
+  std::optional<uint32_t> interrupt_parent_;
+  std::optional<uint32_t> interrupt_cells_;
+  bool error_ = false;
 };
 
 // Decodes PSCI information from a devicetree and synthesizes a
@@ -231,13 +274,21 @@ class DevicetreeChosenNodeMatcherBase
                                               const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState HandleUartInterruptParent(const devicetree::PropertyDecoder& decoder);
 
+  // May only be called after |uart_irq_.ResolveIrqController| returns |fit::ok(true)|.
+  void UpdateUart() {
+    if (uart_emplacer_) {
+      uart_dcfg_.irq = uart_irq_.GetIrqNumber(0).value_or(0);
+      uart_emplacer_(uart_dcfg_);
+    }
+  }
+
   // Path to device node containing the stdout device (uart).
   bool found_chosen_ = false;
   std::string_view stdout_path_;
   std::optional<devicetree::ResolvedPath> resolved_stdout_;
   zbi_dcfg_simple_t uart_dcfg_ = {};
-  std::optional<uint32_t> uart_interrupt_parent_;
-  std::optional<devicetree::PropertyValue> uart_interrupts_;
+
+  DevicetreeIrqResolver uart_irq_;
 
   // Command line provided by the devicetree.
   std::string_view cmdline_;
@@ -653,6 +704,24 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
           set_boot_cpu();
         });
   }
+};
+
+// See https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/arch_timer.txt
+class ArmDevicetreeTimerItem
+    : public DevicetreeItemBase<ArmDevicetreeTimerItem, 2>,
+      public SingleOptionalItem<zbi_dcfg_arm_generic_timer_driver_t, ZBI_TYPE_KERNEL_DRIVER,
+                                ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER> {
+ public:
+  static constexpr auto kCompatibleDevices =
+      cpp20::to_array({"arm,armv7-timer", "arm,armv8-timer"});
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+ private:
+  DevicetreeIrqResolver irq_;
+  // Optional, maps to frequency override.
+  std::optional<uint64_t> frequency_;
 };
 
 // A flat Devicetree ZBI Item.
