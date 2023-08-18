@@ -10,6 +10,7 @@ import("//build/testing/zbi_test.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
+import("//zircon/kernel/phys/shim_executable.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 
 # All these 32-bit legacy shims can be booted directly by QEMU.
@@ -190,19 +191,6 @@ if (toolchain_environment == "kernel.phys32") {
       "//zircon/kernel/phys:stdio",
       "//zircon/kernel/phys:uart",
     ]
-  }
-
-  template("shim_executable") {
-    phys_executable(target_name) {
-      forward_variables_from(invoker, "*")
-      if (qemu_boot_shim.name == target_name) {
-        # This marks it as the official default boot shim for using QEMU.
-        images_metadata = {
-          name = "qemu-kernel"
-          archive = add_qemu_to_build_archives
-        }
-      }
-    }
   }
 
   shim_executable("linux-x86-boot-shim") {

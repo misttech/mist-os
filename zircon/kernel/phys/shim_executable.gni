@@ -1,0 +1,36 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/images/args.gni")
+import("//build/zircon/zircon_cpu.gni")
+import("//zircon/kernel/phys/phys_executable.gni")
+import("//zircon/kernel/phys/qemu.gni")
+
+# Defines a public phys_executable() target with the appropriate metadata to be used
+# as a kernel for QEMU.
+#
+# See phys_executable() for details.
+template("shim_executable") {
+  phys_executable(target_name) {
+    forward_variables_from(invoker, "*", [ "image_metadata" ])
+
+    if (qemu_boot_shim.name == target_name) {
+      # This marks it as the official default boot shim for using QEMU.
+      images_metadata = {
+        name = "qemu-kernel"
+        archive = add_qemu_to_build_archives
+      }
+    }
+  }
+}
+
+_phys_import = {
+  import("//zircon/kernel/arch/$zircon_cpu/phys/phys.gni")
+}
+
+set_defaults("shim_executable") {
+  configs = default_executable_configs + _phys_import.phys_zbi_configs
+}

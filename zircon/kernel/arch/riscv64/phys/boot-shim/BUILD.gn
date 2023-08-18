@@ -9,6 +9,7 @@ import("//build/testing/zbi_test.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
+import("//zircon/kernel/phys/shim_executable.gni")
 
 # Just the one for now, but will be more later.
 legacy_shims = [ "riscv64-qemu-boot-shim" ]
@@ -20,9 +21,8 @@ group("boot-shim") {
   }
 }
 
-phys_executable("linux-riscv64-boot-shim") {
+shim_executable("linux-riscv64-boot-shim") {
   sources = [ "linux-riscv64-boot-shim.cc" ]
-
   deps = [
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//zircon/kernel/lib/boot-options",
@@ -40,7 +40,7 @@ phys_executable("linux-riscv64-boot-shim") {
   ]
 }
 
-phys_executable("riscv64-qemu-boot-shim") {
+shim_executable("riscv64-qemu-boot-shim") {
   sources = [ "riscv64-qemu-boot-shim.cc" ]
   deps = [
     "..:linuxboot",
@@ -58,14 +58,6 @@ phys_executable("riscv64-qemu-boot-shim") {
     "//zircon/kernel/phys:uart",
     "//zircon/kernel/phys/lib/boot-shim",
   ]
-
-  if (qemu_boot_shim.name == target_name) {
-    # This marks it as the official default boot shim for using QEMU.
-    images_metadata = {
-      name = "qemu-kernel"
-      archive = add_qemu_to_build_archives
-    }
-  }
 }
 
 qemu_shim_phys_tests = [
