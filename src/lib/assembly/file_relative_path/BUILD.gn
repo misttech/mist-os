@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_macro.gni")
+import("//build/rust/rustc_test.gni")
 
 assert(is_host, "Assembly libraries are host-only")
 
@@ -12,6 +14,7 @@ rustc_library("file_relative_path") {
   version = "0.1.0"
   with_unit_tests = true
   deps = [
+    ":file_relative_path_derive",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:pathdiff",
@@ -24,7 +27,36 @@ rustc_library("file_relative_path") {
   ]
 }
 
+rustc_macro("file_relative_path_derive") {
+  edition = "2021"
+  name = "assembly_file_relative_path_derive"
+  deps = [
+    "//third_party/rust_crates:proc-macro2",
+    "//third_party/rust_crates:quote",
+    "//third_party/rust_crates:syn",
+  ]
+
+  source_root = "src/macro.rs"
+  sources = [ "src/macro.rs" ]
+}
+
+rustc_test("file_relative_path_derive_test") {
+  edition = "2021"
+  deps = [
+    ":file_relative_path",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+  ]
+  source_root = "src/macro_test.rs"
+  sources = [ "src/macro_test.rs" ]
+}
+
 group("host_tests") {
   testonly = true
-  deps = [ ":file_relative_path_test" ]
+  deps = [
+    ":file_relative_path_derive_test",
+    ":file_relative_path_test",
+  ]
 }

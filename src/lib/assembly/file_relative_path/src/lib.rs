@@ -10,4 +10,5 @@
 
 mod file_relative_path;
 
+pub use assembly_file_relative_path_derive::SupportsFileRelativePaths;
 pub use file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
