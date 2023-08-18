@@ -19,4 +19,16 @@ rustc_library("syslog-listener") {
   ]
 
   sources = [ "syslog-listener/src/lib.rs" ]
+
+  # NOTE: do not add anything to this list. This library is deprecated. Please use
+  # `//src/lib/diagnostics/reader/rust`.
+  visibility = [
+    "//examples/diagnostics/logs/rust:*",
+    "//src/diagnostics/archivist:*",
+    "//src/diagnostics/archivist/tests/integration:*",
+    "//src/diagnostics/log_listener:*",
+    "//src/lib/syslog/rust:*",
+    "//src/recovery/system:*",
+    "//vendor/*",
+  ]
 }

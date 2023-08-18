@@ -17,6 +17,12 @@ go_library("go") {
     "logger.go",
     "logger_test.go",
   ]
+  visibility = [
+    "//src/connectivity/network/netstack/*",
+    "//src/diagnostics/archivist/tests/logs/go/src:*",
+    "//src/lib/syslog/go:*",
+    "//src/tests/fidl/server_suite/go:*",
+  ]
 }
 
 go_test("syslog_test") {

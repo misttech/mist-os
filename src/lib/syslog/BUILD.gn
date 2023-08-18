@@ -6,8 +6,10 @@ group("tests") {
   testonly = true
 
   # The Go toolchain does not support RISC-V.
-  # TODO(fxbug.dev/130020): Ensure this directory has sufficient test coverage
-  # on all platforms.
+  # This Go library is here only to support netstack2 which is being migrated to netstack3.
+  # When the migration to netstack3 is completed, this library will be deleted.
+  # Additionally, we don't include any of the "rust" directory targets as there are no tests
+  # present. The library in that directory is in the process of being deleted.
   if (current_cpu != "riscv64") {
     deps = [ "go:tests" ]
   }
