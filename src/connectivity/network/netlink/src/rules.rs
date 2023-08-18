@@ -367,12 +367,12 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandl
             }
             RuleRequestArgs::New(rule) => {
                 locked_rule_table.add_rule(rule).map_err(|e| e.errno())
-                // TODO(https://issuetracker.google.com/292587350): Notify
+                // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_NEWRULE`.
             }
             RuleRequestArgs::Del(del_pattern) => {
                 locked_rule_table.del_rule(&del_pattern).map_err(|e| e.errno())
-                // TODO(https://issuetracker.google.com/292587350): Notify
+                // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_DELRULE`.
             }
         }

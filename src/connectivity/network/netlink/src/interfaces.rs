@@ -101,7 +101,7 @@ pub(crate) enum LinkRequestArgs {
 pub(crate) enum GetAddressArgs {
     /// Dump state for all addresses with the optional IP version filter.
     Dump { ip_version_filter: Option<IpVersion> },
-    // TODO(https://issuetracker.google.com/283134032): Support get requests w/
+    // TODO(https://issues.fuchsia.dev/296616404): Support get requests w/
     // filter.
 }
 
@@ -353,7 +353,7 @@ enum PendingRequestKind {
     AddAddress(AddressAndInterfaceArgs),
     DelAddress(AddressAndInterfaceArgs),
     DisableInterface(NonZeroU64),
-    // TODO(https://issuetracker.google.com/290372180): Support Pending
+    // TODO(https://issues.fuchsia.dev/290372180): Support Pending
     // "EnableInterface" requests once link_state is available via a FIDL API
 }
 
@@ -580,9 +580,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         // down" and "is the interface admin disabled". This
                         // means we cannot know with certainty whether the link
                         // is enabled or disabled. we take our best guess here.
-                        // TODO(https://issuetracker.google.com/290372180): Make
-                        // this check exact once link status is available via a
-                        // FIDL API.
+                        // TODO(https://issues.fuchsia.dev/290372180): Make this
+                        // check exact once link status is available via a FIDL
+                        // API.
                         !properties.online
                     }
                 };
@@ -833,7 +833,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     log_error!("failed to enable interface {id} for unknown reason: {e:?}");
                     RequestError::Unknown
                 })?;
-            // TODO(https://issuetracker.google.com/290372180): Synchronize this
+            // TODO(https://issues.fuchsia.dev/290372180): Synchronize this
             // request with observed changes from the watcher, once link status
             // is available via a FIDL API.
             Ok(None)
@@ -1421,8 +1421,8 @@ fn interface_properties_to_address_messages(
                 addr_header.family = family.try_into().expect("should fit into u8");
                 addr_header.prefix_len = *prefix_len;
 
-                // TODO(https://issuetracker.google.com/284980862): Determine proper mapping from
-                // Netstack properties to address flags.
+                // TODO(https://issues.fuchsia.dev/284980862): Determine proper
+                // mapping from Netstack properties to address flags.
                 let flags = IFA_F_PERMANENT
                     | match assignment_state {
                         fnet_interfaces::AddressAssignmentState::Assigned => 0,

@@ -554,8 +554,8 @@ pub mod route {
         };
 
         let outbound_interface = outbound_interface.map(NonZeroU64::get).ok_or_else(|| {
-            // TODO(issuetracker.google.com/292103361): Resolve destination IP to
-            // find interface index if it is not provided explicitly.
+            // TODO(https://issues.fuchsia.dev/292103361): Resolve destination
+            // IP to find interface index if it is not provided explicitly.
             log_warn!(
                 "unsupported request: missing `RTA_OIF` in new route request from {}: {:?}",
                 client,
@@ -974,7 +974,7 @@ pub mod route {
                     }
                 }
                 NewRoute(ref message) => {
-                    // TODO(issuetracker.google/290803327): Emulate REPLACE by
+                    // TODO(https://issues.fuchsia.dev/290803327): Emulate REPLACE by
                     // dispatching a delete then add request to Netstack.
                     let is_replace = req_header.flags & NLM_F_REPLACE == NLM_F_REPLACE;
                     if is_replace {
@@ -1119,13 +1119,13 @@ pub mod route {
                 | DelTrafficChain(_)
                 | NewNsId(_)
                 | DelNsId(_)
-                // TODO(https://issuetracker.google.com/285127790): Implement NewNeighbour.
+                // TODO(https://issues.fuchsia.dev/285127790): Implement NewNeighbour.
                 | NewNeighbour(_)
-                // TODO(https://issuetracker.google.com/285127790): Implement DelNeighbour.
+                // TODO(https://issues.fuchsia.dev/285127790): Implement DelNeighbour.
                 | DelNeighbour(_)
-                // TODO(https://issuetracker.google.com/283137907): Implement NewQueueDiscipline.
+                // TODO(https://issues.fuchsia.dev/283137907): Implement NewQueueDiscipline.
                 | NewQueueDiscipline(_)
-                // TODO(https://issuetracker.google.com/283137907): Implement DelQueueDiscipline.
+                // TODO(https://issues.fuchsia.dev/283137907): Implement DelQueueDiscipline.
                 | DelQueueDiscipline(_) => {
                     if expects_ack {
                         log_warn!(
@@ -1145,13 +1145,13 @@ pub mod route {
                 | GetTrafficFilter(_)
                 | GetTrafficChain(_)
                 | GetNsId(_)
-                // TODO(https://issuetracker.google.com/285127384): Implement GetNeighbour.
+                // TODO(https://issues.fuchsia.dev/285127384): Implement GetNeighbour.
                 | GetNeighbour(_)
-                // TODO(https://issuetracker.google.com/283134032): Implement GetAddress.
+                // TODO(https://issues.fuchsia.dev/278565021): Implement GetAddress.
                 | GetAddress(_)
                 // Non-dump GetRoute is not currently necessary for our use.
                 | GetRoute(_)
-                // TODO(https://issuetracker.google.com/283137907): Implement GetQueueDiscipline.
+                // TODO(https://issues.fuchsia.dev/283137907): Implement GetQueueDiscipline.
                 | GetQueueDiscipline(_) => {
                     if is_dump {
                         log_warn!(
