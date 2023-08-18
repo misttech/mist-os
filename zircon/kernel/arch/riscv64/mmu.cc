@@ -407,6 +407,9 @@ void Riscv64ArchVmAspace::FreePageTable(void* vaddr, paddr_t paddr, ConsistencyM
 zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr_t pt_index,
                                                 volatile pte_t* page_table,
                                                 ConsistencyManager& cm) {
+  LTRACEF("vaddr %#lx, level %u, pt_index %#lx, page_table %p\n", vaddr, level, pt_index,
+          page_table);
+
   const pte_t pte = page_table[pt_index];
   DEBUG_ASSERT(riscv64_pte_is_leaf(pte));
 

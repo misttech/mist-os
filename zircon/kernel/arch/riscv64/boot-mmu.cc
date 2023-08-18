@@ -25,8 +25,8 @@ namespace {
 // whereas in the code below it is level 0.
 
 // Level 0 PTEs may point to large pages of size 1GB.
-// const uintptr_t l0_large_page_size = 1UL << (PAGE_SIZE_SHIFT + 2 * RISCV64_MMU_PT_SHIFT);
-// const uintptr_t l0_large_page_size_mask = l0_large_page_size - 1;
+constexpr uintptr_t l0_large_page_size = 1UL << (PAGE_SIZE_SHIFT + 2 * RISCV64_MMU_PT_SHIFT);
+constexpr uintptr_t l0_large_page_size_mask = l0_large_page_size - 1;
 
 // Level 1 PTEs may point to large pages of size 2MB.
 constexpr uintptr_t l1_large_page_size = 1UL << (PAGE_SIZE_SHIFT + RISCV64_MMU_PT_SHIFT);
@@ -84,6 +84,17 @@ extern "C" zx_status_t riscv64_boot_map(pte_t* kernel_ptable0, vaddr_t vaddr, pa
       // A large page can be used if both the virtual and physical addresses
       // are aligned to the large page size and the remaining amount of memory
       // to map is at least the large page size.
+      bool can_map_large_file = ((vaddr & l0_large_page_size_mask) == 0) &&
+                                ((paddr & l0_large_page_size_mask) == 0) &&
+                                len >= l0_large_page_size;
+      if (can_map_large_file) {
+        kernel_ptable0[index0] = riscv64_pte_pa_to_pte((paddr & ~l0_large_page_size_mask)) | flags;
+        vaddr += l0_large_page_size;
+        paddr += l0_large_page_size;
+        len -= l0_large_page_size;
+        continue;
+      }
+
       paddr_t pa = boot_alloc_ptable();
       kernel_ptable0[index0] = riscv64_pte_pa_to_pte(pa) | RISCV64_PTE_V;
       kernel_ptable1 = reinterpret_cast<pte_t*>(pa);
