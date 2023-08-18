@@ -1553,7 +1553,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for BootfileName {
 
 /// Maximum length of a DHCP message that the participant is willing to accept.
 #[derive(Clone, Debug, FromArgs, PartialEq)]
-#[argh(subcommand, name = "renewal-time-value")]
+#[argh(subcommand, name = "max-message-size")]
 pub struct MaxDhcpMessageSize {
     /// the maximum length in octets of a DHCP message that the participant is willing to accept.
     /// The minimum value is 576.
