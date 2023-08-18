@@ -21,7 +21,7 @@ if (has_board) {
          "Need to define board_information_for_assembly")
 }
 
-_product_config = "//products/zedboot"
+_product_config = "//products/zedboot:zedboot_no_fshost"
 if (zedboot_product_assembly_config_label != false) {
   _product_config = zedboot_product_assembly_config_label
 }
@@ -36,7 +36,12 @@ assembled_system("zedboot_assembly") {
   generate_vbmeta = use_vbmeta
   fshost_config = board_zedboot_fshost_config
   use_bringup_platform_bundles_only = true
-  use_assembly_fshost = true
+
+  # Only use the assembly fshost if the product has specified a zedboot product
+  # config. This is only necessary because some vendor repos have not turned on
+  # assembly fshost yet, and are not overriding the zedboot product config yet.
+  use_assembly_fshost =
+      assembly_fshost && zedboot_product_assembly_config_label != false
   product_assembly_config_label = _product_config
   board_config = board_information_for_assembly
 
