@@ -166,9 +166,14 @@ FASTBOOT_ARGS="\$@"
 EOF
 
 if [[ ! -z "${PRODUCT}" ]]; then
+  # Expected output format:
+  #
+  # > fastboot getvar product
+  # product: foo
+  # finished. total time: 0.123s
   cat >> "${OUTPUT}" << EOF
 PRODUCT="${PRODUCT}"
-actual=\$(${FASTBOOT_PATH} \${FASTBOOT_ARGS} getvar product 2>&1 | head -n1 | cut -d' ' -f2-)
+actual=\$(${FASTBOOT_PATH} \${FASTBOOT_ARGS} getvar product 2>&1 | grep -i product | head -n1 | cut -d' ' -f2-)
 if [[ "\${actual}" != "\${PRODUCT}" ]]; then
   echo >&2 "Expected device \${PRODUCT} but found \${actual}"
   exit 1
