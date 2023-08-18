@@ -45,20 +45,6 @@ product_assembly_configuration("terminal") {
     ui = {
       enabled = true
     }
-
-    intl = {
-      config_type = "default"
-    }
-
-    icu = {
-      revision = "default"
-    }
-
-    setui = {
-      use_icu = "with_icu"
-      with_camera = false
-    }
-
     fonts = {
       enabled = true
       # TODO(fxbug.dev/122855): Add `fonts_collection` once OOT is ready to

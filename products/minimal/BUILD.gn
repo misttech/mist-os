@@ -18,21 +18,11 @@ product_assembly_configuration("minimal") {
       # minimal is headless, so ostensibly does not need fonts.
       enabled = false
     }
-    intl = {
-      config_type = "default"
-    }
-    icu = {
-      revision = "default"
-    }
     input = {
       supported_input_devices = [
         "button",
         "touchscreen",
       ]
-    }
-    setui = {
-      use_icu = "with_icu"
-      with_camera = false
     }
     storage = {
       configure_fshost = true

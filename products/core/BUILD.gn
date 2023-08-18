@@ -41,19 +41,6 @@ _platform_configuration_base = {
     enabled = true
   }
 
-  intl = {
-    config_type = "small"
-  }
-
-  icu = {
-    revision = "default"
-  }
-
-  setui = {
-    use_icu = "with_icu"
-    with_camera = false
-  }
-
   # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
   # as part of the platform configuration.
   if (authorized_ssh_keys_path != false) {

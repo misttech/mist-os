@@ -32,16 +32,6 @@ workbench_platform_config = {
             "touchscreen",
         ],
     },
-    "icu": {
-        "revision": "default",
-    },
-    "intl": {
-        "config_type": "default",
-    },
-    "setui": {
-        "use_icu": "with_icu",
-        "with_camera": False,
-    },
     "media": {
         "audio_device_registry_enabled": True,
     },
