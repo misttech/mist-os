@@ -2527,7 +2527,6 @@ mod tests {
             FakeCtxWithSyncCtx, FakeFrameCtx, FakeNonSyncCtx, FakeSyncCtx, Wrapped,
             WrappedFakeSyncCtx,
         },
-        convert::BidirectionalConverter,
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         error::RemoteAddressError,
         ip::{
@@ -2539,7 +2538,6 @@ mod tests {
         },
         socket::{
             self,
-            address::{DualStackIpAddr, DualStackListenerIpAddr},
             datagram::{MulticastInterfaceSelector, UninstantiableContext},
         },
         testutil::{set_logger_for_test, TestIpExt as _},
@@ -2572,9 +2570,7 @@ mod tests {
         }
     }
 
-    impl<Outer: Default, const DUAL_STACK_ENABLED: bool>
-        Wrapped<Outer, FakeUdpInnerSyncCtx<FakeDeviceId, DUAL_STACK_ENABLED>>
-    {
+    impl<Outer: Default> Wrapped<Outer, FakeUdpInnerSyncCtx<FakeDeviceId>> {
         fn with_local_remote_ip_addrs<A: Into<SpecifiedAddr<IpAddr>>>(
             local_ips: Vec<A>,
             remote_ips: Vec<A>,
@@ -2587,9 +2583,7 @@ mod tests {
         }
     }
 
-    impl<Outer: Default, D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
-        Wrapped<Outer, FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>>
-    {
+    impl<Outer: Default, D: FakeStrongDeviceId> Wrapped<Outer, FakeUdpInnerSyncCtx<D>> {
         fn with_state(state: FakeDualStackIpSocketCtx<D>) -> Self {
             Wrapped {
                 outer: Outer::default(),
@@ -2603,14 +2597,12 @@ mod tests {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct FakeBoundSockets<D: WeakId, const DUAL_STACK_ENABLED: bool> {
+    struct FakeBoundSockets<D: WeakId> {
         v4: BoundSockets<Ipv4, D>,
         v6: BoundSockets<Ipv6, D>,
     }
 
-    impl<D: WeakId, I: IpExt, const DUAL_STACK_ENABLED: bool> AsRef<BoundSockets<I, D>>
-        for FakeBoundSockets<D, DUAL_STACK_ENABLED>
-    {
+    impl<D: WeakId, I: IpExt> AsRef<BoundSockets<I, D>> for FakeBoundSockets<D> {
         fn as_ref(&self) -> &BoundSockets<I, D> {
             I::map_ip(
                 IpInvariant(self),
@@ -2620,9 +2612,7 @@ mod tests {
         }
     }
 
-    impl<D: WeakId, I: IpExt, const DUAL_STACK_ENABLED: bool> AsMut<BoundSockets<I, D>>
-        for FakeBoundSockets<D, DUAL_STACK_ENABLED>
-    {
+    impl<D: WeakId, I: IpExt> AsMut<BoundSockets<I, D>> for FakeBoundSockets<D> {
         fn as_mut(&mut self) -> &mut BoundSockets<I, D> {
             I::map_ip(
                 IpInvariant(self),
@@ -2646,11 +2636,10 @@ mod tests {
 
     /// `FakeSyncCtx` specialized for UDP.
     type FakeUdpSyncCtx<I, D> =
-        Wrapped<SocketsState<I, FakeWeakDeviceId<D>>, FakeUdpSingleStackInnerSyncCtx<D>>;
+        Wrapped<SocketsState<I, FakeWeakDeviceId<D>>, FakeUdpInnerSyncCtx<D>>;
 
-    type FakeUdpInnerSyncCtx<D, const DUAL_STACK_ENABLED: bool> =
-        Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, DUAL_STACK_ENABLED>, FakeBufferSyncCtx<D>>;
-    type FakeUdpSingleStackInnerSyncCtx<D> = FakeUdpInnerSyncCtx<D, false>;
+    type FakeUdpInnerSyncCtx<D> =
+        Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>>, FakeBufferSyncCtx<D>>;
 
     /// `FakeNonSyncCtx` specialized for UDP.
     type FakeUdpNonSyncCtx = FakeNonSyncCtx<(), (), FakeNonSyncCtxState>;
@@ -2724,11 +2713,9 @@ mod tests {
             D: FakeStrongDeviceId,
             Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
                 + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
-            const DUAL_STACK_ENABLED: bool,
-        > StateContext<I, FakeUdpNonSyncCtx>
-        for Wrapped<Outer, FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>>
+        > StateContext<I, FakeUdpNonSyncCtx> for Wrapped<Outer, FakeUdpInnerSyncCtx<D>>
     {
-        type SocketStateCtx<'a> = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
+        type SocketStateCtx<'a> = FakeUdpInnerSyncCtx<D>;
 
         fn with_sockets_state<
             O,
@@ -2765,12 +2752,12 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
-        BoundStateContext<I, FakeUdpNonSyncCtx> for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    impl<I: TestIpExt, D: FakeStrongDeviceId> BoundStateContext<I, FakeUdpNonSyncCtx>
+        for FakeUdpInnerSyncCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
-        type DualStackContext = I::UdpDualStackBoundStateContext<D, DUAL_STACK_ENABLED>;
-        type NonDualStackContext = I::UdpNonDualStackBoundStateContext<D, DUAL_STACK_ENABLED>;
+        type DualStackContext = I::UdpDualStackBoundStateContext<D>;
+        type NonDualStackContext = I::UdpNonDualStackBoundStateContext<D>;
 
         fn with_bound_sockets<
             O,
@@ -2805,84 +2792,37 @@ mod tests {
         fn dual_stack_context(
             &mut self,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-            struct Wrap<'a, I: Ip + TestIpExt, D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool>(
+            struct Wrap<'a, I: Ip + TestIpExt, D: FakeStrongDeviceId + 'static>(
                 MaybeDualStack<
-                    &'a mut I::UdpDualStackBoundStateContext<D, DUAL_STACK_ENABLED>,
-                    &'a mut I::UdpNonDualStackBoundStateContext<D, DUAL_STACK_ENABLED>,
+                    &'a mut I::UdpDualStackBoundStateContext<D>,
+                    &'a mut I::UdpNonDualStackBoundStateContext<D>,
                 >,
             );
             // TODO(https://fxbug.dev/131992): Replace this with a derived impl.
-            impl<
-                    'a,
-                    I: TestIpExt,
-                    NewIp: TestIpExt,
-                    D: FakeStrongDeviceId + 'static,
-                    const DUAL_STACK_ENABLED: bool,
-                > GenericOverIp<NewIp> for Wrap<'a, I, D, DUAL_STACK_ENABLED>
+            impl<'a, I: TestIpExt, NewIp: TestIpExt, D: FakeStrongDeviceId + 'static>
+                GenericOverIp<NewIp> for Wrap<'a, I, D>
             {
-                type Type = Wrap<'a, NewIp, D, DUAL_STACK_ENABLED>;
+                type Type = Wrap<'a, NewIp, D>;
             }
 
             let Wrap(context) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(this)| Wrap(MaybeDualStack::NotDualStack(this)),
-                |IpInvariant(this)| {
-                    Wrap(match DUAL_STACK_ENABLED {
-                        true => MaybeDualStack::DualStack(this),
-                        false => MaybeDualStack::NotDualStack(this),
-                    })
-                },
+                |IpInvariant(this)| Wrap(MaybeDualStack::DualStack(this)),
             );
             context
         }
     }
 
-    impl<D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool> UdpStateContext
-        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    impl<D: FakeStrongDeviceId + 'static> UdpStateContext for FakeUdpInnerSyncCtx<D> {}
+
+    impl<D: FakeStrongDeviceId> NonDualStackBoundStateContext<Ipv4, FakeUdpNonSyncCtx>
+        for FakeUdpInnerSyncCtx<D>
     {
     }
 
-    impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
-        NonDualStackBoundStateContext<Ipv4, FakeUdpNonSyncCtx>
-        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
-    {
-    }
-
-    struct FakeSingleStackConverter;
-
-    impl<A: IpAddress, LI>
-        BidirectionalConverter<DualStackListenerIpAddr<A, LI>, ListenerIpAddr<A, LI>>
-        for FakeSingleStackConverter
-    where
-        A::Version: TestIpExt,
-    {
-        fn convert_back(&self, b: ListenerIpAddr<A, LI>) -> DualStackListenerIpAddr<A, LI> {
-            let ListenerIpAddr { addr, identifier } = b;
-            DualStackListenerIpAddr { addr: DualStackIpAddr::ThisStack(addr), identifier }
-        }
-        fn convert(&self, a: DualStackListenerIpAddr<A, LI>) -> ListenerIpAddr<A, LI> {
-            let DualStackListenerIpAddr { addr, identifier } = a;
-            match addr {
-                DualStackIpAddr::ThisStack(addr) => ListenerIpAddr { addr, identifier },
-                DualStackIpAddr::OtherStack(_) => panic!("not dual-stack"),
-            }
-        }
-    }
-
-    /// Allow non-dual-stack operation for IPv6.
-    impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
-        NonDualStackDatagramBoundStateContext<Ipv6, FakeUdpNonSyncCtx, Udp>
-        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
-    {
-        type Converter = FakeSingleStackConverter;
-        fn converter(&self) -> Self::Converter {
-            FakeSingleStackConverter
-        }
-    }
-
-    impl<D: FakeStrongDeviceId, const DUAL_STACK_ENABLED: bool>
-        DualStackBoundStateContext<Ipv6, FakeUdpNonSyncCtx>
-        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    impl<D: FakeStrongDeviceId> DualStackBoundStateContext<Ipv6, FakeUdpNonSyncCtx>
+        for FakeUdpInnerSyncCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
 
@@ -2921,16 +2861,13 @@ mod tests {
             B: BufferMut,
             Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
                 + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
-            const DUAL_STACK_ENABLED: bool,
-        > BufferStateContext<I, FakeUdpNonSyncCtx, B>
-        for Wrapped<Outer, FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>>
+        > BufferStateContext<I, FakeUdpNonSyncCtx, B> for Wrapped<Outer, FakeUdpInnerSyncCtx<D>>
     {
         type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId, B: BufferMut, const DUAL_STACK_ENABLED: bool>
-        BufferBoundStateContext<I, FakeUdpNonSyncCtx, B>
-        for FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>
+    impl<I: TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
+        BufferBoundStateContext<I, FakeUdpNonSyncCtx, B> for FakeUdpInnerSyncCtx<D>
     {
         type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
     }
@@ -3014,10 +2951,8 @@ mod tests {
         }
     }
 
-    type FakeUdpDualStackInnerSyncCtx<D> =
-        Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>, true>, FakeBufferSyncCtx<D>>;
     type FakeUdpDualStackSyncCtx<D> =
-        Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpDualStackInnerSyncCtx<D>>;
+        Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpInnerSyncCtx<D>>;
 
     /// Dual-stack delivery for [`FakeUdpDualStackSyncCtx`].
     impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
@@ -3113,23 +3048,19 @@ mod tests {
     }
 
     trait TestIpExt: crate::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
-        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool>:
+        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
             DualStackDatagramBoundStateContext<Self, FakeUdpNonSyncCtx, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
-        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static, const DUAL_STACK_ENABLED: bool>:
+        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
             NonDualStackDatagramBoundStateContext<Self, FakeUdpNonSyncCtx, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
         fn try_into_recv_src_addr(addr: Self::Addr) -> Option<Self::RecvSrcAddr>;
     }
 
     impl TestIpExt for Ipv4 {
-        type UdpDualStackBoundStateContext<
-            D: FakeStrongDeviceId + 'static,
-            const DUAL_STACK_ENABLED: bool,
-        > = UninstantiableContext<Self, Udp, FakeUdpDualStackInnerSyncCtx<D>>;
+        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+            UninstantiableContext<Self, Udp, FakeUdpInnerSyncCtx<D>>;
 
-        type UdpNonDualStackBoundStateContext<
-            D: FakeStrongDeviceId + 'static,
-            const DUAL_STACK_ENABLED: bool,
-        > = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
+        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+            FakeUdpInnerSyncCtx<D>;
 
         fn try_into_recv_src_addr(addr: Ipv4Addr) -> Option<Ipv4Addr> {
             Some(addr)
@@ -3137,14 +3068,10 @@ mod tests {
     }
 
     impl TestIpExt for Ipv6 {
-        type UdpDualStackBoundStateContext<
-            D: FakeStrongDeviceId + 'static,
-            const DUAL_STACK_ENABLED: bool,
-        > = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
-        type UdpNonDualStackBoundStateContext<
-            D: FakeStrongDeviceId + 'static,
-            const DUAL_STACK_ENABLED: bool,
-        > = FakeUdpInnerSyncCtx<D, DUAL_STACK_ENABLED>;
+        type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+            FakeUdpInnerSyncCtx<D>;
+        type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
+            UninstantiableContext<Self, Udp, FakeUdpInnerSyncCtx<D>>;
 
         fn try_into_recv_src_addr(addr: Ipv6Addr) -> Option<Ipv6SourceAddr> {
             Ipv6SourceAddr::new(addr)
