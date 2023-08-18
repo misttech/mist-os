@@ -29,8 +29,6 @@ board_bootfs_labels += _bootfs_deps
 board_zedboot_bootfs_labels += _bootfs_deps
 board_recovery_bootfs_labels += _bootfs_deps
 
-board_driver_package_labels += [ "//bundles/packages/prod:drivers-system" ]
-
 board_package_labels += [
   "//src/hwinfo:default_board_config",
   "//src/graphics/bin/vulkan_loader",

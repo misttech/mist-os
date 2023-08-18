@@ -545,15 +545,11 @@ From //build/board.gni:18
 A list of driver package labels to include in the 'base' package set. Used
 by the board definition rather than the product definition.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles/packages/prod:drivers-system"]`
-
-From //boards/common/arm64-common.gni:32
-
-**Overridden from the default:** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]` (this is the default)
 
 From //build/board.gni:25
 
-**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/power/fake-battery:fake-battery"]`
+**Current value for `target_cpu = "x64"`:** `["//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/power/fake-battery:fake-battery"]`
 
 From //boards/common/x64-common.gni:74
 

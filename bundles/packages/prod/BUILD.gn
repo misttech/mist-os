@@ -24,7 +24,6 @@ group("all") {
     ":cobalt_client",
     ":cpuperf",
     ":debug_agent",
-    ":drivers-system",
     ":far",
     ":sched",
     ":telephony",
@@ -80,15 +79,6 @@ group("bluetooth_core") {
   ]
 }
 
-group("bluetooth_drivers") {
-  public_deps = [
-    "//src/connectivity/bluetooth/core/bt-host",
-    "//src/connectivity/bluetooth/hci/passthrough",
-    "//src/connectivity/bluetooth/hci/vendor/atheros",
-    "//src/connectivity/bluetooth/hci/vendor/intel",
-  ]
-}
-
 group("bluetooth_hci") {
   testonly = true
   public_deps = [ "//src/connectivity/bluetooth/hci/passthrough" ]
@@ -141,15 +131,6 @@ group("cpuperf") {
 group("debug_agent") {
   testonly = true
   public_deps = [ "//src/developer/debug/debug_agent" ]
-}
-
-# Note: elements of this group are all installed in the system package.
-group("drivers-system") {
-  public_deps = [
-    ":bluetooth_drivers",
-    "//src/connectivity/ppp/drivers",
-    "//src/connectivity/telephony/drivers:prod-drivers",
-  ]
 }
 
 group("far") {
