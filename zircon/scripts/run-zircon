@@ -35,7 +35,7 @@ function HELP {
     echo "--debugger           : Enable gdb stub and wait for connection"
     echo "--gic=<version>      : use GIC 2, 3, or max supported. default is max"
     echo "--no-serial          : Disable writing out to the guest's serial port"
-    echo "-S <device>          : output serial port to a QEMU character device"
+    echo "-S <device>          : output serial port to a QEMU character device. Default is stdio."
     echo "-M <device>          : output QEMU monitor console to a QEMU character device"
     echo "--uefi               : Boot QEMU through UEFI. With this setting, one of -t or -D must be"
     echo "                       supplied: if -t is supplied, then that value is assumed to be a"
@@ -100,7 +100,7 @@ UPSCRIPT=no
 VNC=
 VIRTIO=1
 SERIAL=1
-SERIAL_DEV=
+SERIAL_DEV="stdio"
 MONITOR_DEV=
 SMP=$SMP_DEFAULT
 CMDLINE=""
@@ -376,35 +376,39 @@ fi
 # Always use virtio as the rng source
 ARGS+=" -device virtio-rng-pci"
 
-if [[ -n "$SERIAL_DEV" ]]; then
-  ARGS+=" -serial $SERIAL_DEV"
-fi
-
 if [[ -n "$MONITOR_DEV" ]]; then
   ARGS+=" -monitor $MONITOR_DEV"
 fi
 
-if (( !$GRAPHICS  )); then
-    ARGS+=" -nographic -vga none"
+ADD_SERIAL_ARG=1
+if (( !$GRAPHICS )); then
+  ARGS+=" -nographic -vga none"
+
+  # -nographic implies -serial stdio and will complain if you
+  # try to set anything else pointing at stdio.
+  if [[ "$SERIAL_DEV" == "stdio" ]]; then
+    ADD_SERIAL_ARG=0
+  fi
 else
-    if [[ -z "$SERIAL" ]]; then
-      ARGS+=" -serial stdio"
-    fi
-    if [[ "$ARCH" == "x64" && $VIRTIO == 0 ]]; then
-        # Enable Bochs VBE device, which Zircon has a device for
-        ARGS+=" -vga std"
-    else
-        # use the virtio gpu for display
-        ARGS+=" -vga none"
-        ARGS+=" -device virtio-gpu-pci"
-    fi
+  if [[ "$ARCH" == "x64" && $VIRTIO == 0 ]]; then
+    # Enable Bochs VBE device, which Zircon has a device for
+    ARGS+=" -vga std"
+  else
+    # use the virtio gpu for display
+    ARGS+=" -vga none"
+    ARGS+=" -device virtio-gpu-pci"
+  fi
+fi
+
+if (( $SERIAL && $ADD_SERIAL_ARG )); then
+  ARGS+=" -serial $SERIAL_DEV"
 fi
 
 for ahcifile in ${AHCI[@]}; do
-    ARGS+=" -drive file=${ahcifile},format=raw,if=none,id=ahcidisk${AHCI_NUM}"
-    ARGS+=" -device ich9-ahci,id=ahci${AHCI_NUM}"
-    ARGS+=" -device ide-hd,drive=ahcidisk${AHCI_NUM},bus=ahci.${AHCI_NUM}"
-    AHCI_NUM=$((AHCI_NUM + 1))
+  ARGS+=" -drive file=${ahcifile},format=raw,if=none,id=ahcidisk${AHCI_NUM}"
+  ARGS+=" -device ich9-ahci,id=ahci${AHCI_NUM}"
+  ARGS+=" -device ide-hd,drive=ahcidisk${AHCI_NUM},bus=ahci.${AHCI_NUM}"
+  AHCI_NUM=$((AHCI_NUM + 1))
 done
 
 if (( !$NET )); then
