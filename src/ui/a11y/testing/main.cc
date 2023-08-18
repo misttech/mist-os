@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
@@ -19,39 +18,25 @@ int run_a11y_manager(int argc, const char** argv) {
 
   auto context = sys::ComponentContext::Create();
 
-  // For flatland scenes, we need to serve
-  // `fuchsia.accessibility.scene.Provider`.
-  //
-  // First, query scenic to determine which composition API to use. Then, if
-  // we're using flatland, create an accessibility view object.
-  fuchsia::ui::scenic::ScenicSyncPtr scenic;
-  context->svc()->Connect<fuchsia::ui::scenic::Scenic>(scenic.NewRequest());
-
-  bool use_flatland = false;
-  scenic->UsesFlatland(&use_flatland);
-
-  std::unique_ptr<a11y::FlatlandAccessibilityView> maybe_a11y_view;
-  if (use_flatland) {
-    auto make_flatland = [&]() {
-      fidl::InterfacePtr flatland = context->svc()->Connect<fuchsia::ui::composition::Flatland>();
-      flatland.set_error_handler([&](zx_status_t status) {
-        FX_PLOGS(ERROR, status) << "flatland connection closed; exiting";
-        loop.Quit();
-      });
-      return flatland;
-    };
-    maybe_a11y_view = std::make_unique<a11y::FlatlandAccessibilityView>(
-        make_flatland(), make_flatland(),
-        context->svc()->Connect<fuchsia::ui::observation::scope::Registry>(),
-        context->svc()->Connect<fuchsia::ui::pointer::augment::LocalHit>());
-    context->outgoing()->AddPublicService(maybe_a11y_view->GetHandler());
-  }
+  auto make_flatland = [&]() {
+    fidl::InterfacePtr flatland = context->svc()->Connect<fuchsia::ui::composition::Flatland>();
+    flatland.set_error_handler([&](zx_status_t status) {
+      FX_PLOGS(ERROR, status) << "flatland connection closed; exiting";
+      loop.Quit();
+    });
+    return flatland;
+  };
+  std::unique_ptr<a11y::FlatlandAccessibilityView> a11y_view =
+      std::make_unique<a11y::FlatlandAccessibilityView>(
+          make_flatland(), make_flatland(),
+          context->svc()->Connect<fuchsia::ui::observation::scope::Registry>(),
+          context->svc()->Connect<fuchsia::ui::pointer::augment::LocalHit>());
+  context->outgoing()->AddPublicService(a11y_view->GetHandler());
 
   a11y_testing::FakeA11yManager fake_a11y_manager;
   context->outgoing()->AddPublicService(fake_a11y_manager.GetHandler());
 
-  a11y_testing::FakeMagnifier fake_magnifier =
-      a11y_testing::FakeMagnifier(std::move(maybe_a11y_view));
+  a11y_testing::FakeMagnifier fake_magnifier = a11y_testing::FakeMagnifier(std::move(a11y_view));
   context->outgoing()->AddPublicService(fake_magnifier.GetTestMagnifierHandler());
   context->outgoing()->AddPublicService(fake_magnifier.GetMagnifierHandler());
 

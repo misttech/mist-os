@@ -44,25 +44,23 @@ void FakeA11yManager::RegisterViewForSemantics(
   semantic_trees_.back()->SetSemanticsEnabled(false);
 }
 
-FakeMagnifier::FakeMagnifier(std::unique_ptr<a11y::FlatlandAccessibilityView> maybe_a11y_view)
-    : maybe_a11y_view_(std::move(maybe_a11y_view)) {
+FakeMagnifier::FakeMagnifier(std::unique_ptr<a11y::FlatlandAccessibilityView> a11y_view)
+    : a11y_view_(std::move(a11y_view)) {
   FX_LOGS(INFO) << "Starting fake magnifier";
 
-  if (maybe_a11y_view_) {
-    maybe_a11y_view_->add_scene_ready_callback([this]() {
-      // Listen for pointer events.
-      touch_source_ = maybe_a11y_view_->TakeTouchSource();
-      touch_source_->Watch({}, fit::bind_member(this, &FakeMagnifier::WatchCallback));
-      return true;
-    });
-  }
+  a11y_view_->add_scene_ready_callback([this]() {
+    // Listen for pointer events.
+    touch_source_ = a11y_view_->TakeTouchSource();
+    touch_source_->Watch({}, fit::bind_member(this, &FakeMagnifier::WatchCallback));
+    return true;
+  });
 }
 
 void FakeMagnifier::RegisterHandler(
     fidl::InterfaceHandle<fuchsia::accessibility::MagnificationHandler> handler) {
   handler_ = handler.Bind();
 
-  MaybeSetClipSpaceTransform();
+  SetMagnificationTransform();
 }
 
 void FakeMagnifier::SetMagnification(float scale, float translation_x, float translation_y,
@@ -72,27 +70,12 @@ void FakeMagnifier::SetMagnification(float scale, float translation_x, float tra
   translation_y_ = translation_y;
   callback_ = std::move(callback);
 
-  MaybeSetClipSpaceTransform();
+  SetMagnificationTransform();
 }
 
-void FakeMagnifier::MaybeSetClipSpaceTransform() {
-  // Flatland path.
-  if (maybe_a11y_view_) {
-    maybe_a11y_view_->SetMagnificationTransform(scale_, translation_x_, translation_y_,
-                                                std::move(callback_));
-    return;
-  }
-
-  // GFX path.
-  if (!handler_.is_bound()) {
-    return;
-  }
-
-  handler_->SetClipSpaceTransform(translation_x_, translation_y_, scale_, [this]() {
-    if (callback_) {
-      callback_();
-    }
-  });
+void FakeMagnifier::SetMagnificationTransform() {
+  a11y_view_->SetMagnificationTransform(scale_, translation_x_, translation_y_,
+                                        std::move(callback_));
 }
 
 fidl::InterfaceRequestHandler<fuchsia::accessibility::Magnifier>

@@ -29,7 +29,6 @@
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.observation.scope.Registry",
                 "fuchsia.ui.pointer.augment.LocalHit",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
     ],
