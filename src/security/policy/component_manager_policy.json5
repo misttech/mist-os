@@ -113,7 +113,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console",
-                    "/core/debug_serial",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
 

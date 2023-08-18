@@ -103,7 +103,6 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.hardware.pty.Device",
-                "fuchsia.hardware.serial.DeviceProxy",
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
