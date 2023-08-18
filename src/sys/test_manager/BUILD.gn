@@ -198,8 +198,6 @@ fuchsia_package("pkg") {
 
   subpackages = [
     "//src/connectivity/network/testing/netemul/runner:package",
-    "//src/sys/test_runners/dart_wrapper:dart-aot-wrapper-runner",
-    "//src/sys/test_runners/dart_wrapper:dart-jit-wrapper-runner",
     "//src/sys/test_runners/elf:elf-test-ambient-exec-runner",
     "//src/sys/test_runners/elf:elf-test-create-raw-processes-ambient-exec-runner",
     "//src/sys/test_runners/elf:elf-test-create-raw-processes-runner",

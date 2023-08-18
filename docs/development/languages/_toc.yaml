@@ -18,9 +18,6 @@ toc:
 - title: "C/C++"
   section:
   - include: /docs/development/languages/c-cpp/_toc.yaml
-- title: "Dart"
-  section:
-  - include: /docs/development/languages/dart/_toc.yaml
 - title: "Go"
   section:
   - include: /docs/development/languages/go/_toc.yaml

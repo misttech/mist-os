@@ -21,11 +21,9 @@ OSRB request is approved, continue with the steps below.
 
 ### Language-specific guides
 
-If you are adding Rust, Dart or Go dependencies, follow the guides below:
+If you are adding Rust or Go dependencies, follow the guides below:
 
 - **Rust**: Follow the [external Rust crates][rust-third-party] guide.
-
-- **Dart**: Follow the [third-party Dart packages][dart-third-party] guide.
 
 - **Go**: See [`//third_party/golibs/`][golibs].
 
@@ -207,7 +205,6 @@ steps:
 - [Source code layout][source-layout]
 
 [build-secondary]: /build/secondary/
-[dart-third-party]: /docs/development/languages/dart/third_party.md
 [fuchsia-git]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main
 [gitignore]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/.gitignore
 [golibs]: /third_party/golibs/

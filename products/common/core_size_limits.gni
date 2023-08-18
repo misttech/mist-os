@@ -203,8 +203,6 @@ size_checker_input = {
       src = [
         "packages/base/trace_manager",
         "packages/cache/test_manager",
-        "packages/cache/dart-aot-wrapper-runner",
-        "packages/cache/dart-jit-wrapper-runner",
         "packages/cache/elf-test-runner",
         "packages/cache/elf-test-ambient-exec-runner",
         "packages/cache/elf-test-create-raw-processes-runner",

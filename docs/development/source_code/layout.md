@@ -307,8 +307,6 @@ populated from CIPD).
     * `...` *
  * `prebuilt/`
     * `chromium/` *
-    * `dart/` *
-    * `flutter/` *
     * `llvm/` *
  * `tools/`
     * `banjo/`

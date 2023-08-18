@@ -9,14 +9,6 @@
             extends: "realm",
             runners: [
                 {
-                    runner: "dart_aot_runner",
-                    from: "#dart_aot_runner",
-                },
-                {
-                    runner: "dart_jit_runner",
-                    from: "#dart_jit_runner",
-                },
-                {
                     runner: "elf_test_runner",
                     from: "#elf_test_runner",
                 },

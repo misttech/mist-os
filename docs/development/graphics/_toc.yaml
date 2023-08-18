@@ -9,9 +9,6 @@ toc:
 - title: "Escher (Physically-based renderer) concepts"
   section:
   - include: /docs/development/graphics/escher/concepts/_toc.yaml
-- title: "Flutter (UI toolkit)"
-  path: //flutter.io/
-  status: external
 - title: "Magma (Vulkan driver) concepts"
   section:
   - include: /docs/development/graphics/magma/concepts/_toc.yaml

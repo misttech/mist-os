@@ -19,14 +19,6 @@
     },
     children: [
         {
-            name: "dart_aot_runner",
-            url: "dart-aot-wrapper-runner#meta/dart-aot-wrapper-runner.cm",
-        },
-        {
-            name: "dart_jit_runner",
-            url: "dart-jit-wrapper-runner#meta/dart-jit-wrapper-runner.cm",
-        },
-        {
             name: "elf_test_runner",
             url: "elf-test-runner#meta/elf-test-runner.cm",
         },
@@ -259,11 +251,7 @@
                 "fuchsia.posix.socket.Provider",
             ],
             from: "parent",
-            to: [
-                "#dart_aot_runner",
-                "#dart_jit_runner",
-                "#g3_dart_jit_product_runner",
-            ],
+            to: [ "#g3_dart_jit_product_runner" ],
         },
 
         // These capabilities are offered for use by certain non-hermetic tests.
@@ -450,9 +438,6 @@
             directory: "config-data",
             from: "parent",
             to: [
-                // TODO(99511) Remove dependence on config-data once it is removed from the dart_*_runner cml.
-                "#dart_aot_runner",
-                "#dart_jit_runner",
                 "#g3_dart_jit_product_runner",
                 "#system-tests",
             ],

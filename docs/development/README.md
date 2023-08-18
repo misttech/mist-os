@@ -19,7 +19,6 @@ operating system. Explore the open source code at [cs.fuchsia.dev](https://cs.fu
 
  - [README](languages/README.md) - Language usage in Fuchsia
  - [C/C++](languages/c-cpp/README.md)
- - [Dart](languages/dart/README.md)
  - [FIDL](languages/fidl/README.md)
  - [Go](languages/go/README.md)
  - [Rust](languages/rust/README.md)

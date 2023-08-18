@@ -873,17 +873,6 @@
   related_guides: [""]
   area: ["FIDL", "UI"]
 
-- term: "Flutter"
-  short_description: "A functional-reactive user interface framework optimized for Fuchsia and is
-  used by many system components."
-  full_description: "A functional-reactive user interface framework optimized for Fuchsia and is
-  used by many system components. Flutter also runs on a variety of other platforms, including Android and iOS. Fuchsia
-  itself does not require you to use any particular language or user interface
-  framework."
-  see_also: ["<a href=\"http://flutter.dev\">flutter.dev</a>"]
-  related_guides: [""]
-  area: ["General", "Flutter"]
-
 - term: "Fragment"
   short_description: "A fragment is a <a href=\"/docs/glossary#node\">node</a> that composes a
   Driver Framework v1 <a href=\"/docs/glossary#composite-node\">composite node</a>. Each fragment
@@ -928,9 +917,9 @@
   short_description: "A scheme that refers to a repository, a package, or a package resource."
   full_description: "A scheme that refers to a repository, a package, or a package resource. The
   syntax is <code>fuchsia-pkg://<repo-hostname>[/<pkg-name>][#<path>]</code>]`. For example, for
-  the component <code>echo_client_dart.cm</code> published under the package <code>echo_dart</code>'s
+  the component <code>test_manager.cm</code> published under the package <code>test_manager</code>'s
   <code>meta</code> directory, from the <code>fuchsia.com</code> repository, its URL is
-  <code>fuchsia-pkg://fuchsia.com/echo_dart#meta/echo_client_dart.cm</code>."
+  <code>fuchsia-pkg://fuchsia.com/test_manager#meta/test_manager.cm</code>."
   see_also: ["<a href=\"/docs/concepts/packages/package_url.md\">Fuchsia package URLs</a>"]
   related_guides: [""]
   area: ["Component Framework", "System"]
@@ -1837,8 +1826,7 @@
 
 - term: "Runner"
   short_description: "A <a href=\"/docs/glossary#component\">component</a> that provides a
-  runtime environment for other components, e.g. the ELF runner, the Dart AOT runner, the Chromium
-  web runner."
+  runtime environment for other components, e.g. the ELF runner, the GTest runner."
   full_description: "Every component needs a runner in order to launch. Components express their
   dependency on a runner in the component's <a href=\"/docs/glossary#component-declaration\">declaration</a>.
   When the  <a href=\"/docs/glossary#component-framework\">component framework</a> starts a

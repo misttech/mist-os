@@ -367,28 +367,6 @@ paths.
    }
    ```
 
-   * {Dart}
-
-   ```gn
-   import("//build/dart/dart_component.gni")
-   import("//build/dart/dart_library.gni")
-   import("//build/components.gni")
-
-   dart_library("lib") {
-     package_name = "my_lib"
-     sources = [ "main.dart" ]
-   }
-
-   dart_component("my_component") {
-     manifest = "meta/my_component.cml"
-     deps = [ ":lib" ]
-   }
-
-   fuchsia_package("my_package") {
-     deps = [ ":my_component" ]
-   }
-   ```
-
 ### Packages with a single component {#packages-with-single-component}
 
 Packages are units of distribution. It is beneficial to define multiple

@@ -86,7 +86,5 @@ To run one of the test components defined here, provide the package name to
 
 -   [Inspect codelab](codelab/README.md): Interactive codelab demonstrating
     additional Inspect concepts.
--   [Inspect Dart](dart/README.md): A simple module that demonstrates Inspect
-    usage from within Flutter/Dart.
 -   [Ergonomic Inspect](rust-ergonomic/README.md): Demonstration of the
     `fuchsia_derive_inspect` Rust crate.

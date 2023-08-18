@@ -31,7 +31,6 @@ below is not complete: as Fuchsia evolves, more rubrics will be added.
    * [CLI tool help requirements](cli_help.md)
  * Languages
    * [C API Readability](c.md)
-   * [Dart API Readability](dart.md)
    * [FIDL Style][fidl-style]
    * [FIDL API][fidl-api]
    * [Go rubric](go.md)

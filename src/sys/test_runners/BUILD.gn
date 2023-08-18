@@ -145,7 +145,6 @@ group("tests") {
   deps = [
     ":test-runner-test-lib-unit-tests",
     ":test-runner-unit-tests",
-    "dart_wrapper:tests",
     "elf:tests",
     "fuzz:tests",
     "gotests:tests",

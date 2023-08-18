@@ -14,7 +14,6 @@ group("tests") {
 
   deps = [
     "bazel:tests",
-    "dart:tests",
     "fidl:tests",
     "go:tests",
     "python:tests",
@@ -155,10 +154,6 @@ group("non_hermetic_deps") {
     "//src/chromium:web_runner_pkg",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
     "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
-    "//src/dart:dart_aot_product_runner",
-    "//src/dart:dart_aot_runner",
-    "//src/dart:dart_jit_product_runner",
-    "//src/dart:dart_jit_runner",
     "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0",
     "//src/media/codec/codecs/vaapi:codec_runner_intel_gen",
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",

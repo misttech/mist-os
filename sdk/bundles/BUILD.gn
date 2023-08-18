@@ -17,7 +17,6 @@ group("core-tools") {
     "//bundles/packages/prod:tiles",
     "//bundles/packages/prod:tracing",
     "//src/connectivity:tools",
-    "//src/dart",
     "//src/fonts",
     "//src/graphics/lib/magma:magma-tools",
     "//src/media/audio/bundles:services",

@@ -17,9 +17,8 @@ language-specific rules take precedence; these special cases are identified
 below.
 
 Here are the links to language-specific guidelines for languages likely to be
-used in the Fuchsia repository: [C and
-C++](/docs/development/languages/c-cpp/cpp-style.md),
-[Dart](/docs/development/languages/dart/style.md)
+used in the Fuchsia repository:
+[C and C++](/docs/development/languages/c-cpp/cpp-style.md),
 [Rust](https://github.com/rust-lang-nursery/fmt-rfcs/blob/HEAD/guide/guide.md),
 [Java](https://google.github.io/styleguide/javaguide.html),
 [Kotlin](https://kotlinlang.org/docs/reference/coding-conventions.html#documentation-comments).

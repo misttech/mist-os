@@ -21,8 +21,6 @@ toc:
     path: /docs/development/api/cli.md
   - title: "CLI tool help requirements"
     path: /docs/development/api/cli_help.md
-  - title: "Dart API readability rubric"
-    path: /docs/development/api/dart.md
   - title: "Developer tool guidelines"
     path: /docs/development/api/tools.md
   - title: "FIDL API readability rubric"
