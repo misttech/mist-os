@@ -19,7 +19,6 @@ group("tests") {
 # Core paver implementation shared between all implementations.
 source_set("paver-core") {
   sources = [
-    "abr-client-vboot.cc",
     "abr-client.cc",
     "device-partitioner.cc",
     "fvm.cc",
@@ -133,22 +132,6 @@ source_set("astro") {
   ]
 }
 
-source_set("chromebook-x64") {
-  sources = [
-    "chromebook-x64.cc",
-    "flashmap-client.cc",
-  ]
-  deps = [
-    ":gpt",
-    ":paver-core",
-    "//sdk/fidl/fuchsia.acpi.chromeos:fuchsia.acpi.chromeos_cpp_wire",
-    "//sdk/fidl/fuchsia.nand.flashmap:fuchsia.nand.flashmap_cpp_wire",
-    "//sdk/fidl/fuchsia.tpm.cr50:fuchsia.tpm.cr50_cpp_wire",
-    "//sdk/fidl/fuchsia.vboot:fuchsia.vboot_cpp_wire",
-    "//src/lib/uuid",
-  ]
-}
-
 source_set("sherlock") {
   sources = [ "sherlock.cc" ]
   deps = [
@@ -233,7 +216,6 @@ zx_library("paver") {
   deps = [
     ":as370",
     ":astro",
-    ":chromebook-x64",
     ":luis",
     ":nelson",
     ":paver-core",

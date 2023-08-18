@@ -10,7 +10,6 @@
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/as370.h"
 #include "src/storage/lib/paver/astro.h"
-#include "src/storage/lib/paver/chromebook-x64.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
@@ -45,8 +44,6 @@ zx_status_t Init(void** out_ctx) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(
-      std::make_unique<paver::ChromebookX64PartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::PinecrestPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
@@ -55,7 +52,6 @@ zx_status_t Init(void** out_ctx) {
   abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::ChromebookX64AbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::PinecrestAbrClientFactory>());
   return ZX_OK;

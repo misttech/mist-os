@@ -30,7 +30,6 @@
 #include <utility>
 
 #include <fbl/unique_fd.h>
-#include <gpt/cros.h>
 #include <gpt/gpt.h>
 #include <soc/aml-common/aml-guid.h>
 #include <zxtest/zxtest.h>
@@ -38,7 +37,6 @@
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/as370.h"
 #include "src/storage/lib/paver/astro.h"
-#include "src/storage/lib/paver/chromebook-x64.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/pinecrest.h"
@@ -76,7 +74,6 @@ constexpr uint8_t kNewFvmType[GPT_GUID_LEN] = GPT_FVM_TYPE_GUID;
 // Legacy Type GUID's
 constexpr uint8_t kBootloaderType[GPT_GUID_LEN] = GUID_BOOTLOADER_VALUE;
 constexpr uint8_t kEfiType[GPT_GUID_LEN] = GUID_EFI_VALUE;
-constexpr uint8_t kCrosKernelType[GPT_GUID_LEN] = GUID_CROS_KERNEL_VALUE;
 constexpr uint8_t kZirconAType[GPT_GUID_LEN] = GUID_ZIRCON_A_VALUE;
 constexpr uint8_t kZirconBType[GPT_GUID_LEN] = GUID_ZIRCON_B_VALUE;
 constexpr uint8_t kZirconRType[GPT_GUID_LEN] = GUID_ZIRCON_R_VALUE;
@@ -883,239 +880,6 @@ TEST_F(EfiDevicePartitionerTests, ValidatePayload) {
   // Non-kernel partitions are not validated.
   ASSERT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kAbrMeta),
                                          cpp20::span<uint8_t>()));
-}
-
-class CrosDevicePartitionerTests : public GptDevicePartitionerTests {
- protected:
-  CrosDevicePartitionerTests() : GptDevicePartitionerTests(fbl::String(), 512) {}
-
-  // Create a DevicePartition for a device.
-  void CreatePartitioner(BlockDevice* device,
-                         std::unique_ptr<paver::DevicePartitioner>* partitioner) {
-    zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-    ASSERT_OK(controller_endpoints);
-    auto& [controller, controller_server] = controller_endpoints.value();
-
-    ASSERT_OK(fidl::WireCall(device->block_controller_interface())
-                  ->ConnectToController(std::move(controller_server))
-                  .status());
-    fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
-    zx::result status = paver::CrosDevicePartitioner::Initialize(
-        devmgr_.devfs_root().duplicate(), svc_root, paver::Arch::kX64, std::move(controller));
-    ASSERT_OK(status);
-    *partitioner = std::move(status.value());
-  }
-};
-
-TEST_F(CrosDevicePartitionerTests, InitPartitionTables) {
-  std::unique_ptr<BlockDevice> disk;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &disk));
-
-  {
-    // Pause the block watcher while we write partitions to the disk.
-    // This is to avoid the block watcher seeing an intermediate state of the partition table
-    // and incorrectly treating it as an MBR.
-    // The watcher is automatically resumed when this goes out of scope.
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
-    // Write initial partitions to disk.
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(disk.get(), &gpt));
-    const std::array<PartitionDescription, 5> partitions_at_start{
-        PartitionDescription{"SYSCFG", kSysConfigType, 0x22, 0x800},
-        PartitionDescription{"ZIRCON-A", kCrosKernelType, 0x822, 0x20000},
-        PartitionDescription{"ZIRCON-B", kCrosKernelType, 0x20822, 0x20000},
-        PartitionDescription{"ZIRCON-R", kCrosKernelType, 0x40822, 0x20000},
-        PartitionDescription{"fvm", kFvmType, 0x60822, 0x1000000},
-    };
-    for (auto& part : partitions_at_start) {
-      ASSERT_OK(
-          gpt->AddPartition(part.name, part.type, GetRandomGuid(), part.start, part.length, 0),
-          "%s", part.name);
-    }
-
-    ASSERT_OK(gpt->Sync());
-  }
-
-  // Create CrOS device partitioner and initialise partition tables.
-  std::unique_ptr<paver::DevicePartitioner> partitioner;
-  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(disk.get(), &partitioner));
-  ASSERT_OK(partitioner->InitPartitionTables());
-
-  // Ensure the final partition layout looks like we expect it to.
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice(disk.get(), &gpt));
-  const std::array<PartitionDescription, 7> partitions_at_end{
-      PartitionDescription{GPT_ZIRCON_A_NAME, kCrosKernelType, 0x22, 0x20000},
-      PartitionDescription{GPT_ZIRCON_B_NAME, kCrosKernelType, 0x20022, 0x20000},
-      PartitionDescription{GPT_ZIRCON_R_NAME, kCrosKernelType, 0x40022, 0x20000},
-      PartitionDescription{GPT_VBMETA_A_NAME, kVbMetaType, 0x60022, 0x80},
-      PartitionDescription{GPT_VBMETA_B_NAME, kVbMetaType, 0x600a2, 0x80},
-      PartitionDescription{GPT_VBMETA_R_NAME, kVbMetaType, 0x60122, 0x80},
-      PartitionDescription{GPT_FVM_NAME, kNewFvmType, 0x601a2, 0x7000000},
-  };
-  ASSERT_NO_FATAL_FAILURE(EnsurePartitionsMatch(gpt.get(), partitions_at_end));
-
-  // Make sure we can find the important partitions.
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconR)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaA)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaB)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaR)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
-}
-
-TEST_F(CrosDevicePartitionerTests, SupportsPartition) {
-  // Create a 32 GiB disk.
-  std::unique_ptr<BlockDevice> disk;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(32 * kGibibyte, &disk));
-
-  // Create EFI device partitioner and initialise partition tables.
-  std::unique_ptr<paver::DevicePartitioner> partitioner;
-  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(disk.get(), &partitioner));
-
-  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA)));
-  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconB)));
-  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconR)));
-  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kVbMetaA)));
-  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kVbMetaB)));
-  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kVbMetaR)));
-  EXPECT_TRUE(
-      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
-  EXPECT_TRUE(partitioner->SupportsPartition(
-      PartitionSpec(paver::Partition::kFuchsiaVolumeManager, paver::kOpaqueVolumeContentType)));
-
-  // Unsupported partition type.
-  EXPECT_FALSE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kUnknown)));
-  EXPECT_FALSE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderA)));
-  EXPECT_FALSE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kAbrMeta)));
-
-  // Unsupported content type.
-  EXPECT_FALSE(
-      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA, "foo_type")));
-}
-
-TEST_F(CrosDevicePartitionerTests, ValidatePayload) {
-  // Create a 32 GiB disk.
-  std::unique_ptr<BlockDevice> disk;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(32 * kGibibyte, &disk));
-
-  // Create EFI device partitioner and initialise partition tables.
-  std::unique_ptr<paver::DevicePartitioner> partitioner;
-  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(disk.get(), &partitioner));
-
-  // Test invalid partitions.
-  ASSERT_NOT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kZirconA),
-                                             cpp20::span<uint8_t>()));
-  ASSERT_NOT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kZirconB),
-                                             cpp20::span<uint8_t>()));
-  ASSERT_NOT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kZirconR),
-                                             cpp20::span<uint8_t>()));
-
-  // Test valid partition.
-  constexpr std::string_view kChromeOsMagicHeader = "CHROMEOS";
-  ASSERT_OK(partitioner->ValidatePayload(
-      PartitionSpec(paver::Partition::kZirconA),
-      cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(kChromeOsMagicHeader.data()),
-                                 kChromeOsMagicHeader.size())));
-
-  // Non-kernel partitions are not validated.
-  ASSERT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kFuchsiaVolumeManager),
-                                         cpp20::span<uint8_t>()));
-}
-
-// Get Cros GPT flags for a kernel with the given priority.
-uint64_t CrosGptPriorityFlags(uint8_t priority) {
-  uint64_t flags = 0;
-  ZX_ASSERT(gpt_cros_attr_set_priority(&flags, priority) >= 0);
-  return flags;
-}
-
-uint8_t CrosGptHighestKernelPriority(const gpt::GptDevice* gpt) {
-  uint8_t top_priority = 0;
-  for (uint32_t i = 0; i < gpt::kPartitionCount; ++i) {
-    zx::result<const gpt_partition_t*> partition_or = gpt->GetPartition(i);
-    if (partition_or.is_error()) {
-      continue;
-    }
-    const gpt_partition_t* partition = partition_or.value();
-    const uint8_t priority = gpt_cros_attr_get_priority(partition->flags);
-    // Ignore anything not of type CROS KERNEL.
-    if (uuid::Uuid(partition->type) != uuid::Uuid(GUID_CROS_KERNEL_VALUE)) {
-      continue;
-    }
-
-    if (priority > top_priority) {
-      top_priority = priority;
-    }
-  }
-
-  return top_priority;
-}
-
-TEST_F(CrosDevicePartitionerTests, KernelPriority) {
-  // Create a 32 GiB disk.
-  std::unique_ptr<BlockDevice> disk;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &disk));
-
-  {
-    // Pause the block watcher while we write partitions to the disk.
-    // This is to avoid the block watcher seeing an intermediate state of the partition table
-    // and incorrectly treating it as an MBR.
-    // The watcher is automatically resumed when this goes out of scope.
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
-    // Set up partition table for test.
-    // Add non-ChromeOS partitions.
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(disk.get(), &gpt));
-    ASSERT_OK(gpt->AddPartition("CROS_KERNEL", kCrosKernelType, GetRandomGuid(), 0x1000, 0x1000,
-                                CrosGptPriorityFlags(3)));
-    ASSERT_OK(gpt->AddPartition("NOT_KERNEL", GetRandomGuid(), GetRandomGuid(), 0x2000, 0x10,
-                                CrosGptPriorityFlags(7)));
-
-    ASSERT_OK(gpt->Sync());
-  }
-
-  // Partition the disk, which will add ChromeOS partitions and adjust priorities.
-  {
-    std::unique_ptr<paver::DevicePartitioner> partitioner;
-    ASSERT_NO_FATAL_FAILURE(CreatePartitioner(disk.get(), &partitioner));
-    ASSERT_OK(partitioner->InitPartitionTables());
-    ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconA)));
-  }
-
-  // Ensure that the "zircon-a" kernel has the highest priority.
-  {
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(disk.get(), &gpt));
-    const gpt_partition_t* zircon_a_partition =
-        FindPartitionWithLabel(gpt.get(), GPT_ZIRCON_A_NAME);
-    ASSERT_TRUE(zircon_a_partition != nullptr);
-    EXPECT_EQ(gpt_cros_attr_get_priority(zircon_a_partition->flags),
-              CrosGptHighestKernelPriority(gpt.get()));
-  }
-
-  // Partition the disk again.
-  {
-    std::unique_ptr<paver::DevicePartitioner> partitioner;
-    ASSERT_NO_FATAL_FAILURE(CreatePartitioner(disk.get(), &partitioner));
-    ASSERT_OK(partitioner->FinalizePartition(PartitionSpec(paver::Partition::kZirconA)));
-  }
-
-  // Ensure that the "zircon-a" kernel still has the highest priority.
-  {
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(disk.get(), &gpt));
-    const gpt_partition_t* zircon_a_partition =
-        FindPartitionWithLabel(gpt.get(), GPT_ZIRCON_A_NAME);
-    ASSERT_TRUE(zircon_a_partition != nullptr);
-    EXPECT_EQ(gpt_cros_attr_get_priority(zircon_a_partition->flags),
-              CrosGptHighestKernelPriority(gpt.get()));
-  }
 }
 
 class FixedDevicePartitionerTests : public zxtest::Test {

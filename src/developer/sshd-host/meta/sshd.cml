@@ -185,7 +185,6 @@
                 "fuchsia.ui.activity.Provider",
                 "fuchsia.ui.brightness.Control",
                 "fuchsia.update.CommitStatusProvider",
-                "fuchsia.vboot.FirmwareParam",
                 "fuchsia.virtualconsole.SessionManager",
                 "fuchsia.vulkan.loader.Loader",
             ],

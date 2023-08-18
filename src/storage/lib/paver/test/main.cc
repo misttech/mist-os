@@ -7,7 +7,6 @@
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/as370.h"
 #include "src/storage/lib/paver/astro.h"
-#include "src/storage/lib/paver/chromebook-x64.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
@@ -23,8 +22,6 @@ int main(int argc, char** argv) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(
-      std::make_unique<paver::ChromebookX64PartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::PinecrestPartitionerFactory>());
 
   // X64PartitionerFactory must be placed last if test will be run on x64 devices.

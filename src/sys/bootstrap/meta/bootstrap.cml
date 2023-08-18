@@ -38,10 +38,6 @@
             environment: "#devfs-env",
         },
         {
-            name: "flashmap",
-            url: "fuchsia-boot:///#meta/flashmap.cm",
-        },
-        {
             name: "fshost",
             url: "fuchsia-boot:///#meta/fshost.cm",
             environment: "#fshost-env",
@@ -106,10 +102,6 @@
         {
             name: "cr50_agent",
             url: "fuchsia-boot:///#meta/cr50_agent.cm",
-        },
-        {
-            name: "vboot-fwparam",
-            url: "fuchsia-boot:///#meta/vboot-fwparam.cm",
         },
         {
             // base_resolver is present on all product configurations except
@@ -700,10 +692,8 @@
             from: "#devfs-with-pkg",
             to: [
                 "#console-launcher",
-                "#flashmap",
                 "#miscsvc",
                 "#sysinfo",
-                "#vboot-fwparam",
             ],
         },
         {
@@ -935,7 +925,6 @@
                 "#driver-hosts",
                 "#driver_index",
                 "#driver_manager",
-                "#flashmap",
                 "#fshost",
                 "#full-pkg-drivers",
                 "#live_usb",
@@ -948,16 +937,7 @@
                 "#shutdown_shim",
                 "#svchost",
                 "#sysinfo",
-                "#vboot-fwparam",
                 "#virtual_console",
-            ],
-        },
-        {
-            protocol: [ "fuchsia.vboot.FirmwareParam" ],
-            from: "#vboot-fwparam",
-            to: [
-                "#console-launcher",
-                "#miscsvc",
             ],
         },
         {
@@ -984,10 +964,7 @@
         {
             protocol: [ "fuchsia.tpm.cr50.Cr50" ],
             from: "#cr50_agent",
-            to: [
-                "#console-launcher",
-                "#miscsvc",
-            ],
+            to: "#console-launcher",
         },
         {
             directory: "dev-class",
@@ -1000,14 +977,6 @@
             protocol: [ "fuchsia.fshost.BlockWatcher" ],
             from: "#fshost",
             to: "#miscsvc",
-        },
-        {
-            protocol: "fuchsia.nand.flashmap.Manager",
-            from: "#flashmap",
-            to: [
-                "#miscsvc",
-                "#vboot-fwparam",
-            ],
         },
         {
             protocol: [ "fuchsia.fshost.BlockWatcher" ],
@@ -1198,10 +1167,6 @@
             from: "#driver_index",
         },
         {
-            protocol: [ "fuchsia.vboot.FirmwareParam" ],
-            from: "#vboot-fwparam",
-        },
-        {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
         },
@@ -1272,10 +1237,6 @@
         {
             resolver: "base_resolver",
             from: "#base_resolver",
-        },
-        {
-            protocol: "fuchsia.nand.flashmap.Manager",
-            from: "#flashmap",
         },
         {
             protocol: [

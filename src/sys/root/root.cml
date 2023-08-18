@@ -191,7 +191,6 @@
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
                 "fuchsia.update.verify.BlobfsVerifier",
-                "fuchsia.vboot.FirmwareParam",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "#bootstrap",
