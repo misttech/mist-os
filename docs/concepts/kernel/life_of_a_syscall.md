@@ -46,8 +46,8 @@ Example zither output:
 KERNEL_SYSCALL(channel_create, zx_status_t, /* no attributes */, 3,
     (options, out0, out1), (
     uint32_t options,
-    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) user_out_handle* out0,
-    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) user_out_handle* out1))
+    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) zx_handle_t* out0,
+    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) zx_handle_t* out1))
 ```
 
 Example x86 implementation:
@@ -159,8 +159,8 @@ macro and a zither-generated source file.
 KERNEL_SYSCALL(channel_create, zx_status_t, /* no attributes */, 3,
     (options, out0, out1), (
     uint32_t options,
-    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) user_out_handle* out0,
-    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) user_out_handle* out1))
+    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) zx_handle_t* out0,
+    _ZX_SYSCALL_ANNO(acquire_handle("Fuchsia")) zx_handle_t* out1))
 
 .macro syscall_dispatch nargs, syscall
   LOCAL_FUNCTION(.Lcall_\syscall\())
@@ -183,17 +183,25 @@ These wrappers have the naming convention `wrapper_<syscall>`.
 ```
 syscall_result wrapper_channel_create(uint32_t options, zx_handle_t* out0, zx_handle_t* out1, uint64_t pc) {
     return do_syscall(ZX_SYS_channel_create, pc, &VDso::ValidSyscallPC::channel_create, [&](ProcessDispatcher* current_process) -> uint64_t {
-        user_out_handle out_handle_out0;
-        user_out_handle out_handle_out1;
+        zx_handle_t out_handle_out0;
+        zx_handle_t out_handle_out1;
         auto result = sys_channel_create(options, &out_handle_out0, &out_handle_out1);
         if (result != ZX_OK)
             return result;
-        if (out_handle_out0.begin_copyout(current_process, make_user_out_ptr(out0)))
-            return ZX_ERR_INVALID_ARGS;
-        if (out_handle_out1.begin_copyout(current_process, make_user_out_ptr(out1)))
-            return ZX_ERR_INVALID_ARGS;
-        out_handle_out0.finish_copyout(current_process);
-        out_handle_out1.finish_copyout(current_process);
+        result = make_user_out_ptr(SafeSyscallArgument<zx_handle_t*>::Sanitize(out0))
+                                   .copy_to_user(out_handle_out0);
+        if (result != ZX_OK) {
+            // We should never fail to copy out a handle to userspace. If we do, a
+            // handle will be leaked, so throw a SignalPolicyException.
+            Thread::Current::SignalPolicyException(ZX_EXCP_POLICY_CODE_HANDLE_LEAK, 0u);
+        }
+        result = make_user_out_ptr(SafeSyscallArgument<zx_handle_t*>::Sanitize(out1))
+                    .copy_to_user(out_handle_out1);
+        if (result != ZX_OK) {
+            // We should never fail to copy out a handle to userspace. If we do, a
+            // handle will be leaked, so throw a SignalPolicyException.
+            Thread::Current::SignalPolicyException(ZX_EXCP_POLICY_CODE_HANDLE_LEAK, 0u);
+        }
         return result;
     });
 }
