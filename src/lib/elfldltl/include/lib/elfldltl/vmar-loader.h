@@ -9,6 +9,9 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/syscalls/object.h>
+
+#include <type_traits>
 
 #include "diagnostics.h"
 #include "memory.h"
@@ -68,6 +71,41 @@ class VmarLoader {
     return true;
   }
 
+  // This can be specialized by the user for particular LoadInfo types passed
+  // to Load().  It's constructed by Load() for each segment using the specific
+  // LoadInfo::*Segment type, not the LoadInfo::Segment std::variant type, so
+  // it can have a constructor that works differently for each type.  The
+  // constructor will be called with the individual segment object reference,
+  // and the VMO for the whole file.  Both will be valid for the lifetime of
+  // the SegmentVmo object.  The handle returned by .vmo() will only be used
+  // during that lifetime.  So, a specialization might return an object that
+  // owns the VMO handle it yields.
+  template <class LoadInfo>
+  class SegmentVmo {
+   public:
+    SegmentVmo() = delete;
+
+    template <class Segment>
+    SegmentVmo(const Segment& segment, zx::unowned_vmo vmo)
+        : vmo_{vmo->borrow()}, offset_{segment.offset()} {}
+
+    // This is the VMO to map the segment's contents from.
+    zx::unowned_vmo vmo() const { return vmo_->borrow(); }
+
+    // If true and the segment is writable, make a copy-on-write child VMO.
+    // This is the usual behavior when using the original file VMO directly.
+    // A specialization can return anything convertible to bool.
+    constexpr std::true_type copy_on_write() const { return {}; }
+
+    // This is the offset within the VMO whence the segment should be mapped
+    // (or cloned if this->copy_on_write()).
+    uint64_t offset() const { return offset_; }
+
+   private:
+    zx::unowned_vmo vmo_;
+    uint64_t offset_;
+  };
+
  protected:
   // This encapsulates the main differences between the Load methods of the
   // derived classes.  Each derived class's Load method just calls a different
@@ -111,6 +149,12 @@ class VmarLoader {
       // Where in the VMAR the segment begins, accounting for load bias.
       const uintptr_t vmar_offset = segment.vaddr() - vaddr_start;
 
+      // Let the Segment type choose a different VMO and offset if it wants to.
+      SegmentVmo<LoadInfo> segment_vmo{segment, vmo->borrow()};
+      zx::unowned_vmo map_vmo = segment_vmo.vmo();
+      const auto map_cow = segment_vmo.copy_on_write();
+      const uint64_t map_offset = segment_vmo.offset();
+
       // The read-only ConstantSegment shares little in common with the others.
       // The segment.writable() is statically true in the ConstantSegment
       // instantiation of the mapper call operator, so the rest of the code
@@ -123,10 +167,10 @@ class VmarLoader {
                                  (segment.readable() ? ZX_VM_PERM_READ : 0) |
                                  (segment.executable() ? kVmExecutable : 0);
         zx_status_t status =
-            Map(vmar_offset, options, vmo->borrow(), segment.offset(), segment.filesz());
+            Map(vmar_offset, options, map_vmo->borrow(), map_offset, segment.filesz());
         if (status != ZX_OK) [[unlikely]] {
-          diag.SystemError("cannot map read-only segment from file", FileAddress{segment.vaddr()},
-                           ZirconError{status});
+          diag.SystemError("cannot map read-only segment", FileAddress{segment.vaddr()}, " from ",
+                           FileOffset{segment.offset()}, ": ", ZirconError{status});
           return false;
         }
 
@@ -179,6 +223,7 @@ class VmarLoader {
         switch (PartialPage) {
           case PartialPagePolicy::kProhibited:
             // MapWritable will assert that map_size is aligned.
+            zero_size = segment.memsz() - map_size;
             break;
           case PartialPagePolicy::kCopyInProcess:
             // Round down what's mapped, and copy the difference.
@@ -198,10 +243,11 @@ class VmarLoader {
       // First map data from the file, if any.
       if (map_size > 0) {
         zx_status_t status = MapWritable<PartialPage == PartialPagePolicy::kZeroInVmo>(
-            vmar_offset, vmo->borrow(), base_name, segment.offset(), map_size, num_data_segments);
+            vmar_offset, map_vmo->borrow(), map_cow, base_name, map_offset, map_size,
+            num_data_segments);
         if (status != ZX_OK) [[unlikely]] {
-          diag.SystemError("cannot map writable segment from file", FileAddress{segment.vaddr()},
-                           ZirconError{status});
+          diag.SystemError("cannot map writable segment", FileAddress{segment.vaddr()},
+                           " from file", FileOffset{map_offset}, ": ", ZirconError{status});
           return false;
         }
       }
@@ -222,7 +268,7 @@ class VmarLoader {
             MapZeroFill(zero_fill_vmar_offset, base_name, zero_size, num_zero_segments);
         if (status != ZX_OK) [[unlikely]] {
           diag.SystemError("cannot map zero-fill pages", FileAddress{segment.vaddr() + map_size},
-                           ZirconError{status});
+                           ": ", ZirconError{status});
           return false;
         }
 
@@ -230,12 +276,12 @@ class VmarLoader {
         if constexpr (PartialPage != PartialPagePolicy::kCopyInProcess) {
           ZX_DEBUG_ASSERT(copy_size == 0);
         } else if (copy_size > 0) {
-          const size_t copy_offset = segment.offset() + map_size;
+          const size_t copy_offset = map_offset + map_size;
           void* const copy_data =
               reinterpret_cast<void*>(vaddr_start + zero_fill_vmar_offset + load_bias_);
-          zx_status_t status = vmo->read(copy_data, copy_offset, copy_size);
+          zx_status_t status = map_vmo->read(copy_data, copy_offset, copy_size);
           if (status != ZX_OK) [[unlikely]] {
-            diag.SystemError("cannot read segment data from file", FileOffset{copy_offset},
+            diag.SystemError("cannot read segment data from file", FileOffset{copy_offset}, ": ",
                              ZirconError{status});
             return false;
           }
@@ -288,8 +334,9 @@ class VmarLoader {
   }
 
   template <bool ZeroPartialPage>
-  zx_status_t MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, std::string_view base_name,
-                          uint64_t vmo_offset, size_t size, size_t& num_data_segments);
+  zx_status_t MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo,
+                          std::string_view base_name, uint64_t vmo_offset, size_t size,
+                          size_t& num_data_segments);
 
   zx_status_t MapZeroFill(uintptr_t vmar_offset, std::string_view base_name, size_t size,
                           size_t& num_zero_segments);
@@ -366,19 +413,29 @@ class RemoteVmarLoader : public VmarLoader {
   }
 };
 
+/// elfldltl::AlignedRemoteVmarLoader is like elfldltl::RemoteVmarLoader but it
+/// expects that any DataWithZeroFillSegment segments have been prepared to
+/// have a page-aligned filesz() by zero-filling the final partial page of
+/// the data portion in the VMO.
+class AlignedRemoteVmarLoader : public VmarLoader {
+ public:
+  using VmarLoader::VmarLoader;  // Requires a const zx::vmar& argument.
+
+  template <class Diagnostics, class LoadInfo>
+  [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
+    return VmarLoader::Load<PartialPagePolicy::kProhibited>(diag, load_info, vmo->borrow());
+  }
+};
+
 // Both possible MapWritable instantiations are defined in vmar-loader.cc.
 
-extern template zx_status_t VmarLoader::MapWritable<false>(uintptr_t vmar_offset,
-                                                           zx::unowned_vmo vmo,
-                                                           std::string_view base_name,
-                                                           uint64_t vmo_offset, size_t size,
-                                                           size_t& num_data_segments);
+extern template zx_status_t VmarLoader::MapWritable<false>(  //
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
-extern template zx_status_t VmarLoader::MapWritable<true>(uintptr_t vmar_offset,
-                                                          zx::unowned_vmo vmo,
-                                                          std::string_view base_name,
-                                                          uint64_t vmo_offset, size_t size,
-                                                          size_t& num_data_segments);
+extern template zx_status_t VmarLoader::MapWritable<true>(  //
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 }  // namespace elfldltl
 

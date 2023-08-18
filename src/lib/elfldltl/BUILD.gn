@@ -71,6 +71,7 @@ library_headers("headers") {
     "lib/elfldltl/relocation.h",
     "lib/elfldltl/relro.h",
     "lib/elfldltl/resolve.h",
+    "lib/elfldltl/segment-with-vmo.h",
     "lib/elfldltl/self.h",
     "lib/elfldltl/static-pie-with-vdso.h",
     "lib/elfldltl/static-pie.h",

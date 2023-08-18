@@ -10,7 +10,6 @@
 #include <type_traits>
 #include <variant>
 
-#include "../constants.h"
 #include "../layout.h"
 #include "../phdr.h"
 
@@ -46,6 +45,9 @@ constexpr bool VisitEach(F&& f, V&& v, std::index_sequence<I...>) {
   ((v.index() == I && visit_one(std::get<I>(std::forward<V>(v)))) || ...);
   return result;
 }
+
+template <class SegmentType>
+using NoSegmentWrapper = SegmentType;
 
 // This is used to implement the LoadInfo::ConstantSegment type below.
 template <typename SegmentType>
@@ -94,6 +96,14 @@ struct LoadSegmentTypes {
   class SegmentBase {
    public:
     using size_type = LoadSegmentTypes::size_type;
+
+    // This is a hook for a SegmentWrapper subclass to add some constraint on
+    // merging (e.g. incompatible extra subclass state).  It's checked first,
+    // before the segments are examined for adjacency and compatible features.
+    template <class OtherSegment>
+    constexpr std::true_type CanMergeWith(const OtherSegment& other) const {
+      return {};
+    }
 
     constexpr std::true_type readable() const { return {}; }
 
@@ -182,6 +192,15 @@ struct LoadSegmentTypes {
     // Only a leading subset of the in-memory segment is loaded from the file.
     constexpr size_type filesz() const { return filesz_; }
 
+    // Modify the segment in place so that filesz() is page-aligned.
+    // Return the size of the partial page left at the end of the new size,
+    // which needs to be zeroed in place before the segment is mapped.
+    constexpr size_type MakeAligned(size_type page_size) {
+      const size_type exact_filesz = filesz_;
+      filesz_ = (filesz_ + page_size - 1) & -page_size;
+      return filesz_ - exact_filesz;
+    }
+
    private:
     size_type filesz_ = 0;
   };
@@ -198,8 +217,18 @@ struct LoadSegmentTypes {
 
     constexpr size_type vaddr() const { return this->offset(); }
 
-    constexpr size_type filesz() const { return 0; }
+    constexpr std::integral_constant<size_type, 0> filesz() const { return {}; }
   };
+};
+
+template <class LoadInfo>
+struct SegmentMerger {
+  using size_type = typename LoadInfo::size_type;
+  using ConstantSegment = typename LoadInfo::ConstantSegment;
+  using DataSegment = typename LoadInfo::DataSegment;
+  using DataWithZeroFillSegment = typename LoadInfo::DataWithZeroFillSegment;
+  using ZeroFillSegment = typename LoadInfo::ZeroFillSegment;
+  using Segment = typename LoadInfo::Segment;
 
   template <class First, class Second>
   static constexpr bool Adjacent(const First& first, const Second& second) {
@@ -223,65 +252,61 @@ struct LoadSegmentTypes {
   // storage.  If the first and second segments are adjacent and compatible,
   // this merges them by storing a new merged range into storage and then
   // returns true.
-  template <class Merged, class... T, class First, class Second, typename... A>
-  static constexpr void Emplace(std::variant<T...>& storage, const First& first,
-                                const Second& second, A... args) {
+  template <class Merged, class First, class Second, typename... Args>
+  static constexpr void Emplace(Segment& storage, const First& first, const Second& second,
+                                Args&&... args) {
     size_type memsz = first.memsz() + second.memsz();
-    storage.template emplace<Merged>(first.offset(), first.vaddr(), memsz, args...);
+    storage.template emplace<Merged>(first.offset(), first.vaddr(), memsz,
+                                     std::forward<Args>(args)...);
   }
 
   // Helper used when details other than vaddr, offset, and memsz match.
-  template <class... T, class First, typename... A>
-  static constexpr bool MergeSame(std::variant<T...>& storage, const First& first,
-                                  const First& second, A... args) {
+  template <class First, typename... Args>
+  static constexpr bool MergeSame(Segment& storage, const First& first, const First& second,
+                                  Args&&... args) {
     if (Adjacent(first, second)) {
-      Emplace<First>(storage, first, second, args...);
+      Emplace<First>(storage, first, second, std::forward<Args>(args)...);
       return true;
     }
     return false;
   }
 
-  // This is the fallback overload for mismatched segment types, since this
-  // is the base class of every segment but the actual type of none.
-  template <class... T>
-  static constexpr bool Merge(std::variant<T...>& storage, const SegmentBase& first,
-                              const SegmentBase& second) {
+  // This is the fallback overload for mismatched segment types.
+  template <class... T, class First, class Second>
+  static constexpr bool Merge(std::variant<T...>& storage, const First& first,
+                              const Second& second) {
     return false;
   }
 
   // Identical adjacent segments merge.
-  template <class... T, PhdrLoadPolicy Policy>
-  static constexpr bool Merge(std::variant<T...>& storage, const ConstantSegment<Policy>& first,
-                              const ConstantSegment<Policy>& second) {
+  static constexpr bool Merge(Segment& storage, const ConstantSegment& first,
+                              const ConstantSegment& second) {
     return first.flags() == second.flags() && MergeSame(storage, first, second, first.flags());
   }
 
   // Identical adjacent segments merge.
-  template <class... T, PhdrLoadPolicy Policy>
-  static constexpr bool Merge(std::variant<T...>& storage, const DataSegment<Policy>& first,
-                              const DataSegment<Policy>& second) {
+  static constexpr bool Merge(Segment& storage, const DataSegment& first,
+                              const DataSegment& second) {
     size_type filesz = first.filesz() + second.filesz();
     return MergeSame(storage, first, second, filesz);
   }
 
   // A data segment can be merged into an adjacent data + bss segment.
-  template <class... T, PhdrLoadPolicy Policy>
-  static constexpr bool Merge(std::variant<T...>& storage, const DataSegment<Policy>& first,
-                              const DataWithZeroFillSegment<Policy>& second) {
+  static constexpr bool Merge(Segment& storage, const DataSegment& first,
+                              const DataWithZeroFillSegment& second) {
     if (Adjacent(first, second)) {
       size_type filesz = first.filesz() + second.filesz();
-      Emplace<DataWithZeroFillSegment<Policy>>(storage, first, second, filesz);
+      Emplace<DataWithZeroFillSegment>(storage, first, second, filesz);
       return true;
     }
     return false;
   }
 
   // A data segment can be merged with an adjacent plain zero-fill segment.
-  template <class... T, PhdrLoadPolicy Policy>
-  static constexpr bool Merge(std::variant<T...>& storage, const DataSegment<Policy>& first,
+  static constexpr bool Merge(Segment& storage, const DataSegment& first,
                               const ZeroFillSegment& second) {
     if (Adjacent(first, second)) {
-      Emplace<DataWithZeroFillSegment<Policy>>(storage, first, second, first.filesz());
+      Emplace<DataWithZeroFillSegment>(storage, first, second, first.filesz());
       return true;
     }
     return false;
@@ -307,7 +332,8 @@ struct LoadSegmentTypes {
   static constexpr bool Merge(std::variant<T...>& first, std::variant<T...>& second) {
     auto unwrap_first = [&storage = first, &second](const auto& first) {
       auto unwrap_second = [&storage, &first](const auto& second) {
-        return Merge(storage, first, second);
+        return first.CanMergeWith(second) && second.CanMergeWith(first) &&
+               Merge(storage, first, second);
       };
       return Visit(unwrap_second, second);
     };

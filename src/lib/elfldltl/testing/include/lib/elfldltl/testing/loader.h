@@ -22,6 +22,7 @@
 #include "lib/elfldltl/testing/diagnostics.h"
 
 #ifdef __Fuchsia__
+#include <lib/elfldltl/segment-with-vmo.h>
 #include <lib/elfldltl/vmar-loader.h>
 #include <lib/elfldltl/vmo.h>
 #include <lib/zx/vmar.h>
@@ -36,6 +37,9 @@ namespace elfldltl::testing {
 
 #ifdef __Fuchsia__
 struct LocalVmarLoaderTraits {
+  template <class Elf, template <class> class Container>
+  using Info = LoadInfo<Elf, Container>;
+
   // The Loader object is move-constructible and move-assignable.
   // It might be default-constructible for not.
   using Loader = elfldltl::LocalVmarLoader;
@@ -66,24 +70,46 @@ struct LocalVmarLoaderTraits {
 
   // This indicates that the Loader::memory() method is available.
   static constexpr bool kHasMemory = true;
+
+  // This can modify the LoadInfo segments before loading.
+  template <class Diagnostics, class LoadInfo, class File, class Loader>
+  static constexpr bool Normalize(Diagnostics& diag, LoadInfo& info, File& file, Loader& loader) {
+    return true;
+  }
 };
 
 struct RemoteVmarLoaderTraits : public LocalVmarLoaderTraits {
   using Loader = elfldltl::RemoteVmarLoader;
 
-  static Loader MakeLoader(const zx::vmar& vmar = *zx::vmar::root_self()) {
-    return elfldltl::RemoteVmarLoader{vmar};
-  }
+  static Loader MakeLoader(const zx::vmar& vmar = *zx::vmar::root_self()) { return Loader{vmar}; }
 
   // No Loader::memory() method is available.
   static constexpr bool kHasMemory = false;
 };
-#endif
+
+struct AlignedRemoteVmarLoaderTraits : public RemoteVmarLoaderTraits {
+  template <class Elf, template <class> class Container>
+  using Info = LoadInfo<Elf, Container, PhdrLoadPolicy::kBasic, SegmentWithVmo::NoCopy>;
+
+  using Loader = elfldltl::AlignedRemoteVmarLoader;
+
+  static Loader MakeLoader(const zx::vmar& vmar = *zx::vmar::root_self()) { return Loader{vmar}; }
+
+  template <class Diagnostics, class LoadInfo, class File>
+  static constexpr bool Normalize(Diagnostics& diag, LoadInfo& info, const File& file,
+                                  const Loader& loader) {
+    return SegmentWithVmo::AlignSegments(diag, info, file.borrow(), loader.page_size());
+  }
+};
+#endif  // __Fuchsia__
 
 struct MmapLoaderTraits {
+  template <class Elf, template <class> class Container>
+  using Info = LoadInfo<Elf, Container>;
+
   using Loader = elfldltl::MmapLoader;
 
-  static auto MakeLoader() { return elfldltl::MmapLoader{}; }
+  static Loader MakeLoader() { return Loader{}; }
 
   static constexpr auto TestLibProvider = GetTestLib;
 
@@ -96,11 +122,16 @@ struct MmapLoaderTraits {
 
   // This indicates that the Loader::memory() method is available.
   static constexpr bool kHasMemory = true;
+
+  template <class Diagnostics, class LoadInfo, class File>
+  static constexpr bool Normalize(Diagnostics& diag, LoadInfo& info, File& file, Loader& loader) {
+    return true;
+  }
 };
 
 using LoaderTypes = ::testing::Types<
 #ifdef __Fuchsia__
-    LocalVmarLoaderTraits, RemoteVmarLoaderTraits,
+    LocalVmarLoaderTraits, RemoteVmarLoaderTraits, AlignedRemoteVmarLoaderTraits,
 #endif
     MmapLoaderTraits>;
 
@@ -114,7 +145,7 @@ template <class Traits = MmapLoaderTraits, class Elf = Elf<>>
 class LoadTests : public ::testing::Test {
  public:
   using Loader = typename Traits::Loader;
-  using LoadInfo = LoadInfo<Elf, StdContainer<std::vector>::Container>;
+  using LoadInfo = typename Traits::template Info<Elf, StdContainer<std::vector>::Container>;
   using Addr = typename Elf::Addr;
   using Phdr = typename Elf::Phdr;
   using TestLib = decltype(Traits::TestLibProvider({}));
@@ -156,6 +187,8 @@ class LoadTests : public ::testing::Test {
     ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs,
                                       result->info.GetPhdrObserver(result->loader.page_size()),
                                       PhdrStackObserver<Elf>{result->stack_size}));
+
+    ASSERT_TRUE(Traits::Normalize(diag, result->info, file, result->loader));
 
     ASSERT_TRUE(result->loader.Load(diag, result->info, Traits::LoadFileArgument(test_lib)));
   }

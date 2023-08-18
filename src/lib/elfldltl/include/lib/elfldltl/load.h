@@ -186,6 +186,20 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
 //
 //  * ZeroFillSegment has only vaddr() and memsz().
 //
+// The optional SegmentWrapper template template parameter can be provided to
+// modify the segment types above.  Each of the named segment types will be the
+// instantiation of that template with the original built-in segment type.
+// This can override the methods and/or add additional ones.  The segments will
+// be constructed only as the built-in types are constructed, so subclasses
+// should just delegate to the base class constructors (`using Base::Base;`)
+// with any new members default-constructed.
+//
+// In addition to the standard members, a segment subclass should override the
+// (templated) `bool CanMerge(const auto&) const` method to return false if
+// the segment cannot be merged with an adjacent semantic of compatible flags.
+// Such merging may reconstruct a new segment object and remove the old two,
+// default-constructing any subclass members and losing such state.
+//
 // The GetPhdrObserver method is used with elfldltl::DecodePhdrs (see phdr.h)
 // to call AddSegment, which can also be called directly with a valid sequence
 // of PT_LOAD segments.
@@ -201,7 +215,8 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
 // using std::visit.
 //
 template <class Elf, template <typename> class Container,
-          PhdrLoadPolicy Policy = PhdrLoadPolicy::kBasic>
+          PhdrLoadPolicy Policy = PhdrLoadPolicy::kBasic,
+          template <class SegmentType> class SegmentWrapper = internal::NoSegmentWrapper>
 class LoadInfo {
  private:
   using Types = internal::LoadSegmentTypes<typename Elf::size_type>;
@@ -211,10 +226,11 @@ class LoadInfo {
   using Region = typename Types::Region;
   using Phdr = typename Elf::Phdr;
 
-  using ConstantSegment = typename Types::template ConstantSegment<Policy>;
-  using DataSegment = typename Types::template DataSegment<Policy>;
-  using DataWithZeroFillSegment = typename Types::template DataWithZeroFillSegment<Policy>;
-  using ZeroFillSegment = typename Types::ZeroFillSegment;
+  using ConstantSegment = SegmentWrapper<typename Types::template ConstantSegment<Policy>>;
+  using DataSegment = SegmentWrapper<typename Types::template DataSegment<Policy>>;
+  using DataWithZeroFillSegment =
+      SegmentWrapper<typename Types::template DataWithZeroFillSegment<Policy>>;
+  using ZeroFillSegment = SegmentWrapper<typename Types::ZeroFillSegment>;
 
   using Segment =
       std::variant<ConstantSegment, DataSegment, DataWithZeroFillSegment, ZeroFillSegment>;
@@ -230,10 +246,12 @@ class LoadInfo {
   template <class Diagnostics>
   constexpr bool AddSegment(Diagnostics& diagnostics, size_type page_size, const Phdr& phdr) {
     // Merge with the last segment if possible, or else append a new one.
-    // Types::Merge overloads match each specific type as it's created below.
+    // SegmentMerger::Merge overloads match each specific type as it's created below.
     auto add = [this, &diagnostics](auto&& segment) -> bool {
-      return (!segments_.empty() && Types::Merge(segments_.back(), segment)) ||
-             segments_.emplace_back(diagnostics, internal::kTooManyLoads, segment);
+      using T = decltype(segment);
+      return (!segments_.empty() &&
+              SegmentMerger::Merge(segments_.back(), std::forward<T>(segment))) ||
+             segments_.emplace_back(diagnostics, internal::kTooManyLoads, std::forward<T>(segment));
     };
 
     // Normalize the file and memory bounds to whole pages.
@@ -413,6 +431,8 @@ class LoadInfo {
   }
 
  private:
+  using SegmentMerger = internal::SegmentMerger<LoadInfo>;
+
   // Making this static with a universal reference parameter avoids having to
   // repeat the actual body in the const and non-const methods that call it.
   template <typename T, class C>
@@ -470,32 +490,32 @@ class LoadInfo {
   }
 
   // Complete ApplyRelro once the specific segment has been found.  This is
-  // instantiated separately for DataSegment and DataWithZeroFillSegment.
-  // It firsts creates a new ConstantSegment spanning relro_size.  If relro_size
+  // instantiated separately for DataSegment and DataWithZeroFillSegment.  It
+  // firsts creates a new ConstantSegment spanning relro_size.  If relro_size
   // is less than the full segment size a second segment will be inserted after
-  // the relro segment.  Merging is attempted on the two new segments.  Note that
-  // because the two new segments will never be mergeable together we only need
-  // to try merging the relro segment with the segment behind it, and the split
-  // segment with the one in front of it.  AddSegment will always merge if
-  // possible, so no new merging opportunities will become available after those
-  // two attempted merges have taken place.
-  // This is useful in cases where the segments will be copied after applying relro
-  // like in out of process dynamic linking. This can reduce the number of segments
-  // that need to be copied over into that processes address space. It doesn't make
-  // sense for traditional dynamic linking because all segments have already been
-  // mapped in before relocation can take place, so there is no efficiency to be
-  // found using this.
+  // the relro segment.  Merging is attempted on the two new segments.  Note
+  // that because the two new segments will never be mergeable together we only
+  // need to try merging the relro segment with the segment behind it, and the
+  // split segment with the one in front of it.  AddSegment will always merge
+  // if possible, so no new merging opportunities will become available after
+  // those two attempted merges have taken place.  This is useful in cases
+  // where the segments will be copied after applying relro like in out of
+  // process dynamic linking. This can reduce the number of segments that need
+  // to be copied over into that processes address space. It doesn't make sense
+  // for traditional dynamic linking because all segments have already been
+  // mapped in before relocation can take place, so there is no efficiency to
+  // be found using this.
   template <class Diagnostics, class SegmentType>
   constexpr bool FixupRelro(Diagnostics& diagnostics, typename Container<Segment>::iterator it,
                             SegmentType segment, size_type relro_size, bool merge_ro) {
     auto [relro_segment, split_segment] = SplitRelro(segment, relro_size, merge_ro);
 
     auto merge = [this](auto it1, auto it2) {
-      if (!Types::Merge(*it1, *it2)) {
+      if (!SegmentMerger::Merge(*it1, *it2)) {
         return it2;
       }
-      // Distances are used in place of iterators because they can be invalidated
-      // by insert/erase.
+      // Distances are used in place of iterators because they can be
+      // invalidated by insert/erase.
       auto dist = std::distance(segments().begin(), it1);
       segments().erase(it2);
       return segments().begin() + dist;
@@ -527,6 +547,18 @@ class LoadInfo {
   Container<Segment> segments_;
   size_type vaddr_start_ = 0, vaddr_size_ = 0;
 };
+
+// Given some `LoadInfo::...Segment` type, this is true if and only if its
+// writable() method ever returns true.
+template <class SegmentType>
+inline constexpr bool kSegmentWritable =
+    !std::is_same_v<decltype(std::declval<SegmentType>().writable()), std::false_type>;
+
+// Given some `LoadInfo::...Segment` type, this is true if and only if its
+// filesz() can ever return nonzero.
+template <class SegmentType>
+inline constexpr bool kSegmentHasFilesz =
+    std::is_same_v<decltype(std::declval<SegmentType>().filesz()), typename SegmentType::size_type>;
 
 }  // namespace elfldltl
 

@@ -81,7 +81,7 @@ zx_status_t VmarLoader::AllocateVmar(size_t vaddr_size, size_t vaddr_start) {
 
 // This has both explicit instantiations below.
 template <bool ZeroInVmo>
-zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo,
+zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo,
                                     std::string_view base_name, uint64_t vmo_offset, size_t size,
                                     size_t& num_data_segments) {
   if constexpr (!ZeroInVmo) {
@@ -89,10 +89,16 @@ zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo,
   }
 
   zx::vmo writable_vmo;
-  zx_status_t status =
-      vmo->create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, vmo_offset, size, &writable_vmo);
-  if (status != ZX_OK) [[unlikely]] {
-    return status;
+  zx::unowned_vmo map_vmo;
+  if (copy_vmo) {
+    zx_status_t status =
+        vmo->create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, vmo_offset, size, &writable_vmo);
+    if (status != ZX_OK) [[unlikely]] {
+      return status;
+    }
+    map_vmo = writable_vmo.borrow();
+  } else {
+    map_vmo = vmo->borrow();
   }
 
   // If the size is not page-aligned, zero the last page beyond the size.
@@ -101,27 +107,27 @@ zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo,
     if (subpage_size > 0) {
       const size_t zero_offset = size;
       const size_t zero_size = page_size() - subpage_size;
-      status = writable_vmo.op_range(ZX_VMO_OP_ZERO, zero_offset, zero_size, nullptr, 0);
+      zx_status_t status = map_vmo->op_range(ZX_VMO_OP_ZERO, zero_offset, zero_size, nullptr, 0);
       if (status != ZX_OK) [[unlikely]] {
         return status;
       }
     }
   }
 
-  SetVmoName<kVmoNamePrefixData>(writable_vmo.borrow(), base_name, num_data_segments++);
+  SetVmoName<kVmoNamePrefixData>(map_vmo->borrow(), base_name, num_data_segments++);
 
-  return Map(vmar_offset, kMapWritable, writable_vmo.borrow(), 0, size);
+  return Map(vmar_offset, kMapWritable, map_vmo->borrow(), 0, size);
 }
 
 // Explicitly instantiate both flavors.
 
-template zx_status_t VmarLoader::MapWritable<false>(uintptr_t vmar_offset, zx::unowned_vmo vmo,
-                                                    std::string_view base_name, uint64_t vmo_offset,
-                                                    size_t size, size_t& num_data_segments);
+template zx_status_t VmarLoader::MapWritable<false>(  //
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
-template zx_status_t VmarLoader::MapWritable<true>(uintptr_t vmar_offset, zx::unowned_vmo vmo,
-                                                   std::string_view base_name, uint64_t vmo_offset,
-                                                   size_t size, size_t& num_data_segments);
+template zx_status_t VmarLoader::MapWritable<true>(  //
+    uintptr_t vmar_offset, zx::unowned_vmo vmo, bool copy_vmo, std::string_view base_name,
+    uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
 zx_status_t VmarLoader::MapZeroFill(uintptr_t vmar_offset, std::string_view base_name, size_t size,
                                     size_t& num_zero_segments) {
