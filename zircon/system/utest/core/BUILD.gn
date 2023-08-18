@@ -249,12 +249,6 @@ core_tests("core-tests") {
   # when booted via firmware on certain types of hardware.  Leave a little buffer
   # for growth.
   timeout = 840
-
-  # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
-  # to 17 minutes on RISC-V, so extend the timeout in that case.
-  if (current_cpu == "riscv64") {
-    timeout = 1800
-  }
 }
 
 # If we are building for x64, make sure to run the core tests on a system which
@@ -276,12 +270,6 @@ if (current_cpu == "x64") {
 core_tests("core-tests-serial-migration") {
   args = [ "kernel.experimental.serial_migration=true" ]
   device_types = [ "QEMU" ]
-
-  # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
-  # to 17 minutes on RISC-V, so extend the timeout in that case.
-  if (current_cpu == "riscv64") {
-    timeout = 1800
-  }
 }
 boot_tests += [ ":core-tests-serial-migration" ]
 

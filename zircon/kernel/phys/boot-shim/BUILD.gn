@@ -49,9 +49,10 @@ if (have_devicetree) {
   devicetree_zbi_test("core-tests") {
     deps = [ "//zircon/system/utest/core:core-tests.zbi($default_toolchain)" ]
 
-    # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
-    # to 17 minutes on RISC-V, so extend the timeout in that case.
-    timeout = 1800
+    # We've observed the ASAN variant of core-tests take as long as 701 seconds
+    # when booted via firmware on certain types of hardware.  Leave a little buffer
+    # for growth.
+    timeout = 840
   }
 }
 
@@ -175,12 +176,6 @@ zbi_test("zbi-boot-shim-core-tests") {
     ":zbi-boot-shim",
     "//zircon/system/utest/core:core-tests.zbi($default_toolchain)",
   ]
-
-  # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
-  # to 17 minutes on RISC-V, so extend the timeout in that case.
-  if (current_cpu == "riscv64") {
-    timeout = 1800
-  }
 }
 
 zbi_executable("debugdata-boot-shim-test") {

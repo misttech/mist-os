@@ -130,10 +130,4 @@ qemu_shim_test("core-tests") {
   # isn't necessarily really quick, so don't impose the short timeout used for
   # raw phys tests.
   timeout = false
-
-  # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
-  # to 17 minutes on RISC-V, so extend the timeout in that case.
-  if (current_cpu == "riscv64") {
-    timeout = 1800
-  }
 }
