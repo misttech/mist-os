@@ -1135,7 +1135,7 @@ impl Display for ZbiError {
             ZbiError::Truncated => "Truncaded error",
             ZbiError::TooBig => "Too big",
             ZbiError::IncompleteKernel => "Incomplete Kernel",
-            ZbiError::PlatformBadLength => "Bad ZBI length for this platfrom",
+            ZbiError::PlatformBadLength => "Bad ZBI length for this platform",
             ZbiError::Crc32NotSupported => "CRC32 is not supported yet",
             ZbiError::LengthOverflow => "Length type overflow",
         };
