@@ -12,7 +12,7 @@
 #include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 
-#include "src/devices/lib/metadata/llcpp/registers.h"
+#include "src/devices/lib/fidl-metadata/registers.h"
 
 namespace registers {
 
@@ -141,70 +141,39 @@ class RegistersDeviceTest : public zxtest::Test {
   fidl::Arena<2048> allocator_;
 };
 
-TEST_F(RegistersDeviceTest, EncodeDecodeTest) {
-  fidl::VectorView<MmioMetadataEntry> mmio(allocator_, 3);
-  mmio[0] = registers::BuildMetadata(allocator_, 0);
-  mmio[1] = registers::BuildMetadata(allocator_, 1);
-  mmio[2] = registers::BuildMetadata(allocator_, 2);
-
-  fidl::VectorView<RegistersMetadataEntry> registers(allocator_, 2);
-  registers[0] = registers::BuildMetadata(allocator_, 0, 0,
-                                          std::vector<MaskEntryBuilder<uint32_t>>{
-                                              {.mask = 0xFFFF, .mmio_offset = 0x1, .reg_count = 3},
-                                              {.mask = 0x8888, .mmio_offset = 0x2, .reg_count = 2},
-                                          });
-  registers[1] =
-      registers::BuildMetadata(allocator_, 1, 1,
-                               std::vector<MaskEntryBuilder<uint32_t>>{
-                                   {.mask = 0x5555, .mmio_offset = 0x3, .reg_count = 1},
-                                   {.mask = 0x77777777, .mmio_offset = 0x4, .reg_count = 2},
-                                   {.mask = 0x1234, .mmio_offset = 0x5, .reg_count = 4},
-                               });
-
-  auto metadata_original = registers::BuildMetadata(allocator_, mmio, registers);
-  fit::result msg = fidl::Persist(metadata_original);
-  ASSERT_TRUE(msg.is_ok(), "%s", msg.error_value().FormatDescription().c_str());
-
-  auto metadata = fidl::InplaceUnpersist<Metadata>(cpp20::span(msg.value()));
-  ASSERT_TRUE(metadata.is_ok(), "%s", metadata.error_value().FormatDescription().c_str());
-  ASSERT_EQ(metadata->mmio().count(), 3);
-  EXPECT_EQ(metadata->mmio()[0].id(), 0);
-  EXPECT_EQ(metadata->mmio()[1].id(), 1);
-  EXPECT_EQ(metadata->mmio()[2].id(), 2);
-  ASSERT_EQ(metadata->registers().count(), 2);
-  EXPECT_EQ(metadata->registers()[0].bind_id(), 0);
-  EXPECT_EQ(metadata->registers()[0].mmio_id(), 0);
-  EXPECT_EQ(metadata->registers()[0].masks()[0].mask().r32(), 0xFFFF);
-  EXPECT_EQ(metadata->registers()[0].masks()[0].mmio_offset(), 0x1);
-  EXPECT_EQ(metadata->registers()[0].masks()[0].count(), 3);
-  EXPECT_EQ(metadata->registers()[0].masks()[1].mask().r32(), 0x8888);
-  EXPECT_EQ(metadata->registers()[0].masks()[1].mmio_offset(), 0x2);
-  EXPECT_EQ(metadata->registers()[0].masks()[1].count(), 2);
-  EXPECT_EQ(metadata->registers()[1].bind_id(), 1);
-  EXPECT_EQ(metadata->registers()[1].mmio_id(), 1);
-  EXPECT_EQ(metadata->registers()[1].masks()[0].mask().r32(), 0x5555);
-  EXPECT_EQ(metadata->registers()[1].masks()[0].mmio_offset(), 0x3);
-  EXPECT_EQ(metadata->registers()[1].masks()[0].count(), 1);
-  EXPECT_EQ(metadata->registers()[1].masks()[1].mask().r32(), 0x77777777);
-  EXPECT_EQ(metadata->registers()[1].masks()[1].mmio_offset(), 0x4);
-  EXPECT_EQ(metadata->registers()[1].masks()[1].count(), 2);
-  EXPECT_EQ(metadata->registers()[1].masks()[2].mask().r32(), 0x1234);
-  EXPECT_EQ(metadata->registers()[1].masks()[2].mmio_offset(), 0x5);
-  EXPECT_EQ(metadata->registers()[1].masks()[2].count(), 4);
-}
-
 TEST_F(RegistersDeviceTest, Read32Test) {
   auto device = Init<uint32_t>(/* mmio_count: */ 3);
   ASSERT_NOT_NULL(device);
 
-  device->AddRegister(BuildMetadata(allocator_, 0, 0,
-                                    std::vector<MaskEntryBuilder<uint32_t>>{
-                                        {.mask = 0xFFFFFFFF, .mmio_offset = 0x0, .reg_count = 1}}));
-  device->AddRegister(BuildMetadata(allocator_, 1, 2,
-                                    std::vector<MaskEntryBuilder<uint32_t>>{
-                                        {.mask = 0xFFFFFFFF, .mmio_offset = 0x0, .reg_count = 2},
-                                        {.mask = 0xFFFF0000, .mmio_offset = 0x8, .reg_count = 1},
-                                    }));
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(0)
+                          .mmio_id(0)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR32(0xFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build()})
+                          .Build());
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(1)
+                          .mmio_id(2)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR32(0xFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(2)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR32(0xFFFF0000))
+                                  .mmio_offset(0x8)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                          })
+                          .Build());
 
   // Invalid Call
   auto invalid_call_result =
@@ -257,14 +226,35 @@ TEST_F(RegistersDeviceTest, Write32Test) {
   auto device = Init<uint32_t>(/* mmio_count: */ 2);
   ASSERT_NOT_NULL(device);
 
-  device->AddRegister(BuildMetadata(allocator_, 0, 0,
-                                    std::vector<MaskEntryBuilder<uint32_t>>{
-                                        {.mask = 0xFFFFFFFF, .mmio_offset = 0x0, .reg_count = 1}}));
-  device->AddRegister(BuildMetadata(allocator_, 1, 1,
-                                    std::vector<MaskEntryBuilder<uint32_t>>{
-                                        {.mask = 0xFFFFFFFF, .mmio_offset = 0x0, .reg_count = 2},
-                                        {.mask = 0xFFFF0000, .mmio_offset = 0x8, .reg_count = 1},
-                                    }));
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(0)
+                          .mmio_id(0)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR32(0xFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build()})
+                          .Build());
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(1)
+                          .mmio_id(1)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR32(0xFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(2)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR32(0xFFFF0000))
+                                  .mmio_offset(0x8)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                          })
+                          .Build());
 
   // Invalid Call
   auto invalid_call_result =
@@ -324,17 +314,45 @@ TEST_F(RegistersDeviceTest, Read64Test) {
   auto device = Init<uint64_t>(/* mmio_count: */ 3);
   ASSERT_NOT_NULL(device);
 
-  device->AddRegister(
-      BuildMetadata(allocator_, 0, 0,
-                    std::vector<MaskEntryBuilder<uint64_t>>{
-                        {.mask = 0xFFFFFFFFFFFFFFFF, .mmio_offset = 0x0, .reg_count = 1}}));
-  device->AddRegister(
-      BuildMetadata(allocator_, 1, 2,
-                    std::vector<MaskEntryBuilder<uint64_t>>{
-                        {.mask = 0xFFFFFFFFFFFFFFFF, .mmio_offset = 0x0, .reg_count = 1},
-                        {.mask = 0x00000000FFFFFFFF, .mmio_offset = 0x8, .reg_count = 1},
-                        {.mask = 0x0000FFFFFFFF0000, .mmio_offset = 0x10, .reg_count = 1},
-                    }));
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(0)
+                          .mmio_id(0)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0xFFFFFFFFFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build()})
+                          .Build());
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(1)
+                          .mmio_id(2)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0xFFFFFFFFFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0x00000000FFFFFFFF))
+                                  .mmio_offset(0x8)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0x0000FFFFFFFF0000))
+                                  .mmio_offset(0x10)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                          })
+                          .Build());
 
   // Invalid Call
   auto invalid_call_result =
@@ -380,17 +398,45 @@ TEST_F(RegistersDeviceTest, Write64Test) {
   auto device = Init<uint64_t>(/* mmio_count: */ 2);
   ASSERT_NOT_NULL(device);
 
-  device->AddRegister(
-      BuildMetadata(allocator_, 0, 0,
-                    std::vector<MaskEntryBuilder<uint64_t>>{
-                        {.mask = 0xFFFFFFFFFFFFFFFF, .mmio_offset = 0x0, .reg_count = 1}}));
-  device->AddRegister(
-      BuildMetadata(allocator_, 1, 1,
-                    std::vector<MaskEntryBuilder<uint64_t>>{
-                        {.mask = 0xFFFFFFFFFFFFFFFF, .mmio_offset = 0x0, .reg_count = 1},
-                        {.mask = 0x00000000FFFFFFFF, .mmio_offset = 0x8, .reg_count = 1},
-                        {.mask = 0x0000FFFFFFFF0000, .mmio_offset = 0x10, .reg_count = 1},
-                    }));
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(0)
+                          .mmio_id(0)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0xFFFFFFFFFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build()})
+                          .Build());
+  device->AddRegister(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator_)
+                          .bind_id(1)
+                          .mmio_id(1)
+                          .masks(std::vector<fuchsia_hardware_registers::wire::MaskEntry>{
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0xFFFFFFFFFFFFFFFF))
+                                  .mmio_offset(0x0)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0x00000000FFFFFFFF))
+                                  .mmio_offset(0x8)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                              fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator_)
+                                  .mask(fuchsia_hardware_registers::wire::Mask::WithR64(
+                                      allocator_, 0x0000FFFFFFFF0000))
+                                  .mmio_offset(0x10)
+                                  .count(1)
+                                  .overlap_check_on(true)
+                                  .Build(),
+                          })
+                          .Build());
 
   // Invalid Call
   auto invalid_call_result =

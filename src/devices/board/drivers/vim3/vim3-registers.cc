@@ -14,7 +14,7 @@
 
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/lib/metadata/llcpp/registers.h"
+#include "src/devices/lib/fidl-metadata/registers.h"
 #include "vim3.h"
 
 namespace vim3 {
@@ -35,72 +35,67 @@ static const std::vector<fpbus::Mmio> registers_mmios{
     }},
 };
 
+static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
+    {
+        .bind_id = aml_registers::REGISTER_USB_PHY_V2_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK |
+                             aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+                    .mmio_offset = A311D_RESET1_REGISTER,
+                },
+                {
+                    .value = aml_registers::USB_RESET1_LEVEL_MASK,
+                    .mmio_offset = A311D_RESET1_LEVEL,
+                },
+            },
+    },
+    {
+        .bind_id = aml_registers::REGISTER_NNA_RESET_LEVEL2,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::NNA_RESET2_LEVEL_MASK,
+                    .mmio_offset = A311D_RESET2_LEVEL,
+                },
+            },
+    },
+    {
+        .bind_id = aml_registers::REGISTER_MALI_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::MALI_RESET0_MASK,
+                    .mmio_offset = A311D_RESET0_MASK,
+                },
+                {
+                    .value = aml_registers::MALI_RESET0_MASK,
+                    .mmio_offset = A311D_RESET0_LEVEL,
+                },
+                {
+                    .value = aml_registers::MALI_RESET2_MASK,
+                    .mmio_offset = A311D_RESET2_MASK,
+                },
+                {
+                    .value = aml_registers::MALI_RESET2_MASK,
+                    .mmio_offset = A311D_RESET2_LEVEL,
+                },
+            },
+    },
+};
+
 }  // namespace
 
 zx_status_t Vim3::RegistersInit() {
-  fidl::Arena<2048> allocator;
-  fidl::VectorView<registers::MmioMetadataEntry> mmio_entries(allocator, MMIO_COUNT);
-
-  mmio_entries[RESET_MMIO] = registers::BuildMetadata(allocator, RESET_MMIO);
-
-  fidl::VectorView<registers::RegistersMetadataEntry> register_entries(
-      allocator, aml_registers::REGISTER_ID_COUNT);
-
-  register_entries[aml_registers::REGISTER_USB_PHY_V2_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_USB_PHY_V2_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK |
-                                               aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
-                                       .mmio_offset = A311D_RESET1_REGISTER,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::USB_RESET1_LEVEL_MASK,
-                                       .mmio_offset = A311D_RESET1_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-  register_entries[aml_registers::REGISTER_NNA_RESET_LEVEL2] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_NNA_RESET_LEVEL2, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::NNA_RESET2_LEVEL_MASK,
-                                       .mmio_offset = A311D_RESET2_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-  register_entries[aml_registers::REGISTER_MALI_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_MALI_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::MALI_RESET0_MASK,
-                                       .mmio_offset = A311D_RESET0_MASK,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET0_MASK,
-                                       .mmio_offset = A311D_RESET0_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET2_MASK,
-                                       .mmio_offset = A311D_RESET2_MASK,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET2_MASK,
-                                       .mmio_offset = A311D_RESET2_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  auto metadata = registers::BuildMetadata(allocator, mmio_entries, register_entries);
-  fit::result metadata_bytes = fidl::Persist(metadata);
-  if (!metadata_bytes.is_ok()) {
-    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__,
-           metadata_bytes.error_value().FormatDescription().c_str());
-    return metadata_bytes.error_value().status();
+  auto metadata_bytes = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
+  if (metadata_bytes.is_error()) {
+    zxlogf(ERROR, "%s: Failed to FIDL encode registers metadata %s\n", __func__,
+           metadata_bytes.status_string());
+    return metadata_bytes.error_value();
   }
 
   const std::vector<fpbus::Metadata> registers_metadata{

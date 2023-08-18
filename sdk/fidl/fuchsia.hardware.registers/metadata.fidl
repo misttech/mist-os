@@ -39,15 +39,7 @@ type RegistersMetadataEntry = table {
     3: masks vector<MaskEntry>:MAX;
 };
 
-type MmioMetadataEntry = table {
-    /// MMIO ID.
-    1: id uint32;
-};
-
 type Metadata = table {
-    /// Vector of MMIO metadata. One for each MMIO listed.
-    1: mmio vector<MmioMetadataEntry>:MAX;
-
     /// Vector of Registers metadata. One for each register to be published.
-    2: registers vector<RegistersMetadataEntry>:MAX;
+    1: registers vector<RegistersMetadataEntry>:MAX;
 };

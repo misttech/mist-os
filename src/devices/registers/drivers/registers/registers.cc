@@ -131,10 +131,6 @@ zx_status_t RegistersDevice<T>::Init(zx_device_t* parent, Metadata metadata) {
     zxlogf(ERROR, "%s: Could not get device info", __func__);
     return status;
   }
-  if (metadata.mmio().count() != device_info.mmio_count) {
-    zxlogf(ERROR, "%s: MMIO metadata size doesn't match MMIO count.", __func__);
-    return ZX_ERR_INTERNAL;
-  }
 
   // Get MMIOs
   std::map<uint32_t, std::vector<T>> overlap;
@@ -152,12 +148,12 @@ zx_status_t RegistersDevice<T>::Init(zx_device_t* parent, Metadata metadata) {
     }
 
     std::vector<fbl::Mutex> tmp_locks(register_count);
-    mmios_.emplace(metadata.mmio()[i].id(), std::make_shared<MmioInfo>(MmioInfo{
-                                                .mmio = *std::move(tmp_mmio),
-                                                .locks = std::move(tmp_locks),
-                                            }));
+    mmios_.emplace(i, std::make_shared<MmioInfo>(MmioInfo{
+                          .mmio = *std::move(tmp_mmio),
+                          .locks = std::move(tmp_locks),
+                      }));
 
-    overlap.emplace(metadata.mmio()[i].id(), std::vector<T>(register_count, 0));
+    overlap.emplace(i, std::vector<T>(register_count, 0));
   }
 
   // Check for overlapping bits.
@@ -282,15 +278,9 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
   const Metadata& metadata = *decoded.value();
 
   // Validate
-  if (!metadata.has_mmio() || !metadata.has_registers()) {
+  if (!metadata.has_registers()) {
     zxlogf(ERROR, "Metadata incomplete");
     return ZX_ERR_INTERNAL;
-  }
-  for (const auto& mmio : metadata.mmio()) {
-    if (!mmio.has_id()) {
-      zxlogf(ERROR, "Metadata incomplete");
-      return ZX_ERR_INTERNAL;
-    }
   }
   bool begin = true;
   fuchsia_hardware_registers::wire::Mask::Tag tag;

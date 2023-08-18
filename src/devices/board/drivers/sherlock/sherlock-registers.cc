@@ -13,7 +13,7 @@
 #include <soc/aml-common/aml-registers.h>
 
 #include "sherlock.h"
-#include "src/devices/lib/metadata/llcpp/registers.h"
+#include "src/devices/lib/fidl-metadata/registers.h"
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -29,125 +29,122 @@ enum MmioMetadataIdx {
   MMIO_COUNT,
 };
 
+const std::vector<fpbus::Mmio> registers_mmios = {
+    {{
+        .base = T931_RESET_BASE,
+        .length = T931_RESET_LENGTH,
+    }},
+#ifdef FACTORY_BUILD
+    []() {
+      fpbus::Mmio ret;
+      ret.base() = T931_USB_BASE;
+      ret.length() = T931_USB_LENGTH;
+      return ret;
+    }(),
+#endif  // FACTORY_BUILD
+};
+
+static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
+    {
+        .bind_id = aml_registers::REGISTER_USB_PHY_V2_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK |
+                             aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+                    .mmio_offset = T931_RESET1_REGISTER,
+                },
+                {
+                    .value = aml_registers::USB_RESET1_LEVEL_MASK,
+                    .mmio_offset = T931_RESET1_LEVEL,
+                },
+            },
+    },
+
+    {
+        .bind_id = aml_registers::REGISTER_NNA_RESET_LEVEL2,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::NNA_RESET2_LEVEL_MASK,
+                    .mmio_offset = T931_RESET2_LEVEL,
+                },
+            },
+    },
+    {
+        .bind_id = aml_registers::REGISTER_MALI_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::MALI_RESET0_MASK,
+                    .mmio_offset = T931_RESET0_MASK,
+                },
+                {
+                    .value = aml_registers::MALI_RESET0_MASK,
+                    .mmio_offset = T931_RESET0_LEVEL,
+                },
+                {
+                    .value = aml_registers::MALI_RESET2_MASK,
+                    .mmio_offset = T931_RESET2_MASK,
+                },
+                {
+                    .value = aml_registers::MALI_RESET2_MASK,
+                    .mmio_offset = T931_RESET2_LEVEL,
+                },
+            },
+    },
+
+    {
+        .bind_id = aml_registers::REGISTER_ISP_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::ISP_RESET4_MASK,
+                    .mmio_offset = T931_RESET4_LEVEL,
+                },
+            },
+    },
+
+    {
+        .bind_id = aml_registers::REGISTER_SPICC0_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::SPICC0_RESET_MASK,
+                    .mmio_offset = T931_RESET6_REGISTER,
+                },
+            },
+    },
+
+#ifdef FACTORY_BUILD
+    {
+        .bind_id = aml_registers::REGISTER_USB_PHY_FACTORY,
+        .mmio_id = USB_FACTORY_MMIO,
+        .masks =
+            {
+                {
+                    .value = 0xFFFFFFFF,
+                    .mmio_offset = 0,
+                    .count = T931_USB_LENGTH / sizeof(uint32_t),
+                    .overlap_check_on = false,
+                },
+            },
+    },
+#endif  // FACTORY_BUILD
+};
+
 }  // namespace
 
 zx_status_t Sherlock::RegistersInit() {
-  const std::vector<fpbus::Mmio> registers_mmios = {
-      {{
-          .base = T931_RESET_BASE,
-          .length = T931_RESET_LENGTH,
-      }},
-#ifdef FACTORY_BUILD
-      []() {
-        fpbus::Mmio ret;
-        ret.base() = T931_USB_BASE;
-        ret.length() = T931_USB_LENGTH;
-        return ret;
-      }(),
-#endif  // FACTORY_BUILD
-  };    // namespace sherlock
-
-  fidl::Arena<2048> allocator;
-  fidl::VectorView<registers::MmioMetadataEntry> mmio_entries(allocator, MMIO_COUNT);
-
-  mmio_entries[RESET_MMIO] = registers::BuildMetadata(allocator, RESET_MMIO);
-
-  fidl::VectorView<registers::RegistersMetadataEntry> register_entries(
-      allocator, aml_registers::REGISTER_ID_COUNT);
-
-  register_entries[aml_registers::REGISTER_USB_PHY_V2_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_USB_PHY_V2_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK |
-                                               aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
-                                       .mmio_offset = T931_RESET1_REGISTER,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::USB_RESET1_LEVEL_MASK,
-                                       .mmio_offset = T931_RESET1_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_NNA_RESET_LEVEL2] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_NNA_RESET_LEVEL2, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::NNA_RESET2_LEVEL_MASK,
-                                       .mmio_offset = T931_RESET2_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_MALI_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_MALI_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::MALI_RESET0_MASK,
-                                       .mmio_offset = T931_RESET0_MASK,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET0_MASK,
-                                       .mmio_offset = T931_RESET0_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET2_MASK,
-                                       .mmio_offset = T931_RESET2_MASK,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET2_MASK,
-                                       .mmio_offset = T931_RESET2_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_ISP_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_ISP_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::ISP_RESET4_MASK,
-                                       .mmio_offset = T931_RESET4_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_SPICC0_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_SPICC0_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::SPICC0_RESET_MASK,
-                                       .mmio_offset = T931_RESET6_REGISTER,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-#ifdef FACTORY_BUILD
-  mmio_entries[USB_FACTORY_MMIO] = registers::BuildMetadata(allocator, USB_FACTORY_MMIO);
-
-  register_entries[aml_registers::REGISTER_USB_PHY_FACTORY] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_USB_PHY_FACTORY, USB_FACTORY_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = 0xFFFFFFFF,
-                                       .mmio_offset = 0,
-                                       .reg_count = T931_USB_LENGTH / sizeof(uint32_t),
-                                       .overlap_check_on = false,
-                                   },
-                               });
-#endif  // FACTORY_BUILD
-
-  auto metadata =
-      registers::BuildMetadata(allocator, std::move(mmio_entries), std::move(register_entries));
-  fit::result metadata_bytes = fidl::Persist(metadata);
+  auto metadata_bytes = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
   if (!metadata_bytes.is_ok()) {
-    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__,
-           metadata_bytes.error_value().FormatDescription().c_str());
-    return metadata_bytes.error_value().status();
+    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__, metadata_bytes.status_string());
+    return metadata_bytes.error_value();
   }
 
   std::vector<fpbus::Metadata> registers_metadata{

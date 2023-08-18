@@ -14,7 +14,7 @@
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
-#include "src/devices/lib/metadata/llcpp/registers.h"
+#include "src/devices/lib/fidl-metadata/registers.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -27,85 +27,82 @@ enum MmioMetadataIdx {
   MMIO_COUNT,
 };
 
+static const std::vector<fpbus::Mmio> registers_mmios{
+    {{
+        .base = S905D3_RESET_BASE,
+        .length = S905D3_RESET_LENGTH,
+    }},
+};
+
+static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
+    {
+        .bind_id = aml_registers::REGISTER_NNA_RESET_LEVEL2,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::NNA_RESET2_LEVEL_MASK,
+                    .mmio_offset = S905D3_RESET2_LEVEL,
+                },
+            },
+    },
+
+    {
+        .bind_id = aml_registers::REGISTER_MALI_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::MALI_RESET0_MASK,
+                    .mmio_offset = S905D3_RESET0_MASK,
+                },
+                {
+                    .value = aml_registers::MALI_RESET0_MASK,
+                    .mmio_offset = S905D3_RESET0_LEVEL,
+                },
+                {
+                    .value = aml_registers::MALI_RESET2_MASK,
+                    .mmio_offset = S905D3_RESET2_MASK,
+                },
+                {
+                    .value = aml_registers::MALI_RESET2_MASK,
+                    .mmio_offset = S905D3_RESET2_LEVEL,
+                },
+            },
+    },
+
+    {
+        .bind_id = aml_registers::REGISTER_SPICC0_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::SPICC0_RESET_MASK,
+                    .mmio_offset = S905D3_RESET6_REGISTER,
+                },
+            },
+    },
+
+    {
+        .bind_id = aml_registers::REGISTER_SPICC1_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::SPICC1_RESET_MASK,
+                    .mmio_offset = S905D3_RESET6_REGISTER,
+                },
+            },
+    },
+};
+
 }  // namespace
 
 zx_status_t Nelson::RegistersInit() {
-  static const std::vector<fpbus::Mmio> registers_mmios{
-      {{
-          .base = S905D3_RESET_BASE,
-          .length = S905D3_RESET_LENGTH,
-      }},
-  };
-
-  fidl::Arena<2048> allocator;
-  fidl::VectorView<registers::MmioMetadataEntry> mmio_entries(allocator, MMIO_COUNT);
-
-  mmio_entries[RESET_MMIO] = registers::BuildMetadata(allocator, RESET_MMIO);
-
-  fidl::VectorView<registers::RegistersMetadataEntry> register_entries(
-      allocator, aml_registers::REGISTER_ID_COUNT);
-
-  register_entries[aml_registers::REGISTER_NNA_RESET_LEVEL2] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_NNA_RESET_LEVEL2, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::NNA_RESET2_LEVEL_MASK,
-                                       .mmio_offset = S905D3_RESET2_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_MALI_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_MALI_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::MALI_RESET0_MASK,
-                                       .mmio_offset = S905D3_RESET0_MASK,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET0_MASK,
-                                       .mmio_offset = S905D3_RESET0_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET2_MASK,
-                                       .mmio_offset = S905D3_RESET2_MASK,
-                                       .reg_count = 1,
-                                   },
-                                   {
-                                       .mask = aml_registers::MALI_RESET2_MASK,
-                                       .mmio_offset = S905D3_RESET2_LEVEL,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_SPICC0_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_SPICC0_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::SPICC0_RESET_MASK,
-                                       .mmio_offset = S905D3_RESET6_REGISTER,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  register_entries[aml_registers::REGISTER_SPICC1_RESET] =
-      registers::BuildMetadata(allocator, aml_registers::REGISTER_SPICC1_RESET, RESET_MMIO,
-                               std::vector<registers::MaskEntryBuilder<uint32_t>>{
-                                   {
-                                       .mask = aml_registers::SPICC1_RESET_MASK,
-                                       .mmio_offset = S905D3_RESET6_REGISTER,
-                                       .reg_count = 1,
-                                   },
-                               });
-
-  auto metadata = registers::BuildMetadata(allocator, mmio_entries, register_entries);
-  fit::result metadata_bytes = fidl::Persist(metadata);
+  auto metadata_bytes = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
   if (!metadata_bytes.is_ok()) {
-    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__,
-           metadata_bytes.error_value().FormatDescription().c_str());
-    return metadata_bytes.error_value().status();
+    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__, metadata_bytes.status_string());
+    return metadata_bytes.error_value();
   }
 
   std::vector<fpbus::Metadata> registers_metadata{

@@ -5,6 +5,7 @@
 source_set("fidl-metadata") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
     "//zircon/system/ulib/zx",
@@ -13,6 +14,7 @@ source_set("fidl-metadata") {
   include_dirs = [ "." ]
   sources = [
     "i2c.cc",
+    "registers.cc",
     "spi.cc",
     "tee.cc",
   ]
