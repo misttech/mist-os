@@ -597,23 +597,23 @@ namespace cpp17 {
 inline namespace literals {
 inline namespace string_view_literals {
 
-constexpr cpp17::string_view operator"" _sv(typename cpp17::string_view::const_pointer str,
-                                            typename cpp17::string_view::size_type len) noexcept {
+constexpr cpp17::string_view operator""_sv(typename cpp17::string_view::const_pointer str,
+                                           typename cpp17::string_view::size_type len) noexcept {
   return cpp17::string_view(str, len);
 }
 
-constexpr cpp17::wstring_view operator"" _sv(typename cpp17::wstring_view::const_pointer str,
-                                             typename cpp17::wstring_view::size_type len) noexcept {
+constexpr cpp17::wstring_view operator""_sv(typename cpp17::wstring_view::const_pointer str,
+                                            typename cpp17::wstring_view::size_type len) noexcept {
   return cpp17::wstring_view(str, len);
 }
 
-constexpr cpp17::u16string_view operator"" _sv(
+constexpr cpp17::u16string_view operator""_sv(
     typename cpp17::u16string_view::const_pointer str,
     typename cpp17::u16string_view::size_type len) noexcept {
   return cpp17::u16string_view(str, len);
 }
 
-constexpr cpp17::u32string_view operator"" _sv(
+constexpr cpp17::u32string_view operator""_sv(
     typename cpp17::u32string_view::const_pointer str,
     typename cpp17::u32string_view::size_type len) noexcept {
   return cpp17::u32string_view(str, len);
