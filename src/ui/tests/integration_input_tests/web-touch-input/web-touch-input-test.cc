@@ -109,7 +109,6 @@ using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Route;
-using RealmBuilder = component_testing::RealmBuilder;
 
 // Alias for Component child name as provided to Realm Builder.
 using ChildName = std::string;
@@ -124,21 +123,10 @@ using time_utc = zx::basic_time<1>;
 
 constexpr auto kMockResponseListener = "response_listener";
 
-struct UIStackConfig {
-  bool use_flatland = true;
-  int32_t display_rotation = 0;
-
-  // Use a DPR other than 1.0, so that physical and logical coordinate spaces
-  // are different.
-  float device_pixel_ratio = 2.f;
-};
-
-std::vector<UIStackConfig> UIStackConfigsToTest() {
-  std::vector<UIStackConfig> configs;
-
-  // Flatland X SM
-  configs.push_back({.use_flatland = true, .display_rotation = 90, .device_pixel_ratio = 2.f});
-
+std::vector<float> ConfigsToTest() {
+  std::vector<float> configs;
+  // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
+  configs.push_back(2.f);
   return configs;
 }
 
@@ -153,24 +141,6 @@ std::vector<std::tuple<T>> AsTuples(std::vector<T> v) {
 }
 
 enum class TapLocation { kTopLeft, kTopRight };
-
-enum class SwipeGesture {
-  UP = 1,
-  DOWN,
-  LEFT,
-  RIGHT,
-};
-
-struct ExpectedSwipeEvent {
-  double x = 0, y = 0;
-  fuchsia::ui::pointer::EventPhase phase;
-};
-
-struct InjectSwipeParams {
-  SwipeGesture direction = SwipeGesture::UP;
-  int begin_x = 0, begin_y = 0;
-  std::vector<ExpectedSwipeEvent> expected_events;
-};
 
 // Combines all vectors in `vecs` into one.
 template <typename T>
@@ -238,7 +208,7 @@ class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListen
 };
 
 class WebEngineTest : public ui_testing::PortableUITest,
-                      public testing::WithParamInterface<std::tuple<UIStackConfig>> {
+                      public testing::WithParamInterface<std::tuple<float>> {
  protected:
   ~WebEngineTest() override {
     FX_CHECK(touch_injection_request_count() > 0) << "injection expected but didn't happen.";
@@ -469,10 +439,11 @@ class WebEngineTest : public ui_testing::PortableUITest,
   uint32_t display_width() { return display_size().width; }
   uint32_t display_height() { return display_size().height; }
 
-  bool use_flatland() override { return std::get<0>(this->GetParam()).use_flatland; }
+  bool use_flatland() override { return true; }
 
-  uint32_t display_rotation() override { return std::get<0>(this->GetParam()).display_rotation; }
+  uint32_t display_rotation() override { return 90; }
 
+  // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
   float device_pixel_ratio() override { return 1.f; }
 
   std::shared_ptr<ResponseState> response_state() const { return response_state_; }
@@ -538,7 +509,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
 };
 
 INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
-                         testing::ValuesIn(AsTuples(UIStackConfigsToTest())));
+                         testing::ValuesIn(AsTuples(ConfigsToTest())));
 
 TEST_P(WebEngineTest, ChromiumTap) {
   // Launch client view, and wait until it's rendering to proceed with the test.

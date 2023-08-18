@@ -48,9 +48,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <src/lib/fostr/fidl/fuchsia/ui/gfx/formatting.h>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/util/portable_ui_test.h"
 
 // This test exercises the touch input dispatch path from Input Pipeline to a Scenic client. It is a
@@ -106,21 +104,13 @@
 
 namespace {
 
-using ScenicEvent = fuchsia::ui::scenic::Event;
-using GfxEvent = fuchsia::ui::gfx::Event;
-
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
-using component_testing::ConfigValue;
 using component_testing::Directory;
-using component_testing::DirectoryContents;
-using component_testing::LocalComponentHandles;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
-using component_testing::Realm;
 using component_testing::Route;
-using RealmBuilder = component_testing::RealmBuilder;
 
 // Alias for Component child name as provided to Realm Builder.
 using ChildName = std::string;
@@ -160,21 +150,10 @@ void ExpectLocationAndPhase(
   EXPECT_EQ(expected_phase, e.phase());
 }
 
-struct UIStackConfig {
-  bool use_flatland = true;
-  int32_t display_rotation = 0;
-
-  // Use a DPR other than 1.0, so that physical and logical coordinate spaces
-  // are different.
-  float device_pixel_ratio = 2.f;
-};
-
-std::vector<UIStackConfig> UIStackConfigsToTest() {
-  std::vector<UIStackConfig> configs;
-
-  // Flatland X SM
-  configs.push_back({.use_flatland = true, .display_rotation = 90, .device_pixel_ratio = 2.f});
-
+std::vector<float> ConfigsToTest() {
+  std::vector<float> configs;
+  // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
+  configs.push_back(2.f);
   return configs;
 }
 
@@ -406,7 +385,7 @@ class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListen
 
 template <typename... Ts>
 class TouchInputBase : public ui_testing::PortableUITest,
-                       public testing::WithParamInterface<std::tuple<UIStackConfig, Ts...>> {
+                       public testing::WithParamInterface<std::tuple<float, Ts...>> {
  protected:
   ~TouchInputBase() override {
     FX_CHECK(touch_injection_request_count() > 0) << "injection expected but didn't happen.";
@@ -543,10 +522,11 @@ class TouchInputBase : public ui_testing::PortableUITest,
   uint32_t display_height() { return display_size().height; }
 
   // Override test-ui-stack parameters.
-  bool use_flatland() override { return std::get<0>(this->GetParam()).use_flatland; }
+  bool use_flatland() override { return true; }
 
-  uint32_t display_rotation() override { return std::get<0>(this->GetParam()).display_rotation; }
+  uint32_t display_rotation() override { return 90; }
 
+  // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
   float device_pixel_ratio() override { return 1.f; }
 
   std::shared_ptr<ResponseState> response_state() const { return response_state_; }
@@ -574,27 +554,21 @@ class TouchInputBase : public ui_testing::PortableUITest,
 };
 
 template <typename... Ts>
-class CppInputTestIpBase : public TouchInputBase<Ts...> {
+class CppInputTestBase : public TouchInputBase<Ts...> {
  protected:
-  virtual std::string_view GetViewProvider() = 0;
-
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
-    return {std::make_pair(kCppGfxClient, kCppGfxClientUrl),
-            std::make_pair(kCppFlatlandClient, kCppFlatlandClientUrl)};
+    return {std::make_pair(kCppFlatlandClient, kCppFlatlandClientUrl)};
   }
 
   std::vector<Route> GetTestRoutes() override {
-    const std::string_view view_provider = GetViewProvider();
+    const std::string_view view_provider = kCppFlatlandClient;
     return {
         {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
          .source = ChildRef{view_provider},
          .targets = {ParentRef()}},
         {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
          .source = ChildRef{kMockResponseListener},
-         .targets = {ChildRef{kCppGfxClient}, ChildRef{kCppFlatlandClient}}},
-        {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-         .source = ui_testing::PortableUITest::kTestUIStackRef,
-         .targets = {ChildRef{kCppGfxClient}}},
+         .targets = {ChildRef{kCppFlatlandClient}}},
         {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
                           Protocol{fuchsia::ui::composition::Allocator::Name_}},
          .source = ui_testing::PortableUITest::kTestUIStackRef,
@@ -602,27 +576,17 @@ class CppInputTestIpBase : public TouchInputBase<Ts...> {
     };
   }
 
-  static constexpr auto kCppGfxClient = "touch-gfx-client";
   static constexpr auto kCppFlatlandClient = "touch-flatland-client";
 
  private:
-  static constexpr auto kCppGfxClientUrl = "#meta/touch-gfx-client.cm";
   static constexpr auto kCppFlatlandClientUrl = "#meta/touch-flatland-client.cm";
 };
 
-class CppInputTestIp : public CppInputTestIpBase<> {
- protected:
-  std::string_view GetViewProvider() override {
-    auto ui_stack_config = std::get<0>(GetParam());
-    std::string_view view_provider =
-        ui_stack_config.use_flatland ? kCppFlatlandClient : kCppGfxClient;
-    return view_provider;
-  }
-};
-INSTANTIATE_TEST_SUITE_P(CppInputTestIpParametized, CppInputTestIp,
-                         testing::ValuesIn(AsTuples(UIStackConfigsToTest())));
+class CppInputTest : public CppInputTestBase<> {};
+INSTANTIATE_TEST_SUITE_P(CppInputTestParametized, CppInputTest,
+                         testing::ValuesIn(AsTuples(ConfigsToTest())));
 
-TEST_P(CppInputTestIp, CppClientTap) {
+TEST_P(CppInputTest, CppClientTap) {
   // Launch client view, and wait until it's rendering to proceed with the test.
   FX_LOGS(INFO) << "Initializing scene";
   LaunchClient();
@@ -631,7 +595,7 @@ TEST_P(CppInputTestIp, CppClientTap) {
   InjectInput(TapLocation::kTopLeft);
   RunLoopUntil([this] {
     return LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase::REMOVE,
-                                         static_cast<std::string>(GetViewProvider()));
+                                         kCppFlatlandClient);
   });
 
   const auto& events_received = this->response_state()->events_received();
@@ -644,19 +608,10 @@ TEST_P(CppInputTestIp, CppClientTap) {
                          fuchsia::ui::pointer::EventPhase::REMOVE);
 }
 
-class CppSwipeTest : public CppInputTestIpBase<InjectSwipeParams> {
- protected:
-  std::string_view GetViewProvider() override {
-    auto ui_stack_config = std::get<0>(GetParam());
-    std::string_view view_provider =
-        ui_stack_config.use_flatland ? kCppFlatlandClient : kCppGfxClient;
-    return view_provider;
-  }
-};
-
+class CppSwipeTest : public CppInputTestBase<InjectSwipeParams> {};
 INSTANTIATE_TEST_SUITE_P(
     CppSwipeTestParameterized, CppSwipeTest,
-    testing::Combine(testing::ValuesIn(UIStackConfigsToTest()),
+    testing::Combine(testing::ValuesIn(ConfigsToTest()),
                      testing::Values(GetRightSwipeParams(), GetDownwardSwipeParams(),
                                      GetLeftSwipeParams(), GetUpwardSwipeParams())));
 
@@ -684,7 +639,7 @@ TEST_P(CppSwipeTest, CppClientSwipeTest) {
   AssertSwipeEvents(actual_events, expected_events);
 }
 
-class WebEngineTestIp : public TouchInputBase<> {
+class WebEngineTest : public TouchInputBase<> {
  protected:
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
@@ -866,10 +821,9 @@ class WebEngineTestIp : public TouchInputBase<> {
   static constexpr auto kTapRetryInterval = zx::sec(1);
 };
 
-INSTANTIATE_TEST_SUITE_P(WebEngineTestIpParameterized, WebEngineTestIp,
-                         testing::ValuesIn(AsTuples(UIStackConfigsToTest())));
-
-TEST_P(WebEngineTestIp, ChromiumTap) {
+INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
+                         testing::ValuesIn(AsTuples(ConfigsToTest())));
+TEST_P(WebEngineTest, ChromiumTap) {
   // Launch client view, and wait until it's rendering to proceed with the test.
   FX_LOGS(INFO) << "Initializing scene";
   LaunchClient();

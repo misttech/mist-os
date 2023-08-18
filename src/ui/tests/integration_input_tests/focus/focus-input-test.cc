@@ -14,10 +14,6 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/resources.h>
-#include <lib/ui/scenic/cpp/session.h>
-#include <lib/ui/scenic/cpp/view_ref_pair.h>
-#include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
@@ -31,7 +27,6 @@
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
 #include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 #include "src/ui/testing/util/flatland_test_view.h"
-#include "src/ui/testing/util/gfx_test_view.h"
 
 namespace {
 
@@ -44,36 +39,23 @@ using component_testing::Route;
 
 constexpr auto kViewProvider = "view-provider";
 
-std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
-  std::vector<ui_testing::UITestRealm::Config> configs;
+// This test fixture exercises the interactions between scenic, scene manager,
+// and a client view with respect to focus.
+//
+// The test uses the following components: scenic, scene manager, and a local
+// mock component that provides a test client view.
+class FocusInputTest : public gtest::RealLoopFixture {
+ protected:
+  FocusInputTest() = default;
+  ~FocusInputTest() override = default;
 
-  // Flatland x scene manager
-  {
+  void SetUp() override {
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
     config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::composition::Allocator::Name_};
-    configs.push_back(config);
-  }
-
-  return configs;
-}
-
-// This test fixture exercises the interactions between scenic, the scene owner,
-// and a client view with respect to focus.
-//
-// The test uses the following components: scenic, root presnter, and a local
-// mock component that provides a test client view.
-class FocusInputTest : public gtest::RealLoopFixture,
-                       public testing::WithParamInterface<ui_testing::UITestRealm::Config> {
- protected:
-  FocusInputTest() = default;
-  ~FocusInputTest() override = default;
-
-  void SetUp() override {
-    auto config = GetParam();
 
     FX_LOGS(INFO) << "Setting up test case";
     ui_test_manager_.emplace(config);
@@ -83,25 +65,17 @@ class FocusInputTest : public gtest::RealLoopFixture,
     realm_ = ui_test_manager_->AddSubrealm();
 
     // Add a test view provider.
-    component_testing::LocalComponentFactory test_view;
-
     test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
-    if (config.use_flatland) {
-      // Lifetime note:
-      // dispatcher() is a pointer to the base class dispatcher loop. The
-      // closure below lives until realm_ is torn down. Since
-      // dispatcher() is cleaned up after realm_, `d` should outlive this
-      // closure.
-      test_view = [d = dispatcher(), a = test_view_access_]() {
-        return std::make_unique<ui_testing::FlatlandTestView>(
-            d, ui_testing::TestView::ContentType::COORDINATE_GRID, a);
-      };
-    } else {
-      test_view = [d = dispatcher(), a = test_view_access_]() {
-        return std::make_unique<ui_testing::GfxTestView>(
-            d, ui_testing::TestView::ContentType::COORDINATE_GRID, a);
-      };
-    }
+    // Lifetime note:
+    // dispatcher() is a pointer to the base class dispatcher loop. The
+    // closure below lives until realm_ is torn down. Since
+    // dispatcher() is cleaned up after realm_, `d` should outlive this
+    // closure.
+    component_testing::LocalComponentFactory test_view = [d = dispatcher(),
+                                                          a = test_view_access_]() {
+      return std::make_unique<ui_testing::FlatlandTestView>(
+          d, ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+    };
 
     realm_->AddLocalChild(kViewProvider, std::move(test_view));
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
@@ -145,13 +119,10 @@ class FocusInputTest : public gtest::RealLoopFixture,
   std::optional<Realm> realm_;
 };
 
-INSTANTIATE_TEST_SUITE_P(FocusInputTestWithParams, FocusInputTest,
-                         ::testing::ValuesIn(UIConfigurationsToTest()));
-
 // This test exercises the focus contract with the scene owner: the view offered to the
 // scene owner will have focus transferred to it. The test itself offers such a view to
 // the scene owner (`test_view`).
-TEST_P(FocusInputTest, TestView_ReceivesFocusTransfer_FromSceneOwner) {
+TEST_F(FocusInputTest, TestView_ReceivesFocusTransfer_FromSceneOwner) {
   EXPECT_FALSE(ui_test_manager()->ClientViewIsFocused());
 
   // Create a test view, and attach to the scene.
@@ -166,7 +137,7 @@ TEST_P(FocusInputTest, TestView_ReceivesFocusTransfer_FromSceneOwner) {
 // It does not set up a scene; these "early" listeners should observe an empty focus chain.
 // NOTE. This test does not use test.focus.ResponseListener. There's not a client that listens to
 // ViewRefFocused.
-TEST_P(FocusInputTest, SimultaneousCallsTo_FocusChainListenerRegistry) {
+TEST_F(FocusInputTest, SimultaneousCallsTo_FocusChainListenerRegistry) {
   // This implements the FocusChainListener class. Its purpose is to test that focus events
   // are actually sent out to the listeners.
   class FocusChainListenerImpl : public fuchsia::ui::focus::FocusChainListener {

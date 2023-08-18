@@ -49,12 +49,12 @@ before the test completes, increase the amount of time in the `--duration` flag.
 You can use [`tiles-session`](/src/ui/bin/tiles-session/README.md) to manually run and
 interact with any of the child clients under test.
 
-### Play with the C++ GFX client
+### Play with the C++ Flatland client
 
-To play around with the C++ GFX client used in the automated test, invoke the client like this:
+To play around with the C++ Flatland client used in the automated test, invoke the client like this:
 
 ```shell
-$ ffx session add fuchsia-pkg://fuchsia.com/touch-gfx-client#meta/touch-gfx-client.cm
+$ ffx session add fuchsia-pkg://fuchsia.com/touch-flatland-client#meta/touch-flatland-client.cm
 ```
 
 ### Play with the web client

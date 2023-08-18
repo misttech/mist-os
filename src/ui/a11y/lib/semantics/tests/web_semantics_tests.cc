@@ -26,7 +26,6 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
@@ -37,21 +36,15 @@
 
 #include <gtest/gtest.h>
 
-#include "src/chromium/web_runner_tests/mock_get.h"
-#include "src/chromium/web_runner_tests/test_server.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/ui/a11y/lib/semantics/tests/semantics_integration_test_fixture.h"
-#include "src/ui/testing/ui_test_manager/ui_test_manager.h"
 
 namespace accessibility_test {
 namespace {
 
 using component_testing::ChildRef;
 using component_testing::Directory;
-using component_testing::LocalComponent;
 using component_testing::ParentRef;
 using component_testing::Protocol;
-using component_testing::Route;
 
 static constexpr auto kStaticHtml = R"(
 <html>
@@ -272,9 +265,7 @@ class StaticHtmlTest : public WebSemanticsTest {
   std::string HtmlForTestCase() override { return kStaticHtml; }
 };
 
-INSTANTIATE_TEST_SUITE_P(StaticHtmlTestWithParams, StaticHtmlTest,
-                         ::testing::ValuesIn(SemanticsIntegrationTestV2::UIConfigurationsToTest()));
-TEST_P(StaticHtmlTest, StaticSemantics) {
+TEST_F(StaticHtmlTest, StaticSemantics) {
   /* The semantic tree for static.html:
    *
    * ID: 0 Label:Title Role: UNKNOWN
@@ -290,7 +281,7 @@ TEST_P(StaticHtmlTest, StaticSemantics) {
   RunLoopUntilNodeExistsWithLabel("Paragraph");
 }
 
-TEST_P(StaticHtmlTest, HitTesting) {
+TEST_F(StaticHtmlTest, HitTesting) {
   FX_LOGS(INFO) << "Wait for scale factor";
   WaitForScaleFactor();
   FX_LOGS(INFO) << "Received scale factor";
@@ -324,10 +315,7 @@ class DynamicHtmlTest : public WebSemanticsTest {
   std::string HtmlForTestCase() override { return kDynamicHtml; }
 };
 
-INSTANTIATE_TEST_SUITE_P(DynamicHtmlTestWithParams, DynamicHtmlTest,
-                         ::testing::ValuesIn(SemanticsIntegrationTestV2::UIConfigurationsToTest()));
-
-TEST_P(DynamicHtmlTest, PerformAction) {
+TEST_F(DynamicHtmlTest, PerformAction) {
   // Find the node with the counter to make sure it still reads 0
   RunLoopUntilNodeExistsWithLabel("0");
   // There shouldn't be a node labeled 1 yet
@@ -353,10 +341,7 @@ class ScrollingHtmlTest : public WebSemanticsTest {
   std::string HtmlForTestCase() override { return kScrollingHtml; }
 };
 
-INSTANTIATE_TEST_SUITE_P(ScrollingHtmlTestWithParams, ScrollingHtmlTest,
-                         ::testing::ValuesIn(SemanticsIntegrationTestV2::UIConfigurationsToTest()));
-
-TEST_P(ScrollingHtmlTest, ScrollToMakeVisible) {
+TEST_F(ScrollingHtmlTest, ScrollToMakeVisible) {
   FX_LOGS(INFO) << "Wait for scale factor";
   WaitForScaleFactor();
   FX_LOGS(INFO) << "Received scale factor";

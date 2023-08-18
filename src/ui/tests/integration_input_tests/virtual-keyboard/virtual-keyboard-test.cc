@@ -36,7 +36,6 @@
 #include <type_traits>
 
 #include <gtest/gtest.h>
-#include <src/lib/fostr/fidl/fuchsia/ui/gfx/formatting.h>
 #include <test/virtualkeyboard/cpp/fidl.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -65,13 +64,10 @@
 namespace {
 
 using test::virtualkeyboard::InputPositionListener;
-using ScenicEvent = fuchsia::ui::scenic::Event;
-using GfxEvent = fuchsia::ui::gfx::Event;
 
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::Directory;
-using component_testing::LocalComponentHandles;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
@@ -95,38 +91,6 @@ std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
     result.insert(result.end(), v.begin(), v.end());
   }
   return result;
-}
-
-std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
-  std::vector<ui_testing::UITestRealm::Config> configs;
-  std::vector<std::string> protocols_required = {
-      fuchsia::ui::scenic::Scenic::Name_,
-      fuchsia::accessibility::semantics::SemanticsManager::Name_,
-      fuchsia::ui::input3::Keyboard::Name_,
-      fuchsia::ui::input::ImeService::Name_,
-      fuchsia::input::virtualkeyboard::Manager::Name_,
-      fuchsia::input::virtualkeyboard::ControllerCreator::Name_};
-
-  // Flatland x scene manager
-  {
-    ui_testing::UITestRealm::Config config;
-    config.use_flatland = true;
-    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.use_scene_owner = true;
-    config.ui_to_client_services = protocols_required;
-    config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
-    config.ui_to_client_services.push_back(fuchsia::ui::composition::Allocator::Name_);
-    config.passthrough_capabilities = {
-        {Protocol{fuchsia::kernel::VmexResource::Name_},
-         Protocol{fuchsia::process::Launcher::Name_},
-         Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }}};
-    configs.push_back(std::move(config));
-  }
-
-  return configs;
 }
 
 class InputPositionState {
@@ -172,8 +136,7 @@ class InputPositionListenerServer : public InputPositionListener, public LocalCo
   std::weak_ptr<InputPositionState> state_;
 };
 
-class VirtualKeyboardBase : public gtest::RealLoopFixture,
-                            public ::testing::WithParamInterface<ui_testing::UITestRealm::Config> {
+class VirtualKeyboardBase : public gtest::RealLoopFixture {
  protected:
   VirtualKeyboardBase() = default;
 
@@ -183,7 +146,28 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
 
   void SetUp() override {
     FX_LOGS(INFO) << "Setting up test case";
-    ui_test_manager_.emplace(GetParam());
+    ui_testing::UITestRealm::Config config;
+    config.use_flatland = true;
+    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
+    config.use_scene_owner = true;
+    config.ui_to_client_services = {
+        fuchsia::accessibility::semantics::SemanticsManager::Name_,
+        fuchsia::input::virtualkeyboard::Manager::Name_,
+        fuchsia::input::virtualkeyboard::ControllerCreator::Name_,
+        fuchsia::ui::composition::Allocator::Name_,
+        fuchsia::ui::composition::Flatland::Name_,
+        fuchsia::ui::input3::Keyboard::Name_,
+        fuchsia::ui::input::ImeService::Name_,
+        fuchsia::ui::scenic::Scenic::Name_,
+    };
+    config.passthrough_capabilities = {
+        {Protocol{fuchsia::kernel::VmexResource::Name_},
+         Protocol{fuchsia::process::Launcher::Name_},
+         Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }}};
+    ui_test_manager_.emplace(config);
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
@@ -510,9 +494,7 @@ class WebEngineTest : public VirtualKeyboardBase {
   std::optional<async::Task> inject_retry_task_;
 };
 
-INSTANTIATE_TEST_SUITE_P(WebEngineTestWithParams, WebEngineTest,
-                         ::testing::ValuesIn(UIConfigurationsToTest()));
-TEST_P(WebEngineTest, ShowAndHideKeyboard) {
+TEST_F(WebEngineTest, ShowAndHideKeyboard) {
   // Launch the chromium view.
   ui_test_manager()->InitializeScene();
   FX_LOGS(INFO) << "Waiting for client view to render";

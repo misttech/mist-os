@@ -192,10 +192,7 @@ examples.
 ## Synchronization challenges
 
 Correct, flake-free inter-component graphics synchronization depends intimately
-on the specific graphics API being used. The
-[legacy Scenic API](/sdk/fidl/fuchsia.ui.scenic/session.fidl), sometimes called
-"GFX", has sparse guarantees for when something is "on screen", so extra care
-must be taken to ensure a flake free test. As a rule of thumb, if you imagine
+on the specific graphics API being used. As a rule of thumb, if you imagine
 the timeline of actions for every component stretching and shrinking by
 arbitrary amounts, a robust test will complete for all CPU-schedulable
 timelines. The challenge is to construct action gates where the test will hold

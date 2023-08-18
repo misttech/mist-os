@@ -25,14 +25,12 @@
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
-#include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cmath>
 
 #include "lib/sys/component/cpp/testing/realm_builder_types.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/a11y/lib/view/a11y_view_semantics.h"
 #include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 
@@ -40,13 +38,8 @@ namespace accessibility_test {
 
 namespace {
 
-using ScenicEvent = fuchsia::ui::scenic::Event;
-using GfxEvent = fuchsia::ui::gfx::Event;
-
 using component_testing::Directory;
-using component_testing::ParentRef;
 using component_testing::Protocol;
-using component_testing::Route;
 using fuchsia::accessibility::semantics::Node;
 
 constexpr auto kDevicePixelRatio = 1.25f;
@@ -73,9 +66,19 @@ void SemanticsManagerProxy::RegisterViewForSemantics(
                                                std::move(semantic_tree_request));
 }
 
-std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfigurationsToTest() {
-  std::vector<ui_testing::UITestRealm::Config> configs;
-  const std::vector<component_testing::Capability> passthrough_capabilities = {
+void SemanticsIntegrationTestV2::SetUp() {
+  FX_LOGS(INFO) << "Setting up test fixture";
+
+  // Initialize ui test manager.
+  ui_testing::UITestRealm::Config config;
+  config.use_flatland = true;
+  config.device_pixel_ratio = kDevicePixelRatio;
+  config.use_scene_owner = true;
+  config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
+  config.ui_to_client_services = {fuchsia::ui::composition::Allocator::Name_,
+                                  fuchsia::ui::composition::Flatland::Name_,
+                                  fuchsia::ui::scenic::Scenic::Name_};
+  config.passthrough_capabilities = {
       Protocol{fuchsia::kernel::VmexResource::Name_},
       Protocol{fuchsia::process::Launcher::Name_},
       Directory{
@@ -83,31 +86,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
           .type = fuchsia::component::decl::DependencyType::STRONG,
       },
   };
-
-  // Flatland x scene manager
-  {
-    ui_testing::UITestRealm::Config config;
-
-    config.use_flatland = true;
-    config.device_pixel_ratio = kDevicePixelRatio;
-    config.use_scene_owner = true;
-    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.ui_to_client_services = {fuchsia::ui::composition::Allocator::Name_,
-                                    fuchsia::ui::composition::Flatland::Name_,
-                                    fuchsia::ui::scenic::Scenic::Name_};
-
-    config.passthrough_capabilities = passthrough_capabilities;
-    configs.push_back(config);
-  }
-
-  return configs;
-}
-
-void SemanticsIntegrationTestV2::SetUp() {
-  FX_LOGS(INFO) << "Setting up test fixture";
-
-  // Initialize ui test manager.
-  ui_test_manager_.emplace(GetParam());
+  ui_test_manager_.emplace(config);
 
   // Initialize ui test realm.
   BuildRealm();
