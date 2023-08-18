@@ -95,9 +95,7 @@ PhysBootTimes gBootTimes;
   }
 
   // Make sure the kernel was built to match this physboot binary.
-  // TODO(mcgrathr): Use gSymbolize->build_id() after fxrev.dev/795906 lands.
-  elf_kernel.AssertInterpMatchesBuildId(gSymbolize->name(),
-                                        *gSymbolize->modules().back()->build_id());
+  elf_kernel.AssertInterpMatchesBuildId(gSymbolize->name(), gSymbolize->build_id());
 
   // Use the putative eventual virtual address to relocate the kernel.
   const uint64_t kernel_vaddr = kArchHandoffVirtualAddress;
