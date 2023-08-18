@@ -79,6 +79,7 @@ class Vim3 : public Vim3Type {
   zx_status_t AudioInit();
   zx_status_t BacklightInit();
   zx_status_t BluetoothInit();
+  zx::result<> ButtonsInit();
   zx_status_t CanvasInit();
   zx_status_t ClkInit();
   zx_status_t CpuInit();

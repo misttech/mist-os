@@ -85,7 +85,7 @@ zx_status_t AmlSaradcDevice::GetSample(uint32_t channel, uint32_t *outval) {
       ClkEna(false);
       SetClock(CLK_SRC_OSCIN, 20);
       ClkEna(true);
-      zxlogf(ERROR, "reg0 = %08x", busy);
+      // zxlogf(ERROR, "reg0 = %08x", busy);
       return ZX_ERR_UNAVAILABLE;
     }
   } while (busy & 0x70000000);

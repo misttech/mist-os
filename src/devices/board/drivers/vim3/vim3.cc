@@ -121,6 +121,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if (auto result = ButtonsInit(); result.is_error()) {
+    zxlogf(ERROR, "ButtonsInit() failed: %s", result.status_string());
+    init_txn_->Reply(result.error_value());
+    return result.error_value();
+  }
   if ((status = UsbInit()) != ZX_OK) {
     zxlogf(ERROR, "UsbInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);

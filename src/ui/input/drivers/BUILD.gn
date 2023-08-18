@@ -4,6 +4,7 @@
 
 group("drivers") {
   deps = [
+    "adc-buttons",
     "ctaphid",
     "cypress",
     "focaltech",
@@ -26,6 +27,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    "adc-buttons:tests",
     "ctaphid:tests",
     "cypress:tests",
     "focaltech:tests",

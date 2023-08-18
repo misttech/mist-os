@@ -376,6 +376,7 @@
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver
 //src/ui/backlight/drivers/vim3-pwm-backlight:vim3-pwm-backlight-driver
+//src/ui/input/drivers/adc-buttons:adc-buttons-driver
 //src/ui/input/drivers/ctaphid:ctaphid-driver
 //src/ui/input/drivers/cypress:cypress-driver
 //src/ui/input/drivers/focaltech:focaltech-driver

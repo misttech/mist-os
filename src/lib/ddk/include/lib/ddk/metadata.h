@@ -70,6 +70,10 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: fuchsia.hardware.gpt.metadata.GptInfo
 #define DEVICE_METADATA_GPT_INFO 0x49545047  // GPTI
 
+// Button Metadata
+// type: fuchsia.buttons.Metadata
+#define DEVICE_METADATA_BUTTONS 0x534E5442  // BTNS
+
 // list of buttons_button_config_t
 #define DEVICE_METADATA_BUTTONS_BUTTONS 0x424E5442  // BTNB
 

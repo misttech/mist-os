@@ -30,6 +30,10 @@ type ConsumerControlButton = flexible enum : uint32 {
 
     /// This button represents disabling the camera on the host.
     CAMERA_DISABLE = 7;
+
+    /// This button represents a function.
+    @available(added=HEAD)
+    FUNCTION = 8;
 };
 
 /// Describes the format of the input report that will be sent from the

@@ -51,6 +51,7 @@ _common_bootfs_deps = [
   "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite",
   "//src/power/power-manager/thermal_config:vim3",
   "//src/ui/backlight/drivers/vim3-pwm-backlight",
+  "//src/ui/input/drivers/adc-buttons",
   "//src/ui/input/drivers/focaltech",
 ]
 

@@ -46,6 +46,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   DEVICETREE = 0x32,
   FAKE_BATTERY = 0x33,
   TCS3400_LIGHT = 0x34,
+  ADC_BUTTONS = 0x35,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {

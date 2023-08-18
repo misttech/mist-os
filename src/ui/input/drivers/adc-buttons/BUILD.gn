@@ -1,0 +1,77 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/test.gni")
+
+driver_bind_rules("adc-buttons-bind") {
+  rules = "adc-buttons.bind"
+  bind_output = "adc-buttons.bindbc"
+  tests = "bind-tests.json"
+  deps = [ "//src/devices/bind/fuchsia.platform" ]
+}
+
+fuchsia_driver("adc-buttons-driver") {
+  output_name = "adc-buttons"
+  deps = [
+    ":adc-buttons-bind",
+    ":common",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("adc-buttons") {
+  visibility = [ ":*" ]
+  component_name = "adc-buttons"
+  deps = [ ":adc-buttons-driver" ]
+  info = "adc-buttons-info.json"
+  manifest = "meta/adc-buttons.cml"
+}
+
+source_set("common") {
+  sources = [
+    "adc-buttons-device.cc",
+    "adc-buttons.cc",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_cpp",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp_driver",
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/mmio",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+test("adc-buttons-test") {
+  configs += [ "//build/config:all_source" ]
+  output_name = "adc-buttons-test"
+  sources = [ "adc-buttons-test.cc" ]
+  deps = [
+    ":common",
+    "//src/devices/testing/mock-mmio-reg",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("adc-buttons-test-package") {
+  package_name = "adc-buttons-test"
+  deps = [ ":adc-buttons-test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":adc-buttons-bind_test",
+    ":adc-buttons-test-package",
+  ]
+}
