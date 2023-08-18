@@ -53,11 +53,15 @@ PhysbootHandoff = _start
     call     boot_alloc_init
 
     // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
+
+    // Set up an identity map for bootstrapping the mmu now and later when secondary cores are initialized.
+    // Global pages are explicitly not used here since it's within the user address space range and
+    // we dont want any stale TLB entries when context switching to user space later.
     lla     a0, riscv64_kernel_bootstrap_translation_table
     li      a1, 0
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
-    li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
+    li      a4, RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
     call    riscv64_boot_map
 
     // map a large run of physical memory at the base of the kernel's address space
@@ -69,8 +73,7 @@ PhysbootHandoff = _start
     call    riscv64_boot_map
 
     // map the kernel to a fixed address
-    // note: mapping the kernel here with full rwx, this will get locked down
-    // later in vm initialization;
+    // note: mapping the kernel here with full rwx, this will get locked down later in vm initialization
     lla     a0, riscv64_kernel_bootstrap_translation_table
     lla     t0, kernel_relocated_base
     ld      a1, (t0)
