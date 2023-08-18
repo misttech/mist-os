@@ -954,7 +954,8 @@ template("assembled_system") {
 
             forward_variables_from(_common_metadata, "*")
             if (defined(invoker.output_dir)) {
-              label = get_label_info(labels.copy_zbi, "label_with_toolchain")
+              label =
+                  get_label_info(":${labels.copy_zbi}", "label_with_toolchain")
               path = rebase_path("${invoker.output_dir}/" +
                                      get_path_info(files.zbi, "file"),
                                  root_build_dir)
@@ -1021,7 +1022,7 @@ template("assembled_system") {
 
               forward_variables_from(_common_metadata, "*")
               if (defined(invoker.output_dir)) {
-                label = get_label_info(labels.copy_zbi_signed,
+                label = get_label_info(":${labels.copy_zbi_signed}",
                                        "label_with_toolchain")
                 path = rebase_path("${invoker.output_dir}/" +
                                        get_path_info(files.zbi_signed, "file"),
@@ -1042,8 +1043,8 @@ template("assembled_system") {
               type = "vbmeta"
               forward_variables_from(_common_metadata, "*")
               if (defined(invoker.output_dir)) {
-                label =
-                    get_label_info(labels.copy_vbmeta, "label_with_toolchain")
+                label = get_label_info(":${labels.copy_vbmeta}",
+                                       "label_with_toolchain")
                 path = rebase_path("${invoker.output_dir}/" +
                                        get_path_info(files.vbmeta, "file"),
                                    root_build_dir)
@@ -1223,7 +1224,7 @@ template("assembled_system") {
           image_name = _namespace
           assembly_manifest_path =
               rebase_path(files.assembly_manifest, root_build_dir)
-          label = get_label_info(target_name, "label_with_toolchain")
+          label = get_label_info(":${target_name}", "label_with_toolchain")
         },
       ]
     }
