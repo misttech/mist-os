@@ -12,6 +12,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::{
     ffi::CStr,
+    marker::PhantomData,
     mem::{size_of, size_of_val},
     os::raw::{c_char, c_int, c_uint, c_void},
     pin::Pin,
@@ -87,8 +88,12 @@ pub struct ZxioDirent {
     pub name: Vec<u8>,
 }
 
-pub struct DirentIterator {
+pub struct DirentIterator<'a> {
     iterator: Box<zxio_dirent_iterator_t>,
+
+    // zxio_dirent_iterator_t holds pointers to the underlying directory, so we must keep it alive
+    // until we've destroyed it.
+    _directory: PhantomData<&'a Zxio>,
 
     /// Whether the iterator has reached the end of dir entries.
     /// This is necessary because the zxio API returns only once the error code
@@ -97,7 +102,7 @@ pub struct DirentIterator {
     finished: bool,
 }
 
-impl DirentIterator {
+impl DirentIterator<'_> {
     /// Rewind the iterator to the beginning.
     pub fn rewind(&mut self) -> Result<(), zx::Status> {
         let status = unsafe { zxio::zxio_dirent_iterator_rewind(&mut *self.iterator) };
@@ -109,7 +114,7 @@ impl DirentIterator {
 
 /// It is important that all methods here are &mut self, to require the client
 /// to obtain exclusive access to the object, externally locking it.
-impl Iterator for DirentIterator {
+impl Iterator for DirentIterator<'_> {
     type Item = Result<ZxioDirent, zx::Status>;
 
     /// Returns the next dir entry for this iterator.
@@ -140,16 +145,16 @@ impl Iterator for DirentIterator {
     }
 }
 
-impl Drop for DirentIterator {
+impl Drop for DirentIterator<'_> {
     fn drop(&mut self) {
         unsafe {
             zxio::zxio_dirent_iterator_destroy(&mut *self.iterator.as_mut());
-        };
+        }
     }
 }
 
-unsafe impl Send for DirentIterator {}
-unsafe impl Sync for DirentIterator {}
+unsafe impl Send for DirentIterator<'_> {}
+unsafe impl Sync for DirentIterator<'_> {}
 
 impl ZxioDirent {
     fn from(dirent: zxio_dirent_t, name_buffer: Vec<u8>) -> ZxioDirent {
@@ -812,11 +817,12 @@ impl Zxio {
         zxio_signals
     }
 
-    pub fn create_dirent_iterator(&self) -> Result<DirentIterator, zx::Status> {
+    pub fn create_dirent_iterator(&self) -> Result<DirentIterator<'_>, zx::Status> {
         let mut zxio_iterator = Box::default();
         let status = unsafe { zxio::zxio_dirent_iterator_init(&mut *zxio_iterator, self.as_ptr()) };
         zx::ok(status)?;
-        let iterator = DirentIterator { iterator: zxio_iterator, finished: false };
+        let iterator =
+            DirentIterator { iterator: zxio_iterator, _directory: PhantomData, finished: false };
         Ok(iterator)
     }
 

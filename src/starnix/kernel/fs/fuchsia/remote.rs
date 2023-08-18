@@ -911,8 +911,8 @@ pub fn zxio_query_events(zxio: &Arc<Zxio>) -> FdEvents {
 
 /// Helper struct to track the context necessary to iterate over dir entries.
 #[derive(Default)]
-struct RemoteDirectoryIterator {
-    iterator: Option<DirentIterator>,
+struct RemoteDirectoryIterator<'a> {
+    iterator: Option<DirentIterator<'a>>,
 
     /// If the last attempt to write to the sink failed, this contains the entry that is pending to
     /// be added. This is also used to synthesize dot-dot.
@@ -946,8 +946,8 @@ impl From<Option<ZxioDirent>> for Entry {
     }
 }
 
-impl RemoteDirectoryIterator {
-    fn get_or_init_iterator(&mut self, zxio: &Zxio) -> Result<&mut DirentIterator, Errno> {
+impl<'a> RemoteDirectoryIterator<'a> {
+    fn get_or_init_iterator(&mut self, zxio: &'a Zxio) -> Result<&mut DirentIterator<'a>, Errno> {
         if self.iterator.is_none() {
             let iterator =
                 zxio.create_dirent_iterator().map_err(|status| from_status_like_fdio!(status))?;
@@ -963,7 +963,7 @@ impl RemoteDirectoryIterator {
 
     /// Returns the next dir entry. If no more entries are found, returns None.  Returns an error if
     /// the iterator fails for other reasons described by the zxio library.
-    pub fn next(&mut self, zxio: &Zxio) -> Result<Entry, Errno> {
+    pub fn next(&mut self, zxio: &'a Zxio) -> Result<Entry, Errno> {
         let mut next = self.pending_entry.take();
         if let Entry::None = next {
             next = self
@@ -987,15 +987,27 @@ impl RemoteDirectoryIterator {
 }
 
 struct RemoteDirectoryObject {
-    /// The underlying Zircon I/O object.
-    zxio: Zxio,
+    iterator: Mutex<RemoteDirectoryIterator<'static>>,
 
-    iterator: Mutex<RemoteDirectoryIterator>,
+    // The underlying Zircon I/O object.  This *must* be dropped after `iterator` above because the
+    // iterator has references to this object.  We use some unsafe code below to erase the lifetime
+    // (hence the 'static above).
+    zxio: Zxio,
 }
 
 impl RemoteDirectoryObject {
     pub fn new(zxio: Zxio) -> RemoteDirectoryObject {
         RemoteDirectoryObject { zxio, iterator: Mutex::new(RemoteDirectoryIterator::default()) }
+    }
+
+    /// Returns a reference to Zxio with the lifetime erased.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold the lifetime requirements, which will be the case if this is only
+    /// used for the contained iterator (`iterator` is dropped before `zxio`).
+    unsafe fn zxio(&self) -> &'static Zxio {
+        &*(&self.zxio as *const Zxio)
     }
 }
 
@@ -1025,7 +1037,9 @@ impl FileOps for RemoteDirectoryObject {
 
         // Advance the iterator to catch up with the offset.
         for i in iterator_position..new_offset {
-            match iterator.next(&self.zxio) {
+            // SAFETY: See the comment on the `zxio` function above.  The iterator outlives this
+            // function and the zxio object must outlive the iterator.
+            match iterator.next(unsafe { self.zxio() }) {
                 Ok(Entry::Some(_) | Entry::DotDot) => {}
                 Ok(Entry::None) => break, // No more entries.
                 Err(_) => {
@@ -1053,7 +1067,9 @@ impl FileOps for RemoteDirectoryObject {
         let mut iterator = self.iterator.lock();
 
         loop {
-            let entry = iterator.next(&self.zxio)?;
+            // SAFETY: See the comment on the `zxio` function above.  The iterator outlives this
+            // function and the zxio object must outlive the iterator.
+            let entry = iterator.next(unsafe { self.zxio() })?;
             if let Err(e) = match &entry {
                 Entry::Some(entry) => {
                     let inode_num: ino_t = entry.id.ok_or_else(|| errno!(EIO))?;
