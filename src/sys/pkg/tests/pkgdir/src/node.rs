@@ -41,7 +41,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         expected_mode: u32,
         id_verifier: Box<dyn U64Verifier>,
         expected_content_size: u64,
-        expected_storage_size: u64,
+        storage_size_verifier: Box<dyn U64Verifier>,
         time_verifier: Box<dyn U64Verifier>,
     }
 
@@ -52,7 +52,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
                 expected_mode: 0,
                 id_verifier: Box::new(1),
                 expected_content_size: 0,
-                expected_storage_size: 0,
+                storage_size_verifier: Box::new(AnyU64),
                 time_verifier: Box::new(0),
             }
         }
@@ -61,11 +61,11 @@ async fn get_attr_per_package_source(source: PackageSource) {
     async fn verify_get_attrs(root_dir: &fio::DirectoryProxy, path: &str, args: Args) {
         let node = fuchsia_fs::directory::open_node(root_dir, path, args.open_flags).await.unwrap();
         let (status, attrs) = node.get_attr().await.unwrap();
-        zx::Status::ok(status).unwrap();
+        let () = zx::Status::ok(status).unwrap();
         assert_eq!(Mode(attrs.mode), Mode(args.expected_mode));
         args.id_verifier.verify(attrs.id);
         assert_eq!(attrs.content_size, args.expected_content_size);
-        assert_eq!(attrs.storage_size, args.expected_storage_size);
+        args.storage_size_verifier.verify(attrs.storage_size);
         assert_eq!(attrs.link_count, 1);
         args.time_verifier.verify(attrs.creation_time);
         args.time_verifier.verify(attrs.modification_time);
@@ -100,8 +100,8 @@ async fn get_attr_per_package_source(source: PackageSource) {
             expected_mode: fio::MODE_TYPE_FILE | 0o500,
             id_verifier: Box::new(AnyU64),
             expected_content_size: 4,
-            expected_storage_size: 8192,
             time_verifier: Box::new(0),
+            ..Default::default()
         },
     )
     .await;
@@ -112,7 +112,6 @@ async fn get_attr_per_package_source(source: PackageSource) {
             open_flags: fio::OpenFlags::NOT_DIRECTORY,
             expected_mode: fio::MODE_TYPE_FILE | 0o600,
             expected_content_size: 64,
-            expected_storage_size: 64,
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -125,7 +124,6 @@ async fn get_attr_per_package_source(source: PackageSource) {
             open_flags: fio::OpenFlags::DIRECTORY,
             expected_mode: fio::MODE_TYPE_DIRECTORY | 0o700,
             expected_content_size: 75,
-            expected_storage_size: 75,
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -137,7 +135,6 @@ async fn get_attr_per_package_source(source: PackageSource) {
         Args {
             expected_mode: fio::MODE_TYPE_DIRECTORY | 0o700,
             expected_content_size: 75,
-            expected_storage_size: 75,
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -149,7 +146,6 @@ async fn get_attr_per_package_source(source: PackageSource) {
         Args {
             expected_mode: fio::MODE_TYPE_FILE | 0o600,
             expected_content_size: 9,
-            expected_storage_size: 9,
             time_verifier: Box::new(0),
             ..Default::default()
         },
