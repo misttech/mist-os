@@ -79,6 +79,18 @@ extern const int INSTR_PROF_PROFILE_RUNTIME_VAR = 0;
 // in with its own definition.
 [[gnu::weak]] extern intptr_t INSTR_PROF_PROFILE_COUNTER_BIAS_VAR = 0;
 
+// These are outcalls made by the value-profiling instrumentation.  This
+// runtime doesn't support value-profiling in any meaningful way.  But the
+// entry points are provided so that instrumented code can be linked against
+// this runtime instead of the standard runtime.  The stubs here are made weak
+// in case both this and the standard runtime are linked in.
+
+[[gnu::weak]] extern void INSTR_PROF_VALUE_PROF_FUNC(uint64_t TargetValue, void* Data,
+                                                     uint32_t CounterIndex) {}
+
+[[gnu::weak]] extern void INSTR_PROF_VALUE_PROF_MEMOP_FUNC(uint64_t TargetValue, void* Data,
+                                                           uint32_t CounterIndex) {}
+
 }  // extern "C"
 
 // Here _WIN32 really means EFI.  At link-time, it's Windows/x64 essentially.
