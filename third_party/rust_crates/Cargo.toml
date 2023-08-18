@@ -28,7 +28,7 @@ aes = { version = "0.7.5", features = ["armv8"] }
 aes-gcm = "0.9"
 aes-gcm-siv = { version = "0.10.3", features = ["std"] }
 ansi_term = "0.12.0"
-anyhow = "1.0.57"
+anyhow = "1.0.75"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
 arrayvec = "0.7.1"
@@ -408,7 +408,7 @@ add_cfgs = []
 [gn.package.aes."0.7.5"]
 configs = [ "//build/config/rust:allow_simd" ]
 
-[gn.package.anyhow."1.0.57"]
+[gn.package.anyhow."1.0.75"]
 # TODO(https://github.com/rust-lang/rust/pull/72981): uncomment when backtrace is stabilized.
 #rustflags = ["--cfg=backtrace"]
 

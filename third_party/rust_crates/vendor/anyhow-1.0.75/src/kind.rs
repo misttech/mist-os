@@ -40,7 +40,7 @@
 // The anyhow! macro will set up the call in this form:
 //
 //     #[allow(unused_imports)]
-//     use $crate::private::{AdhocKind, TraitKind};
+//     use $crate::__private::{AdhocKind, TraitKind};
 //     let error = $msg;
 //     (&error).anyhow_kind().new(error)
 
@@ -52,6 +52,7 @@ use crate::StdError;
 
 pub struct Adhoc;
 
+#[doc(hidden)]
 pub trait AdhocKind: Sized {
     #[inline]
     fn anyhow_kind(&self) -> Adhoc {
@@ -73,6 +74,7 @@ impl Adhoc {
 
 pub struct Trait;
 
+#[doc(hidden)]
 pub trait TraitKind: Sized {
     #[inline]
     fn anyhow_kind(&self) -> Trait {
@@ -96,6 +98,7 @@ impl Trait {
 pub struct Boxed;
 
 #[cfg(feature = "std")]
+#[doc(hidden)]
 pub trait BoxedKind: Sized {
     #[inline]
     fn anyhow_kind(&self) -> Boxed {
@@ -110,7 +113,7 @@ impl BoxedKind for Box<dyn StdError + Send + Sync> {}
 impl Boxed {
     #[cold]
     pub fn new(self, error: Box<dyn StdError + Send + Sync>) -> Error {
-        let backtrace = backtrace_if_absent!(error);
+        let backtrace = backtrace_if_absent!(&*error);
         Error::from_boxed(error, backtrace)
     }
 }

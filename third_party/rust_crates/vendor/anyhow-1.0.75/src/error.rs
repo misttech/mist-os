@@ -11,6 +11,8 @@ use core::mem::ManuallyDrop;
 #[cfg(not(anyhow_no_ptr_addr_of))]
 use core::ptr;
 use core::ptr::NonNull;
+#[cfg(backtrace)]
+use std::error::{self, Request};
 
 #[cfg(feature = "std")]
 use core::ops::{Deref, DerefMut};
@@ -31,7 +33,7 @@ impl Error {
     where
         E: StdError + Send + Sync + 'static,
     {
-        let backtrace = backtrace_if_absent!(error);
+        let backtrace = backtrace_if_absent!(&error);
         Error::from_std(error, backtrace)
     }
 
@@ -520,6 +522,22 @@ impl Error {
             Some(addr.cast::<E>().deref_mut())
         }
     }
+
+    #[cfg(backtrace)]
+    pub(crate) fn provide<'a>(&'a self, request: &mut Request<'a>) {
+        unsafe { ErrorImpl::provide(self.inner.by_ref(), request) }
+    }
+
+    // Called by thiserror when you have `#[source] anyhow::Error`. This provide
+    // implementation includes the anyhow::Error's Backtrace if any, unlike
+    // deref'ing to dyn Error where the provide implementation would include
+    // only the original error's Backtrace from before it got wrapped into an
+    // anyhow::Error.
+    #[cfg(backtrace)]
+    #[doc(hidden)]
+    pub fn thiserror_provide<'a>(&'a self, request: &mut Request<'a>) {
+        Self::provide(self, request);
+    }
 }
 
 #[cfg(feature = "std")]
@@ -530,7 +548,7 @@ where
 {
     #[cold]
     fn from(error: E) -> Self {
-        let backtrace = backtrace_if_absent!(error);
+        let backtrace = backtrace_if_absent!(&error);
         Error::from_std(error, backtrace)
     }
 }
@@ -886,11 +904,19 @@ impl ErrorImpl {
             .as_ref()
             .or_else(|| {
                 #[cfg(backtrace)]
-                return Self::error(this).backtrace();
-                #[cfg(all(not(backtrace), feature = "backtrace"))]
+                return error::request_ref::<Backtrace>(Self::error(this));
+                #[cfg(not(backtrace))]
                 return (vtable(this.ptr).object_backtrace)(this);
             })
             .expect("backtrace capture failed")
+    }
+
+    #[cfg(backtrace)]
+    unsafe fn provide<'a>(this: Ref<'a, Self>, request: &mut Request<'a>) {
+        if let Some(backtrace) = &this.deref().backtrace {
+            request.provide_ref(backtrace);
+        }
+        Self::error(this).provide(request);
     }
 
     #[cold]
@@ -903,13 +929,13 @@ impl<E> StdError for ErrorImpl<E>
 where
     E: StdError,
 {
-    #[cfg(backtrace)]
-    fn backtrace(&self) -> Option<&Backtrace> {
-        Some(unsafe { ErrorImpl::backtrace(self.erase()) })
-    }
-
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         unsafe { ErrorImpl::error(self.erase()).source() }
+    }
+
+    #[cfg(backtrace)]
+    fn provide<'a>(&'a self, request: &mut Request<'a>) {
+        unsafe { ErrorImpl::provide(self.erase(), request) }
     }
 }
 
