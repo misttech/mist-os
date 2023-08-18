@@ -281,7 +281,13 @@ void async_loop_shutdown(async_loop_t* loop) {
   async_loop_cancel_all(loop);
 
   if (loop->config.make_default_for_current_thread) {
-    ZX_DEBUG_ASSERT(loop->config.default_accessors.getter() == &loop->dispatcher);
+    ZX_DEBUG_ASSERT_MSG(
+        loop->config.default_accessors.getter() == &loop->dispatcher,
+        "The default dispatcher for the current thread is different from the dispatcher "
+        "of this async loop. "
+        "If you used the kAsyncLoopConfigAttachToCurrentThread loop config, "
+        "the loop must be created and destroyed on the same thread. "
+        "Did you move the loop to a different thread?");
     loop->config.default_accessors.setter(NULL);
   }
 }
