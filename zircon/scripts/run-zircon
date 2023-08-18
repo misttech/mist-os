@@ -33,6 +33,7 @@ function HELP {
     echo "                       <host_drv> should be one of (alsa, oss, pa, wav, none)"
     echo "--ahci=<disk image>  : run with disk image file as raw ahci drive"
     echo "--debugger           : Enable gdb stub and wait for connection"
+    echo "--dry-run            : do everything but start qemu"
     echo "--gic=<version>      : use GIC 2, 3, or max supported. default is max"
     echo "--no-serial          : Disable writing out to the guest's serial port"
     echo "-S <device>          : output serial port to a QEMU character device. Default is stdio."
@@ -88,6 +89,7 @@ DEBUGGER=0
 DISKFILE=
 DISKTYPE=
 DISKFMT="raw"
+DRY_RUN=0
 GIC=max
 GRAPHICS=0
 DO_HVF=
@@ -260,6 +262,7 @@ while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:S:M:h-:" FLAG; do
             debugger) DEBUGGER=1;;
             disktype=*) DISKTYPE=${OPTARG#*=};;
             diskfmt=*) DISKFMT=${OPTARG#*=};;
+            dry-run) DRY_RUN=1;;
             gic=*) GIC=${OPTARG#*=};;
             no-serial) SERIAL=0;;
             vnc=*) VNC=${OPTARG#*=};;
@@ -598,13 +601,20 @@ CMDLINE+="kernel.halt-on-panic=true "
 CMDLINE+=$OPT_CMDLINE
 
 cd /
-set -x
+
+# If dry run is set, simply echo all commands run from here on out.
+if (( $DRY_RUN )); then
+  RUN_CMD="echo"
+else
+  RUN_CMD="exec"
+  set -x
+fi
 
 # TODO(joshuaseaton): this and other command-line building logic above can be
 # tidied up in having $ARGS be an array.
 if (( $UEFI_DISK_BOOT )); then
-    exec $QEMU $ARGS "$@"
+  $RUN_CMD $QEMU $ARGS "$@"
 else
-    echo "CMDLINE: $CMDLINE"
-    exec $QEMU $ARGS -append "$CMDLINE" "$@"
+  echo "CMDLINE: $CMDLINE"
+  $RUN_CMD $QEMU $ARGS -append "$CMDLINE" "$@"
 fi
