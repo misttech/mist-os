@@ -16,5 +16,14 @@
                 "AllocateTest.Fallocate",
             ],
         },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/130402): Re-enable once flake is resolved.
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerPeek/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerRead/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListener/*",
+            ],
+        }
     ],
 }
