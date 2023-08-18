@@ -23,15 +23,6 @@
             url: "netstack#meta/netstack.cm",
         },
     ],
-    collections: [
-        // TODO(fxbug.dev/131564): This collection is going away in favor of
-        // a single `#kernel` child component. In the transition period, we'll
-        // offer the same capabilities to both `#kernel` and `#kernels`.
-        {
-            name: "kernels",
-            durability: "single_run",
-        },
-    ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
     ],
@@ -55,10 +46,7 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: [
-                "#kernel",
-                "#kernels",
-            ],
+            to: [ "#kernel" ],
         },
         {
             protocol: [
@@ -79,10 +67,7 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
-            to: [
-                "#kernel",
-                "#kernels",
-            ],
+            to: [ "#kernel" ],
         },
         {
             protocol: [
@@ -97,18 +82,12 @@
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#netstack",
-            to: [
-                "#kernel",
-                "#kernels",
-            ],
+            to: [ "#kernel" ],
         },
         {
             directory: "dev-gpu",
             from: "parent",
-            to: [
-                "#kernel",
-                "#kernels",
-            ],
+            to: [ "#kernel" ],
         },
         {
             protocol: "fuchsia.logger.LogSink",

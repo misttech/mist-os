@@ -9,7 +9,6 @@ mod helpers;
 mod ltp;
 mod results_parser;
 mod runner;
-mod test_container;
 mod test_suite;
 
 use anyhow::Error;
