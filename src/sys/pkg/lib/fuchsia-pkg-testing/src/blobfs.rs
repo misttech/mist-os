@@ -22,7 +22,7 @@ impl Fake {
     /// Panics on error
     pub fn new() -> (Self, blobfs::Client) {
         let fake = Self { root: TempDir::new().unwrap() };
-        let blobfs = blobfs::Client::new(fake.root_proxy(), None);
+        let blobfs = blobfs::Client::new(fake.root_proxy(), None, None, None).unwrap();
         (fake, blobfs)
     }
 

@@ -378,7 +378,7 @@ impl ProtocolsExt for fio::OpenFlags {
         // Disallow invalid flag combinations.
         let mut prohibited_flags = fio::OpenFlags::empty();
         if !self.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
-            prohibited_flags |= fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE
+            prohibited_flags |= fio::OpenFlags::TRUNCATE
         }
         if self.intersects(fio::OpenFlags::NODE_REFERENCE) {
             prohibited_flags |= !fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;

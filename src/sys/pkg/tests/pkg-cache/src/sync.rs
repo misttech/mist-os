@@ -16,6 +16,9 @@ impl crate::Blobfs for BrokenBlobfs {
     fn blob_creator_proxy(&self) -> Option<fidl_fuchsia_fxfs::BlobCreatorProxy> {
         None
     }
+    fn blob_reader_proxy(&self) -> Option<fidl_fuchsia_fxfs::BlobReaderProxy> {
+        None
+    }
 }
 
 #[fuchsia::test]

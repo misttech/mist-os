@@ -8,6 +8,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{collections::HashSet, convert::TryInto as _, sync::Arc},
+    tracing::error,
     vfs::{
         common::send_on_open_with_error,
         directory::entry::{DirectoryEntry, EntryInfo},
@@ -71,11 +72,12 @@ impl Error {
 /// The storage that provides the non-meta files (accessed by hash) of a package-directory (e.g.
 /// blobfs).
 pub trait NonMetaStorage: Send + Sync + 'static {
-    /// Open a non-meta file by hash.
+    /// Open a non-meta file by hash. `scope` may complete while there are still open connections.
     fn open(
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
+        scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError>;
 }
@@ -85,9 +87,10 @@ impl NonMetaStorage for blobfs::Client {
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
+        scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError> {
-        self.forward_open(blob, flags, server_end)
+        self.open_blob_for_read(blob, flags, scope, server_end)
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
     }
 }
@@ -98,6 +101,7 @@ impl NonMetaStorage for fio::DirectoryProxy {
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
+        _scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError> {
         self.open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end)

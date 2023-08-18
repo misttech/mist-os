@@ -184,13 +184,13 @@ mod tests {
 
     #[test]
     fn new_connection_validate_flags_append() {
-        assert_eq!(
+        assert_matches!(
             ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND, true, false, false),
-            Err(zx::Status::INVALID_ARGS),
+            Ok(_)
         );
-        assert_eq!(
+        assert_matches!(
             ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND, true, true, false),
-            Err(zx::Status::INVALID_ARGS),
+            Ok(_)
         );
         assert_matches!(
             ncvf(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND, true, true, false),

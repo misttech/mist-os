@@ -296,9 +296,10 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         }
 
         if let Some(blob) = self.non_meta_files.get(canonical_path) {
-            let () = self.non_meta_storage.open(blob, flags, server_end).unwrap_or_else(|e| {
-                error!("Error forwarding content blob open to blobfs: {:#}", anyhow::anyhow!(e))
-            });
+            let () =
+                self.non_meta_storage.open(blob, flags, scope, server_end).unwrap_or_else(|e| {
+                    error!("Error forwarding content blob open to blobfs: {:#}", anyhow::anyhow!(e))
+                });
             return;
         }
 
@@ -415,6 +416,7 @@ fn open_for_read(
     let () = non_meta_storage.open(
         blob,
         fio::OpenFlags::RIGHT_READABLE | additional_flags,
+        ExecutionScope::new(),
         server_end.into_channel().into(),
     )?;
     Ok(file)

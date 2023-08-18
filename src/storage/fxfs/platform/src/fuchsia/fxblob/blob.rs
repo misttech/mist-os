@@ -135,6 +135,16 @@ impl FxBlob {
             }
         }
     }
+
+    /// Return a reference child vmo.
+    pub fn get_child_reference_vmo(&self) -> Result<zx::Vmo, Status> {
+        let child_vmo = self.vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0)?;
+        if self.handle.owner().pager().watch_for_zero_children(self).map_err(map_to_status)? {
+            // Take an open count so that we keep this object alive if it is otherwise closed.
+            self.open_count_add_one();
+        }
+        Ok(child_vmo)
+    }
 }
 
 /// Implement VFS pseudo-directory entry for a blob.
@@ -469,14 +479,15 @@ impl PagerBackedVmo for FxBlob {
 
         self.handle.owner().clone().spawn(async move {
             static TRANSFER_BUFFERS: Lazy<TransferBuffers> = Lazy::new(|| TransferBuffers::new());
-            let (buffer_result, transfer_buffer) = join!(self.read_uncached(range.clone()), async {
-                let buffer = TRANSFER_BUFFERS.get().await;
-                // Committing pages in the kernel is time consuming, so we do this in parallel
-                // to the read.  This assumes that the implementation of join! polls the other
-                // future first (which happens to be the case for now).
-                buffer.commit(range.end - range.start);
-                buffer
-            });
+            let (buffer_result, transfer_buffer) =
+                join!(self.read_uncached(range.clone()), async {
+                    let buffer = TRANSFER_BUFFERS.get().await;
+                    // Committing pages in the kernel is time consuming, so we do this in parallel
+                    // to the read.  This assumes that the implementation of join! polls the other
+                    // future first (which happens to be the case for now).
+                    buffer.commit(range.end - range.start);
+                    buffer
+                });
             let (buffer, len) = match buffer_result {
                 Ok(v) => v,
                 Err(e) => {

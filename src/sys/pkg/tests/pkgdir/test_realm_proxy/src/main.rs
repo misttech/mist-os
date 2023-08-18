@@ -15,6 +15,15 @@ use {
     tracing::{error, info},
 };
 
+// When this feature is enabled, the pkgdir tests will start Fxblob.
+#[cfg(feature = "use_fxblob")]
+static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation = blobfs_ramdisk::Implementation::Fxblob;
+
+// When this feature is not enabled, the pkgdir tests will start cpp Blobfs.
+#[cfg(not(feature = "use_fxblob"))]
+static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation =
+    blobfs_ramdisk::Implementation::CppBlobfs;
+
 enum IncomingService {
     RealmProxy(RealmProxy_RequestStream),
 }
@@ -27,7 +36,11 @@ async fn main() -> Result<(), Error> {
     let test_package = make_test_package().await;
     let system_image_package =
         SystemImageBuilder::new().static_packages(&[&test_package]).build().await;
-    let blobfs = BlobfsRamdisk::start().await.expect("started blobfs");
+    let blobfs = BlobfsRamdisk::builder()
+        .implementation(BLOB_IMPLEMENTATION)
+        .start()
+        .await
+        .expect("started blobfs");
     test_package.write_to_blobfs(&blobfs).await;
     system_image_package.write_to_blobfs(&blobfs).await;
 
@@ -141,7 +154,7 @@ fn make_file_contents(size: usize) -> impl Iterator<Item = u8> {
     b"ABCD".iter().copied().cycle().take(size)
 }
 
-// A [RealmProxy] implementation that returns clones of the pacakge directory
+// A [RealmProxy] implementation that returns clones of the package directory
 // for testing. It only responds to requests to connect to fuchsia.io.Directory.
 // Any other protocol connection is rejected with [OperationError::Unsupported].
 pub struct PkgdirTestRealmProxy {

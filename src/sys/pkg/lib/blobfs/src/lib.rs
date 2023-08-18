@@ -14,7 +14,11 @@ use {
     futures::{stream, StreamExt as _},
     std::{collections::HashSet, sync::Arc},
     thiserror::Error,
-    tracing::warn,
+    tracing::{error, warn},
+    vfs::{
+        common::send_on_open_with_error, directory::entry::DirectoryEntry,
+        execution_scope::ExecutionScope, path::Path,
+    },
 };
 
 pub mod mock;
@@ -44,6 +48,15 @@ pub enum BlobfsError {
 
     #[error("while connecting to fuchsia.fxfs/BlobCreator")]
     ConnectToBlobCreator(#[source] anyhow::Error),
+
+    #[error("while connecting to fuchsia.fxfs/BlobReader")]
+    ConnectToBlobReader(#[source] anyhow::Error),
+
+    #[error("while connecting to fuchsia.kernel/VmexResource")]
+    ConnectToVmexResource(#[source] anyhow::Error),
+
+    #[error("while setting the VmexResource")]
+    InitVmexResource(#[source] anyhow::Error),
 }
 
 /// An error encountered while creating a blob
@@ -78,55 +91,137 @@ impl From<ffxfs::CreateBlobError> for CreateError {
     }
 }
 
+/// A builder for [`Client`]
+#[derive(Default)]
+pub struct ClientBuilder {
+    use_reader: Reader,
+    use_creator: bool,
+    readable: bool,
+    writable: bool,
+    executable: bool,
+}
+
+#[derive(Default)]
+enum Reader {
+    #[default]
+    DontUse,
+    Use {
+        use_vmex: bool,
+    },
+}
+
+impl ClientBuilder {
+    /// Opens the /blob directory in the component's namespace with readable, writable, and/or
+    /// executable flags. Connects to the fuchsia.fxfs.BlobCreator and BlobReader if requested.
+    /// Connects to and initializes the VmexResource if `use_vmex` is set. Returns a `Client`.
+    pub async fn build(self) -> Result<Client, BlobfsError> {
+        let mut flags = fio::OpenFlags::empty();
+        if self.readable {
+            flags |= fio::OpenFlags::RIGHT_READABLE
+        }
+        if self.writable {
+            flags |= fio::OpenFlags::RIGHT_WRITABLE
+        }
+        if self.executable {
+            flags |= fio::OpenFlags::RIGHT_EXECUTABLE
+        }
+        let dir = fuchsia_fs::directory::open_in_namespace("/blob", flags)?;
+        let reader = match self.use_reader {
+            Reader::DontUse => None,
+            Reader::Use { use_vmex } => {
+                if use_vmex {
+                    let client = fuchsia_component::client::connect_to_protocol::<
+                        fidl_fuchsia_kernel::VmexResourceMarker,
+                    >()
+                    .map_err(BlobfsError::ConnectToVmexResource)?;
+                    let vmex = client.get().await?;
+                    vmo_blob::init_vmex_resource(vmex).map_err(BlobfsError::InitVmexResource)?;
+                }
+                Some(
+                    fuchsia_component::client::connect_to_protocol::<ffxfs::BlobReaderMarker>()
+                        .map_err(BlobfsError::ConnectToBlobReader)?,
+                )
+            }
+        };
+
+        let creator = if self.use_creator {
+            Some(
+                fuchsia_component::client::connect_to_protocol::<ffxfs::BlobCreatorMarker>()
+                    .map_err(BlobfsError::ConnectToBlobCreator)?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Client { dir, creator, reader })
+    }
+
+    /// `Client` will connect to and use fuchsia.fxfs/BlobReader for reads. Sets the VmexResource
+    /// for `Client`. The VmexResource is used by `get_backing_memory` to mark blobs as executable.
+    pub fn use_reader(self) -> Self {
+        Self { use_reader: Reader::Use { use_vmex: true }, ..self }
+    }
+
+    /// `Client` will connect to and use fuchsia.fxfs/BlobReader for reads. Does not set the
+    /// VmexResource.
+    pub fn use_reader_no_vmex(self) -> Self {
+        Self { use_reader: Reader::Use { use_vmex: false }, ..self }
+    }
+
+    /// If set, `Client` will connect to and use fuchsia.fxfs/BlobCreator for writes.
+    pub fn use_creator(self) -> Self {
+        Self { use_creator: true, ..self }
+    }
+
+    /// If set, `Client` will connect to /blob in the current component's namespace with
+    /// OPEN_RIGHT_READABLE.
+    pub fn readable(self) -> Self {
+        Self { readable: true, ..self }
+    }
+
+    /// If set, `Client` will connect to /blob in the current component's namespace with
+    /// OPEN_RIGHT_WRITABLE. WRITABLE is needed so that `delete_blob` can call
+    /// fuchsia.io/Directory.Unlink.
+    pub fn writable(self) -> Self {
+        Self { writable: true, ..self }
+    }
+
+    /// If set, `Client` will connect to /blob in the current component's namespace with
+    /// OPEN_RIGHT_EXECUTABLE.
+    pub fn executable(self) -> Self {
+        Self { executable: true, ..self }
+    }
+}
+
+impl Client {
+    /// Create an empty `ClientBuilder`
+    pub fn builder() -> ClientBuilder {
+        Default::default()
+    }
+}
 /// Blobfs client
 #[derive(Debug, Clone)]
 pub struct Client {
     dir: fio::DirectoryProxy,
-    blob_creator: Option<ffxfs::BlobCreatorProxy>,
+    creator: Option<ffxfs::BlobCreatorProxy>,
+    reader: Option<ffxfs::BlobReaderProxy>,
 }
 
 impl Client {
-    /// Returns a client connected to /blob in the current component's namespace with
-    /// OPEN_RIGHT_READABLE and OPEN_RIGHT_EXECUTABLE.
-    /// Does not use fuchsia.fxfs/BlobCreator.
-    pub fn open_from_namespace_rx() -> Result<Self, BlobfsError> {
-        let dir = fuchsia_fs::directory::open_in_namespace(
-            "/blob",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
-        Ok(Client { dir, blob_creator: None })
-    }
-
-    /// Returns a client connected to /blob in the current component's namespace with
-    /// OPEN_RIGHT_READABLE, OPEN_RIGHT_WRITABLE, and OPEN_RIGHT_EXECUTABLE.
-    /// Uses /blob for writes, does not connect to fuchsia.fxfs/BlobCreator.
-    pub fn open_from_namespace_rwx() -> Result<Self, BlobfsError> {
-        let dir = fuchsia_fs::directory::open_in_namespace(
-            "/blob",
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
-        Ok(Client { dir, blob_creator: None })
-    }
-
-    /// Returns a client connected to /blob in the current component's namespace with
-    /// OPEN_RIGHT_READABLE, OPEN_RIGHT_WRITABLE, and OPEN_RIGHT_EXECUTABLE.
-    /// Connects to and uses fuchsia.fxfs/BlobCreator for writes.
-    /// WRITABLE is needed so that `delete_blob` can call fuchsia.io/Directory.Unlink.
-    pub fn open_from_namespace_rwx_use_fxblob() -> Result<Self, BlobfsError> {
-        let mut ret = Self::open_from_namespace_rwx()?;
-        ret.blob_creator = Some(
-            fuchsia_component::client::connect_to_protocol::<ffxfs::BlobCreatorMarker>()
-                .map_err(BlobfsError::ConnectToBlobCreator)?,
-        );
-        Ok(ret)
-    }
-
-    /// Returns a client connected to the given blob directory and BlobCreatorProxy.
-    /// If `blob_creator` is not supplied, writes will be performed through the blob directory.
-    pub fn new(dir: fio::DirectoryProxy, blob_creator: Option<ffxfs::BlobCreatorProxy>) -> Self {
-        Client { dir, blob_creator }
+    /// Returns a client connected to the given blob directory, BlobCreatorProxy, and
+    /// BlobReaderProxy. If `vmex` is passed in, sets the VmexResource, which is used to mark blobs
+    /// as executable. If `creator` or `reader` is not supplied, writes or reads respectively will
+    /// be performed through the blob directory.
+    pub fn new(
+        dir: fio::DirectoryProxy,
+        creator: Option<ffxfs::BlobCreatorProxy>,
+        reader: Option<ffxfs::BlobReaderProxy>,
+        vmex: Option<zx::Resource>,
+    ) -> Result<Self, anyhow::Error> {
+        if let Some(vmex) = vmex {
+            vmo_blob::init_vmex_resource(vmex)?;
+        }
+        Ok(Self { dir, creator, reader })
     }
 
     /// Creates a new client backed by the returned request stream. This constructor should not be
@@ -139,7 +234,7 @@ impl Client {
         let (dir, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
 
-        (Self { dir, blob_creator: None }, stream)
+        (Self { dir, creator: None, reader: None }, stream)
     }
 
     /// Creates a new client backed by the returned mock. This constructor should not be used
@@ -152,17 +247,51 @@ impl Client {
         let (dir, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
 
-        (Self { dir, blob_creator: None }, mock::Mock { stream })
+        (Self { dir, creator: None, reader: None }, mock::Mock { stream })
     }
 
-    /// Forward an open request directly to BlobFs.
-    pub fn forward_open(
+    /// Open a blob for read. `scope` will only be used if the client was configured to use
+    /// fuchsia.fxfs.BlobReader.
+    pub fn open_blob_for_read(
         &self,
         blob: &Hash,
         flags: fio::OpenFlags,
+        scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
-        self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+        if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            send_on_open_with_error(describe, server_end, zx::Status::ACCESS_DENIED);
+            return Ok(());
+        }
+        if let Some(reader) = &self.reader {
+            let hash = blob.clone();
+            let scope_clone = scope.clone();
+            let reader = reader.clone();
+
+            scope.spawn(async move {
+                let vmo = match reader.get_vmo(&hash.into()).await {
+                    Err(e) => {
+                        error!("Transport error on get_vmo: {:?}", e);
+                        return send_on_open_with_error(describe, server_end, zx::Status::INTERNAL);
+                    }
+                    Ok(Err(e)) => {
+                        warn!("Failed to get vmo: {:?}", zx::Status::from_raw(e));
+                        return send_on_open_with_error(
+                            describe,
+                            server_end,
+                            zx::Status::from_raw(e),
+                        );
+                    }
+                    Ok(Ok(vmo)) => vmo,
+                };
+                let blob = Arc::new(vmo_blob::VmoBlob::new(vmo));
+                let () = blob.open(scope_clone, flags, Path::dot(), server_end);
+            });
+        } else {
+            return self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end);
+        }
+        Ok(())
     }
 
     /// Returns the list of known blobs in blobfs.
@@ -185,39 +314,13 @@ impl Client {
             .map_err(|s| BlobfsError::Unlink(Status::from_raw(s)))
     }
 
-    /// Open the blob for reading.
-    pub async fn open_blob_for_read(
-        &self,
-        blob: &Hash,
-    ) -> Result<fio::FileProxy, fuchsia_fs::node::OpenError> {
-        fuchsia_fs::directory::open_file(
-            &self.dir,
-            &blob.to_string(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-    }
-
-    /// Open the blob for reading. The target is not verified to be any
-    /// particular type and may not implement the fuchsia.io.File protocol.
-    pub fn open_blob_for_read_no_describe(
-        &self,
-        blob: &Hash,
-    ) -> Result<fio::FileProxy, fuchsia_fs::node::OpenError> {
-        fuchsia_fs::directory::open_file_no_describe(
-            &self.dir,
-            &blob.to_string(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-    }
-
     /// Open a new blob for write.
     pub async fn open_blob_for_write(
         &self,
         blob: &Hash,
         blob_type: fpkg::BlobType,
     ) -> Result<fpkg::BlobWriter, CreateError> {
-        Ok(if let Some(blob_creator) = &self.blob_creator {
+        Ok(if let Some(blob_creator) = &self.creator {
             // FxBlob only supports Delivery blobs.
             if blob_type != fpkg::BlobType::Delivery {
                 return Err(CreateError::UnsupportedBlobType(blob_type));
@@ -259,57 +362,63 @@ impl Client {
 
     /// Returns whether blobfs has a blob with the given hash.
     pub async fn has_blob(&self, blob: &Hash) -> bool {
-        let file = match fuchsia_fs::directory::open_file_no_describe(
-            &self.dir,
-            &blob.to_string(),
-            fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
-        ) {
-            Ok(file) => file,
-            Err(_) => return false,
-        };
-
-        let mut events = file.take_event_stream();
-
-        let event = match events.next().await {
-            None => return false,
-            Some(event) => match event {
+        if let Some(reader) = &self.reader {
+            // TODO(https://fxbug.dev/295552228): Use faster API for determining blob presence.
+            matches!(reader.get_vmo(blob).await, Ok(Ok(_)))
+        } else {
+            let file = match fuchsia_fs::directory::open_file_no_describe(
+                &self.dir,
+                &blob.to_string(),
+                fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
+            ) {
+                Ok(file) => file,
                 Err(_) => return false,
-                Ok(event) => match event {
-                    fio::FileEvent::OnOpen_ { s, info } => {
-                        if Status::from_raw(s) != Status::OK {
-                            return false;
-                        }
+            };
 
-                        match info {
-                            Some(info) => match *info {
-                                fio::NodeInfoDeprecated::File(fio::FileObject {
-                                    event: Some(event),
-                                    stream: _, // TODO(fxbug.dev/122125): Use stream
-                                }) => event,
+            let mut events = file.take_event_stream();
+
+            let event = match events.next().await {
+                None => return false,
+                Some(event) => match event {
+                    Err(_) => return false,
+                    Ok(event) => match event {
+                        fio::FileEvent::OnOpen_ { s, info } => {
+                            if Status::from_raw(s) != Status::OK {
+                                return false;
+                            }
+
+                            match info {
+                                Some(info) => match *info {
+                                    fio::NodeInfoDeprecated::File(fio::FileObject {
+                                        event: Some(event),
+                                        stream: _, // TODO(https://fxbug.dev/293606235): Use stream
+                                    }) => event,
+                                    _ => return false,
+                                },
                                 _ => return false,
-                            },
-                            _ => return false,
+                            }
                         }
-                    }
-                    fio::FileEvent::OnRepresentation { payload } => match payload {
-                        fio::Representation::File(fio::FileInfo {
-                            observer: Some(event), ..
-                        }) => event,
-                        _ => return false,
+                        fio::FileEvent::OnRepresentation { payload } => match payload {
+                            fio::Representation::File(fio::FileInfo {
+                                observer: Some(event),
+                                ..
+                            }) => event,
+                            _ => return false,
+                        },
                     },
                 },
-            },
-        };
+            };
 
-        // Check that the USER_0 signal has been asserted on the file's event to make sure we
-        // return false on the edge case of the blob is current being written.
-        match event.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST) {
-            Ok(_) => true,
-            Err(status) => {
-                if status != Status::TIMED_OUT {
-                    warn!("blobfs: unknown error asserting blob existence: {}", status);
+            // Check that the USER_0 signal has been asserted on the file's event to make sure we
+            // return false on the edge case of the blob is current being written.
+            match event.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST) {
+                Ok(_) => true,
+                Err(status) => {
+                    if status != Status::TIMED_OUT {
+                        warn!("blobfs: unknown error asserting blob existence: {}", status);
+                    }
+                    false
                 }
-                false
             }
         }
     }
@@ -376,7 +485,13 @@ impl Client {
     ///
     /// Panics on error.
     pub fn for_ramdisk(blobfs: &blobfs_ramdisk::BlobfsRamdisk) -> Self {
-        Self::new(blobfs.root_dir_proxy().unwrap(), blobfs.blob_creator_proxy().unwrap())
+        Self::new(
+            blobfs.root_dir_proxy().unwrap(),
+            blobfs.blob_creator_proxy().unwrap(),
+            blobfs.blob_reader_proxy().unwrap(),
+            None,
+        )
+        .unwrap()
     }
 }
 
@@ -472,6 +587,18 @@ mod tests {
             true
         );
         assert_eq!(client.has_blob(&Hash::from([1; 32])).await, false);
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn has_blob_fxblob() {
+        let blobfs =
+            BlobfsRamdisk::builder().fxblob().with_blob(&b"blob 1"[..]).start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        assert!(client.has_blob(&MerkleTree::from_reader(&b"blob 1"[..]).unwrap().root()).await);
+        assert!(!client.has_blob(&Hash::from([1; 32])).await);
 
         blobfs.stop().await.unwrap();
     }
@@ -793,10 +920,14 @@ mod tests {
     async fn open_blob_for_write_uses_fxblob_if_configured() {
         let (blob_creator, mut blob_creator_stream) =
             fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
+        let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>().unwrap();
         let client = Client::new(
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
             Some(blob_creator),
-        );
+            Some(blob_reader),
+            None,
+        )
+        .unwrap();
 
         fuchsia_async::Task::spawn(async move {
             match blob_creator_stream.next().await.unwrap().unwrap() {
@@ -819,10 +950,15 @@ mod tests {
     async fn open_blob_for_write_fxblob_maps_already_exists() {
         let (blob_creator, mut blob_creator_stream) =
             fidl::endpoints::create_proxy_and_stream::<ffxfs::BlobCreatorMarker>().unwrap();
+        let (blob_reader, _) = fidl::endpoints::create_proxy::<ffxfs::BlobReaderMarker>().unwrap();
+
         let client = Client::new(
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
             Some(blob_creator),
-        );
+            Some(blob_reader),
+            None,
+        )
+        .unwrap();
 
         fuchsia_async::Task::spawn(async move {
             match blob_creator_stream.next().await.unwrap().unwrap() {

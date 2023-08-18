@@ -66,9 +66,29 @@ fuchsia_test_package("pkgdir-integration-tests") {
   ]
 }
 
+fuchsia_test_package("pkgdir-integration-tests-fxblob") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_components = [ ":test-root" ]
+  subpackages = [ ":pkgdir-tests" ]
+  renameable_subpackages = [
+    {
+      name = "test_realm_proxy"
+      package =
+          "//src/sys/pkg/tests/pkgdir/test_realm_proxy:test_realm_proxy_fxblob"
+    },
+  ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":pkgdir-integration-tests" ]
+  deps = [
+    ":pkgdir-integration-tests",
+    ":pkgdir-integration-tests-fxblob",
+  ]
 }
 
 group("ctf-tests") {

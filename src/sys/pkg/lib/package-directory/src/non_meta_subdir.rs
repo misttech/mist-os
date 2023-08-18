@@ -78,9 +78,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
 
         if let Some(blob) = self.root_dir.non_meta_files.get(&file_path) {
             let () =
-                self.root_dir.non_meta_storage.open(blob, flags, server_end).unwrap_or_else(|e| {
-                    error!("Error forwarding content blob open to blobfs: {:#}", anyhow!(e))
-                });
+                self.root_dir.non_meta_storage.open(blob, flags, scope, server_end).unwrap_or_else(
+                    |e| error!("Error forwarding content blob open to blobfs: {:#}", anyhow!(e)),
+                );
             return;
         }
 

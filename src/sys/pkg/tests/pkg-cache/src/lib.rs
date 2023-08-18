@@ -305,6 +305,7 @@ trait Blobfs {
     fn root_proxy(&self) -> fio::DirectoryProxy;
     fn svc_dir(&self) -> fio::DirectoryProxy;
     fn blob_creator_proxy(&self) -> Option<ffxfs::BlobCreatorProxy>;
+    fn blob_reader_proxy(&self) -> Option<ffxfs::BlobReaderProxy>;
 }
 
 impl Blobfs for BlobfsRamdisk {
@@ -316,6 +317,9 @@ impl Blobfs for BlobfsRamdisk {
     }
     fn blob_creator_proxy(&self) -> Option<ffxfs::BlobCreatorProxy> {
         self.blob_creator_proxy().unwrap()
+    }
+    fn blob_reader_proxy(&self) -> Option<ffxfs::BlobReaderProxy> {
+        self.blob_reader_proxy().unwrap()
     }
 }
 
@@ -823,8 +827,13 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     async fn write_to_blobfs(&self, hash: &Hash, contents: &[u8]) {
-        let blobfs =
-            blobfs::Client::new(self.blobfs.root_proxy(), self.blobfs.blob_creator_proxy());
+        let blobfs = blobfs::Client::new(
+            self.blobfs.root_proxy(),
+            self.blobfs.blob_creator_proxy(),
+            self.blobfs.blob_reader_proxy(),
+            None,
+        )
+        .unwrap();
         // c++blobfs supports uncompressed and delivery blobs and FxBlob only supports delivery
         // blobs, so we always write delivery blobs.
         let () = compress_and_write_blob(

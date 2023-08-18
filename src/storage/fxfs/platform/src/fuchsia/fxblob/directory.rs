@@ -82,14 +82,11 @@ impl RootDir for BlobDirectory {
                 BlobCreatorRequest::Create { responder, hash, .. } => {
                     // TODO(fxbug.dev/129357): Figure out how we handle concurrent writes to the
                     // same blob.
-                    responder
-                        .send(self.create_blob(Hash::from(hash)).await.map_err(|error| {
-                            tracing::error!(?error, "blob service: create failed");
-                            error
-                        }))
-                        .unwrap_or_else(|error| {
+                    responder.send(self.create_blob(Hash::from(hash)).await).unwrap_or_else(
+                        |error| {
                             tracing::error!(?error, "failed to send Create response");
-                        });
+                        },
+                    );
                 }
             }
         }

@@ -108,12 +108,11 @@ async fn main_inner() -> Result<(), Error> {
     };
 
     let mut package_index = PackageIndex::new(inspector.root().create_child("index"));
-    let blobfs = if use_fxblob {
-        blobfs::Client::open_from_namespace_rwx_use_fxblob()
-    } else {
-        blobfs::Client::open_from_namespace_rwx()
-    }
-    .context("error opening blobfs")?;
+    let builder = blobfs::Client::builder().readable().writable().executable();
+    let blobfs = if use_fxblob { builder.use_creator() } else { builder }
+        .build()
+        .await
+        .context("error opening blobfs")?;
 
     let (system_image, executability_restrictions, base_packages, cache_packages) =
         if use_system_image {

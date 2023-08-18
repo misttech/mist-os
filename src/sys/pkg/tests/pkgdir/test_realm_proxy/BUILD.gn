@@ -30,6 +30,33 @@ rustc_binary("bin") {
   ]
 }
 
+rustc_binary("bin-fxblob") {
+  testonly = true
+  name = "test_realm_proxy_fxblob"
+  visibility = [ ":*" ]
+  edition = "2021"
+  sources = [ "src/main.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/storage/vfs/rust:vfs",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/fxfs:fxfs_component",
+    "//src/sys/pkg/lib/fuchsia-pkg-testing",
+    "//src/sys/pkg/lib/package-directory",
+    "//src/sys/pkg/testing/blobfs-ramdisk",
+    "//src/testing/realm_proxy",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  features = [ "use_fxblob" ]
+}
+
 fuchsia_component("test_realm_proxy_component") {
   testonly = true
   visibility = [ ":*" ]
@@ -38,7 +65,23 @@ fuchsia_component("test_realm_proxy_component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_component("test_realm_proxy_component_fxblob") {
+  testonly = true
+  visibility = [ ":*" ]
+  component_name = "default"
+  manifest = "meta/default-fxblob.cml"
+  deps = [
+    ":bin-fxblob",
+    "//src/sys/pkg/bin/pm:pm_bin",
+  ]
+}
+
 fuchsia_package("test_realm_proxy") {
   testonly = true
   deps = [ ":test_realm_proxy_component" ]
+}
+
+fuchsia_package("test_realm_proxy_fxblob") {
+  testonly = true
+  deps = [ ":test_realm_proxy_component_fxblob" ]
 }

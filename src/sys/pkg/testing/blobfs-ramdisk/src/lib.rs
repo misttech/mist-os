@@ -272,6 +272,21 @@ impl ServingFilesystem {
         })
     }
 
+    /// None if the filesystem does not support the API.
+    fn blob_reader_proxy(&self) -> Result<Option<ffxfs::BlobReaderProxy>, Error> {
+        Ok(match self.svc_dir()? {
+            Some(d) => {
+                Some(
+                    fuchsia_component::client::connect_to_protocol_at_dir_root::<
+                        ffxfs::BlobReaderMarker,
+                    >(&d)
+                    .context("connecting to fuchsia.fxfs.BlobReader")?,
+                )
+            }
+            None => None,
+        })
+    }
+
     fn implementation(&self) -> Implementation {
         match self {
             Self::SingleVolume(_) => Implementation::CppBlobfs,
@@ -297,7 +312,13 @@ impl BlobfsRamdisk {
     ///
     /// Panics on error
     pub fn client(&self) -> blobfs::Client {
-        blobfs::Client::new(self.root_dir_proxy().unwrap(), self.blob_creator_proxy().unwrap())
+        blobfs::Client::new(
+            self.root_dir_proxy().unwrap(),
+            self.blob_creator_proxy().unwrap(),
+            self.blob_reader_proxy().unwrap(),
+            None,
+        )
+        .unwrap()
     }
 
     /// Returns a new connection to blobfs's root directory as a raw zircon channel.
@@ -425,6 +446,12 @@ impl BlobfsRamdisk {
     /// implementation does not support it.
     pub fn blob_creator_proxy(&self) -> Result<Option<ffxfs::BlobCreatorProxy>, Error> {
         self.fs.blob_creator_proxy()
+    }
+
+    /// Returns a new connection to blobfs's fuchsia.fxfs/BlobReader API, or None if the
+    /// implementation does not support it.
+    pub fn blob_reader_proxy(&self) -> Result<Option<ffxfs::BlobReaderProxy>, Error> {
+        self.fs.blob_reader_proxy()
     }
 }
 
@@ -729,6 +756,15 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn blobfs_does_not_support_blob_reader_api() {
+        let blobfs = BlobfsRamdisk::builder().cpp_blobfs().start().await.unwrap();
+
+        assert!(blobfs.blob_reader_proxy().unwrap().is_none());
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn fxblob_read_and_write() {
         let blobfs = BlobfsRamdisk::builder().fxblob().start().await.unwrap();
         let root = blobfs.root_dir().unwrap();
@@ -765,6 +801,25 @@ mod tests {
         let () = blob_writer.write(&compressed_data).await.unwrap();
 
         assert_eq!(list_blobs(&root), vec![hash.to_string()]);
+
+        drop(root);
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn fxblob_blob_reader_api() {
+        let data = "Hello blobfs!".as_bytes();
+        let hash = fuchsia_merkle::MerkleTree::from_reader(data).unwrap().root();
+        let blobfs = BlobfsRamdisk::builder().fxblob().with_blob(data).start().await.unwrap();
+
+        let root = blobfs.root_dir().unwrap();
+        assert_eq!(list_blobs(&root), vec![hash.to_string()]);
+
+        let blob_reader = blobfs.blob_reader_proxy().unwrap().unwrap();
+        let vmo = blob_reader.get_vmo(&hash.into()).await.unwrap().unwrap();
+        let mut buf = vec![0; vmo.get_content_size().unwrap() as usize];
+        let () = vmo.read(&mut buf, 0).unwrap();
+        assert_eq!(buf, data);
 
         drop(root);
         blobfs.stop().await.unwrap();
