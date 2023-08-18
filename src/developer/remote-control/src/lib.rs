@@ -17,9 +17,7 @@ use {
     fuchsia_zircon as zx,
     futures::future::join,
     futures::prelude::*,
-    moniker::{Moniker, MonikerBase},
-    selector_maps::{MappingError, SelectorMappingList},
-    selectors::{StringSelector, TreeSelector},
+    moniker::Moniker,
     std::{borrow::Borrow, cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, rc::Weak},
     tracing::*,
 };
@@ -30,7 +28,6 @@ pub struct RemoteControlService {
     ids: RefCell<Vec<Weak<RefCell<Vec<u64>>>>>,
     id_allocator: fn() -> Result<HostIdentifier>,
     connector: Box<dyn Fn(fidl::Socket)>,
-    maps: SelectorMappingList,
     moniker_map: HashMap<String, String>,
 }
 
@@ -46,8 +43,8 @@ struct Client {
 
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
-        let (list, moniker_map) = join(Self::load_selector_map(), Self::load_moniker_map()).await;
-        Self::new_with_allocator_and_maps(connector, || HostIdentifier::new(), list, moniker_map)
+        let moniker_map = Self::load_moniker_map().await;
+        Self::new_with_allocator(connector, || HostIdentifier::new(), moniker_map)
     }
 
     async fn load_moniker_map() -> HashMap<String, String> {
@@ -77,46 +74,12 @@ impl RemoteControlService {
         }
     }
 
-    async fn load_selector_map() -> SelectorMappingList {
-        let f = match fuchsia_fs::file::open_in_namespace(
-            "/pkg/data/selector-maps.json",
-            io::OpenFlags::RIGHT_READABLE,
-        ) {
-            Ok(f) => f,
-            Err(e) => {
-                error!(%e, "failed to open selector maps json file");
-                return SelectorMappingList::default();
-            }
-        };
-        let bytes = match fuchsia_fs::file::read(&f).await {
-            Ok(b) => b,
-            Err(e) => {
-                error!(?e, "failed to read bytes from selector maps json");
-                return SelectorMappingList::default();
-            }
-        };
-        match serde_json::from_slice(bytes.as_slice()) {
-            Ok(m) => m,
-            Err(e) => {
-                error!(?e, "failed to parse selector map json");
-                SelectorMappingList::default()
-            }
-        }
-    }
-
-    pub(crate) fn new_with_allocator_and_maps(
+    pub(crate) fn new_with_allocator(
         connector: impl Fn(fidl::Socket) + 'static,
         id_allocator: fn() -> Result<HostIdentifier>,
-        maps: SelectorMappingList,
         moniker_map: HashMap<String, String>,
     ) -> Self {
-        Self {
-            id_allocator,
-            ids: Default::default(),
-            connector: Box::new(connector),
-            maps,
-            moniker_map,
-        }
+        Self { id_allocator, ids: Default::default(), connector: Box::new(connector), moniker_map }
     }
 
     // Some of the ID-lists may be gone because old clients have shut down.
@@ -176,11 +139,6 @@ impl RemoteControlService {
                         .connect_capability(moniker, capability_name, flags, server_chan)
                         .await,
                 )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::Connect { selector, service_chan, responder } => {
-                let response = self.clone().connect_to_service(selector, service_chan).await;
-                responder.send(response.as_ref().map_err(|e| *e))?;
                 Ok(())
             }
             rcs::RemoteControlRequest::RootRealmExplorer { server, responder } => {
@@ -401,26 +359,6 @@ impl RemoteControlService {
         self.moniker_map.get(&moniker).cloned().unwrap_or(moniker)
     }
 
-    pub(crate) fn map_selector(
-        self: &Rc<Self>,
-        selector: diagnostics::Selector,
-    ) -> Result<diagnostics::Selector, rcs::ConnectError> {
-        self.maps.map_selector(selector.clone()).map_err(|e| {
-            match e {
-                MappingError::BadSelector(selector_str, err) => {
-                    error!(?selector, ?selector_str, %err, "got invalid selector mapping");
-                }
-                MappingError::BadInputSelector(err) => {
-                    error!(%err, "input selector invalid");
-                }
-                MappingError::Unbounded => {
-                    error!(?selector, %e, "got a cycle in mapping selector");
-                }
-            }
-            rcs::ConnectError::ServiceRerouteFailed
-        })
-    }
-
     pub async fn identify_host(
         self: &Rc<Self>,
         responder: rcs::RemoteControlIdentifyHostResponder,
@@ -489,74 +427,11 @@ impl RemoteControlService {
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })?;
 
-        let moniker = parse_moniker(moniker).ok_or(rcs::ConnectCapabilityError::InvalidMoniker)?;
+        let moniker = Moniker::try_from(moniker.as_str())
+            .map_err(|_| rcs::ConnectCapabilityError::InvalidMoniker)?;
         connect_to_exposed_capability(moniker, capability_name, server_end, flags, lifecycle, query)
             .await
     }
-
-    /// Connects to an exposed capability identified by the given selector.
-    async fn connect_to_service(
-        self: &Rc<Self>,
-        selector: diagnostics::Selector,
-        server_end: zx::Channel,
-    ) -> Result<rcs::ServiceMatch, rcs::ConnectError> {
-        // If applicable, get a remapped selector
-        let selector = self.map_selector(selector)?;
-
-        // Connect to the root LifecycleController protocol
-        let lifecycle = connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
-            "/svc/fuchsia.sys2.LifecycleController.root",
-        )
-        .map_err(|err| {
-            error!(%err, "could not connect to lifecycle controller");
-            rcs::ConnectError::ServiceConnectFailed
-        })?;
-
-        // Connect to the root RealmQuery protocol
-        let query = connect_to_protocol_at_path::<fsys::RealmQueryMarker>(
-            "/svc/fuchsia.sys2.RealmQuery.root",
-        )
-        .map_err(|err| {
-            error!(%err, "could not connect to realm query");
-            rcs::ConnectError::ServiceConnectFailed
-        })?;
-
-        let (moniker, protocol_name) = extract_moniker_and_protocol_from_selector(selector)
-            .ok_or(rcs::ConnectError::ServiceConnectFailed)?;
-        let moniker_parts = moniker.path().iter().map(|part| part.to_string()).collect();
-
-        connect_to_exposed_capability(
-            moniker,
-            protocol_name.clone(),
-            server_end,
-            io::OpenFlags::empty(),
-            lifecycle,
-            query,
-        )
-        .await
-        .map_err(|err| match err {
-            rcs::ConnectCapabilityError::NoMatchingComponent => {
-                rcs::ConnectError::NoMatchingServices
-            }
-            rcs::ConnectCapabilityError::CapabilityConnectFailed => {
-                rcs::ConnectError::ServiceConnectFailed
-            }
-            rcs::ConnectCapabilityError::NoMatchingCapabilities => {
-                rcs::ConnectError::NoMatchingServices
-            }
-            _ => unreachable!("we only emit the errors above"),
-        })?;
-
-        Ok(rcs::ServiceMatch {
-            moniker: moniker_parts,
-            subdir: "expose".to_string(),
-            service: protocol_name,
-        })
-    }
-}
-
-fn parse_moniker(moniker: String) -> Option<Moniker> {
-    Moniker::try_from(moniker.as_str()).ok()
 }
 
 async fn connect_to_exposed_capability(
@@ -589,41 +464,6 @@ async fn connect_to_exposed_capability(
 
     connect_to_capability_in_exposed_dir(&exposed_dir, &capability_name, server_end, flags).await?;
     Ok(())
-}
-
-fn extract_moniker_and_protocol_from_selector(
-    selector: diagnostics::Selector,
-) -> Option<(Moniker, String)> {
-    // Construct the moniker from the selector
-    let moniker_segments = selector.component_selector?.moniker_segments?;
-    let mut children = vec![];
-    for segment in moniker_segments {
-        let child = segment.exact_match()?.to_string();
-        children.push(child);
-    }
-    let moniker = format!("./{}", children.join("/"));
-
-    let tree_selector = selector.tree_selector?;
-
-    // Namespace must be `expose`. Nothing else is supported.
-    let namespace = tree_selector.node_path()?.get(0)?.exact_match()?;
-    if namespace != "expose" {
-        return None;
-    }
-
-    // Get the protocol name
-    let property_selector = tree_selector.property()?;
-    let protocol_name = property_selector.exact_match()?.to_string();
-
-    // Make sure the moniker is valid
-    let moniker = Moniker::try_from(moniker.as_str())
-        .map_err(|err| {
-            error!(%err, "moniker invalid");
-            err
-        })
-        .ok()?;
-
-    Some((moniker, protocol_name))
 }
 
 async fn connect_to_capability_in_exposed_dir(
@@ -758,15 +598,11 @@ async fn forward_traffic(
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
-        fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio,
-        fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
-        fuchsia_component::server::ServiceFs,
-        fuchsia_zircon as zx,
-        selectors::{parse_selector, VerboseError},
-        std::net::Ipv4Addr,
+        super::*, assert_matches::assert_matches, fidl_fuchsia_buildinfo as buildinfo,
+        fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_device as fdevice,
+        fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
+        fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_component::server::ServiceFs,
+        fuchsia_zircon as zx, std::net::Ipv4Addr,
     };
 
     const NODENAME: &'static str = "thumb-set-human-shred";
@@ -774,11 +610,11 @@ mod tests {
     const SERIAL: &'static str = "test_serial";
     const BOARD_CONFIG: &'static str = "test_board_name";
     const PRODUCT_CONFIG: &'static str = "core";
-    const FAKE_SERVICE_SELECTOR: &'static str = "my/component:expose:some.fake.Service";
-    const MAPPED_SERVICE_SELECTOR: &'static str = "my/other/component:out:some.fake.mapped.Service";
 
     const IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];
     const IPV6_ADDR: [u8; 16] = [127, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6];
+    const FAKE_SERVICE_MONIKER: &'static str = "my/component";
+    const MAPPED_SERVICE_MONIKER: &'static str = "my/other/component";
 
     fn setup_fake_device_service() -> hwinfo::DeviceProxy {
         let (proxy, mut stream) =
@@ -918,14 +754,11 @@ mod tests {
     }
 
     fn make_rcs() -> Rc<RemoteControlService> {
-        make_rcs_with_maps(vec![], HashMap::default())
+        make_rcs_with_maps(HashMap::default())
     }
 
-    fn make_rcs_with_maps(
-        maps: Vec<(&str, &str)>,
-        moniker_map: HashMap<String, String>,
-    ) -> Rc<RemoteControlService> {
-        Rc::new(RemoteControlService::new_with_allocator_and_maps(
+    fn make_rcs_with_maps(moniker_map: HashMap<String, String>) -> Rc<RemoteControlService> {
+        Rc::new(RemoteControlService::new_with_allocator(
             |_| (),
             || {
                 Ok(HostIdentifier {
@@ -936,9 +769,6 @@ mod tests {
                     boot_timestamp_nanos: BOOT_TIME,
                 })
             },
-            SelectorMappingList::new(
-                maps.iter().map(|s| (s.0.to_string(), s.1.to_string())).collect(),
-            ),
             moniker_map,
         ))
     }
@@ -1004,31 +834,6 @@ mod tests {
             }
         })
         .unwrap()
-    }
-
-    #[fuchsia::test]
-    async fn test_extract_moniker_protocol() -> Result<()> {
-        let selector =
-            parse_selector::<VerboseError>("core/my_component:expose:fuchsia.foo.bar").unwrap();
-        let (moniker, protocol) = extract_moniker_and_protocol_from_selector(selector).unwrap();
-
-        assert_eq!(moniker, Moniker::try_from("./core/my_component").unwrap());
-        assert_eq!(protocol, "fuchsia.foo.bar");
-
-        for selector in [
-            "*:*:*",
-            "core/my_component:expose",
-            "core/my_component:expose:*",
-            "*:expose:fuchsia.foo.bar",
-            "core/my_component:*:fuchsia.foo.bar",
-            "core/my_component:out:fuchsia.foo.bar",
-            "core/my_component:in:fuchsia.foo.bar",
-        ] {
-            let selector = parse_selector::<VerboseError>(selector).unwrap();
-            assert!(extract_moniker_and_protocol_from_selector(selector).is_none());
-        }
-
-        Ok(())
     }
 
     #[fuchsia::test]
@@ -1118,77 +923,17 @@ mod tests {
         Ok(())
     }
 
-    fn service_selector() -> diagnostics::Selector {
-        parse_selector::<VerboseError>(FAKE_SERVICE_SELECTOR).unwrap()
-    }
-
-    fn mapped_service_selector() -> diagnostics::Selector {
-        parse_selector::<VerboseError>(MAPPED_SERVICE_SELECTOR).unwrap()
-    }
-
-    #[fuchsia::test]
-    async fn test_map_selector() -> Result<()> {
-        let service = make_rcs_with_maps(
-            vec![(FAKE_SERVICE_SELECTOR, MAPPED_SERVICE_SELECTOR)],
-            HashMap::default(),
-        );
-
-        assert_eq!(service.map_selector(service_selector()).unwrap(), mapped_service_selector());
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_map_selector_broken_mapping() -> Result<()> {
-        let service = make_rcs_with_maps(
-            vec![(FAKE_SERVICE_SELECTOR, "not_a_selector:::::")],
-            HashMap::default(),
-        );
-
-        assert_matches!(
-            service.map_selector(service_selector()).unwrap_err(),
-            rcs::ConnectError::ServiceRerouteFailed
-        );
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_map_selector_unbounded_mapping() -> Result<()> {
-        let service = make_rcs_with_maps(
-            vec![
-                (FAKE_SERVICE_SELECTOR, MAPPED_SERVICE_SELECTOR),
-                (MAPPED_SERVICE_SELECTOR, FAKE_SERVICE_SELECTOR),
-            ],
-            HashMap::default(),
-        );
-
-        assert_matches!(
-            service.map_selector(service_selector()).unwrap_err(),
-            rcs::ConnectError::ServiceRerouteFailed
-        );
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_map_selector_no_matches() -> Result<()> {
-        let service = make_rcs_with_maps(
-            vec![("not/a/match:out:some.Service", MAPPED_SERVICE_SELECTOR)],
-            HashMap::default(),
-        );
-
-        assert_eq!(service.map_selector(service_selector()).unwrap(), service_selector());
-        Ok(())
-    }
-
     #[fuchsia::test]
     async fn test_map_moniker() -> Result<()> {
-        let map = [(FAKE_SERVICE_SELECTOR.to_string(), MAPPED_SERVICE_SELECTOR.to_string())]
+        let map = [(FAKE_SERVICE_MONIKER.to_string(), MAPPED_SERVICE_MONIKER.to_string())]
             .into_iter()
             .collect();
-        let service = make_rcs_with_maps(vec![], map);
-        assert_eq!(service.map_moniker(FAKE_SERVICE_SELECTOR.to_string()), MAPPED_SERVICE_SELECTOR);
 
-        let service = make_rcs_with_maps(vec![], HashMap::new());
-        assert_eq!(service.map_moniker(FAKE_SERVICE_SELECTOR.to_string()), FAKE_SERVICE_SELECTOR);
+        let service = make_rcs_with_maps(map);
+        assert_eq!(service.map_moniker(FAKE_SERVICE_MONIKER.to_string()), MAPPED_SERVICE_MONIKER);
+
+        let service = make_rcs_with_maps(HashMap::new());
+        assert_eq!(service.map_moniker(FAKE_SERVICE_MONIKER.to_string()), FAKE_SERVICE_MONIKER);
         Ok(())
     }
 

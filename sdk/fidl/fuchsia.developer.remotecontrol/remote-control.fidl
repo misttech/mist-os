@@ -74,17 +74,6 @@ closed protocol RemoteControl {
         response IdentifyHostResponse;
     }) error IdentifyHostError;
 
-    // Connects a channel to a service, given a selector and a channel iff the selector
-    // matches exactly one service on the system.
-    // If successful, returns information about the service connected to.
-    @deprecated("Please use `ConnectCapability`")
-    strict Connect(resource struct {
-        selector diagnostics.Selector;
-        service_chan zx.Handle:CHANNEL;
-    }) -> (struct {
-        match ServiceMatch;
-    }) error ConnectError;
-
     // Connects a channel to a service, given a moniker and a channel iff the
     // component identified by the given moniker exposes a capability of the
     // requested name.

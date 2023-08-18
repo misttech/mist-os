@@ -250,20 +250,20 @@ dependencies or mappings:
 You can simply add the above proxies to your plugin's parameter list to access
 them  in your implementation.
 
-### Proxy selector maps {#selector-maps}
+### Proxy moniker map {#moniker-map}
 
 `ffx` and the Remote Control Service (RCS) provide a mechanism for maintaining
-compatibility with existing selectors used by `ffx` plugins if the selector
+compatibility with existing monikers used by `ffx` plugins if the moniker
 representing a given FIDL proxy changes. For example:
 
 -   The FIDL proxy is provided by a new component
 -   The FIDL protocol name changes
--   The proxy selector varies across product builds
+-   The proxy moniker varies across product builds
 
-RCS supports this using *selector maps* that override the selectors defined in
+RCS supports this using *moniker maps* that override the monikers defined in
 an `ffx` plugin's source and map it to a different value. To override a given
-selector, add an entry to
-[`//src/developer/remote-control/data/selector-maps.json`][selector-maps]
+moniker, add an entry to
+[`//src/developer/remote-control/data/moniker-map.json`][moniker-map]
 in the following format:
 
 ```json {:.devsite-disable-click-to-copy}
@@ -282,4 +282,4 @@ the mapping.
 [ffx-build]: /src/developer/ffx/BUILD.gn
 [overnet]: /src/connectivity/overnet/
 [rust-testing]: /docs/development/languages/rust/testing.md
-[selector-maps]: /src/developer/remote-control/data/selector-maps.json
+[moniker-map]: /src/developer/remote-control/data/moniker-map.json

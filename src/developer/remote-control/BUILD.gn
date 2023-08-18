@@ -19,11 +19,6 @@ group("remote-control") {
   ]
 }
 
-resource("selector-maps") {
-  sources = [ "data/selector-maps.json" ]
-  outputs = [ "data/selector-maps.json" ]
-}
-
 resource("moniker-map") {
   sources = [ "data/moniker-map.json" ]
   outputs = [ "data/moniker-map.json" ]
@@ -55,8 +50,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-    "//src/developer/ffx/lib/selector-maps",
-    "//src/lib/diagnostics/selectors",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -166,7 +159,6 @@ fuchsia_package("remote-control-package") {
   deps = [
     ":moniker-map",
     ":remote-control-component",
-    ":selector-maps",
     "//src/developer/remote-control/runner:bin",
   ]
 }
