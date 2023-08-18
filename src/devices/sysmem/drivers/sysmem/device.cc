@@ -982,6 +982,17 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(
           allocator->set_ready();
         }
 
+        is_secure_mem_ready_ = true;
+
+        // At least for now, we just call all the LogicalBufferCollection(s), regardless of which
+        // are waiting on secure mem (if any). The extra calls are required (by semantics of
+        // OnDependencyReady) to not be harmful from a correctness point of view. If any are waiting
+        // on secure mem, those can now proceed, and will do so using the current thread (the loop_
+        // thread).
+        ForEachLogicalBufferCollection([](LogicalBufferCollection* logical_buffer_collection) {
+          logical_buffer_collection->OnDependencyReady();
+        });
+
         LOG(DEBUG, "sysmem RegisterSecureMem() done (async)");
       });
 }

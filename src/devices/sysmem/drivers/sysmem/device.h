@@ -163,19 +163,16 @@ class Device final : public DdkDeviceType,
   [[nodiscard]] const zx_device_t* device() const { return zxdev_; }
   [[nodiscard]] async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
-  // Test hook
   [[nodiscard]] std::unordered_set<LogicalBufferCollection*>& logical_buffer_collections() {
     std::lock_guard checker(*loop_checker_);
     return logical_buffer_collections_;
   }
 
-  // Test hook
   void AddLogicalBufferCollection(LogicalBufferCollection* collection) {
     std::lock_guard checker(*loop_checker_);
     logical_buffer_collections_.insert(collection);
   }
 
-  // Test hook
   void RemoveLogicalBufferCollection(LogicalBufferCollection* collection) {
     std::lock_guard checker(*loop_checker_);
     logical_buffer_collections_.erase(collection);
@@ -191,7 +188,34 @@ class Device final : public DdkDeviceType,
   void ResetThreadCheckerForTesting() { loop_checker_.emplace(fit::thread_checker()); }
 
   bool protected_ranges_disable_dynamic() const override {
+    std::lock_guard checker(*loop_checker_);
     return cmdline_protected_ranges_disable_dynamic_;
+  }
+
+  // false - no secure heaps are expected to exist
+  // true - secure heaps are expected to exist (regardless of whether any of them currently exist)
+  bool is_secure_mem_expected() const {
+    std::lock_guard checker(*loop_checker_);
+    // Currently, we can base this on secure_allocators_ non-empty() since in all current cases
+    // there will be at least one secure allocator added before any clients can connect iff there
+    // will be any secure heaps available. Non-empty here does not imply that all secure heaps are
+    // already present and ready. For that, use is_secure_mem_ready().
+    return !secure_allocators_.empty();
+  }
+
+  // false - secure mem is expected, but is not yet ready
+  //
+  // true - secure mem is not expected (and is therefore as ready as it will ever be / ready in the
+  // "secure mem system is ready for allocation requests" sense), or secure mem is expected and
+  // ready.
+  bool is_secure_mem_ready() const {
+    std::lock_guard checker(*loop_checker_);
+    if (!is_secure_mem_expected()) {
+      // attempts to use secure mem can go ahead and try to allocate and fail to allocate, so this
+      // means "as ready
+      return true;
+    }
+    return is_secure_mem_ready_;
   }
 
  private:
@@ -205,6 +229,23 @@ class Device final : public DdkDeviceType,
     fidl::WireSyncClient<fuchsia_sysmem::SecureMem> connection_;
     std::unique_ptr<async::Wait> wait_for_close_;
   };
+
+  // to_run must not cause creation or deletion of any LogicalBufferCollection(s), with the one
+  // exception of causing deletion of the passed-in LogicalBufferCollection, which is allowed
+  void ForEachLogicalBufferCollection(fit::function<void(LogicalBufferCollection*)> to_run) {
+    std::lock_guard checker(*loop_checker_);
+    // to_run can erase the current item, but std::unordered_set only invalidates iterators pointing
+    // at the erased item, so we can just save the pointer and advance iter before calling to_run
+    //
+    // to_run must not cause any other iterator invalidation
+    LogicalBufferCollections::iterator next;
+    for (auto iter = logical_buffer_collections_.begin(); iter != logical_buffer_collections_.end();
+         /* iter already advanced in the loop */) {
+      auto* item = *iter;
+      ++iter;
+      to_run(item);
+    }
+  }
 
   Driver* parent_driver_ = nullptr;
   inspect::Inspector inspector_;
@@ -240,12 +281,6 @@ class Device final : public DdkDeviceType,
   // This map contains all registered memory allocators.
   std::map<fuchsia_sysmem2::HeapType, std::shared_ptr<MemoryAllocator>> allocators_
       __TA_GUARDED(*loop_checker_);
-
-  // Some memory allocators need to be registered with properties before
-  // we can use them to allocate memory. We keep this map to store all the
-  // unregistered allocators.
-  std::map<MemoryAllocator*, std::pair<fuchsia_sysmem2::HeapType, std::unique_ptr<MemoryAllocator>>>
-      unregistered_allocators_ __TA_GUARDED(*loop_checker_);
 
   // This map contains only the secure allocators, if any.  The pointers are owned by allocators_.
   //
@@ -300,8 +335,8 @@ class Device final : public DdkDeviceType,
 
   std::unique_ptr<MemoryAllocator> contiguous_system_ram_allocator_ __TA_GUARDED(*loop_checker_);
 
-  std::unordered_set<LogicalBufferCollection*> logical_buffer_collections_
-      __TA_GUARDED(*loop_checker_);
+  using LogicalBufferCollections = std::unordered_set<LogicalBufferCollection*>;
+  LogicalBufferCollections logical_buffer_collections_ __TA_GUARDED(*loop_checker_);
 
   Settings settings_;
 
@@ -309,7 +344,9 @@ class Device final : public DdkDeviceType,
 
   SysmemMetrics metrics_;
 
-  bool cmdline_protected_ranges_disable_dynamic_ = false;
+  bool cmdline_protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;
+
+  bool is_secure_mem_ready_ __TA_GUARDED(*loop_checker_) = false;
 };
 
 class FidlDevice;

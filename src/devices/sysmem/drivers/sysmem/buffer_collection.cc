@@ -223,7 +223,7 @@ void BufferCollection::V1::SetConstraints(SetConstraintsRequest& request,
   //
   // The LogicalBufferCollection cares if this BufferCollection view has null
   // constraints, but only later when it asks for the specific constraints.
-  parent_.logical_buffer_collection().OnNodeReady();
+  parent_.logical_buffer_collection().OnDependencyReady();
   // |this| may be gone at this point, if the allocation failed.  Regardless,
   // SetConstraints() worked, so ZX_OK.
 }
@@ -257,7 +257,7 @@ void BufferCollection::V2::SetConstraints(SetConstraintsRequest& request,
   //
   // The LogicalBufferCollection cares if this BufferCollection view has null
   // constraints, but only later when it asks for the specific constraints.
-  parent_.logical_buffer_collection().OnNodeReady();
+  parent_.logical_buffer_collection().OnDependencyReady();
   // |this| may be gone at this point, if the allocation failed.  Regardless,
   // SetConstraints() worked, so ZX_OK.
 }

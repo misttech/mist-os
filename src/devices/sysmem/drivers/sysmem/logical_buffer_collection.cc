@@ -797,7 +797,7 @@ void LogicalBufferCollection::SweepLifetimeTracking() {
   }
 }
 
-void LogicalBufferCollection::OnNodeReady() {
+void LogicalBufferCollection::OnDependencyReady() {
   // MaybeAllocate() requires the caller to keep "this" alive.
   auto self = fbl::RefPtr(this);
   MaybeAllocate();
@@ -1275,10 +1275,6 @@ void LogicalBufferCollection::MaybeAllocate() {
         LogPrunedSubTree(eligible_subtree);
       }
 
-      // We know all the nodes of this sub-tree are ready to attempt allocation.  Every path from
-      // here down will have done something.
-      did_something = true;
-
       ZX_DEBUG_ASSERT((!is_allocate_attempted_) == (eligible_subtree == root_.get()));
       ZX_DEBUG_ASSERT(is_allocate_attempted_ || eligible_subtrees.size() == 1);
 
@@ -1350,6 +1346,12 @@ void LogicalBufferCollection::MaybeAllocate() {
               ZX_DEBUG_ASSERT(subtree_status == ZX_ERR_NOT_SUPPORTED);
               // next child selections
               break;
+            case ZX_ERR_SHOULD_WAIT:
+              // OnDependencyReady will call MaybeAllocate again later after all secure allocators
+              // are ready
+              subtree_status = ZX_ERR_SHOULD_WAIT;
+              done_with_subtree = true;
+              break;
             default:
               subtree_status = result.error();
               done_with_subtree = true;
@@ -1378,10 +1380,19 @@ void LogicalBufferCollection::MaybeAllocate() {
         // done_with_subtree true means loop will be done
         ZX_DEBUG_ASSERT(done_with_subtree);
       }
-      // This can still be ZX_ERR_NOT_SUPPORTED if we never got any more immediate failure and
-      // never got success, or this can be some other more immediate failure (still needs to be
-      // handled/propagated here), or this can be ZX_OK if we already handled success.
+      // The subtree_status can still be ZX_ERR_NOT_SUPPORTED if we never got any more immediate
+      // failure and never got success, or this can be some other more immediate failure (still
+      // needs to be handled/propagated here), or this can be ZX_OK if we already handled success,
+      // or can be ZX_ERR_SHOULD_WAIT if not all secure allocators are ready yet.
+      did_something = did_something || (subtree_status != ZX_ERR_SHOULD_WAIT);
       if (subtree_status != ZX_OK) {
+        if (subtree_status == ZX_ERR_SHOULD_WAIT) {
+          // next sub-tree
+          //
+          // OnDependencyReady will call MaybeAllocate again later after all secure allocators are
+          // ready
+          continue;
+        }
         if (was_allocate_attempted) {
           // fail entire logical allocation, including all pruned subtree nodes, regardless of
           // group child selections
@@ -1425,7 +1436,9 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
     }
   }
 
-  InitializeConstraintSnapshots(constraints_list);
+  if (!waiting_for_secure_allocators_ready_) {
+    InitializeConstraintSnapshots(constraints_list);
+  }
 
   auto combine_result = CombineConstraints(&constraints_list);
   if (!combine_result.is_ok()) {
@@ -1437,6 +1450,14 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
   ZX_DEBUG_ASSERT(combine_result.is_ok());
   ZX_DEBUG_ASSERT(constraints_list.empty());
   auto combined_constraints = combine_result.take_value();
+
+  if (*combined_constraints.buffer_memory_constraints()->secure_required() &&
+      !parent_device_->is_secure_mem_ready()) {
+    // parent_device_ will call OnDependencyReady when all secure heaps/allocators are ready
+    LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
+    waiting_for_secure_allocators_ready_ = true;
+    return fpromise::error(ZX_ERR_SHOULD_WAIT);
+  }
 
   auto generate_result = GenerateUnpopulatedBufferCollectionInfo(combined_constraints);
   if (!generate_result.is_ok()) {

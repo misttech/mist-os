@@ -258,7 +258,7 @@ void BufferCollectionTokenGroup::CommonAllChildrenPresent(Completer& completer) 
     return;
   }
   is_all_children_present_ = true;
-  logical_buffer_collection().OnNodeReady();
+  logical_buffer_collection().OnDependencyReady();
 }
 
 void BufferCollectionTokenGroup::V1::AllChildrenPresent(

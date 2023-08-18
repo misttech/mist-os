@@ -107,7 +107,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   void AttachLifetimeTracking(zx::eventpair server_end, uint32_t buffers_remaining);
   void SweepLifetimeTracking();
 
-  void OnNodeReady();
+  // Calling this extra times (including after allocation complete) isn't harmful from a correctness
+  // point of view.
+  void OnDependencyReady();
 
   void SetName(uint32_t priority, std::string name);
   void SetDebugTimeoutLogDeadline(int64_t deadline);
@@ -700,6 +702,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   std::unordered_map<zx_koid_t, NodeProperties*> node_properties_by_node_ref_keep_koid_;
 
   bool done_with_group_child_selection_ = false;
+
+  bool waiting_for_secure_allocators_ready_ = false;
 };
 
 }  // namespace sysmem_driver
