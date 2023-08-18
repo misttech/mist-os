@@ -1931,7 +1931,7 @@ mod tests {
         test_stack: &mut TestStack,
         proto: fposix_socket::DatagramSocketProtocol,
     ) -> fposix_socket::SynchronousDatagramSocketProxy {
-        let socket_provider = test_stack.connect_socket_provider().unwrap();
+        let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
             .datagram_socket(A::DOMAIN, proto)
             .await
@@ -2318,7 +2318,7 @@ mod tests {
     ) {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
         let test_stack = t.get(0);
-        let socket_provider = test_stack.connect_socket_provider().unwrap();
+        let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
             .datagram_socket(domain, proto)
             .await
@@ -2355,7 +2355,7 @@ mod tests {
     ) {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
         let test_stack = t.get(0);
-        let socket_provider = test_stack.connect_socket_provider().unwrap();
+        let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
             .datagram_socket(domain, proto)
             .await

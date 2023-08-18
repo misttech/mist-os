@@ -45,7 +45,6 @@ use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fuchsia_async as fasync;
-use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_zircon as zx;
 use futures::{
     channel::mpsc, lock::Mutex as AsyncMutex, FutureExt as _, SinkExt as _, StreamExt as _,
@@ -946,7 +945,7 @@ impl Netstack {
     }
 }
 
-enum Service {
+pub enum Service {
     DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     Filter(fidl_fuchsia_net_filter::FilterRequestStream),
@@ -991,9 +990,11 @@ impl<D: DiscoverableProtocolMarker, S: RequestStream<Protocol = D>> RequestStrea
 impl NetstackSeed {
     /// Consumes the netstack and starts serving all the FIDL services it
     /// implements to the outgoing service directory.
-    pub async fn serve(self) -> Result<(), anyhow::Error> {
-        use anyhow::Context as _;
-
+    pub async fn serve<S: futures::Stream<Item = Service>>(
+        self,
+        services: S,
+        inspector: &fuchsia_inspect::Inspector,
+    ) {
         info!("serving netstack with netstack3");
 
         let Self { mut netstack, interfaces_worker, interfaces_watcher_sink } = self;
@@ -1014,27 +1015,6 @@ impl NetstackSeed {
             panic!("interfaces worker finished unexpectedly {:?}", result);
         });
 
-        let mut fs = ServiceFs::new();
-        let _: &mut ServiceFsDir<'_, _> = fs
-            .dir("svc")
-            .add_service_connector(Service::DebugDiagnostics)
-            .add_fidl_service(Service::DebugInterfaces)
-            .add_fidl_service(Service::Stack)
-            .add_fidl_service(Service::Socket)
-            .add_fidl_service(Service::PacketSocket)
-            .add_fidl_service(Service::RawSocket)
-            .add_fidl_service(Service::RootInterfaces)
-            .add_fidl_service(Service::RoutesState)
-            .add_fidl_service(Service::RoutesStateV4)
-            .add_fidl_service(Service::RoutesStateV6)
-            .add_fidl_service(Service::Interfaces)
-            .add_fidl_service(Service::InterfacesAdmin)
-            .add_fidl_service(Service::Filter)
-            .add_fidl_service(Service::Neighbor)
-            .add_fidl_service(Service::Verifier);
-
-        let inspector = fuchsia_inspect::component::inspector();
-        inspect_runtime::serve(inspector, &mut fs).expect("failed to serve inspect");
         let socket_ctx = netstack.ctx.clone();
         let _sockets = inspector.root().create_lazy_child("Sockets", move || {
             futures::future::ok(inspect::sockets(&mut socket_ctx.clone())).boxed()
@@ -1047,8 +1027,6 @@ impl NetstackSeed {
         let _devices = inspector.root().create_lazy_child("Devices", move || {
             futures::future::ok(inspect::devices(&devices_ctx)).boxed()
         });
-
-        let services = fs.take_and_serve_directory_handle().context("directory handle")?;
 
         // Buffer size doesn't matter much, we're just trying to reduce
         // allocations.
@@ -1161,6 +1139,5 @@ impl NetstackSeed {
         let ((), (), ()) =
             futures::join!(work_items_fut, interfaces_worker_task, loopback_interface_control_task);
         debug!("Services stream finished");
-        Ok(())
     }
 }

@@ -3,17 +3,16 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
-use std::sync::Once;
+use std::sync::{Arc, Once};
 
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_ext::IntoExt;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
-use futures::{FutureExt as _, StreamExt as _};
+use futures::channel::mpsc;
 use net_declare::{net_ip_v4, net_subnet_v4, net_subnet_v6};
 use net_types::{
     ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv6},
@@ -39,34 +38,8 @@ use tracing_subscriber::{
 use crate::bindings::{
     devices::{BindingId, Devices},
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, RequestStreamExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
-
-mod util {
-    use fuchsia_async as fasync;
-    use netstack3_core::sync::Mutex;
-    use std::sync::Arc;
-
-    /// A thread-safe collection of [`fasync::Task`].
-    #[derive(Clone, Default)]
-    pub(super) struct TaskCollection(Arc<Mutex<Vec<fasync::Task<()>>>>);
-
-    impl TaskCollection {
-        /// Creates a new `TaskCollection` with the tasks in `i`.
-        pub(super) fn new(i: impl Iterator<Item = fasync::Task<()>>) -> Self {
-            Self(Arc::new(Mutex::new(i.collect())))
-        }
-
-        /// Pushes `task` into the collection.
-        ///
-        /// Hiding this in a method ensures that the task lock can't be
-        /// interleaved with executor yields.
-        pub(super) fn push(&self, task: fasync::Task<()>) {
-            let Self(t) = self;
-            t.lock().push(task);
-        }
-    }
-}
 
 struct LogFormatter;
 
@@ -106,106 +79,111 @@ pub(crate) fn set_logger_for_test() {
     })
 }
 
-#[derive(Clone)]
-/// A netstack context for testing.
-pub(crate) struct TestContext {
-    netstack: crate::bindings::Netstack,
-    interfaces_watcher_sink: crate::bindings::interfaces_watcher::WorkerWatcherSink,
-    tasks: util::TaskCollection,
-}
-
-impl TestContext {
-    fn new() -> Self {
-        let crate::bindings::NetstackSeed { netstack, interfaces_worker, interfaces_watcher_sink } =
-            crate::bindings::NetstackSeed::default();
-
-        Self {
-            netstack,
-            interfaces_watcher_sink,
-            tasks: util::TaskCollection::new(std::iter::once(fasync::Task::spawn(
-                interfaces_worker.run().map(|r| {
-                    let _: futures::stream::FuturesUnordered<_> = r.expect("watcher failed");
-                }),
-            ))),
-        }
-    }
-}
-
-/// A holder for a [`TestContext`].
 /// `TestStack` is obtained from [`TestSetupBuilder`] and offers utility methods
 /// to connect to the FIDL APIs served by [`TestContext`], as well as keeps
 /// track of configured interfaces during the setup procedure.
 pub(crate) struct TestStack {
-    ctx: TestContext,
+    // Keep a clone of the netstack so we can peek into core contexts and such
+    // in tests.
+    netstack: crate::bindings::Netstack,
+    // The main task running the netstack.
+    _task: fasync::Task<()>,
+    // A channel sink standing in for ServiceFs when running tests.
+    services_sink: mpsc::UnboundedSender<crate::bindings::Service>,
+    // The inspector instance given to Netstack, can be used to probe available
+    // inspect data.
+    _inspector: Arc<fuchsia_inspect::Inspector>,
+    // Keep track of installed endpoints.
     endpoint_ids: HashMap<String, BindingId>,
-    // We must keep this sender around to prevent the control task from removing
-    // the loopback interface.
-    loopback_termination_sender:
-        Option<futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>>,
 }
 
+pub(crate) trait NetstackServiceMarker: fidl::endpoints::DiscoverableProtocolMarker {
+    fn make_service(server: fidl::endpoints::ServerEnd<Self>) -> crate::bindings::Service;
+}
+
+macro_rules! impl_service_marker {
+    ($proto:ty, $svc:ident) => {
+        impl_service_marker!($proto, $svc, stream);
+    };
+    ($proto:ty, $svc:ident, stream) => {
+        impl_service_marker!($proto, $svc, |server: fidl::endpoints::ServerEnd<Self>| server
+            .into_stream()
+            .unwrap());
+    };
+    ($proto:ty, $svc:ident, server_end) => {
+        impl_service_marker!($proto, $svc, |server: fidl::endpoints::ServerEnd<Self>| server);
+    };
+    ($proto:ty, $svc:ident, $transf:expr) => {
+        impl NetstackServiceMarker for $proto {
+            fn make_service(server: fidl::endpoints::ServerEnd<Self>) -> crate::bindings::Service {
+                let t = $transf;
+                crate::bindings::Service::$svc(t(server))
+            }
+        }
+    };
+}
+
+impl_service_marker!(fidl_fuchsia_net_debug::DiagnosticsMarker, DebugDiagnostics, server_end);
+impl_service_marker!(fidl_fuchsia_net_debug::InterfacesMarker, DebugInterfaces);
+impl_service_marker!(fidl_fuchsia_net_filter::FilterMarker, Filter);
+impl_service_marker!(fidl_fuchsia_net_interfaces::StateMarker, Interfaces);
+impl_service_marker!(fidl_fuchsia_net_interfaces_admin::InstallerMarker, InterfacesAdmin);
+impl_service_marker!(fidl_fuchsia_net_neighbor::ViewMarker, Neighbor);
+impl_service_marker!(fidl_fuchsia_posix_socket_packet::ProviderMarker, PacketSocket);
+impl_service_marker!(fidl_fuchsia_posix_socket_raw::ProviderMarker, RawSocket);
+impl_service_marker!(fidl_fuchsia_net_root::InterfacesMarker, RootInterfaces);
+impl_service_marker!(fidl_fuchsia_net_routes::StateMarker, RoutesState);
+impl_service_marker!(fidl_fuchsia_net_routes::StateV4Marker, RoutesStateV4);
+impl_service_marker!(fidl_fuchsia_net_routes::StateV6Marker, RoutesStateV6);
+impl_service_marker!(fidl_fuchsia_posix_socket::ProviderMarker, Socket);
+impl_service_marker!(fidl_fuchsia_net_stack::StackMarker, Stack);
+impl_service_marker!(fidl_fuchsia_update_verify::NetstackVerifierMarker, Verifier);
+
 impl TestStack {
+    /// Connects a service to the contained stack.
+    pub(crate) fn connect_service(&self, service: crate::bindings::Service) {
+        self.services_sink.unbounded_send(service).expect("send service request");
+    }
+
+    /// Connect to a discoverable service offered by the netstack.
+    pub(crate) fn connect_proxy<M: NetstackServiceMarker>(&self) -> M::Proxy {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<M>().expect("create proxy");
+        self.connect_service(M::make_service(server_end));
+        proxy
+    }
+
     /// Connects to the `fuchsia.net.stack.Stack` service.
-    pub(crate) fn connect_stack(&self) -> Result<fidl_fuchsia_net_stack::StackProxy, Error> {
-        let (stack, rs) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_stack::StackMarker>()?;
-        fasync::Task::spawn(rs.serve_with(|rs| {
-            crate::bindings::stack_fidl_worker::StackFidlWorker::serve(
-                self.ctx.netstack.clone(),
-                rs,
-            )
-        }))
-        .detach();
-        Ok(stack)
+    pub(crate) fn connect_stack(&self) -> fidl_fuchsia_net_stack::StackProxy {
+        self.connect_proxy::<fidl_fuchsia_net_stack::StackMarker>()
     }
 
     /// Connects to the `fuchsia.net.interfaces.admin.Installer` service.
     pub(crate) fn connect_interfaces_installer(
         &self,
     ) -> fidl_fuchsia_net_interfaces_admin::InstallerProxy {
-        let (installer, rs) = fidl::endpoints::create_proxy_and_stream::<
-            fidl_fuchsia_net_interfaces_admin::InstallerMarker,
-        >()
-        .expect("create endpoints");
-        let task_stream = crate::bindings::interfaces_admin::serve(self.ctx.netstack.clone(), rs);
-        let task_sink = self.ctx.tasks.clone();
-        self.ctx.tasks.push(fasync::Task::spawn(task_stream.for_each(move |r| {
-            futures::future::ready(task_sink.push(r.expect("error serving interfaces installer")))
-        })));
-        installer
+        self.connect_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
     }
 
     /// Creates a new `fuchsia.net.interfaces/Watcher` for this stack.
-    pub(crate) async fn new_interfaces_watcher(&self) -> fidl_fuchsia_net_interfaces::WatcherProxy {
-        let (watcher, rs) = fidl::endpoints::create_proxy_and_stream::<
-            fidl_fuchsia_net_interfaces::WatcherMarker,
-        >()
-        .expect("create proxy");
-        let mut sender = self.ctx.interfaces_watcher_sink.clone();
-        sender
-            .add_watcher(rs, crate::bindings::interfaces_watcher::WatcherOptions::default())
-            .await
-            .expect("add watcher");
+    pub(crate) fn new_interfaces_watcher(&self) -> fidl_fuchsia_net_interfaces::WatcherProxy {
+        let state = self.connect_proxy::<fidl_fuchsia_net_interfaces::StateMarker>();
+        let (watcher, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
+                .expect("create proxy");
+        state
+            .get_watcher(&fidl_fuchsia_net_interfaces::WatcherOptions::default(), server_end)
+            .expect("get watcher");
         watcher
     }
 
     /// Connects to the `fuchsia.posix.socket.Provider` service.
-    pub(crate) fn connect_socket_provider(
-        &self,
-    ) -> Result<fidl_fuchsia_posix_socket::ProviderProxy, Error> {
-        let (stack, rs) = fidl::endpoints::create_proxy_and_stream::<
-            fidl_fuchsia_posix_socket::ProviderMarker,
-        >()?;
-        fasync::Task::spawn(
-            rs.serve_with(|rs| crate::bindings::socket::serve(self.ctx.netstack.ctx.clone(), rs)),
-        )
-        .detach();
-        Ok(stack)
+    pub(crate) fn connect_socket_provider(&self) -> fidl_fuchsia_posix_socket::ProviderProxy {
+        self.connect_proxy::<fidl_fuchsia_posix_socket::ProviderMarker>()
     }
 
     /// Waits for interface with given `if_id` to come online.
     pub(crate) async fn wait_for_interface_online(&mut self, if_id: BindingId) {
-        let watcher = self.new_interfaces_watcher().await;
+        let watcher = self.new_interfaces_watcher();
         loop {
             let event = watcher.watch().await.expect("failed to watch");
             let fidl_fuchsia_net_interfaces::Properties { id, online, .. } = match event {
@@ -229,6 +207,26 @@ impl TestStack {
         }
     }
 
+    async fn wait_for_loopback_id(&mut self) -> BindingId {
+        let watcher = self.new_interfaces_watcher();
+        loop {
+            let event = watcher.watch().await.expect("failed to watch");
+            let fidl_fuchsia_net_interfaces::Properties { id, name, .. } = match event {
+                fidl_fuchsia_net_interfaces::Event::Added(props)
+                | fidl_fuchsia_net_interfaces::Event::Existing(props) => props,
+                fidl_fuchsia_net_interfaces::Event::Changed(_)
+                | fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
+                | fidl_fuchsia_net_interfaces::Event::Removed(_) => {
+                    continue;
+                }
+            };
+            if name.expect("missing name") != LOOPBACK_NAME {
+                continue;
+            }
+            break BindingId::try_from(id.expect("missing id")).expect("bad id");
+        }
+    }
+
     /// Gets an installed interface identifier from the configuration endpoint
     /// `index`.
     pub(crate) fn get_endpoint_id(&self, index: usize) -> BindingId {
@@ -243,20 +241,33 @@ impl TestStack {
 
     /// Creates a new `TestStack`.
     pub(crate) fn new() -> Self {
-        let ctx = TestContext::new();
-        TestStack { ctx, endpoint_ids: HashMap::new(), loopback_termination_sender: None }
+        let seed = crate::bindings::NetstackSeed::default();
+        let (services_sink, services) = mpsc::unbounded();
+        let inspector = Arc::new(fuchsia_inspect::Inspector::default());
+        let netstack = seed.netstack.clone();
+        let inspector_cloned = inspector.clone();
+        let task =
+            fasync::Task::spawn(async move { seed.serve(services, &inspector_cloned).await });
+
+        Self {
+            netstack,
+            _task: task,
+            services_sink,
+            _inspector: inspector,
+            endpoint_ids: Default::default(),
+        }
     }
 
     /// Helper function to invoke a closure that provides a locked
     /// [`Ctx< BindingsContext>`] provided by this `TestStack`.
     pub(crate) fn with_ctx<R, F: FnOnce(&mut Ctx) -> R>(&mut self, f: F) -> R {
-        let mut ctx = self.ctx.netstack.ctx.clone();
+        let mut ctx = self.netstack.ctx.clone();
         f(&mut ctx)
     }
 
     /// Acquire this `TestStack`'s context.
     pub(crate) fn ctx(&self) -> Ctx {
-        self.ctx.netstack.ctx.clone()
+        self.netstack.ctx.clone()
     }
 }
 
@@ -407,12 +418,7 @@ impl TestSetupBuilder {
         for stack_cfg in self.stacks.into_iter() {
             println!("Adding stack: {:?}", stack_cfg);
             let mut stack = TestStack::new();
-            let (loopback_termination_sender, binding_id, loopback_interface_control_task) =
-                stack.ctx.netstack.add_loopback();
-
-            stack.loopback_termination_sender = Some(loopback_termination_sender);
-            stack.ctx.tasks.push(loopback_interface_control_task);
-
+            let binding_id = stack.wait_for_loopback_id().await;
             assert_eq!(stack.endpoint_ids.insert(LOOPBACK_NAME.to_string(), binding_id), None);
 
             for (ep_name, addr) in stack_cfg.endpoints.into_iter() {
@@ -491,7 +497,7 @@ impl TestSetupBuilder {
 
                     let (_, subnet) = addr.addr_subnet();
 
-                    let stack = stack.connect_stack().context("connect stack")?;
+                    let stack = stack.connect_stack();
                     stack
                         .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
                             subnet: subnet.into_fidl(),
@@ -554,7 +560,7 @@ async fn test_add_device_routes() {
         .await
         .unwrap();
     let test_stack = t.get(0);
-    let stack = test_stack.connect_stack().unwrap();
+    let stack = test_stack.connect_stack();
     let if_id = test_stack.get_endpoint_id(1);
 
     let fwd_entry1 = fidl_net_stack::ForwardingEntry {
@@ -645,7 +651,7 @@ async fn test_list_del_routes() {
         .unwrap();
 
     let test_stack = t.get(0);
-    let stack = test_stack.connect_stack().unwrap();
+    let stack = test_stack.connect_stack();
     let if_id = test_stack.get_named_endpoint_id(EP_NAME);
     let loopback_id = test_stack.get_named_endpoint_id(LOOPBACK_NAME);
     assert_ne!(loopback_id, if_id);
@@ -808,7 +814,7 @@ async fn test_add_remote_routes() {
         .unwrap();
 
     let test_stack = t.get(0);
-    let stack = test_stack.connect_stack().unwrap();
+    let stack = test_stack.connect_stack();
     let device_id = test_stack.get_endpoint_id(1).get();
 
     let subnet = fidl_net::Subnet {
