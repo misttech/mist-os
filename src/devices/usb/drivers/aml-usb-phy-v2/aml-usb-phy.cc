@@ -81,8 +81,6 @@ void AmlUsbPhy::InitPll(fdf::MmioBuffer* mmio) {
 }
 
 zx_status_t AmlUsbPhy::InitPhy() {
-  auto* usbctrl_mmio = &*usbctrl_mmio_;
-
   // first reset USB
   // The bits being manipulated here are not documented.
   auto level_result =
@@ -106,18 +104,18 @@ zx_status_t AmlUsbPhy::InitPhy() {
 
   // amlogic_new_usb2_init()
   for (int i = 0; i < 2; i++) {
-    U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_por(1).WriteTo(usbctrl_mmio);
+    U2P_R0_V2::Get(i).ReadFrom(ctrl_mmio()).set_por(1).WriteTo(ctrl_mmio());
     if (i == 1) {
       U2P_R0_V2::Get(i)
-          .ReadFrom(usbctrl_mmio)
+          .ReadFrom(ctrl_mmio())
           .set_idpullup0(1)
           .set_drvvbus0(1)
           .set_host_device((dr_mode_ == USB_MODE_PERIPHERAL) ? 0 : 1)
-          .WriteTo(usbctrl_mmio);
+          .WriteTo(ctrl_mmio());
     } else {
-      U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_host_device(1).WriteTo(usbctrl_mmio);
+      U2P_R0_V2::Get(i).ReadFrom(ctrl_mmio()).set_host_device(1).WriteTo(ctrl_mmio());
     }
-    U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_por(0).WriteTo(usbctrl_mmio);
+    U2P_R0_V2::Get(i).ReadFrom(ctrl_mmio()).set_por(0).WriteTo(ctrl_mmio());
 
     zx::nanosleep(zx::deadline_after(zx::usec(10)));
 
@@ -136,7 +134,7 @@ zx_status_t AmlUsbPhy::InitPhy() {
     auto u2p_r1 = U2P_R1_V2::Get(i);
 
     int count = 0;
-    while (!u2p_r1.ReadFrom(usbctrl_mmio).phy_rdy()) {
+    while (!u2p_r1.ReadFrom(ctrl_mmio()).phy_rdy()) {
       // wait phy ready max 5ms, common is 100us
       if (count > 1000) {
         zxlogf(WARNING, "AmlUsbPhy::InitPhy U2P_R1_PHY_RDY wait failed");
@@ -152,51 +150,68 @@ zx_status_t AmlUsbPhy::InitPhy() {
 }
 
 zx_status_t AmlUsbPhy::InitOtg() {
-  auto* mmio = &*usbctrl_mmio_;
+  USB_R1_V2::Get().ReadFrom(ctrl_mmio()).set_u3h_fladj_30mhz_reg(0x20).WriteTo(ctrl_mmio());
 
-  USB_R1_V2::Get().ReadFrom(mmio).set_u3h_fladj_30mhz_reg(0x20).WriteTo(mmio);
-
-  USB_R5_V2::Get().ReadFrom(mmio).set_iddig_en0(1).set_iddig_en1(1).set_iddig_th(255).WriteTo(mmio);
+  // clang-format off
+  (USB_R5_V2::Get()
+   .ReadFrom(ctrl_mmio())
+   .set_iddig_en0(1)
+   .set_iddig_en1(1)
+   .set_iddig_th(255)
+   .WriteTo(ctrl_mmio()));
+  // clang-format on
 
   return ZX_OK;
 }
 
+void AmlUsbPhy::ReadOtgAndSetMode(SetModeCompletion completion) {
+  auto r5 = USB_R5_V2::Get().ReadFrom(ctrl_mmio());
+
+  if (r5.iddig_curr() == 0) {
+    SetMode(UsbMode::HOST, std::move(completion));
+  } else {
+    SetMode(UsbMode::PERIPHERAL, std::move(completion));
+  }
+}
+
 void AmlUsbPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
   ZX_DEBUG_ASSERT(mode == UsbMode::HOST || mode == UsbMode::PERIPHERAL);
-  // Only the irq thread calls |SetMode|, and it should have waited for the
-  // previous call to |SetMode| to complete.
+
+  if (mode == UsbMode::HOST) {
+    zxlogf(INFO, "Entering USB Host Mode");
+  } else {
+    zxlogf(INFO, "Entering USB Peripheral Mode");
+  }
+
   ZX_DEBUG_ASSERT(!set_mode_completion_);
   auto cleanup = fit::defer([&]() {
-    if (completion)
+    if (completion) {
       completion();
-    // If the DdkInit() thread is waiting, unblock it.
-    init_cond_.Signal();
+    }
   });
 
   if (mode == phy_mode_)
     return;
 
-  auto* usbctrl_mmio = &*usbctrl_mmio_;
-
-  auto r0 = USB_R0_V2::Get().ReadFrom(usbctrl_mmio);
+  auto r0 = USB_R0_V2::Get().ReadFrom(ctrl_mmio());
   if (mode == UsbMode::HOST) {
     r0.set_u2d_act(0);
   } else {
     r0.set_u2d_act(1);
     r0.set_u2d_ss_scaledown_mode(0);
   }
-  r0.WriteTo(usbctrl_mmio);
+  r0.WriteTo(ctrl_mmio());
 
   USB_R4_V2::Get()
-      .ReadFrom(usbctrl_mmio)
+      .ReadFrom(ctrl_mmio())
       .set_p21_sleepm0(mode == UsbMode::PERIPHERAL)
-      .WriteTo(usbctrl_mmio);
+      .WriteTo(ctrl_mmio());
 
   U2P_R0_V2::Get(0)
-      .ReadFrom(usbctrl_mmio)
+      .ReadFrom(ctrl_mmio())
       .set_host_device(mode == UsbMode::HOST)
       .set_por(0)
-      .WriteTo(usbctrl_mmio);
+      .WriteTo(ctrl_mmio());
 
   zx::nanosleep(zx::deadline_after(zx::usec(500)));
 
@@ -205,15 +220,13 @@ void AmlUsbPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
 
   if (old_mode == UsbMode::UNKNOWN) {
     // One time PLL initialization
-    InitPll(&*usbphy20_mmio_);
-    InitPll(&*usbphy21_mmio_);
+    InitPll(phy20_mmio());
+    InitPll(phy21_mmio());
   } else {
-    auto* phy_mmio = &*usbphy21_mmio_;
-
     PLL_REGISTER::Get(0x38)
         .FromValue(mode == UsbMode::HOST ? pll_settings_[6] : 0)
-        .WriteTo(phy_mmio);
-    PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(phy_mmio);
+        .WriteTo(phy21_mmio());
+    PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(phy21_mmio());
   }
 
   zx_status_t status;
@@ -233,46 +246,38 @@ void AmlUsbPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
 }
 
 int AmlUsbPhy::IrqThread() {
-  auto* mmio = &*usbctrl_mmio_;
-
   // Wait for PHY to stabilize before reading initial mode.
   zx::nanosleep(zx::deadline_after(zx::sec(1)));
 
-  lock_.Acquire();
-
   while (true) {
-    auto r5 = USB_R5_V2::Get().ReadFrom(mmio);
-
-    // Since |SetMode| is asynchronous, we need to block until it completes.
-    sync_completion_t set_mode_sync;
-    auto completion = [&]() { sync_completion_signal(&set_mode_sync); };
-    // Read current host/device role.
-    if (r5.iddig_curr() == 0) {
-      zxlogf(INFO, "Entering USB Host Mode");
-      SetMode(UsbMode::HOST, std::move(completion));
-    } else {
-      zxlogf(INFO, "Entering USB Peripheral Mode");
-      SetMode(UsbMode::PERIPHERAL, std::move(completion));
-    }
-
-    lock_.Release();
-    sync_completion_wait(&set_mode_sync, ZX_TIME_INFINITE);
-    auto status = irq_.wait(nullptr);
+    zx_status_t status = irq_.wait(nullptr);
     if (status == ZX_ERR_CANCELED) {
-      return 0;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: irq_.wait failed: %d", __func__, status);
+      break;
+    } else if (status != ZX_OK) {
+      zxlogf(ERROR, "irq_.wait() error: %s", zx_status_get_string(status));
       return -1;
     }
-    lock_.Acquire();
 
-    // Acknowledge interrupt
-    r5.ReadFrom(mmio).set_usb_iddig_irq(0).WriteTo(mmio);
+    // A side effect of ReadOtgAndSetMode() is any current child will be DdkAsyncRemoved. We need
+    // to synchronize the releasing of the child to this irq handling thread.
+    sync_completion_t child_released;
+    auto completion = [&]() { sync_completion_signal(&child_released); };
+
+    {
+      fbl::AutoLock _(&lock_);
+      ReadOtgAndSetMode(std::move(completion));
+    }
+
+    // Unblock any test waiting for the side effects of SetMode() to occur. See header for details.
+    testing_edge_.Signal();
+
+    // Block until ChildPreRelease() indicates the Ddk has released the child.
+    sync_completion_wait(&child_released, ZX_TIME_INFINITE);
+
+    USB_R5_V2::Get().ReadFrom(ctrl_mmio()).set_usb_iddig_irq(0).WriteTo(ctrl_mmio());
   }
 
-  lock_.Release();
-
+  zxlogf(INFO, "IrqThread exiting");
   return 0;
 }
 
@@ -327,8 +332,9 @@ zx_status_t AmlUsbPhy::AddXhciDevice() {
 
 void AmlUsbPhy::RemoveXhciDevice(SetModeCompletion completion) {
   auto cleanup = fit::defer([&]() {
-    if (completion)
+    if (completion) {
       completion();
+    }
   });
   if (xhci_device_) {
     // The callback will be run by the ChildPreRelease hook once the xhci device has been removed.
@@ -457,36 +463,27 @@ zx_status_t AmlUsbPhy::Init() {
 }
 
 void AmlUsbPhy::DdkInit(ddk::InitTxn txn) {
+  // Note that at this point in the driver's lifecycle, there can be no child device to
+  // DdkAsyncRemove(), which is why SetMode() is not supplied a completion.
   if (dr_mode_ != USB_MODE_OTG) {
-    sync_completion_t set_mode_sync;
-    auto completion = [&]() { sync_completion_signal(&set_mode_sync); };
     fbl::AutoLock lock(&lock_);
     if (dr_mode_ == USB_MODE_PERIPHERAL) {
-      zxlogf(INFO, "Entering USB Peripheral Mode");
-      SetMode(UsbMode::PERIPHERAL, std::move(completion));
+      SetMode(UsbMode::PERIPHERAL);
     } else {
-      zxlogf(INFO, "Entering USB Host Mode");
-      SetMode(UsbMode::HOST, std::move(completion));
+      SetMode(UsbMode::HOST);
     }
-    sync_completion_wait(&set_mode_sync, ZX_TIME_INFINITE);
-
     return txn.Reply(ZX_OK);
   }
 
   irq_thread_started_ = true;
-  {
-    fbl::AutoLock lock(&lock_);
-    int rc = thrd_create_with_name(
-        &irq_thread_,
-        [](void* arg) -> int { return reinterpret_cast<AmlUsbPhy*>(arg)->IrqThread(); },
-        reinterpret_cast<void*>(this), "amlogic-usb-thread");
-    if (rc != thrd_success) {
-      irq_thread_started_ = false;
-      lock.release();
-      return txn.Reply(ZX_ERR_INTERNAL);  // This will schedule the device to be unbound.
-    }
-    init_cond_.Wait(&lock_);
+  int rc = thrd_create_with_name(
+      &irq_thread_, [](void* arg) -> int { return reinterpret_cast<AmlUsbPhy*>(arg)->IrqThread(); },
+      reinterpret_cast<void*>(this), "amlogic-usb-thread");
+  if (rc != thrd_success) {
+    irq_thread_started_ = false;
+    return txn.Reply(ZX_ERR_INTERNAL);  // This will schedule the device to be unbound.
   }
+
   return txn.Reply(ZX_OK);
 }
 
@@ -497,13 +494,11 @@ void AmlUsbPhy::UsbPhyConnectStatusChanged(bool connected) {
   if (dwc2_connected_ == connected)
     return;
 
-  auto* mmio = &*usbphy21_mmio_;
-
   if (connected) {
-    PLL_REGISTER::Get(0x38).FromValue(pll_settings_[7]).WriteTo(mmio);
-    PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
+    PLL_REGISTER::Get(0x38).FromValue(pll_settings_[7]).WriteTo(phy21_mmio());
+    PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(phy21_mmio());
   } else {
-    InitPll(mmio);
+    InitPll(phy21_mmio());
   }
 
   dwc2_connected_ = connected;
@@ -520,8 +515,6 @@ void AmlUsbPhy::DdkUnbind(ddk::UnbindTxn txn) {
 void AmlUsbPhy::DdkChildPreRelease(void* child_ctx) {
   fbl::AutoLock lock(&lock_);
   if (set_mode_completion_) {
-    // If the mode is currently being set, the irq thread will be blocked
-    // until we call this completion.
     set_mode_completion_();
   }
 }

@@ -134,9 +134,10 @@ class AmlUsbPhyTest : public zxtest::Test {
     ASSERT_NO_FATAL_FAILURE();
   }
 
-  void TriggerInterrupt(ddk::PDevFidl& pdev, AmlUsbPhy::UsbMode mode) {
+  // This method fires the irq and then waits for the side effects of SetMode to have taken place.
+  void TriggerInterruptAndWait(AmlUsbPhy* phy, AmlUsbPhy::UsbMode mode) {
     std::optional<fdf::MmioBuffer> usbctrl_mmio;
-    ASSERT_OK(pdev.MapMmio(0, &usbctrl_mmio));
+    ASSERT_OK(phy->pdev().MapMmio(0, &usbctrl_mmio));
 
     // Switch to appropriate mode. This will be read by the irq thread.
     USB_R5_V2::Get()
@@ -145,6 +146,9 @@ class AmlUsbPhyTest : public zxtest::Test {
         .WriteTo(&usbctrl_mmio.value());
     // Wake up the irq thread.
     ASSERT_OK(irq_->trigger(0, zx::clock::get_monotonic()));
+
+    // Wait until irq thread sets the mode.
+    phy->testing_edge().Wait();
   }
 
  protected:
@@ -168,6 +172,10 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   mock_phy->InitOp();
   mock_phy->WaitUntilInitReplyCalled();
   EXPECT_TRUE(mock_phy->InitReplyCalled());
+
+  // Trigger interrupt configuring initial Host mode.
+  TriggerInterruptAndWait(phy, AmlUsbPhy::UsbMode::HOST);
+  // Because no child has been added (yet), nothing is DdkAsyncRemoved() at this time.
   auto* mock_xhci = mock_phy->GetLatestChild();
   ASSERT_NOT_NULL(mock_xhci);
   auto* xhci = mock_xhci->GetDeviceContext<void>();
@@ -176,9 +184,9 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::HOST);
 
   // Trigger interrupt, and switch to Peripheral mode.
-  TriggerInterrupt(phy->pdev(), AmlUsbPhy::UsbMode::PERIPHERAL);
+  phy->testing_edge().Reset();
+  TriggerInterruptAndWait(phy, AmlUsbPhy::UsbMode::PERIPHERAL);
   mock_xhci->WaitUntilAsyncRemoveCalled();
-  EXPECT_TRUE(mock_xhci->AsyncRemoveCalled());
   mock_ddk::ReleaseFlaggedDevices(root_.get());
   ASSERT_EQ(mock_phy->child_count(), 1);
   auto* mock_dwc2 = mock_phy->GetLatestChild();
@@ -189,9 +197,9 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::PERIPHERAL);
 
   // Trigger interrupt, and switch (back) to Host mode.
-  TriggerInterrupt(phy->pdev(), AmlUsbPhy::UsbMode::HOST);
+  phy->testing_edge().Reset();
+  TriggerInterruptAndWait(phy, AmlUsbPhy::UsbMode::HOST);
   mock_dwc2->WaitUntilAsyncRemoveCalled();
-  EXPECT_TRUE(mock_dwc2->AsyncRemoveCalled());
   mock_ddk::ReleaseFlaggedDevices(root_.get());
   ASSERT_EQ(mock_phy->child_count(), 1);
   mock_xhci = mock_phy->GetLatestChild();
