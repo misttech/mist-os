@@ -16,6 +16,9 @@ When updating, please add the value in alphabetical order.
 :                                         : start automatically when a subtool :
 :                                         : that requires the daemon is        :
 :                                         : invoked.  Defaults to `true`.      :
+| `daemon.host_pipe_ssh_timeout`          | Time the daemon waits for an       |
+:                                         : initial response from ssh on the   :
+:                                         : target. Defaults to 30 seconds.    :
 | `discovery.expire_targets`              | Determines if targets discovered   |
 :                                         : should expire. Defaults to `true`  :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |

@@ -42,6 +42,7 @@ use usb_bulk::AsyncInterface as Interface;
 
 const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
 const DEFAULT_SSH_PORT: u16 = 22;
+const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
 
 #[derive(Debug, Clone, Hash)]
 pub enum TargetAddrType {
@@ -968,7 +969,9 @@ impl Target {
 
             let watchdogs: bool =
                 ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
-            let nr = spawn(weak_target.clone(), watchdogs).await;
+            let ssh_timeout: u16 =
+                ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).await.unwrap_or(30);
+            let nr = spawn(weak_target.clone(), watchdogs, ssh_timeout).await;
             match nr {
                 Ok(mut hp) => {
                     tracing::debug!("host pipe spawn returned OK for {target_name_str}");

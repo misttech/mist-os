@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command;
-use fuchsia_async::{unblock, Task, Timer};
+use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
 use shared_child::SharedChild;
@@ -87,6 +87,7 @@ pub(crate) trait HostPipeChildBuilder {
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
+        ssh_timeout: u16,
     ) -> Result<(Option<HostAddr>, HostPipeChild)>
     where
         Self: Sized;
@@ -104,8 +105,9 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
+        ssh_timeout: u16,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, watchdogs).await
+        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, watchdogs, ssh_timeout).await
     }
 }
 
@@ -141,12 +143,14 @@ fn setup_watchdogs() {
 }
 
 impl HostPipeChild {
+    #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
         addr: SocketAddr,
         id: u64,
         stderr_buf: Rc<LogBuffer>,
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
+        ssh_timeout: u16,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
         // TODO (119900): Re-enable ABI checks when ffx repository server uses ssh to setup
         // repositories for older devices.
@@ -193,15 +197,20 @@ impl HostPipeChild {
         // value.
         let mut stdout = BufReader::with_capacity(BUFFER_SIZE, stdout);
 
-        let ssh_host_address =
-            match parse_ssh_connection(&mut stdout).await.context("reading ssh connection") {
-                Ok(Some(addr)) => Some(HostAddr(addr)),
-                Ok(None) => None,
-                Err(e) => {
-                    tracing::error!("Failed to read ssh client address: {:?}", e);
-                    None
-                }
-            };
+        tracing::debug!("Awaiting client address from ssh connection");
+        let ssh_host_address = match parse_ssh_connection(&mut stdout)
+            .on_timeout(Duration::from_secs(ssh_timeout as u64), || {
+                Err(ParseSshConnectionError::Timeout)
+            })
+            .await
+            .context("reading ssh connection")
+        {
+            Ok(addr) => Some(HostAddr(addr)),
+            Err(e) => {
+                tracing::error!("Failed to read ssh client address: {:?}", e);
+                None
+            }
+        };
 
         let copy_in = async move {
             if let Err(e) = copy_buf(stdout, &mut pipe_tx).await {
@@ -260,16 +269,25 @@ enum ParseSshConnectionError {
     Io(#[from] std::io::Error),
     #[error("Parse error: {:?}", .0)]
     Parse(String),
+    #[error("Read-line timeout")]
+    Timeout,
 }
 
+#[tracing::instrument(skip(rdr))]
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
-) -> std::result::Result<Option<String>, ParseSshConnectionError> {
+) -> std::result::Result<String, ParseSshConnectionError> {
     let mut line = String::new();
+    // Note: if there is a failure due to _some_ data being sent, but no
+    // newline, then we'll simply timeout without any debugging about the data.
+    // If there is reason to think that situation is arising, it may be
+    // worth replacing this read_line() with a loop that capture the data
+    // as it comes in, terminating when a newline is reached.
     rdr.read_line(&mut line).await.map_err(ParseSshConnectionError::Io)?;
 
     if line.is_empty() {
-        return Ok(None);
+        tracing::error!("Failed to first line");
+        return Err(ParseSshConnectionError::Parse(line));
     }
 
     let mut parts = line.split(' ');
@@ -278,6 +296,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     match parts.next() {
         Some("++") => {}
         Some(_) | None => {
+            tracing::error!("Failed to read first anchor: {line}");
             return Err(ParseSshConnectionError::Parse(line));
         }
     }
@@ -287,6 +306,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     let client_address = if let Some(part) = parts.next() {
         part
     } else {
+        tracing::error!("Failed to read client_address: {line}");
         return Err(ParseSshConnectionError::Parse(line));
     };
 
@@ -294,6 +314,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     let _client_port = if let Some(part) = parts.next() {
         part
     } else {
+        tracing::error!("Failed to read port: {line}");
         return Err(ParseSshConnectionError::Parse(line));
     };
 
@@ -301,6 +322,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     let _server_address = if let Some(part) = parts.next() {
         part
     } else {
+        tracing::error!("Failed to read port: {line}");
         return Err(ParseSshConnectionError::Parse(line));
     };
 
@@ -308,6 +330,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     let _server_port = if let Some(part) = parts.next() {
         part
     } else {
+        tracing::error!("Failed to read server_port: {line}");
         return Err(ParseSshConnectionError::Parse(line));
     };
 
@@ -315,16 +338,18 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     match parts.next() {
         Some("++\n") => {}
         Some(_) | None => {
+            tracing::error!("Failed to read second anchor: {line}");
             return Err(ParseSshConnectionError::Parse(line));
         }
     }
 
     // Finally, there should be nothing left.
     if let Some(_) = parts.next() {
+        tracing::error!("Extra data: {line}");
         return Err(ParseSshConnectionError::Parse(line));
     }
 
-    Ok(Some(client_address.to_string()))
+    Ok(client_address.to_string())
 }
 
 impl Drop for HostPipeChild {
@@ -366,6 +391,7 @@ where
     inner: Arc<HostPipeChild>,
     relaunch_command_delay: Duration,
     host_pipe_child_builder: T,
+    ssh_timeout: u16,
     watchdogs: bool,
 }
 
@@ -382,11 +408,13 @@ where
 pub(crate) async fn spawn(
     target: Weak<Target>,
     watchdogs: bool,
+    ssh_timeout: u16,
 ) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder>> {
     let host_pipe_child_builder = HostPipeChildDefaultBuilder {};
     HostPipeConnection::<HostPipeChildDefaultBuilder>::spawn_with_builder(
         target,
         host_pipe_child_builder,
+        ssh_timeout,
         RETRY_DELAY,
         watchdogs,
     )
@@ -400,6 +428,7 @@ where
     async fn start_child_pipe(
         target: &Weak<Target>,
         builder: T,
+        ssh_timeout: u16,
         watchdogs: bool,
     ) -> Result<Arc<HostPipeChild>> {
         let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
@@ -413,7 +442,14 @@ where
         })?;
 
         let (host_addr, cmd) = builder
-            .new(ssh_address, target.id(), log_buf.clone(), target.events.clone(), watchdogs)
+            .new(
+                ssh_address,
+                target.id(),
+                log_buf.clone(),
+                target.events.clone(),
+                watchdogs,
+                ssh_timeout,
+            )
             .await
             .with_context(|| {
                 format!("creating host-pipe command to target {:?}", target_nodename)
@@ -433,13 +469,22 @@ where
     async fn spawn_with_builder(
         target: Weak<Target>,
         host_pipe_child_builder: T,
+        ssh_timeout: u16,
         relaunch_command_delay: Duration,
         watchdogs: bool,
     ) -> Result<Self> {
-        let hpc = Self::start_child_pipe(&target, host_pipe_child_builder, watchdogs).await?;
+        let hpc = Self::start_child_pipe(&target, host_pipe_child_builder, ssh_timeout, watchdogs)
+            .await?;
         let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
 
-        Ok(Self { target, inner: hpc, relaunch_command_delay, host_pipe_child_builder, watchdogs })
+        Ok(Self {
+            target,
+            inner: hpc,
+            relaunch_command_delay,
+            host_pipe_child_builder,
+            ssh_timeout,
+            watchdogs,
+        })
     }
 
     pub async fn wait(&mut self) -> Result<()> {
@@ -487,6 +532,7 @@ where
             let hpc = Self::start_child_pipe(
                 &Rc::downgrade(&self.target),
                 self.host_pipe_child_builder,
+                self.ssh_timeout,
                 self.watchdogs,
             )
             .await?;
@@ -544,6 +590,7 @@ mod test {
             stderr_buf: Rc<LogBuffer>,
             event_queue: events::Queue<TargetEvent>,
             _watchdogs: bool,
+            _ssh_timeout: u16,
         ) -> Result<(Option<HostAddr>, HostPipeChild)> {
             match self.operation_type {
                 ChildOperationType::Normal => {
@@ -612,6 +659,7 @@ mod test {
         let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::Normal },
+            30,
             Duration::default(),
             false,
         )
@@ -630,6 +678,7 @@ mod test {
         let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::InternalFailure },
+            30,
             Duration::default(),
             false,
         )
@@ -659,6 +708,7 @@ mod test {
         let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder { operation_type: ChildOperationType::SshFailure },
+            30,
             Duration::default(),
             false,
         )
@@ -671,15 +721,14 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_parse_ssh_connection_works() {
         for (line, expected) in [
-            (&""[..], None),
-            (&"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..], Some("192.168.1.1".to_string())),
+            (&"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..], "192.168.1.1".to_string()),
             (
                 &"++ fe80::111:2222:3333:444 56671 10.0.0.1 22 ++\n",
-                Some("fe80::111:2222:3333:444".to_string()),
+                "fe80::111:2222:3333:444".to_string(),
             ),
             (
                 &"++ fe80::111:2222:3333:444%ethxc2 56671 10.0.0.1 22 ++\n",
-                Some("fe80::111:2222:3333:444%ethxc2".to_string()),
+                "fe80::111:2222:3333:444%ethxc2".to_string(),
             ),
         ] {
             match parse_ssh_connection(&mut line.as_bytes()).await {
@@ -700,6 +749,7 @@ mod test {
             &"++192.168.1.1 1234 10.0.0.1 22++"[..],
             &"++192.168.1.1 1234 10.0.0.1 22 ++"[..],
             &"++ 192.168.1.1 1234 10.0.0.1 22++"[..],
+            &"++ ++"[..],
             &"## 192.168.1.1 1234 10.0.0.1 22 ##"[..],
             // Truncation
             &"++"[..],
