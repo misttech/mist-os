@@ -46,6 +46,7 @@ pub fn sysctl_directory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHa
     dir.subdir(b"vm", 0o555, |dir| {
         dir.entry(b"mmap_rnd_bits", StubSysctl::new_node(), mode);
         dir.entry(b"mmap_rnd_compat_bits", StubSysctl::new_node(), mode);
+        dir.entry(b"drop_caches", StubSysctl::new_node(), mode);
     });
     dir.build()
 }
