@@ -69,8 +69,8 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
 use crate::{
     sealed, LinkLocalAddr, LinkLocalAddress, LinkLocalMulticastAddr, LinkLocalUnicastAddr,
-    MulticastAddr, MulticastAddress, Scope, ScopeableAddress, SpecifiedAddr, SpecifiedAddress,
-    UnicastAddr, UnicastAddress, Witness,
+    MappedAddress, MulticastAddr, MulticastAddress, Scope, ScopeableAddress, SpecifiedAddr,
+    SpecifiedAddress, UnicastAddr, UnicastAddress, Witness,
 };
 
 // NOTE on passing by reference vs by value: Clippy advises us to pass IPv4
@@ -940,6 +940,38 @@ impl LinkLocalAddress for IpAddr {
     #[inline]
     fn is_link_local(&self) -> bool {
         map_ip_addr!(self, is_link_local)
+    }
+}
+
+impl MappedAddress for Ipv4Addr {
+    /// Is this address non-mapped?
+    ///
+    /// Always true; IPv4 address do not have a mapped address space.
+    #[inline]
+    fn is_non_mapped(&self) -> bool {
+        true
+    }
+}
+
+impl MappedAddress for Ipv6Addr {
+    /// Is this address non-mapped?
+    ///
+    /// `is_non_mapped` returns true if `self` is outside of the IPv4 mapped
+    /// Ipv6 address subnet, as defined in [RFC 4291 Section 2.5.5.2] (e.g.
+    /// `::FFFF:0:0/96`).
+    ///
+    /// [RFC 4291 Section 2.5.5.2]: https://tools.ietf.org/html/rfc4291#section-2.5.5.2
+    #[inline]
+    fn is_non_mapped(&self) -> bool {
+        self.to_ipv4_mapped().is_none()
+    }
+}
+
+impl MappedAddress for IpAddr {
+    /// Is this address non-mapped?
+    #[inline]
+    fn is_non_mapped(&self) -> bool {
+        map_ip_addr!(self, is_non_mapped)
     }
 }
 
@@ -2132,6 +2164,13 @@ impl LinkLocalAddress for Ipv6SourceAddr {
     }
 }
 
+impl MappedAddress for Ipv6SourceAddr {
+    fn is_non_mapped(&self) -> bool {
+        let addr: Ipv6Addr = self.into();
+        addr.is_non_mapped()
+    }
+}
+
 impl From<Ipv6SourceAddr> for Ipv6Addr {
     fn from(addr: Ipv6SourceAddr) -> Ipv6Addr {
         addr.get()
@@ -2265,6 +2304,15 @@ impl LinkLocalAddress for UnicastOrMulticastIpv6Addr {
         match self {
             UnicastOrMulticastIpv6Addr::Unicast(addr) => addr.is_link_local(),
             UnicastOrMulticastIpv6Addr::Multicast(addr) => addr.is_link_local(),
+        }
+    }
+}
+
+impl MappedAddress for UnicastOrMulticastIpv6Addr {
+    fn is_non_mapped(&self) -> bool {
+        match self {
+            UnicastOrMulticastIpv6Addr::Unicast(addr) => addr.is_non_mapped(),
+            UnicastOrMulticastIpv6Addr::Multicast(addr) => addr.is_non_mapped(),
         }
     }
 }
@@ -3067,6 +3115,8 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
+    use crate::NonMappedAddr;
+
     #[test]
     fn test_map_ip_associated_constant() {
         fn get_loopback_address<I: Ip>() -> SpecifiedAddr<I::Addr> {
@@ -3622,6 +3672,17 @@ mod tests {
 
         assert_eq!(not_embedded.to_ipv4_compatible(), None);
         assert_eq!(not_embedded.to_ipv4_mapped(), None);
+
+        assert_eq!(
+            NonMappedAddr::new(compatible),
+            Some(unsafe { NonMappedAddr::new_unchecked(compatible) })
+        );
+        assert_eq!(NonMappedAddr::new(mapped), None);
+        assert_eq!(
+            NonMappedAddr::new(not_embedded),
+            Some(unsafe { NonMappedAddr::new_unchecked(not_embedded) })
+        );
+        assert_eq!(NonMappedAddr::new(v4), Some(unsafe { NonMappedAddr::new_unchecked(v4) }));
     }
 
     #[test]

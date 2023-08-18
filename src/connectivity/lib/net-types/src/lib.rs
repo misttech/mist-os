@@ -92,8 +92,8 @@ mod sealed {
 ///
 /// A type which implements `Witness<A>` wraps an address of type `A` and
 /// guarantees some property about the wrapped address. It is implemented by
-/// [`SpecifiedAddr`], [`UnicastAddr`], [`MulticastAddr`], and
-/// [`LinkLocalAddr`].
+/// [`SpecifiedAddr`], [`UnicastAddr`], [`MulticastAddr`], [`LinkLocalAddr`],
+/// and [`NonMappedAddr`].
 pub trait Witness<A>: AsRef<A> + Sized + sealed::Sealed {
     /// Constructs a new witness type.
     ///
@@ -205,6 +205,7 @@ impl_trait_for_witness!(SpecifiedAddress, is_specified, UnicastAddr);
 impl_trait_for_witness!(SpecifiedAddress, is_specified, MulticastAddr);
 impl_trait_for_witness!(SpecifiedAddress, is_specified, BroadcastAddr);
 impl_trait_for_witness!(SpecifiedAddress, is_specified, LinkLocalAddr);
+impl_trait_for_witness!(SpecifiedAddress, is_specified, NonMappedAddr);
 
 /// Addresses that can be unicast.
 ///
@@ -239,6 +240,7 @@ impl_trait_for_witness!(UnicastAddress, is_unicast, SpecifiedAddr);
 impl_trait_for_witness!(UnicastAddress, is_unicast, MulticastAddr);
 impl_trait_for_witness!(UnicastAddress, is_unicast, BroadcastAddr);
 impl_trait_for_witness!(UnicastAddress, is_unicast, LinkLocalAddr);
+impl_trait_for_witness!(UnicastAddress, is_unicast, NonMappedAddr);
 
 /// Addresses that can be multicast.
 ///
@@ -269,6 +271,7 @@ impl_trait_for_witness!(MulticastAddress, is_multicast, SpecifiedAddr);
 impl_trait_for_witness!(MulticastAddress, is_multicast, UnicastAddr);
 impl_trait_for_witness!(MulticastAddress, is_multicast, BroadcastAddr);
 impl_trait_for_witness!(MulticastAddress, is_multicast, LinkLocalAddr);
+impl_trait_for_witness!(MulticastAddress, is_multicast, NonMappedAddr);
 
 /// Addresses that can be broadcast.
 ///
@@ -291,6 +294,7 @@ impl_trait_for_witness!(BroadcastAddress, is_broadcast, SpecifiedAddr);
 impl_trait_for_witness!(BroadcastAddress, is_broadcast, UnicastAddr);
 impl_trait_for_witness!(BroadcastAddress, is_broadcast, MulticastAddr);
 impl_trait_for_witness!(BroadcastAddress, is_broadcast, LinkLocalAddr);
+impl_trait_for_witness!(BroadcastAddress, is_broadcast, NonMappedAddr);
 
 /// Addresses that can be a link-local.
 ///
@@ -323,6 +327,7 @@ impl_trait_for_witness!(LinkLocalAddress, is_link_local, SpecifiedAddr);
 impl_trait_for_witness!(LinkLocalAddress, is_link_local, UnicastAddr);
 impl_trait_for_witness!(LinkLocalAddress, is_link_local, MulticastAddr);
 impl_trait_for_witness!(LinkLocalAddress, is_link_local, BroadcastAddr);
+impl_trait_for_witness!(LinkLocalAddress, is_link_local, NonMappedAddr);
 
 /// A scope used by [`ScopeableAddress`]. See that trait's documentation for
 /// more information.
@@ -374,6 +379,26 @@ pub trait ScopeableAddress {
     /// have a zone.
     fn scope(&self) -> Self::Scope;
 }
+
+/// An address that may represent an address from another addressing scheme.
+///
+/// `MappedAddress` is implemented by address types that can map another
+/// addressing scheme. Notably, IPv6 addresses, which may represent an IPv4
+/// address using the IPv4-mapped-Ipv6 subnet (e.g. ::FFFF:0:0/96).
+///
+/// Address types which cannot be used to represent another addressing scheme
+/// can still implement `MappedAddress` by treating all addresses as
+/// non-mapped.
+pub trait MappedAddress {
+    /// Is this a non-mapped address?
+    fn is_non_mapped(&self) -> bool;
+}
+
+impl_trait_for_witness!(MappedAddress, is_non_mapped, SpecifiedAddr);
+impl_trait_for_witness!(MappedAddress, is_non_mapped, UnicastAddr);
+impl_trait_for_witness!(MappedAddress, is_non_mapped, MulticastAddr);
+impl_trait_for_witness!(MappedAddress, is_non_mapped, BroadcastAddr);
+impl_trait_for_witness!(MappedAddress, is_non_mapped, LinkLocalAddr);
 
 macro_rules! doc_comment {
     ($x:expr, $($tt:tt)*) => {
@@ -637,26 +662,30 @@ impl_try_from_witness!(
     [LinkLocalAddr: LinkLocalAddress],
     [LinkLocalUnicastAddr: LinkLocalUnicastAddress],
     [LinkLocalMulticastAddr: LinkLocalMulticastAddress],
-    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress]
+    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress],
+    [NonMappedAddr: MappedAddress]
 );
 
 // UnicastAddr
 impl_witness!(UnicastAddr, "unicast", UnicastAddress, is_unicast);
 impl_into_specified!(UnicastAddr, UnicastAddress, is_unicast);
 impl_nested_witness!(UnicastAddress, UnicastAddr, LinkLocalAddress, LinkLocalAddr, new_link_local);
+impl_nested_witness!(UnicastAddress, UnicastAddr, MappedAddress, NonMappedAddr, new_non_mapped);
 impl_into_specified_for_nested_witness!(
     UnicastAddress,
     UnicastAddr,
     LinkLocalAddress,
     LinkLocalAddr
 );
+impl_into_specified_for_nested_witness!(UnicastAddress, UnicastAddr, MappedAddress, NonMappedAddr);
 impl_try_from_witness!(
     [UnicastAddr: UnicastAddress],
     [MulticastAddr: MulticastAddress],
     [BroadcastAddr: BroadcastAddress],
     [LinkLocalAddr: LinkLocalAddress],
     [LinkLocalMulticastAddr: LinkLocalMulticastAddress],
-    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress]
+    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress],
+    [NonMappedAddr: MappedAddress]
 );
 
 // MulticastAddr
@@ -669,11 +698,18 @@ impl_nested_witness!(
     LinkLocalAddr,
     new_link_local
 );
+impl_nested_witness!(MulticastAddress, MulticastAddr, MappedAddress, NonMappedAddr, new_non_mapped);
 impl_into_specified_for_nested_witness!(
     MulticastAddress,
     MulticastAddr,
     LinkLocalAddress,
     LinkLocalAddr
+);
+impl_into_specified_for_nested_witness!(
+    MulticastAddress,
+    MulticastAddr,
+    MappedAddress,
+    NonMappedAddr
 );
 impl_try_from_witness!(
     [MulticastAddr: MulticastAddress],
@@ -681,7 +717,8 @@ impl_try_from_witness!(
     [BroadcastAddr: BroadcastAddress],
     [LinkLocalAddr: LinkLocalAddress],
     [LinkLocalUnicastAddr: LinkLocalUnicastAddress],
-    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress]
+    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress],
+    [NonMappedAddr: MappedAddress]
 );
 
 // BroadcastAddr
@@ -694,11 +731,18 @@ impl_nested_witness!(
     LinkLocalAddr,
     new_link_local
 );
+impl_nested_witness!(BroadcastAddress, BroadcastAddr, MappedAddress, NonMappedAddr, new_non_mapped);
 impl_into_specified_for_nested_witness!(
     BroadcastAddress,
     BroadcastAddr,
     LinkLocalAddress,
     LinkLocalAddr
+);
+impl_into_specified_for_nested_witness!(
+    BroadcastAddress,
+    BroadcastAddr,
+    MappedAddress,
+    NonMappedAddr
 );
 impl_try_from_witness!(
     [BroadcastAddr: BroadcastAddress],
@@ -706,7 +750,8 @@ impl_try_from_witness!(
     [MulticastAddr: MulticastAddress],
     [LinkLocalAddr: LinkLocalAddress],
     [LinkLocalUnicastAddr: LinkLocalUnicastAddress],
-    [LinkLocalMulticastAddr: LinkLocalMulticastAddress]
+    [LinkLocalMulticastAddr: LinkLocalMulticastAddress],
+    [NonMappedAddr: MappedAddress]
 );
 
 // LinkLocalAddr
@@ -727,6 +772,7 @@ impl_nested_witness!(
     BroadcastAddr,
     new_broadcast
 );
+impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, MappedAddress, NonMappedAddr, new_non_mapped);
 impl_into_specified_for_nested_witness!(
     LinkLocalAddress,
     LinkLocalAddr,
@@ -745,11 +791,56 @@ impl_into_specified_for_nested_witness!(
     BroadcastAddress,
     BroadcastAddr
 );
+impl_into_specified_for_nested_witness!(
+    LinkLocalAddress,
+    LinkLocalAddr,
+    MappedAddress,
+    NonMappedAddr
+);
 impl_try_from_witness!(
     [LinkLocalAddr: LinkLocalAddress],
     [UnicastAddr: UnicastAddress],
     [MulticastAddr: MulticastAddress],
-    [BroadcastAddr: BroadcastAddress]
+    [BroadcastAddr: BroadcastAddress],
+    [NonMappedAddr: MappedAddress]
+);
+
+// NonMappedAddr
+impl_witness!(NonMappedAddr, "non_mapped", MappedAddress, is_non_mapped);
+impl_nested_witness!(MappedAddress, NonMappedAddr, SpecifiedAddress, SpecifiedAddr, new_specified);
+impl_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr, new_unicast);
+impl_nested_witness!(MappedAddress, NonMappedAddr, MulticastAddress, MulticastAddr, new_multicast);
+impl_nested_witness!(MappedAddress, NonMappedAddr, BroadcastAddress, BroadcastAddr, new_broadcast);
+impl_nested_witness!(MappedAddress, NonMappedAddr, LinkLocalAddress, LinkLocalAddr, new_link_local);
+impl_into_specified_for_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr);
+impl_into_specified_for_nested_witness!(
+    MappedAddress,
+    NonMappedAddr,
+    MulticastAddress,
+    MulticastAddr
+);
+impl_into_specified_for_nested_witness!(
+    MappedAddress,
+    NonMappedAddr,
+    BroadcastAddress,
+    BroadcastAddr
+);
+impl_into_specified_for_nested_witness!(
+    MappedAddress,
+    NonMappedAddr,
+    LinkLocalAddress,
+    LinkLocalAddr
+);
+impl_try_from_witness!(
+    [NonMappedAddr: MappedAddress],
+    [SpecifiedAddr: SpecifiedAddress],
+    [UnicastAddr: UnicastAddress],
+    [MulticastAddr: MulticastAddress],
+    [BroadcastAddr: BroadcastAddress],
+    [LinkLocalAddr: LinkLocalAddress],
+    [LinkLocalUnicastAddr: LinkLocalUnicastAddress],
+    [LinkLocalMulticastAddr: LinkLocalMulticastAddress],
+    [LinkLocalBroadcastAddr: LinkLocalBroadcastAddress]
 );
 
 // NOTE(joshlf): We provide these type aliases both for convenience and also to
@@ -993,6 +1084,9 @@ mod tests {
         LinkLocalUnicast,
         LinkLocalMulticast,
         LinkLocalBroadcast,
+        MappedUnicast,
+        MappedMulticast,
+        MappedBroadcast,
     }
 
     impl SpecifiedAddress for Address {
@@ -1005,9 +1099,9 @@ mod tests {
         fn is_unicast(&self) -> bool {
             use Address::*;
             match self {
-                GlobalUnicast | LinkLocalUnicast => true,
+                GlobalUnicast | LinkLocalUnicast | MappedUnicast => true,
                 Unspecified | GlobalMulticast | GlobalBroadcast | LinkLocalMulticast
-                | LinkLocalBroadcast => false,
+                | LinkLocalBroadcast | MappedMulticast | MappedBroadcast => false,
             }
         }
     }
@@ -1016,9 +1110,9 @@ mod tests {
         fn is_multicast(&self) -> bool {
             use Address::*;
             match self {
-                GlobalMulticast | LinkLocalMulticast => true,
+                GlobalMulticast | LinkLocalMulticast | MappedMulticast => true,
                 Unspecified | GlobalUnicast | GlobalBroadcast | LinkLocalUnicast
-                | LinkLocalBroadcast => false,
+                | MappedUnicast | MappedBroadcast | LinkLocalBroadcast => false,
             }
         }
     }
@@ -1027,9 +1121,9 @@ mod tests {
         fn is_broadcast(&self) -> bool {
             use Address::*;
             match self {
-                GlobalBroadcast | LinkLocalBroadcast => true,
+                GlobalBroadcast | LinkLocalBroadcast | MappedBroadcast => true,
                 Unspecified | GlobalUnicast | GlobalMulticast | LinkLocalUnicast
-                | LinkLocalMulticast => false,
+                | MappedUnicast | MappedMulticast | LinkLocalMulticast => false,
             }
         }
     }
@@ -1039,7 +1133,19 @@ mod tests {
             use Address::*;
             match self {
                 LinkLocalUnicast | LinkLocalMulticast | LinkLocalBroadcast => true,
-                Unspecified | GlobalUnicast | GlobalMulticast | GlobalBroadcast => false,
+                Unspecified | GlobalUnicast | GlobalMulticast | GlobalBroadcast | MappedUnicast
+                | MappedBroadcast | MappedMulticast => false,
+            }
+        }
+    }
+
+    impl MappedAddress for Address {
+        fn is_non_mapped(&self) -> bool {
+            use Address::*;
+            match self {
+                MappedUnicast | MappedBroadcast | MappedMulticast => false,
+                Unspecified | GlobalUnicast | GlobalMulticast | GlobalBroadcast
+                | LinkLocalUnicast | LinkLocalMulticast | LinkLocalBroadcast => true,
             }
         }
     }
@@ -1130,18 +1236,37 @@ mod tests {
     }
 
     #[test]
-    fn test_nested() {
+    fn test_non_mapped_addr() {
+        assert_eq!(
+            NonMappedAddr::new(Address::LinkLocalUnicast),
+            Some(NonMappedAddr(Address::LinkLocalUnicast))
+        );
+        assert_eq!(NonMappedAddr::new(Address::MappedUnicast), None);
+        assert_eq!(
+            NonMappedAddr::new(Address::LinkLocalMulticast),
+            Some(NonMappedAddr(Address::LinkLocalMulticast))
+        );
+        assert_eq!(NonMappedAddr::new(Address::MappedMulticast), None);
+        assert_eq!(
+            NonMappedAddr::new(Address::LinkLocalBroadcast),
+            Some(NonMappedAddr(Address::LinkLocalBroadcast))
+        );
+        assert_eq!(NonMappedAddr::new(Address::MappedBroadcast), None);
+    }
+
+    macro_rules! test_nested {
+        ($new:expr, $($input:ident => $output:expr,)*) => {
+            $(
+                assert_eq!($new(Address::$input), $output);
+            )*
+        };
+    }
+
+    #[test]
+    fn test_nested_link_local() {
         // Test UnicastAddr<LinkLocalAddr>, MulticastAddr<LinkLocalAddr>,
         // BroadcastAddr<LinkLocalAddr>, LinkLocalAddr<UnicastAddr>,
         // LinkLocalAddr<MulticastAddr>, LinkLocalAddr<BroadcastAddr>.
-
-        macro_rules! test_nested {
-            ($new:expr, $($input:ident => $output:expr,)*) => {
-                $(
-                    assert_eq!($new(Address::$input), $output);
-                )*
-            };
-        }
 
         // Unicast
         test_nested!(
@@ -1198,6 +1323,76 @@ mod tests {
             LinkLocalUnicast => None,
             LinkLocalMulticast => None,
             LinkLocalBroadcast => Some(LinkLocalAddr(BroadcastAddr(Address::LinkLocalBroadcast))),
+        );
+    }
+
+    #[test]
+    fn test_nested_non_mapped() {
+        // Test:
+        //   UnicastAddr<NonMappedAddr>, NonMappedAddr<UnicastAddr>,
+        //   MulticastAddr<NonMappedAddr>, NonMappedAddr<MulticastAddr>,
+        //   BroadcastAddr<NonMappedAddr>, NonMappedAddr<BroadcastAddr>,
+
+        // Unicast
+        test_nested!(UnicastAddr::new_non_mapped,
+            Unspecified => None,
+            LinkLocalUnicast => Some(UnicastAddr(NonMappedAddr(Address::LinkLocalUnicast))),
+            LinkLocalMulticast => None,
+            LinkLocalBroadcast => None,
+            MappedUnicast => None,
+            MappedMulticast => None,
+            MappedBroadcast => None,
+        );
+
+        // Multicast
+        test_nested!(MulticastAddr::new_non_mapped,
+            Unspecified => None,
+            LinkLocalUnicast => None,
+            LinkLocalMulticast => Some(MulticastAddr(NonMappedAddr(Address::LinkLocalMulticast))),
+            LinkLocalBroadcast => None,
+            MappedUnicast => None,
+            MappedMulticast => None,
+            MappedBroadcast => None,
+        );
+
+        // Broadcast
+        test_nested!(BroadcastAddr::new_non_mapped,
+            Unspecified => None,
+            LinkLocalUnicast => None,
+            LinkLocalMulticast => None,
+            LinkLocalBroadcast => Some(BroadcastAddr(NonMappedAddr(Address::LinkLocalBroadcast))),
+            MappedUnicast => None,
+            MappedMulticast => None,
+            MappedBroadcast => None,
+        );
+
+        // non-mapped
+        test_nested!(NonMappedAddr::new_unicast,
+            Unspecified => None,
+            LinkLocalUnicast => Some(NonMappedAddr(UnicastAddr(Address::LinkLocalUnicast))),
+            LinkLocalMulticast => None,
+            LinkLocalBroadcast => None,
+            MappedUnicast => None,
+            MappedMulticast => None,
+            MappedBroadcast => None,
+        );
+        test_nested!(NonMappedAddr::new_multicast,
+            Unspecified => None,
+            LinkLocalUnicast => None,
+            LinkLocalMulticast => Some(NonMappedAddr(MulticastAddr(Address::LinkLocalMulticast))),
+            LinkLocalBroadcast => None,
+            MappedUnicast => None,
+            MappedMulticast => None,
+            MappedBroadcast => None,
+        );
+        test_nested!(NonMappedAddr::new_broadcast,
+            Unspecified => None,
+            LinkLocalUnicast => None,
+            LinkLocalMulticast => None,
+            LinkLocalBroadcast => Some(NonMappedAddr(BroadcastAddr(Address::LinkLocalBroadcast))),
+            MappedUnicast => None,
+            MappedMulticast => None,
+            MappedBroadcast => None,
         );
     }
 
