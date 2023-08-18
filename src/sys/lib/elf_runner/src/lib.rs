@@ -38,6 +38,7 @@ use {
     futures::channel::oneshot,
     moniker::Moniker,
     runner::component::ChannelEpitaph,
+    runner::StartInfo,
     std::convert::TryFrom,
     std::{convert::TryInto, path::Path, sync::Arc},
     tracing::warn,
@@ -208,30 +209,29 @@ impl ElfRunner {
         start_info: fcrunner::ComponentStartInfo,
         checker: &ScopedPolicyChecker,
     ) -> Result<ElfComponent, StartComponentError> {
-        let resolved_url = start_info
-            .resolved_url
-            .clone()
-            .ok_or(StartComponentError::StartInfoError(StartInfoError::MissingResolvedUrl))?;
+        let start_info: StartInfo = start_info
+            .try_into()
+            .map_err(StartInfoError::StartInfoError)
+            .map_err(StartComponentError::StartInfoError)?;
+
+        let resolved_url = start_info.resolved_url.clone();
 
         // This also checks relevant security policy for config that it wraps using the provided
         // PolicyChecker.
-        let program_config = start_info
-            .program
-            .as_ref()
-            .map(|program| ElfProgramConfig::parse_and_check(&program, &checker))
-            .ok_or(StartComponentError::StartInfoError(StartInfoError::MissingProgram))?
+        let program_config = ElfProgramConfig::parse_and_check(&start_info.program, &checker)
             .map_err(|err| {
                 StartComponentError::StartInfoError(StartInfoError::ProgramError(err))
             })?;
 
-        let url = resolved_url.clone();
         let main_process_critical = program_config.main_process_critical;
-        let res: Result<ElfComponent, StartComponentError> = self
-            .start_component_helper(start_info, checker.scope.clone(), resolved_url, program_config)
-            .await;
+        let res: Result<ElfComponent, StartComponentError> =
+            self.start_component_helper(start_info, checker.scope.clone(), program_config).await;
         match res {
             Err(e) if main_process_critical => {
-                panic!("failed to launch component with a critical process ({:?}): {:?}", url, e)
+                panic!(
+                    "failed to launch component with a critical process ({:?}): {:?}",
+                    &resolved_url, e
+                )
             }
             x => x,
         }
@@ -239,11 +239,12 @@ impl ElfRunner {
 
     async fn start_component_helper(
         &self,
-        mut start_info: fcrunner::ComponentStartInfo,
+        mut start_info: StartInfo,
         moniker: Moniker,
-        resolved_url: String,
         program_config: ElfProgramConfig,
     ) -> Result<ElfComponent, StartComponentError> {
+        let resolved_url = &start_info.resolved_url;
+
         // Connect to `fuchsia.process.Launcher`.
         let launcher = self
             .launcher_connector
@@ -262,10 +263,8 @@ impl ElfRunner {
         .map_err(StartComponentError::ExceptionRegistrationFailed)?;
 
         // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
-        let ns = runner::component::ComponentNamespace::try_from(
-            start_info.ns.take().unwrap_or_else(|| vec![]),
-        )
-        .map_err(StartComponentError::ComponentNamespaceError)?;
+        let ns = runner::component::ComponentNamespace::try_from(start_info.namespace)
+            .map_err(StartComponentError::ComponentNamespaceError)?;
 
         let config_vmo = start_info
             .encoded_config
@@ -291,16 +290,9 @@ impl ElfRunner {
         // Take the UTC clock handle out of `start_info.numbered_handles`, if available.
         let utc_handle = start_info
             .numbered_handles
-            .as_mut()
-            .map(|handles| {
-                handles
-                    .iter()
-                    .position(|handles| {
-                        handles.id == HandleInfo::new(HandleType::ClockUtc, 0).as_raw()
-                    })
-                    .map(|position| handles.swap_remove(position).handle)
-            })
-            .flatten();
+            .iter()
+            .position(|handles| handles.id == HandleInfo::new(HandleType::ClockUtc, 0).as_raw())
+            .map(|position| start_info.numbered_handles.swap_remove(position).handle);
 
         let utc_clock = if let Some(handle) = utc_handle {
             zx::Clock::from(handle)
@@ -342,16 +334,14 @@ impl ElfRunner {
         handle_infos.extend(stdout_and_stderr_handles);
 
         // Add any external numbered handles.
-        if let Some(handles) = start_info.numbered_handles {
-            handle_infos.extend(handles);
-        }
+        handle_infos.extend(start_info.numbered_handles);
 
         // Configure the process launcher.
         let job_dup = job
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(StartComponentError::JobDuplicateFailed)?;
 
-        let name = Path::new(&resolved_url)
+        let name = Path::new(resolved_url)
             .file_name()
             .and_then(|filename| filename.to_str())
             .ok_or_else(|| {

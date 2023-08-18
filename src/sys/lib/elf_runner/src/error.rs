@@ -85,12 +85,10 @@ pub enum JobError {
 /// Errors from parsing ComponentStartInfo.
 #[derive(Debug, Clone, Error)]
 pub enum StartInfoError {
-    #[error("missing program")]
-    MissingProgram,
+    #[error(transparent)]
+    StartInfoError(#[from] runner::StartInfoError),
     #[error("missing runtime dir")]
     MissingRuntimeDir,
-    #[error("missing resolved URL")]
-    MissingResolvedUrl,
     #[error("component resolved URL is malformed: {_0}")]
     BadResolvedUrl(String),
     #[error("program is invalid: {_0}")]
@@ -101,9 +99,8 @@ impl StartInfoError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            StartInfoError::MissingProgram => zx::Status::INVALID_ARGS,
+            StartInfoError::StartInfoError(err) => err.as_zx_status(),
             StartInfoError::MissingRuntimeDir => zx::Status::INVALID_ARGS,
-            StartInfoError::MissingResolvedUrl => zx::Status::INVALID_ARGS,
             StartInfoError::BadResolvedUrl(_) => zx::Status::INVALID_ARGS,
             StartInfoError::ProgramError(err) => err.as_zx_status(),
         }

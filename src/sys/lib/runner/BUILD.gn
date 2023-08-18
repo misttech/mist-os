@@ -15,6 +15,7 @@ rustc_library("runner") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
