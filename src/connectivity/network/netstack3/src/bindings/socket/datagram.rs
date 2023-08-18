@@ -1921,8 +1921,8 @@ mod tests {
                     .add_named_endpoint(test_ep_name(1), Some(A::config_addr_subnet())),
             )
             .build()
-            .await
-            .unwrap();
+            .await;
+
         let (proxy, event) = get_socket_and_event::<A>(t.get(0), proto).await;
         (t, proxy, event)
     }
@@ -2173,8 +2173,8 @@ mod tests {
                     .add_named_endpoint(test_ep_name(2), Some(A::config_addr_subnet_remote())),
             )
             .build()
-            .await
-            .unwrap();
+            .await;
+
         let alice = t.get(0);
         let (alice_socket, alice_events) = get_socket_and_event::<A>(alice, proto).await;
 
@@ -2316,7 +2316,7 @@ mod tests {
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
+        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
@@ -2353,7 +2353,7 @@ mod tests {
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
+        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
@@ -2415,8 +2415,8 @@ mod tests {
                     .add_named_endpoint(test_ep_name(2), Some(A::config_addr_subnet_remote())),
             )
             .build()
-            .await
-            .unwrap();
+            .await;
+
         let (alice_socket, alice_events) = get_socket_and_event::<A>(t.get(0), proto).await;
         let alice_cloned = socket_clone(&alice_socket).expect("cannot clone socket");
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event: alice_event, .. } =
@@ -2581,7 +2581,7 @@ mod tests {
     {
         // Make sure we cannot close twice from the same channel so that we
         // maintain the correct refcount.
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
+        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket = get_socket::<A>(test_stack, proto).await;
         let cloned = socket_clone(&socket).unwrap();
@@ -2633,7 +2633,7 @@ mod tests {
         T: Transport<<A::AddrType as IpAddress>::Version>,
         crate::bindings::BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
     {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
+        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let cloned = {
             let socket = get_socket::<A>(test_stack, proto).await;
@@ -2668,7 +2668,7 @@ mod tests {
         T: Transport<<A::AddrType as IpAddress>::Version>,
         crate::bindings::BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
     {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
+        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket = get_socket::<A>(test_stack, proto).await;
         let () = socket
@@ -2699,8 +2699,8 @@ mod tests {
                     .add_named_endpoint(test_ep_name(1), Some(A::config_addr_subnet())),
             )
             .build()
-            .await
-            .unwrap();
+            .await;
+
         let (socket, events) = get_socket_and_event::<A>(t.get(0), proto).await;
         let local = A::create(A::LOCAL_ADDR, 200);
         let remote = A::create(A::REMOTE_ADDR, 300);
@@ -2814,8 +2814,7 @@ mod tests {
     ) where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<Udp>,
     {
-        let mut t =
-            TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await.unwrap();
+        let mut t = TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await;
 
         let (socket, _events) = get_socket_and_event::<A>(t.get(0), proto).await;
         let addr =

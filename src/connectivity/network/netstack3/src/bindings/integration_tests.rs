@@ -5,14 +5,13 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Once};
 
-use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
-use futures::channel::mpsc;
+use futures::{channel::mpsc, TryFutureExt as _};
 use net_declare::{net_ip_v4, net_subnet_v4, net_subnet_v6};
 use net_types::{
     ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv6},
@@ -292,38 +291,31 @@ impl TestSetup {
     async fn get_endpoint(
         &mut self,
         ep_name: &str,
-    ) -> Result<
-        (
-            fidl::endpoints::ClientEnd<fidl_fuchsia_hardware_network::DeviceMarker>,
-            fidl_fuchsia_hardware_network::PortId,
-        ),
-        Error,
-    > {
-        let epm = self.sandbox().get_endpoint_manager()?;
-        let ep = match epm.get_endpoint(ep_name).await? {
-            Some(ep) => ep.into_proxy()?,
-            None => {
-                return Err(format_err!("Failed to retrieve endpoint {}", ep_name));
-            }
-        };
-
-        let (port, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
-        ep.get_port(server_end).context("get port")?;
-        let (device, server_end) = fidl::endpoints::create_endpoints();
-        port.get_device(server_end).context("get device")?;
-        let port_id = port
-            .get_info()
+    ) -> (
+        fidl::endpoints::ClientEnd<fidl_fuchsia_hardware_network::DeviceMarker>,
+        fidl_fuchsia_hardware_network::PortId,
+    ) {
+        let epm = self.sandbox().get_endpoint_manager().expect("get endpoint manager");
+        let ep = epm
+            .get_endpoint(ep_name)
             .await
-            .context("get port info")?
-            .id
-            .ok_or_else(|| anyhow::anyhow!("missing port id"))?;
-        Ok((device, port_id))
+            .unwrap_or_else(|e| panic!("get endpoint {ep_name}: {e:?}"))
+            .unwrap_or_else(|| panic!("failed to retrieve endpoint {ep_name}"))
+            .into_proxy()
+            .expect("into proxy");
+
+        let (port, server_end) = fidl::endpoints::create_proxy().expect("create proxy");
+        ep.get_port(server_end).expect("get port");
+        let (device, server_end) = fidl::endpoints::create_endpoints();
+        port.get_device(server_end).expect("get device");
+        let port_id = port.get_info().await.expect("get port info").id.expect("missing port id");
+        (device, port_id)
     }
 
     /// Creates a new empty `TestSetup`.
-    fn new() -> Result<Self, Error> {
+    fn new() -> Self {
         set_logger_for_test();
-        Ok(Self { sandbox: None, _network: None, stacks: Vec::new() })
+        Self { sandbox: None, _network: None, stacks: Vec::new() }
     }
 
     fn sandbox(&mut self) -> &netemul::TestSandbox {
@@ -331,10 +323,7 @@ impl TestSetup {
             .get_or_insert_with(|| netemul::TestSandbox::new().expect("create netemul sandbox"))
     }
 
-    async fn configure_network(
-        &mut self,
-        ep_names: impl Iterator<Item = String>,
-    ) -> Result<(), Error> {
+    async fn configure_network(&mut self, ep_names: impl Iterator<Item = String>) {
         let handle = self
             .sandbox()
             .setup_networks(vec![net::NetworkSetup {
@@ -343,11 +332,10 @@ impl TestSetup {
                 endpoints: ep_names.map(|name| new_endpoint_setup(name)).collect(),
             }])
             .await
-            .context("create network")?
+            .expect("create network")
             .into_proxy();
 
         self._network = Some(handle);
-        Ok(())
     }
 
     fn add_stack(&mut self, stack: TestStack) {
@@ -408,10 +396,10 @@ impl TestSetupBuilder {
     }
 
     /// Attempts to build a [`TestSetup`] with the provided configuration.
-    pub(crate) async fn build(self) -> Result<TestSetup, Error> {
-        let mut setup = TestSetup::new()?;
+    pub(crate) async fn build(self) -> TestSetup {
+        let mut setup = TestSetup::new();
         if !self.endpoints.is_empty() {
-            let () = setup.configure_network(self.endpoints.into_iter()).await?;
+            setup.configure_network(self.endpoints.into_iter()).await;
         }
 
         // configure all the stacks:
@@ -423,44 +411,44 @@ impl TestSetupBuilder {
 
             for (ep_name, addr) in stack_cfg.endpoints.into_iter() {
                 // get the endpoint from the sandbox config:
-                let (endpoint, port_id) = setup.get_endpoint(&ep_name).await?;
+                let (endpoint, port_id) = setup.get_endpoint(&ep_name).await;
 
                 let installer = stack.connect_interfaces_installer();
 
                 let (device_control, server_end) =
-                    fidl::endpoints::create_proxy().context("create proxy")?;
-                installer.install_device(endpoint, server_end).context("install device")?;
+                    fidl::endpoints::create_proxy().expect("create proxy");
+                installer.install_device(endpoint, server_end).expect("install device");
 
                 // Discard strong ownership of device, we're already holding
                 // onto the device's netemul definition we don't need to hold on
                 // to the netstack side of it too.
-                device_control.detach().context("detach")?;
+                device_control.detach().expect("detach");
 
                 let (interface_control, server_end) =
-                    fidl::endpoints::create_proxy().context("create proxy")?;
+                    fidl::endpoints::create_proxy().expect("create proxy");
                 device_control
                     .create_interface(
                         &port_id,
                         server_end,
                         &fidl_fuchsia_net_interfaces_admin::Options::default(),
                     )
-                    .context("create interface")?;
+                    .expect("create interface");
 
                 let if_id = interface_control
                     .get_id()
+                    .map_ok(|i| BindingId::new(i).expect("nonzero id"))
                     .await
-                    .context("get id")
-                    .and_then(|i| BindingId::new(i).ok_or(Error::msg("id is 0")))?;
+                    .expect("get id");
 
                 // Detach interface_control for the same reason as
                 // device_control.
-                interface_control.detach().context("detach")?;
+                interface_control.detach().expect("detach");
 
                 assert!(interface_control
                     .enable()
                     .await
-                    .context("calling enable")?
-                    .map_err(|e| format_err!("enable error {:?}", e))?);
+                    .expect("calling enable")
+                    .expect("enable failed"));
 
                 // We'll ALWAYS await for the newly created interface to come up
                 // online before returning, so users of `TestSetupBuilder` can
@@ -489,11 +477,11 @@ impl TestSetupBuilder {
                         let core_id = non_sync_ctx
                             .devices
                             .get_core_id(if_id)
-                            .ok_or_else(|| format_err!("Failed to get device {} info", if_id))?;
+                            .unwrap_or_else(|| panic!("failed to get device {if_id} info"));
 
                         add_ip_addr_subnet(sync_ctx, non_sync_ctx, &core_id, addr)
-                            .context("add interface address")
-                    })?;
+                            .expect("add interface address")
+                    });
 
                     let (_, subnet) = addr.addr_subnet();
 
@@ -507,7 +495,7 @@ impl TestSetupBuilder {
                         })
                         .await
                         .squash_result()
-                        .context("add forwarding entry")?;
+                        .expect("add forwarding entry");
                 }
                 assert_eq!(stack.endpoint_ids.insert(ep_name, if_id), None);
             }
@@ -515,7 +503,7 @@ impl TestSetupBuilder {
             setup.add_stack(stack)
         }
 
-        Ok(setup)
+        setup
     }
 }
 
@@ -557,8 +545,8 @@ async fn test_add_device_routes() {
         .add_endpoint()
         .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
         .build()
-        .await
-        .unwrap();
+        .await;
+
     let test_stack = t.get(0);
     let stack = test_stack.connect_stack();
     let if_id = test_stack.get_endpoint_id(1);
@@ -647,8 +635,7 @@ async fn test_list_del_routes() {
         .add_named_endpoint(EP_NAME)
         .add_stack(StackSetupBuilder::new().add_named_endpoint(EP_NAME, None))
         .build()
-        .await
-        .unwrap();
+        .await;
 
     let test_stack = t.get(0);
     let stack = test_stack.connect_stack();
@@ -810,8 +797,7 @@ async fn test_add_remote_routes() {
         .add_endpoint()
         .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
         .build()
-        .await
-        .unwrap();
+        .await;
 
     let test_stack = t.get(0);
     let stack = test_stack.connect_stack();
@@ -877,13 +863,10 @@ fn get_slaac_secret<'s>(
 async fn test_ipv6_slaac_secret_stable() {
     const ENDPOINT: &'static str = "endpoint";
 
-    let mut t = TestSetupBuilder::new()
-        .add_named_endpoint(ENDPOINT)
-        .add_empty_stack()
-        .build()
-        .await
-        .unwrap();
-    let (endpoint, port_id) = t.get_endpoint(ENDPOINT).await.expect("has endpoint");
+    let mut t =
+        TestSetupBuilder::new().add_named_endpoint(ENDPOINT).add_empty_stack().build().await;
+
+    let (endpoint, port_id) = t.get_endpoint(ENDPOINT).await;
 
     let test_stack = t.get(0);
     let installer = test_stack.connect_interfaces_installer();
