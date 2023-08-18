@@ -1820,8 +1820,11 @@ TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
     ASSERT_NO_FATAL_FAILURE(VmoCheck(child, 4, zx_system_get_page_size()));
 
     // The parent is gone now, so the remaining page that the child could see should also have
-    // moved to the child.
-    ASSERT_EQ(2 * zx_system_get_page_size(), VmoCommittedBytes(child));
+    // moved to the child. We might need to poll a few times in case the vmo.reset() above did not
+    // destroy the parent. When run as a component test, memory_monitor might be querying the
+    // parent's attribution, keeping it alive. That should only be a small window though and the
+    // parent should eventually be destroyed.
+    ASSERT_TRUE(PollVmoCommittedBytes(child, 2 * zx_system_get_page_size()));
   }
 }
 

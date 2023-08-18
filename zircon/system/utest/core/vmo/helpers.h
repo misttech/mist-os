@@ -60,6 +60,20 @@ static inline size_t VmoCommittedBytes(const zx::vmo& vmo) {
   return info.committed_bytes;
 }
 
+static inline bool PollVmoCommittedBytes(const zx::vmo& vmo, size_t expected_bytes) {
+  zx_info_vmo_t info;
+  while (true) {
+    if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
+      return false;
+    }
+    if (info.committed_bytes == expected_bytes) {
+      return true;
+    }
+    printf("polling again. page count %zu\n", info.committed_bytes / zx_system_get_page_size());
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+  }
+}
+
 // Create a fit::defer which will check a BTI to make certain that it has no
 // pinned or quarantined pages when it goes out of scope, and fail the test if
 // it does.
