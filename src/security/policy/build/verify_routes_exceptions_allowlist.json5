@@ -725,30 +725,6 @@
                     },
                 },
 
-                // TODO(https://fxbug.dev/107231): When RFC-0155 is implemented,
-                // route this with `from: "void"` from the Netstack2 component
-                // instead of allow-listing it here.
-                // TODO(https://fxbug.dev/125773): Remove this when Netstack2 is
-                // only using the out-of-stack DHCP client component.
-                {
-                    using_node: "/core/network/netcfg",
-                    capability: "fuchsia.net.dhcp.ClientProvider",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    offer_from_child_expose_not_found: {
-                                        child_moniker: "netstack",
-                                        moniker: "/core/network",
-                                        capability_id: "fuchsia.net.dhcp.ClientProvider",
-                                    },
-                                },
-                            },
-                        },
-                        message: "`fuchsia.net.dhcp.ClientProvider` was not exposed to `/core/network` from child `#netstack`.",
-                    },
-                },
-
                 // ################################################################################
                 // END: TODO(https://fxbug.dev/115632): Fix broken routes in /core/test_manager/*
                 // ################################################################################

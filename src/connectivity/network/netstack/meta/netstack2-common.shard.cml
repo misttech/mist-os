@@ -43,5 +43,13 @@
             ],
             from: "self",
         },
+
+        // TODO(https://fxbug.dev/125773): Remove once DHCP client is used by both netstacks
+        // and is moved into the network realm.
+        {
+            protocol: "fuchsia.net.dhcp.ClientProvider",
+            from: "void",
+            availability: "optional",
+        },
     ],
 }
