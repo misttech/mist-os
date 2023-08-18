@@ -14,6 +14,7 @@
 
 #include "test_thread.h"
 #include "userpager.h"
+#include "zircon/system/utest/core/vmo/helpers.h"
 
 namespace pager_tests {
 
@@ -7142,21 +7143,10 @@ TEST(PagerWriteback, EvictAfterDirtyRequest) {
   constexpr char k_command[] = "scanner reclaim_all";
   ASSERT_OK(zx_debug_send_command(root_resource->get(), k_command, strlen(k_command)));
 
+  // Check if the middle page has been evicted yet.
   // Eviction is asynchronous. Wait for the eviction to occur.
-  while (true) {
-    zx::nanosleep(zx::deadline_after(zx::msec(50)));
-    printf("polling page count...\n");
-
-    // Verify that the vmo has evicted pages.
-    zx_info_vmo_t info;
-    ASSERT_OK(vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-
-    // Check if the middle page has been evicted yet.
-    if (info.committed_bytes == (kNumPages - 1) * zx_system_get_page_size()) {
-      break;
-    }
-    printf("page count %zu\n", info.committed_bytes / zx_system_get_page_size());
-  }
+  ASSERT_TRUE(
+      vmo_test::PollVmoCommittedBytes(vmo->vmo(), (kNumPages - 1) * zx_system_get_page_size()));
 
   // Try to resolve the DIRTY request now. The entire operation should fail.
   ASSERT_FALSE(pager.DirtyPages(vmo, 0, kNumPages));

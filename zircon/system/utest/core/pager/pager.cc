@@ -24,6 +24,7 @@
 
 #include "test_thread.h"
 #include "userpager.h"
+#include "zircon/system/utest/core/vmo/helpers.h"
 
 namespace pager_tests {
 
@@ -2798,21 +2799,10 @@ TEST(Pager, EvictionHintDontNeed) {
   ASSERT_OK(
       zx_debug_send_command(root_resource->get(), k_command_reclaim, strlen(k_command_reclaim)));
 
+  // Verify that the vmo has no committed pages after eviction.
   // Eviction is asynchronous. Poll in a loop until we see the committed page count drop. In case
   // we're left polling forever, the external test timeout will kick in.
-  while (true) {
-    zx::nanosleep(zx::deadline_after(zx::msec(50)));
-    printf("polling page count...\n");
-
-    // Verify that the vmo has no committed pages after eviction.
-    ASSERT_OK(vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-    if (info.committed_bytes == 0) {
-      break;
-    }
-    printf("page count %zu\n", info.committed_bytes / zx_system_get_page_size());
-  }
-
-  ASSERT_EQ(0, info.committed_bytes);
+  ASSERT_TRUE(vmo_test::PollVmoCommittedBytes(vmo->vmo(), 0));
 }
 
 // Tests that the zx_vmo_op_range() API succeeds and fails as expected for hints.
