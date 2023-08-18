@@ -70,6 +70,8 @@ class CompatHash {
   constexpr iterator begin() const;
   constexpr iterator end() const;
 
+  constexpr size_t size() const { return buckets_.size(); }
+
  private:
   AbiSpan<const Word, cpp20::dynamic_extent, Elf, AbiTraits> buckets_, chain_;
 };

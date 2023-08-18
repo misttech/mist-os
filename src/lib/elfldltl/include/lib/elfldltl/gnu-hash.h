@@ -212,6 +212,12 @@ class GnuHash {
   constexpr iterator begin() const;
   constexpr iterator end() const;
 
+  // This is roughly the size of the hash table, though not exactly equivalent to
+  // std::distance(begin(), end()).
+  constexpr size_t size() const {
+    return tables_.size() * kBucketsPerAddr - AbsoluteBucketChainStart(chain_index_bias_);
+  }
+
  private:
   // The DT_GNU_HASH data is always a whole number of Addr-aligned units, and
   // so comes in as span<const Addr>.  The actual encoding uses Addr-sized

@@ -11,6 +11,8 @@
 
 namespace {
 
+constexpr size_t kMaxBuckets = 1024;
+
 template <typename Hasher>
 void HashFuzzer(Hasher&& hasher, uint32_t no, FuzzedDataProvider& provider) {
   auto name = provider.ConsumeRandomLengthString();
@@ -56,6 +58,16 @@ struct SymbolFuzzer {
         .set_strtab({strtab.data(), strtab.size()})
         .set_compat_hash(compat_hash)
         .set_gnu_hash(gnu_hash);
+
+    if (info.compat_hash() && info.compat_hash()->size() > kMaxBuckets) {
+      info.set_compat_hash({});
+    }
+    if (info.gnu_hash() && info.gnu_hash()->size() > kMaxBuckets) {
+      info.set_gnu_hash({});
+    }
+    if (!info.compat_hash() && !info.gnu_hash()) {
+      return -1;
+    }
 
     auto fuzz_hash_table_entry =  // Do some exhaustive iteration tests.
         [safe_symtab = info.safe_symtab(), &info](uint32_t symndx) {
