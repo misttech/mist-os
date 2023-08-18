@@ -227,7 +227,7 @@ impl worker::SocketWorkerHandler for BindingData {
 
     fn handle_request(
         &mut self,
-        ctx: &Ctx,
+        ctx: &mut Ctx,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
@@ -244,7 +244,7 @@ impl worker::SocketWorkerHandler for BindingData {
 }
 
 struct RequestHandler<'a> {
-    ctx: &'a Ctx,
+    ctx: &'a mut Ctx,
     data: &'a mut BindingData,
 }
 
@@ -277,8 +277,7 @@ impl<'a> RequestHandler<'a> {
             })
             .transpose()?;
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
@@ -310,8 +309,7 @@ impl<'a> RequestHandler<'a> {
         fposix::Errno,
     > {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         let SocketInfo { device, protocol } =
             netstack3_core::device::socket::get_info(sync_ctx, id);
@@ -362,8 +360,7 @@ impl<'a> RequestHandler<'a> {
         data: Vec<u8>,
     ) -> Result<(), fposix::Errno> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let SocketState { kind, queue: _ } = *id.socket_state();
 
         let data = Buf::new(data, ..);

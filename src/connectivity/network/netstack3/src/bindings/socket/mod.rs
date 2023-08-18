@@ -64,8 +64,7 @@ pub(crate) async fn serve(
             match req {
                 psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
                     let response = {
-                        let ctx = ctx.clone();
-                        let Ctx { sync_ctx: _, non_sync_ctx } = &ctx;
+                        let non_sync_ctx = ctx.non_sync_ctx();
                         BindingId::new(index)
                             .ok_or(DeviceNotFoundError)
                             .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
@@ -80,9 +79,8 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let response = {
-                        let ctx = ctx.clone();
-                        let Ctx { sync_ctx: _, non_sync_ctx } = &ctx;
-                        let devices = AsRef::<Devices<_>>::as_ref(&non_sync_ctx);
+                        let non_sync_ctx = ctx.non_sync_ctx();
+                        let devices = AsRef::<Devices<_>>::as_ref(non_sync_ctx);
                         let result = devices
                             .get_device_by_name(&name)
                             .map(|d| d.external_state().static_common_info().binding_id.get())
@@ -157,7 +155,7 @@ pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
 }
 
 fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
-    let Ctx { sync_ctx, non_sync_ctx } = ctx;
+    let (sync_ctx, non_sync_ctx) = ctx.contexts();
     non_sync_ctx.devices.with_devices(|devices| {
         devices
             .map(|d| {
@@ -191,7 +189,7 @@ fn get_interface_flags(
     ctx: &Ctx,
     name: &str,
 ) -> Result<psocket::InterfaceFlags, zx::sys::zx_status_t> {
-    let Ctx { sync_ctx: _, non_sync_ctx } = ctx;
+    let non_sync_ctx = ctx.non_sync_ctx();
     let device =
         non_sync_ctx.devices.get_device_by_name(name).ok_or(zx::Status::NOT_FOUND.into_raw())?;
     Ok(flags_for_device(&device.external_state()))

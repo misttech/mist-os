@@ -746,7 +746,7 @@ where
 
     fn handle_request(
         &mut self,
-        ctx: &Ctx,
+        ctx: &mut Ctx,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
@@ -784,7 +784,7 @@ where
 }
 /// A borrow into a [`SocketWorker`]'s state.
 struct RequestHandler<'a, I: Ip, T: Transport<I>> {
-    ctx: &'a crate::bindings::Ctx,
+    ctx: &'a mut crate::bindings::Ctx,
     data: &'a mut BindingData<I, T>,
 }
 
@@ -1361,8 +1361,7 @@ where
                     info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let sockaddr = I::SocketAddress::from_sock_addr(addr)?;
         trace!("connect sockaddr: {:?}", sockaddr);
         let (remote_addr, remote_port) =
@@ -1395,8 +1394,7 @@ where
                     info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         let (sockaddr, port) =
             TryFromFidlWithContext::try_from_fidl_with_ctx(&non_sync_ctx, sockaddr)
@@ -1422,8 +1420,7 @@ where
                     info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         T::disconnect(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
         Ok(())
@@ -1442,8 +1439,7 @@ where
                     info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         let l: LocalAddress<_, _, _> = T::get_socket_info(sync_ctx, non_sync_ctx, id).into_fidl();
         l.try_into_fidl_with_ctx(non_sync_ctx).map(SockAddr::into_sock_addr)
@@ -1479,8 +1475,7 @@ where
                     info: SocketControlInfo { _properties: _, id },
                 },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         T::get_socket_info(sync_ctx, non_sync_ctx, id).try_into_fidl().and_then(
             |r: RemoteAddress<_, _, _>| {
@@ -1505,7 +1500,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts();
         let front = I::with_collection(non_sync_ctx, |c| {
             let messages = c.received.get(id.get_key_index()).expect("has queue");
             let mut messages = messages.lock();
@@ -1567,8 +1562,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let remote = remote_addr
             .map(|remote_addr| {
                 let (remote_addr, port) =
@@ -1598,8 +1592,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let device = device
             .map(|name| non_sync_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
             .transpose()?;
@@ -1614,7 +1607,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts();
 
         let device = match T::get_bound_device(sync_ctx, non_sync_ctx, id) {
             None => return Ok(None),
@@ -1637,8 +1630,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         T::set_reuse_port(sync_ctx, non_sync_ctx, id, reuse_port).map_err(IntoErrno::into_errno)
     }
 
@@ -1648,7 +1640,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts();
 
         T::get_reuse_port(sync_ctx, non_sync_ctx, id)
     }
@@ -1659,7 +1651,7 @@ where
                 BindingData { peer_event: _, info: SocketControlInfo { id, _properties }, messages },
             ctx,
         } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts();
         let how = match (
             how.contains(fposix_socket::ShutdownMode::READ),
             how.contains(fposix_socket::ShutdownMode::WRITE),
@@ -1711,8 +1703,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         let interface =
             interface.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
@@ -1748,8 +1739,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         T::set_unicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
         Ok(())
     }
@@ -1776,8 +1766,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         T::set_multicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
         Ok(())
     }
@@ -1794,7 +1783,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts();
         Ok(T::get_unicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
 
@@ -1810,7 +1799,7 @@ where
             data:
                 BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
         } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts();
 
         Ok(T::get_multicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
@@ -2543,7 +2532,7 @@ mod tests {
         for i in 0..2 {
             t.get(i).with_ctx(|ctx| {
                 <A::AddrType as IpAddress>::Version::with_collection(
-                    &ctx.non_sync_ctx,
+                    ctx.non_sync_ctx(),
                     |SocketCollection { received }| {
                         assert_matches!(received.iter().collect::<Vec<_>>()[..], [_]);
                     },
@@ -2568,7 +2557,7 @@ mod tests {
         for i in 0..2 {
             t.get(i).with_ctx(|ctx| {
                 <A::AddrType as IpAddress>::Version::with_collection(
-                    &ctx.non_sync_ctx,
+                    ctx.non_sync_ctx(),
                     |SocketCollection { received }| {
                         assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                     },
@@ -2611,7 +2600,7 @@ mod tests {
         // empty
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                &ctx.non_sync_ctx,
+                ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.iter().collect::<Vec<_>>()[..], [_]);
                 },
@@ -2626,7 +2615,7 @@ mod tests {
         // Now it should become empty
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                &ctx.non_sync_ctx,
+                ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                 },
@@ -2661,7 +2650,7 @@ mod tests {
         // No socket should be there now.
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                &ctx.non_sync_ctx,
+                ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                 },
@@ -2692,7 +2681,7 @@ mod tests {
         // make sure we don't leak anything.
         test_stack.with_ctx(|ctx| {
             <A::AddrType as IpAddress>::Version::with_collection(
-                &ctx.non_sync_ctx,
+                ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
                     assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
                 },
@@ -2858,7 +2847,8 @@ mod tests {
         };
         loop {
             let all_delivered =
-                stack.with_ctx(|Ctx { sync_ctx: _, non_sync_ctx }| {
+                stack.with_ctx(|ctx| {
+                    let non_sync_ctx = ctx.non_sync_ctx_mut();
                     <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<
                         Udp,
                     >>::with_collection(non_sync_ctx, |SocketCollection { received }| {

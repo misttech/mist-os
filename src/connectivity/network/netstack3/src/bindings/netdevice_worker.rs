@@ -99,7 +99,7 @@ impl NetdeviceWorker {
     }
 
     pub async fn run(self) -> Result<std::convert::Infallible, Error> {
-        let Self { ctx, inner: Inner { device: _, session, state }, task } = self;
+        let Self { mut ctx, inner: Inner { device: _, session, state }, task } = self;
         // Allow buffer shuttling to happen in other threads.
         let mut task = fuchsia_async::Task::spawn(task).fuse();
 
@@ -130,8 +130,7 @@ impl NetdeviceWorker {
                 Error::Client(e)
             })?;
 
-            let mut ctx = ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
             let Some(id) = id.upgrade() else {
                 // This is okay because we hold a weak reference; the device may
@@ -167,7 +166,7 @@ pub(crate) struct DeviceHandler {
 impl DeviceHandler {
     pub(crate) async fn add_port(
         &self,
-        ns: &Netstack,
+        ns: &mut Netstack,
         InterfaceOptions { name, metric }: InterfaceOptions,
         port: fhardware_network::PortId,
         control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
@@ -266,8 +265,8 @@ impl DeviceHandler {
             }
             netdevice_client::port_slab::Entry::Vacant(e) => e,
         };
-        let mut ctx = &mut ns.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let Netstack { interfaces_event_sink, ctx } = ns;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         // Check if there already exists an interface with this name.
         // Interface names are unique.
@@ -304,7 +303,8 @@ impl DeviceHandler {
                         common_info: devices::DynamicCommonInfo {
                             mtu: max_frame_size.as_mtu(),
                             admin_enabled: false,
-                            events: ns.create_interface_event_producer(
+                            events: crate::bindings::create_interface_event_producer(
+                                interfaces_event_sink,
                                 binding_id,
                                 crate::bindings::InterfaceProperties {
                                     name: name.clone(),
@@ -334,7 +334,8 @@ impl DeviceHandler {
         let devices::StaticCommonInfo { binding_id, name: _, tx_notifier } =
             external_state.static_common_info();
         let binding_id = *binding_id;
-        crate::bindings::devices::spawn_tx_task(&tx_notifier, ns, core_id.clone());
+        crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         netstack3_core::device::set_tx_queue_configuration(
             sync_ctx,
             non_sync_ctx,

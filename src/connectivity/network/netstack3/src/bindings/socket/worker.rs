@@ -51,7 +51,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// - `ControlFlow::Continue(None)` otherwise.
     fn handle_request(
         &mut self,
-        ctx: &Ctx,
+        ctx: &mut Ctx,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>>;
 
@@ -86,14 +86,13 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
             + Send
             + 'static,
     >(
-        ctx: Ctx,
+        mut ctx: Ctx,
         make_data: F,
         properties: SocketWorkerProperties,
         events: H::RequestStream,
     ) {
         let data = {
-            let mut ctx = ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
             make_data(sync_ctx, non_sync_ctx, properties)
         };
@@ -163,7 +162,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         };
 
         let Self { mut ctx, data } = self;
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         data.close(sync_ctx, non_sync_ctx);
 
         if let Some(respond_close) = respond_close {

@@ -483,7 +483,7 @@ where
 
     fn handle_request(
         &mut self,
-        ctx: &Ctx,
+        ctx: &mut Ctx,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
@@ -620,7 +620,7 @@ impl IntoErrno for ConnectionError {
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
 fn spawn_send_task<I: IpExt>(
-    ctx: crate::bindings::Ctx,
+    mut ctx: crate::bindings::Ctx,
     socket: Arc<zx::Socket>,
     watcher: NeedsDataWatcher,
     id: SocketId<I>,
@@ -642,8 +642,7 @@ fn spawn_send_task<I: IpExt>(
                 _ = watcher.as_mut().peek() => continue,
             };
             assert!(observed.contains(zx::Signals::SOCKET_READABLE));
-            let mut ctx = ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
             netstack3_core::transport::tcp::socket::do_send::<I, _>(
                 sync_ctx,
                 non_sync_ctx,
@@ -656,7 +655,7 @@ fn spawn_send_task<I: IpExt>(
 
 struct RequestHandler<'a, I: IpExt> {
     data: &'a mut BindingData<I>,
-    ctx: &'a Ctx,
+    ctx: &'a mut Ctx,
 }
 
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
@@ -669,8 +668,7 @@ where
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let (addr, port) =
             addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
         *id = bind::<I, _>(sync_ctx, non_sync_ctx, *id, addr, NonZeroU16::new(port))
@@ -679,11 +677,9 @@ where
     }
 
     fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx: ns_ctx } =
-            self;
+        let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
-        let mut ctx = ns_ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
@@ -691,7 +687,7 @@ where
         let connection = connect::<I, _>(sync_ctx, non_sync_ctx, *id, SocketAddr { ip, port })
             .map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
-            spawn_send_task::<I>(ns_ctx.clone(), local, watcher, connection);
+            spawn_send_task::<I>(ctx.clone(), local, watcher, connection);
             *id = connection;
             Err(fposix::Errno::Einprogress)
         } else {
@@ -701,8 +697,7 @@ where
 
     fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        let sync_ctx = ctx.sync_ctx();
         // The POSIX specification for `listen` [1] says
         //
         //   If listen() is called with a backlog argument value that is
@@ -731,8 +726,7 @@ where
 
     fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let fidl = match get_info::<I, _>(sync_ctx, *id) {
             SocketInfo::Unbound(_) => return Err(fposix::Errno::Einval),
             SocketInfo::Bound(BoundInfo { addr, port, device: _ }) => {
@@ -748,8 +742,7 @@ where
 
     fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         match get_info::<I, _>(sync_ctx, *id) {
             SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
             SocketInfo::Connection(info) => Ok({
@@ -768,30 +761,27 @@ where
         (Option<fnet::SocketAddress>, ClientEnd<fposix_socket::StreamSocketMarker>),
         fposix::Errno,
     > {
-        let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx: ns_ctx } =
-            self;
+        let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
 
-        let mut ctx = ns_ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let (accepted, addr, peer) =
             accept::<I, _>(sync_ctx, non_sync_ctx, *id).map_err(IntoErrno::into_errno)?;
         let addr = addr
-            .try_into_fidl_with_ctx(&non_sync_ctx)
+            .try_into_fidl_with_ctx(non_sync_ctx)
             .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
             .into_sock_addr();
         let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
         let (client, request_stream) = crate::bindings::socket::create_request_stream();
         peer.signal_handle(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
             .expect("failed to signal connection established");
-        spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, accepted);
-        spawn_connected_socket_task(ns_ctx.clone(), accepted, peer, request_stream);
+        spawn_send_task::<I>(ctx.clone(), socket, watcher, accepted);
+        spawn_connected_socket_task(ctx.clone(), accepted, peer, request_stream);
         Ok((want_addr.then_some(addr), client))
     }
 
     fn get_error(self) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        let sync_ctx = ctx.sync_ctx();
         match get_socket_error(sync_ctx, *id) {
             Some(err) => Err(err.into_errno()),
             None => Ok(()),
@@ -800,8 +790,7 @@ where
 
     fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let shutdown_recv = mode.contains(fposix_socket::ShutdownMode::READ);
         let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
         let is_conn = shutdown::<I, _>(
@@ -822,8 +811,7 @@ where
 
     fn set_bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let device = device
             .map(|name| non_sync_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
             .transpose()?;
@@ -833,8 +821,7 @@ where
 
     fn set_send_buffer_size(self, new_size: u64) {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         set_send_buffer_size(sync_ctx, non_sync_ctx, *id, new_size);
@@ -842,8 +829,7 @@ where
 
     fn send_buffer_size(self) -> u64 {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         send_buffer_size(sync_ctx, non_sync_ctx, *id)
             // If the socket doesn't have a send buffer (e.g. because it was shut
             // down for writing and all the data was sent to the peer), return 0.
@@ -855,8 +841,7 @@ where
 
     fn set_receive_buffer_size(self, new_size: u64) {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         set_receive_buffer_size(sync_ctx, non_sync_ctx, *id, new_size);
@@ -864,8 +849,7 @@ where
 
     fn receive_buffer_size(self) -> u64 {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         receive_buffer_size(sync_ctx, non_sync_ctx, *id)
             // If the socket doesn't have a receive buffer (e.g. because the remote
             // end signalled FIN and all data was sent to the client), return 0.
@@ -877,15 +861,13 @@ where
 
     fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        let sync_ctx = ctx.sync_ctx();
         set_reuseaddr(sync_ctx, *id, value).map_err(IntoErrno::into_errno)
     }
 
     fn reuse_address(self) -> bool {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+        let sync_ctx = ctx.sync_ctx();
         reuseaddr(sync_ctx, *id)
     }
 
@@ -1561,16 +1543,13 @@ where
 
     fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(self, f: F) -> R {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         with_socket_options_mut(sync_ctx, non_sync_ctx, *id, f)
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
         let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
-        let ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &ctx;
-        with_socket_options(sync_ctx, *id, f)
+        with_socket_options(ctx.sync_ctx(), *id, f)
     }
 }
 

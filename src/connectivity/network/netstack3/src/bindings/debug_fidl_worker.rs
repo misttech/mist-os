@@ -13,19 +13,19 @@ use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{debug, error, warn};
 
-use crate::bindings::{devices::BindingId, DeviceIdExt as _, DeviceSpecificInfo, Netstack};
+use crate::bindings::{devices::BindingId, DeviceIdExt as _, DeviceSpecificInfo};
 
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
 // channel (e.g. a single client connection).
 pub(crate) async fn serve_interfaces(
-    ns: Netstack,
+    non_sync_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
     rs: fnet_debug::InterfacesRequestStream,
 ) -> Result<(), fidl::Error> {
     debug!(protocol = fnet_debug::InterfacesMarker::DEBUG_NAME, "serving");
     rs.try_for_each(|req| async {
         match req {
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
-                handle_get_port(&ns, id, port);
+                handle_get_port(non_sync_ctx, id, port);
             }
         }
         Ok(())
@@ -34,13 +34,11 @@ pub(crate) async fn serve_interfaces(
 }
 
 fn handle_get_port(
-    ns: &Netstack,
+    non_sync_ctx: &crate::bindings::BindingsNonSyncCtxImpl,
     interface_id: u64,
     port: ServerEnd<fhardware_network::PortMarker>,
 ) {
-    let ctx = ns.ctx.clone();
-    let core_id =
-        BindingId::new(interface_id).and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id));
+    let core_id = BindingId::new(interface_id).and_then(|id| non_sync_ctx.devices.get_core_id(id));
     let port_handler =
         core_id.as_ref().ok_or(zx::Status::NOT_FOUND).map(|core_id| core_id.external_state());
     let port_handler =

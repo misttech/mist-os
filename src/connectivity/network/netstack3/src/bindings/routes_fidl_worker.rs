@@ -35,7 +35,7 @@ use tracing::{info, warn};
 
 use crate::bindings::{
     util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
-    BindingsNonSyncCtxImpl, Ctx, Netstack, SyncCtx,
+    BindingsNonSyncCtxImpl, Ctx, SyncCtx,
 };
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
@@ -45,11 +45,11 @@ use crate::bindings::{
 const MAX_PENDING_EVENTS: usize = (fnet_routes::MAX_EVENTS * 5) as usize;
 
 /// Serve the `fuchsia.net.routes/State` protocol.
-pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ns: Netstack) {
+pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, mut ctx: Ctx) {
     rs.try_for_each_concurrent(None, |req| match req {
         fnet_routes::StateRequest::Resolve { destination, responder } => futures::future::ready(
             responder
-                .send(resolve(destination, ns.clone()).as_ref().ok_or(ZX_ERR_ADDRESS_UNREACHABLE)),
+                .send(resolve(destination, &mut ctx).as_ref().ok_or(ZX_ERR_ADDRESS_UNREACHABLE)),
         ),
     })
     .await
@@ -59,18 +59,17 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ns: Netstac
 /// Resolves the route to the given destination address.
 ///
 /// Returns `None` if the destination can't be resolved.
-fn resolve(destination: fnet::IpAddress, ns: Netstack) -> Option<fnet_routes::Resolved> {
+fn resolve(destination: fnet::IpAddress, ctx: &mut Ctx) -> Option<fnet_routes::Resolved> {
     let addr: IpAddr = destination.into_core();
     match addr {
-        IpAddr::V4(addr) => resolve_inner(addr, ns),
-        IpAddr::V6(addr) => resolve_inner(addr, ns),
+        IpAddr::V4(addr) => resolve_inner(addr, ctx),
+        IpAddr::V6(addr) => resolve_inner(addr, ctx),
     }
 }
 
 /// The inner implementation of [`resolve`] that's generic over `Ip`.
-fn resolve_inner<A: IpAddress>(destination: A, ns: Netstack) -> Option<fnet_routes::Resolved> {
-    let mut ctx = ns.ctx;
-    let Ctx { sync_ctx, ref mut non_sync_ctx } = &mut ctx;
+fn resolve_inner<A: IpAddress>(destination: A, ctx: &mut Ctx) -> Option<fnet_routes::Resolved> {
+    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
     let ResolvedRoute { device, src_addr, next_hop } =
         match netstack3_core::ip::resolve_route::<A::Version, _>(sync_ctx, destination) {
             Err(e) => {
@@ -135,10 +134,10 @@ fn resolve_ethernet_link_addr<A: IpAddress>(
 }
 
 /// Serve the `fuchsia.net.routes/StateV4` protocol.
-pub(crate) async fn serve_state_v4(rs: fnet_routes::StateV4RequestStream, ns: Netstack) {
+pub(crate) async fn serve_state_v4(rs: fnet_routes::StateV4RequestStream, ctx: Ctx) {
     rs.try_for_each_concurrent(None, |req| match req {
         fnet_routes::StateV4Request::GetWatcherV4 { options: _, watcher, control_handle: _ } => {
-            serve_watcher::<Ipv4>(watcher, ns.clone()).map(|result| {
+            serve_watcher::<Ipv4>(watcher, ctx.clone()).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
                 }))
@@ -152,10 +151,10 @@ pub(crate) async fn serve_state_v4(rs: fnet_routes::StateV4RequestStream, ns: Ne
 }
 
 /// Serve the `fuchsia.net.routes/StateV6` protocol.
-pub(crate) async fn serve_state_v6(rs: fnet_routes::StateV6RequestStream, ns: Netstack) {
+pub(crate) async fn serve_state_v6(rs: fnet_routes::StateV6RequestStream, ctx: Ctx) {
     rs.try_for_each_concurrent(None, |req| match req {
         fnet_routes::StateV6Request::GetWatcherV6 { options: _, watcher, control_handle: _ } => {
-            serve_watcher::<Ipv6>(watcher, ns.clone()).map(|result| {
+            serve_watcher::<Ipv6>(watcher, ctx.clone()).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
                 }))
@@ -183,16 +182,14 @@ enum ServeWatcherError {
 // Serve a single client of the `WatcherV4` or `WatcherV6` protocol.
 async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
-    ns: Netstack,
+    mut ctx: Ctx,
 ) -> Result<(), ServeWatcherError> {
     let request_stream =
         server_end.into_stream().expect("failed to acquire request_stream from server_end");
-    let watcher = {
-        let mut ctx = ns.ctx.clone();
-        let Ctx { sync_ctx: _, ref mut non_sync_ctx } = &mut ctx;
-        let x = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
-        x
-    };
+
+    let non_sync_ctx = ctx.non_sync_ctx_mut();
+
+    let watcher = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
 
     let canceled_fut = watcher.canceled.wait();
     // NB: `watcher` needs to be an `AsyncMutex` so that it can be borrowed from
@@ -220,13 +217,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
             () = canceled_fut => Err(ServeWatcherError::Canceled),
         }
     };
-
-    {
-        let mut ctx = ns.ctx.clone();
-        let Ctx { sync_ctx: _, ref mut non_sync_ctx } = &mut ctx;
-        non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher.into_inner());
-    }
-
+    non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher.into_inner());
     result
 }
 

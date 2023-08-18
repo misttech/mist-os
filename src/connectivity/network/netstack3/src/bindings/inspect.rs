@@ -69,7 +69,7 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let Ctx { sync_ctx, non_sync_ctx: _ } = ctx;
+    let sync_ctx = ctx.sync_ctx();
     let mut visitor =
         Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
     tcp::socket::with_info::<Ipv4, _, _>(sync_ctx, &mut visitor);
@@ -122,7 +122,7 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let Ctx { sync_ctx, non_sync_ctx: _ } = ctx;
+    let sync_ctx = ctx.sync_ctx();
     let mut visitor =
         Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
     ip::forwarding::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
@@ -133,8 +133,7 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 
 pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
-    let Ctx { sync_ctx: _, non_sync_ctx } = ctx;
-    non_sync_ctx.devices.with_devices(|devices| {
+    ctx.non_sync_ctx().devices.with_devices(|devices| {
         for ref device in devices {
             let id = device.external_state().static_common_info().binding_id;
             inspector.root().record_child(format!("{id}"), |node| {

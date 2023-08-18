@@ -28,7 +28,6 @@ use tracing::warn;
 
 use crate::bindings::{
     interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
-    Netstack,
 };
 
 pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
@@ -153,18 +152,16 @@ impl DeviceSpecificInfo<'_> {
 
 pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
-    ns: &Netstack,
+    mut ctx: Ctx,
     device_id: &LoopbackDeviceId<BindingsNonSyncCtxImpl>,
 ) {
     let mut watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
-    let ns = ns.clone();
     fuchsia_async::Task::spawn(async move {
         // Loop while we are woken up to handle enqueued RX packets.
         while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
-            let mut ctx = ns.ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
             handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
         }
     })
@@ -173,18 +170,16 @@ pub(crate) fn spawn_rx_task(
 
 pub(crate) fn spawn_tx_task(
     notifier: &NeedsDataNotifier,
-    ns: &Netstack,
+    mut ctx: Ctx,
     device_id: DeviceId<BindingsNonSyncCtxImpl>,
 ) {
     let mut watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
-    let ns = ns.clone();
     fuchsia_async::Task::spawn(async move {
         // Loop while we are woken up to handle enqueued TX frames.
         while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
-            let mut ctx = ns.ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
             match transmit_queued_tx_frames(sync_ctx, non_sync_ctx, &device_id) {
                 Ok(()) => {}
                 Err(DeviceSendFrameError::DeviceNotReady(())) => {

@@ -462,7 +462,8 @@ impl TestSetupBuilder {
                 stack.wait_for_interface_online(if_id).await;
 
                 // Disable DAD for simplicity of testing.
-                stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+                stack.with_ctx(|ctx| {
+                    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
                     let devices: &Devices<_> = non_sync_ctx.as_ref();
                     let device = devices.get_core_id(if_id).unwrap();
                     let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
@@ -477,7 +478,8 @@ impl TestSetupBuilder {
                     .unwrap();
                 });
                 if let Some(addr) = addr {
-                    stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+                    stack.with_ctx(|ctx| {
+                        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
                         let core_id = non_sync_ctx
                             .devices
                             .get_core_id(if_id)
@@ -647,7 +649,7 @@ async fn test_list_del_routes() {
     let if_id = test_stack.get_named_endpoint_id(EP_NAME);
     let loopback_id = test_stack.get_named_endpoint_id(LOOPBACK_NAME);
     assert_ne!(loopback_id, if_id);
-    let device = test_stack.ctx().non_sync_ctx.get_core_id(if_id).expect("device exists");
+    let device = test_stack.ctx().non_sync_ctx().get_core_id(if_id).expect("device exists");
     let sub1 = net_subnet_v4!("192.168.0.0/24");
     let route1: AddableEntryEither<_> = AddableEntry::without_gateway(
         sub1,
@@ -671,7 +673,8 @@ async fn test_list_del_routes() {
     )
     .into();
 
-    let () = test_stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+    let () = test_stack.with_ctx(|ctx| {
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         // add a couple of routes directly into core:
         netstack3_core::add_route(sync_ctx, non_sync_ctx, route1).unwrap();
         netstack3_core::add_route(sync_ctx, non_sync_ctx, route2).unwrap();
@@ -762,7 +765,7 @@ async fn test_list_del_routes() {
 
     fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
         let mut ctx = ts.ctx();
-        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         netstack3_core::ip::get_all_routes(sync_ctx)
             .into_iter()
             .map(|entry| {
@@ -853,7 +856,8 @@ fn get_slaac_secret<'s>(
     test_stack: &'s mut TestStack,
     if_id: BindingId,
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
-    test_stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+    test_stack.with_ctx(|ctx| {
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
         netstack3_core::device::get_ipv6_configuration_and_flags(sync_ctx, &device)
             .config
