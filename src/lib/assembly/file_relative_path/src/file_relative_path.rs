@@ -421,6 +421,12 @@ impl<T: ?Sized + AsRef<str>> From<&T> for FileRelativePathBuf {
     }
 }
 
+impl std::fmt::Display for FileRelativePathBuf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        AsRef::<Utf8Path>::as_ref(self).fmt(f)
+    }
+}
+
 //
 // Trait implementations for various containers of FileRelativePathBuf
 //
@@ -772,5 +778,14 @@ mod test {
         let original = FileRelativePathBuf::from("foo/bar/baz.json");
         let relative = original.make_relative_to_dir("foo").unwrap();
         assert_eq!(relative, FileRelativePathBuf::FileRelative("bar/baz.json".into()))
+    }
+
+    #[test]
+    fn test_display() {
+        let original = FileRelativePathBuf::from("foo/bar/baz.json");
+        assert_eq!(format!("{}", original), "foo/bar/baz.json");
+
+        let relative = original.make_relative_to_dir("foo").unwrap();
+        assert_eq!(format!("{}", relative), "bar/baz.json");
     }
 }
