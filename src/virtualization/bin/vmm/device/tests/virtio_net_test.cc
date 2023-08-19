@@ -15,6 +15,8 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/trace-provider/provider.h>
 
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <virtio/net.h>
 
 #include "src/connectivity/lib/network-device/cpp/network_device_client.h"
@@ -26,6 +28,7 @@ namespace {
 using fuchsia::virtualization::hardware::VirtioNet_Start_Result;
 using fuchsia_hardware_network::wire::PortId;
 using network::client::NetworkDeviceClient;
+using ::testing::ElementsAreArray;
 
 constexpr size_t kRxBufferSize = 1526ul;
 constexpr size_t kNumQueues = 2;
@@ -293,8 +296,8 @@ TEST_F(VirtioNetTest, ConcurrentBidirectionalTransfers) {
   fake_network_.device_client()->SetRxCallback([&](NetworkDeviceClient::Buffer buffer) {
     uint8_t received_data[kTxDataSize];
     buffer.data().Read(received_data, kTxDataSize);
-    ASSERT_EQ(std::basic_string_view(received_data, kTxDataSize),
-              std::basic_string_view(tx_packet.data, kTxDataSize));
+    ASSERT_THAT(cpp20::span{received_data},
+                ElementsAreArray(cpp20::span{tx_packet.data, kTxDataSize}));
     total_tx++;
   });
 
@@ -329,8 +332,8 @@ TEST_F(VirtioNetTest, ConcurrentBidirectionalTransfers) {
       used = rx_queue_.NextUsed();
     }
 
-    ASSERT_EQ(std::basic_string_view(rx_packet->data, sizeof(kRxData)),
-              std::basic_string_view(kRxData, sizeof(kRxData)));
+    ASSERT_THAT(cpp20::span(rx_packet->data, sizeof(kRxData)),
+                ElementsAreArray(cpp20::span{kRxData}));
 
     total_rx++;
   }
@@ -394,8 +397,7 @@ TEST_F(VirtioNetTest, ReceiveFromGuest) {
   EXPECT_EQ(received[0].data().len(), kPacketSize);
   uint8_t received_data[kPacketSize];
   received[0].data().Read(received_data, kPacketSize);
-  EXPECT_EQ(std::basic_string_view(received_data, kPacketSize),
-            std::basic_string_view(packet.data, kPacketSize));
+  EXPECT_THAT(cpp20::span{received_data}, ElementsAreArray(cpp20::span{packet.data}));
 }
 
 TEST_F(VirtioNetTest, ResumesReceiveFromGuest) {

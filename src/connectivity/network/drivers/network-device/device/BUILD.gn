@@ -76,6 +76,7 @@ test("test_bin") {
     ":device",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

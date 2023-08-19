@@ -106,9 +106,9 @@ TEST_P(RenameTest, Children) {
   ASSERT_GT(fd, 0);
 
   static constexpr uint8_t file_contents_array[] = "This should be in the file";
-  constexpr std::basic_string_view file_contents = file_contents_array;
-  ASSERT_EQ(write(fd, file_contents.data(), file_contents.size()),
-            static_cast<ssize_t>(file_contents.size()));
+  constexpr cpp20::span kFileContents(file_contents_array);
+  ASSERT_EQ(write(fd, kFileContents.data(), kFileContents.size()),
+            static_cast<ssize_t>(kFileContents.size()));
 
   ASSERT_EQ(rename(GetPath("dir_before_move").c_str(), GetPath("dir").c_str()), 0);
 
@@ -127,13 +127,13 @@ TEST_P(RenameTest, Children) {
   ASSERT_NO_FATAL_FAILURE(CheckDirectoryContents(GetPath("dir/dir2").c_str(), dir2_contents));
 
   // Check the our file data has lasted (without re-opening)
-  ASSERT_NO_FATAL_FAILURE(CheckFileContents(fd, file_contents));
+  ASSERT_NO_FATAL_FAILURE(CheckFileContents(fd, kFileContents));
 
   // Check the our file data has lasted (with re-opening)
   ASSERT_EQ(close(fd), 0);
   fd = open(GetPath("dir/file").c_str(), O_RDONLY, 06444);
   ASSERT_GT(fd, 0);
-  ASSERT_NO_FATAL_FAILURE(CheckFileContents(fd, file_contents));
+  ASSERT_NO_FATAL_FAILURE(CheckFileContents(fd, kFileContents));
   ASSERT_EQ(close(fd), 0);
 
   // Clean up

@@ -11,6 +11,7 @@
 #include <future>
 #include <iomanip>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "device_interface.h"
@@ -30,6 +31,9 @@
 #endif
 
 namespace {
+
+using ::testing::ElementsAreArray;
+
 // Attempts to read an epitaph from |channel|. Returns the epitaph in the OK variant when it could
 // be fetched.
 zx::result<zx_status_t> WaitClosedAndReadEpitaph(const zx::channel& channel) {
@@ -860,8 +864,7 @@ TEST_F(NetworkDeviceTest, ListenSession) {
   buffer_descriptor_t& desc = session_b.descriptor(kDescriptorIndex0);
   ASSERT_EQ(desc.data_length, send_buff.size());
   auto* data = session_b.buffer(desc.offset);
-  ASSERT_EQ(std::basic_string_view(data, send_buff.size()),
-            std::basic_string_view(send_buff.data(), send_buff.size()));
+  EXPECT_THAT(cpp20::span(data, send_buff.size()), ElementsAreArray(send_buff));
 }
 
 TEST_F(NetworkDeviceTest, ClosingPrimarySession) {

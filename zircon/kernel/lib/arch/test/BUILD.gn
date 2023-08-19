@@ -27,6 +27,7 @@ if (is_host) {
     ]
     deps = [
       "//src/lib/fxl/test:gtest_main",
+      "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/arch/testing",

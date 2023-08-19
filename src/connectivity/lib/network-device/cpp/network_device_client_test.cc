@@ -14,6 +14,8 @@
 #include <unordered_set>
 
 #include <fbl/unique_fd.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
@@ -26,6 +28,8 @@ constexpr zx::duration kTimeout = zx::duration::infinite();
 namespace netdev = fuchsia_hardware_network;
 namespace tun = fuchsia_net_tun;
 using NetworkDeviceClient = network::client::NetworkDeviceClient;
+
+using ::testing::ContainerEq;
 
 template <class T>
 class TestEventHandler : public fidl::WireAsyncEventHandler<T> {
@@ -739,8 +743,7 @@ TEST_F(NetDeviceTest, TestPortInfoWithMac) {
   ASSERT_TRUE(port_details.unicast_address.has_value());
   fidl::Array expected_mac = kMacAddress.octets;
   fidl::Array actual_mac = port_details.unicast_address.value().octets;
-  EXPECT_EQ(std::basic_string_view(expected_mac.data(), expected_mac.size()),
-            std::basic_string_view(actual_mac.data(), actual_mac.size()));
+  EXPECT_THAT(expected_mac, ContainerEq(actual_mac));
 }
 
 TEST_F(NetDeviceTest, TestPortInfoInvalidPort) {
