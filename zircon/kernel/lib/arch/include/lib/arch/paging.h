@@ -575,7 +575,7 @@ class Paging : public PagingTraits {
         : on_terminal_(std::move(on_terminal)) {}
 
     template <class TableIo, LevelType Level>
-    std::optional<value_type> operator()(TableIo& io, TableEntry<Level>& entry, uint64_t vaddr) {
+    std::optional<value_type> operator()(TableIo & io, TableEntry<Level>& entry, uint64_t vaddr) {
       if (!entry.present()) {
         return fit::failed();
       }
@@ -642,7 +642,7 @@ class Paging : public PagingTraits {
     uint64_t next_vaddr() const { return input_vaddr_; }
 
     template <typename TableIo, LevelType Level>
-    std::optional<fit::result<MapError>> operator()(TableIo&& io, TableEntry<Level>& entry,
+    std::optional<fit::result<MapError>> operator()(TableIo && io, TableEntry<Level>& entry,
                                                     uint64_t table_paddr) {
       auto to_error = [entry_paddr = table_paddr + kEntrySize<Level> * entry.reg_addr(),
                        vaddr = input_vaddr_](MapError::Type type) -> MapError {
