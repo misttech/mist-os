@@ -82,7 +82,6 @@ var (
 	// changes, but they're almost never actually sensitive to said changes.
 	// https://fxbug.dev/67305 tracks generating this list automatically.
 	neverAffectedTestLabels = []string{
-		"//src/connectivity/overnet/tests/serial:overnet_serial_tests",
 		"//src/recovery/simulator:recovery_simulator_boot_test",
 		"//src/recovery/simulator:recovery_simulator_serial_test",
 		"//src/tests/installer:installer_test",
