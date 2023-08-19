@@ -6,23 +6,9 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_overnet::{MeshControllerProxy, ServiceConsumerProxy, ServicePublisherProxy};
 use once_cell::sync::OnceCell;
 
-mod fuchsia;
 mod not_fuchsia;
 
-#[cfg(target_os = "fuchsia")]
-pub use crate::fuchsia::*;
-#[cfg(not(target_os = "fuchsia"))]
 pub use not_fuchsia::*;
-
-#[cfg(target_os = "fuchsia")]
-pub mod logger {
-    pub fn init() -> Result<(), anyhow::Error> {
-        diagnostics_log::initialize(
-            diagnostics_log::PublishOptions::default().tags(&["overnet_hoist"]),
-        )?;
-        Ok(())
-    }
-}
 
 pub trait OvernetInstance: std::fmt::Debug + Sync + Send {
     fn connect_as_service_consumer(&self) -> Result<ServiceConsumerProxy, Error>;
@@ -43,13 +29,8 @@ pub trait OvernetInstance: std::fmt::Debug + Sync + Send {
 static HOIST: OnceCell<Hoist> = OnceCell::new();
 
 pub fn hoist() -> &'static Hoist {
-    if cfg!(target_os = "fuchsia") {
-        // on fuchsia, we always have a global hoist to return.
-        HOIST.get_or_init(|| Hoist::new().unwrap())
-    } else {
-        // otherwise, don't return it until something sets it up.
-        HOIST.get().expect("Tried to get overnet hoist before it was initialized")
-    }
+    // otherwise, don't return it until something sets it up.
+    HOIST.get().expect("Tried to get overnet hoist before it was initialized")
 }
 
 /// On non-fuchsia OS', call this at the start of the program to enable the global hoist.

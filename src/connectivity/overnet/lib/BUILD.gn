@@ -6,9 +6,7 @@ group("lib") {
   testonly = true
   deps = [
     "core",
-    "hoist",
     "onet_test_util",
-    "onet_tool",
     "quic",
     "serial_link",
     "stream_framer",
@@ -16,7 +14,11 @@ group("lib") {
     "udp_link",
   ]
   if (is_host) {
-    deps += [ "ascendd" ]
+    deps += [
+      "ascendd",
+      "hoist",
+      "onet_tool",
+    ]
   }
 }
 
@@ -25,7 +27,7 @@ group("tests") {
   deps = [
     "circuit:tests",
     "core:tests",
-    "hoist:tests",
+    "hoist:tests($host_toolchain)",
     "onet_test_util:tests",
     "quic:tests",
     "serial_link:tests",
