@@ -63,14 +63,15 @@ class StubHdmiIpBase : public HdmiIpBase {
 
 class FakeAmlHdmiDevice : public AmlHdmiDevice {
  public:
-  static std::unique_ptr<FakeAmlHdmiDevice> Create(AmlHdmiTest* test, fdf::MmioBuffer mmio) {
-    auto device = std::make_unique<FakeAmlHdmiDevice>(test, std::move(mmio));
+  static std::unique_ptr<FakeAmlHdmiDevice> Create(AmlHdmiTest* test, fdf::MmioBuffer mmio,
+                                                   zx::resource smc) {
+    auto device = std::make_unique<FakeAmlHdmiDevice>(test, std::move(mmio), std::move(smc));
     return device;
   }
 
-  explicit FakeAmlHdmiDevice(AmlHdmiTest* test, fdf::MmioBuffer mmio)
+  explicit FakeAmlHdmiDevice(AmlHdmiTest* test, fdf::MmioBuffer mmio, zx::resource smc)
       : AmlHdmiDevice(nullptr, std::move(mmio),
-                      std::make_unique<FakeHdmiDw>(&stub_hdmi_ip_base_, test)) {
+                      std::make_unique<FakeHdmiDw>(&stub_hdmi_ip_base_, test), std::move(smc)) {
     loop_.StartThread("fake-aml-hdmi-test-thread");
   }
 
@@ -89,7 +90,9 @@ class FakeAmlHdmiDevice : public AmlHdmiDevice {
 class AmlHdmiTest : public testing::Test {
  public:
   void SetUp() override {
-    dut_ = FakeAmlHdmiDevice::Create(this, mmio_range_.GetMmioBuffer());
+    // TODO(fxbug.dev/123426): Use a fake SMC resource, when the
+    // implementation lands.
+    dut_ = FakeAmlHdmiDevice::Create(this, mmio_range_.GetMmioBuffer(), /*smc=*/zx::resource{});
     ASSERT_TRUE(dut_);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_hdmi::Hdmi>();

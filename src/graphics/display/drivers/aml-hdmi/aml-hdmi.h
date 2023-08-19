@@ -43,7 +43,7 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   // `mmio` is the region documented as HDMITX in Section 8.1 "Memory Map" of
   // the AMLogic A311D datasheet.
   AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
-                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw);
+                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc);
 
   AmlHdmiDevice(const AmlHdmiDevice&) = delete;
   AmlHdmiDevice(AmlHdmiDevice&&) = delete;
@@ -97,6 +97,11 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
     MMIO_HDMI,
   };
 
+  // Issues a secure monitor call (SMC) to ask the secure monitor to initialize
+  // HDCP 1.4 engine.
+  // The secure monitor call resource `smc_` must be valid.
+  zx_status_t InitializeHdcp14();
+
   void WriteIpReg(uint32_t addr, uint32_t data) override {
     fbl::AutoLock lock(&register_lock_);
     hdmitx_mmio_->Write8(data, addr);
@@ -113,6 +118,7 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   ddk::PDevFidl pdev_;
   fbl::Mutex dw_lock_;
   std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw_ TA_GUARDED(dw_lock_);
+  zx::resource smc_;
 
   fbl::Mutex register_lock_;
   std::optional<fdf::MmioBuffer> hdmitx_mmio_ TA_GUARDED(register_lock_);

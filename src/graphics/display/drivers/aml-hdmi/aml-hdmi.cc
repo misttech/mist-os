@@ -8,13 +8,16 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/epitaph.h>
+#include <lib/zx/resource.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
+#include <zircon/syscalls/smc.h>
 
 #include <cinttypes>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
+#include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
 
@@ -69,6 +72,14 @@ zx_status_t AmlHdmiDevice::Bind() {
   auto status = pdev_.MapMmio(MMIO_HDMI, &hdmitx_mmio_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map MMIO registers: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  static constexpr uint32_t kSiliconProviderSmcIndex = 0;
+  status = pdev_.GetSmc(kSiliconProviderSmcIndex, &smc_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not get secure monitor call (SMC) resource: %s",
+           zx_status_get_string(status));
     return status;
   }
 
@@ -168,6 +179,22 @@ void CalculateTxParam(const fuchsia_hardware_hdmi::wire::DisplayMode& mode,
   p->colorimetry = HDMI_COLORIMETRY_ITU601;
 }
 
+zx_status_t AmlHdmiDevice::InitializeHdcp14() {
+  ZX_DEBUG_ASSERT(smc_.is_valid());
+
+  static constexpr zx_smc_parameters_t params = {
+      // Silicon Provider secure monitor call: "HDCP14_INIT".
+      .func_id = 0x82000012,
+  };
+  zx_smc_result_t result = {};
+  zx_status_t status = zx_smc_call(smc_.get(), &params, &result);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize HDCP 1.4: %s", zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
+}
+
 void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& completer) {
   ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
 
@@ -180,6 +207,29 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
   // Configure HDMI TX IP
   fbl::AutoLock lock(&dw_lock_);
   hdmi_dw_->ConfigHdmitx(request->mode, p);
+
+  // Initialize HDCP 1.4.
+  //
+  // AMLogic-provided bringup code initializes HDCP before clearing
+  // interrupts on the DesignWare HDMI IP's. Following the same sequence
+  // would be difficult given our current layering, as we clear interrupts
+  // in HdmiDw::ConfigHdmitx().
+  //
+  // Fortunately, experiments on VIM3 (using A311D) show that the HDCP
+  // initialization SMC still works if invoked after the interrupts are
+  // cleared.
+  if (smc_.is_valid()) {
+    InitializeHdcp14();
+  } else {
+    // TODO(fxbug.dev/123426): This could occur in tests where fake SMC
+    // resource objects are not yet supported. Once fake SMC is supported, we
+    // should enforce `smc_` to be always valid and always issue a
+    // `zx_smc_call()` syscall.
+    zxlogf(WARNING,
+           "Secure monitor call (SMC) resource is not available. "
+           "Skipping initializing HDCP 1.4.");
+  }
+
   WriteReg(HDMITX_TOP_INTR_STAT_CLR, 0x0000001f);
   hdmi_dw_->SetupInterrupts();
   WriteReg(HDMITX_TOP_INTR_MASKN, 0x9f);
@@ -338,10 +388,11 @@ AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
 AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
-                             std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw)
+                             std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc)
     : DeviceType(parent),
       pdev_(parent),
       hdmi_dw_(std::move(hdmi_dw)),
+      smc_(std::move(smc)),
       hdmitx_mmio_(std::move(hdmitx_mmio)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
   ZX_DEBUG_ASSERT(hdmi_dw_);
