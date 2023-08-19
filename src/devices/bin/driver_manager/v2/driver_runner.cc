@@ -506,8 +506,8 @@ zx::result<> DriverRunner::CreateDriverHostComponent(
 
 zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
     std::string_view url, fdd::RematchFlags rematch_flags) {
-  if (rematch_flags & (fdd::RematchFlags::kCompositeSpec | fdd::RematchFlags::kLegacyComposite)) {
-    LOGF(WARNING, "Rematching composites are not supported currently.");
+  if (rematch_flags & fdd::RematchFlags::kCompositeSpec) {
+    LOGF(WARNING, "Rematching composite spec is not supported currently.");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -521,27 +521,23 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
   // This node will by definition have colocated set to false, so when we call StartDriver
   // on this node we will always create a new driver host. The old driver host will go away
   // on its own asynchronously since it is drained from all of its drivers.
-  PerformBFS(
-      root_node_, [&driver_hosts, rematch_flags, url](const std::shared_ptr<dfv2::Node>& current) {
-        if (driver_hosts.find(current->driver_host()) != driver_hosts.end()) {
-          // We want the node to re-match to a driver (rather than re-using its existing driver) if
-          // it's not a composite and we have either the following:
-          // - The node has the requested URL and we have a requested flag
-          // - We have a non-requested flag
-          if (!current->IsComposite() &&
-              ((current->driver_url() == url && rematch_flags & fdd::RematchFlags::kRequested) ||
-               rematch_flags & fdd::RematchFlags::kNonRequested)) {
-            current->RestartNodeWithRematch();
-          } else {
-            current->RestartNode();
-          }
+  PerformBFS(root_node_,
+             [&driver_hosts, rematch_flags, url](const std::shared_ptr<dfv2::Node>& current) {
+               if (driver_hosts.find(current->driver_host()) == driver_hosts.end()) {
+                 // Not colocated with one of the restarting hosts. Continue to visit the children.
+                 return true;
+               }
 
-          // Don't visit children of this node since we restarted it.
-          return false;
-        }
+               if (current->EvaluateRematchFlags(rematch_flags, url)) {
+                 // Legacy composites and plain nodes both use the restart with rematch flow.
+                 current->RestartNodeWithRematch();
+                 return false;
+               }
 
-        return true;
-      });
+               // Not rematching, plain node restart.
+               current->RestartNode();
+               return false;
+             });
 
   return zx::ok(static_cast<uint32_t>(driver_hosts.size()));
 }

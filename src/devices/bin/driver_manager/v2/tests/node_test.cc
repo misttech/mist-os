@@ -49,6 +49,20 @@ class Dfv2NodeTest : public gtest::TestLoopFixture {
                                         inspect_.CreateDevice(name, zx::vmo(), 0));
   }
 
+  std::shared_ptr<dfv2::Node> CreateCompositeNode(std::string_view name,
+                                                  std::vector<std::weak_ptr<dfv2::Node>> parents,
+                                                  bool is_legacy, uint32_t primary_index = 0) {
+    std::vector<std::string> parent_names;
+    parent_names.reserve(parents.size());
+    for (auto& parent : parents) {
+      parent_names.push_back(parent.lock()->name());
+    }
+
+    return dfv2::Node::CreateCompositeNode(name, parents, std::move(parent_names), {},
+                                           &node_manager_, dispatcher(), is_legacy, primary_index)
+        .value();
+  }
+
  private:
   InspectManager inspect_{dispatcher()};
   FakeNodeManager node_manager_;
@@ -94,4 +108,55 @@ TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {
   node->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
   ASSERT_FALSE(node->has_driver_component());
   ASSERT_EQ(dfv2::NodeState::kStopping, node->node_state());
+}
+
+TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
+  std::optional<Devnode> root_devnode;
+  Devfs devfs = Devfs(root_devnode);
+
+  auto node = CreateNode("plain");
+  ASSERT_FALSE(
+      node->EvaluateRematchFlags(fuchsia_driver_development::RematchFlags::kRequested, "some-url"));
+  ASSERT_TRUE(
+      node->EvaluateRematchFlags(fuchsia_driver_development::RematchFlags::kRequested |
+                                     fuchsia_driver_development::RematchFlags::kNonRequested,
+                                 "some-url"));
+
+  auto parent_1 = CreateNode("p1");
+  auto parent_2 = CreateNode("p2");
+
+  parent_1->AddToDevfsForTesting(root_devnode.value());
+
+  auto legacy_composite = CreateCompositeNode("legacy-composite", {parent_1, parent_2},
+                                              /* is_legacy*/ true, /* primary_index */ 0);
+
+  ASSERT_FALSE(legacy_composite->EvaluateRematchFlags(
+      fuchsia_driver_development::RematchFlags::kRequested |
+          fuchsia_driver_development::RematchFlags::kNonRequested,
+      "some-url"));
+  ASSERT_TRUE(legacy_composite->EvaluateRematchFlags(
+      fuchsia_driver_development::RematchFlags::kRequested |
+          fuchsia_driver_development::RematchFlags::kNonRequested |
+          fuchsia_driver_development::RematchFlags::kLegacyComposite,
+      "some-url"));
+
+  auto composite = CreateCompositeNode("composite", {parent_1, parent_2},
+                                       /* is_legacy*/ false, /* primary_index */ 0);
+
+  ASSERT_FALSE(
+      composite->EvaluateRematchFlags(fuchsia_driver_development::RematchFlags::kRequested |
+                                          fuchsia_driver_development::RematchFlags::kNonRequested,
+                                      "some-url"));
+  ASSERT_FALSE(composite->EvaluateRematchFlags(
+      fuchsia_driver_development::RematchFlags::kRequested |
+          fuchsia_driver_development::RematchFlags::kNonRequested |
+          fuchsia_driver_development::RematchFlags::kLegacyComposite,
+      "some-url"));
+
+  ASSERT_TRUE(legacy_composite->EvaluateRematchFlags(
+      fuchsia_driver_development::RematchFlags::kRequested |
+          fuchsia_driver_development::RematchFlags::kNonRequested |
+          fuchsia_driver_development::RematchFlags::kLegacyComposite |
+          fuchsia_driver_development::RematchFlags::kCompositeSpec,
+      "some-url"));
 }

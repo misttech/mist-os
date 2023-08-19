@@ -315,7 +315,6 @@ type RematchFlags = flexible bits : uint32 {
     /// it is a colocated parent.
     NON_REQUESTED = 0x0002;
     /// Rematch nodes that are legacy composite nodes.
-    /// This is currently not supported and will return ZX_ERR_NOT_SUPPORTED when used.
     LEGACY_COMPOSITE = 0x0004;
     /// Rematch nodes that are created as part of a completed composite spec.
     /// This is currently not supported and will return ZX_ERR_NOT_SUPPORTED when used.

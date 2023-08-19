@@ -1019,6 +1019,31 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
       });
 }
 
+bool Node::EvaluateRematchFlags(fuchsia_driver_development::RematchFlags rematch_flags,
+                                std::string_view requested_url) {
+  if (type_ == NodeType::kLegacyComposite &&
+      !(rematch_flags & fuchsia_driver_development::RematchFlags::kLegacyComposite)) {
+    return false;
+  }
+
+  if (type_ == NodeType::kComposite &&
+      !(rematch_flags & fuchsia_driver_development::RematchFlags::kCompositeSpec)) {
+    return false;
+  }
+
+  if (driver_url() == requested_url &&
+      !(rematch_flags & fuchsia_driver_development::RematchFlags::kRequested)) {
+    return false;
+  }
+
+  if (driver_url() != requested_url &&
+      !(rematch_flags & fuchsia_driver_development::RematchFlags::kNonRequested)) {
+    return false;
+  }
+
+  return true;
+}
+
 void Node::ScheduleStopComponent() {
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriver,
                 "ScheduleStopComponent called in invalid node state: %s",

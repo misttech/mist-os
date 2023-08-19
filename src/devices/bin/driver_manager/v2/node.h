@@ -161,6 +161,16 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     return type_ == NodeType::kLegacyComposite || type_ == NodeType::kComposite;
   }
 
+  // Evaluates the given rematch_flags against the node. Returns true if rematch should take place,
+  // false otherwise. Rematching is done based on the node type and url both matching:
+  // For node type, if the node is a composite, the rematch flags must contain the flag
+  // for the composite variant that the node is. No validation for non-composites.
+  // For the url, rematch takes place if either:
+  //  - the url matches the requested_url and the 'requested' flag is available.
+  //  - the url does not match and the 'non_requested' flag is available.
+  bool EvaluateRematchFlags(fuchsia_driver_development::RematchFlags rematch_flags,
+                            std::string_view requested_url);
+
   // Creates the node's topological path by combining each primary parent's name together,
   // separated by '/'.
   // E.g: dev/sys/topo/path
