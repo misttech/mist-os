@@ -371,8 +371,7 @@ macro_rules! instantiate_common_routing_tests {
         #[fuchsia_async::run_singlethreaded(test)]
         async fn $test() {
             fuchsia::init_logging_for_component_with_executor(
-                || {}, &[], fuchsia::Interest::default())();
-
+                || {}, fuchsia::LoggingOptions::default())();
             $crate::CommonRoutingTest::<$builder_impl>::new().$test().await
         }
     };

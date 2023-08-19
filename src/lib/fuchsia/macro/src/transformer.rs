@@ -337,7 +337,7 @@ impl Finish for Transformer {
         let asyncness = self.sig.asyncness;
         let block = self.block;
         let inputs = self.sig.inputs;
-        let logging_tags = self.logging_tags;
+        let mut logging_tags = self.logging_tags;
         let interest = self.interest;
 
         let mut func_attrs = Vec::new();
@@ -346,28 +346,38 @@ impl Finish for Transformer {
         let init_logging = if !self.logging {
             quote! { func }
         } else if self.executor.is_test() {
-            let test_name = LitStr::new(&format!("{}", ident), ident.span());
+            logging_tags.tags.insert(0, format!("{ident}"));
             if self.executor.is_some() {
                 quote! {
-                    ::fuchsia::init_logging_for_test_with_executor(
-                        func, #test_name, &[#logging_tags], #interest)
+                    ::fuchsia::init_logging_for_test_with_executor(func, ::fuchsia::LoggingOptions {
+                        tags: &[#logging_tags],
+                        interest: #interest,
+                    })
                 }
             } else {
                 quote! {
-                    ::fuchsia::init_logging_for_test_with_threads(
-                        func, #test_name, &[#logging_tags], #interest)
+                    ::fuchsia::init_logging_for_test_with_threads(func, ::fuchsia::LoggingOptions {
+                        tags: &[#logging_tags],
+                        interest: #interest,
+                    })
                 }
             }
         } else {
             if self.executor.is_some() {
                 quote! {
                     ::fuchsia::init_logging_for_component_with_executor(
-                        func, &[#logging_tags], #interest)
+                        func, ::fuchsia::LoggingOptions {
+                            tags: &[#logging_tags],
+                            interest: #interest,
+                        })
                 }
             } else {
                 quote! {
                     ::fuchsia::init_logging_for_component_with_threads(
-                        func, &[#logging_tags], #interest)
+                        func, ::fuchsia::LoggingOptions {
+                            tags: &[#logging_tags],
+                            interest: #interest,
+                        })
                 }
             }
         };
