@@ -58,6 +58,12 @@ class SymbolName : public std::string_view {
   constexpr SymbolName& operator=(const SymbolName&) = default;
 
   constexpr SymbolName& operator=(const std::string_view& name) {
+    // No valid symbol will have an embedded NUL character, in which case just yield an empty
+    // symbol.
+    if (name != std::string_view{} && std::string_view(name.data()).size() != name.size())
+        [[unlikely]] {
+      return *this = std::string_view{};
+    }
     std::string_view::operator=(name);
     compat_hash_ = kCompatNoHash;
     gnu_hash_ = kGnuNoHash;
@@ -215,11 +221,11 @@ class SymbolInfo {
   // Look up a symbol in one of the hash tables.  The filter is a predicate to
   // accept or reject symbols before name matching.
   template <class HashTable, typename Filter>
-  constexpr const Sym* Lookup(const HashTable& table, std::string_view name, uint32_t hash,
+  constexpr const Sym* Lookup(const HashTable& table, SymbolName name, uint32_t hash,
                               Filter&& filter = DefinedSymbol) const {
     static_assert(std::is_invocable_r_v<bool, Filter, const Sym&>);
     const uint32_t bucket = table.Bucket(hash);
-    if (bucket != 0 && name.size() < strtab().size()) {
+    if (bucket != 0 && name.size() && name.size() < strtab().size()) {
       for (uint32_t i : HashBucket<HashTable>(table, bucket, hash)) {
         if (i >= symtab_.size()) [[unlikely]] {
           break;
