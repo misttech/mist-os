@@ -106,31 +106,18 @@ zx_status_t AmlogicDisplay::RestartDisplay() {
   }
   vpu_->PowerOff();
   vpu_->PowerOn();
-  vpu_->VppInit();
+  vpu_->SetupPostProcessorColorConversion();
   // Need to call this function since VPU/VPP registers were reset
-  vpu_->SetFirstTimeDriverLoad();
+  vpu_->CheckAndClaimHardwareOwnership();
 
   return vout_->RestartDisplay();
 }
 
 zx_status_t AmlogicDisplay::DisplayInit() {
   ZX_ASSERT(!fully_initialized());
-  zx_status_t status;
-  fbl::AllocChecker ac;
-
-  // Setup VPU and VPP units first
-  vpu_ = fbl::make_unique_checked<Vpu>(&ac);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  status = vpu_->Init(pdev_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize VPU object: %s", zx_status_get_string(status));
-    return status;
-  }
 
   // Determine whether it's first time boot or not
-  const bool skip_disp_init = vpu_->SetFirstTimeDriverLoad();
+  const bool skip_disp_init = vpu_->CheckAndClaimHardwareOwnership();
   if (skip_disp_init) {
     zxlogf(INFO, "First time driver load. Skip display initialization");
     // Make sure AFBC engine is on. Since bootloader does not use AFBC, it might not have powered
@@ -1401,6 +1388,16 @@ zx_status_t AmlogicDisplay::Bind() {
   status = InitializeVout();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initalize Vout: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  vpu_ = fbl::make_unique_checked<Vpu>(&ac);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  status = vpu_->Init(pdev_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize VPU object: %s", zx_status_get_string(status));
     return status;
   }
 

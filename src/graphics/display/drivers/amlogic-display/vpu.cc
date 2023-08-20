@@ -83,9 +83,7 @@ constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInp
 #define WRITE32_RESET_REG(a, v) reset_mmio_->Write32(v, a)
 
 zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
-  if (initialized_) {
-    return ZX_OK;
-  }
+  ZX_ASSERT(!initialized_);
 
   // Map VPU registers
   zx_status_t status = pdev.MapMmio(MMIO_VPU, &vpu_mmio_);
@@ -122,7 +120,7 @@ zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
   return ZX_OK;
 }
 
-bool Vpu::SetFirstTimeDriverLoad() {
+bool Vpu::CheckAndClaimHardwareOwnership() {
   ZX_DEBUG_ASSERT(initialized_);
   uint32_t regVal = READ32_REG(VPU, VPP_DUMMY_DATA);
   if (regVal == kFirstTimeLoadMagicNumber) {
@@ -134,7 +132,7 @@ bool Vpu::SetFirstTimeDriverLoad() {
   return true;
 }
 
-void Vpu::VppInit() {
+void Vpu::SetupPostProcessorOutputInterface() {
   ZX_DEBUG_ASSERT(initialized_);
 
   // init vpu fifo control register
@@ -142,6 +140,10 @@ void Vpu::VppInit() {
   WRITE32_REG(VPU, VPP_HOLD_LINES, 0x08080808);
   // default probe_sel, for highlight en
   SET_BIT32(VPU, VPP_MATRIX_CTRL, 0x7, 12, 3);
+}
+
+void Vpu::SetupPostProcessorColorConversion() {
+  ZX_DEBUG_ASSERT(initialized_);
 
   // setting up os1 for rgb -> yuv limit
   const int16_t* m = RGB709_to_YUV709l_coeff;

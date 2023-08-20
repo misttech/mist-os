@@ -20,24 +20,48 @@
 
 namespace amlogic_display {
 
+// TODO(fxbug.dev/126195): `Vpu` currently contains multiple relatively
+// independent units of the greater Video Processing Unit (VPU) including power
+// control, AFBC engine control, Video Post-processing matrices and capture
+// engine. These functional units should be split into different classes.
 class Vpu {
  public:
-  Vpu() {}
-  zx_status_t Init(ddk::PDevFidl& pdev);
-  // This function powers on VPU related blocks. The function contains undocumented
-  // register and/or power-on sequences.
-  void PowerOn();
-  // This function powers off VPU related blocks. The function contains undocumented
-  // register and/or power-off sequences.
-  void PowerOff();
-  // This function sets up default video post processing unit. It contains undocumented
-  // registers and/or initialization sequences
-  void VppInit();
-  // This function sets a flag to indicate the first time driver is loaded. Returns
-  // false if driver was already loaded previously
-  bool SetFirstTimeDriverLoad();
+  Vpu() = default;
+  ~Vpu() = default;
 
-  // Power On/Off AFBC Engine
+  // Disallows copying and moving.
+  Vpu(const Vpu&) = delete;
+  Vpu(Vpu&&) = delete;
+  Vpu& operator=(const Vpu&) = delete;
+  Vpu& operator=(Vpu&&) = delete;
+
+  // Initialization work that is not suitable for the constructor.
+  // Must be called exactly once and before any other method.
+  zx_status_t Init(ddk::PDevFidl& pdev);
+
+  // Powers on the hardware.
+  void PowerOn();
+
+  // Powers off the hardware.
+  void PowerOff();
+
+  // Sets up video post processor (VPP) output interfaces.
+  // The hardware must be powered on.
+  void SetupPostProcessorOutputInterface();
+
+  // Sets up video post processor (VPP) color conversion matrices.
+  // The hardware must be powered on.
+  void SetupPostProcessorColorConversion();
+
+  // Claims the ownership of the driver by changing the hardware state.
+  // The hardware state change reflects that the driver owns and drives
+  // the hardware and it can survive driver reloads.
+  //
+  // Returns true iff the hardware was owned by a different driver.
+  bool CheckAndClaimHardwareOwnership();
+
+  // Powers on/off AFBC Engine.
+  // The main power of the Video Processing Unit must be powered on.
   void AfbcPower(bool power_on);
 
   zx_status_t CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t stride);
