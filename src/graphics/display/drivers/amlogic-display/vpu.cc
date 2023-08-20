@@ -7,6 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/time.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 
 #include <cstdint>
@@ -18,6 +19,7 @@
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
@@ -29,11 +31,6 @@ constexpr uint32_t kFirstTimeLoadMagicNumber = 0x304e65;  // 0Ne
 constexpr int16_t RGB709_to_YUV709l_coeff[24] = {
     0x0000, 0x0000, 0x0000, 0x00bb, 0x0275, 0x003f, 0x1f99, 0x1ea6, 0x01c2, 0x01c2, 0x1e67, 0x1fd7,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0040, 0x0200, 0x0200, 0x0000, 0x0000, 0x0000,
-};
-
-constexpr int16_t YUV709l_to_RGB709_coeff12[24] = {
-    -256, -2048, -2048, 4788, 0, 7372, 4788, -876, -2190, 4788, 8686, 0,
-    0,    0,     0,     0,    0, 0,    0,    0,    0,     0,    0,    0,
 };
 
 // Below co-efficients are used to convert 709L to RGB. The table is provided
@@ -142,70 +139,45 @@ void Vpu::SetupPostProcessorOutputInterface() {
   SET_BIT32(VPU, VPP_MATRIX_CTRL, 0x7, 12, 3);
 }
 
-void Vpu::SetupPostProcessorColorConversion() {
+void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
   ZX_DEBUG_ASSERT(initialized_);
 
-  // setting up os1 for rgb -> yuv limit
-  const int16_t* m = RGB709_to_YUV709l_coeff;
+  // TODO(fxbug.dev/132309): Revise the selection of matrices used for color
+  // conversion.
+  switch (mode) {
+    case ColorSpaceConversionMode::kRgbInternalRgbOut:
+      // This deviates from the Amlogic-provided code which does an RGB ->
+      // YUV conversion for all OSDs and a YUV -> RGB conversion after
+      // blending.
+      SET_BIT32(VPU, VPP_WRAP_OSD1_MATRIX_EN_CTRL, 0, 0, 1);
+      break;
+    case ColorSpaceConversionMode::kRgbInternalYuvOut: {
+      // setting up os1 for rgb -> yuv limit
+      const int16_t* m = RGB709_to_YUV709l_coeff;
 
-  // VPP WRAP OSD1 matrix
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET0_1, ((m[0] & 0xfff) << 16) | (m[1] & 0xfff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET2, m[2] & 0xfff);
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF00_01, ((m[3] & 0x1fff) << 16) | (m[4] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF02_10, ((m[5] & 0x1fff) << 16) | (m[6] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF11_12, ((m[7] & 0x1fff) << 16) | (m[8] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF20_21, ((m[9] & 0x1fff) << 16) | (m[10] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF22, m[11] & 0x1fff);
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_OFFSET0_1, ((m[18] & 0xfff) << 16) | (m[19] & 0xfff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_OFFSET2, m[20] & 0xfff);
-  SET_BIT32(VPU, VPP_WRAP_OSD1_MATRIX_EN_CTRL, 1, 0, 1);
-
-  // VPP WRAP OSD2 matrix
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_PRE_OFFSET0_1, ((m[0] & 0xfff) << 16) | (m[1] & 0xfff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_PRE_OFFSET2, m[2] & 0xfff);
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_COEF00_01, ((m[3] & 0x1fff) << 16) | (m[4] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_COEF02_10, ((m[5] & 0x1fff) << 16) | (m[6] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_COEF11_12, ((m[7] & 0x1fff) << 16) | (m[8] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_COEF20_21, ((m[9] & 0x1fff) << 16) | (m[10] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_COEF22, m[11] & 0x1fff);
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_OFFSET0_1, ((m[18] & 0xfff) << 16) | (m[19] & 0xfff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD2_MATRIX_OFFSET2, m[20] & 0xfff);
-  SET_BIT32(VPU, VPP_WRAP_OSD2_MATRIX_EN_CTRL, 1, 0, 1);
-
-  // VPP WRAP OSD3 matrix
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_PRE_OFFSET0_1, ((m[0] & 0xfff) << 16) | (m[1] & 0xfff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_PRE_OFFSET2, m[2] & 0xfff);
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_COEF00_01, ((m[3] & 0x1fff) << 16) | (m[4] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_COEF02_10, ((m[5] & 0x1fff) << 16) | (m[6] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_COEF11_12, ((m[7] & 0x1fff) << 16) | (m[8] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_COEF20_21, ((m[9] & 0x1fff) << 16) | (m[10] & 0x1fff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_COEF22, m[11] & 0x1fff);
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_OFFSET0_1, ((m[18] & 0xfff) << 16) | (m[19] & 0xfff));
-  WRITE32_REG(VPU, VPP_WRAP_OSD3_MATRIX_OFFSET2, m[20] & 0xfff);
-  SET_BIT32(VPU, VPP_WRAP_OSD3_MATRIX_EN_CTRL, 1, 0, 1);
+      // VPP WRAP OSD1 matrix
+      // TODO(fxbug.dev/107649): Also set VPP_WRAP_OSD2/3 when OSD2/3 is
+      // supported.
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET0_1, ((m[0] & 0xfff) << 16) | (m[1] & 0xfff));
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET2, m[2] & 0xfff);
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF00_01, ((m[3] & 0x1fff) << 16) | (m[4] & 0x1fff));
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF02_10, ((m[5] & 0x1fff) << 16) | (m[6] & 0x1fff));
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF11_12, ((m[7] & 0x1fff) << 16) | (m[8] & 0x1fff));
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF20_21, ((m[9] & 0x1fff) << 16) | (m[10] & 0x1fff));
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF22, m[11] & 0x1fff);
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_OFFSET0_1, ((m[18] & 0xfff) << 16) | (m[19] & 0xfff));
+      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_OFFSET2, m[20] & 0xfff);
+      SET_BIT32(VPU, VPP_WRAP_OSD1_MATRIX_EN_CTRL, 1, 0, 1);
+      break;
+    }
+    default:
+      ZX_ASSERT_MSG(false, "Invalid color conversion mode: %d", static_cast<int>(mode));
+  }
 
   WRITE32_REG(VPU, DOLBY_PATH_CTRL, 0xf);
 
-  // POST2 matrix: YUV limit -> RGB  default is 12bit
-  m = YUV709l_to_RGB709_coeff12;
-
-  // VPP WRAP POST2 matrix
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_PRE_OFFSET0_1,
-              (((m[0] >> 2) & 0xfff) << 16) | ((m[1] >> 2) & 0xfff));
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_PRE_OFFSET2, (m[2] >> 2) & 0xfff);
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_COEF00_01,
-              (((m[3] >> 2) & 0x1fff) << 16) | ((m[4] >> 2) & 0x1fff));
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_COEF02_10,
-              (((m[5] >> 2) & 0x1fff) << 16) | ((m[6] >> 2) & 0x1fff));
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_COEF11_12,
-              (((m[7] >> 2) & 0x1fff) << 16) | ((m[8] >> 2) & 0x1fff));
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_COEF20_21,
-              (((m[9] >> 2) & 0x1fff) << 16) | ((m[10] >> 2) & 0x1fff));
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_COEF22, (m[11] >> 2) & 0x1fff);
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_OFFSET0_1,
-              (((m[18] >> 2) & 0xfff) << 16) | ((m[19] >> 2) & 0xfff));
-  WRITE32_REG(VPU, VPP_POST2_MATRIX_OFFSET2, (m[20] >> 2) & 0xfff);
-  SET_BIT32(VPU, VPP_POST2_MATRIX_EN_CTRL, 1, 0, 1);
+  // Disables VPP POST2 matrix.
+  SET_BIT32(VPU, VPP_POST2_MATRIX_EN_CTRL, 0, 0, 1);
 }
 
 void Vpu::ConfigureClock() {

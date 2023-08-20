@@ -16,9 +16,17 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
 namespace amlogic_display {
+
+// Mode of color space conversion from the internal Video Input Unit (VIU) to
+// the Video output module (Vout) by the Video Post Processor (VPP).
+enum class ColorSpaceConversionMode {
+  kRgbInternalRgbOut,
+  kRgbInternalYuvOut,
+};
 
 // TODO(fxbug.dev/126195): `Vpu` currently contains multiple relatively
 // independent units of the greater Video Processing Unit (VPU) including power
@@ -51,7 +59,7 @@ class Vpu {
 
   // Sets up video post processor (VPP) color conversion matrices.
   // The hardware must be powered on.
-  void SetupPostProcessorColorConversion();
+  void SetupPostProcessorColorConversion(ColorSpaceConversionMode mode);
 
   // Claims the ownership of the driver by changing the hardware state.
   // The hardware state change reflects that the driver owns and drives

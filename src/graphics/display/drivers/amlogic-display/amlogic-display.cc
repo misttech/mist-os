@@ -90,6 +90,17 @@ void SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType form
   constraints.start_offset_divisor = kBufferAlignment;
 }
 
+ColorSpaceConversionMode GetColorSpaceConversionMode(VoutType vout_type) {
+  switch (vout_type) {
+    case VoutType::kDsi:
+      return ColorSpaceConversionMode::kRgbInternalRgbOut;
+    case VoutType::kHdmi:
+      return ColorSpaceConversionMode::kRgbInternalYuvOut;
+    default:
+      ZX_ASSERT_MSG(false, "Invalid VoutType: %d", static_cast<int>(vout_type));
+  }
+}
+
 }  // namespace
 
 zx_status_t AmlogicDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
@@ -106,7 +117,8 @@ zx_status_t AmlogicDisplay::RestartDisplay() {
   }
   vpu_->PowerOff();
   vpu_->PowerOn();
-  vpu_->SetupPostProcessorColorConversion();
+  const ColorSpaceConversionMode color_conversion_mode = GetColorSpaceConversionMode(vout_->type());
+  vpu_->SetupPostProcessorColorConversion(color_conversion_mode);
   // Need to call this function since VPU/VPP registers were reset
   vpu_->CheckAndClaimHardwareOwnership();
 
