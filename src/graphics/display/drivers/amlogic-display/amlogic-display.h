@@ -163,9 +163,9 @@ class AmlogicDisplay
   }
 
  private:
-  int VSyncThread();
-  int CaptureThread();
-  int HpdThread();
+  void VSyncThreadEntryPoint();
+  void CaptureThreadEntryPoint();
+  void HpdThreadEntryPoint();
   void PopulatePanelType() TA_REQ(display_mutex_);
 
   // TODO(fxbug.dev/132267): Currently, AmlogicDisplay has a multi-step
@@ -249,8 +249,8 @@ class AmlogicDisplay
   zx::interrupt inth_;
 
   // Thread handles
-  thrd_t vsync_thread_;
-  thrd_t capture_thread_;
+  std::optional<thrd_t> vsync_thread_;
+  std::optional<thrd_t> capture_thread_;
 
   // Protocol handles used in by this driver
   ddk::PDevFidl pdev_;
@@ -259,7 +259,7 @@ class AmlogicDisplay
 
   // Interrupts
   zx::interrupt vsync_irq_;
-  zx::interrupt vd1_wr_irq_;
+  zx::interrupt capture_finished_irq_;
 
   // Locks used by the display driver
   fbl::Mutex display_mutex_;  // general display state (i.e. display_id)
@@ -308,7 +308,7 @@ class AmlogicDisplay
   // Hot Plug Detection
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> hpd_gpio_;
   zx::interrupt hpd_irq_;
-  thrd_t hpd_thread_;
+  std::optional<thrd_t> hpd_thread_;
 
   fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
 };
