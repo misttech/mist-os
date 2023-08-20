@@ -35,6 +35,7 @@ use {
     fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet},
     std::{
         cmp::min,
+        future::Future,
         ops::{Bound, Range},
         sync::{
             atomic::{self, AtomicBool},
@@ -506,7 +507,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                     .key_manager
                     .get_or_insert(
                         self.object_id,
-                        &store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
+                        store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
                         store.get_keys(self.object_id),
                         false,
                     )
@@ -539,7 +540,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                                 .key_manager
                                 .get_or_insert(
                                     self.object_id,
-                                    &store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
+                                    store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
                                     async { Ok(keys) },
                                     false,
                                 )
@@ -1129,6 +1130,26 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         );
         transaction.commit().await?;
         Ok(())
+    }
+
+    /// Returns a future that will pre-fetches the keys so as to avoid paying the performance
+    /// penalty later.
+    pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
+        if let Encryption::CachedKeys = self.encryption {
+            let owner = self.owner.clone();
+            let object_id = self.object_id;
+            Some(async move {
+                let store = owner.as_ref().as_ref();
+                if let Some(crypt) = store.crypt() {
+                    let _: Result<_, _> = store
+                        .key_manager
+                        .get_or_insert(object_id, crypt, store.get_keys(object_id), false)
+                        .await;
+                }
+            })
+        } else {
+            None
+        }
     }
 }
 

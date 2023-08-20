@@ -808,25 +808,9 @@ impl ObjectStore {
         owner: &Arc<S>,
         object_id: u64,
         options: HandleOptions,
-        mut crypt: Option<Arc<dyn Crypt>>,
+        crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
-        let store_crypt = store.crypt();
-        // If a crypt service has been specified, it needs to be a permanent key because cached keys
-        // can only use the store's crypt service.
-        let permanent = crypt.is_some();
-        if crypt.is_none() {
-            crypt = store_crypt;
-        }
-        if let Some(crypt) = crypt {
-            store.key_manager.pre_fetch(
-                object_id,
-                crypt,
-                store.get_keys(object_id).await?,
-                permanent,
-            );
-        }
-
         let item = store
             .tree
             .find(&ObjectKey::attribute(
@@ -838,6 +822,24 @@ impl ObjectStore {
             .ok_or(FxfsError::NotFound)?;
         if let ObjectValue::Attribute { size } = item.value {
             ensure!(size <= MAX_FILE_SIZE, FxfsError::Inconsistent);
+
+            // If a crypt service has been specified, it needs to be a permanent key because cached
+            // keys can only use the store's crypt service.
+            let permanent = if let Some(crypt) = crypt {
+                store
+                    .key_manager
+                    .get_or_insert(
+                        object_id,
+                        crypt,
+                        store.get_keys(object_id),
+                        /* permanent: */ true,
+                    )
+                    .await?;
+                true
+            } else {
+                false
+            };
+
             Ok(DataObjectHandle::new(
                 owner.clone(),
                 object_id,

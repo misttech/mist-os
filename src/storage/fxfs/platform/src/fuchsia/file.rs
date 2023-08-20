@@ -83,6 +83,13 @@ impl FxFile {
         flags: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+        if let Some(rights) = flags.rights() {
+            if rights.intersects(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES) {
+                if let Some(fut) = this.handle.pre_fetch_keys() {
+                    this.handle.owner().scope().spawn(fut);
+                }
+            }
+        }
         object_request.create_connection(
             scope.clone(),
             this.take(),

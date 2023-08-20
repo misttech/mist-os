@@ -28,6 +28,7 @@ use {
     },
     scopeguard::ScopeGuard,
     std::{
+        future::Future,
         ops::{FnOnce, Range},
         sync::{Arc, Mutex},
     },
@@ -256,6 +257,10 @@ impl PagedObjectHandle {
 
     pub fn get_size(&self) -> u64 {
         self.vmo.get_content_size().unwrap()
+    }
+
+    pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
+        self.handle.handle().pre_fetch_keys()
     }
 
     async fn new_transaction<'a>(

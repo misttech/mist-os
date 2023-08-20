@@ -88,20 +88,6 @@ struct Inner {
     unwrapping: HashMap<u64, Arc<UnwrapResult>>,
 }
 
-impl Inner {
-    fn get_unwrap_result(&mut self, object_id: u64) -> Option<Arc<UnwrapResult>> {
-        if self.keys.get(object_id).is_some() {
-            None
-        } else if let Entry::Vacant(v) = self.unwrapping.entry(object_id) {
-            let unwrap_result = UnwrapResult::new();
-            v.insert(unwrap_result.clone());
-            Some(unwrap_result)
-        } else {
-            None
-        }
-    }
-}
-
 struct UnwrapResult {
     event: Event,
     error: UnsafeCell<bool>,
@@ -159,44 +145,6 @@ impl KeyManager {
         Self { inner, _purge_task: purge_task }
     }
 
-    /// Initiates a pre-fetch for the key.  This will return before the keys have been unwrapped.
-    pub fn pre_fetch(
-        &self,
-        object_id: u64,
-        crypt: Arc<dyn Crypt>,
-        wrapped_keys: WrappedKeys,
-        permanent: bool,
-    ) {
-        // If it's a permanent key, we must establish the result now to avoid races.  We don't do it
-        // otherwise because taking the lock seems to have a performance hit, so we move it onto the
-        // spawned task.
-        let unwrap_result = if permanent {
-            let unwrap_result = self.inner.lock().unwrap().get_unwrap_result(object_id);
-            if unwrap_result.is_none() {
-                return;
-            }
-            unwrap_result
-        } else {
-            None
-        };
-
-        let inner = self.inner.clone();
-        fasync::Task::spawn(async move {
-            let Some(unwrap_result) =
-                unwrap_result.or_else(|| inner.lock().unwrap().get_unwrap_result(object_id))
-            else {
-                return
-            };
-            unwrap_result.set(
-                &inner,
-                object_id,
-                permanent,
-                crypt.unwrap_keys(&wrapped_keys, object_id).await.map(|k| Some(k.to_cipher_set())),
-            );
-        })
-        .detach();
-    }
-
     /// Retrieves a key from the cache but won't initiate unwrapping if no key is present.  If the
     /// key is currently in the process of being unwrapped, this will wait until that has finished.
     /// This should be used with permanent keys.
@@ -224,64 +172,70 @@ impl KeyManager {
     }
 
     /// This retrieves keys from the cache or initiates unwrapping if they are not in the cache.
-    pub async fn get_or_insert(
+    pub fn get_or_insert(
         &self,
         object_id: u64,
-        crypt: &Arc<dyn Crypt>,
+        crypt: Arc<dyn Crypt>,
         wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
         permanent: bool,
-    ) -> Result<Arc<XtsCipherSet>, Error> {
-        let mut wrapped_keys = pin!(future::maybe_done(wrapped_keys));
+    ) -> impl Future<Output = Result<Arc<XtsCipherSet>, Error>> {
+        let inner = self.inner.clone();
+        async move {
+            let mut wrapped_keys = pin!(future::maybe_done(wrapped_keys));
 
-        loop {
-            let (unwrap_result, listener) = {
-                let mut inner = self.inner.lock().unwrap();
+            loop {
+                let (unwrap_result, listener) = {
+                    let mut inner = inner.lock().unwrap();
 
-                if let Some(keys) = inner.keys.get(object_id) {
-                    return Ok(keys.clone());
-                }
-
-                match inner.unwrapping.entry(object_id) {
-                    Entry::Vacant(v) => {
-                        let unwrap_result = UnwrapResult::new();
-                        v.insert(unwrap_result.clone());
-                        (unwrap_result, None)
+                    if let Some(keys) = inner.keys.get(object_id) {
+                        return Ok(keys.clone());
                     }
-                    Entry::Occupied(o) => {
-                        let unwrap_result = o.get().clone();
-                        let listener = unwrap_result.event.listen();
-                        (unwrap_result, Some(listener))
-                    }
-                }
-            };
-            if let Some(listener) = listener {
-                listener.await;
-                // SAFETY: This is safe because there can be no mutations happening at this point.
-                if !unsafe { *unwrap_result.error.get() } {
-                    // Loop around and try and get the key.
-                    continue;
-                }
-            } else {
-                // Use a guard in case we're dropped.
-                let mut result = scopeguard::guard(Ok(None), |result| {
-                    unwrap_result.set(&self.inner, object_id, permanent, result);
-                });
 
-                wrapped_keys.as_mut().await;
-                let error = match wrapped_keys.as_mut().output_mut().unwrap() {
-                    Ok(wrapped_keys) => match crypt.unwrap_keys(wrapped_keys, object_id).await {
-                        Ok(unwrapped_keys) => {
-                            let keys = unwrapped_keys.to_cipher_set();
-                            *result = Ok(Some(keys.clone()));
-                            return Ok(keys);
+                    match inner.unwrapping.entry(object_id) {
+                        Entry::Vacant(v) => {
+                            let unwrap_result = UnwrapResult::new();
+                            v.insert(unwrap_result.clone());
+                            (unwrap_result, None)
                         }
-                        Err(e) => e,
-                    },
-                    Err(_) => wrapped_keys.take_output().unwrap().unwrap_err(),
+                        Entry::Occupied(o) => {
+                            let unwrap_result = o.get().clone();
+                            let listener = unwrap_result.event.listen();
+                            (unwrap_result, Some(listener))
+                        }
+                    }
                 };
-                *result = Err(error);
+                if let Some(listener) = listener {
+                    listener.await;
+                    // SAFETY: This is safe because there can be no mutations happening at this
+                    // point.
+                    if !unsafe { *unwrap_result.error.get() } {
+                        // Loop around and try and get the key.
+                        continue;
+                    }
+                } else {
+                    // Use a guard in case we're dropped.
+                    let mut result = scopeguard::guard(Ok(None), |result| {
+                        unwrap_result.set(&inner, object_id, permanent, result);
+                    });
+
+                    wrapped_keys.as_mut().await;
+                    let error = match wrapped_keys.as_mut().output_mut().unwrap() {
+                        Ok(wrapped_keys) => {
+                            match crypt.unwrap_keys(wrapped_keys, object_id).await {
+                                Ok(unwrapped_keys) => {
+                                    let keys = unwrapped_keys.to_cipher_set();
+                                    *result = Ok(Some(keys.clone()));
+                                    return Ok(keys);
+                                }
+                                Err(e) => e,
+                            }
+                        }
+                        Err(_) => wrapped_keys.take_output().unwrap().unwrap_err(),
+                    };
+                    *result = Err(error);
+                }
+                bail!("Failed to unwrap keys");
             }
-            bail!("Failed to unwrap keys");
         }
     }
 
@@ -410,7 +364,7 @@ mod tests {
         let task1 = fasync::Task::spawn(async move {
             let mut buf = cipher_text(0);
             manager1
-                .get_or_insert(1, &(crypt1 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false)
+                .get_or_insert(1, crypt1, async { Ok(wrapped_keys()) }, false)
                 .await
                 .expect("get_or_insert failed")
                 .decrypt(0, 0, &mut buf)
@@ -420,7 +374,7 @@ mod tests {
         let task2 = fasync::Task::spawn(async move {
             let mut buf = cipher_text(0);
             manager2
-                .get_or_insert(1, &(crypt2 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false)
+                .get_or_insert(1, crypt2, async { Ok(wrapped_keys()) }, false)
                 .await
                 .expect("get_or_insert failed")
                 .decrypt(0, 0, &mut buf)
@@ -446,28 +400,6 @@ mod tests {
         task1.await;
         task2.await;
         task3.await;
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn test_pre_fetch() {
-        TestExecutor::advance_to(Time::from_nanos(0)).await;
-
-        let crypt = TestCrypt::new(0);
-        let manager = Arc::new(KeyManager::new());
-
-        manager.pre_fetch(1, crypt.clone(), wrapped_keys(), false);
-
-        TestExecutor::advance_to(Time::after(zx::Duration::from_seconds(1))).await;
-
-        let mut buf = cipher_text(0);
-        manager
-            .get(1)
-            .await
-            .expect("get failed")
-            .expect("missing key")
-            .decrypt(0, 0, &mut buf)
-            .expect("decrypt failed");
-        assert_eq!(&buf, PLAIN_TEXT);
     }
 
     #[fuchsia::test]
@@ -561,13 +493,13 @@ mod tests {
 
         let task1 = fasync::Task::spawn(async move {
             assert!(manager1
-                .get_or_insert(1, &(crypt1 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false,)
+                .get_or_insert(1, crypt1, async { Ok(wrapped_keys()) }, false,)
                 .await
                 .is_err());
         });
         let task2 = fasync::Task::spawn(async move {
             assert!(manager2
-                .get_or_insert(1, &(crypt2 as Arc<dyn Crypt>), async { Ok(wrapped_keys()) }, false,)
+                .get_or_insert(1, crypt2, async { Ok(wrapped_keys()) }, false,)
                 .await
                 .is_err());
         });
