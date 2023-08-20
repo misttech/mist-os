@@ -4,14 +4,14 @@
 
 #include "src/lib/fxl/strings/concatenate.h"
 
+#include <string>
+
 #include <gtest/gtest.h>
 
 namespace fxl {
 namespace {
 
-// Creates correct std::strings from C-style string constants with \0 bytes
-// inside.
-std::string operator"" _s(const char* str, size_t size) { return std::string(str, size); }
+using namespace std::literals::string_literals;
 
 TEST(StringUtil, Concatenate) {
   EXPECT_EQ("", Concatenate({}));
@@ -21,8 +21,8 @@ TEST(StringUtil, Concatenate) {
   std::string such = "such";
   EXPECT_EQ("wow such useful", Concatenate({"wow ", such, " useful"}));
 
-  std::string with_zeroes = "abc\0def"_s;
-  EXPECT_EQ("abc\0def\0ghi"_s, Concatenate({with_zeroes, "\0ghi"_s}));
+  std::string with_zeroes = "abc\0def"s;
+  EXPECT_EQ("abc\0def\0ghi"s, Concatenate({with_zeroes, "\0ghi"s}));
 }
 
 }  // namespace
