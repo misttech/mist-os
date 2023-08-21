@@ -8,7 +8,7 @@ use core::num::NonZeroU16;
 
 use zerocopy::{byteorder::network_endian::U16, AsBytes, FromBytes, FromZeroes, Unaligned};
 
-use super::IdAndSeq;
+use super::{IcmpUnusedCode, IdAndSeq, OriginalPacket};
 
 /// An ICMP Destination Unreachable message.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, FromZeroes, FromBytes, AsBytes, Unaligned)]
@@ -133,3 +133,6 @@ pub struct IcmpTimeExceeded {
     /* Body of IcmpTimeExceeded is entirely variable-length, so is stored in
      * the message_body field in IcmpPacket */
 }
+
+impl_common_icmp_message!(IcmpEchoReply, ECHO_REPLY, IcmpUnusedCode, OriginalPacket<B>);
+impl_common_icmp_message!(IcmpEchoRequest, ECHO_REQUEST, IcmpUnusedCode, OriginalPacket<B>);

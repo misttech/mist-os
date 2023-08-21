@@ -1531,7 +1531,7 @@ mod tests {
     use packet::{Buf, InnerPacketBuilder, ParseBuffer};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
-        icmp::{IcmpEchoReply, IcmpIpExt, IcmpMessage, IcmpUnusedCode},
+        icmp::{IcmpIpExt, IcmpUnusedCode},
         ip::{IpExt, IpPacket, Ipv4Proto},
         ipv4::{Ipv4OnlyMeta, Ipv4Packet},
         testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame},
@@ -1846,7 +1846,6 @@ mod tests {
     ) where
         for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>,
-        IcmpEchoReply: IcmpMessage<I, Code = IcmpUnusedCode>,
     {
         set_logger_for_test();
 

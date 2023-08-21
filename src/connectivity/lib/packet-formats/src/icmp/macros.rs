@@ -42,6 +42,32 @@ macro_rules! impl_icmp_message {
     };
 }
 
+macro_rules! impl_common_icmp_message {
+    ($type:ident, $icmp_type:ident, $code:tt, $body_type:ty, $expects_body:ident) => {
+        impl<I: crate::icmp::IcmpIpExt> crate::icmp::IcmpMessage<I> for $type {
+            const EXPECTS_BODY: bool = $expects_body;
+
+            type Code = $code;
+
+            type Body<B: zerocopy::ByteSlice> = $body_type;
+
+            const TYPE: I::IcmpMessageType = I::$icmp_type;
+
+            fn code_from_u8(u: u8) -> Option<Self::Code> {
+                impl_icmp_message_inner_code_from_u8!($code, u)
+            }
+        }
+    };
+
+    ($type:ident, $icmp_type:ident, $code:tt, $body_type:ty) => {
+        impl_common_icmp_message!($type, $icmp_type, $code, $body_type, true);
+    };
+
+    ($type:ident, $icmp_type:ident, $code:tt) => {
+        impl_common_icmp_message!($type, $icmp_type, $code, crate::icmp::EmptyMessage<B>, false);
+    };
+}
+
 macro_rules! impl_icmp_message_inner_message_type {
     (Ipv4, $msg_variant:ident) => {
         crate::icmp::icmpv4::Icmpv4MessageType::$msg_variant

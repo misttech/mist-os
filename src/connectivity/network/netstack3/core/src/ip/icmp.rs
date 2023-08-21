@@ -826,8 +826,6 @@ pub(crate) enum IcmpIpTransportContext {}
 
 impl<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>, SC: InnerIcmpContext<I, C>>
     IpTransportContext<I, C, SC> for IcmpIpTransportContext
-where
-    IcmpEchoRequest: IcmpMessage<I>,
 {
     fn receive_icmp_error(
         sync_ctx: &mut SC,
@@ -2763,10 +2761,7 @@ fn send_icmp_echo_request_inner<
     conn: SocketId<I>,
     seq_num: u16,
     body: B,
-) -> Result<(), (B, IpSockSendError)>
-where
-    IcmpEchoRequest: IcmpMessage<I, Code = IcmpUnusedCode>,
-{
+) -> Result<(), (B, IpSockSendError)> {
     // TODO(joshlf): Come up with a better approach to the lifetimes issues than
     // cloning the entire socket.
     let conn = sync_ctx.with_icmp_sockets_mut(|sockets| {
@@ -3011,8 +3006,8 @@ mod tests {
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
         icmp::{
-            mld::MldPacket, IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacket,
-            IcmpUnusedCode, Icmpv4TimestampRequest, MessageBody,
+            mld::MldPacket, IcmpEchoRequest, IcmpMessage, IcmpPacket, IcmpUnusedCode,
+            Icmpv4TimestampRequest, MessageBody,
         },
         ip::{IpPacketBuilder, IpProto},
         testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
@@ -3216,15 +3211,7 @@ mod tests {
         // Test that, when receiving an echo request, we respond with an echo
         // reply with the appropriate parameters.
 
-        fn test<I: TestIpExt + IcmpIpExt>(assert_counters: &[&str])
-        where
-            IcmpEchoRequest: IcmpMessage<I, Code = IcmpUnusedCode>,
-            IcmpEchoReply: for<'a> IcmpMessage<
-                I,
-                Code = IcmpUnusedCode,
-                Body<&'a [u8]> = OriginalPacket<&'a [u8]>,
-            >,
-        {
+        fn test<I: TestIpExt + IcmpIpExt>(assert_counters: &[&str]) {
             let req = IcmpEchoRequest::new(0, 0);
             let req_body = &[1, 2, 3, 4];
             let mut buffer = Buf::new(req_body.to_vec(), ..)

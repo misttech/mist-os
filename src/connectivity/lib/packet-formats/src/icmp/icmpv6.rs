@@ -179,10 +179,6 @@ impl IcmpMessageType for Icmpv6MessageType {
     }
 }
 
-impl_icmp_message!(Ipv6, IcmpEchoRequest, EchoRequest, IcmpUnusedCode, OriginalPacket<B>);
-
-impl_icmp_message!(Ipv6, IcmpEchoReply, EchoReply, IcmpUnusedCode, OriginalPacket<B>);
-
 create_protocol_enum!(
     #[allow(missing_docs)]
     #[derive(Copy, Clone, PartialEq, Eq)]

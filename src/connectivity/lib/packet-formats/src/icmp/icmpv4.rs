@@ -152,8 +152,6 @@ impl_icmp_message!(
     Icmpv4DestUnreachableCode,
     OriginalPacket<B>
 );
-impl_icmp_message!(Ipv4, IcmpEchoRequest, EchoRequest, IcmpUnusedCode, OriginalPacket<B>);
-impl_icmp_message!(Ipv4, IcmpEchoReply, EchoReply, IcmpUnusedCode, OriginalPacket<B>);
 
 create_protocol_enum!(
     #[allow(missing_docs)]

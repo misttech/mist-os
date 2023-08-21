@@ -127,6 +127,11 @@ pub trait IcmpIpExt: IpProtoExt {
     /// the entire header. If the version is IPv6, the returned length should
     /// include all extension headers.
     fn header_len(bytes: &[u8]) -> usize;
+
+    /// Icmp{v4,v6}MessageType::EchoReply.
+    const ECHO_REPLY: Self::IcmpMessageType;
+    /// Icmp{v4,v6}MessageType::EchoRequest.
+    const ECHO_REQUEST: Self::IcmpMessageType;
 }
 
 impl IcmpIpExt for Ipv4 {
@@ -145,6 +150,9 @@ impl IcmpIpExt for Ipv4 {
             Ref::<_, ipv4::HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap();
         cmp::min(header_prefix.ihl() as usize * 4, bytes.len())
     }
+
+    const ECHO_REPLY: Icmpv4MessageType = Icmpv4MessageType::EchoReply;
+    const ECHO_REQUEST: Icmpv4MessageType = Icmpv4MessageType::EchoRequest;
 }
 
 impl IcmpIpExt for Ipv6 {
@@ -164,6 +172,9 @@ impl IcmpIpExt for Ipv6 {
         // it would cause bugs in the caller.
         unimplemented!()
     }
+
+    const ECHO_REPLY: Icmpv6MessageType = Icmpv6MessageType::EchoReply;
+    const ECHO_REQUEST: Icmpv6MessageType = Icmpv6MessageType::EchoRequest;
 }
 
 /// An ICMP or ICMPv6 packet

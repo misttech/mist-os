@@ -31,8 +31,8 @@ use packet_formats::{
         EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
     },
     icmp::{
-        IcmpEchoRequest, IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs,
-        IcmpUnusedCode, MessageBody as _, OriginalPacket,
+        IcmpEchoRequest, IcmpIpExt, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
+        MessageBody as _,
     },
     ip::{IpExt, IpPacketBuilder as _},
 };
@@ -369,8 +369,6 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
     sub_test_name: &str,
     test_case: ForwardingTestCase<I>,
 ) where
-    IcmpEchoRequest:
-        for<'a> IcmpMessage<I, Code = IcmpUnusedCode, Body<&'a [u8]> = OriginalPacket<&'a [u8]>>,
     I::Addr: NetTypesIpAddressExt,
 {
     const TTL: u8 = 64;
