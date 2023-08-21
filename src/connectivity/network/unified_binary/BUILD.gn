@@ -14,6 +14,7 @@ rustc_binary("network_unified_binary") {
     "//src/connectivity/network/dns:bin_gub_lib",
     "//src/connectivity/network/http-client:http_client_gub_lib",
     "//src/connectivity/network/netcfg:bin-basic_gub_lib",
+    "//src/connectivity/network/netstack-proxy:bin_gub_lib",
     "//src/connectivity/network/netstack3:bin_gub_lib",
     "//src/connectivity/network/reachability:bin_gub_lib",
     "//src/connectivity/network/stack-migration:bin_gub_lib",

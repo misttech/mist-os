@@ -16,6 +16,7 @@ fn main() {
         "dns_resolver" => dns_resolver::main().expect("dns_resolver exited with an error"),
         "http_client" => http_client::main().expect("http_client exited with an error"),
         "netcfg_basic" => netcfg_basic::main(),
+        "netstack_proxy" => netstack_proxy::main(),
         "netstack3" => netstack3::main(),
         "reachability" => reachability::main(),
         "stack_migration" => stack_migration::main(),

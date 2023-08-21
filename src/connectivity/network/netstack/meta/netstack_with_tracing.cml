@@ -6,6 +6,7 @@
         "//src/connectivity/network/meta/netstack-common.shard.cml",
         "//src/connectivity/network/netstack/meta/netstack2-common.shard.cml",
         "//src/connectivity/network/netstack/meta/netstack2-prod.shard.cml",
+        "//src/connectivity/network/netstack/meta/netstack2-void-dhcp-client.shard.cml",
         "trace/use.shard.cml",
     ],
     program: {

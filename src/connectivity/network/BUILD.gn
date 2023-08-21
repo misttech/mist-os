@@ -93,6 +93,7 @@ group("tests") {
     # target becomes load bearing elsewhere.
     "netstack:component-with-tracing-dropin",
     "netstack:tests",
+    "netstack-proxy:tests",
     "netstack3:tests",
     "reachability:tests",
     "testing:tests",

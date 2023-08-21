@@ -29,6 +29,13 @@ pub fn main() {
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> = fs
         .dir("svc")
+        // TODO(https://fxbug.dev/125773): This is transitional. Once the
+        // out-of-stack DHCP client is being used by both netstacks, it
+        // should be moved out of the netstack realm and into the network
+        // realm. The trip through Netstack3 allows for availability of DHCP
+        // client to be dependent on Netstack version when using
+        // netstack-proxy.
+        .add_proxy_service::<fidl_fuchsia_net_dhcp::ClientProviderMarker, _>()
         .add_service_connector(Service::DebugDiagnostics)
         .add_fidl_service(Service::DebugInterfaces)
         .add_fidl_service(Service::Stack)
