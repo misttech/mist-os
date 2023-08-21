@@ -101,14 +101,12 @@ icu_fuchsia_package("pkg_small") {
   icu_deps = [ ":component_small" ]
 }
 
-core_shard("intl_services_shard") {
-  shard_file = "meta/intl.core_shard.cml"
+# TODO: fxbug.dev/117974 - Remove these targets, they are not needed anymore.
+group("intl_services_shard") {
 }
 
-core_shard("intl_services_small_shard") {
-  shard_file = "meta/intl_small.core_shard.cml"
+group("intl_services_small_shard") {
 }
 
-core_shard("intl_services_small_timezones_shard") {
-  shard_file = "meta/intl_small_timezones.core_shard.cml"
+group("intl_services_small_timezones_shard") {
 }
