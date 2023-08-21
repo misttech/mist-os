@@ -17,6 +17,10 @@
                 // TODO(https://fxbug.dev/111877): un-skip some of these when the data path is ready.
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectSendShutdownWrite/*",
 
+                // Skip flaky tests. TODO(https://fxbug.dev/132128): un-skip
+                // once de-flaked.
+                "AllInetTests/TcpSocketTest.SendUnblocksOnSendBufferIncrease/*",
+
                 // Skip flaky tests. TODO(https://fxbug.dev/111877): un-skip
                 // once de-flaked.
                 "AllInetTests/TcpSocketTest.PollWithFullBufferBlocks/*",
