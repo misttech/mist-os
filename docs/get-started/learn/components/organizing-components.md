@@ -93,7 +93,7 @@ ffx component show echo-args
 You should now see the following output:
 
 ```none {:.devsite-disable-click-to-copy}
-               Moniker: /core/ffx-laboratory:echo-args
+               Moniker: core/ffx-laboratory:echo-args
                    URL: fuchsia-pkg://fuchsia.com/echo-args#meta/echo-args.cm
                   Type: CML dynamic component
        Component State: Resolved

@@ -14,9 +14,9 @@ Once a component is destroyed, the framework removes its persistent state
 (such as local storage).
 
 The framework starts a component instance when another component attempts to
-open a channel to it — known as **binding**. Binding happens **implicitly** when
-connecting to a capability exposed by the component. Binding to a component that
-is already started connects to the currently running instance.
+open a channel to it. This happens **implicitly** when connecting to a
+capability exposed by the component. Connecting to a component
+that is already started reuses the running instance.
 
 <aside class="key-point">
 Components are initially <strong>stopped</strong> when they are created. A
@@ -26,8 +26,7 @@ before it can <strong>start</strong>.
 
 Components may stop themselves by exiting the program (as defined by the
 component's `runner`), or the framework may stop the component as part of
-system shutdown. Before being destroyed, the framework moves components to a
-**shutdown** state to indicate that it cannot be started again.
+system shutdown.
 
 ![Diagram showing how components have two distinct states: instance and
 execution. Together, these states describe the "component lifecycle."](
