@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_inputs.gni")
 import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
 
@@ -144,27 +145,36 @@ template("board_configuration") {
       _vbmeta = _filesystems.vbmeta
       _vbmeta_rebased = {
       }
-      _vbmeta_inputs = []
       if (defined(_vbmeta.key)) {
-        _vbmeta_inputs += [ _vbmeta.key ]
-        _vbmeta_rebased.key = rebase_path(_vbmeta.key, root_build_dir)
-      }
-      if (defined(_vbmeta.key_metadata)) {
-        _vbmeta_inputs += [ _vbmeta.key_metadata ]
-        _vbmeta_rebased.key_metadata =
-            rebase_path(_vbmeta.key_metadata, root_build_dir)
-      }
+        _vbmeta_key_filename = get_path_info(_vbmeta.key, "file")
+        _vbmeta_rebased.key = "vbmeta/${_vbmeta_key_filename}"
 
-      if (_vbmeta_inputs != []) {
-        # create a group to validate that the keys exist, and make them part of
-        # the transitive deps of any assembly that uses this board.
-        group_with_inputs("${target_name}.vbmeta") {
-          inputs = _vbmeta_inputs
+        copy("${target_name}.vbmeta.key") {
+          sources = [ _vbmeta.key ]
+          outputs =
+              [ "${files.board_configuration_dir}/${_vbmeta_rebased.key}" ]
 
           # keys currently need to be source files.
           deps = []
         }
-        creation_deps += [ ":${target_name}.vbmeta" ]
+        creation_deps += [ ":${target_name}.vbmeta.key" ]
+      }
+
+      if (defined(_vbmeta.key_metadata)) {
+        _vbmeta_key_metadata_filename =
+            get_path_info(_vbmeta.key_metadata, "file")
+        _vbmeta_rebased.key_metadata = "vbmeta/${_vbmeta_key_metadata_filename}"
+
+        copy("${target_name}.vbmeta.key_metadata") {
+          sources = [ _vbmeta.key_metadata ]
+          outputs = [
+            "${files.board_configuration_dir}/${_vbmeta_rebased.key_metadata}",
+          ]
+
+          # keys currently need to be source files.
+          deps = []
+        }
+        creation_deps += [ ":${target_name}.vbmeta.key_metadata" ]
       }
 
       if (_vbmeta_rebased != {
@@ -247,7 +257,7 @@ template("board_configuration") {
     forward_variables_from(invoker, [ "testonly" ])
     visibility = [
       ":${labels.main_target}",
-      ":${labels.main_target}.verify",
+      ":${labels.main_target}.copy",
     ]
 
     outputs = [ files.base_info ]
@@ -255,6 +265,8 @@ template("board_configuration") {
 
     contents = {
       name = board_name
+
+      uses_file_relative_paths = true
 
       if (defined(_filesystems)) {
         filesystems = _filesystems
@@ -264,20 +276,30 @@ template("board_configuration") {
     }
   }
 
+  # TODO:  Replace this with a generation of the bundle that includes the
+  # drivers.
+  copy("${target_name}.copy") {
+    forward_variables_from(invoker, [ "testonly" ])
+    deps = [ ":${labels.base_info}" ] + creation_deps
+    sources = [ files.base_info ]
+    outputs = [ files.board_configuration ]
+  }
+
   if (defined(invoker.verify_against)) {
     # If a file is specified to verify the generated one against, then do so.
     python_action("${target_name}.verify") {
       forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":${labels.main_target}" ]
 
       depfile = "${target_gen_dir}/${target_name}.d"
 
       inputs = [
-        files.base_info,
+        files.board_configuration,
         invoker.verify_against,
       ]
       outputs = [ "${target_out_dir}/${target_name}.diff" ]
 
-      deps = [ ":${labels.base_info}" ]
+      deps = [ ":${labels.main_target}.copy" ]
 
       binary_label = "//build/bazel/assembly/board_configurations:verify_board_configuration"
       args = [
@@ -298,16 +320,21 @@ template("board_configuration") {
     creation_deps += [ ":${target_name}.verify" ]
   }
 
-  # TODO:  Replace this with a generation of the bundle that includes the
-  # drivers.
-  copy(target_name) {
+  group(target_name) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    deps = creation_deps + [ ":${labels.base_info}" ]
-    sources = [ files.base_info ]
-    outputs = [ files.board_configuration ]
+    public_deps = [ ":${target_name}.copy" ]
+    deps = creation_deps
+  }
+
+  # Make board configuration and hardware support bundle available to Bazel
+  bazel_input_resource_directory("${target_name}.bazel_input") {
+    forward_variables_from(invoker, [ "testonly" ])
+    source_dir = files.board_configuration_dir
+    dest_dir = rebase_path(files.board_configuration_dir, root_out_dir)
+    deps = [ ":${labels.main_target}" ]
   }
 }

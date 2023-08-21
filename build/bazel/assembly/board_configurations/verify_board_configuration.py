@@ -20,15 +20,32 @@ def file_sha1(path):
     return sha1.hexdigest()
 
 
-def replace_with_file_hash(dict, key, root_dir, extra_files_read):
-    p = os.path.join(root_dir, dict[key])
+def replace_with_file_hash(
+        dict, key, root_dir, file_path, uses_file_relative_paths,
+        extra_files_read):
+    p = resolve_file_path(
+        root_dir, file_path, dict[key], uses_file_relative_paths)
     dict[key] = file_sha1(p)
     # Follow links for depfile entry. See https://fxbug.dev/122513.
     p = os.path.relpath(os.path.realpath(p))
     extra_files_read.append(p)
 
 
-def normalize(config, root_dir, extra_files_read):
+def resolve_file_path(root_dir, file_path, path, uses_file_relative_paths):
+    """Resolves a path from a file that may be using file-relative paths into a
+    path that's usable by the script."""
+    if uses_file_relative_paths:
+        dir_path = os.path.dirname(file_path)
+        return os.path.join(root_dir, dir_path, path)
+    else:
+        return os.path.join(root_dir, path)
+
+
+def normalize(config, root_dir, file_path, extra_files_read):
+    uses_file_relative_paths = config.setdefault(
+        "uses_file_relative_paths", False)
+    config.pop("uses_file_relative_paths")
+
     if "filesystems" in config:
         filesystems = config["filesystems"]
 
@@ -37,7 +54,8 @@ def normalize(config, root_dir, extra_files_read):
             for key in ("key", "key_metadata"):
                 if key in vbmeta:
                     replace_with_file_hash(
-                        vbmeta, key, root_dir, extra_files_read)
+                        vbmeta, key, root_dir, file_path,
+                        uses_file_relative_paths, extra_files_read)
 
         if "zbi" in filesystems:
             zbi = filesystems["zbi"]
@@ -46,6 +64,8 @@ def normalize(config, root_dir, extra_files_read):
                     zbi["postprocessing_script"],
                     "path",
                     root_dir,
+                    file_path,
+                    uses_file_relative_paths,
                     extra_files_read,
                 )
 
@@ -75,8 +95,11 @@ def main():
     golden = json5.load(args.golden_json5)
 
     extra_files_read = []
-    normalize(generated, args.generated_root_dir, extra_files_read)
-    normalize(golden, args.golden_root_dir, extra_files_read)
+    normalize(
+        generated, args.generated_root_dir, args.generated_board_config.name,
+        extra_files_read)
+    normalize(
+        golden, args.golden_root_dir, args.golden_json5.name, extra_files_read)
 
     generated_str = json.dumps(generated, sort_keys=True, indent=2).splitlines()
     golden_str = json.dumps(golden, sort_keys=True, indent=2).splitlines()

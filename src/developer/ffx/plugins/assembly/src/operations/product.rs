@@ -5,6 +5,7 @@
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{Context, Result};
 use assembly_config_schema::{AssemblyConfig, BoardInformation};
+use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::ImagesConfig;
 use assembly_tool::SdkToolProvider;
 use assembly_util as util;
@@ -35,6 +36,17 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let board_info_path = board_info;
     let board_info = util::read_config::<BoardInformation>(&board_info_path)
         .context("Loading board information")?;
+
+    // To support the transition to using file-relative paths, only relativize
+    // them when the transitional marker flag is set.
+    let board_info = if board_info.uses_file_relative_paths {
+        let resolved = board_info
+            .resolve_paths_from_file(&board_info_path)
+            .context("Resolving paths in board configuration.")?;
+        resolved
+    } else {
+        board_info
+    };
 
     let mut builder = ImageAssemblyConfigBuilder::default();
 

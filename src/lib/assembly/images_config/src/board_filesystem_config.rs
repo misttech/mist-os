@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// The options include those derived from the partition table and what the bootloader expects.
 /// A board developer can specify options for many different filesystems, and let the product
 /// choose which filesystem to actually create.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct BoardFilesystemConfig {
     /// Required board configuration for a zbi. All assemblies must produce a ZBI.
@@ -20,6 +21,7 @@ pub struct BoardFilesystemConfig {
     /// is necessary, therefore this is an optional board-level argument. fxfs and fvm below are
     /// chosen by the product, therefore those variables are always available for all boards.
     #[serde(default)]
+    #[file_relative_paths]
     pub vbmeta: Option<VBMeta>,
 
     /// Board configuration for a fxfs if requested by the product. If the product does not
@@ -82,14 +84,14 @@ pub struct PostProcessingScript {
 }
 
 /// The parameters describing how to create a VBMeta image.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct VBMeta {
     /// Path on host to the key for signing VBMeta.
-    pub key: Utf8PathBuf,
+    pub key: FileRelativePathBuf,
 
     /// Path on host to the key metadata to add to the VBMeta.
-    pub key_metadata: Utf8PathBuf,
+    pub key_metadata: FileRelativePathBuf,
 
     /// Optional descriptors to add to the VBMeta image.
     #[serde(default)]

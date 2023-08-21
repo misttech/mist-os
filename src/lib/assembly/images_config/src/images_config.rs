@@ -399,8 +399,8 @@ impl ImagesConfig {
             let bfc::VBMeta { key, key_metadata, additional_descriptors } = vbmeta.clone();
             images.push(Image::VBMeta(VBMeta {
                 name: product.image_name.0.clone(),
-                key,
-                key_metadata,
+                key: key.into(),
+                key_metadata: key_metadata.into(),
                 additional_descriptors,
             }));
         }

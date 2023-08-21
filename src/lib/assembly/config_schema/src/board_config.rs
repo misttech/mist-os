@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::BoardFilesystemConfig;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,7 @@ use crate::common::PackageSet;
 
 /// This struct provides information about the "board" that a product is being
 /// assembled to run on.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct BoardInformation {
     /// The name of the board.
@@ -26,6 +27,7 @@ pub struct BoardInformation {
     /// Configuration for the various filesystems that the product can choose to
     /// include.
     #[serde(default)]
+    #[file_relative_paths]
     pub filesystems: BoardFilesystemConfig,
 
     /// This is the bundle of board-specific artifacts that the Fuchsia platform
@@ -39,6 +41,10 @@ pub struct BoardInformation {
     /// If any of these artifacts are removed, even the 'bootstrap' feature set
     /// may be unable to boot.
     pub main_support_bundle: Option<HardwareSupportBundle>,
+
+    /// Temporary flag to handle transition
+    #[serde(default)]
+    pub uses_file_relative_paths: bool,
 }
 
 /// This struct defines a bundle of artifacts that can be included by the board

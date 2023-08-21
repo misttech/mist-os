@@ -632,6 +632,7 @@ mod tests {
             provided_features: vec![],
             main_support_bundle: None,
             filesystems: BoardFilesystemConfig::default(),
+            uses_file_relative_paths: false,
         };
     }
 
