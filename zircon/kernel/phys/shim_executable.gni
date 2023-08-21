@@ -9,7 +9,7 @@ import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
-# Defines a public phys_executable() target with the appropriate metadata to be used
+# Defines a public target with the appropriate metadata to be used
 # as a kernel for QEMU.
 #
 # See phys_executable() for details.

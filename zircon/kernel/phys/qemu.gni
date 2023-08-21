@@ -89,7 +89,7 @@ if (current_cpu == "arm64" || current_cpu == "riscv64") {
         shim_path = "$root_build_dir/qemu-boot-shim.bin"
       }
       if (current_cpu == "riscv64") {
-        shim_deps = [ "//zircon/kernel/arch/riscv64/phys/boot-shim:riscv64-qemu-boot-shim($environment)" ]
+        shim_deps = [ "//zircon/kernel/arch/riscv64/phys/boot-shim:linux-riscv64-boot-shim($environment)" ]
       }
       timeout = qemu_short_timeout
     },
