@@ -296,9 +296,19 @@ static zx_status_t brcmf_sdiod_transfer_vmo(struct brcmf_sdio_dev* sdiodev,
   TRACE_DURATION("brcmfmac:isr", "sdio_do_rw_txn");
   zx_status_t result = sdio_do_rw_txn(proto, &txn);
   if (result != ZX_OK) {
+    if (result == ZX_ERR_TIMED_OUT) {
+      zx_status_t err = sdiodev->drvr->recovery_trigger->sdio_timeout_.Inc();
+      if (err != ZX_OK) {
+        BRCMF_WARN("Failed to trigger, recovery likely in progress - status: %s",
+                   zx_status_get_string(err));
+      }
+    }
     BRCMF_ERR("SDIO transaction failed: %s", zx_status_get_string(result));
     return result;
   }
+
+  // Clear the TriggerCondition counter if SDIO transmission succeeded.
+  sdiodev->drvr->recovery_trigger->sdio_timeout_.Clear();
 
   if (!write) {
     result = zx_cache_flush(frame.Data(), size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
@@ -353,8 +363,21 @@ static zx_status_t brcmf_sdiod_transfer_vmos(struct brcmf_sdio_dev* sdiodev,
   TRACE_DURATION("brcmfmac:isr", "sdio_do_rw_txn");
   zx_status_t result = sdio_do_rw_txn(proto, &txn);
   if (result != ZX_OK) {
+    if (result == ZX_ERR_TIMED_OUT) {
+      // There could be multiple buffers being tranferred at the same time, but we regard it as a
+      // single transfer here and increase the trigger count by 1.
+      zx_status_t err = sdiodev->drvr->recovery_trigger->sdio_timeout_.Inc();
+      if (err != ZX_OK) {
+        BRCMF_WARN("Failed to trigger, recovery likely in progress - status: %s",
+                   zx_status_get_string(err));
+      }
+    }
     BRCMF_ERR("SDIO transaction failed: %s", zx_status_get_string(result));
+    return result;
   }
+
+  // Clear the TriggerCondition counter if SDIO transmission succeeded.
+  sdiodev->drvr->recovery_trigger->sdio_timeout_.Clear();
 
   if (!write) {
     for (auto frame = begin; frame != end; ++frame) {
@@ -935,9 +958,9 @@ zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out
   sdiodev->product_id = devinfo.func_hw_info.product_id;
 
   // No need to call brcmf_sdiod_change_state here. Since the bus struct was allocated above it
-  // can't contain any meaningful previous state that we can transition from. So we just need to set
-  // the expected bus state here. This way we avoid any spurious errors messages about setting the
-  // state to the same value if they happen to match.
+  // can't contain any meaningful previous state that we can transition from. So we just need to
+  // set the expected bus state here. This way we avoid any spurious errors messages about setting
+  // the state to the same value if they happen to match.
   sdiodev->state = BRCMF_SDIOD_DOWN;
 
   BRCMF_DBG(SDIO, "F2 found, calling brcmf_sdiod_probe...");

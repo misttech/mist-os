@@ -432,6 +432,192 @@ TEST(Sdio, AlignSize) {
   sdio1.VerifyAndClear();
 }
 
+zx_status_t fake_brcmf_schedule_recovery_worker(struct brcmf_pub* drvr) {
+  drvr->drvr_resetting.store(true);
+  return ZX_OK;
+}
+
+// Verify sdio_timeout recovery trigger logic in brcmf_sdiod_transfer_vmos().
+TEST(Sdio, SdioTimeoutRecoveryVmos) {
+  FakeSdioDevice device;
+  std::unique_ptr<FakeSdioBus> sdio_bus;
+  ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
+  brcmf_sdio_dev sdio_dev = {.drvr = device.drvr(), .bus = sdio_bus->get()};
+  sdio_func func1 = {};
+  bool recovery_triggered = false;
+  // Create RecoveryTrigger with the fake recovery worker.
+  auto recovery_start_callback = std::make_shared<std::function<zx_status_t()>>();
+  *recovery_start_callback = std::bind(&fake_brcmf_schedule_recovery_worker, device.drvr());
+  device.drvr()->recovery_trigger =
+      std::make_unique<wlan::brcmfmac::RecoveryTrigger>(recovery_start_callback);
+
+  pthread_mutex_init(&func1.lock, nullptr);
+
+  MockSdio sdio1;
+
+  sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
+  sdio_dev.func1 = &func1;
+
+  // The expected frame sequence: 4 frames with ZX_ERR_TIMED_OUT, 1 frame with ZX_OK, 5 frames with
+  // ZX_ERR_TIMED_OUT.
+  for (size_t i = 0; i < 4; i++) {
+    sdio_bus->ExpectDoRwTxn(sdio1, ZX_ERR_TIMED_OUT, i * 0x00001000, FakeSdioBus::kFrameSize, true,
+                            true);
+  }
+
+  sdio_bus->ExpectDoRwTxn(sdio1, ZX_OK, 0x00000000, FakeSdioBus::kFrameSize, true, true);
+
+  for (size_t i = 0; i < 5; i++) {
+    sdio_bus->ExpectDoRwTxn(sdio1, ZX_ERR_TIMED_OUT, i * 0x00001000, FakeSdioBus::kFrameSize, true,
+                            true);
+  }
+
+  uint8_t some_data[FakeSdioBus::kFrameSize] = {};
+
+  // Make sure the drvr_setting bit is false before any of the frames sent.
+  recovery_triggered = device.drvr()->drvr_resetting.load();
+  EXPECT_FALSE(recovery_triggered);
+
+  // Write four frames and with ZX_ERR_TIMED_OUT returned.
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00000000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00001000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00002000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00003000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+
+  // Write one frame with ZX_OK returned. This frame resets the sdio_timeout recovery trigger
+  // counter.
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00000000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_OK);
+
+  // Write one more frame with ZX_ERR_TIMED_OUT returned.
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00000000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+
+  // Although there are already 5 ZX_ERR_TIMED_OUTs returned, the last frame resets the counter, so
+  // no recovery should be triggered here.
+  recovery_triggered = device.drvr()->drvr_resetting.load();
+  EXPECT_FALSE(recovery_triggered);
+
+  // Write four more frames with ZX_ERR_TIMED_OUT returned.
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00001000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00002000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00003000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(brcmf_sdiod_write(&sdio_dev, &sdio_dev.sdio_proto_fn1, 0x00004000, some_data,
+                              FakeSdioBus::kFrameSize, false),
+            ZX_ERR_TIMED_OUT);
+
+  // sdio_timeout recovery should be triggered here since there are five contiguous ZX_ERR_TIMED_OUT
+  // returned.
+  recovery_triggered = device.drvr()->drvr_resetting.load();
+  EXPECT_TRUE(recovery_triggered);
+
+  sdio1.VerifyAndClear();
+}
+
+// Verify sdio_timeout recovery trigger logic in brcmf_sdiod_transfer_vmo().
+TEST(Sdio, SdioTimeoutRecoveryVmo) {
+  FakeSdioDevice device;
+  std::unique_ptr<FakeSdioBus> sdio_bus;
+  ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
+  brcmf_sdio_dev sdio_dev = {.drvr = device.drvr(), .bus = sdio_bus->get()};
+
+  {
+    std::lock_guard lock(sdio_dev.bus->rx_tx_data.tx_space);
+    sdio_dev.bus->rx_tx_data.tx_frame = std::move(*sdio_dev.bus->rx_tx_data.tx_space.Acquire());
+  }
+  sdio_func func1 = {};
+  bool recovery_triggered = false;
+  // Create RecoveryTrigger with the fake recovery worker.
+  auto recovery_start_callback = std::make_shared<std::function<zx_status_t()>>();
+  *recovery_start_callback = std::bind(&fake_brcmf_schedule_recovery_worker, device.drvr());
+  device.drvr()->recovery_trigger =
+      std::make_unique<wlan::brcmfmac::RecoveryTrigger>(recovery_start_callback);
+
+  pthread_mutex_init(&func1.lock, nullptr);
+
+  MockSdio sdio1;
+
+  sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
+  sdio_dev.func1 = &func1;
+  uint32_t some_data = 0x1234;
+  uint32_t addr = 0x0000000;
+  SBSDIO_FORMAT_ADDR(addr);
+
+  // The expected frame sequence: 4 frames with ZX_ERR_TIMED_OUT, 1 frame with ZX_OK, 5 frames with
+  // ZX_ERR_TIMED_OUT.
+  for (size_t i = 0; i < 4; i++) {
+    sdio_bus->ExpectDoRwTxn(sdio1, ZX_ERR_TIMED_OUT, addr, sizeof(some_data), true, true);
+  }
+
+  sdio_bus->ExpectDoRwTxn(sdio1, ZX_OK, addr, sizeof(some_data), true, true);
+
+  for (size_t i = 0; i < 5; i++) {
+    sdio_bus->ExpectDoRwTxn(sdio1, ZX_ERR_TIMED_OUT, addr, sizeof(some_data), true, true);
+  }
+
+  zx_status_t result = ZX_OK;
+  // Make sure the drvr_setting bit is false before any of the frames sent.
+  recovery_triggered = device.drvr()->drvr_resetting.load();
+  EXPECT_FALSE(recovery_triggered);
+
+  // Write four frames and with ZX_ERR_TIMED_OUT returned.
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+
+  // Write one frame with ZX_OK returned. This frame resets the sdio_timeout recovery trigger
+  // counter.
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_OK);
+
+  // Write one more frame with ZX_ERR_TIMED_OUT returned.
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+
+  // Although there are already 5 ZX_ERR_TIMED_OUTs returned, the last frame resets the counter, so
+  // no recovery should be triggered here.
+  recovery_triggered = device.drvr()->drvr_resetting.load();
+  EXPECT_FALSE(recovery_triggered);
+
+  // Write four more frames with ZX_ERR_TIMED_OUT returned.
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+  brcmf_sdiod_func1_wl(&sdio_dev, 0x00000000, some_data, &result);
+  EXPECT_EQ(result, ZX_ERR_TIMED_OUT);
+
+  // sdio_timeout recovery should be triggered here since there are five contiguous ZX_ERR_TIMED_OUT
+  // returned.
+  recovery_triggered = device.drvr()->drvr_resetting.load();
+  EXPECT_TRUE(recovery_triggered);
+
+  sdio1.VerifyAndClear();
+}
+
 /*
  * A minimially initialized `struct brcmf_sdio` instance.
  *
