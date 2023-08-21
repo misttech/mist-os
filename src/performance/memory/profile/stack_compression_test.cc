@@ -22,7 +22,7 @@ std::vector<uint8_t> compressed(std::vector<const uint64_t> input) {
   return compressed;
 }
 
-inline constexpr unsigned char operator"" _u8(unsigned long long arg) noexcept {
+inline constexpr unsigned char operator""_u8(unsigned long long arg) noexcept {
   return static_cast<unsigned char>(arg);
 }
 
