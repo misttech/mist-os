@@ -626,7 +626,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "getopt",
     "getopt_long_only",
     "__getopt_msg",
-    "getpagesize",
     "getpass",
     "getpeername",
     "getpgid",
@@ -1076,11 +1075,9 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "__sanitizer_change_code_protection",
     "__sanitizer_fast_backtrace",
     "__sanitizer_fill_shadow",
-    "__sanitizer_log_write",
     "__sanitizer_memory_snapshot",
     "__sanitizer_module_loaded",
     "__sanitizer_process_exit_hook",
-    "__sanitizer_publish_data",
     "__sanitizer_shadow_bounds",
     "__sanitizer_startup_hook",
     "__sanitizer_thread_create_hook",
@@ -1407,7 +1404,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "zx_utc_reference_get",
     "_zx_utc_reference_swap",
     "zx_utc_reference_swap",
-    "_zx_vmar_root_self",
 };
 
 }  // namespace driver_symbols
