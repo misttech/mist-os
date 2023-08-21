@@ -543,6 +543,14 @@ config("default_warnings") {
     "-Wno-sign-conversion",
     "-Wno-unused-parameter",
     "-Wnonportable-system-include-path",
+
+    # TODO(fxbug.dev/64272): Disable "-Wmissing-field-initializers" which
+    # warns when designated initializers are used on some (but not all)
+    # fields in C++, but not C.
+    #
+    # There is ongoing discussion about whether it should apply to C++ or not.
+    # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=96868 for details.
+    "-Wno-missing-field-initializers",
   ]
 
   cflags_cc = []
@@ -576,13 +584,6 @@ config("default_warnings") {
     ]
 
     cflags += [
-      # TODO(fxbug.dev/64272): Disable "-Wmissing-field-initializers" which
-      # warns when designated initializers are used on some (but not all)
-      # fields in C++, contrary to its documentation (and Clang).
-      #
-      # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=39589.
-      "-Wno-missing-field-initializers",
-
       # TODO(fxbug.dev/101358): -Warray-bounds has false positives in GCC 12.
       # When https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105762 is fixed,
       # remove this.
