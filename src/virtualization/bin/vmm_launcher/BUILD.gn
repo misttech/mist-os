@@ -76,7 +76,6 @@ fuchsia_test_package("vmm_launcher_tests") {
   deps = [
     ":default_config",
     ":vmm_launcher_component",
-    "//src/virtualization/bin/vmm_rs:component",
   ]
 }
 

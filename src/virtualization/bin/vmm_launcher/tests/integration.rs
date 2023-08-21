@@ -11,7 +11,6 @@ use {
 };
 
 static VMM_URL: &'static str = "#meta/vmm.cm";
-static VMM_RS_URL: &'static str = "#meta/vmm_rs.cm";
 
 async fn build_test_realm(vmm_url: &'static str) -> Result<RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
@@ -96,11 +95,6 @@ async fn test_vmm_launcher_launches_vmm() -> Result<(), Error> {
     vmm_launcher_launches_vmm(VMM_URL).await
 }
 
-#[fuchsia::test]
-async fn test_vmm_launcher_launches_vmm_rs() -> Result<(), Error> {
-    vmm_launcher_launches_vmm(VMM_RS_URL).await
-}
-
 async fn spawn_component_per_connection(url: &'static str) -> Result<(), Error> {
     let test_realm = build_test_realm(url).await.unwrap();
 
@@ -124,11 +118,6 @@ async fn spawn_component_per_connection(url: &'static str) -> Result<(), Error> 
 #[fuchsia::test]
 async fn test_component_per_connection_vmm() -> Result<(), Error> {
     spawn_component_per_connection(VMM_URL).await
-}
-
-#[fuchsia::test]
-async fn test_component_per_connection_vmm_rs() -> Result<(), Error> {
-    spawn_component_per_connection(VMM_RS_URL).await
 }
 
 async fn drop_guest_lifecycle_terminates_component(url: &'static str) -> Result<(), Error> {
@@ -159,9 +148,4 @@ async fn drop_guest_lifecycle_terminates_component(url: &'static str) -> Result<
 #[fuchsia::test]
 async fn test_drop_guest_lifecycle_terminates_vmm() -> Result<(), Error> {
     drop_guest_lifecycle_terminates_component(VMM_URL).await
-}
-
-#[fuchsia::test]
-async fn test_drop_guest_lifecycle_terminates_vmm_rs() -> Result<(), Error> {
-    drop_guest_lifecycle_terminates_component(VMM_RS_URL).await
 }
