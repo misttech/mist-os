@@ -115,7 +115,7 @@ async fn build_container(
     Ok(container)
 }
 
-#[fuchsia::main(logging_tags = ["starnix"])]
+#[fuchsia::main(logging_tags = ["starnix"], logging_blocking)]
 async fn main() -> Result<(), Error> {
     // Because the starnix kernel state is shared among all of the processes in the same job,
     // we need to kill those in addition to the process which panicked.
