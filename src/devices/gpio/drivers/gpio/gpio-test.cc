@@ -209,11 +209,11 @@ TEST_F(GpioTest, Init) {
 
   fidl::Arena arena;
 
-  fuchsia_hardware_gpio_init::wire::GpioInitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio_init::wire::GpioInitStep>(arena, 10);
+  fuchsia_hardware_gpio::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>(arena, 10);
 
   metadata.steps[0].index = 1;
-  metadata.steps[0].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[0].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullDown)
                                   .output_value(1)
                                   .drive_strength_ua(4000)
@@ -223,7 +223,7 @@ TEST_F(GpioTest, Init) {
       .ExpectSetDriveStrength(ZX_OK, 1, 4000, 4000);
 
   metadata.steps[1].index = 2;
-  metadata.steps[1].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[1].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .input_flags(fuchsia_hardware_gpio::GpioFlags::kNoPull)
                                   .alt_function(5)
                                   .drive_strength_ua(2000)
@@ -234,22 +234,22 @@ TEST_F(GpioTest, Init) {
 
   metadata.steps[2].index = 3;
   metadata.steps[2].options =
-      fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena).output_value(0).Build();
+      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(0).Build();
   gpio.ExpectConfigOut(ZX_OK, 3, 0);
 
   metadata.steps[3].index = 3;
   metadata.steps[3].options =
-      fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena).output_value(1).Build();
+      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(1).Build();
   gpio.ExpectConfigOut(ZX_OK, 3, 1);
 
   metadata.steps[4].index = 3;
-  metadata.steps[4].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[4].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullUp)
                                   .Build();
   gpio.ExpectConfigIn(ZX_OK, 3, GPIO_PULL_UP);
 
   metadata.steps[5].index = 2;
-  metadata.steps[5].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[5].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .alt_function(0)
                                   .drive_strength_ua(1000)
                                   .Build();
@@ -257,11 +257,11 @@ TEST_F(GpioTest, Init) {
 
   metadata.steps[6].index = 2;
   metadata.steps[6].options =
-      fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena).output_value(1).Build();
+      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(1).Build();
   gpio.ExpectConfigOut(ZX_OK, 2, 1);
 
   metadata.steps[7].index = 1;
-  metadata.steps[7].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[7].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullUp)
                                   .alt_function(0)
                                   .drive_strength_ua(4000)
@@ -272,11 +272,11 @@ TEST_F(GpioTest, Init) {
 
   metadata.steps[8].index = 1;
   metadata.steps[8].options =
-      fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena).output_value(1).Build();
+      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(1).Build();
   gpio.ExpectConfigOut(ZX_OK, 1, 1);
 
   metadata.steps[9].index = 3;
-  metadata.steps[9].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[9].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .alt_function(3)
                                   .drive_strength_ua(2000)
                                   .Build();
@@ -314,11 +314,11 @@ TEST_F(GpioTest, InitErrorHandling) {
 
   fidl::Arena arena;
 
-  fuchsia_hardware_gpio_init::wire::GpioInitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio_init::wire::GpioInitStep>(arena, 4);
+  fuchsia_hardware_gpio::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>(arena, 4);
 
   metadata.steps[0].index = 4;
-  metadata.steps[0].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[0].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullDown)
                                   .output_value(1)
                                   .drive_strength_ua(4000)
@@ -328,7 +328,7 @@ TEST_F(GpioTest, InitErrorHandling) {
       .ExpectSetDriveStrength(ZX_OK, 4, 4000, 4000);
 
   metadata.steps[1].index = 2;
-  metadata.steps[1].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[1].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .input_flags(fuchsia_hardware_gpio::GpioFlags::kNoPull)
                                   .alt_function(5)
                                   .drive_strength_ua(2000)
@@ -339,13 +339,13 @@ TEST_F(GpioTest, InitErrorHandling) {
 
   metadata.steps[2].index = 3;
   metadata.steps[2].options =
-      fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena).output_value(0).Build();
+      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(0).Build();
   gpio.ExpectConfigOut(ZX_ERR_NOT_FOUND, 3, 0);
 
   // Processing should continue after the above error.
 
   metadata.steps[3].index = 2;
-  metadata.steps[3].options = fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+  metadata.steps[3].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
                                   .alt_function(0)
                                   .drive_strength_ua(1000)
                                   .Build();

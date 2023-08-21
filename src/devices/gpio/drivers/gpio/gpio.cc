@@ -173,7 +173,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
 void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClient& gpio) {
   // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
   // child devices don't expect.
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpio_init::wire::GpioInitMetadata>(
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpio::wire::InitMetadata>(
       parent, DEVICE_METADATA_GPIO_INIT_STEPS);
   if (!decoded.is_ok()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
@@ -203,7 +203,7 @@ void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClie
 }
 
 zx_status_t GpioInitDevice::ConfigureGpios(
-    const fuchsia_hardware_gpio_init::wire::GpioInitMetadata& metadata,
+    const fuchsia_hardware_gpio::wire::InitMetadata& metadata,
     const ddk::GpioImplProtocolClient& gpio) {
   // Log errors but continue processing to put as many GPIOs as possible into the requested state.
   zx_status_t return_status = ZX_OK;

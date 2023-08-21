@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.gpio") {
-  sources = [ "gpio.fidl" ]
+  sources = [
+    "gpio.fidl",
+    "init.fidl",
+  ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
