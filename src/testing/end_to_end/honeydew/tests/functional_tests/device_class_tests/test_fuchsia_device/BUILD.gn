@@ -8,6 +8,7 @@ import("//build/testing/environments.gni")
 
 if (is_host) {
   python_library("test_fuchsia_device_lib") {
+    testonly = true
     library_name = "test_fuchsia_device"
     sources = [
       "__init__.py",

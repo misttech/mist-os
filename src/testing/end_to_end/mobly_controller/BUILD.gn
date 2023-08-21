@@ -5,10 +5,12 @@
 import("//build/python/python_library.gni")
 
 python_library("mobly_controller") {
+  testonly = true
   library_name = "mobly_controller"
   source_root = "."
   sources = [
     "__init__.py",
     "fuchsia_device.py",
   ]
+  library_deps = [ "//src/testing/end_to_end/honeydew" ]
 }

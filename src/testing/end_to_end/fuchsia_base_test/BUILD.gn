@@ -5,6 +5,7 @@
 import("//build/python/python_library.gni")
 
 python_library("fuchsia_base_test") {
+  testonly = true
   library_name = "fuchsia_base_test"
   sources = [
     "__init__.py",
