@@ -347,7 +347,6 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
 
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
-  devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
   devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 
   // Returns true if additional ranges from the devicetree are successfully appended.
@@ -403,7 +402,6 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
   }
 
   bool AppendRangesFromReg(const devicetree::PropertyDecoder& decoder,
-                           const std::optional<devicetree::RangesProperty>& parent_range,
                            memalloc::Type memrange_type);
 
   devicetree::ScanState HandleMemoryNode(const devicetree::NodePath& path,
@@ -414,12 +412,6 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
 
   cpp20::span<memalloc::Range> ranges_;
   size_t ranges_count_ = 0;
-
-  const devicetree::Node* reserved_memory_root_ = nullptr;
-
-  // Used to translate child node memory ranges.
-  std::optional<devicetree::RangesProperty> root_ranges_;
-  std::optional<devicetree::RangesProperty> reserved_memory_ranges_;
 };
 
 // This item parses the '/cpus' 'timebase-frequency property to generate a timer driver
