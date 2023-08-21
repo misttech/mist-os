@@ -8,12 +8,12 @@ use {
             error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
+        runner::Runner,
     },
     ::routing::{
         capability_source::InternalCapability, config::SecurityPolicy, policy::ScopedPolicyChecker,
     },
     async_trait::async_trait,
-    cm_runner::Runner,
     cm_types::Name,
     cm_util::channel,
     cm_util::TaskGroup,

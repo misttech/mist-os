@@ -15,10 +15,10 @@ use {
         namespace::create_namespace,
         routing::{route_and_open_capability, OpenOptions, RouteRequest},
     },
+    crate::runner::{NamespaceEntry, Runner},
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
-    cm_runner::{NamespaceEntry, Runner},
     config_encoder::ConfigFields,
     fidl::{
         endpoints::{create_proxy, DiscoverableProtocolMarker},

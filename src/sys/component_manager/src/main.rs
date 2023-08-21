@@ -39,6 +39,7 @@ mod elf_runner;
 mod framework;
 mod model;
 mod root_stop_notifier;
+mod runner;
 mod startup;
 
 extern "C" {

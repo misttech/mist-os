@@ -318,6 +318,7 @@ pub(crate) fn allowlist_entry_matches(
 
 /// Evaluates security policy relative to a specific Component (based on that Component's
 /// Moniker).
+#[derive(Clone)]
 pub struct ScopedPolicyChecker {
     /// The security policy to apply.
     policy: Arc<SecurityPolicy>,

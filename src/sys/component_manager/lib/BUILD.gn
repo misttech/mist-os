@@ -7,7 +7,6 @@ group("tests") {
   deps = [
     "logger:tests",
     "processargs:tests",
-    "runner:tests",
     "sandbox:tests",
     "serve_processargs:tests",
     "util:tests",

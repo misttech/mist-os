@@ -10,13 +10,13 @@ use {
             error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
+        runner::{namespace::Entry as NamespaceEntry, Namespace},
     },
     ::routing::{
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
         mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
         verify_instance_in_component_id_index, RouteRequest,
     },
-    cm_runner::{namespace::Entry as NamespaceEntry, Namespace},
     cm_rust::{self, ComponentDecl, UseDecl},
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},

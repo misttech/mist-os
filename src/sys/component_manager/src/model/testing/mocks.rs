@@ -7,6 +7,7 @@ use {
         bedrock::program::Program,
         builtin::runner::BuiltinRunnerFactory,
         model::{component::WeakComponentInstance, resolver::Resolver, routing::RouteRequest},
+        runner::{Namespace, Runner},
     },
     ::routing::{
         capability_source::ComponentCapability,
@@ -17,7 +18,6 @@ use {
     anyhow::format_err,
     assert_matches::assert_matches,
     async_trait::async_trait,
-    cm_runner::{Namespace, Runner},
     cm_rust::{CapabilityTypeName, ComponentDecl, ConfigValuesData},
     fidl::prelude::*,
     fidl::{

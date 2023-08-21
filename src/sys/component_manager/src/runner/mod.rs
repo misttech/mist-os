@@ -13,9 +13,6 @@ use {
 };
 
 /// Executes a component instance.
-/// TODO: The runner should return a trait object to allow the component instance to be stopped,
-/// binding to services, and observing abnormal termination.  In other words, a wrapper that
-/// encapsulates fcrunner::ComponentController FIDL interfacing concerns.
 #[async_trait]
 pub trait Runner: Sync + Send {
     async fn start(

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cm_runner::{Namespace, Runner};
+use crate::runner::{Namespace, Runner};
 use fidl::endpoints;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as fcrunner;

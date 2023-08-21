@@ -27,6 +27,7 @@ use {
             OpenOptions, RouteRequest,
         },
     },
+    crate::runner::{builtin::NullRunner, builtin::RemoteRunner, NamespaceEntry, Runner},
     ::routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_id_index::{ComponentIdIndex, ComponentInstanceId},
@@ -46,7 +47,6 @@ use {
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
-    cm_runner::{builtin::NullRunner, builtin::RemoteRunner, NamespaceEntry, Runner},
     cm_rust::{
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
         OfferDeclCommon, UseDecl,

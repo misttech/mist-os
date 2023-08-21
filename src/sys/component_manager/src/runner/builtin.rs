@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::Runner, async_trait::async_trait, fidl::endpoints::ServerEnd, fidl::prelude::*,
+    crate::runner::Runner, async_trait::async_trait, fidl::endpoints::ServerEnd, fidl::prelude::*,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_async as fasync, futures::stream::StreamExt, thiserror::Error, tracing::warn,
 };

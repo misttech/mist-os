@@ -839,7 +839,7 @@ pub enum CreateNamespaceError {
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 
     #[error("invalid additional namespace entries")]
-    InvalidAdditionalEntries(#[source] cm_runner::NamespaceError),
+    InvalidAdditionalEntries(#[source] crate::runner::NamespaceError),
 }
 
 impl CreateNamespaceError {

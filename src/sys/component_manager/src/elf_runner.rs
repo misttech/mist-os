@@ -3,12 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::runner::BuiltinRunnerFactory, ::routing::policy::ScopedPolicyChecker,
-    cm_runner::Runner, elf_runner::ElfRunner, std::sync::Arc,
+    crate::builtin::runner::BuiltinRunnerFactory, crate::runner::builtin::RemoteRunner,
+    crate::runner::Runner, ::routing::policy::ScopedPolicyChecker, elf_runner::ElfRunner,
+    fidl_fuchsia_component_runner as fcrunner, std::sync::Arc,
 };
 
 impl BuiltinRunnerFactory for ElfRunner {
     fn get_scoped_runner(self: Arc<Self>, checker: ScopedPolicyChecker) -> Arc<dyn Runner> {
-        self.get_scoped_runner(checker)
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+        self.get_scoped_runner(checker).serve(stream);
+        Arc::new(RemoteRunner::new(proxy))
     }
 }

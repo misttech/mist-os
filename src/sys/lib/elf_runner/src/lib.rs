@@ -22,9 +22,7 @@ use {
     },
     crate::{crash_info::CrashRecords, vdso_vmo::get_next_vdso_vmo},
     ::routing::policy::ScopedPolicyChecker,
-    async_trait::async_trait,
     chrono::{DateTime, NaiveDateTime, Utc},
-    cm_runner::Runner,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
@@ -36,6 +34,7 @@ use {
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::channel::oneshot,
+    futures::TryStreamExt,
     moniker::Moniker,
     runner::component::ChannelEpitaph,
     runner::StartInfo,
@@ -429,60 +428,70 @@ impl ElfRunner {
         ))
     }
 
-    pub fn get_scoped_runner(self: Arc<Self>, checker: ScopedPolicyChecker) -> Arc<dyn Runner> {
+    pub fn get_scoped_runner(
+        self: Arc<Self>,
+        checker: ScopedPolicyChecker,
+    ) -> Arc<ScopedElfRunner> {
         Arc::new(ScopedElfRunner { runner: self, checker })
     }
 }
 
-struct ScopedElfRunner {
+pub struct ScopedElfRunner {
     runner: Arc<ElfRunner>,
     checker: ScopedPolicyChecker,
 }
 
-#[async_trait]
-impl Runner for ScopedElfRunner {
-    /// Starts a component by creating a new Job and Process for the component.
-    /// The Runner also creates and hosts a namespace for the component. The
-    /// namespace and other runtime state of the component will live until the
-    /// Future returned is dropped or the `server_end` is sent either
-    /// `ComponentController.Stop` or `ComponentController.Kill`. Sending
-    /// `ComponentController.Stop` or `ComponentController.Kill` causes the
-    /// Future to complete.
-    async fn start(
-        &self,
-        start_info: fcrunner::ComponentStartInfo,
-        server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
-    ) {
-        let resolved_url =
-            start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
-
-        let elf_component = match self.runner.start_component(start_info, &self.checker).await {
-            Ok(elf_component) => elf_component,
-            Err(err) => {
-                runner::component::report_start_error(
-                    err.as_zx_status(),
-                    format!("{}", err),
-                    &resolved_url,
-                    server_end,
-                );
-                return;
+impl ScopedElfRunner {
+    pub fn serve(&self, mut stream: fcrunner::ComponentRunnerRequestStream) {
+        let runner = self.runner.clone();
+        let checker = self.checker.clone();
+        fasync::Task::spawn(async move {
+            while let Ok(Some(request)) = stream.try_next().await {
+                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
+                    request;
+                start(runner.clone(), checker.clone(), start_info, controller).await;
             }
-        };
+        })
+        .detach();
+    }
+}
 
-        let (epitaph_tx, epitaph_rx) = oneshot::channel::<ChannelEpitaph>();
-        // This function waits for something from the channel and
-        // returns it or Error::Internal if the channel is closed
-        let epitaph_fn = Box::pin(async move {
-            epitaph_rx
-                .await
-                .unwrap_or_else(|_| {
-                    warn!("epitaph oneshot channel closed unexpectedly");
-                    fcomp::Error::Internal.into()
-                })
-                .into()
-        });
+/// Starts a component by creating a new Job and Process for the component.
+async fn start(
+    runner: Arc<ElfRunner>,
+    checker: ScopedPolicyChecker,
+    start_info: fcrunner::ComponentStartInfo,
+    server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
+) {
+    let resolved_url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
 
-        let Some(proc_copy) = elf_component.copy_process() else {
+    let elf_component = match runner.start_component(start_info, &checker).await {
+        Ok(elf_component) => elf_component,
+        Err(err) => {
+            runner::component::report_start_error(
+                err.as_zx_status(),
+                format!("{}", err),
+                &resolved_url,
+                server_end,
+            );
+            return;
+        }
+    };
+
+    let (epitaph_tx, epitaph_rx) = oneshot::channel::<ChannelEpitaph>();
+    // This function waits for something from the channel and
+    // returns it or Error::Internal if the channel is closed
+    let epitaph_fn = Box::pin(async move {
+        epitaph_rx
+            .await
+            .unwrap_or_else(|_| {
+                warn!("epitaph oneshot channel closed unexpectedly");
+                fcomp::Error::Internal.into()
+            })
+            .into()
+    });
+
+    let Some(proc_copy) = elf_component.copy_process() else {
             runner::component::report_start_error(
                 zx::Status::from_raw(
                     i32::try_from(fcomp::Error::InstanceCannotStart.into_primitive()).unwrap(),
@@ -494,67 +503,77 @@ impl Runner for ScopedElfRunner {
             return;
         };
 
-        let component_diagnostics = elf_component
-            .copy_job_for_diagnostics()
-            .map(|job| ComponentDiagnostics {
-                tasks: Some(ComponentTasks {
-                    component_task: Some(DiagnosticsTask::Job(job.into())),
-                    ..Default::default()
-                }),
+    let component_diagnostics = elf_component
+        .copy_job_for_diagnostics()
+        .map(|job| ComponentDiagnostics {
+            tasks: Some(ComponentTasks {
+                component_task: Some(DiagnosticsTask::Job(job.into())),
                 ..Default::default()
-            })
-            .map_err(|error| {
-                warn!(%error, "Failed to copy job for diagnostics");
-                ()
-            })
-            .ok();
-
-        // Spawn a future that watches for the process to exit
-        fasync::Task::spawn(async move {
-            fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
-                .await
-                .map(|_: fidl::Signals| ()) // Discard.
-                .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
-            // Process exit code '0' is considered a clean return.
-            // TODO (fxbug.dev/57024) If we create an epitaph that indicates
-            // intentional, non-zero exit, use that for all non-0 exit
-            // codes.
-            let exit_status: ChannelEpitaph = match proc_copy.info() {
-                Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
-                Ok(_) => fcomp::Error::InstanceDied.into(),
-                Err(error) => {
-                    warn!(%error, "Unable to query process info");
-                    fcomp::Error::Internal.into()
-                }
-            };
-            epitaph_tx.send(exit_status).unwrap_or_else(|_| warn!("error sending epitaph"));
+            }),
+            ..Default::default()
         })
-        .detach();
+        .map_err(|error| {
+            warn!(%error, "Failed to copy job for diagnostics");
+            ()
+        })
+        .ok();
 
-        // Create a future which owns and serves the controller
-        // channel. The `epitaph_fn` future completes when the
-        // component's main process exits. The controller then sets the
-        // epitaph on the controller channel, closes it, and stops
-        // serving the protocol.
-        fasync::Task::spawn(async move {
-            let (server_stream, control) = match server_end.into_stream_and_control_handle() {
-                Ok(s) => s,
-                Err(error) => {
-                    warn!(%error, "Converting Controller channel to stream failed");
-                    return;
-                }
-            };
-            if let Some(component_diagnostics) = component_diagnostics {
-                control.send_on_publish_diagnostics(component_diagnostics).unwrap_or_else(
-                    |error| warn!(url=%resolved_url, %error, "sending diagnostics failed"),
-                );
+    // Spawn a future that watches for the process to exit
+    fasync::Task::spawn(async move {
+        fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
+            .await
+            .map(|_: fidl::Signals| ()) // Discard.
+            .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
+        // Process exit code '0' is considered a clean return.
+        // TODO (fxbug.dev/57024) If we create an epitaph that indicates
+        // intentional, non-zero exit, use that for all non-0 exit
+        // codes.
+        let exit_status: ChannelEpitaph = match proc_copy.info() {
+            Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
+            Ok(_) => fcomp::Error::InstanceDied.into(),
+            Err(error) => {
+                warn!(%error, "Unable to query process info");
+                fcomp::Error::Internal.into()
             }
-            runner::component::Controller::new(elf_component, server_stream)
-                .serve(epitaph_fn)
-                .await
-                .unwrap_or_else(|error| warn!(%error, "serving ComponentController"));
-        })
-        .detach();
+        };
+        epitaph_tx.send(exit_status).unwrap_or_else(|_| warn!("error sending epitaph"));
+    })
+    .detach();
+
+    // Create a future which owns and serves the controller
+    // channel. The `epitaph_fn` future completes when the
+    // component's main process exits. The controller then sets the
+    // epitaph on the controller channel, closes it, and stops
+    // serving the protocol.
+    fasync::Task::spawn(async move {
+        let (server_stream, control) = match server_end.into_stream_and_control_handle() {
+            Ok(s) => s,
+            Err(error) => {
+                warn!(%error, "Converting Controller channel to stream failed");
+                return;
+            }
+        };
+        if let Some(component_diagnostics) = component_diagnostics {
+            control.send_on_publish_diagnostics(component_diagnostics).unwrap_or_else(
+                |error| warn!(url=%resolved_url, %error, "sending diagnostics failed"),
+            );
+        }
+        runner::component::Controller::new(elf_component, server_stream)
+            .serve(epitaph_fn)
+            .await
+            .unwrap_or_else(|error| warn!(%error, "serving ComponentController"));
+    })
+    .detach();
+}
+
+#[cfg(test)]
+impl ScopedElfRunner {
+    async fn start(
+        &self,
+        start_info: fcrunner::ComponentStartInfo,
+        server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
+    ) {
+        start(self.runner.clone(), self.checker.clone(), start_info, server_end).await
     }
 }
 

@@ -52,7 +52,7 @@ pub async fn serve_controller(
                     stop_payload: None,
                 };
                 let numbered_handles = args.numbered_handles.take().unwrap_or_default();
-                let namespace: cm_runner::Namespace =
+                let namespace: crate::runner::Namespace =
                     args.namespace_entries.take().unwrap_or_default().try_into().unwrap();
                 if let Err(err) = component
                     .start(

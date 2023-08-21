@@ -11,12 +11,12 @@ use {
     crate::{
         builtin::{capability::BuiltinCapability, runner::BuiltinRunnerFactory},
         model::resolver::{self, Resolver},
+        runner::{builtin::RemoteRunner, Runner},
     },
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
     anyhow::Error,
     async_trait::async_trait,
-    cm_runner::{builtin::RemoteRunner, Runner},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_component::client as fclient,
