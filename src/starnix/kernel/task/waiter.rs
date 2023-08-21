@@ -476,10 +476,6 @@ struct WaitEntry {
     /// The events that the waiter is waiting for.
     filter: WaitEvents,
 
-    /// Whether the waiter wishes to remain in the WaitQueue after one of
-    /// the events that the waiter is waiting for occurs.
-    persistent: bool,
-
     /// key for cancelling and queueing events
     key: WaitKey,
 }
@@ -530,12 +526,7 @@ impl WaitQueue {
         let key = waiter.next_key();
         self.wait_async_on_entry(
             waiter,
-            WaitEntry {
-                waiter: waiter.weak(),
-                filter: WaitEvents::Mask(mask),
-                persistent: false,
-                key,
-            },
+            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::Mask(mask), key },
         )
     }
 
@@ -551,12 +542,7 @@ impl WaitQueue {
         let key = waiter.next_key();
         self.wait_async_on_entry(
             waiter,
-            WaitEntry {
-                waiter: waiter.weak(),
-                filter: WaitEvents::Value(value),
-                persistent: false,
-                key,
-            },
+            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::Value(value), key },
         )
     }
 
@@ -572,7 +558,7 @@ impl WaitQueue {
         let key = waiter.next_key();
         self.wait_async_on_entry(
             waiter,
-            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::All, persistent: false, key },
+            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::All, key },
         )
     }
 
@@ -593,12 +579,7 @@ impl WaitQueue {
         let key = waiter.wake_on_events(handler);
         self.wait_async_on_entry(
             waiter,
-            WaitEntry {
-                waiter: waiter.weak(),
-                filter: WaitEvents::Fd(events),
-                persistent: false,
-                key,
-            },
+            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::Fd(events), key },
         )
     }
 
@@ -617,7 +598,7 @@ impl WaitQueue {
                     waiter.queue_events(&entry.key, events);
                     limit -= 1;
                     woken += 1;
-                    return entry.persistent;
+                    return false;
                 }
 
                 true
@@ -628,9 +609,8 @@ impl WaitQueue {
 
     /// Notify any waiters that the given events have occurred.
     ///
-    /// Walks the wait queue and wakes each waiter that is waiting on an
-    /// event that matches the given mask. Persistent waiters remain in the
-    /// list. Non-persistent waiters are removed.
+    /// Walks the wait queue and wakes and removes each waiter that is waiting
+    /// on an event that matches the given mask.
     ///
     /// The waiters will wake up on their own threads to handle these events.
     /// They are not called synchronously by this function.
