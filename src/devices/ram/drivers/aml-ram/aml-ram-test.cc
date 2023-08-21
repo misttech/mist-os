@@ -261,4 +261,127 @@ TEST_F(AmlRamDeviceTest, ValidRequest) {
             kReadCycles[0] + kReadCycles[1] + kReadCycles[2] + kReadCycles[3]);
 }
 
+TEST_F(AmlRamDeviceTest, ValidRequestWithRetries) {
+  constexpr uint32_t kCyclesToMeasure = (1024 * 1024 * 5u);
+  constexpr uint32_t kControlStart = DMC_QOS_ENABLE_CTRL | 0b1001;
+  constexpr uint32_t kControlStop = DMC_QOS_CLEAR_CTRL | 0b1111;
+  constexpr uint32_t kFreq = 0x4 | (0x1 << 10);  // F=24000000 (M=4, N=1, OD=0, OD1=0)
+
+  // Note that the cycles are to be interpreted as shifted 4 bits.
+  constexpr uint32_t kReadCycles[] = {0x125001, 0x0, 0x0, 0x123003};
+
+  // This is the number of MMIO accesses we track as part of each bandwidth measurement. Multiple
+  // measurement attempts are done in this test case, so this constant is used to determine which
+  // attempt and which step within each attempt we're on.
+  constexpr int kStepsPerMeasurement = 6;
+
+  ram_metrics::wire::BandwidthMeasurementConfig config = {kCyclesToMeasure, {3, 0, 0, 4}};
+
+  // |step| helps track of the expected sequence of reads and writes.
+  std::atomic<int> step = 0;
+
+  mmio_.reg(dmc_offsets_.timer_offset)
+      .SetWriteCallback([expect = kCyclesToMeasure, &step](size_t value) {
+        EXPECT_EQ(step % kStepsPerMeasurement, 0, "unexpected: 0x%lx", value);
+        EXPECT_EQ(value, expect, "0: got write of 0x%lx", value);
+        ++step;
+      });
+
+  mmio_.reg(dmc_offsets_.port_ctrl_offset).SetReadCallback([&step]() -> uint32_t {
+    uint32_t value = 0;
+    if (step % kStepsPerMeasurement == 2) {
+      // Only return a valid register value on the third try.
+      if (step / kStepsPerMeasurement >= 2) {
+        value = DMC_QOS_CLEAR_CTRL;
+      }
+
+      ++step;
+    } else {
+      EXPECT_TRUE(false, "unexpected read of port_ctrl_offset");
+    }
+
+    return value;
+  });
+
+  mmio_.reg(dmc_offsets_.port_ctrl_offset)
+      .SetWriteCallback([this, start = kControlStart, stop = kControlStop, &step](size_t value) {
+        if (step % kStepsPerMeasurement == 1) {
+          EXPECT_EQ(value, start, "1: got write of 0x%lx", value);
+          InjectInterrupt();
+          ++step;
+        } else if (step % kStepsPerMeasurement == 5) {
+          EXPECT_EQ(value, stop, "5: got write of 0x%lx", value);
+          ++step;
+        } else {
+          EXPECT_TRUE(false, "unexpected: 0x%lx", value);
+        }
+      });
+
+  mmio_.reg(dmc_offsets_.pll_ctrl0_offset).SetReadCallback([value = kFreq]() { return value; });
+
+  // Note that reading from `dmc_offsets_.port_ctrl_offset` by default returns 0
+  // and that makes the operation succeed.
+
+  mmio_.reg(dmc_offsets_.bw_offset[0]).SetReadCallback([&step, value = kReadCycles[0]]() {
+    EXPECT_EQ(step % kStepsPerMeasurement, 3);
+    // Value of channel 0 cycles granted.
+    return value;
+  });
+
+  mmio_.reg(dmc_offsets_.bw_offset[1]).SetReadCallback([&step, value = kReadCycles[1]]() {
+    EXPECT_EQ(step % kStepsPerMeasurement, 3);
+    // Value of channel 1 cycles granted.
+    return value;
+  });
+
+  mmio_.reg(dmc_offsets_.bw_offset[2]).SetReadCallback([&step, value = kReadCycles[2]]() {
+    EXPECT_EQ(step % kStepsPerMeasurement, 3);
+    // Value of channel 2 cycles granted.
+    return value;
+  });
+
+  mmio_.reg(dmc_offsets_.bw_offset[3]).SetReadCallback([&step, value = kReadCycles[3]]() {
+    EXPECT_EQ(step % kStepsPerMeasurement, 3);
+    ++step;
+    // Value of channel 3 cycles granted.
+    return value;
+  });
+
+  mmio_.reg(dmc_offsets_.all_bw_offset)
+      .SetReadCallback(
+          [&step, value = kReadCycles[0] + kReadCycles[1] + kReadCycles[2] + kReadCycles[3]]() {
+            EXPECT_EQ(step % kStepsPerMeasurement, 4);
+            ++step;
+            // Value of all cycles granted.
+            return value;
+          });
+
+  auto client = fidl::WireSyncClient<ram_metrics::Device>(ConnectToFidl());
+  auto info = client->MeasureBandwidth(config);
+  ASSERT_TRUE(info.ok());
+  ASSERT_FALSE(info->is_error());
+
+  // Check All mmio reads and writes happened.
+  EXPECT_EQ(step, 18);
+
+  EXPECT_GT(info->value()->info.timestamp, 0u);
+  EXPECT_EQ(info->value()->info.frequency, 24000000u);
+  EXPECT_EQ(info->value()->info.bytes_per_cycle, 16u);
+
+  // Check FIDL result makes sense. AML hw does not support read or write only counters.
+  int ix = 0;
+  for (auto& c : info->value()->info.channels) {
+    if (ix < 4) {
+      EXPECT_EQ(c.readwrite_cycles, kReadCycles[ix]);
+    } else {
+      EXPECT_EQ(c.readwrite_cycles, 0u);
+    }
+    EXPECT_EQ(c.write_cycles, 0u);
+    EXPECT_EQ(c.read_cycles, 0u);
+    ++ix;
+  }
+  EXPECT_EQ(info->value()->info.total.readwrite_cycles,
+            kReadCycles[0] + kReadCycles[1] + kReadCycles[2] + kReadCycles[3]);
+}
+
 }  // namespace amlogic_ram

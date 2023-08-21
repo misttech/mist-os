@@ -197,7 +197,8 @@ class AmlRam : public DeviceType {
   void GetDdrWindowingResults(GetDdrWindowingResultsCompleter::Sync& completer) override;
 
   void StartReadBandwithCounters(Job* job);
-  void FinishReadBandwithCounters(ram_metrics::wire::BandwidthInfo* bpi, zx_time_t start_time);
+  zx_status_t FinishReadBandwithCounters(ram_metrics::wire::BandwidthInfo* bpi,
+                                         zx_time_t start_time);
   void CancelReadBandwithCounters();
 
   zx_status_t Bind();

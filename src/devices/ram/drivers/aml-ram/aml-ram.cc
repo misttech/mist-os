@@ -267,16 +267,19 @@ void AmlRam::StartReadBandwithCounters(Job* job) {
   mmio_.Write32(channels_enabled | DMC_QOS_ENABLE_CTRL, dmc_offsets_.port_ctrl_offset);
 }
 
-void AmlRam::FinishReadBandwithCounters(ram_metrics::wire::BandwidthInfo* bpi,
-                                        zx_time_t start_time) {
+zx_status_t AmlRam::FinishReadBandwithCounters(ram_metrics::wire::BandwidthInfo* bpi,
+                                               zx_time_t start_time) {
   ZX_ASSERT(irq_.ack() == ZX_OK);
 
   bpi->timestamp = start_time;
   bpi->frequency = ReadFrequency();
   bpi->bytes_per_cycle = (device_pid_ == PDEV_PID_AMLOGIC_A1) ? kBytesPerCycleA1 : kBytesPerCycle;
 
-  uint32_t value = mmio_.Read32(dmc_offsets_.port_ctrl_offset);
-  ZX_ASSERT(value & DMC_QOS_CLEAR_CTRL);
+  const bool success = mmio_.Read32(dmc_offsets_.port_ctrl_offset) & DMC_QOS_CLEAR_CTRL;
+
+  // The controller may be in an unexpected state as indicated by `success`. The documentation
+  // doesn't say how to handle this, so just do all of the normal MMIO accesses in case they are
+  // required into put the controller back into a good state.
 
   bpi->channels[0].readwrite_cycles = mmio_.Read32(dmc_offsets_.bw_offset[0]);
   bpi->channels[1].readwrite_cycles = mmio_.Read32(dmc_offsets_.bw_offset[1]);
@@ -286,6 +289,8 @@ void AmlRam::FinishReadBandwithCounters(ram_metrics::wire::BandwidthInfo* bpi,
   bpi->total.readwrite_cycles = all_grant_broken_ ? 0 : mmio_.Read32(dmc_offsets_.all_bw_offset);
 
   mmio_.Write32(0x0f | DMC_QOS_CLEAR_CTRL, dmc_offsets_.port_ctrl_offset);
+
+  return success ? ZX_OK : ZX_ERR_IO;
 }
 
 void AmlRam::CancelReadBandwithCounters() {
@@ -316,14 +321,17 @@ void AmlRam::ReadLoop() {
       case kPortKeyIrqMsg: {
         ZX_ASSERT(!jobs.empty());
         ram_metrics::wire::BandwidthInfo bpi;
-        FinishReadBandwithCounters(&bpi, jobs.front().start_time);
-        Job job = std::move(jobs.front());
-        jobs.pop_front();
-        // Start new measurement before we reply the current one.
-        if (!jobs.empty()) {
+        if (FinishReadBandwithCounters(&bpi, jobs.front().start_time) == ZX_OK) {
+          Job job = std::move(jobs.front());
+          jobs.pop_front();
+          // Start new measurement before we reply the current one.
+          if (!jobs.empty()) {
+            StartReadBandwithCounters(&jobs.front());
+          }
+          job.completer.ReplySuccess(bpi);
+        } else {
           StartReadBandwithCounters(&jobs.front());
         }
-        job.completer.ReplySuccess(bpi);
         break;
       }
 
