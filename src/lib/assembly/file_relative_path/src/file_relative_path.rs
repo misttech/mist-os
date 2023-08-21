@@ -444,6 +444,19 @@ impl SupportsFileRelativePaths for Vec<FileRelativePathBuf> {
     }
 }
 
+impl<T: SupportsFileRelativePaths> SupportsFileRelativePaths for Option<T> {
+    fn resolve_paths_from_dir(self, dir_path: impl AsRef<Utf8Path>) -> Result<Self> {
+        self.map(|s| s.resolve_paths_from_dir(dir_path)).transpose()
+    }
+
+    fn make_paths_relative_to_dir(
+        self,
+        path_to_containing_dir: impl AsRef<Utf8Path>,
+    ) -> Result<Self> {
+        self.map(|s| s.make_paths_relative_to_dir(path_to_containing_dir)).transpose()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -714,6 +727,38 @@ mod test {
                 FileRelativePathBuf::FileRelative("file_2".into()),
                 FileRelativePathBuf::FileRelative("file_3".into()),
             ]
+        );
+    }
+
+    #[test]
+    fn test_trait_impl_option_resolve() {
+        let option = Some(SimpleStruct {
+            flag: true,
+            path: FileRelativePathBuf::FileRelative("a/file.json".into()),
+        });
+        let resolved = option.resolve_paths_from_file("some/manifest.list").unwrap();
+        assert_eq!(
+            resolved,
+            Some(SimpleStruct {
+                flag: true,
+                path: FileRelativePathBuf::Resolved("some/a/file.json".into())
+            })
+        );
+    }
+
+    #[test]
+    fn test_trait_impl_option_make_relative() {
+        let option = Some(SimpleStruct {
+            flag: true,
+            path: FileRelativePathBuf::Resolved("some/a/file.json".into()),
+        });
+        let resolved = option.make_paths_relative_to_file("some/manifest.list").unwrap();
+        assert_eq!(
+            resolved,
+            Some(SimpleStruct {
+                flag: true,
+                path: FileRelativePathBuf::FileRelative("a/file.json".into())
+            })
         );
     }
 

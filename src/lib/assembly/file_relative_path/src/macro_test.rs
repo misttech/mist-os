@@ -126,3 +126,34 @@ fn test_nested_struct() {
         FileRelativePathBuf::Resolved("resources/will/not/change".into())
     );
 }
+
+#[derive(Deserialize, SupportsFileRelativePaths)]
+struct StructWithOption {
+    #[file_relative_paths]
+    optional: Option<SimpleStruct>,
+}
+
+#[test]
+fn test_struct_with_option() {
+    let json = serde_json::json!({
+        "optional": {
+            "flag": true,
+            "path": "foo/file_1.json"
+          },
+    });
+
+    let parsed: StructWithOption = serde_json::from_value(json).unwrap();
+    assert_eq!(
+        parsed.optional,
+        Some(SimpleStruct {
+            flag: true,
+            path: FileRelativePathBuf::FileRelative("foo/file_1.json".into())
+        })
+    );
+
+    let resolved = parsed.resolve_paths_from_file("some/file").unwrap();
+    assert_eq!(
+        resolved.optional.unwrap().path,
+        FileRelativePathBuf::Resolved("some//foo/file_1.json".into())
+    );
+}
