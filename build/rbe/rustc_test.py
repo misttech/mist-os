@@ -332,6 +332,20 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.link_map_output, map_file)
         self.assertIn(map_file, set(r.extra_output_files()))
 
+    def test_soname(self):
+        soname = 'foo.so'
+        for opts in (
+                [f'-Clink-arg=--soname={soname}'],
+                ['-C', f'link-arg=--soname={soname}'],
+        ):
+            r = rustc.RustAction(
+                [
+                    '../tools/rustc'] + opts + ['../foo/lib.rs', '-o',
+                    'foo.rlib',
+                ])
+            self.assertNotIn(soname, r.link_arg_files)
+            self.assertEqual([], r.link_arg_files)
+
     def test_direct_inputs(self):
         input1 = Path('obj/foo/this.a')
         input2 = Path('../foo/lib.rs')

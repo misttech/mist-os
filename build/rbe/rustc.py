@@ -215,6 +215,11 @@ class RustAction(object):
             if left == '-fuse-ld':
                 self._use_ld = Path(right)
                 continue
+            if left == '--soname':
+                # `-Clink-arg=--soname=foo.so` is intended to set the DT_SONAME
+                # for the shared object and is not an input or output file that
+                # needs to be relativized.
+                continue
             if is_linkable(arg):
                 self._link_arg_files.append(arg)
 
