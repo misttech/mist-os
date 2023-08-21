@@ -11,7 +11,6 @@ group("tests") {
     ":display_integration_tests",
     ":flatland_integration_tests",
     ":flatland_protected_memory_integration_test",
-    ":gfx_integration_tests",
     ":observer_integration_tests",
   ]
 }
@@ -97,137 +96,6 @@ source_set("screen_capture_utils") {
     "//src/ui/scenic/lib/flatland/engine",
     "//zircon/system/ulib/fbl",
   ]
-}
-
-source_set("gfx_pixel_test") {
-  testonly = true
-  sources = [
-    "gfx_integration_tests/pixel_test.cc",
-    "gfx_integration_tests/pixel_test.h",
-  ]
-  public_deps = [
-    ":scenic_realm_builder",
-    "//sdk/fidl/fuchsia.ui.annotation:fuchsia.ui.annotation_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/lib/syslog/cpp",
-    "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/testing/loop_fixture",
-    "//src/ui/testing/views:views",
-    "//third_party/googletest:gtest",
-  ]
-
-  configs += [ ":vulkan_no_nodiscard" ]
-}
-
-executable("gfx_focus_integration_test_bin") {
-  testonly = true
-  sources = [ "gfx_integration_tests/gfx_focus_integration_test.cc" ]
-  deps = [
-    ":common_deps_cts",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
-  ]
-}
-
-fuchsia_test_component("gfx_focus_integration_test") {
-  component_name = "gfx_focus_integration_test"
-  manifest = "meta/gfx_focus_integration_test.cml"
-  deps = [ ":gfx_focus_integration_test_bin" ]
-  test_type = "vulkan"
-}
-
-executable("gfx_touch_integration_test_bin") {
-  testonly = true
-  sources = [
-    "gfx_integration_tests/gfx_touch_integration_test.cc",
-    "gfx_integration_tests/gfx_touch_local_hit_integration_test.cc",
-  ]
-  deps = [
-    ":common_deps_cts",
-    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
-  ]
-}
-
-fuchsia_test_component("gfx_touch_integration_test") {
-  component_name = "gfx_touch_integration_test"
-  manifest = "meta/gfx_touch_integration_test.cml"
-  deps = [ ":gfx_touch_integration_test_bin" ]
-  test_type = "vulkan"
-}
-
-executable("gfx_mouse_integration_test_bin") {
-  testonly = true
-  sources = [ "gfx_integration_tests/gfx_mouse_integration_test.cc" ]
-  deps = [
-    ":common_deps_cts",
-    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
-  ]
-}
-
-fuchsia_test_component("gfx_mouse_integration_test") {
-  component_name = "gfx_mouse_integration_test"
-  manifest = "meta/gfx_mouse_integration_test.cml"
-  deps = [ ":gfx_mouse_integration_test_bin" ]
-  test_type = "vulkan"
-}
-
-executable("gfx_view_ref_installed_integration_test_bin") {
-  testonly = true
-  sources =
-      [ "gfx_integration_tests/gfx_view_ref_installed_integration_test.cc" ]
-  deps = [
-    ":common_deps_cts",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-  ]
-}
-
-fuchsia_test_component("gfx_view_ref_installed_integration_test") {
-  component_name = "gfx_view_ref_installed_integration_test"
-  manifest = "meta/gfx_view_ref_installed_integration_test.cml"
-  deps = [ ":gfx_view_ref_installed_integration_test_bin" ]
-  test_type = "vulkan"
-}
-
-executable("gfx_viewstate_apptest_bin") {
-  testonly = true
-  sources = [ "gfx_integration_tests/gfx_viewstate_apptest.cc" ]
-  deps = [
-    ":common_deps",
-    ":gfx_pixel_test",
-    ":scenic_realm_builder",
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
-  ]
-}
-
-fuchsia_test_component("gfx_viewstate_apptest") {
-  component_name = "gfx_viewstate_apptest"
-  manifest = "meta/gfx_viewstate_app_test.cml"
-  deps = [ ":gfx_viewstate_apptest_bin" ]
-  test_type = "vulkan"
-}
-
-executable("scenic_pixeltest_bin") {
-  testonly = true
-  sources = [ "gfx_integration_tests/scenic_pixeltest.cc" ]
-  deps = [
-    ":gfx_pixel_test",
-    ":scenic_realm_builder",
-    "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
-    "//sdk/lib/ui/scenic/cpp",
-    "//src/ui/lib/yuv",
-    "//src/ui/scenic/lib/gfx/tests:gfx_tests_main",
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
-  ]
-  configs += [ ":vulkan_no_nodiscard" ]
-}
-
-fuchsia_test_component("scenic_pixeltest") {
-  component_name = "scenic_pixeltest"
-  manifest = "meta/scenic_pixeltest.cml"
-  deps = [ ":scenic_pixeltest_bin" ]
-  test_type = "vulkan"
 }
 
 executable("flatland_touch_integration_test_bin") {
@@ -476,9 +344,8 @@ executable("flatland_pixeltest_bin") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/testing/loop_fixture",
+    "//src/ui/lib/escher/test/common:gtest_escher",
     "//src/ui/scenic/lib/allocation:allocation",
-    "//src/ui/scenic/lib/gfx/tests:gfx_tests_main",
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:screenshot_helper",
@@ -500,25 +367,6 @@ fuchsia_test_component("flatland_pixeltest_general") {
   manifest = "meta/flatland_pixeltest_general.cml"
   deps = [ ":flatland_pixeltest_bin" ]
   test_type = "vulkan"
-}
-
-fuchsia_test_package("gfx_integration_tests") {
-  test_components = [
-    ":gfx_focus_integration_test",
-    ":gfx_mouse_integration_test",
-    ":gfx_touch_integration_test",
-    ":gfx_view_ref_installed_integration_test",
-    ":gfx_viewstate_apptest",
-    ":scenic_pixeltest",
-  ]
-
-  test_specs = {
-    environments = vulkan_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    timeout_secs = 600  # More generous timeout for scenic_pixeltest
-  }
 }
 
 fuchsia_test_package("flatland_integration_tests") {

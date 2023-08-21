@@ -503,7 +503,7 @@ class ParameterizedFlipAndOrientationTest
   // |________________|________________|
   //
   auto GetPixelColor(unsigned int pixel_index, unsigned int bytes_per_row,
-                     unsigned int image_vmo_bytes) {
+                     uint64_t image_vmo_bytes) {
     const ui_testing::Pixel color_quadrants[2][2] = {
         {ui_testing::Screenshot::kBlack, ui_testing::Screenshot::kRed},
         {ui_testing::Screenshot::kGreen, ui_testing::Screenshot::kBlue},
