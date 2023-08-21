@@ -592,6 +592,13 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
     /// Returns if the socket state indicates dual-stack operation is enabled.
     fn dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool;
 
+    /// Asserts that the socket state indicates dual-stack operation is enabled.
+    ///
+    /// Provided trait function.
+    fn assert_dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) {
+        debug_assert!(self.dual_stack_enabled(state), "socket must be dual-stack enabled")
+    }
+
     /// A type for converting between address types.
     ///
     /// This allows converting between the possibly-dual-stack
@@ -1348,8 +1355,11 @@ where
                                     )
                                 }
                                 // Bound only in the other stack.
-                                (DualStackIpAddr::OtherStack(addr), true | false) => {
-                                    RemoveOperation::OnlyOtherStack(dual_stack_ctx, addr)
+                                (DualStackIpAddr::OtherStack(addr), true) => {
+                                   RemoveOperation::OnlyOtherStack(dual_stack_ctx, addr)
+                                }
+                                (DualStackIpAddr::OtherStack(_addr), false) => {
+                                    unreachable!("dual-stack disabled socket cannot be OtherStack")
                                 }
                             };
                             (op, identifier)
@@ -1465,7 +1475,7 @@ where
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
             SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
-                let ListenerState { addr, ip_options: _ } = state;
+                let ListenerState { addr, ip_options } = state;
                 let ListenerAddr { ip, device } = addr.clone();
                 let ip = match sync_ctx.dual_stack_context() {
                     MaybeDualStack::DualStack(ds) => {
@@ -1475,6 +1485,7 @@ where
                             match addr {
                                 DualStackIpAddr::ThisStack(addr) => addr,
                                 DualStackIpAddr::OtherStack(addr) => {
+                                    ds.assert_dual_stack_enabled(ip_options);
                                     SpecifiedAddr::new(ds.from_other_ip_addr(addr.map_or(
                                         <I::OtherVersion as Ip>::UNSPECIFIED_ADDRESS,
                                         |a| *a,
@@ -2165,14 +2176,14 @@ where
             }
             SocketState::Bound(state) => match state {
                 BoundSocketState::Listener { state, sharing: listener_sharing } => {
-                    let converter = sync_ctx.dual_stack_context().to_converter();
                     let ListenerState { ip_options, addr: ListenerAddr { device, ip } } = state;
-                    let ip = match converter {
-                        MaybeDualStack::DualStack(converter) => {
+                    let ip = match sync_ctx.dual_stack_context() {
+                        MaybeDualStack::DualStack(dual_stack) => {
                             let DualStackListenerIpAddr { addr, identifier } =
-                                converter.convert(ip.clone());
+                                dual_stack.converter().convert(ip.clone());
                             match addr {
                                 DualStackIpAddr::OtherStack(_) => {
+                                    dual_stack.assert_dual_stack_enabled(state);
                                     todo!("https://fxbug.dev/21198: connecting dual-stack sockets")
                                 }
                                 DualStackIpAddr::ThisStack(addr) => {
@@ -2180,7 +2191,9 @@ where
                                 }
                             }
                         }
-                        MaybeDualStack::NotDualStack(converter) => converter.convert(ip.clone()),
+                        MaybeDualStack::NotDualStack(single_stack) => {
+                            single_stack.converter().convert(ip.clone())
+                        }
                     };
                     let ListenerIpAddr { addr, identifier } = ip;
                     (
@@ -2621,6 +2634,7 @@ where
                         match addr {
                             DualStackIpAddr::ThisStack(addr) => (addr, identifier),
                             DualStackIpAddr::OtherStack(_) => {
+                                dual_stack.assert_dual_stack_enabled(state);
                                 // To implement: perform a one-shot send on the
                                 // other IP stack's transport context.
                                 todo!("https://fxbug.dev/21198: implement dual-stack send")
@@ -2723,23 +2737,27 @@ pub(crate) fn set_device<
                 BoundSocketState::Listener { state, sharing: _ } => {
                     // Don't allow changing the device if one of the IP addresses in the socket
                     // address vector requires a zone (scope ID).
-                    let ListenerState { ip_options: _, addr } = state;
+                    let ListenerState { ip_options, addr } = state;
                     let ListenerAddr { device: old_device, ip } = addr;
-                    let converter = sync_ctx.dual_stack_context().to_converter();
-                    let ip = match &converter {
-                        MaybeDualStack::DualStack(converter) => {
+                    let ip = match sync_ctx.dual_stack_context() {
+                        MaybeDualStack::DualStack(dual_stack) => {
                             let DualStackListenerIpAddr { addr, identifier } =
-                                converter.convert(ip.clone());
+                                dual_stack.converter().convert(ip.clone());
                             match addr {
                                 DualStackIpAddr::ThisStack(addr) => {
                                     ListenerIpAddr { addr, identifier }
                                 }
-                                DualStackIpAddr::OtherStack(_) => todo!(
-                                    "https://fxbug.dev/21198: implement dual-stack set_device"
-                                ),
+                                DualStackIpAddr::OtherStack(_) => {
+                                    dual_stack.assert_dual_stack_enabled(ip_options);
+                                    todo!(
+                                        "https://fxbug.dev/21198: implement dual-stack set_device"
+                                    )
+                                }
                             }
                         }
-                        MaybeDualStack::NotDualStack(converter) => converter.convert(ip.clone()),
+                        MaybeDualStack::NotDualStack(single_stack) => {
+                            single_stack.converter().convert(ip.clone())
+                        }
                     };
 
                     let ListenerIpAddr { addr: ip_addr, identifier: _ } = &ip;
@@ -2779,7 +2797,7 @@ pub(crate) fn set_device<
                     let new_addr = {
                         let ListenerAddr { device, ip } = new_addr;
 
-                        let new_ip = match converter {
+                        let new_ip = match sync_ctx.dual_stack_context().to_converter() {
                             MaybeDualStack::DualStack(converter) => {
                                 // TODO(https://fxbug.dev/21198): Don't assume the
                                 // listener address is in the current stack.
