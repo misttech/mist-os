@@ -28,6 +28,7 @@ if (is_host) {
       # TODO(b/294272164): session functional test can only run on terminal
       # product. Use `terminal_emulator_tests_fyi` to avoid it run on CQ.
       "test_session:session_test($host_toolchain)",
+      "test_ui:screenshot_test($host_toolchain)",
     ]
   }
 

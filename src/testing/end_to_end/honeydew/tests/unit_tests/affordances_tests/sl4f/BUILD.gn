@@ -15,6 +15,16 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
+  python_host_test("screenshot_sl4f_test") {
+    main_source = "screenshot_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("tracing_sl4f_test") {
     main_source = "tracing_test.py"
     libraries = [
@@ -30,6 +40,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":bluetooth_gap_sl4f_test($host_toolchain)",
+    ":screenshot_sl4f_test($host_toolchain)",
     ":tracing_sl4f_test($host_toolchain)",
   ]
 }

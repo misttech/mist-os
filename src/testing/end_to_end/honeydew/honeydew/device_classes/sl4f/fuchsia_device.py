@@ -110,7 +110,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         Returns:
             screenshot.Screenshot object
         """
-        return screenshot_sl4f.Screenshot()
+        return screenshot_sl4f.Screenshot(sl4f=self.sl4f)
 
     @properties.Affordance
     def tracing(self) -> tracing_interface.Tracing:

@@ -17,7 +17,7 @@ class ScreenshotImage:
     """
 
     size: custom_types.Size
-    data: bytearray
+    data: bytes
 
 
 class Screenshot(abc.ABC):
