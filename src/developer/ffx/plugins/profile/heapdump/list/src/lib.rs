@@ -5,7 +5,6 @@
 use {
     anyhow::{Context, Result},
     async_trait::async_trait,
-    errors::ffx_error,
     ffx_profile_heapdump_common::{
         build_process_selector, check_collector_error, connect_to_collector,
     },
@@ -68,43 +67,46 @@ impl FfxMain for ListTool {
     type Writer = MachineWriter<Vec<StoredSnapshot>>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let ListTool { cmd, remote_control } = self;
-        let (iterator_proxy, iterator_server) = create_proxy().unwrap();
-        let request = fheapdump_client::CollectorListStoredSnapshotsRequest {
-            iterator: Some(iterator_server),
-            process_selector: match (cmd.by_name, cmd.by_koid) {
-                (None, None) => None,
-                (by_name, by_koid) => Some(build_process_selector(by_name, by_koid)?),
-            },
-            ..Default::default()
-        };
-
-        let collector = connect_to_collector(&remote_control, cmd.collector).await?;
-        check_collector_error(
-            collector
-                .list_stored_snapshots(request)
-                .await
-                .map_err(|err| ffx_error!("Failed to list stored snapshots: {err}"))?,
-        )?;
-
-        let stored_snapshots = receive_list_of_stored_snapshots(iterator_proxy).await?;
-        if writer.is_machine() {
-            writer.machine(&stored_snapshots)?;
-        } else {
-            let mut table = Table::new();
-            table.set_titles(row!["ID", "NAME", "PROCESS"]);
-
-            for elem in stored_snapshots {
-                table.add_row(row![
-                    format!("{}", elem.snapshot_id),
-                    elem.snapshot_name,
-                    format!("{}[{}]", elem.process_name, elem.process_koid),
-                ]);
-            }
-
-            table.print(&mut writer).map_err(|err| ffx_error!("Failed to print table: {err}"))?;
-        }
-
+        list(self.remote_control, self.cmd, &mut writer).await?;
         Ok(())
     }
+}
+
+async fn list(
+    remote_control: RemoteControlProxy,
+    cmd: ListCommand,
+    writer: &mut MachineWriter<Vec<StoredSnapshot>>,
+) -> Result<()> {
+    let (iterator_proxy, iterator_server) = create_proxy().unwrap();
+    let request = fheapdump_client::CollectorListStoredSnapshotsRequest {
+        iterator: Some(iterator_server),
+        process_selector: match (cmd.by_name, cmd.by_koid) {
+            (None, None) => None,
+            (by_name, by_koid) => Some(build_process_selector(by_name, by_koid)?),
+        },
+        ..Default::default()
+    };
+
+    let collector = connect_to_collector(&remote_control, cmd.collector).await?;
+    check_collector_error(collector.list_stored_snapshots(request).await?)?;
+
+    let stored_snapshots = receive_list_of_stored_snapshots(iterator_proxy).await?;
+    if writer.is_machine() {
+        writer.machine(&stored_snapshots)?;
+    } else {
+        let mut table = Table::new();
+        table.set_titles(row!["ID", "NAME", "PROCESS"]);
+
+        for elem in stored_snapshots {
+            table.add_row(row![
+                format!("{}", elem.snapshot_id),
+                elem.snapshot_name,
+                format!("{}[{}]", elem.process_name, elem.process_koid),
+            ]);
+        }
+
+        table.print(writer)?;
+    }
+
+    Ok(())
 }
