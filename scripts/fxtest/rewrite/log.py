@@ -22,9 +22,12 @@ async def writer(
     value: event.Event
 
     async for value in recorder.iter():
-        json.dump(value.to_dict(), out_stream)  # type:ignore
-        out_stream.write("\n")
-        # Eagerly flush after each line. This task may terminate at any time,
-        # including from an interrupt, so this ensures we at least see
-        # the most recently written lines.
-        out_stream.flush()
+        try:
+            json.dump(value.to_dict(), out_stream)  # type:ignore
+            out_stream.write("\n")
+            # Eagerly flush after each line. This task may terminate at any time,
+            # including from an interrupt, so this ensures we at least see
+            # the most recently written lines.
+            out_stream.flush()
+        except TypeError as e:
+            print(f"LOG ERROR: {e} {value}")

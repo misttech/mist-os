@@ -215,7 +215,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
 
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
-        recorder.emit_end("Failed to run tests.")
+        recorder.emit_end("Test failures reported")
         return 1
 
     recorder.emit_end()
@@ -592,8 +592,10 @@ async def run_all_tests(
     tasks = []
 
     abort_all_tests_event = asyncio.Event()
+    test_failure_observed: bool = False
 
     async def test_executor():
+        nonlocal test_failure_observed
         to_run: execution.TestExecution
         was_non_hermetic: bool = False
 
@@ -654,6 +656,7 @@ async def run_all_tests(
                 message = str(e)
             except execution.TestFailed as e:
                 status = event.TestSuiteStatus.FAILED
+                test_failure_observed = True
                 if flags.fail:
                     # Abort all other running tests, dropping through to the
                     # following run state code to trigger any waiting executors.
@@ -674,7 +677,7 @@ async def run_all_tests(
 
     recorder.emit_end(id=test_group)
 
-    return True
+    return not test_failure_observed
 
 
 async def run_commands_in_parallel(

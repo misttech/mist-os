@@ -14,5 +14,12 @@
             "label": "//src/sys:bar_test(//build/toolchain/host:x64)",
             "path": "host_x64/bar_test"
         }
+    },
+    {
+        "test": {
+            "name": "host_x64/baz_test",
+            "label": "//src/sys:baz_test(//build/toolchain/host:x64)",
+            "path": "host_x64/baz_test"
+        }
     }
 ]

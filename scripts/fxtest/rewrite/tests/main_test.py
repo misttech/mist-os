@@ -14,6 +14,7 @@ from parameterized import parameterized
 import args
 import event
 import main
+import util.command
 
 
 class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
@@ -24,7 +25,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     """
 
     DEVICE_TESTS_IN_INPUT = 1
-    HOST_TESTS_IN_INPUT = 1
+    HOST_TESTS_IN_INPUT = 2
     TOTAL_TESTS_IN_INPUT = DEVICE_TESTS_IN_INPUT + HOST_TESTS_IN_INPUT
 
     def setUp(self) -> None:
@@ -80,7 +81,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         return m
 
     def _mock_run_command(self, return_code: int) -> mock.MagicMock:
-        m = mock.AsyncMock(return_value=mock.MagicMock(return_code=return_code))
+        m = mock.AsyncMock(
+            return_value=mock.MagicMock(return_code=return_code, stdout="", stderr="")
+        )
         patch = mock.patch("main.execution.run_command", m)
         patch.start()
         self.addCleanup(patch.stop)
@@ -219,8 +222,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             call_prefixes,
         )
 
-        # Make sure we ran the host test.
+        # Make sure we ran the host tests.
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
+        self.assertTrue(any(["baz_test" in v[0] for v in call_prefixes]))
 
     async def test_no_build(self):
         """Test that we can run all tests and report success"""
@@ -246,3 +250,31 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         # Make sure we ran the host test.
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
+        self.assertTrue(any(["baz_test" in v[0] for v in call_prefixes]))
+
+    async def test_first_failure(self):
+        """Test that one failing test aborts the rest with --fail"""
+
+        command_mock = self._mock_run_command(1)
+        command_mock.side_effect = [
+            util.command.CommandOutput("out", "err", 1, 10, None),
+            util.command.CommandOutput("out", "err", 1, 10, None),
+            util.command.CommandOutput("out", "err", 1, 10, None),
+        ]
+
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--no-build", "--fail"])
+        )
+
+        # bar_test and baz_test are not hermetic, so cannot run at the same time.
+        # One of them will run before the other, which means --fail
+        # prevents one of them from starting, and we expect to see
+        # only bar_test (since baz_test is defined later in the file)
+        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+        self.assertEqual(ret, 1)
+
+        self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
+        self.assertFalse(any(["baz_test" in v[0] for v in call_prefixes]))

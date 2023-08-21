@@ -23,6 +23,13 @@
                 "//src/sys:bar_test(//build/toolchain/host:x64)"
             ],
             "tags": []
+        },
+        {
+            "name": "host_x64/baz_test",
+            "labels": [
+                "//src/sys:baz_test(//build/toolchain/host:x64)"
+            ],
+            "tags": []
         }
     ]
 }
