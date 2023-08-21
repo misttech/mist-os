@@ -95,7 +95,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
             }
         })
     }
-    let task_shutdown = Box::pin(component.blocking_task_scope().shutdown());
+    let task_shutdown = Box::pin(component.blocking_task_group().join());
     let nfs = {
         let actions = component.lock_actions().await;
         vec![
@@ -512,7 +512,7 @@ pub mod tests {
             }
             task_done_tx.try_send(()).unwrap();
         };
-        component_a.blocking_task_scope().add_task(fut).await;
+        component_a.blocking_task_group().spawn(fut).await;
 
         let mock_action_key = ActionKey::Start;
         let (mock_action, mut mock_action_unblocker) = MockAction::new(

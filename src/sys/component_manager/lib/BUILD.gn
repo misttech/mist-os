@@ -10,7 +10,6 @@ group("tests") {
     "runner:tests",
     "sandbox:tests",
     "serve_processargs:tests",
-    "task_scope:tests",
     "util:tests",
   ]
 }

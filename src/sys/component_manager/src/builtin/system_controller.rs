@@ -14,9 +14,9 @@ use {
     ::routing::capability_source::InternalCapability,
     anyhow::{format_err, Context as _, Error},
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_sys2::*,
@@ -143,7 +143,7 @@ impl SystemControllerCapabilityProvider {
 impl CapabilityProvider for SystemControllerCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -152,8 +152,8 @@ impl CapabilityProvider for SystemControllerCapabilityProvider {
         let server_end = ServerEnd::<SystemControllerMarker>::new(server_end);
         let stream: SystemControllerRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 let result = self.open_async(stream).await;
                 if let Err(error) = result {
                     warn!(%error, "SystemController.open failed");
@@ -215,9 +215,9 @@ mod tests {
         let (client_channel, server_channel) =
             endpoints::create_endpoints::<fsys::SystemControllerMarker>();
         let mut server_channel = server_channel.into_channel();
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         sys_controller
-            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_channel)
+            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_channel)
             .await
             .expect("failed to open capability");
         let controller_proxy =
@@ -300,10 +300,10 @@ mod tests {
             let (client_channel, server_channel) =
                 endpoints::create_endpoints::<fsys::SystemControllerMarker>();
             let mut server_channel = server_channel.into_channel();
-            let task_scope = TaskScope::new();
+            let task_group = TaskGroup::new();
             sys_controller
                 .open(
-                    task_scope.clone(),
+                    task_group.clone(),
                     fio::OpenFlags::empty(),
                     PathBuf::new(),
                     &mut server_channel,

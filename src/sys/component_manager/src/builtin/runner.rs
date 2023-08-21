@@ -14,9 +14,9 @@ use {
     },
     async_trait::async_trait,
     cm_runner::Runner,
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::stream::TryStreamExt,
@@ -105,7 +105,7 @@ impl RunnerCapabilityProvider {
 impl CapabilityProvider for RunnerCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -115,8 +115,8 @@ impl CapabilityProvider for RunnerCapabilityProvider {
         let mut stream = ServerEnd::<fcrunner::ComponentRunnerMarker>::new(server_end)
             .into_stream()
             .map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 // Keep handling requests until the stream closes.
                 while let Ok(Some(request)) = stream.try_next().await {
                     let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
@@ -162,7 +162,7 @@ mod tests {
         hooks: &Hooks,
         moniker: Moniker,
         url: &str,
-    ) -> Result<TaskScope, Error> {
+    ) -> Result<TaskGroup, Error> {
         let provider_result = Arc::new(Mutex::new(None));
         hooks
             .dispatch(&Event::new_for_test(
@@ -184,15 +184,15 @@ mod tests {
         let (_, server_controller) =
             fidl::endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>();
         let mut server = server.into_channel();
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         provider
-            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
+            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
             .await?;
 
         // Start the component.
         client.start(sample_start_info(url), server_controller)?;
 
-        Ok(task_scope)
+        Ok(task_group)
     }
 
     // Test plumbing a `BuiltinRunner` through the hook system.
@@ -217,7 +217,7 @@ mod tests {
 
         // Case 1: The started component's moniker matches the allowlist entry above.
         let url = "xxx://test";
-        let _task_scope =
+        let _task_group =
             start_component_through_hooks(&hooks, Moniker::try_from(vec!["foo"]).unwrap(), url)
                 .await?;
         runner.wait_for_url(&url).await;
@@ -225,7 +225,7 @@ mod tests {
         assert_matches!(checker.ambient_mark_vmo_exec_allowed(), Ok(()));
 
         // Case 2: Moniker does not match allowlist entry.
-        let _task_scope = start_component_through_hooks(&hooks, Moniker::root(), url).await?;
+        let _task_group = start_component_through_hooks(&hooks, Moniker::root(), url).await?;
         runner.wait_for_url(&url).await;
         let checker = runner.last_checker().expect("No PolicyChecker held by MockRunner");
         assert_matches!(checker.ambient_mark_vmo_exec_allowed(), Err(_));
@@ -245,9 +245,9 @@ mod tests {
         // Open a connection to the provider.
         let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>()?;
         let mut server = server.into_channel();
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         provider
-            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
+            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
             .await?;
 
         // Ensure errors are propagated back to the caller.

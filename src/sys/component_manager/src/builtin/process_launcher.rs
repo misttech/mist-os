@@ -12,9 +12,9 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     elf_runner::process_launcher::ProcessLauncher,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_zircon as zx,
@@ -90,7 +90,7 @@ impl ProcessLauncherCapabilityProvider {
 impl CapabilityProvider for ProcessLauncherCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -99,8 +99,8 @@ impl CapabilityProvider for ProcessLauncherCapabilityProvider {
         let server_end = ServerEnd::<fproc::LauncherMarker>::new(server_end);
         let stream: fproc::LauncherRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 let result = ProcessLauncher::serve(stream).await;
                 if let Err(error) = result {
                     warn!(%error, "ProcessLauncher.serve failed");
@@ -153,7 +153,7 @@ mod tests {
     }
 
     async fn serve_launcher(
-    ) -> Result<(fproc::LauncherProxy, Arc<ProcessLauncherSvc>, TaskScope), Error> {
+    ) -> Result<(fproc::LauncherProxy, Arc<ProcessLauncherSvc>, TaskGroup), Error> {
         let process_launcher = Arc::new(ProcessLauncherSvc::new());
         let hooks = Hooks::new();
         hooks.install(process_launcher.hooks()).await;
@@ -177,17 +177,17 @@ mod tests {
         hooks.dispatch(&event).await;
 
         let capability_provider = capability_provider.lock().await.take();
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         if let Some(capability_provider) = capability_provider {
             capability_provider
-                .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
+                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
                 .await?;
         };
 
         let launcher_proxy = ClientEnd::<fproc::LauncherMarker>::new(client)
             .into_proxy()
             .expect("failed to create launcher proxy");
-        Ok((launcher_proxy, process_launcher, task_scope))
+        Ok((launcher_proxy, process_launcher, task_group))
     }
 
     fn connect_util(client: &zx::Channel) -> Result<UtilProxy, Error> {
@@ -268,7 +268,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn start_util_with_args() -> Result<(), Error> {
-        let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
+        let (launcher, _process_launcher, _task_group) = serve_launcher().await?;
         let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let test_args = &["arg0", "arg1", "arg2"];
@@ -290,7 +290,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn start_util_with_env() -> Result<(), Error> {
-        let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
+        let (launcher, _process_launcher, _task_group) = serve_launcher().await?;
         let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let test_env = &[("VAR1", "value2"), ("VAR2", "value2")];
@@ -312,7 +312,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn start_util_with_namespace_entries() -> Result<(), Error> {
-        let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
+        let (launcher, _process_launcher, _task_group) = serve_launcher().await?;
         let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let mut randbuf = [0; 8];
@@ -354,7 +354,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_without_starting() -> Result<(), Error> {
-        let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
+        let (launcher, _process_launcher, _task_group) = serve_launcher().await?;
         let (launch_info, proxy) = setup_test_util(&launcher).await?;
 
         let test_args = &["arg0", "arg1", "arg2"];

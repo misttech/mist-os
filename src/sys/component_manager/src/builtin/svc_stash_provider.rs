@@ -60,7 +60,7 @@ mod tests {
             capability::CapabilitySource,
             model::hooks::{Event, EventPayload, Hooks},
         },
-        cm_task_scope::TaskScope,
+        cm_util::TaskGroup,
         fidl::endpoints::ClientEnd,
         fidl_fuchsia_io as fio,
         fuchsia_zircon::sys,
@@ -97,10 +97,10 @@ mod tests {
         hooks.dispatch(&event).await;
 
         let (client, mut server) = Channel::create();
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         if let Some(provider) = provider.lock().await.take() {
             provider
-                .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
+                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
                 .await?;
         };
 

@@ -14,9 +14,9 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker},
@@ -53,7 +53,7 @@ impl BinderCapabilityProvider {
 impl CapabilityProvider for BinderCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -62,8 +62,8 @@ impl CapabilityProvider for BinderCapabilityProvider {
         let source = self.source.clone();
         let server_end = channel::take_channel(server_end);
 
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 let source = match source.upgrade().map_err(|e| ModelError::from(e)) {
                     Ok(source) => source,
                     Err(err) => {
@@ -187,7 +187,7 @@ mod tests {
         assert_matches::assert_matches,
         cm_rust::{self, ComponentDecl},
         cm_rust_testing::*,
-        cm_task_scope::TaskScope,
+        cm_util::TaskGroup,
         fidl::{client::Client, handle::AsyncChannel},
         fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
@@ -255,14 +255,14 @@ mod tests {
         let (_client_end, mut server_end) = zx::Channel::create();
         let moniker: Moniker = vec!["source"].try_into().unwrap();
 
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         fixture
             .provider(moniker.clone(), vec!["target"].try_into().unwrap())
             .await
-            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
+            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
             .await
             .expect("failed to call open()");
-        task_scope.shutdown().await;
+        task_group.join().await;
 
         assert!(event_stream.wait_until(EventType::Resolved, moniker.clone()).await.is_some());
         assert!(event_stream.wait_until(EventType::Started, moniker.clone()).await.is_some());
@@ -283,14 +283,14 @@ mod tests {
         let (client_end, mut server_end) = zx::Channel::create();
         let moniker: Moniker = vec!["foo"].try_into().unwrap();
 
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         fixture
             .provider(moniker, Moniker::root())
             .await
-            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
+            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
             .await
             .expect("failed to call open()");
-        task_scope.shutdown().await;
+        task_group.join().await;
 
         let client_end =
             AsyncChannel::from_channel(client_end).expect("failed to create AsyncChanel");
