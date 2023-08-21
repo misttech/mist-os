@@ -144,6 +144,12 @@ template("board_configuration") {
     if (defined(_filesystems.vbmeta)) {
       _vbmeta = _filesystems.vbmeta
       _vbmeta_rebased = {
+        forward_variables_from(_filesystems.vbmeta,
+                               "*",
+                               [
+                                 "key",
+                                 "key_metadata",
+                               ])
       }
       if (defined(_vbmeta.key)) {
         _vbmeta_key_filename = get_path_info(_vbmeta.key, "file")
