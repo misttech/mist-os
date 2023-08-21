@@ -5,6 +5,7 @@
 #ifndef LIB_LD_STARTUP_LOAD_H_
 #define LIB_LD_STARTUP_LOAD_H_
 
+#include <lib/elfldltl/link.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/relro.h>
@@ -17,7 +18,6 @@
 
 #include "allocator.h"
 #include "diagnostics.h"
-#include "lib/elfldltl/link.h"
 
 namespace ld {
 
