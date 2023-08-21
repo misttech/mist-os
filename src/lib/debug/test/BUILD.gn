@@ -11,6 +11,13 @@ group("tests") {
     ":backtrace-request-integration-test-pkg",
     ":backtrace-request-test-pkg",
   ]
+
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/129959): Fix the build and remove from this list.
+      ":backtrace-request-test-pkg",
+    ]
+  }
 }
 
 test("backtrace-request-test") {
