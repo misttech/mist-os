@@ -17,7 +17,7 @@ mod my_tests {
 
     #[test]
     fn failing_test() {
-        panic!("I'm supposed panic!()");
+        panic!("I'm supposed to panic!()");
     }
 
     #[test]

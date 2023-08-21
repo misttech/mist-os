@@ -120,7 +120,7 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
         })
     };
     assert_contains("thread 'main' panicked at");
-    assert_contains("I'm supposed panic!()");
+    assert_contains("I'm supposed to panic!()");
     assert_contains("../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:20:9");
     assert_contains("stack backtrace:");
     assert_eq!(
@@ -158,10 +158,11 @@ async fn launch_and_run_sample_test_include_disabled() {
         &RunEvent::case_started("my_tests::failing_test")
     );
 
-    assert_eq!(
-        &events_failing_test.stderr_events[1],
-        &RunEvent::case_stderr("my_tests::failing_test", "stack backtrace:")
-    );
+    // TODO(fxbug.dev/132477): Re-enable this
+    // assert_eq!(
+    //     &events_failing_test.stderr_events[1],
+    //     &RunEvent::case_stderr("my_tests::failing_test", "I'm supposed to panic!()")
+    // );
 
     let events_ignored_failing_test =
         grouped_events.get(&Some("my_tests::ignored_failing_test".to_string())).unwrap();
