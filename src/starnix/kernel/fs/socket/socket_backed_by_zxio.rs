@@ -5,7 +5,7 @@
 use super::*;
 
 use crate::{
-    fs::{buffers::*, fuchsia::*, *},
+    fs::{buffers::*, zxio::*, *},
     logging::not_implemented,
     mm::MemoryAccessorExt,
     task::*,
@@ -234,7 +234,7 @@ impl SocketOps for ZxioBackedSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        Ok(zxio_query_events(&self.zxio))
+        zxio_query_events(&self.zxio)
     }
 
     fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {

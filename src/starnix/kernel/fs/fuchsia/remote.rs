@@ -7,16 +7,15 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 use syncio::{
-    zxio,
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
     zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator, XattrSetMode, Zxio, ZxioDirent,
-    ZxioSignals,
 };
 
 use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        zxio::*,
         *,
     },
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -240,58 +239,6 @@ fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
     // Make sure the same permissions are granted to user, group, and other.
     mode |= FileMode::from_bits((user_perms >> 3) | (user_perms >> 6));
     Ok(mode)
-}
-
-fn get_zxio_signals_from_events(events: FdEvents) -> zxio::zxio_signals_t {
-    let mut signals = ZxioSignals::NONE;
-
-    if events.contains(FdEvents::POLLIN) {
-        signals |= ZxioSignals::READABLE;
-    }
-    if events.contains(FdEvents::POLLPRI) {
-        signals |= ZxioSignals::OUT_OF_BAND;
-    }
-    if events.contains(FdEvents::POLLOUT) {
-        signals |= ZxioSignals::WRITABLE;
-    }
-    if events.contains(FdEvents::POLLERR) {
-        signals |= ZxioSignals::ERROR;
-    }
-    if events.contains(FdEvents::POLLHUP) {
-        signals |= ZxioSignals::PEER_CLOSED;
-    }
-    if events.contains(FdEvents::POLLRDHUP) {
-        signals |= ZxioSignals::READ_DISABLED;
-    }
-
-    signals.bits()
-}
-
-fn get_events_from_zxio_signals(signals: zxio::zxio_signals_t) -> FdEvents {
-    let zxio_signals = ZxioSignals::from_bits_truncate(signals);
-
-    let mut events = FdEvents::empty();
-
-    if zxio_signals.contains(ZxioSignals::READABLE) {
-        events |= FdEvents::POLLIN;
-    }
-    if zxio_signals.contains(ZxioSignals::OUT_OF_BAND) {
-        events |= FdEvents::POLLPRI;
-    }
-    if zxio_signals.contains(ZxioSignals::WRITABLE) {
-        events |= FdEvents::POLLOUT;
-    }
-    if zxio_signals.contains(ZxioSignals::ERROR) {
-        events |= FdEvents::POLLERR;
-    }
-    if zxio_signals.contains(ZxioSignals::PEER_CLOSED) {
-        events |= FdEvents::POLLHUP;
-    }
-    if zxio_signals.contains(ZxioSignals::READ_DISABLED) {
-        events |= FdEvents::POLLRDHUP;
-    }
-
-    events
 }
 
 fn get_name_str(name_bytes: &FsStr) -> Result<&str, Errno> {
@@ -868,47 +815,6 @@ fn zxio_write_at(
     Ok(actual)
 }
 
-pub fn zxio_wait_async(
-    zxio: &Arc<Zxio>,
-    waiter: &Waiter,
-    events: FdEvents,
-    handler: EventHandler,
-) -> WaitCanceler {
-    let zxio_clone = zxio.clone();
-    let signal_handler = move |signals: zx::Signals| {
-        let observed_zxio_signals = zxio_clone.wait_end(signals);
-        let observed_events = get_events_from_zxio_signals(observed_zxio_signals);
-        handler(observed_events);
-    };
-
-    let (handle, signals) = zxio.wait_begin(get_zxio_signals_from_events(events));
-    // unwrap OK here as errors are only generated from misuse
-    let zxio = Arc::downgrade(zxio);
-    let canceler =
-        waiter.wake_on_zircon_signals(&handle, signals, Box::new(signal_handler)).unwrap();
-    WaitCanceler::new(move || {
-        if let Some(zxio) = zxio.upgrade() {
-            let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
-            let did_cancel = canceler.cancel(handle);
-            zxio.wait_end(signals);
-            did_cancel
-        } else {
-            false
-        }
-    })
-}
-
-pub fn zxio_query_events(zxio: &Arc<Zxio>) -> FdEvents {
-    let (handle, signals) = zxio.wait_begin(ZxioSignals::all().bits());
-    // Wait can error out if the remote gets closed.
-    let observed_signals = match handle.wait(signals, zx::Time::INFINITE_PAST) {
-        Ok(signals) => signals,
-        Err(_) => return FdEvents::POLLHUP,
-    };
-    let observed_zxio_signals = zxio.wait_end(observed_signals);
-    get_events_from_zxio_signals(observed_zxio_signals)
-}
-
 /// Helper struct to track the context necessary to iterate over dir entries.
 #[derive(Default)]
 struct RemoteDirectoryIterator<'a> {
@@ -1238,7 +1144,7 @@ impl FileOps for RemotePipeObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        Ok(zxio_query_events(&self.zxio))
+        zxio_query_events(&self.zxio)
     }
 
     fn to_handle(

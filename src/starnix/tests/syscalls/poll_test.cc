@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <netinet/tcp.h>
 #include <poll.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
@@ -10,6 +12,7 @@
 #include "src/starnix/tests/syscalls/test_helper.h"
 
 namespace {
+
 TEST(PollTest, REventsIsCleared) {
   int pipefd[2];
   SAFE_SYSCALL(pipe2(pipefd, 0));
@@ -29,4 +32,19 @@ TEST(PollTest, REventsIsCleared) {
   ASSERT_EQ(0, fds[0].revents);
   ASSERT_EQ(POLLOUT, fds[1].revents);
 }
+
+TEST(PollTest, UnconnectedSocket) {
+  int fd = socket(PF_INET, SOCK_STREAM, 0);
+  ASSERT_GT(fd, 0);
+
+  struct pollfd p;
+  p.fd = fd;
+  p.events = 0x7FFF;
+
+  EXPECT_EQ(poll(&p, 1, 0), 1);
+  EXPECT_EQ(p.revents, POLLHUP | POLLWRNORM | POLLOUT);
+
+  close(fd);
+}
+
 }  // namespace

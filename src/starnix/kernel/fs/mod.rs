@@ -28,6 +28,7 @@ mod vec_directory;
 mod vmo_file;
 mod wd_number;
 mod xattr;
+mod zxio;
 
 pub mod buffers;
 pub mod cgroup;

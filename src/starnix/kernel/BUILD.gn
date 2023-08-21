@@ -288,6 +288,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/vmo_file.rs",
     "fs/wd_number.rs",
     "fs/xattr.rs",
+    "fs/zxio.rs",
     "loader.rs",
     "lock.rs",
     "logging.rs",

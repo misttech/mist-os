@@ -765,15 +765,12 @@
                 "SysretTest.BadRsp",
 
                 // tcp_socket_test
-                "AllInetTests/SimpleTcpSocketTest.OnlyAcknowledgeBacklogConnections/*",
-                "AllInetTests/SimpleTcpSocketTest.PollAroundAccept/*",
                 "AllInetTests/SimpleTcpSocketTest.SetSocketAttachDetachFilter/*",
                 "AllInetTests/TcpSocketTest.MsgTrunc/*",
                 "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
                 "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
-                "AllInetTests/TcpSocketTest.PollWithFullBufferBlocks/*",
                 "AllInetTests/TcpSocketTest.TcpInq/*",
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
