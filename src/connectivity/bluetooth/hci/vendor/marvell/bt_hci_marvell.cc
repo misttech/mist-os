@@ -19,7 +19,7 @@
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_frame.emb.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_hci.h"
 
-#include <pw_bluetooth/hci.emb.h>
+#include <pw_bluetooth/hci_commands.emb.h>
 
 namespace bt_hci_marvell {
 

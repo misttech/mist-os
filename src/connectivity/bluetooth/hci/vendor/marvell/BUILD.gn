@@ -37,7 +37,7 @@ source_set("common") {
   deps = [
     ":bt_hci_marvell_bind",
     "//src/devices/lib/driver",
-    "//third_party/pigweed/src/pw_bluetooth:emboss_hci",
+    "//third_party/pigweed/src/pw_bluetooth:emboss_hci_group",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]
