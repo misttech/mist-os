@@ -25,7 +25,6 @@ fho::embedded_plugin!(DownloadTool);
 impl FfxMain for DownloadTool {
     type Writer = SimpleWriter;
 
-    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         let DownloadTool { cmd, remote_control } = self;
         let collector = connect_to_collector(&remote_control, cmd.collector)

@@ -67,7 +67,6 @@ fho::embedded_plugin!(ListTool);
 impl FfxMain for ListTool {
     type Writer = MachineWriter<Vec<StoredSnapshot>>;
 
-    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let ListTool { cmd, remote_control } = self;
         let (iterator_proxy, iterator_server) = create_proxy().unwrap();

@@ -30,7 +30,6 @@ fho::embedded_plugin!(SnapshotTool);
 impl FfxMain for SnapshotTool {
     type Writer = SimpleWriter;
 
-    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         snapshot(self.remote_control, self.cmd).await?;
         Ok(())
