@@ -27,7 +27,6 @@ libs = [
   "rcs",
   "schema",
   "sdk",
-  "selector-maps",
   "ssh",
   "stream_util",
   "symbol-index",
