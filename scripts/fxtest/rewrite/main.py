@@ -37,46 +37,70 @@ def main():
     # Main entrypoint.
     # Set up the event loop to catch termination signals (i.e. Ctrl+C), and
     # cancel the main task when they are received.
-    fut = asyncio.ensure_future(async_main(args.parse_args()))
+    fut = asyncio.ensure_future(async_main_wrapper(args.parse_args()))
     util.signals.register_on_terminate_signal(fut.cancel)
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(fut)
+        sys.exit(fut.result())
     except asyncio.CancelledError:
         print("\n\nReceived interrupt, exiting")
+        sys.exit(1)
 
 
-async def async_main(flags: args.Flags):
-    # Main logic for fx test.
+async def async_main_wrapper(
+    flags: args.Flags, recorder: event.EventRecorder | None = None
+) -> int:
+    """Wrapper for the main logic of fx test.
 
-    recorder = event.EventRecorder()
+    This wrapper creates a list containing tasks that must be
+    awaited before the program exits. The main logic may add tasks to this
+    list during execution, and then return the intended status code.
 
+    Args:
+        flags (args.Flags): Flags to pass into the main function.
+        recorder (event.EventRecorder | None, optional): If set,
+            use this event recorder. Used for testing.
+
+    Returns:
+        The return code of the program.
+    """
+    tasks: typing.List[asyncio.Task] = []
+    if recorder is None:
+        recorder = event.EventRecorder()
+
+    ret = await async_main(flags, tasks, recorder)
+
+    try:
+        await asyncio.wait_for(asyncio.wait(tasks), timeout=5)
+    except asyncio.TimeoutError:
+        print(
+            "\n\nTimed out waiting for tasks to exit, terminating...\n",
+            file=sys.stderr,
+        )
+    return ret
+
+
+async def async_main(
+    flags: args.Flags, tasks: typing.List[asyncio.Task], recorder: event.EventRecorder
+) -> int:
+    """Main logic of fx test.
+
+    Args:
+        flags (args.Flags): Flags controlling the behavior of fx test.
+        tasks (List[asyncio.Tasks]): List to add tasks to that must be awaited before termination.
+        recorder (event.Recorder): The recorder for events.
+
+    Returns:
+        The return code of the program.
+    """
     do_status_output_signal: asyncio.Event = asyncio.Event()
 
-    tasks: typing.List[asyncio.Task] = []
     tasks.append(
         asyncio.create_task(
             console.console_printer(recorder, flags, do_status_output_signal)
         )
     )
-
-    async def complete(exit_code=0):
-        """Wait for all tasks to finish, then exit with the given code.
-
-        This is used to ensure that all logging and printing is
-        done before terminating.
-
-        Args:
-            exit_code (int, optional): Program exit code. Defaults to 0.
-        """
-        try:
-            await asyncio.wait_for(asyncio.wait(tasks), timeout=5)
-        except asyncio.TimeoutError:
-            print(
-                "\n\nTimed out waiting for tasks to exit, terminating...\n",
-                file=sys.stderr,
-            )
-        sys.exit(exit_code)
 
     # Initialize event recording.
     recorder.emit_init()
@@ -99,7 +123,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         recorder.emit_parse_flags(flags.__dict__)
     except args.FlagError as e:
         recorder.emit_end(f"Flags are invalid: {e}")
-        await complete(1)
+        return 1
 
     # Initialize status printing at this point, if desired.
     if flags.status:
@@ -112,7 +136,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         exec_env = environment.ExecutionEnvironment.initialize_from_args(flags)
     except environment.EnvironmentError as e:
         recorder.emit_end(f"Failed to initialize environment: {e}\nDid you run fx set?")
-        await complete(1)
+        return 1
     recorder.emit_process_env(exec_env.__dict__)
 
     # Configure file logging based on flags.
@@ -149,7 +173,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         tests = await load_test_list(recorder, exec_env)
     except Exception as e:
         recorder.emit_end(f"Failed to load tests: {e}")
-        await complete(1)
+        return 1
 
     # Use flags to select which tests to run.
     try:
@@ -162,12 +186,12 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         recorder.emit_test_selections(selections)
     except selection.SelectionError as e:
         recorder.emit_end(f"Selection is invalid: {e}")
-        await complete(1)
+        return 1
 
     # Check that the selected tests are valid.
     if not await validate_test_selections(selections, recorder, flags):
         recorder.emit_end("Test selections could not be validated.")
-        await complete(1)
+        return 1
 
     # If desired, we randomize the execution order of tests.
     # Otherwise, they are run in the order they appear in the tests.json file.
@@ -182,20 +206,20 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             recorder.emit_info_message(f"  {s.info.name}")
         recorder.emit_instruction_message("\nWill not run any tests, --dry specified")
         recorder.emit_end()
-        await complete(0)
+        return 0
 
     # If enabled, try to build and update the selected tests.
     if flags.build and not await do_build(selections, recorder, exec_env):
         recorder.emit_end("Failed to build.")
-        await complete(1)
+        return 1
 
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
         recorder.emit_end("Failed to run tests.")
-        await complete(1)
+        return 1
 
     recorder.emit_end()
-    await complete()
+    return 0
 
 
 async def load_test_list(

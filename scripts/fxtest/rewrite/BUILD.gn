@@ -6,6 +6,7 @@ import("//build/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
+import("//build/testing/host_test_data.gni")
 
 group("tests") {
   testonly = true
@@ -17,6 +18,7 @@ group("tests") {
     ":event_test($host_toolchain)",
     ":execution_test($host_toolchain)",
     ":log_test($host_toolchain)",
+    ":main_test($host_toolchain)",
     ":selection_test($host_toolchain)",
     ":test_list_file_test($host_toolchain)",
     ":tests_json_file_test($host_toolchain)",
@@ -64,6 +66,7 @@ if (is_host) {
     "event",
     "execution",
     "log",
+    "main",
     "selection",
     "test_list_file",
     "tests_json_file",
@@ -76,9 +79,20 @@ if (is_host) {
       main_source = main_source
       main_callable = "unittest.main"
       extra_args = [ "-v" ]
-      sources = binary_sources
-      libraries = binary_deps
+      test_dir = "$root_out_dir/test_data/fxtest-rewrite-tests"
+      sources = binary_sources + [ "main.py" ]
+      libraries = binary_deps + [ "//third_party/parameterized" ]
+      deps = [ ":test_data" ]
     }
+  }
+
+  host_test_data("test_data") {
+    sources = [
+      "tests/test_data/build_output/test-list.json",
+      "tests/test_data/build_output/tests.json",
+    ]
+
+    outputs = [ "$root_out_dir/test_data/fxtest-rewrite-tests/test_data/build_output/{{source_file_part}}" ]
   }
 
   # Rename the resulting .pyz for the host tool

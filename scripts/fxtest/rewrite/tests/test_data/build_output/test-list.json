@@ -1,0 +1,28 @@
+{
+    "schema_id": "experimental",
+    "data": [
+        {
+            "name": "fuchsia-pkg://fuchsia.com/foo-test#meta/foo_test.cm",
+            "labels": [
+                "//src/sys:foo_test(//build/toolchain/fuchsia:x64)"
+            ],
+            "tags": [
+                {
+                    "key": "hermetic",
+                    "value": "true"
+                }
+            ],
+            "execution": {
+                "component_url": "fuchsia-pkg://fuchsia.com/foo-test#meta/foo_test.cm",
+                "max_severity_logs": "ERROR"
+            }
+        },
+        {
+            "name": "host_x64/bar_test",
+            "labels": [
+                "//src/sys:bar_test(//build/toolchain/host:x64)"
+            ],
+            "tags": []
+        }
+    ]
+}

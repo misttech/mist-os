@@ -1,0 +1,18 @@
+[
+    {
+        "test": {
+            "name": "fuchsia-pkg://fuchsia.com/foo-test#meta/foo_test.cm",
+            "label": "//src/sys:foo_test(//build/toolchain/fuchsia:x64)",
+            "component_label": "//src/sys:foo_test_component(//build/toolchain/fuchsia:x64)",
+            "package_label": "//src/sys:foo_test_package(//build/toolchain/fuchsia:x64)",
+            "package_url": "fuchsia-pkg://fuchsia.com/foo-test#meta/foo_test.cm"
+        }
+    },
+    {
+        "test": {
+            "name": "host_x64/bar_test",
+            "label": "//src/sys:bar_test(//build/toolchain/host:x64)",
+            "path": "host_x64/bar_test"
+        }
+    }
+]
