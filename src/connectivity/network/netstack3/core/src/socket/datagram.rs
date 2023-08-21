@@ -92,7 +92,7 @@ pub(crate) enum BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketS
         sharing: S::ListenerSharingState,
     },
     Connected {
-        state: ConnState<I, D, S>,
+        state: ConnState<I, D, S, IpOptions<I, D, S>>,
         sharing: <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ConnSharingState,
     },
 }
@@ -220,9 +220,9 @@ impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D
 }
 
 #[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug"))]
-pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized> {
-    socket: IpSock<I, D, IpOptions<I, D, S>>,
+#[derivative(Debug(bound = "D: Debug, O: Debug"))]
+pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized, O> {
+    socket: IpSock<I, D, O>,
     shutdown: Shutdown,
     addr: ConnAddr<
         I::Addr,
@@ -247,15 +247,15 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
     clear_device_on_disconnect: bool,
 }
 
-impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
-    for ConnState<I, D, S>
+impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<O>
+    for ConnState<I, D, S, O>
 {
-    fn as_ref(&self) -> &IpOptions<I, D, S> {
+    fn as_ref(&self) -> &O{
         self.socket.options()
     }
 }
 
-impl<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec> ConnState<I, D, S> {
+impl<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec, O> ConnState<I, D, S, O> {
     pub(crate) fn should_receive(&self) -> bool {
         let Self { shutdown, socket: _, clear_device_on_disconnect: _, addr: _ } = self;
         let Shutdown { receive, send: _ } = shutdown;
