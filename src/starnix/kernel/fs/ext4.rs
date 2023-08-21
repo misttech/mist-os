@@ -65,7 +65,7 @@ impl ExtFilesystem {
         };
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, fs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Cached, fs, options);
         fs.set_root_node(root);
         Ok(fs)
     }
