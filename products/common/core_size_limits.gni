@@ -257,7 +257,7 @@ size_checker_input = {
     {
       component = "Connectivity/Wlan-Drivers"
       src = [ "src/connectivity/wlan/drivers/third_party/intel/iwlwifi" ]
-      limit = 5242880  # 5.0 MiB
+      limit = 5578880  # 5.32 MiB
       creep_limit = 524288  # 512.0 KiB
     },
 
@@ -265,7 +265,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       src = []
-      limit = 5095662449
+      limit = 5095326449
       creep_limit = 0
     },
   ]
