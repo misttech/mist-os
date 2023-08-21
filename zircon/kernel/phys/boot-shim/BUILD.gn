@@ -150,14 +150,10 @@ group("boot_tests") {
 
   if (have_devicetree) {
     deps += [
+      ":devicetree-shim-core-tests",
       ":devicetree-shim-memory-test",
       ":devicetree-shim-phys-unittests",
     ]
-  }
-
-  # TODO(fxbug.dev/114124): Unlike RISC-V, zircon's ARM64 requires a |ZBI_TYPE_CPU_TOPOLOGY| item.
-  if (current_cpu == "riscv64") {
-    deps += [ ":devicetree-shim-core-tests" ]
   }
 }
 

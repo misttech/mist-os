@@ -674,6 +674,9 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
             return;
           }
 
+          node.architecture_info.arm64.gic_id =
+              static_cast<uint8_t>(node.logical_ids[node.logical_id_count - 1]);
+
           // One cell.
           // The reg cell bits [23:0] must be set to bits [23:0] of MPIDR_EL1.
           if (reg->size() == 1) {

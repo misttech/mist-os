@@ -57,7 +57,7 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  static boot_shim::DevicetreeBootShim<
+  boot_shim::DevicetreeBootShim<
       boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::RiscvDevicetreePlicItem,
       boot_shim::RiscvDevicetreeTimerItem, boot_shim::RiscvDevictreeCpuTopologyItem,
       boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem>

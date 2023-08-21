@@ -7,6 +7,7 @@
 #include <lib/boot-shim/pool-mem-config.h>
 #include <lib/memalloc/pool-mem-config.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/memory.h>
 #include <stdio.h>
 #include <zircon/assert.h>
 
@@ -16,11 +17,6 @@
 namespace {
 
 using ErrorType = boot_shim::ItemBase::DataZbi::Error;
-
-size_t PayloadSize(const memalloc::Pool& pool) {
-  memalloc::PoolMemConfig mem_config(pool);
-  return std::distance(mem_config.begin(), mem_config.end()) * sizeof(zbi_mem_range_t);
-}
 
 void WritePayload(const memalloc::Pool& pool, cpp20::span<std::byte> buffer) {
   memalloc::PoolMemConfig mem_config(pool);
@@ -35,10 +31,15 @@ void WritePayload(const memalloc::Pool& pool, cpp20::span<std::byte> buffer) {
 
 namespace boot_shim {
 
-size_t PoolMemConfigItem::size_bytes() const { return pool_ ? ItemSize(PayloadSize(*pool_)) : 0; }
+size_t PoolMemConfigItem::PayloadSize() const {
+  memalloc::PoolMemConfig mem_config(*pool_);
+  return std::distance(mem_config.begin(), mem_config.end()) * sizeof(zbi_mem_range_t);
+}
 
-fit::result<ErrorType> PoolMemConfigItem::AppendItems(DataZbi& zbi) const {
-  const size_t payload_size = pool_ ? PayloadSize(*pool_) : 0;
+size_t PoolMemConfigItem::size_bytes() const { return pool_ ? ItemSize(PayloadSize()) : 0; }
+
+fit::result<ErrorType> PoolMemConfigItem::AppendItems(DataZbi& zbi, size_t extra_ranges) const {
+  const size_t payload_size = (pool_ ? PayloadSize() : 0) + extra_ranges * sizeof(zbi_mem_range_t);
   if (payload_size > 0) {
     auto result = zbi.Append({
         .type = ZBI_TYPE_MEM_CONFIG,

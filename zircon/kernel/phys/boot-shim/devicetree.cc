@@ -35,7 +35,7 @@ namespace {
 // ranges.
 constexpr size_t kDevicetreeMaxMemoryRanges = 512;
 
-void DevicetreeInitMemory(zbitl::ByteView zbi, const boot_shim::DevicetreeMemoryMatcher& memory) {
+void DevicetreeInitMemory(zbitl::ByteView zbi, cpp20::span<memalloc::Range> ranges) {
   uint64_t phys_start = reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
   ktl::array<memalloc::Range, 2> special_ranges = {
@@ -56,7 +56,6 @@ void DevicetreeInitMemory(zbitl::ByteView zbi, const boot_shim::DevicetreeMemory
     special_ranges_view = special_ranges;
   }
 
-  auto ranges = memory.memory_ranges();
   auto memory_ranges =
       cpp20::span<memalloc::Range>(const_cast<memalloc::Range*>(ranges.data()), ranges.size());
   Allocation::Init(memory_ranges, special_ranges_view);
@@ -85,7 +84,8 @@ void InitMemory(void* dtb) {
   boot_options.serial = chosen.uart().uart();
   SetBootOptionsWithoutEntropy(boot_options, {}, chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
-  DevicetreeInitMemory(chosen.zbi(), memory);
+  DevicetreeInitMemory(chosen.zbi(),
+                       cpp20::span(memory_ranges).subspan(0, memory.memory_ranges().size()));
 
   gDevicetreeBoot = {
       .cmdline = chosen.cmdline().value_or(""),
