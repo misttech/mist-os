@@ -26,4 +26,25 @@ if (is_host) {
     transport = "fuchsia-controller"
     environments = [ emu_env ]
   }
+
+  python_mobly_test("user_input_test") {
+    main_source = "test_user_input.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+    ]
+    local_config_source = "../../testbeds/One-FEmu.yaml"
+    environments = [ emu_env ]
+  }
+
+  python_mobly_test("user_input_test_fc") {
+    main_source = "test_user_input.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+    ]
+    local_config_source = "../../testbeds/One-FEmu.yaml"
+    transport = "fuchsia-controller"
+    environments = [ emu_env ]
+  }
 }

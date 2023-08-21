@@ -131,7 +131,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         Returns:
             user_input.UserInput object
         """
-        return user_input_sl4f.UserInput()
+        return user_input_sl4f.UserInput(sl4f=self.sl4f)
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

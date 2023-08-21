@@ -3,12 +3,26 @@
 # found in the LICENSE file.
 """UserInput affordance implementation using SL4F."""
 
+from typing import Any, Dict
+
 from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.interfaces.affordances.ui import user_input
+from honeydew.transports import sl4f as sl4f_transport
+
+_SL4F_METHODS: Dict[str, str] = {
+    "Tap": "input_facade.Tap",
+}
 
 
 class UserInput(user_input.UserInput):
-    """UserInput affordance implementation using SL4F."""
+    """UserInput affordance implementation using SL4F.
+
+    Args:
+        sl4f: SL4F transport.
+    """
+
+    def __init__(self, sl4f: sl4f_transport.SL4F) -> None:
+        self._sl4f: sl4f_transport.SL4F = sl4f
 
     def tap(
             self,
@@ -32,4 +46,14 @@ class UserInput(user_input.UserInput):
             duration: Duration of the event(s) in milliseconds, defaults to
                 300.
         """
-        raise NotImplementedError
+
+        method_params: Dict[str, Any] = {
+            "x": location.x,
+            "y": location.y,
+            "width": touch_screen_size.width,
+            "height": touch_screen_size.height,
+            "tap_event_count": tap_event_count,
+            "duration": duration,
+        }
+
+        self._sl4f.run(method=_SL4F_METHODS["Tap"], params=method_params)

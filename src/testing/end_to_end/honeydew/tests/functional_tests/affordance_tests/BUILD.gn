@@ -29,6 +29,7 @@ if (is_host) {
       # product. Use `terminal_emulator_tests_fyi` to avoid it run on CQ.
       "test_session:session_test($host_toolchain)",
       "test_ui:screenshot_test($host_toolchain)",
+      "test_ui:user_input_test($host_toolchain)",
     ]
   }
 
