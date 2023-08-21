@@ -133,7 +133,7 @@ zx_status_t NativeFakeDispatcher::FakeAsyncLoop::CancelTask(async_task_t* task) 
 }
 
 zx_status_t NativeFakeDispatcher::FakeAsyncLoop::RunUntilIdle() {
-  zx_status_t status = Run(0, false);
+  zx_status_t status = Run(now_, false);
   if (status == ZX_ERR_TIMED_OUT) {
     status = ZX_OK;
   }
