@@ -473,7 +473,7 @@ def find_prebuilt_python_content_files(install_path: str) -> Sequence[str]:
     return result
 
 
-_VALID_TARGET_CPUS = ('arm64', 'x64')
+_VALID_TARGET_CPUS = ('arm64', 'x64', 'riscv64')
 
 
 def main():

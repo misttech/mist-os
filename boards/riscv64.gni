@@ -31,3 +31,5 @@ board_bootfs_labels += [
 board_bootfs_labels += _imports.virtio_drivers
 
 partitions_config_label = "//boards/partitions:riscv64"
+
+bazel_product_bundle_board = "riscv64"

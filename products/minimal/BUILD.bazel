@@ -117,3 +117,27 @@ fuchsia_product_bundle(
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
+
+fuchsia_product_image(
+    name = "image.riscv64",
+    board_config = "//boards:riscv64",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng_riscv64",
+    product_config = ":product_config.default",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.riscv64",
+    product_image = ":image.riscv64",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle.riscv64",
+    board_name = "riscv64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:riscv64",
+    product_image = ":image.riscv64",
+    product_name = "fuchsia",
+    recovery = "//products/zedboot:riscv64",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+)

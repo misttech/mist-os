@@ -54,4 +54,5 @@ fuchsia_product_configuration(
     "x64",
     "qemu-x64",
     "vim3",
+    "riscv64",
 ]]

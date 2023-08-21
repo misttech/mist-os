@@ -81,3 +81,7 @@ platforms:
   //build/bazel/platforms:fuchsia_arm64
     --cpu=aarch64
     --crosstool_top=@fuchsia_clang//:cc-compiler-aarch64
+
+  //build/bazel/platforms:fuchsia_riscv64
+    --cpu=riscv64
+    --crosstool_top=@fuchsia_clang//:cc-compiler-riscv64
