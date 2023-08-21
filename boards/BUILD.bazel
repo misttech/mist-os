@@ -80,3 +80,17 @@ fuchsia_board_configuration(
         "fuchsia::usb_peripheral_support",
     ],
 )
+
+fuchsia_board_configuration(
+    name = "riscv64",
+    board_name = "qemu-riscv64",
+    filesystems = {
+        "fvm": {
+            "sparse_output": {},
+        },
+    },
+    provided_features = [
+        "fuchsia::driver_framework_v2_support",
+        "fuchsia::network_require_netstack3",
+    ],
+)

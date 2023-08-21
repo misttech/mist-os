@@ -30,10 +30,17 @@ verify_partitions_configuration("verify_vim3") {
   bazel_partitions_config_target = ":vim3"
 }
 
+verify_partitions_configuration("verify_riscv64") {
+  testonly = true
+  gn_partitions_config_target = "//boards/partitions:riscv64"
+  bazel_partitions_config_target = ":riscv64"
+}
+
 group("verifications") {
   testonly = true
   deps = [
     ":verify_qemu-x64",
+    ":verify_riscv64",
     ":verify_vim3",
   ]
 

@@ -143,3 +143,8 @@ fuchsia_partitions_configuration(
         ":fvm",
     ],
 )
+
+fuchsia_partitions_configuration(
+    name = "riscv64",
+    hardware_revision = "riscv64",
+)
