@@ -35,9 +35,9 @@ class Interner {
  public:
   explicit Interner(perfetto::third_party::perftools::profiles::Profile* profile);
 
-  void AddSample(const std::vector<BackTraceEntry>& entries);
+  void AddSample(const std::vector<std::vector<BackTraceEntry>>& entries);
 
-  uint64_t InternLocation(const BackTraceEntry& entry);
+  uint64_t InternLocation(const std::vector<BackTraceEntry>& frame);
   int64_t InternString(std::string value);
   uint64_t InternFunction(std::string function_name, std::string file_name, int64_t line_no);
 

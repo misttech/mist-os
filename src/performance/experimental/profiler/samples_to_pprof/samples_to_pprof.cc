@@ -27,22 +27,24 @@ Interner::Interner(perfetto::third_party::perftools::profiles::Profile* profile)
   string_table_->Add("");
 }
 
-void Interner::AddSample(const std::vector<BackTraceEntry>& entries) {
+void Interner::AddSample(const std::vector<std::vector<BackTraceEntry>>& entries) {
   perfetto::third_party::perftools::profiles::Sample* sample = sample_table_->Add();
-  for (const BackTraceEntry& entry : entries) {
+  for (const std::vector<BackTraceEntry>& entry : entries) {
     uint64_t location_id = InternLocation(entry);
     sample->add_location_id(location_id);
   }
   sample->add_value(1);
 }
 
-uint64_t Interner::InternLocation(const BackTraceEntry& entry) {
+uint64_t Interner::InternLocation(const std::vector<BackTraceEntry>& frame) {
   perfetto::third_party::perftools::profiles::Location* location = location_table_->Add();
   location->set_id(location_counter_++);
-  location->set_address(entry.addr);
-  perfetto::third_party::perftools::profiles::Line* line = location->add_line();
-  line->set_function_id(InternFunction(entry.function_name, entry.file_name, entry.line_no));
-  line->set_line(entry.line_no);
+  location->set_address(frame.front().addr);
+  for (const BackTraceEntry& entry : frame) {
+    perfetto::third_party::perftools::profiles::Line* line = location->add_line();
+    line->set_function_id(InternFunction(entry.function_name, entry.file_name, entry.line_no));
+    line->set_line(entry.line_no);
+  }
 
   return location->id();
 }
@@ -153,13 +155,13 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
   value_type->set_type(interner.InternString("location"));
   value_type->set_unit(interner.InternString("count"));
 
-  std::vector<BackTraceEntry> entries;
+  // Each frame might have multiple backtrace entries due to inlining
+  std::vector<std::vector<BackTraceEntry>> entries;
   std::string pid;
   std::string tid;
   enum ParsingState {
     MODULES,
     PID_TID,
-    FIRST_ENTRY,
     ENTRIES,
   };
   ParsingState state = MODULES;
@@ -187,13 +189,14 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
   //  [ START ]
   //     |
   //     v
-  //  [ MODULES ] -> [ PID_TID ] -> [ FIRST_ENTRY ]
+  //  [ MODULES ] -> [ PID_TID ] --------\
   //    ^   |             ^              |
   //    \---/             |              v
   //                      \-------- [ ENTRIES ]-\
   //                                      ^     |
   //                                      \-----/
   //
+  std::vector<BackTraceEntry> frame;
   for (std::string line; std::getline(in, line);) {
     switch (state) {
       case MODULES:
@@ -206,36 +209,36 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
           break;
         }
       case PID_TID: {
-        state = FIRST_ENTRY;
+        state = ENTRIES;
         tid = line;
         break;
       }
-      case FIRST_ENTRY: {
-        if (!entries.empty()) {
-          interner.AddSample(entries);
-          entries.clear();
-        }
-        std::optional<BackTraceEntry> entry = parseBackTraceEntry(line);
-        if (entry && entry->addr != 0) {
-          entries.push_back(*entry);
-        }
-        state = ENTRIES;
-        break;
-      }
       case ENTRIES: {
-        if (line[0] != ' ') {
+        if (line[0] != ' ') {  // This is a pid, meaning we've hit a new sample
           // Include two artificial frames containing the pid and tid of the sample. This way
           // profiles which include samples from multiple threads and processes will have their
           // samples properly nested.
-          entries.emplace_back(0xDEADBEEF, "tid: " + tid, "<>", 1);
-          entries.emplace_back(0xDEADBEEF, "pid: " + pid, "<>", 1);
+          entries.emplace_back().emplace_back(0xDEADBEEF, "tid: " + tid, "<>", 1);
+          entries.emplace_back().emplace_back(0xDEADBEEF, "pid: " + pid, "<>", 1);
+          interner.AddSample(entries);
+          entries.clear();
+
           pid = line;
           state = PID_TID;
           break;
         }
         std::optional<BackTraceEntry> entry = parseBackTraceEntry(line);
-        if (entry) {
-          entries.push_back(*entry);
+        if (entry && entry->addr != 0) {
+          frame.push_back(*entry);
+        }
+        // A line like '   #13.1" with a '.' indicates we're reading inline entries in the same
+        // frame A line like '   #13  " indicates the last entry in the inline frame.
+        size_t frame_number_start = line.find_first_of('#');
+        size_t frame_number_end = line.find_first_of(' ', frame_number_start);
+        size_t first_point = line.find_first_of('.', frame_number_start);
+        if (first_point > frame_number_end && !frame.empty()) {
+          entries.push_back(frame);
+          frame.clear();
         }
         break;
       }
