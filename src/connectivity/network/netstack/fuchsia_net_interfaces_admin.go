@@ -173,7 +173,7 @@ type adminControlImpl struct {
 	cancelServe context.CancelFunc
 	syncRemoval bool
 	doneChannel chan zx.Channel
-	// TODO(https://fxbug.dev/85061): encode owned, strong, and weak refs once
+	// TODO(https://fxbug.dev/87963): encode owned, strong, and weak refs once
 	// cloning Control is allowed.
 	isStrongRef bool
 }
