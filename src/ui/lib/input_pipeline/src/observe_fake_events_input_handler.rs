@@ -34,4 +34,8 @@ impl input_handler::InputHandler for ObserveFakeEventsInputHandler {
 
         vec![input_event]
     }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {}
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, _msg: &str) {}
 }

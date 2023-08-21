@@ -7,6 +7,7 @@ use {
     async_trait::async_trait,
     fuchsia_inspect::{self, health::Reporter, NumericProperty, Property},
     std::any::Any,
+    std::cell::RefCell,
     std::fmt::{Debug, Formatter},
     std::rc::Rc,
 };
@@ -53,6 +54,10 @@ pub trait InputHandler: AsRcAny {
         self: std::rc::Rc<Self>,
         input_event: input_device::InputEvent,
     ) -> Vec<input_device::InputEvent>;
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>);
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str);
 
     /// Returns the name of the input handler.
     ///
@@ -111,6 +116,10 @@ where
             }
         }
     }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {}
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, _msg: &str) {}
 }
 
 pub struct InputHandlerStatus {
@@ -127,7 +136,7 @@ pub struct InputHandlerStatus {
     last_received_timestamp_ns: fuchsia_inspect::UintProperty,
 
     // This node records the health status of the `InputHandler`.
-    _health_node: fuchsia_inspect::health::Node,
+    pub health_node: RefCell<fuchsia_inspect::health::Node>,
 }
 
 impl PartialEq for InputHandlerStatus {
@@ -165,7 +174,7 @@ impl InputHandlerStatus {
             events_received_count: events_received_count,
             events_handled_count: events_handled_count,
             last_received_timestamp_ns: last_received_timestamp_ns,
-            _health_node: health_node,
+            health_node: RefCell::new(health_node),
         }
     }
 
@@ -326,6 +335,14 @@ mod tests {
                 self: std::rc::Rc<Self>,
                 _input_event: InputEvent,
             ) -> Vec<InputEvent> {
+                unimplemented!()
+            }
+
+            fn set_handler_healthy(self: std::rc::Rc<Self>) {
+                unimplemented!()
+            }
+
+            fn set_handler_unhealthy(self: std::rc::Rc<Self>, _msg: &str) {
                 unimplemented!()
             }
         }

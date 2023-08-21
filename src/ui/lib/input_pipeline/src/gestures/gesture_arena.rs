@@ -16,7 +16,7 @@ use {
     async_trait::async_trait,
     core::cell::RefCell,
     fidl_fuchsia_input_report as fidl_input_report,
-    fuchsia_inspect::{self, ArrayProperty, Node as InspectNode},
+    fuchsia_inspect::{self, health::Reporter, ArrayProperty, Node as InspectNode},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
     std::any::Any,
@@ -1062,6 +1062,14 @@ impl InputHandler for GestureArena {
                 vec![input_event]
             }
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

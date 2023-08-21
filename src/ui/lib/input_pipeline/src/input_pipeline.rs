@@ -81,6 +81,7 @@ impl InputPipelineAssembly {
         let (next_sender, next_receiver) = mpsc::unbounded();
         let handler_name = handler.get_name();
         tasks.push(fasync::Task::local(async move {
+            handler.clone().set_handler_healthy();
             while let Some(event) = receiver.next().await {
                 // Note: the `handler_name` _should not_ be used as ABI (e.g. referenced from
                 // data processing scripts), as `handler_name` is not guaranteed to be consistent
@@ -107,6 +108,7 @@ impl InputPipelineAssembly {
                     }
                 }
             }
+            handler.clone().set_handler_unhealthy(std::format!("Receive loop terminated for handler: {:?}", handler_name).as_str());
             panic!("receive loop is not supposed to terminate for handler: {:?}", handler_name);
         }));
         receiver = next_receiver;

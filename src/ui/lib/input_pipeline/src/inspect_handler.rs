@@ -6,14 +6,15 @@ use crate::input_device::{Handled, InputDeviceEvent, InputDeviceType, InputEvent
 use crate::input_handler::InputHandler;
 use async_trait::async_trait;
 use fuchsia_inspect::{
-    self as inspect, ExponentialHistogramParams, HistogramProperty, Inspector, NumericProperty,
-    Property,
+    self as inspect, health::Reporter, ExponentialHistogramParams, HistogramProperty, Inspector,
+    NumericProperty, Property,
 };
 use fuchsia_zircon as zx;
 use futures::lock::Mutex;
 use futures::FutureExt;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Debug;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -171,12 +172,11 @@ impl CircularBuffer {
 /// All events are passed through unmodified.  Some properties of those events
 /// may be exposed in the metrics.  No PII information should ever be exposed
 /// this way.
-#[derive(Debug)]
 pub struct InspectHandler<F> {
     /// A function that obtains the current timestamp.
     now: RefCell<F>,
     /// A node that contains the statistics about this particular handler.
-    _node: inspect::Node,
+    node: inspect::Node,
     /// The number of total events that this handler has seen so far.
     events_count: inspect::UintProperty,
     /// The timestamp (in nanoseconds) when the last event was seen by this
@@ -193,6 +193,22 @@ pub struct InspectHandler<F> {
     /// the time the `InputEvent` was observed by this handler. Reported in milliseconds,
     /// because values less than 1 msec aren't especially interesting.
     pipeline_latency_ms: inspect::IntExponentialHistogramProperty,
+    // This node records the health status of `InspectHandler`.
+    health_node: RefCell<fuchsia_inspect::health::Node>,
+}
+
+impl<F: FnMut() -> zx::Time + 'static> Debug for InspectHandler<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InspectHandler")
+            .field("node", &self.node)
+            .field("events_count", &self.events_count)
+            .field("last_seen_timestamp_ns", &self.last_seen_timestamp_ns)
+            .field("last_generated_timestamp_ns", &self.last_generated_timestamp_ns)
+            .field("events_by_type", &self.events_by_type)
+            .field("recent_events_log", &self.recent_events_log)
+            .field("pipeline_latency_ms", &self.pipeline_latency_ms)
+            .finish()
+    }
 }
 
 #[async_trait(?Send)]
@@ -213,6 +229,14 @@ impl<F: FnMut() -> zx::Time + 'static> InputHandler for InspectHandler<F> {
         }
         self.pipeline_latency_ms.insert((now - event_time).into_millis());
         vec![input_event]
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 
@@ -258,6 +282,9 @@ impl<F> InspectHandler<F> {
         let pipeline_latency_ms = node
             .create_int_exponential_histogram("pipeline_latency_ms", LATENCY_HISTOGRAM_PROPERTIES);
 
+        let mut health_node = fuchsia_inspect::health::Node::new(&node);
+        health_node.set_starting_up();
+
         let mut events_by_type = HashMap::new();
         if supported_input_devices.contains(&InputDeviceType::Keyboard) {
             EventCounters::add_new_into(&mut events_by_type, &node, EventType::Keyboard);
@@ -280,13 +307,14 @@ impl<F> InspectHandler<F> {
 
         Rc::new(Self {
             now: RefCell::new(now),
-            _node: node,
+            node,
             events_count: event_count,
             last_seen_timestamp_ns,
             last_generated_timestamp_ns,
             events_by_type,
             recent_events_log,
             pipeline_latency_ms,
+            health_node: RefCell::new(health_node),
         })
     }
 }

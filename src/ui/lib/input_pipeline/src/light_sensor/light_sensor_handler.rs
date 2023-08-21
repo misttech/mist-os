@@ -17,7 +17,7 @@ use fidl_fuchsia_lightsensor::{
 };
 use fidl_fuchsia_settings::LightProxy;
 use fidl_fuchsia_ui_brightness::ControlProxy as BrightnessControlProxy;
-use fuchsia_inspect::{self, NumericProperty};
+use fuchsia_inspect::{self, health::Reporter, NumericProperty};
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use futures::TryStreamExt;
@@ -502,6 +502,14 @@ where
             self.inspect_status.count_handled_event();
         }
         vec![input_event]
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 
