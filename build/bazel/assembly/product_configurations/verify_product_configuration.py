@@ -120,6 +120,7 @@ def normalize_platform(config, root_dir):
         "development_support.authorized_ssh_ca_certs_path")
     files_to_normalize.append("ui.sensor_config")
     files_to_normalize.append("forensics.cobalt.registry")
+    files_to_normalize.append("connectivity.network.netcfg_config_path")
     normalize_files_in_config(platform, files_to_normalize, root_dir)
 
     # Due to how some optional configs are routed to Bazel, there may be empty

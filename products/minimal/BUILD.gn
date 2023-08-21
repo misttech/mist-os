@@ -14,6 +14,13 @@ assert(
 product_assembly_configuration("minimal") {
   platform = {
     build_type = "eng"
+    connectivity = {
+      network = {
+        netcfg_config_path =
+            rebase_path("//src/connectivity/network/netcfg/config/default.json",
+                        root_build_dir)
+      }
+    }
     fonts = {
       # minimal is headless, so ostensibly does not need fonts.
       enabled = false

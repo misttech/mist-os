@@ -20,6 +20,11 @@ _PRODUCT_CONFIG_BASE_JSON = {
         "development_support": {
             "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
         },
+        "connectivity": {
+            "network": {
+                "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:default.json)",
+            },
+        },
         "fonts": {
             "enabled": False,
         },
