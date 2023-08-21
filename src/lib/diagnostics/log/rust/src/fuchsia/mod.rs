@@ -20,7 +20,7 @@ mod filter;
 mod sink;
 
 use filter::InterestFilter;
-use sink::Sink;
+use sink::{Sink, SinkConfig};
 
 pub use diagnostics_log_encoding::{encode::TestRecord, Metatag};
 
@@ -32,17 +32,19 @@ pub trait OnInterestChanged {
 
 /// Options to configure a `Publisher`.
 pub struct PublisherOptions<'t> {
+    blocking: bool,
     pub(crate) interest: Interest,
-    pub(crate) metatags: HashSet<Metatag>,
-    pub(crate) tags: &'t [&'t str],
     listen_for_interest_updates: bool,
     log_sink_proxy: Option<LogSinkProxy>,
+    pub(crate) metatags: HashSet<Metatag>,
+    pub(crate) tags: &'t [&'t str],
     wait_for_initial_interest: bool,
 }
 
 impl<'t> Default for PublisherOptions<'t> {
     fn default() -> Self {
         Self {
+            blocking: false,
             interest: Interest::default(),
             listen_for_interest_updates: true,
             log_sink_proxy: None,
@@ -62,12 +64,13 @@ impl PublisherOptions<'_> {
     /// configuration that is desired in most scenarios.
     pub fn empty() -> Self {
         Self {
+            blocking: false,
             interest: Interest::default(),
+            listen_for_interest_updates: false,
+            log_sink_proxy: None,
             metatags: HashSet::new(),
             tags: &[],
             wait_for_initial_interest: false,
-            listen_for_interest_updates: false,
-            log_sink_proxy: None,
         }
     }
 }
@@ -105,6 +108,16 @@ macro_rules! publisher_options {
                 pub fn use_log_sink(mut $self, proxy: LogSinkProxy) -> Self {
                     let this = &mut $self$(.$self_arg)*;
                     this.log_sink_proxy = Some(proxy);
+                    $self
+                }
+
+                /// When set to true, writes to the log socket will be blocking. This is, we'll
+                /// retry every time the socket buffer is full until we are able to write the log.
+                ///
+                /// Default: false
+                pub fn blocking(mut $self, is_blocking: bool) -> Self {
+                    let this = &mut $self$(.$self_arg)*;
+                    this.blocking = is_blocking;
                     $self
                 }
             }
@@ -185,11 +198,12 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
     let PublishOptions {
         publisher:
             PublisherOptions {
+                blocking,
                 interest,
                 metatags,
-                tags,
                 listen_for_interest_updates,
                 log_sink_proxy,
+                tags,
                 wait_for_initial_interest,
             },
         ingest_log_events,
@@ -206,6 +220,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 listen_for_interest_updates,
                 log_sink_proxy,
                 wait_for_initial_interest,
+                blocking,
             },
             ingest_log_events,
             install_panic_hook,
@@ -259,7 +274,14 @@ impl Publisher {
                 .map_err(|e| e.to_string())
                 .map_err(PublishError::LogSinkConnect)?,
         };
-        let sink = Sink::new(&proxy, opts.tags, opts.metatags)?;
+        let sink = Sink::new(
+            &proxy,
+            SinkConfig {
+                tags: opts.tags.into_iter().map(|s| s.to_string()).collect(),
+                metatags: opts.metatags,
+                retry_on_buffer_full: opts.blocking,
+            },
+        )?;
         let (filter, on_change) =
             InterestFilter::new(proxy, opts.interest, opts.wait_for_initial_interest);
         let interest_listening_task = if opts.listen_for_interest_updates {

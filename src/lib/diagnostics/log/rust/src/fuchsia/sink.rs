@@ -23,6 +23,13 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
+#[derive(Default)]
+pub(crate) struct SinkConfig {
+    pub(crate) metatags: HashSet<Metatag>,
+    pub(crate) retry_on_buffer_full: bool,
+    pub(crate) tags: Vec<String>,
+}
+
 thread_local! {
     static PROCESS_ID: zx::Koid =
         rt::process_self().get_koid().expect("couldn't read our own process koid");
@@ -33,26 +40,15 @@ thread_local! {
 
 pub(crate) struct Sink {
     socket: zx::Socket,
-    pub tags: Vec<String>,
-    pub metatags: HashSet<Metatag>,
     num_events_dropped: AtomicU32,
+    config: SinkConfig,
 }
 
 impl Sink {
-    pub fn new(
-        log_sink: &LogSinkProxy,
-        tags: &[&str],
-        metatags: HashSet<Metatag>,
-    ) -> Result<Self, PublishError> {
+    pub fn new(log_sink: &LogSinkProxy, config: SinkConfig) -> Result<Self, PublishError> {
         let (socket, remote_socket) = zx::Socket::create_datagram();
         log_sink.connect_structured(remote_socket).map_err(PublishError::SendSocket)?;
-
-        Ok(Self {
-            socket,
-            tags: tags.iter().map(|s| s.to_string()).collect(),
-            metatags,
-            num_events_dropped: AtomicU32::new(0),
-        })
+        Ok(Self { socket, config, num_events_dropped: AtomicU32::new(0) })
     }
 }
 
@@ -77,11 +73,26 @@ impl Sink {
 
         let end = encoder.inner().cursor();
         let packet = &encoder.inner().get_ref()[..end];
-        match self.socket.write(packet) {
-            Ok(_) => (),
-            Err(zx::Status::SHOULD_WAIT) |
-            // TODO(fxbug.dev/56043) handle socket closure separately from buffer full
-            Err(_) => restore_and_increment_dropped_count(),
+        self.send(packet, restore_and_increment_dropped_count);
+    }
+
+    fn send(&self, packet: &[u8], on_error: impl Fn() -> ()) {
+        while let Err(status) = self.socket.write(packet) {
+            if status != zx::Status::SHOULD_WAIT || !self.config.retry_on_buffer_full {
+                on_error();
+                break;
+            }
+            let Ok(signals) = self.socket.wait_handle(
+                zx::Signals::SOCKET_PEER_CLOSED | zx::Signals::SOCKET_WRITABLE,
+                zx::Time::INFINITE,
+            ) else {
+                on_error();
+                break;
+            };
+            if signals.contains(zx::Signals::SOCKET_PEER_CLOSED) {
+                on_error();
+                break;
+            }
         }
     }
 
@@ -89,7 +100,7 @@ impl Sink {
         self.encode_and_send(move |encoder, previously_dropped| {
             encoder.write_event(WriteEventParams {
                 event: record,
-                tags: &self.tags,
+                tags: &self.config.tags,
                 metatags: std::iter::empty(),
                 pid: PROCESS_ID.with(|p| *p),
                 tid: THREAD_ID.with(|t| *t),
@@ -107,8 +118,8 @@ where
         self.encode_and_send(|encoder, previously_dropped| {
             encoder.write_event(WriteEventParams {
                 event: TracingEvent::new(event, cx),
-                tags: &self.tags,
-                metatags: self.metatags.iter(),
+                tags: &self.config.tags,
+                metatags: self.config.metatags.iter(),
                 pid: PROCESS_ID.with(|p| *p),
                 tid: THREAD_ID.with(|t| *t),
                 dropped: previously_dropped,
@@ -134,17 +145,15 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
-    use futures::stream::StreamExt;
+    use futures::{stream::StreamExt, AsyncReadExt};
     use tracing::{debug, error, info, info_span, trace, warn};
     use tracing_subscriber::{layer::SubscriberExt, Registry};
 
     const TARGET: &str = "diagnostics_log_lib_test::fuchsia::sink::tests";
 
-    async fn init_sink(tags: &[&str], metatags: &[Metatag]) -> fidl::Socket {
+    async fn init_sink(config: SinkConfig) -> fidl::Socket {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let mut sink = Sink::new(&proxy, &[], HashSet::default()).unwrap();
-        sink.tags = tags.iter().copied().map(str::to_string).collect();
-        sink.metatags = metatags.iter().copied().collect();
+        let sink = Sink::new(&proxy, config).unwrap();
         tracing::subscriber::set_global_default(Registry::default().with(sink)).unwrap();
 
         match requests.next().await.unwrap().unwrap() {
@@ -167,8 +176,46 @@ mod tests {
     }
 
     #[fuchsia::test(logging = false)]
+    async fn wait_and_retry_is_possible() {
+        // 160 writes so we write 5 MB given that we write 32K each write. Without enabling
+        // retrying, this would lead to dropped logs.
+        const TOTAL_WRITES: usize = 32 * 5;
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        // Writes a megabyte of data to the Sink.
+        std::thread::spawn(move || {
+            let sink = Sink::new(
+                &proxy,
+                SinkConfig { retry_on_buffer_full: true, ..SinkConfig::default() },
+            )
+            .unwrap();
+            for i in 0..TOTAL_WRITES {
+                let buf = [i as u8; MAX_DATAGRAM_LEN_BYTES as _];
+                sink.send(&buf, || unreachable!("We should never drop a log in this test"));
+            }
+        });
+        let socket = match requests.next().await.unwrap().unwrap() {
+            LogSinkRequest::ConnectStructured { socket, .. } => socket,
+            _ => panic!("sink ctor sent the wrong message"),
+        };
+        let mut socket = fuchsia_async::Socket::from_socket(socket).expect("make async socket");
+        // Ensure we are able to read all of the data written to the socket and we didn't drop
+        // anything.
+        for i in 0..TOTAL_WRITES {
+            let mut buf = vec![0u8; MAX_DATAGRAM_LEN_BYTES as _];
+            let len = socket.read(&mut buf).await.unwrap();
+            assert_eq!(len, MAX_DATAGRAM_LEN_BYTES as usize);
+            assert_eq!(buf, vec![i as u8; MAX_DATAGRAM_LEN_BYTES as _]);
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    #[fuchsia::test(logging = false)]
     async fn packets_are_sent() {
-        let socket = init_sink(&[], &[Metatag::Target]).await;
+        let socket = init_sink(SinkConfig {
+            metatags: HashSet::from([Metatag::Target]),
+            ..SinkConfig::default()
+        })
+        .await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
         let mut next_message = || {
             let len = socket.read(&mut buf).unwrap();
@@ -289,7 +336,11 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn tags_are_sent() {
-        let socket = init_sink(&["tags_are_sent"], &[]).await;
+        let socket = init_sink(SinkConfig {
+            tags: vec!["tags_are_sent".to_string()],
+            ..SinkConfig::default()
+        })
+        .await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
         let mut next_message = || {
             let len = socket.read(&mut buf).unwrap();
@@ -318,7 +369,7 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn spans_are_supported() {
-        let socket = init_sink(&[], &[]).await;
+        let socket = init_sink(SinkConfig::default()).await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
         let mut next_message = || {
             let len = socket.read(&mut buf).unwrap();
@@ -350,7 +401,7 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn drop_count_is_tracked() {
-        let socket = init_sink(&[], &[]).await;
+        let socket = init_sink(SinkConfig::default()).await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
         const MESSAGE_SIZE: usize = 104;
         const MESSAGE_SIZE_WITH_DROPS: usize = 136;
