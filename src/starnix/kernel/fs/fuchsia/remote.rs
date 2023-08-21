@@ -5,6 +5,7 @@
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use syncio::{
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
@@ -1022,11 +1023,34 @@ impl FileOps for RemoteDirectoryObject {
 pub struct RemoteFileObject {
     /// The underlying Zircon I/O object.
     zxio: Arc<Zxio>,
+
+    /// Cached read-only VMO handle.
+    read_only_vmo: OnceCell<Arc<zx::Vmo>>,
+
+    /// Cached read/exec VMO handle.
+    read_exec_vmo: OnceCell<Arc<zx::Vmo>>,
 }
 
 impl RemoteFileObject {
     pub fn new(zxio: Zxio) -> RemoteFileObject {
-        RemoteFileObject { zxio: Arc::new(zxio) }
+        RemoteFileObject {
+            zxio: Arc::new(zxio),
+            read_only_vmo: Default::default(),
+            read_exec_vmo: Default::default(),
+        }
+    }
+
+    fn fetch_remote_vmo(&self, prot: ProtectionFlags) -> Result<Arc<zx::Vmo>, Errno> {
+        let without_exec = self
+            .zxio
+            .vmo_get(prot.to_vmar_flags() - zx::VmarFlags::PERM_EXECUTE)
+            .map_err(|status| from_status_like_fdio!(status))?;
+        let all_flags = if prot.contains(ProtectionFlags::EXEC) {
+            without_exec.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?
+        } else {
+            without_exec
+        };
+        Ok(Arc::new(all_flags))
     }
 }
 
@@ -1061,15 +1085,17 @@ impl FileOps for RemoteFileObject {
         prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
         trace_duration!(trace_category_starnix_mm!(), "RemoteFileGetVmo");
-        let has_execute = prot.contains(ProtectionFlags::EXEC);
-        let vmar_flags = prot.to_vmar_flags() - zx::VmarFlags::PERM_EXECUTE;
-        // TODO(tbodt): Consider caching the VMO handle instead of getting a new one on each call.
-        let mut vmo =
-            self.zxio.vmo_get(vmar_flags).map_err(|status| from_status_like_fdio!(status))?;
-        if has_execute {
-            vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
-        }
-        Ok(Arc::new(vmo))
+        let vmo_cache = if prot == (ProtectionFlags::READ | ProtectionFlags::EXEC) {
+            Some(&self.read_exec_vmo)
+        } else if prot == ProtectionFlags::READ {
+            Some(&self.read_only_vmo)
+        } else {
+            None
+        };
+
+        vmo_cache
+            .map(|c| c.get_or_try_init(|| self.fetch_remote_vmo(prot)).cloned())
+            .unwrap_or_else(|| self.fetch_remote_vmo(prot))
     }
 
     fn to_handle(
