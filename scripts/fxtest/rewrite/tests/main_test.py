@@ -72,12 +72,68 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         return super().setUp()
 
-    def _mock_run_commands_in_parallel(self, stdout) -> mock.MagicMock:
+    def _mock_run_commands_in_parallel(self, stdout: str) -> mock.MagicMock:
         m = mock.AsyncMock(return_value=[mock.MagicMock(stdout=stdout)])
         patch = mock.patch("main.run_commands_in_parallel", m)
         patch.start()
         self.addCleanup(patch.stop)
         return m
+
+    def _mock_run_command(self, return_code: int) -> mock.MagicMock:
+        m = mock.AsyncMock(return_value=mock.MagicMock(return_code=return_code))
+        patch = mock.patch("main.execution.run_command", m)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return m
+
+    def _mock_has_device_connected(self, value: bool):
+        m = mock.AsyncMock(return_value=value)
+        patch = mock.patch("main.has_device_connected", m)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def _mock_has_tests_in_base(self, value: bool):
+        m = mock.MagicMock(return_value=value)
+        patch = mock.patch("main.has_tests_in_base", m)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def _make_call_args_prefix_set(
+        self, call_list: mock._CallList
+    ) -> typing.Set[typing.Tuple]:
+        """Given a list of mock calls, turn them into a set of prefixes for comparison.
+
+        For instance, if the mock call is ("fx", "run", "command") the output
+        is: {
+            ('fx',),
+            ('fx', 'run'),
+            ('fx', 'run', 'command'),
+        }
+
+        This can be used to check containment.
+
+        Args:
+            call_list (mock._CallList): Calls to process.
+
+        Returns:
+            typing.Set[typing.List[typing.Any]]: Set of prefixes to calls.
+        """
+        ret: typing.Set[typing.Tuple] = set()
+        for call in call_list:
+            args, _ = call
+            cur = []
+            for a in args:
+                cur.append(a)
+                ret.add(tuple(cur))
+
+        return ret
+
+    def assertIsSubset(
+        self, subset: typing.Set[typing.Any], full: typing.Set[typing.Any]
+    ):
+        inter = full.intersection(subset)
+        msg_output = lambda: "\n ".join(map(lambda x: " ".join(x), sorted(full)))
+        self.assertEqual(inter, subset, f"Full set was\n {msg_output()}")
 
     async def test_dry_run(self):
         """Test a basic dry run of the command."""
@@ -120,6 +176,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(selection_event.selected), expected_count)
 
     async def test_suggestions(self):
+        """Test that targets are suggested when there are no test matches."""
         mocked_commands = self._mock_run_commands_in_parallel("No matches")
         ret = await main.async_main_wrapper(
             args.parse_args(["--simple", "non_existant_test_does_not_match"])
@@ -137,3 +194,55 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 ]
             ],
         )
+
+        # TODO(b/295340412): Test that suggestions are suppressed.
+
+    async def test_full_success(self):
+        """Test that we can run all tests and report success"""
+
+        command_mock = self._mock_run_command(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        ret = await main.async_main_wrapper(args.parse_args(["--simple"]))
+        self.assertEqual(ret, 0)
+
+        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+
+        # Make sure we built, published, and ran the device test.
+        self.assertIsSubset(
+            {
+                ("fx", "build", "src/sys:foo_test_package", "host_x64/bar_test"),
+                ("fx", "ffx", "repository", "publish"),
+                ("fx", "ffx", "test", "run"),
+            },
+            call_prefixes,
+        )
+
+        # Make sure we ran the host test.
+        self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
+
+    async def test_no_build(self):
+        """Test that we can run all tests and report success"""
+
+        command_mock = self._mock_run_command(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        ret = await main.async_main_wrapper(args.parse_args(["--simple", "--no-build"]))
+        self.assertEqual(ret, 0)
+
+        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+
+        self.assertFalse(("fx", "build") in call_prefixes)
+        self.assertFalse(("fx", "ffx", "repository", "publish") in call_prefixes)
+
+        self.assertIsSubset(
+            {
+                ("fx", "ffx", "test", "run"),
+            },
+            call_prefixes,
+        )
+
+        # Make sure we ran the host test.
+        self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))

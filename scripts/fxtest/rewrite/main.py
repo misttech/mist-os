@@ -385,7 +385,7 @@ async def do_build(
         label = selection.build.test.package_label or selection.build.test.label
         path = selection.build.test.path
         if path is not None:
-            # Host tests are build by output name.
+            # Host tests are built by output name.
             build_command_line.append(path)
         elif label:
             # Other tests are built by label content, without toolchain.
