@@ -128,11 +128,6 @@
 	url = https://fuchsia.googlesource.com/third_party/curl
 	name = third_party/curl
 	ignore = all
-[submodule "third_party/dart-pkg/git/flutter"]
-	path = third_party/dart-pkg/git/flutter
-	url = https://chromium.googlesource.com/external/github.com/flutter/flutter
-	name = external/github.com/flutter/flutter
-	ignore = all
 [submodule "third_party/dart-pkg/pub"]
 	path = third_party/dart-pkg/pub
 	url = https://fuchsia.googlesource.com/third_party/dart-pkg
