@@ -4,10 +4,11 @@
 
 use core::arch::x86_64::_rdtsc;
 use fuchsia_zircon as zx;
-use std::sync::Arc;
-use zerocopy::AsBytes;
 
-use crate::types::{errno, from_status_like_fdio, uapi, Errno};
+use crate::{
+    types::{uapi, Errno},
+    vdso::vdso_loader::MemoryMappedVvar,
+};
 
 pub const HAS_VDSO: bool = true;
 
@@ -36,20 +37,17 @@ pub fn calculate_ticks_offset() -> i64 {
     ticks_offset
 }
 
-pub fn set_vvar_data(vvar_vmo: &Arc<zx::Vmo>) -> Result<(), Errno> {
+pub fn set_vvar_data(vvar_vmo: &mut MemoryMappedVvar) {
     let clock = zx::Clock::create(zx::ClockOpts::MONOTONIC | zx::ClockOpts::AUTO_START, None)
         .expect("failed to create clock");
     let details = clock.get_details().expect("Failed to get clock details");
     let ticks_offset = calculate_ticks_offset();
-    let vvar_data: uapi::vvar_data = uapi::vvar_data {
+    let vvar_data = uapi::vvar_data {
         raw_ticks_to_ticks_offset: ticks_offset,
         ticks_to_mono_numerator: details.ticks_to_synthetic.rate.synthetic_ticks,
         ticks_to_mono_denominator: details.ticks_to_synthetic.rate.reference_ticks,
     };
-    vvar_vmo
-        .write(vvar_data.as_bytes(), 0 as u64)
-        .map_err(|status| from_status_like_fdio!(status))?;
-    Ok(())
+    vvar_vmo.write_vvar_data(vvar_data);
 }
 
 pub fn get_sigreturn_offset(_vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {

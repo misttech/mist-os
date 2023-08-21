@@ -4,16 +4,16 @@
 
 use fuchsia_zircon as zx;
 use process_builder::elf_parse;
-use std::sync::Arc;
 use zerocopy::AsBytes;
 
-use crate::types::{errno, from_status_like_fdio, Errno};
+use crate::{
+    types::{errno, from_status_like_fdio, Errno},
+    vdso::vdso_loader::MemoryMappedVvar,
+};
 
 pub const HAS_VDSO: bool = true;
 
-pub fn set_vvar_data(_vvar_vmo: &Arc<zx::Vmo>) -> Result<(), Errno> {
-    Ok(())
-}
+pub fn set_vvar_data(_vvar_vmo: &mut MemoryMappedVvar) {}
 
 pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
