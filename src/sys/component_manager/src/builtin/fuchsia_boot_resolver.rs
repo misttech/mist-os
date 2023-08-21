@@ -521,7 +521,7 @@ mod tests {
         ));
 
         let expected_program = Some(cm_rust::ProgramDecl {
-            runner: Some("elf".parse().unwrap()),
+            runner: "elf".parse().unwrap(),
             info: fdata::Dictionary {
                 entries: Some(vec![
                     fdata::DictionaryEntry {

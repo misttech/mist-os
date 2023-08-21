@@ -213,8 +213,7 @@ mod tests {
         capabilities: Vec<CapabilityDecl>,
         children: Vec<ChildDecl>,
     ) -> ComponentDecl {
-        let mut program = ProgramDecl::default();
-        program.runner = Some("elf".parse().unwrap());
+        let program = ProgramDecl { runner: "elf".parse().unwrap(), info: Default::default() };
         ComponentDecl {
             program: Some(program),
             uses,
