@@ -224,6 +224,8 @@ template("assembled_system") {
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
   assert(defined(invoker.product_assembly_config_label),
          "Need to define product_assembly_config_label")
+  assert(defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost,
+         "use_assembly_fshost must be set to true")
 
   # One of these is necessary in order to _run_ assembly, but some of the
   # builders have configurations that don't define any board, yet also end up
