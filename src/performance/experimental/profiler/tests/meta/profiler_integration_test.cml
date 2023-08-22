@@ -41,6 +41,7 @@
             protocol: [
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.Log",
+                "fuchsia.logger.LogSink",
             ],
             from: "parent",
             to: [ "#profiler" ],
@@ -55,6 +56,11 @@
             protocol: "fuchsia.sys2.LifecycleController",
             from: "framework",
             as: "fuchsia.sys2.LifecycleController.root",
+            to: "#profiler",
+        },
+        {
+            event_stream: [ "debug_started" ],
+            from: "parent",
             to: "#profiler",
         },
     ],

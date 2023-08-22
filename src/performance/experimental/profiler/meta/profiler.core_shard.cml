@@ -31,8 +31,8 @@
             to: "#profiler",
         },
         {
-            storage: [ "tmp" ],
-            from: "self",
+            event_stream: [ "debug_started" ],
+            from: "parent",
             to: "#profiler",
         },
     ],

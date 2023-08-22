@@ -29,6 +29,10 @@
             // Optional, since integration tests aren't able to provide this capability
             availability: "optional",
         },
+        {
+            event_stream: [ "debug_started" ],
+            from: "parent",
+        },
     ],
     expose: [
         {

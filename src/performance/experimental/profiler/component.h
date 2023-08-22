@@ -10,17 +10,19 @@
 #include <lib/async/dispatcher.h>
 #include <lib/zx/result.h>
 
+#include "component_watcher.h"
+
 namespace profiler {
 class Component {
  public:
-  explicit Component(async_dispatcher_t* dispatcher) {}
+  explicit Component(async_dispatcher_t* dispatcher) : component_watcher_(dispatcher) {}
   // If on_start is specified, the callback will be called when it is successfully started via
   // `StartComponents`
   static zx::result<std::unique_ptr<Component>> Create(async_dispatcher_t* dispatcher,
                                                        const std::string& url,
                                                        const std::string& moniker);
 
-  zx::result<> Start();
+  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr);
   zx::result<> Stop();
   zx::result<> Destroy();
 
@@ -36,6 +38,8 @@ class Component {
   std::string collection_;
   std::string parent_moniker_;
   std::string moniker_;
+
+  ComponentWatcher component_watcher_;
   bool destroyed_ = false;
 };
 }  // namespace profiler

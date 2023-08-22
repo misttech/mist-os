@@ -111,6 +111,10 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
 }
 
 zx::result<> profiler::Sampler::AddTarget(JobTarget&& target) {
+  zx::result<> res = WatchTarget(target);
+  if (res.is_error()) {
+    return res;
+  }
   return targets_.AddJob(std::move(target));
 }
 

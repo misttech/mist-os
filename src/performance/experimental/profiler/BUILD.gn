@@ -8,6 +8,7 @@ import("//src/sys/core/build/core_shard.gni")
 source_set("lib") {
   sources = [
     "component.cc",
+    "component_watcher.cc",
     "job_watcher.cc",
     "process_watcher.cc",
     "sampler.cc",

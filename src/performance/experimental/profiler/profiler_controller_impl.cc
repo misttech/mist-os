@@ -35,6 +35,7 @@
 #include <src/lib/fsl/socket/strings.h>
 #include <src/lib/unwinder/module.h>
 
+#include "component_watcher.h"
 #include "sampler.h"
 #include "symbolization_context.h"
 #include "symbolizer_markup.h"
@@ -260,7 +261,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         }
 
         zx::result<std::unique_ptr<profiler::Component>> res =
-            profiler::Component::Create(dispatcher_, url, std::move(moniker));
+            profiler::Component::Create(dispatcher_, url, moniker);
         if (res.is_error()) {
           FX_PLOGS(INFO, res.error_value())
               << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
@@ -332,37 +333,40 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
   sampler_ = std::make_unique<Sampler>(dispatcher_, std::move(targets_));
   targets_.Clear();
   if (component_target_) {
-    if (zx::result<> res = component_target_->Start(); res.is_error()) {
-      completer.Close(res.error_value());
-      return;
-    }
-    std::string moniker = component_target_->Moniker();
-    zx::result<zx_koid_t> job_id = MonikerToJobId(moniker);
-    if (job_id.is_error()) {
-      completer.Close(job_id.error_value());
-      return;
-    }
-    TaskFinder tf;
-    tf.AddJob(*job_id);
-    zx::result<TaskFinder::FoundTasks> handles = tf.FindHandles();
-    if (handles.is_error()) {
-      FX_PLOGS(ERROR, handles.error_value()) << "Failed to find handle for: " << moniker;
-      return;
-    }
-    for (auto& [koid, handle] : handles->jobs) {
-      if (koid == job_id) {
-        zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
-        if (target.is_error()) {
-          FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
-          return;
-        }
-        zx::result<> target_result = sampler_->AddTarget(std::move(*target));
-        if (target_result.is_error()) {
-          FX_PLOGS(ERROR, target_result.error_value()) << "Failed to add target for: " << moniker;
-          return;
-        }
-        break;
+    ComponentWatcher::ComponentEventHandler on_start_handler = [this](std::string moniker,
+                                                                      std::string url) {
+      zx::result<zx_koid_t> job_id = MonikerToJobId(moniker);
+      if (job_id.is_error()) {
+        FX_PLOGS(ERROR, job_id.error_value()) << "Failed to get moniker from Job ID";
+        return;
       }
+      TaskFinder tf;
+      tf.AddJob(*job_id);
+      zx::result<TaskFinder::FoundTasks> handles = tf.FindHandles();
+      if (handles.is_error()) {
+        FX_PLOGS(ERROR, handles.error_value()) << "Failed to find handle for: " << moniker;
+        return;
+      }
+      for (auto& [koid, handle] : handles->jobs) {
+        if (koid == job_id) {
+          zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
+          if (target.is_error()) {
+            FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
+            return;
+          }
+          zx::result<> target_result = sampler_->AddTarget(std::move(*target));
+          if (target_result.is_error()) {
+            FX_PLOGS(ERROR, target_result.error_value()) << "Failed to add target for: " << moniker;
+            return;
+          }
+          break;
+        }
+      }
+    };
+    if (zx::result<> res = component_target_->Start(std::move(on_start_handler)); res.is_error()) {
+      completer.Close(res.error_value());
+      Reset();
+      return;
     }
   };
 
@@ -387,8 +391,8 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   zx::result<> stop_res = sampler_->Stop();
   if (stop_res.is_error()) {
     FX_PLOGS(ERROR, stop_res.status_value()) << "Sampler failed to stop";
-    Reset();
     completer.Close(stop_res.status_value());
+    Reset();
     return;
   }
 

@@ -71,7 +71,7 @@ std::pair<std::set<zx_koid_t>, std::set<zx_koid_t>> GetOutputKoids(zx::socket so
     pids.insert(strtoll(pid_string.data(), nullptr, 0));
     tids.insert(strtoll(tid_string.data(), nullptr, 0));
   }
-  return {pids, tids};
+  return std::make_pair(std::move(pids), std::move(tids));
 }
 
 TEST(ProfilerIntegrationTest, EndToEnd) {

@@ -56,7 +56,17 @@ zx::result<std::unique_ptr<profiler::Component>> profiler::Component::Create(
   return zx::ok(std::move(component));
 }
 
-zx::result<> profiler::Component::Start() {
+zx::result<> profiler::Component::Start(ComponentWatcher::ComponentEventHandler on_start) {
+  if (on_start) {
+    if (zx::result<> watch_result =
+            component_watcher_.WatchForMoniker(moniker_, std::move(on_start));
+        watch_result.is_error()) {
+      return watch_result;
+    }
+    if (zx::result res = component_watcher_.Watch(); res.is_error()) {
+      return res;
+    }
+  }
   zx::result<fidl::Endpoints<fuchsia_component::Binder>> binder_endpoints =
       fidl::CreateEndpoints<fuchsia_component::Binder>();
   if (binder_endpoints.is_error()) {
