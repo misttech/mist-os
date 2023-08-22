@@ -289,11 +289,16 @@ pub async fn register_target_with_fidl_proxies(
     rewrite_engine_proxy: EngineProxy,
     repo_target_info: &RepositoryTarget,
     target: &ffx::TargetInfo,
-    target_nodename: &str,
-    inner: &Arc<RwLock<RepoInner>>,
+    repo_server_listen_addr: SocketAddr,
+    repo: &Arc<RwLock<RepoClient<Box<dyn RepoProvider>>>>,
     alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 ) -> Result<(), ffx::RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
+    let target_ssh_host_address = target.ssh_host_address.clone();
+    let target_nodename = target.nodename.clone().ok_or_else(|| {
+        tracing::error!("target {:?} does not have a nodename", repo_target_info.target_identifier);
+        ffx::RepositoryError::TargetCommunicationFailure
+    })?;
 
     tracing::info!(
         "Registering repository {:?} for target {:?}",
@@ -301,28 +306,13 @@ pub async fn register_target_with_fidl_proxies(
         repo_target_info.target_identifier
     );
 
-    let repo = inner
-        .read()
-        .await
-        .manager
-        .get(repo_name)
-        .ok_or_else(|| ffx::RepositoryError::NoMatchingRepository)?;
-
-    let listen_addr = match inner.read().await.server.listen_addr() {
-        Some(listen_addr) => listen_addr,
-        None => {
-            tracing::error!("repository server is not running");
-            return Err(ffx::RepositoryError::ServerNotRunning);
-        }
-    };
-
     // Before we register the repository, we need to decide which address the
     // target device should use to reach the repository. If the server is
-    // running on a loopback device, then we need to create a tunnel for the
+    // running on a loopback device, then a tunnel will be created for the
     // device to access the server.
     let (_, repo_host) = create_repo_host(
-        listen_addr,
-        target.ssh_host_address.clone().ok_or_else(|| {
+        repo_server_listen_addr,
+        target_ssh_host_address.ok_or_else(|| {
             tracing::error!(
                 "target {:?} does not have a host address",
                 repo_target_info.target_identifier
@@ -372,7 +362,7 @@ pub async fn register_target_with_fidl_proxies(
         // Checking for registration alias conflicts.
         let check_alias_conflict = pkg_config::check_registration_alias_conflict(
             repo_name,
-            target_nodename,
+            target_nodename.as_str(),
             aliases.clone().into_iter().collect(),
         )
         .await

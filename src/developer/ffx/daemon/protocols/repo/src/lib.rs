@@ -223,31 +223,38 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
             }
         };
 
-        register_target_with_fidl_proxies(
-            proxy,
-            rewrite_engine_proxy,
-            &repo_target_info,
-            &target,
-            &target_nodename,
-            &inner,
-            alias_conflict_mode,
-        )
-        .await?;
+        let repo = &inner
+            .read()
+            .await
+            .manager
+            .get(&repo_target_info.repo_name)
+            .ok_or_else(|| ffx::RepositoryError::NoMatchingRepository)?;
 
-        let listen_addr = match inner.read().await.server.listen_addr() {
-            Some(listen_addr) => listen_addr,
+        let repo_server_listen_addr = match inner.read().await.server.listen_addr() {
+            Some(repo_server_listen_addr) => repo_server_listen_addr,
             None => {
                 tracing::error!("repository server is not running");
                 return Err(ffx::RepositoryError::ServerNotRunning);
             }
         };
 
+        register_target_with_fidl_proxies(
+            proxy,
+            rewrite_engine_proxy,
+            &repo_target_info,
+            &target,
+            repo_server_listen_addr,
+            repo,
+            alias_conflict_mode,
+        )
+        .await?;
+
         // Before we register the repository, we need to decide which address the
         // target device should use to reach the repository. If the server is
         // running on a loopback device, then we need to create a tunnel for the
         // device to access the server.
         let (should_make_tunnel, _) = create_repo_host(
-            listen_addr,
+            repo_server_listen_addr,
             target.ssh_host_address.ok_or_else(|| {
                 tracing::error!(
                     "target {:?} does not have a host address",
