@@ -31,7 +31,7 @@ void main() {
 
   test('loopback_socket_benchmarks_with_netstack3', () async {
     await runTestComponent(
-        packageName: 'loopback-socket-benchmarks-tests-netstack3',
+        packageName: 'loopback-socket-benchmarks-tests',
         componentName: 'loopback-socket-benchmarks-with-netstack3.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile:
@@ -40,7 +40,7 @@ void main() {
 
   test('loopback_socket_benchmarks_with_fake_netstack', () async {
     await runTestComponent(
-        packageName: 'loopback-socket-benchmarks-tests-netstack2',
+        packageName: 'loopback-socket-benchmarks-tests',
         componentName: 'loopback-socket-benchmarks-with-fake-netstack.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
         expectedMetricNamesFile:

@@ -46,8 +46,19 @@ fuchsia_unittest_component("loopback-socket-benchmarks-with-netstack3") {
   ]
 }
 
-fuchsia_test_package("loopback-socket-benchmarks-tests-netstack3") {
-  test_components = [ ":loopback-socket-benchmarks-with-netstack3" ]
+fuchsia_unittest_component("loopback-socket-benchmarks-with-fake-netstack") {
+  manifest = "meta/loopback-socket-benchmarks-with-fake-netstack.cml"
+  deps = [
+    ":loopback_socket_benchmarks",
+    "//src/connectivity/network/tests/benchmarks/fake-netstack",
+  ]
+}
+
+fuchsia_test_package("loopback-socket-benchmarks-tests") {
+  test_components = [
+    ":loopback-socket-benchmarks-with-netstack3",
+    ":loopback-socket-benchmarks-with-fake-netstack",
+  ]
 }
 
 fuchsia_unittest_component(
@@ -88,19 +99,10 @@ if (target_cpu != "riscv64") {
     ]
   }
 
-  fuchsia_unittest_component("loopback-socket-benchmarks-with-fake-netstack") {
-    manifest = "meta/loopback-socket-benchmarks-with-fake-netstack.cml"
-    deps = [
-      ":loopback_socket_benchmarks",
-      "//src/connectivity/network/tests/benchmarks/fake-netstack",
-    ]
-  }
-
   fuchsia_test_package("loopback-socket-benchmarks-tests-netstack2") {
     test_components = [
       ":loopback-socket-benchmarks",
       ":loopback-socket-benchmarks-with-fast-udp",
-      ":loopback-socket-benchmarks-with-fake-netstack",
     ]
   }
 
@@ -147,7 +149,7 @@ if (target_cpu != "riscv64") {
 }
 
 all_test_targets = [
-                     ":loopback-socket-benchmarks-tests-netstack3",
+                     ":loopback-socket-benchmarks-tests",
                      ":loopback-socket-benchmarks-with-tracing-pkg-netstack3",
                    ] + ns2_test_targets
 
