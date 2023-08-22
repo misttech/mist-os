@@ -717,68 +717,119 @@ impl StatFile {
 impl DynamicFileSource for StatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.task)?;
+
+        // All fields and their types as specified in the man page. Unimplemented fields are set to
+        // 0 here.
+        let pid: pid_t; // 1
+        let comm: &str;
+        let state: char;
+        let ppid: pid_t;
+        let pgrp: pid_t; // 5
+        let session: pid_t;
+        let tty_nr: i32;
+        let tpgid: i32 = 0;
+        let flags: u32 = 0;
+        let minflt: u64 = 0; // 10
+        let cminflt: u64 = 0;
+        let majflt: u64 = 0;
+        let cmajflt: u64 = 0;
+        let utime: i64;
+        let stime: i64; // 15
+        let cutime: i64;
+        let cstime: i64;
+        let priority: i64 = 0;
+        let nice: i64 = 0;
+        let num_threads: i64; // 20
+        let itrealvalue: i64 = 0;
+        let starttime: u64;
+        let vsize: usize;
+        let rss: usize;
+        let rsslim: u64; // 25
+        let startcode: u64 = 0;
+        let endcode: u64 = 0;
+        let startstack: usize;
+        let kstkesp: u64 = 0;
+        let kstkeip: u64 = 0; // 30
+        let signal: u64 = 0;
+        let blocked: u64 = 0;
+        let siginore: u64 = 0;
+        let sigcatch: u64 = 0;
+        let wchan: u64 = 0; // 35
+        let nswap: u64 = 0;
+        let cnswap: u64 = 0;
+        let exit_signal: i32 = 0;
+        let processor: i32 = 0;
+        let rt_priority: u32 = 0; // 40
+        let policy: u32 = 0;
+        let delayacct_blkio_ticks: u64 = 0;
+        let guest_time: u64 = 0;
+        let cguest_time: i64 = 0;
+        let start_data: u64 = 0; // 45
+        let end_data: u64 = 0;
+        let start_brk: u64 = 0;
+        let arg_start: usize;
+        let arg_end: usize;
+        let env_start: usize; // 50
+        let env_end: usize;
+        let exit_code: i32 = 0;
+
+        pid = task.get_tid();
         let command = task.command();
-        let command = command.as_c_str().to_str().unwrap_or("unknown");
-        let mut stats = [0u64; 48];
+        comm = command.as_c_str().to_str().unwrap_or("unknown");
+        state = task.state_code().code_char();
+
         {
             let thread_group = task.thread_group.read();
-            stats[0] = thread_group.get_ppid() as u64;
-            stats[1] = thread_group.process_group.leader as u64;
-            stats[2] = thread_group.process_group.session.leader as u64;
+            ppid = thread_group.get_ppid();
+            pgrp = thread_group.process_group.leader;
+            session = thread_group.process_group.session.leader;
 
             // TTY device ID.
             {
                 let session = thread_group.process_group.session.read();
-                stats[3] = session
+                tty_nr = session
                     .controlling_terminal
                     .as_ref()
                     .map(|t| t.terminal.device().bits())
-                    .unwrap_or(0);
+                    .unwrap_or(0) as i32;
             }
 
-            stats[12] =
-                duration_to_scheduler_clock(thread_group.children_time_stats.user_time) as u64;
-            stats[13] =
-                duration_to_scheduler_clock(thread_group.children_time_stats.system_time) as u64;
+            cutime = duration_to_scheduler_clock(thread_group.children_time_stats.user_time);
+            cstime = duration_to_scheduler_clock(thread_group.children_time_stats.system_time);
 
-            stats[16] = thread_group.tasks_count() as u64;
+            num_threads = thread_group.tasks_count() as i64;
         }
 
         let time_stats = match self.scope {
             StatsScope::Task => task.time_stats(),
             StatsScope::ThreadGroup => task.thread_group.time_stats(),
         };
-        stats[10] = duration_to_scheduler_clock(time_stats.user_time) as u64;
-        stats[11] = duration_to_scheduler_clock(time_stats.system_time) as u64;
+        utime = duration_to_scheduler_clock(time_stats.user_time);
+        stime = duration_to_scheduler_clock(time_stats.system_time);
 
         let info = task.thread_group.process.info().map_err(|_| errno!(EIO))?;
-        stats[18] =
+        starttime =
             duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
                 as u64;
 
         let mem_stats = task.mm.get_stats().map_err(|_| errno!(EIO))?;
         let page_size = *PAGE_SIZE as usize;
-        stats[19] = mem_stats.vm_size as u64;
-        stats[20] = (mem_stats.vm_rss / page_size) as u64;
-        stats[21] = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
+        vsize = mem_stats.vm_size;
+        rss = mem_stats.vm_rss / page_size;
+        rsslim = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
 
         {
             let mm_state = task.mm.state.read();
-            stats[24] = mm_state.stack_start.ptr() as u64;
-            stats[44] = mm_state.argv_start.ptr() as u64;
-            stats[45] = mm_state.argv_end.ptr() as u64;
-            stats[46] = mm_state.environ_start.ptr() as u64;
-            stats[47] = mm_state.environ_end.ptr() as u64;
+            startstack = mm_state.stack_start.ptr();
+            arg_start = mm_state.argv_start.ptr();
+            arg_end = mm_state.argv_end.ptr();
+            env_start = mm_state.environ_start.ptr();
+            env_end = mm_state.environ_end.ptr();
         }
-        let stat_str = stats.map(|n| n.to_string()).join(" ");
 
         writeln!(
             sink,
-            "{} ({}) {} {}",
-            task.get_pid(),
-            command,
-            task.state_code().code_char(),
-            stat_str
+            "{pid} ({comm}) {state} {ppid} {pgrp} {session} {tty_nr} {tpgid} {flags} {minflt} {cminflt} {majflt} {cmajflt} {utime} {stime} {cutime} {cstime} {priority} {nice} {num_threads} {itrealvalue} {starttime} {vsize} {rss} {rsslim} {startcode} {endcode} {startstack} {kstkesp} {kstkeip} {signal} {blocked} {siginore} {sigcatch} {wchan} {nswap} {cnswap} {exit_signal} {processor} {rt_priority} {policy} {delayacct_blkio_ticks} {guest_time} {cguest_time} {start_data} {end_data} {start_brk} {arg_start} {arg_end} {env_start} {env_end} {exit_code}"
         )?;
 
         Ok(())
