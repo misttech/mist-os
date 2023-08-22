@@ -23,6 +23,12 @@
 
 #include "src/lib/fxl/strings/string_printf.h"
 
+// TODO(fxbug.dev/131696): names changed in the .inc file Handle both old and
+// new names by defining the old names as macros for the new ones. Remove these
+// after the toolchain rolls in the new .inc file version.
+#define DataSize NumData
+#define CountersSize NumCounters
+
 #include <profile/InstrProfData.inc>
 
 namespace debugdata {
@@ -124,8 +130,8 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src, size_t size) {
   const __llvm_profile_header* dst_header = reinterpret_cast<const __llvm_profile_header*>(dst);
 
   if (src_header->Magic != dst_header->Magic || src_header->Version != dst_header->Version ||
-      src_header->DataSize != dst_header->DataSize ||
-      src_header->CountersSize != dst_header->CountersSize ||
+      src_header->NumData != dst_header->NumData ||
+      src_header->NumCounters != dst_header->NumCounters ||
       src_header->NamesSize != dst_header->NamesSize)
     return false;
 
@@ -136,7 +142,7 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src, size_t size) {
     src_data_start = reinterpret_cast<const __llvm_profile_data*>(
         reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
 #endif
-  const __llvm_profile_data* src_data_end = src_data_start + src_header->DataSize;
+  const __llvm_profile_data* src_data_end = src_data_start + src_header->NumData;
   const __llvm_profile_data* dst_data_start =
       reinterpret_cast<const __llvm_profile_data*>(dst + sizeof(*dst_header));
 #if INSTR_PROF_RAW_VERSION > 5
@@ -144,7 +150,7 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src, size_t size) {
     dst_data_start = reinterpret_cast<const __llvm_profile_data*>(
         reinterpret_cast<const uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
 #endif
-  const __llvm_profile_data* dst_data_end = dst_data_start + dst_header->DataSize;
+  const __llvm_profile_data* dst_data_end = dst_data_start + dst_header->NumData;
 
   for (const __llvm_profile_data *src_data = src_data_start, *dst_data = dst_data_start;
        src_data < src_data_end && dst_data < dst_data_end; ++src_data, ++dst_data) {
@@ -168,7 +174,7 @@ uint8_t* MergeProfiles(uint8_t* dst, const uint8_t* src, size_t size) {
     src_data_start = reinterpret_cast<const __llvm_profile_data*>(
         reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
 #endif
-  const __llvm_profile_data* src_data_end = src_data_start + src_header->DataSize;
+  const __llvm_profile_data* src_data_end = src_data_start + src_header->NumData;
   const uint64_t* src_counters_start = reinterpret_cast<const uint64_t*>(src_data_end);
   uintptr_t src_counters_delta = src_header->CountersDelta;
 
@@ -180,7 +186,7 @@ uint8_t* MergeProfiles(uint8_t* dst, const uint8_t* src, size_t size) {
     dst_data_start = reinterpret_cast<__llvm_profile_data*>(
         reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
 #endif
-  __llvm_profile_data* dst_data_end = dst_data_start + dst_header->DataSize;
+  __llvm_profile_data* dst_data_end = dst_data_start + dst_header->NumData;
   uint64_t* dst_counters_start = reinterpret_cast<uint64_t*>(dst_data_end);
   uintptr_t dst_counters_delta = dst_header->CountersDelta;
 

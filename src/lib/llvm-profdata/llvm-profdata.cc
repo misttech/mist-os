@@ -40,6 +40,12 @@ void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {}
 #include <cstdint>
 #include <cstring>
 
+// TODO(fxbug.dev/131696): names changed in the .inc file Handle both old and
+// new names by defining the old names as macros for the new ones. Remove these
+// after the toolchain rolls in the new .inc file version.
+#define DataSize NumData
+#define CountersSize NumCounters
+
 #include <profile/InstrProfData.inc>
 
 namespace {
@@ -244,9 +250,9 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
 
 [[gnu::const]] ProfRawHeader GetHeader(cpp20::span<const std::byte> build_id) {
   // These are used by the INSTR_PROF_RAW_HEADER initializers.
-  const uint64_t DataSize = ProfDataArray().size();
+  const uint64_t NumData = ProfDataArray().size();
   const uint64_t PaddingBytesBeforeCounters = 0;
-  const uint64_t CountersSize = ProfCountersData().size();
+  const uint64_t NumCounters = ProfCountersData().size();
   const uint64_t PaddingBytesAfterCounters = 0;
   const uint64_t NamesSize = NamesEnd - NamesBegin;
   auto __llvm_profile_get_magic = []() -> uint64_t { return kMagic; };
@@ -279,9 +285,9 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
   const ProfRawHeader header = GetHeader(build_id_);
 
   counters_offset_ = sizeof(header) + header.binary_ids_size() +
-                     (static_cast<size_t>(header.DataSize) * sizeof(__llvm_profile_data)) +
+                     (static_cast<size_t>(header.NumData) * sizeof(__llvm_profile_data)) +
                      static_cast<size_t>(header.PaddingBytesBeforeCounters);
-  counters_size_bytes_ = static_cast<size_t>(header.CountersSize) * sizeof(uint64_t);
+  counters_size_bytes_ = static_cast<size_t>(header.NumCounters) * sizeof(uint64_t);
   ZX_ASSERT(counters_size_bytes_ == ProfCountersData().size_bytes());
 
   size_bytes_ = counters_offset_ + counters_size_bytes_ +
