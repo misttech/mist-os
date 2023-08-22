@@ -186,7 +186,7 @@ group("tests") {
 }
 
 # NOTE: this group is for tests which need to transitively depend on a Fuchsia system image for
-# "e2e" testing of ffx behavior. These are included in `//buildbot/bundles/host` in order to prevent
+# "e2e" testing of ffx behavior. These are included in `//bundles/buildbot/host` in order to prevent
 # dep cycles.
 if (is_host) {
   group("host_tests") {
