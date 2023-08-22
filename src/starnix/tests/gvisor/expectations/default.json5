@@ -442,9 +442,6 @@
                 "PrctlTest.OrphansReparentedToSubreaper",
                 "PrctlTest.RootDumpability",
 
-                // priority_test
-                "SetpriorityTest.NicenessExposedViaProcfs",
-
                 // processes_test
                 "Processes.SetPGIDOfZombie",
 

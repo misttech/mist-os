@@ -738,7 +738,7 @@ impl DynamicFileSource for StatFile {
         let cutime: i64;
         let cstime: i64;
         let priority: i64 = 0;
-        let nice: i64 = 0;
+        let nice: i64;
         let num_threads: i64; // 20
         let itrealvalue: i64 = 0;
         let starttime: u64;
@@ -777,6 +777,7 @@ impl DynamicFileSource for StatFile {
         let command = task.command();
         comm = command.as_c_str().to_str().unwrap_or("unknown");
         state = task.state_code().code_char();
+        nice = 20 - task.read().priority as i64;
 
         {
             let thread_group = task.thread_group.read();
