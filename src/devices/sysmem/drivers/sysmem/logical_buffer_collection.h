@@ -703,6 +703,11 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   bool done_with_group_child_selection_ = false;
 
+  // This can become true before initial allocation if waiting on secure allocators at least once
+  // is/was necessary. Once this becomes true it stays true, even after this collection is no longer
+  // currently waiting on secure allocators.
+  //
+  // This field helps avoid creation of extra child inspect nodes when the wait is over.
   bool waiting_for_secure_allocators_ready_ = false;
 };
 
