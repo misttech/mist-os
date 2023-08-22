@@ -110,7 +110,11 @@ template("fuchsia_component_manifest") {
 
     # Add the manifest
     resource(manifest_resource_target) {
-      forward_variables_from(invoker, [ "data_deps" ])
+      forward_variables_from(invoker,
+                             [
+                               "data_deps",
+                               "testonly",
+                             ])
       sources = get_target_outputs(":${invoker.target_name}")
       outputs = [ "meta/$manifest_name" ]
       visibility = [ ":*" ]
