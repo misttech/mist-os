@@ -1244,6 +1244,14 @@ from infra builds, and later inspection.
 
 From //build/toolchain/rbe.gni:180
 
+### compress_debuginfo
+
+Enable compression of debug sections.
+
+**Current value (from the default):** `"none"`
+
+From //build/config/compiler.gni:85
+
 ### config_example_cpp_greeting
 
 Set this in args.gn to override the greeting emitted by this example.
