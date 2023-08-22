@@ -265,6 +265,10 @@
                 // These tests were updated and no longer pass.
                 "stdio.popen_return_value_signal",
                 "stdio_nofortify.popen_return_value_signal",
+
+                // This test is skipped on not riscv architecture, and the
+                // tooling detect this as a failure.
+                "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
             ],
         },
     ],
