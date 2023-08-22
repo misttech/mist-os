@@ -11,7 +11,6 @@ use {
     crate::{
         builtin::{capability::BuiltinCapability, runner::BuiltinRunnerFactory},
         model::resolver::{self, Resolver},
-        runner::{builtin::RemoteRunner, Runner},
     },
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
@@ -146,34 +145,23 @@ impl BuiltinCapability for RealmBuilderResolver {
     }
 }
 
-pub struct RealmBuilderRunner {
-    remote_runner: RemoteRunner,
-}
+pub struct RealmBuilderRunnerFactory {}
 
-impl RealmBuilderRunner {
-    /// Create a new RealmBuilderRunner. This opens connections to the needed protocols
-    /// in the namespace.
-    pub fn new() -> Result<RealmBuilderRunner, Error> {
-        let runner_proxy = fclient::connect_to_protocol_at_path::<fcrunner::ComponentRunnerMarker>(
-            "/svc/fuchsia.component.runner.RealmBuilder",
-        )?;
-        Ok(RealmBuilderRunner { remote_runner: RemoteRunner::new(runner_proxy) })
+impl RealmBuilderRunnerFactory {
+    pub fn new() -> Self {
+        RealmBuilderRunnerFactory {}
     }
 }
 
-impl BuiltinRunnerFactory for RealmBuilderRunner {
-    fn get_scoped_runner(self: Arc<Self>, _checker: ScopedPolicyChecker) -> Arc<dyn Runner> {
-        self.clone()
-    }
-}
-
-#[async_trait]
-impl Runner for RealmBuilderRunner {
-    async fn start(
-        &self,
-        start_info: fcrunner::ComponentStartInfo,
-        server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
+impl BuiltinRunnerFactory for RealmBuilderRunnerFactory {
+    fn get_scoped_runner(
+        self: Arc<Self>,
+        _checker: ScopedPolicyChecker,
+        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
     ) {
-        self.remote_runner.start(start_info, server_end).await;
+        let _ = fclient::connect_channel_to_protocol_at_path(
+            server_end.into_channel(),
+            "/svc/fuchsia.component.runner.RealmBuilder",
+        );
     }
 }

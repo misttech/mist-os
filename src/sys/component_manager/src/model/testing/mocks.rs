@@ -387,12 +387,25 @@ impl MockRunner {
 }
 
 impl BuiltinRunnerFactory for MockRunner {
-    fn get_scoped_runner(self: Arc<Self>, checker: ScopedPolicyChecker) -> Arc<dyn Runner> {
+    fn get_scoped_runner(
+        self: Arc<Self>,
+        checker: ScopedPolicyChecker,
+        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
+    ) {
         {
             let mut state = self.inner.lock().unwrap();
             state.last_checker = Some(checker);
         }
-        self
+        let mut stream = server_end.into_stream().expect("should not fail to create stream");
+        let runner = self.clone();
+        fasync::Task::spawn(async move {
+            while let Ok(Some(request)) = stream.try_next().await {
+                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
+                    request;
+                runner.start(start_info, controller).await;
+            }
+        })
+        .detach();
     }
 }
 

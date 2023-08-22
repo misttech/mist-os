@@ -8,7 +8,6 @@ use {
             error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
-        runner::Runner,
     },
     ::routing::{
         capability_source::InternalCapability, config::SecurityPolicy, policy::ScopedPolicyChecker,
@@ -19,7 +18,6 @@ use {
     cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::stream::TryStreamExt,
     std::{
         path::PathBuf,
         sync::{Arc, Weak},
@@ -30,23 +28,29 @@ use {
 /// ScopedPolicyChecker for the realm of the component being started, so that runners can enforce
 /// security policy.
 pub trait BuiltinRunnerFactory: Send + Sync {
-    fn get_scoped_runner(self: Arc<Self>, checker: ScopedPolicyChecker) -> Arc<dyn Runner>;
+    /// Get a connection to a scoped runner by pipelining a
+    /// `fuchsia.component.runner/ComponentRunner` server endpoint.
+    fn get_scoped_runner(
+        self: Arc<Self>,
+        checker: ScopedPolicyChecker,
+        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
+    );
 }
 
 /// Provides a hook for routing built-in runners to realms.
 pub struct BuiltinRunner {
     name: Name,
-    runner: Arc<dyn BuiltinRunnerFactory>,
+    factory: Arc<dyn BuiltinRunnerFactory>,
     security_policy: Arc<SecurityPolicy>,
 }
 
 impl BuiltinRunner {
     pub fn new(
         name: Name,
-        runner: Arc<dyn BuiltinRunnerFactory>,
+        factory: Arc<dyn BuiltinRunnerFactory>,
         security_policy: Arc<SecurityPolicy>,
     ) -> Self {
-        Self { name, runner, security_policy }
+        Self { name, factory, security_policy }
     }
 
     /// Construct a `HooksRegistration` that will route our runner as a framework capability.
@@ -78,9 +82,9 @@ impl Hook for BuiltinRunner {
                         self.security_policy.clone(),
                         target_moniker.clone(),
                     );
-                    let runner = self.runner.clone().get_scoped_runner(checker);
+                    let runner = self.factory.clone();
                     *capability_provider.lock().await =
-                        Some(Box::new(RunnerCapabilityProvider::new(runner)));
+                        Some(Box::new(RunnerCapabilityProvider::new(runner, checker)));
                 }
             }
         }
@@ -92,12 +96,13 @@ impl Hook for BuiltinRunner {
 /// as is required by the capability routing code.
 #[derive(Clone)]
 struct RunnerCapabilityProvider {
-    runner: Arc<dyn Runner>,
+    factory: Arc<dyn BuiltinRunnerFactory>,
+    checker: ScopedPolicyChecker,
 }
 
 impl RunnerCapabilityProvider {
-    pub fn new(runner: Arc<dyn Runner>) -> Self {
-        RunnerCapabilityProvider { runner }
+    fn new(factory: Arc<dyn BuiltinRunnerFactory>, checker: ScopedPolicyChecker) -> Self {
+        RunnerCapabilityProvider { factory, checker }
     }
 }
 
@@ -105,26 +110,13 @@ impl RunnerCapabilityProvider {
 impl CapabilityProvider for RunnerCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_group: TaskGroup,
+        _task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), CapabilityProviderError> {
-        let runner = Arc::clone(&self.runner);
         let server_end = channel::take_channel(server_end);
-        let mut stream = ServerEnd::<fcrunner::ComponentRunnerMarker>::new(server_end)
-            .into_stream()
-            .map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                // Keep handling requests until the stream closes.
-                while let Ok(Some(request)) = stream.try_next().await {
-                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                        request;
-                    runner.start(start_info, controller).await;
-                }
-            })
-            .await;
+        self.factory.get_scoped_runner(self.checker, server_end.into());
         Ok(())
     }
 }
@@ -240,7 +232,10 @@ mod tests {
         // target URL.
         let mock_runner = Arc::new(MockRunner::new());
         mock_runner.add_failing_url("xxx://failing");
-        let provider = Box::new(RunnerCapabilityProvider { runner: mock_runner });
+        let policy = Arc::new(SecurityPolicy::default());
+        let moniker = Moniker::try_from(vec!["foo"]).unwrap();
+        let checker = ScopedPolicyChecker::new(policy, moniker);
+        let provider = Box::new(RunnerCapabilityProvider { factory: mock_runner, checker });
 
         // Open a connection to the provider.
         let (client, server) = fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>()?;

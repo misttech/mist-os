@@ -26,8 +26,8 @@ use {
             power_resource::PowerResource,
             process_launcher::ProcessLauncherSvc,
             realm_builder::{
-                RealmBuilderResolver, RealmBuilderRunner, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
-                SCHEME as REALM_BUILDER_SCHEME,
+                RealmBuilderResolver, RealmBuilderRunnerFactory,
+                RUNNER_NAME as REALM_BUILDER_RUNNER_NAME, SCHEME as REALM_BUILDER_SCHEME,
             },
             root_job::{RootJob, ROOT_JOB_CAPABILITY_NAME, ROOT_JOB_FOR_INSPECT_CAPABILITY_NAME},
             root_resource::RootResource,
@@ -266,7 +266,7 @@ impl BuiltinEnvironmentBuilder {
             fidl_fuchsia_component_internal::RealmBuilderResolverAndRunner::Namespace => {
                 self.runners.push((
                     REALM_BUILDER_RUNNER_NAME.parse().unwrap(),
-                    Arc::new(RealmBuilderRunner::new()?),
+                    Arc::new(RealmBuilderRunnerFactory::new()),
                 ));
                 Some(register_realm_builder_resolver(&mut self.resolvers)?)
             }
