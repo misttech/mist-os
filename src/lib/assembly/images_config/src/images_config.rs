@@ -435,10 +435,10 @@ impl ImagesConfig {
                         }));
                         filesystem_names.push("blob".to_string());
                     }
-                    if let Some(pfc::ReservedFvmVolumeConfig { reserved_bytes }) = fvm.reserved {
+                    if let Some(pfc::ReservedFvmVolumeConfig { reserved_slices }) = fvm.reserved {
                         filesystems.push(FvmFilesystem::Reserved(Reserved {
                             name: "internal".into(),
-                            slices: reserved_bytes,
+                            slices: reserved_slices,
                         }));
                         filesystem_names.push("internal".to_string());
                     }
@@ -672,7 +672,7 @@ mod tests {
                     data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
                 }),
                 blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
-                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_bytes: 7 }),
+                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
             }),
         };
 
@@ -766,7 +766,7 @@ mod tests {
                     data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
                 }),
                 blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
-                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_bytes: 7 }),
+                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
             }),
         };
 
