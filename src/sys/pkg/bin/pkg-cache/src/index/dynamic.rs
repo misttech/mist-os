@@ -8,6 +8,7 @@ use {
     fuchsia_merkle::Hash,
     fuchsia_pkg::PackagePath,
     fuchsia_zircon as zx,
+    futures::StreamExt as _,
     std::{
         collections::{HashMap, HashSet},
         convert::TryInto,
@@ -15,6 +16,9 @@ use {
     system_image::CachePackages,
     tracing::{error, warn},
 };
+
+/// Concurrency limit when checking which cache packages are resident on boot.
+const CACHE_PACKAGE_LOADING_CONCURRENCY: usize = 1000;
 
 #[derive(Debug, Default)]
 pub struct DynamicIndex {
@@ -159,12 +163,12 @@ impl DynamicIndex {
     }
 
     /// Notifies dynamic index that the given package's meta far is now present in blobfs,
-    /// providing the meta far's internal name and set of content blobs it references.
+    /// providing the meta far's internal name. The content and subpackage blobs should be added by
+    /// calls to `add_blobs`.
     pub fn fulfill_meta_far(
         &mut self,
         package_hash: Hash,
         package_path: PackagePath,
-        required_blobs: HashSet<Hash>,
     ) -> Result<(), FulfillNotNeededBlobError> {
         if let Some(wrong_state) = match self.packages.get(&package_hash).map(|pwi| &pwi.package) {
             Some(Package::Pending) => None,
@@ -175,7 +179,10 @@ impl DynamicIndex {
             return Err(FulfillNotNeededBlobError { hash: package_hash, state: wrong_state });
         }
 
-        self.add_package(package_hash, Package::WithMetaFar { path: package_path, required_blobs });
+        self.add_package(
+            package_hash,
+            Package::WithMetaFar { path: package_path, required_blobs: HashSet::new() },
+        );
 
         Ok(())
     }
@@ -283,65 +290,80 @@ pub async fn load_cache_packages(
     // This function is called before anything writes to or deletes from blobfs, so if it needs
     // to be sped up, it might be possible to:
     //   1. get the list of all available blobs with `blobfs.list_known_blobs()`
-    //   2. for each cache package, check the list for the meta.far and the necessary content
-    //      blobs (obtained with `RootDir::external_file_hashes()`)
+    //   2. replace `filter_to_missing_blobs` with a fn that takes this list of blobs
     // This alternate approach requires that blobfs responds to `fuchsia.io/Directory.ReadDirents`
     // with *only* blobs that are readable, i.e. blobs for which the `USER_0` signal is set (which
     // is currently checked per-package per-blob by `blobfs.filter_to_missing_blobs()`). Would need
     // to confirm with the storage team that blobfs meets this requirement.
     // TODO(fxbug.dev/90656): ensure non-fuchsia.com URLs are correctly handled in dynamic index.
-    for url in cache_packages.contents() {
-        let hash = url.hash();
-        let path = PackagePath::from_name_and_variant(
-            url.name().clone(),
-            url.variant().unwrap_or(&fuchsia_pkg::PackageVariant::zero()).clone(),
-        );
-        let required_blobs = match package_directory::RootDir::new(blobfs.clone(), hash).await {
-            Ok(root_dir) => match root_dir.path().await {
-                Ok(path_from_far) => {
-                    if path_from_far != path {
-                        error!(
-                            "load_cache_packages: path mismatch for {}, manifest: {}, far: {}",
-                            hash, path, path_from_far
+    let memoized_packages = async_lock::RwLock::new(HashMap::new());
+    // A stream of resident cache packages and all their required blobs.
+    let mut futures = futures::stream::iter(cache_packages.contents().map(|url| {
+        let (blobfs, memoized_packages) = (&blobfs, &memoized_packages);
+        async move {
+            let hash = url.hash();
+            // Find all required blobs (including subpackages).
+            match crate::required_blobs::find_required_blobs_recursive(
+                blobfs,
+                &hash,
+                &memoized_packages,
+                crate::required_blobs::ErrorStrategy::PropagateFailure,
+            )
+            .await
+            {
+                Ok(blobs) => {
+                    // If no required blobs are missing, yield this package for later activation.
+                    if blobfs.filter_to_missing_blobs(&blobs).await.is_empty() {
+                        let path = PackagePath::from_name_and_variant(
+                            url.name().clone(),
+                            url.variant().unwrap_or(&fuchsia_pkg::PackageVariant::zero()).clone(),
                         );
-                        continue;
+                        Some((hash, path, blobs))
+                    } else {
+                        None
                     }
-                    root_dir.external_file_hashes().copied().collect::<HashSet<_>>()
                 }
+                Err(crate::required_blobs::FindRequiredBlobsError::CreateRootDir {
+                    source: package_directory::Error::MissingMetaFar,
+                    ..
+                }) => None,
                 Err(e) => {
                     error!(
-                        "load_cache_packages: obtaining path for {} {} failed: {:#}",
-                        hash,
-                        path,
-                        anyhow!(e)
+                        %url, "load_cache_packages: finding required blobs: {:#}", anyhow!(e)
                     );
-                    continue;
+                    None
                 }
-            },
-            Err(package_directory::Error::MissingMetaFar) => continue,
-            Err(e) => {
+            }
+        }
+    }))
+    .buffer_unordered(CACHE_PACKAGE_LOADING_CONCURRENCY);
+
+    while let Some(cache_package) = futures.next().await {
+        if let Some((hash, path, blobs)) = cache_package {
+            let () = index.start_install(hash);
+            if let Err(e) = index.fulfill_meta_far(hash, path) {
                 error!(
-                    "load_cache_packages: creating RootDir for {} {} failed: {:#}",
+                    "load_cache_packages: fulfill_meta_far of {} failed: {:#}",
                     hash,
-                    path,
                     anyhow!(e)
                 );
+                let () = index.cancel_install(&hash);
                 continue;
             }
-        };
-        if !blobfs.filter_to_missing_blobs(&required_blobs).await.is_empty() {
-            continue;
-        }
-        let () = index.start_install(hash);
-        if let Err(e) = index.fulfill_meta_far(hash, path, required_blobs) {
-            error!("load_cache_packages: fulfill_meta_far of {} failed: {:#}", hash, anyhow!(e));
-            let () = index.cancel_install(&hash);
-            continue;
-        }
-        if let Err(e) = index.complete_install(hash) {
-            error!("load_cache_packages: complete_install of {} failed: {:#}", hash, anyhow!(e));
-            let () = index.cancel_install(&hash);
-            continue;
+            if let Err(e) = index.add_blobs(hash, &blobs) {
+                error!("load_cache_packages: add_blobs of {} failed: {:#}", hash, anyhow!(e));
+                let () = index.cancel_install(&hash);
+                continue;
+            }
+            if let Err(e) = index.complete_install(hash) {
+                error!(
+                    "load_cache_packages: complete_install of {} failed: {:#}",
+                    hash,
+                    anyhow!(e)
+                );
+                let () = index.cancel_install(&hash);
+                continue;
+            }
         }
     }
 }
@@ -731,6 +753,23 @@ mod tests {
             .build()
             .await
             .unwrap();
+        let present_subpackage = PackageBuilder::new("present-sub")
+            .add_resource_at("present-sub-blob", &b"sub-contents-0"[..])
+            .build()
+            .await
+            .unwrap();
+        let present_superpackage = PackageBuilder::new("present-super")
+            .add_subpackage("present-child", &present_subpackage)
+            .add_resource_at("present-blob2", &b"contents2"[..])
+            .build()
+            .await
+            .unwrap();
+        let missing_subpackage = PackageBuilder::new("missing-sub").build().await.unwrap();
+        let has_missing_subpackage = PackageBuilder::new("has-missing-subpackage")
+            .add_subpackage("missing-child", &missing_subpackage)
+            .build()
+            .await
+            .unwrap();
 
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         let blobfs_dir = blobfs.root_dir().unwrap();
@@ -739,11 +778,14 @@ mod tests {
         missing_content_blob.write_to_blobfs(&blobfs).await;
         missing_meta_far.write_to_blobfs(&blobfs).await;
         present_package1.write_to_blobfs(&blobfs).await;
+        present_superpackage.write_to_blobfs(&blobfs).await;
+        has_missing_subpackage.write_to_blobfs(&blobfs).await;
 
         for (hash, _) in missing_content_blob.contents().1 {
             blobfs_dir.remove_file(hash.to_string()).unwrap();
         }
         blobfs_dir.remove_file(missing_meta_far.contents().0.merkle.to_string()).unwrap();
+        blobfs_dir.remove_file(missing_subpackage.contents().0.merkle.to_string()).unwrap();
 
         let cache_packages = CachePackages::from_entries(vec![
             PinnedAbsolutePackageUrl::new(
@@ -770,6 +812,18 @@ mod tests {
                 Some(fuchsia_url::PackageVariant::zero()),
                 *present_package1.hash(),
             ),
+            PinnedAbsolutePackageUrl::new(
+                "fuchsia-pkg://fuchsia.test".parse().unwrap(),
+                "present-super".parse().unwrap(),
+                Some(fuchsia_url::PackageVariant::zero()),
+                *present_superpackage.hash(),
+            ),
+            PinnedAbsolutePackageUrl::new(
+                "fuchsia-pkg://fuchsia.test".parse().unwrap(),
+                "has-missing-subpackage".parse().unwrap(),
+                Some(fuchsia_url::PackageVariant::zero()),
+                *has_missing_subpackage.hash(),
+            ),
         ]);
 
         let mut dynamic_index =
@@ -785,12 +839,21 @@ mod tests {
             path: "present1/0".parse().unwrap(),
             required_blobs: present_package1.contents().1.into_keys().collect(),
         };
+        let present_super = Package::Active {
+            path: "present-super/0".parse().unwrap(),
+            required_blobs: present_superpackage
+                .content_and_subpackage_blobs()
+                .unwrap()
+                .into_keys()
+                .collect(),
+        };
 
         assert_eq!(
             dynamic_index.packages(),
             hashmap! {
                 *present_package0.hash() => present0,
-                *present_package1.hash() => present1
+                *present_package1.hash() => present1,
+                *present_superpackage.hash() => present_super,
             }
         );
         assert_eq!(
@@ -798,6 +861,7 @@ mod tests {
             hashmap! {
                 "present0/0".parse().unwrap() => *present_package0.hash(),
                 "present1/0".parse().unwrap() => *present_package1.hash(),
+                "present-super/0".parse().unwrap() => *present_superpackage.hash(),
             }
         );
         assert_eq!(
@@ -807,6 +871,7 @@ mod tests {
                 .unwrap()
                 .into_iter()
                 .chain(present_package1.list_blobs().unwrap())
+                .chain(present_superpackage.list_blobs().unwrap())
                 .collect()
         );
     }
@@ -823,17 +888,14 @@ mod tests {
         );
         dynamic_index.start_install(hash);
 
-        let blob_hash = Hash::from([3; 32]);
-
-        let () =
-            dynamic_index.fulfill_meta_far(hash, path.clone(), hashset! { blob_hash }).unwrap();
+        let () = dynamic_index.fulfill_meta_far(hash, path.clone()).unwrap();
 
         assert_eq!(
             dynamic_index.packages(),
             hashmap! {
                 hash => Package::WithMetaFar {
                     path,
-                    required_blobs: hashset! { blob_hash },
+                    required_blobs: HashSet::new(),
                 }
             }
         );
@@ -846,8 +908,16 @@ mod tests {
         let mut index = DynamicIndex::new(inspector.root().create_child("index"));
 
         assert_matches!(
-            index.fulfill_meta_far(Hash::from([2; 32]), PackagePath::from_name_and_variant("unknown".parse().unwrap(), "0".parse().unwrap()), hashset!{}),
-            Err(FulfillNotNeededBlobError{hash, state}) if hash == Hash::from([2; 32]) && state == "missing"
+            index
+                .fulfill_meta_far(
+                    Hash::from([2; 32]),
+                    PackagePath::from_name_and_variant(
+                        "unknown".parse().unwrap(),
+                        "0".parse().unwrap()
+                    )
+                ),
+            Err(FulfillNotNeededBlobError{hash, state})
+                if hash == Hash::from([2; 32]) && state == "missing"
         );
     }
 
@@ -861,13 +931,11 @@ mod tests {
             "with-meta-far-pkg".parse().unwrap(),
             "0".parse().unwrap(),
         );
-        let required_blobs = hashset! { Hash::from([3; 32]), Hash::from([4; 32]) };
-        let package =
-            Package::WithMetaFar { path: path.clone(), required_blobs: required_blobs.clone() };
+        let package = Package::WithMetaFar { path: path.clone(), required_blobs: HashSet::new() };
         index.add_package(hash, package);
 
         assert_matches!(
-            index.fulfill_meta_far(hash, path, required_blobs),
+            index.fulfill_meta_far(hash, path),
             Err(FulfillNotNeededBlobError{hash, state}) if hash == Hash::from([2; 32]) && state == "WithMetaFar"
         );
     }
@@ -880,14 +948,13 @@ mod tests {
         let hash = Hash::from([2; 32]);
         let path =
             PackagePath::from_name_and_variant("active".parse().unwrap(), "0".parse().unwrap());
-        let required_blobs = hashset! { Hash::from([3; 32]), Hash::from([4; 32]) };
-        let package =
-            Package::Active { path: path.clone(), required_blobs: required_blobs.clone() };
+        let package = Package::Active { path: path.clone(), required_blobs: HashSet::new() };
         index.add_package(hash, package);
 
         assert_matches!(
-            index.fulfill_meta_far(hash, path, required_blobs),
-            Err(FulfillNotNeededBlobError{hash, state}) if hash == Hash::from([2; 32]) && state == "Active"
+            index.fulfill_meta_far(hash, path),
+            Err(FulfillNotNeededBlobError{hash, state})
+                if hash == Hash::from([2; 32]) && state == "Active"
         );
     }
 
@@ -901,18 +968,16 @@ mod tests {
             "0".parse().unwrap(),
         );
         dynamic_index.start_install(hash);
-        let () = dynamic_index
-            .fulfill_meta_far(hash, path.clone(), hashset! { Hash::from([1; 32]) })
-            .unwrap();
+        let () = dynamic_index.fulfill_meta_far(hash, path.clone()).unwrap();
 
-        let () = dynamic_index.add_blobs(hash, &hashset! { Hash::from([2; 32])}).unwrap();
+        let () = dynamic_index.add_blobs(hash, &HashSet::from([Hash::from([2; 32])])).unwrap();
 
         assert_eq!(
             dynamic_index.packages(),
             hashmap! {
                 hash => Package::WithMetaFar {
                     path,
-                    required_blobs: hashset! { Hash::from([1; 32]), Hash::from([2; 32]) },
+                    required_blobs: HashSet::from([Hash::from([2; 32])]),
                 }
             }
         );
