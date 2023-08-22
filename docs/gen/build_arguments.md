@@ -3057,7 +3057,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:109
+From //build/bazel/legacy_ninja_build_outputs.gni:113
 
 ### extra_package_labels
 
@@ -6569,31 +6569,72 @@ From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:30
 
 ### pw_toolchain_ARM_NONE_EABI_PREFIX
 
-This flag allows you to specify the root directory of the ARM GCC tools to
-to use when compiling with an arm-none-eabi toolchain. This is useful for
-debugging toolchain-related issues, or for building with an
-externally-provided toolchain.
+This flag allows you to specify a prefix for ARM GCC tools use when
+compiling with an arm-none-eabi toolchain. This is useful for debugging
+toolchain-related issues, or for building with an externally-provided
+toolchain.
+
+Pigweed toolchains should NOT override this variable so projects or users
+can control it via `.gn` or by setting it as a regular gn argument (e.g.
+`gn gen --args='pw_toolchain_ARM_NONE_EABI_PREFIX=/path/to/my-'`).
+
+Examples:
+  pw_toolchain_ARM_NONE_EABI_PREFIX = ""
+  command: "arm-none-eabi-gcc" (from PATH)
+
+  pw_toolchain_ARM_NONE_EABI_PREFIX = "my-"
+  command: "my-arm-none-eabi-gcc" (from PATH)
+
+  pw_toolchain_ARM_NONE_EABI_PREFIX = "/bin/my-"
+  command: "/bin/my-arm-none-eabi-gcc" (absolute path)
+
+  pw_toolchain_ARM_NONE_EABI_PREFIX = "//environment/gcc_next/"
+  command: "../environment/gcc_next/arm-none-eabi-gcc" (relative path)
+
+GN templates should use `arm_gcc_toolchain_tools.*` to get the intended
+command string rather than relying directly on
+pw_toolchain_ARM_NONE_EABI_PREFIX.
 
 If the prefix begins with "//", it will be rebased to be relative to the
 root build directory.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_toolchain/arm_gcc/toolchains.gni:32
+From //third_party/pigweed/src/pw_toolchain/arm_gcc/toolchains.gni:53
 
 ### pw_toolchain_CLANG_PREFIX
 
-This flag allows you to specify the root directory of the clang, clang++,
+This flag allows you to specify a prefix to use for clang, clang++,
 and llvm-ar binaries to use when compiling with a clang-based toolchain.
 This is useful for debugging toolchain-related issues by building with an
 externally-provided toolchain.
+
+Pigweed toolchains should NOT override this variable so projects or users
+can control it via `.gn` or by setting it as a regular gn argument (e.g.
+`gn gen --args='pw_toolchain_CLANG_PREFIX=/path/to/my-llvm-'`).
+
+Examples:
+  pw_toolchain_CLANG_PREFIX = ""
+  command: "clang" (from PATH)
+
+  pw_toolchain_CLANG_PREFIX = "my-"
+  command: "my-clang" (from PATH)
+
+  pw_toolchain_CLANG_PREFIX = "/bin/my-"
+  command: "/bin/my-clang" (absolute path)
+
+  pw_toolchain_CLANG_PREFIX = "//environment/clang_next/"
+  command: "../environment/clang_next/clang" (relative path)
+
+GN templates should use `pw_toolchain_clang_tools.*` to get the intended
+command string rather than relying directly on pw_toolchain_CLANG_PREFIX.
 
 If the prefix begins with "//", it will be rebased to be relative to the
 root build directory.
 
 **Current value (from the default):** `"//prebuilt/third_party/bin/"`
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:36
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:56
 
 ### pw_toolchain_COVERAGE_ENABLED
 
@@ -6644,14 +6685,17 @@ From //third_party/pigweed/src/pw_toolchain/rbe.gni:26
 
 ### pw_toolchain_RUST_PREFIX
 
-This flag allows you to specify the root directory of the rustc binary.
+This flag allows you to specify a prefix for rustc.
+
+This follows the same rules as pw_toolchain_CLANG_PREFIX, see above for
+more information.
 
 If the prefix begins with "//", it will be rebased to be relative to the
 root build directory.
 
 **Current value (from the default):** `"//prebuilt/third_party/bin/"`
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:42
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:65
 
 ### pw_toolchain_SANITIZERS
 
