@@ -69,7 +69,10 @@ const (
 	llvmProfileExtension = ".profraw"
 	llvmProfileSinkType  = "llvm-profile"
 
-	testStartedTimeout = 5 * time.Second
+	// This needs to be long enough to allow for significant serial RTT during
+	// startup shortly after booting. We've seen a serial RTT ~8s, so maybe 15s
+	// will be enough margin above ~8s.
+	testStartedTimeout = 15 * time.Second
 
 	// The name of the test to associate early boot data sinks with.
 	earlyBootSinksTestName = "early_boot_sinks"
