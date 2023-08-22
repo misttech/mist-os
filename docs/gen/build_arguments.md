@@ -8178,14 +8178,6 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 From //zircon/kernel/params.gni:132
 
-### use_flatland_by_default
-
-If true, Flatland is the default graphics protocol in Scenic.
-
-**Current value (from the default):** `true`
-
-From //src/ui/scenic/build_args.gni:7
-
 ### use_gigaboot
 
 Build the gigaboot bootloader.
