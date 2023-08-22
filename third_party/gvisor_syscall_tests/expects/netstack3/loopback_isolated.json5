@@ -17,6 +17,8 @@
             matchers: [
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Any",
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Loopback",
+                // TODO(https://fxbug.dev/132600): Deflake and unskip.
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
             ],
         },
         {
