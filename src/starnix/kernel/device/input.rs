@@ -99,7 +99,7 @@ pub struct InspectStatus {
     fidl_events_converted_count: fuchsia_inspect::UintProperty,
 
     /// The number of uapi::input_events generated from TouchEvents.
-    _uapi_events_generated_count: fuchsia_inspect::UintProperty,
+    uapi_events_generated_count: fuchsia_inspect::UintProperty,
 
     /// The number of uapi::input_events read from this touch file by external process.
     _uapi_events_read_count: fuchsia_inspect::UintProperty,
@@ -120,7 +120,7 @@ impl InspectStatus {
             _inspect_node: node,
             fidl_events_received_count,
             fidl_events_converted_count,
-            _uapi_events_generated_count: uapi_events_generated_count,
+            uapi_events_generated_count,
             _uapi_events_read_count: uapi_events_read_count,
             health_node,
         }
@@ -132,6 +132,10 @@ impl InspectStatus {
 
     fn count_converted_events(&self, count: u64) {
         self.fidl_events_converted_count.add(count);
+    }
+
+    fn count_generated_events(&self, count: u64) {
+        self.uapi_events_generated_count.add(count);
     }
 }
 
@@ -318,11 +322,14 @@ impl InputFile {
                                 // but the end result should be a single vector of UAPI events,
                                 // not a `Vec<Vec<uapi::input_event>>`.
                                 let new_events = converted_events.flat_map(make_uapi_events);
+                                let num_generated_events: u64 =
+                                    new_events.clone().count().try_into().unwrap();
                                 let mut inner = slf.inner.lock();
                                 match &inner.inspect_status {
                                     Some(inspect_status) => {
                                         inspect_status.count_received_events(num_received_events);
                                         inspect_status.count_converted_events(num_converted_events);
+                                        inspect_status.count_generated_events(num_generated_events);
                                     }
                                     None => (),
                                 }
@@ -1443,12 +1450,20 @@ mod test {
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
 
-        // Send 5 TouchEvents with pointer sample to proxy.
-        // These should be `received` and `converted`
+        // Send 5 TouchEvents with pointer sample to proxy, these should be received and converted
+        // Add/Remove events generate 5 uapi events each. Change events generate 3 uapi events each.
         match touch_source_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
                 assert_matches!(responses.as_slice(), [_, _]);
-                responder.send(&vec![make_touch_event(); 5]).expect("failure sending Watch reply");
+                responder
+                    .send(&vec![
+                        make_touch_event_with_phase(EventPhase::Add),
+                        make_touch_event(),
+                        make_touch_event(),
+                        make_touch_event(),
+                        make_touch_event_with_phase(EventPhase::Remove),
+                    ])
+                    .expect("failure sending Watch reply");
             }
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
@@ -1465,7 +1480,7 @@ mod test {
             touch_input_file: {
                 fidl_events_received_count: 7u64,
                 fidl_events_converted_count: 5u64,
-                uapi_events_generated_count: 0u64,
+                uapi_events_generated_count: 19u64,
                 uapi_events_read_count: 0u64,
                 "fuchsia.inspect.Health": {
                     status: "STARTING_UP",
