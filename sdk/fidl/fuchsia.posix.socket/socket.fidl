@@ -18,6 +18,8 @@ const USER_SIGNAL_2 uint32 = 0x04000000;
 const USER_SIGNAL_3 uint32 = 0x08000000;
 const USER_SIGNAL_4 uint32 = 0x10000000;
 const USER_SIGNAL_5 uint32 = 0x20000000;
+@available(added=14)
+const USER_SIGNAL_6 uint32 = 0x40000000;
 
 const SIGNAL_DATAGRAM_INCOMING uint32 = USER_SIGNAL_0;
 const SIGNAL_DATAGRAM_OUTGOING uint32 = USER_SIGNAL_1;
@@ -27,6 +29,11 @@ const SIGNAL_DATAGRAM_SHUTDOWN_WRITE uint32 = USER_SIGNAL_5;
 
 const SIGNAL_STREAM_INCOMING uint32 = USER_SIGNAL_0;
 const SIGNAL_STREAM_CONNECTED uint32 = USER_SIGNAL_3;
+/// Asserted on a new stream socket obtained through `Provider.StreamSocket`
+/// until either `BaseNetworkSocket.Connect` or `StreamSocket.Listen` is called
+/// on it.
+@available(added=14)
+const SIGNAL_STREAM_UNCONNECTED uint32 = USER_SIGNAL_6;
 
 /// Socket shutdown mode.
 type ShutdownMode = strict bits : uint16 {

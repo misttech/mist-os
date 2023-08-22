@@ -29,6 +29,9 @@
 #if defined(__Fuchsia__)
 #include <fidl/fuchsia.posix.socket/cpp/wire.h>
 #include <lib/fdio/fd.h>
+#include <lib/fdio/fdio.h>
+#include <lib/fdio/unsafe.h>
+#include <zircon/syscalls.h>
 
 #include "src/lib/testing/predicates/status.h"
 #endif
@@ -2169,5 +2172,94 @@ TEST_P(IOMethodTest, NullptrFaultSTREAM) {
 
 INSTANTIATE_TEST_SUITE_P(IOMethodTests, IOMethodTest, testing::ValuesIn(kAllIOMethods),
                          [](const auto info) { return info.param.IOMethodToString(); });
+
+#if defined(__Fuchsia__)
+#if __Fuchsia_API_level__ >= 14
+TEST(NetStreamTest, WaitBeginBeforeConnect) {
+  constexpr uint32_t kUnconnectedPollSignals = POLLOUT | POLLHUP;
+
+  struct {
+    zx_wait_item_t listener_read;
+    zx_wait_item_t listener_write;
+    zx_wait_item_t client_read;
+    zx_wait_item_t client_write;
+  } items = {};
+  constexpr size_t kItemsCount = sizeof(items) / sizeof(zx_wait_item_t);
+  fbl::unique_fd listener_fd, client_fd;
+  fdio_t *listener_io, *client_io;
+
+  auto setup = [](fbl::unique_fd& fd, fdio_t*& io, zx_wait_item_t& read_item,
+                  zx_wait_item_t& write_item) {
+    ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
+    ASSERT_NE(io = fdio_unsafe_fd_to_io(fd.get()), nullptr);
+    fdio_unsafe_wait_begin(io, POLLIN, &read_item.handle, &read_item.waitfor);
+    ASSERT_NE(read_item.handle, ZX_HANDLE_INVALID);
+    ASSERT_NE(read_item.waitfor, 0u);
+    fdio_unsafe_wait_begin(io, POLLOUT, &write_item.handle, &write_item.waitfor);
+    ASSERT_NE(write_item.handle, ZX_HANDLE_INVALID);
+    ASSERT_NE(write_item.waitfor, 0u);
+  };
+  auto cleanup_io = [](fdio_t*& client_io) {
+    fdio_unsafe_release(client_io);
+    client_io = NULL;
+  };
+  ASSERT_NO_FATAL_FAILURE(
+      setup(listener_fd, listener_io, items.listener_read, items.listener_write));
+  auto _listener_cleanup_io = fit::defer([&listener_io, cleanup_io]() { cleanup_io(listener_io); });
+  ASSERT_NO_FATAL_FAILURE(setup(client_fd, client_io, items.client_read, items.client_write));
+  auto _client_cleanup_io = fit::defer([&client_io, cleanup_io]() { cleanup_io(client_io); });
+
+  auto check_wait_end = [](fdio_t* io, zx_signals_t got_signals, uint32_t expected_events) {
+    uint32_t got_events;
+    fdio_unsafe_wait_end(io, got_signals, &got_events);
+    ASSERT_EQ(got_events, expected_events);
+  };
+  ASSERT_EQ(zx_object_wait_many(reinterpret_cast<zx_wait_item_t*>(&items), kItemsCount,
+                                ZX_TIME_INFINITE_PAST),
+            ZX_OK);
+  ASSERT_NO_FATAL_FAILURE(
+      check_wait_end(listener_io, items.listener_read.pending, kUnconnectedPollSignals));
+  ASSERT_NO_FATAL_FAILURE(
+      check_wait_end(client_io, items.client_read.pending, kUnconnectedPollSignals));
+  ASSERT_NO_FATAL_FAILURE(
+      check_wait_end(listener_io, items.listener_write.pending, kUnconnectedPollSignals));
+  ASSERT_NO_FATAL_FAILURE(
+      check_wait_end(client_io, items.client_write.pending, kUnconnectedPollSignals));
+
+  sockaddr_in addr = LoopbackSockaddrV4(0);
+  ASSERT_EQ(bind(listener_fd.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+      << strerror(errno);
+  socklen_t addrlen = sizeof(addr);
+  ASSERT_EQ(getsockname(listener_fd.get(), reinterpret_cast<sockaddr*>(&addr), &addrlen), 0)
+      << strerror(errno);
+  ASSERT_EQ(addrlen, sizeof(addr));
+  ASSERT_EQ(listen(listener_fd.get(), 0), 0) << strerror(errno);
+  ASSERT_EQ(connect(client_fd.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+      << strerror(errno);
+  // Wait for the listener to have a socket ready to be accepted then poll all
+  // the wait items.
+  ASSERT_EQ(zx_object_wait_many(&items.listener_read, 1, ZX_TIME_INFINITE), ZX_OK);
+  ASSERT_EQ(zx_object_wait_many(reinterpret_cast<zx_wait_item_t*>(&items), kItemsCount,
+                                ZX_TIME_INFINITE_PAST),
+            ZX_OK);
+  ASSERT_NO_FATAL_FAILURE(check_wait_end(listener_io, items.listener_read.pending, POLLIN));
+  ASSERT_NO_FATAL_FAILURE(check_wait_end(listener_io, items.listener_write.pending, POLLIN));
+  ASSERT_NO_FATAL_FAILURE(check_wait_end(client_io, items.client_read.pending, POLLOUT));
+  ASSERT_NO_FATAL_FAILURE(check_wait_end(client_io, items.client_write.pending, POLLOUT));
+
+  fbl::unique_fd server_fd;
+  ASSERT_TRUE(server_fd = fbl::unique_fd(accept(listener_fd.get(), nullptr, nullptr)))
+      << strerror(errno);
+  const char msg[] = "hello";
+  ASSERT_EQ(write(server_fd.get(), msg, sizeof(msg)), ssize_t(sizeof(msg))) << strerror(errno);
+  auto check_client = [client_io, &check_wait_end](zx_wait_item_t item, zx_time_t deadline) {
+    ASSERT_EQ(zx_object_wait_many(&item, 1, deadline), ZX_OK);
+    ASSERT_NO_FATAL_FAILURE(check_wait_end(client_io, item.pending, POLLIN | POLLOUT));
+  };
+  ASSERT_NO_FATAL_FAILURE(check_client(items.client_read, ZX_TIME_INFINITE));
+  ASSERT_NO_FATAL_FAILURE(check_client(items.client_write, ZX_TIME_INFINITE_PAST));
+}
+#endif
+#endif
 
 }  // namespace
