@@ -14,7 +14,6 @@ group("integration-tests") {
   public_deps = [
     ":flatland-a11y-view-test",
     ":flatland-scene-integration-test",
-    ":gfx-a11y-view-test",
   ]
 }
 
@@ -25,7 +24,6 @@ executable("view_tests") {
 
   sources = [
     "a11y_view_semantics_test.cc",
-    "gfx_accessibility_view_test.cc",
     "view_coordinate_converter_test.cc",
     "view_manager_test.cc",
   ]

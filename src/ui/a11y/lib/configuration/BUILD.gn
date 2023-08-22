@@ -16,13 +16,11 @@ source_set("configuration") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
-    "//src/ui/scenic/lib/gfx",
   ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings

@@ -33,19 +33,14 @@ constexpr char kInspectNodeName[] = "test inspector";
 
 constexpr float kEpsilon = 1.e-10f;
 
-enum SceneType { GFX, FLATLAND };
-
-class A11yFocusManagerTest : public gtest::RealLoopFixture,
-                             public ::testing::WithParamInterface<SceneType> {
+class A11yFocusManagerTest : public gtest::RealLoopFixture {
  public:
   A11yFocusManagerTest() : executor_(dispatcher()) {}
   ~A11yFocusManagerTest() override = default;
 
   void SetUp() override {
     inspector_ = std::make_unique<inspect::Inspector>();
-    if (GetParam() == FLATLAND) {
-      mock_highlight_delegate_ = std::make_shared<MockHighlightDelegate>();
-    }
+    mock_highlight_delegate_ = std::make_shared<MockHighlightDelegate>();
 
     a11y_focus_manager_ = std::make_unique<a11y::A11yFocusManagerImpl>(
         &mock_focus_chain_requester_, &mock_focus_chain_registry_, &mock_view_source_,
@@ -117,56 +112,16 @@ class A11yFocusManagerTest : public gtest::RealLoopFixture,
   }
 
   void ExpectNoHighlight() {
-    if (GetParam() == GFX) {
-      auto* mock_annotation_view = GetMockAnnotationView(view_ref_helper_.koid());
-      ASSERT_TRUE(mock_annotation_view);
-      EXPECT_FALSE(mock_annotation_view->GetCurrentFocusHighlight().has_value());
-    } else {
-      ASSERT_TRUE(mock_highlight_delegate_);
-      EXPECT_FALSE(mock_highlight_delegate_->get_current_highlight().has_value());
-    }
+    ASSERT_TRUE(mock_highlight_delegate_);
+    EXPECT_FALSE(mock_highlight_delegate_->get_current_highlight().has_value());
   }
 
   void ExpectSomeHighlight() {
-    if (GetParam() == GFX) {
-      auto* mock_annotation_view = GetMockAnnotationView(view_ref_helper_.koid());
-      ASSERT_TRUE(mock_annotation_view);
-      EXPECT_TRUE(mock_annotation_view->GetCurrentFocusHighlight().has_value());
-    } else {
-      ASSERT_TRUE(mock_highlight_delegate_);
-      EXPECT_TRUE(mock_highlight_delegate_->get_current_highlight().has_value());
-    }
+    ASSERT_TRUE(mock_highlight_delegate_);
+    EXPECT_TRUE(mock_highlight_delegate_->get_current_highlight().has_value());
   }
 
-  void ExpectHighlightGfx(zx_koid_t koid, fuchsia::ui::gfx::BoundingBox bounding_box,
-                          std::array<float, 3> scale, std::array<float, 3> translation) {
-    ASSERT_EQ(GetParam(), GFX);
-
-    auto* mock_annotation_view = GetMockAnnotationView(koid);
-    ASSERT_TRUE(mock_annotation_view);
-    ASSERT_TRUE(mock_annotation_view->GetCurrentFocusHighlight().has_value());
-
-    const auto& highlight_bounding_box = mock_annotation_view->GetCurrentFocusHighlight();
-    ASSERT_TRUE(highlight_bounding_box.has_value());
-    EXPECT_EQ(highlight_bounding_box->min.x, bounding_box.min.x);
-    EXPECT_EQ(highlight_bounding_box->min.y, bounding_box.min.y);
-    EXPECT_EQ(highlight_bounding_box->min.z, bounding_box.min.z);
-    EXPECT_EQ(highlight_bounding_box->max.x, bounding_box.max.x);
-    EXPECT_EQ(highlight_bounding_box->max.y, bounding_box.max.y);
-    EXPECT_EQ(highlight_bounding_box->max.z, bounding_box.max.z);
-
-    const auto& highlight_scale = mock_annotation_view->GetFocusHighlightScaleVector();
-    ASSERT_TRUE(highlight_scale.has_value());
-    EXPECT_EQ(*highlight_scale, scale);
-
-    const auto& highlight_translation = mock_annotation_view->GetFocusHighlightTranslationVector();
-    ASSERT_TRUE(highlight_translation.has_value());
-    EXPECT_EQ(*highlight_translation, translation);
-  }
-
-  void ExpectHighlightFlatland(const MockHighlightDelegate::Highlight& highlight) {
-    ASSERT_EQ(GetParam(), FLATLAND);
-
+  void ExpectHighlight(const MockHighlightDelegate::Highlight& highlight) {
     ASSERT_TRUE(mock_highlight_delegate_);
     ASSERT_TRUE(mock_highlight_delegate_->get_current_highlight().has_value());
 
@@ -198,14 +153,14 @@ class A11yFocusManagerTest : public gtest::RealLoopFixture,
 };
 
 // GetA11yFocus() doesn't return anything when no view is in focus.
-TEST_P(A11yFocusManagerTest, GetA11yFocusNoViewFound) {
+TEST_F(A11yFocusManagerTest, GetA11yFocusNoViewFound) {
   // By default no view is in a11y focus.
   auto a11y_focus = a11y_focus_manager_->GetA11yFocus();
   ASSERT_FALSE(a11y_focus.has_value());
   EXPECT_FALSE(a11y_focus_received_in_update_callback_);
 }
 
-TEST_P(A11yFocusManagerTest, ChangingA11yFocusCausesAFocusChainUpdate) {
+TEST_F(A11yFocusManagerTest, ChangingA11yFocusCausesAFocusChainUpdate) {
   mock_focus_chain_requester_.set_will_change_focus(true);
 
   bool success = false;
@@ -241,7 +196,7 @@ TEST_P(A11yFocusManagerTest, ChangingA11yFocusCausesAFocusChainUpdate) {
   ExpectNoHighlight();
 }
 
-TEST_P(A11yFocusManagerTest, ChangingA11yFocusCausesAnInspectUpdate) {
+TEST_F(A11yFocusManagerTest, ChangingA11yFocusCausesAnInspectUpdate) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(),
@@ -273,7 +228,7 @@ TEST_P(A11yFocusManagerTest, ChangingA11yFocusCausesAnInspectUpdate) {
   ASSERT_EQ(focused_node_id->value(), 1u);
 }
 
-TEST_P(A11yFocusManagerTest, ChangingA11yFocusCausesAFailedFocusChainUpdate) {
+TEST_F(A11yFocusManagerTest, ChangingA11yFocusCausesAFailedFocusChainUpdate) {
   mock_focus_chain_requester_.set_will_change_focus(false);
   bool success = true;  // expects false later.
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(),
@@ -284,7 +239,7 @@ TEST_P(A11yFocusManagerTest, ChangingA11yFocusCausesAFailedFocusChainUpdate) {
   ASSERT_FALSE(a11y_focus.has_value());
 }
 
-TEST_P(A11yFocusManagerTest, ChangingA11yFocusToTheSameView) {
+TEST_F(A11yFocusManagerTest, ChangingA11yFocusToTheSameView) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(),
@@ -311,7 +266,7 @@ TEST_P(A11yFocusManagerTest, ChangingA11yFocusToTheSameView) {
   EXPECT_FALSE(mock_focus_chain_requester_.ReceivedViewRef());
 }
 
-TEST_P(A11yFocusManagerTest, ChangingA11yFocusToTheViewThatHasInputFocus) {
+TEST_F(A11yFocusManagerTest, ChangingA11yFocusToTheViewThatHasInputFocus) {
   // The Focus Chain is updated and the Focus Chain Manager listens to the update.
   mock_focus_chain_registry_.SendViewRefKoid(view_ref_helper_.koid());
   CheckViewInFocus(view_ref_helper_, a11y::A11yFocusManagerImpl::kRootNodeId);
@@ -328,7 +283,7 @@ TEST_P(A11yFocusManagerTest, ChangingA11yFocusToTheViewThatHasInputFocus) {
   EXPECT_FALSE(mock_focus_chain_requester_.ReceivedViewRef());
 }
 
-TEST_P(A11yFocusManagerTest, NoFocusChangeIfViewRefMissing) {
+TEST_F(A11yFocusManagerTest, NoFocusChangeIfViewRefMissing) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
@@ -346,7 +301,7 @@ TEST_P(A11yFocusManagerTest, NoFocusChangeIfViewRefMissing) {
   EXPECT_FALSE(mock_focus_chain_requester_.ReceivedViewRef());
 }
 
-TEST_P(A11yFocusManagerTest, NoFocusChainUpdateToVirtualKeyboardView) {
+TEST_F(A11yFocusManagerTest, NoFocusChainUpdateToVirtualKeyboardView) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
@@ -365,7 +320,7 @@ TEST_P(A11yFocusManagerTest, NoFocusChainUpdateToVirtualKeyboardView) {
   EXPECT_FALSE(mock_focus_chain_requester_.ReceivedViewRef());
 }
 
-TEST_P(A11yFocusManagerTest, NoFocusChainUpdateToVirtualKeyboardViewAndBack) {
+TEST_F(A11yFocusManagerTest, NoFocusChainUpdateToVirtualKeyboardViewAndBack) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   {
     bool success = false;
@@ -399,7 +354,7 @@ TEST_P(A11yFocusManagerTest, NoFocusChainUpdateToVirtualKeyboardViewAndBack) {
   EXPECT_FALSE(mock_focus_chain_requester_.ReceivedViewRef());
 }
 
-TEST_P(A11yFocusManagerTest, RestoresA11yFocusToInputFocus) {
+TEST_F(A11yFocusManagerTest, RestoresA11yFocusToInputFocus) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
@@ -421,13 +376,13 @@ TEST_P(A11yFocusManagerTest, RestoresA11yFocusToInputFocus) {
   CheckViewInFocus(view_ref_helper_, 2u);
 }
 
-TEST_P(A11yFocusManagerTest, ListensToFocusChainUpdates) {
+TEST_F(A11yFocusManagerTest, ListensToFocusChainUpdates) {
   // The Focus Chain is updated and the Focus Chain Manager listens to the update.
   mock_focus_chain_registry_.SendViewRefKoid(view_ref_helper_.koid());
   CheckViewInFocus(view_ref_helper_, a11y::A11yFocusManagerImpl::kRootNodeId);
 }
 
-TEST_P(A11yFocusManagerTest, ClearsTheA11YFocus) {
+TEST_F(A11yFocusManagerTest, ClearsTheA11YFocus) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
@@ -445,7 +400,7 @@ TEST_P(A11yFocusManagerTest, ClearsTheA11YFocus) {
   ExpectNoHighlight();
 }
 
-TEST_P(A11yFocusManagerTest, DeletingA11yFocusManagerClearsHighlights) {
+TEST_F(A11yFocusManagerTest, DeletingA11yFocusManagerClearsHighlights) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
@@ -463,13 +418,7 @@ TEST_P(A11yFocusManagerTest, DeletingA11yFocusManagerClearsHighlights) {
   ExpectNoHighlight();
 }
 
-INSTANTIATE_TEST_SUITE_P(GfxAndFlatland, A11yFocusManagerTest, ::testing::Values(GFX, FLATLAND));
-
-class GfxOnlyTest : public A11yFocusManagerTest {};
-
-INSTANTIATE_TEST_SUITE_P(GfxOnlyFocusManagerTests, GfxOnlyTest, ::testing::Values(GFX));
-
-TEST_P(GfxOnlyTest, DrawsCorrectHighlights) {
+TEST_F(A11yFocusManagerTest, DrawsCorrectHighlights) {
   mock_focus_chain_requester_.set_will_change_focus(true);
   bool success = false;
   a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
@@ -478,29 +427,7 @@ TEST_P(GfxOnlyTest, DrawsCorrectHighlights) {
   EXPECT_TRUE(success);
 
   // Check that the highlight is positioned correctly.
-  ExpectHighlightGfx(
-      view_ref_helper_.koid(), /* bounding box = */
-      {.min = {.x = 2.0f, .y = 3.0, .z = 0.0}, .max = {.x = 4.0, .y = 5.0, .z = 0.0}},
-      /* scale = */
-      {2.f, 2.f, 2.f},
-      /* translation = */ {50.f, 60.f, 0.f});
-}
-
-class FlatlandOnlyTest : public A11yFocusManagerTest {};
-
-INSTANTIATE_TEST_SUITE_P(FlatlandOnlyFocusManagerTests, FlatlandOnlyTest,
-                         ::testing::Values(FLATLAND));
-
-TEST_P(FlatlandOnlyTest, DrawsCorrectHighlights) {
-  mock_focus_chain_requester_.set_will_change_focus(true);
-  bool success = false;
-  a11y_focus_manager_->SetA11yFocus(view_ref_helper_.koid(), 2u,
-                                    [&success](bool result) { success = result; });
-  CheckViewInFocus(view_ref_helper_, 2u);
-  EXPECT_TRUE(success);
-
-  // Check that the highlight is positioned correctly.
-  ExpectHighlightFlatland({{54, 66}, {58, 70}, view_ref_helper_.koid()});
+  ExpectHighlight({{54, 66}, {58, 70}, view_ref_helper_.koid()});
 }
 
 }  // namespace

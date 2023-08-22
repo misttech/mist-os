@@ -7,7 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
-#include "src/ui/a11y/lib/magnifier/gfx_magnifier_delegate.h"
 #include "src/ui/a11y/lib/screen_reader/focus/a11y_focus_manager_impl.h"
 #include "src/ui/a11y/lib/screen_reader/screen_reader_context.h"
 #include "src/ui/a11y/lib/util/util.h"
@@ -23,8 +22,6 @@ auto to_underlying(T value) {
 }  // namespace
 
 namespace a11y_manager {
-
-const float kDefaultMagnificationZoomFactor = 1.0;
 
 void A11yManagerInitializationState ::SetI18nProfileReady() {
   has_i18N_profile_ = true;
@@ -45,9 +42,8 @@ App::App(sys::ComponentContext* context, a11y::ViewManager* view_manager,
          a11y::GestureListenerRegistry* gesture_listener_registry,
          a11y::BootInfoManager* boot_info_manager,
          a11y::ScreenReaderContextFactory* screen_reader_context_factory,
-         inspect::Node inspect_node, bool use_flatland)
-    : use_flatland_(use_flatland),
-      context_(context),
+         inspect::Node inspect_node)
+    : context_(context),
       view_manager_(view_manager),
       tts_manager_(tts_manager),
       color_transform_manager_(color_transform_manager),
@@ -81,16 +77,10 @@ App::App(sys::ComponentContext* context, a11y::ViewManager* view_manager,
   context->outgoing()->AddPublicService(
       gesture_listener_registry_bindings_.GetHandler(gesture_listener_registry_));
 
-  if (use_flatland) {
-    auto magnifier_delegate =
-        std::static_pointer_cast<a11y::Magnifier2::Delegate>(view_manager->flatland_a11y_view());
-    FX_CHECK(magnifier_delegate);
-    magnifier_ = std::make_unique<a11y::Magnifier2>(magnifier_delegate);
-  } else {
-    auto magnifier_delegate = std::make_shared<a11y::GfxMagnifierDelegate>();
-    context->outgoing()->AddPublicService(magnifier_bindings_.GetHandler(magnifier_delegate.get()));
-    magnifier_ = std::make_unique<a11y::Magnifier2>(magnifier_delegate);
-  }
+  auto magnifier_delegate =
+      std::static_pointer_cast<a11y::Magnifier2::Delegate>(view_manager->flatland_a11y_view());
+  FX_CHECK(magnifier_delegate);
+  magnifier_ = std::make_unique<a11y::Magnifier2>(magnifier_delegate);
 
   // Inits Focus Chain focuser support / listening Focus Chain updates.
   focus_chain_manager_ = std::make_unique<a11y::FocusChainManager>(view_manager_->a11y_view());
@@ -316,8 +306,7 @@ A11yManagerState A11yManagerState::withSettings(
 std::unique_ptr<a11y::ScreenReader> App::InitializeScreenReader() {
   auto a11y_focus_manager = std::make_unique<a11y::A11yFocusManagerImpl>(
       focus_chain_manager_.get(), focus_chain_manager_.get(), view_manager_, view_manager_,
-      use_flatland_ ? view_manager_->flatland_a11y_view() : nullptr,
-      inspect_node_.CreateChild("focus_manager"));
+      view_manager_->flatland_a11y_view(), inspect_node_.CreateChild("focus_manager"));
   std::string locale_id = "en-US";
   if (i18n_profile_ && i18n_profile_->has_locales() && !i18n_profile_->locales().empty()) {
     locale_id = i18n_profile_->locales()[0].id;

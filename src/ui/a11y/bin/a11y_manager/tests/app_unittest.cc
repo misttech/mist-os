@@ -202,34 +202,6 @@ TEST_F(AppUnitTest, NoListenerInitially) {
   RunLoopUntilIdle();
 }
 
-// Makes sure gesture priorities are right. If they're not, screen reader would intercept this
-// gesture.
-TEST_F(AppUnitTest, MagnifierGestureWithScreenReader) {
-  auto app = GetApp();
-  MockMagnificationHandler mag_handler;
-  fidl::Binding<fuchsia::accessibility::MagnificationHandler> mag_handler_binding(&mag_handler);
-  {
-    fuchsia::accessibility::MagnifierPtr magnifier;
-    context_provider_.ConnectToPublicService(magnifier.NewRequest());
-    magnifier->RegisterHandler(mag_handler_binding.NewBinding());
-  }
-
-  fuchsia::settings::AccessibilitySettings settings;
-  settings.set_screen_reader(true);
-  settings.set_enable_magnification(true);
-  mock_setui_.Set(std::move(settings), [](auto) {});
-  RunLoopUntilIdle();
-
-  mock_local_hit_.EnqueueTapToEvents();
-  mock_local_hit_.EnqueueTapToEvents();
-  mock_local_hit_.EnqueueTapToEvents();
-  mock_local_hit_.SimulateEnqueuedEvents();
-
-  RunLoopFor(a11y::Magnifier2::kTransitionPeriod);
-
-  EXPECT_GT(mag_handler.transform().scale, 1);
-}
-
 TEST_F(AppUnitTest, ColorCorrectionApplied) {
   auto app = GetApp();
   fuchsia::settings::AccessibilitySettings accessibilitySettings;

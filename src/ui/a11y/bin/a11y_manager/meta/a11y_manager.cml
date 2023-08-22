@@ -41,7 +41,6 @@
                 "fuchsia.ui.observation.scope.Registry",
                 "fuchsia.ui.pointer.augment.LocalHit",
                 "fuchsia.ui.pointerinjector.Registry",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
     ],

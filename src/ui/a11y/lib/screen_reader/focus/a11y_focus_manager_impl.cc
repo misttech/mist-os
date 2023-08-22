@@ -4,14 +4,12 @@
 
 #include "src/ui/a11y/lib/screen_reader/focus/a11y_focus_manager_impl.h"
 
-#include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <optional>
 
-#include "fuchsia/math/cpp/fidl.h"
 #include "src/ui/a11y/lib/annotation/highlight_delegate.h"
 
 namespace a11y {
@@ -92,7 +90,6 @@ void A11yFocusManagerImpl::SetA11yFocus(zx_koid_t koid, uint32_t node_id,
 void A11yFocusManagerImpl::UpdateFocus(zx_koid_t newly_focused_view, uint32_t newly_focused_node) {
   // Update highlights BEFORE updating the focus state, because clearing the
   // old highlight requires the old focus state.
-  // TODO(fxbug.dev/114627) Simplify this when Gfx is deleted.
   UpdateHighlights(newly_focused_view, newly_focused_node);
 
   focused_node_in_view_map_[newly_focused_view] = newly_focused_node;
@@ -172,20 +169,12 @@ void A11yFocusManagerImpl::UpdateHighlights(zx_koid_t newly_focused_view,
   auto bounding_box = annotated_node->location();
 
   // Request to draw the highlight.
-  if (highlight_delegate_) {
-    // Flatland
-    auto local_bounding_box_min = transform->Apply(bounding_box.min);
-    auto local_bounding_box_max = transform->Apply(bounding_box.max);
+  auto local_bounding_box_min = transform->Apply(bounding_box.min);
+  auto local_bounding_box_max = transform->Apply(bounding_box.max);
 
-    highlight_delegate_->DrawHighlight({local_bounding_box_min.x, local_bounding_box_min.y},
-                                       {local_bounding_box_max.x, local_bounding_box_max.y},
-                                       newly_focused_view);
-  } else {
-    // Gfx
-    // TODO(fxbug.dev/114627) Clean this up when Gfx is deleted.
-    view->annotation_view()->DrawHighlight(bounding_box, transform->scale_vector(),
-                                           transform->translation_vector());
-  }
+  highlight_delegate_->DrawHighlight({local_bounding_box_min.x, local_bounding_box_min.y},
+                                     {local_bounding_box_max.x, local_bounding_box_max.y},
+                                     newly_focused_view);
 }
 
 void A11yFocusManagerImpl::ClearA11yFocus() {
@@ -214,20 +203,7 @@ void A11yFocusManagerImpl::ClearHighlights() {
     return;
   }
 
-  if (highlight_delegate_) {
-    // Flatland
-    highlight_delegate_->ClearHighlight();
-  } else {
-    // Gfx
-    auto view = view_source_->GetViewWrapper(currently_focused_view_);
-
-    // If the focused view no longer exists, then there's no work to do.
-    if (!view) {
-      return;
-    }
-
-    view->annotation_view()->ClearFocusHighlights();
-  }
+  highlight_delegate_->ClearHighlight();
 }
 
 }  // namespace a11y

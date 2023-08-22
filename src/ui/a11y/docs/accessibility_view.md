@@ -60,13 +60,9 @@ decision is deliberate, as it allows us to guarantee the following properties:
 
 [TODO.][scene-topology]
 
-## GFX vs. Flatland
-[TODO.][gfx-flatland]
-
 [view-ref]: /docs/development/graphics/scenic/concepts/view_ref.md
 [view-focus]: /docs/development/graphics/scenic/concepts/focus_chain.md
 [view-input]: /docs/development/graphics/scenic/concepts/input
 [highlights]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=78639&q=component%3AAccessibility%20docs&can=2
 [magnification]: /src/ui/a11y/docs/magnifier.md
 [scene-topology]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=96332
-[gfx-flatland]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=96411

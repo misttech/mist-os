@@ -289,11 +289,11 @@ void UITestRealm::ConfigureAccessibility() {
   RouteServices({fuchsia::logger::LogSink::Name_},
                 /* source = */ ParentRef(),
                 /* targets = */ {ChildRef{kA11yManagerName}});
-  RouteServices({fuchsia::ui::composition::Flatland::Name_, fuchsia::ui::scenic::Scenic::Name_,
-                 fuchsia::ui::observation::scope::Registry::Name_,
-                 fuchsia::ui::pointer::augment::LocalHit::Name_},
-                /* source = */ ChildRef{kScenicName},
-                /* targets = */ {ChildRef{kA11yManagerName}});
+  RouteServices(
+      {fuchsia::ui::composition::Flatland::Name_, fuchsia::ui::observation::scope::Registry::Name_,
+       fuchsia::ui::pointer::augment::LocalHit::Name_},
+      /* source = */ ChildRef{kScenicName},
+      /* targets = */ {ChildRef{kA11yManagerName}});
   RouteServices({fuchsia::accessibility::semantics::SemanticsManager::Name_,
                  test::accessibility::Magnifier::Name_},
                 /* source = */ ChildRef{kA11yManagerName},

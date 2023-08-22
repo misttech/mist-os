@@ -11,8 +11,6 @@ source_set("view") {
     "flatland_accessibility_view.h",
     "flatland_connection.cc",
     "flatland_connection.h",
-    "gfx_accessibility_view.cc",
-    "gfx_accessibility_view.h",
     "view_coordinate_converter.cc",
     "view_coordinate_converter.h",
     "view_injector_factory.cc",
@@ -39,11 +37,9 @@ source_set("view") {
     "//src/ui/a11y/lib/magnifier",
     "//src/ui/a11y/lib/util",
     "//src/ui/input/lib/injector",
-    "//src/ui/scenic/lib/gfx",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fidl/cpp",

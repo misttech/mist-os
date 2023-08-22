@@ -120,7 +120,7 @@ class App {
                a11y::GestureListenerRegistry* gesture_listener_registry,
                a11y::BootInfoManager* boot_info_manager,
                a11y::ScreenReaderContextFactory* screen_reader_context_factory,
-               inspect::Node inspect_node = inspect::Node(), bool use_flatland = false);
+               inspect::Node inspect_node = inspect::Node());
   ~App();
 
   // Sets the a11y manager to the given configuration. Visible for testing.
@@ -174,10 +174,6 @@ class App {
   // Handler invoked when the FIDL event OnChange is called.
   // Fetches the user's i18n profile and stores in |i18n_profile_|.
   void PropertyProviderOnChangeHandler();
-
-  // True if we are using Flatland, false if we are using Gfx.
-  // TODO(fxbug.dev/114627) Clean this up when Gfx is deleted.
-  bool use_flatland_;
 
   // Data fields that must be initialized to consider this object as initialized.
   // Current state of the a11y manager

@@ -46,9 +46,7 @@ class A11yFocusManagerImpl : public A11yFocusManager, public AccessibilityFocusC
   static constexpr char kCurrentlyFocusedNodeIdInspectNodeName[] = "currently_focused_node_id";
 
   // |focus_chain_requester| and |registry| must outlive this object.
-  //
-  // |highlight_delegate| is null if we are using Gfx, non-null if
-  // we are using Flatland.
+  // |highlight_delegate| must be non-null since we are using Flatland.
   explicit A11yFocusManagerImpl(AccessibilityFocusChainRequester* focus_chain_requester,
                                 AccessibilityFocusChainRegistry* registry, ViewSource* view_source,
                                 VirtualKeyboardManager* virtual_keyboard_manager,
@@ -147,8 +145,7 @@ class A11yFocusManagerImpl : public A11yFocusManager, public AccessibilityFocusC
   // Used to retrieve information about visible virtual keyboards.
   VirtualKeyboardManager* const virtual_keyboard_manager_ = nullptr;
 
-  // Used to draw a11y highlights.
-  // Null if on Gfx, non-null if on Flatland.
+  // Used to draw a11y highlights; should never be null.
   std::shared_ptr<HighlightDelegate> highlight_delegate_;
 
   OnA11yFocusUpdatedCallback on_a11y_focus_updated_callback_;
