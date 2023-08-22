@@ -19,9 +19,6 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.sys2.EventSource" ],
-        },
-        {
             event_stream: [
                 "destroyed",
                 "started",

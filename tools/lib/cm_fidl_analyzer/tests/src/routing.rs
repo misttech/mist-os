@@ -18,8 +18,8 @@ use {
         ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl,
         ExposeServiceDecl, ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl,
         OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-        OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl, ResolverRegistration,
-        RunnerDecl, RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
+        OfferTarget, RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl,
+        RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
         UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
         UseStorageDecl,
     },
@@ -1676,9 +1676,7 @@ mod tests {
     ///     b
     ///
     /// a: offers framework protocol "fuchsia.component.Realm" to b
-    /// a: offers built-in protocol "fuchsia.sys2.EventSource" to b
     /// b: uses protocol "fuchsia.component.Realm"
-    /// b: uses protocol "fuchsia.sys2.EventSource"
     #[fuchsia::test]
     async fn route_map_use_from_framework_and_builtin() {
         let offer_realm_decl = OfferDecl::Protocol(OfferProtocolDecl {
@@ -1697,46 +1695,18 @@ mod tests {
             availability: Availability::Required,
         });
 
-        let offer_event_source_decl = OfferDecl::Protocol(OfferProtocolDecl {
-            source: OfferSource::Parent,
-            source_name: "fuchsia.sys2.EventSource".parse().unwrap(),
-            target_name: "fuchsia.sys2.EventSource".parse().unwrap(),
-            target: OfferTarget::static_child("b".to_string()),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
-        let use_event_source_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "fuchsia.sys2.EventSource".parse().unwrap(),
-            target_path: "/svc/fuchsia.sys2.EventSource".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
-        let event_source_decl = CapabilityDecl::Protocol(ProtocolDecl {
-            name: "fuchsia.sys2.EventSource".parse().unwrap(),
-            source_path: None,
-        });
-
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(offer_realm_decl.clone())
-                    .offer(offer_event_source_decl.clone())
                     .add_lazy_child("b")
                     .build(),
             ),
-            (
-                "b",
-                ComponentDeclBuilder::new()
-                    .use_(use_realm_decl.clone())
-                    .use_(use_event_source_decl.clone())
-                    .build(),
-            ),
+            ("b", ComponentDeclBuilder::new().use_(use_realm_decl.clone()).build()),
         ];
 
-        let mut builder = RoutingTestBuilderForAnalyzer::new("a", components);
-        builder.set_builtin_capabilities(vec![event_source_decl.clone()]);
+        let builder = RoutingTestBuilderForAnalyzer::new("a", components);
         let test = builder.build().await;
 
         let b_component =
@@ -1759,27 +1729,6 @@ mod tests {
                 }
             ]
         );
-
-        let event_source_route_results =
-            test.model.check_use_capability(&use_event_source_decl, &b_component);
-        assert_eq!(event_source_route_results.len(), 1);
-        let event_source_route_result = &event_source_route_results[0];
-        assert_matches!(event_source_route_result.error, None);
-
-        assert_eq!(
-            event_source_route_result.route,
-            vec![
-                RouteSegment::UseBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: use_event_source_decl
-                },
-                RouteSegment::OfferBy {
-                    moniker: Moniker::root(),
-                    capability: offer_event_source_decl
-                },
-                RouteSegment::ProvideAsBuiltin { capability: event_source_decl }
-            ]
-        )
     }
 
     ///  component manager's namespace

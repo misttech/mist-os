@@ -12,27 +12,23 @@ The following diagram shows a very high level overview of the three lifecycle ev
 ![Figure: Flow of lifecycle events under component manager](component_manager_lifecycle_flow.png)
 
 The archivist consumes the following lifecycle events under component manager through
-[`fuchsia.sys2.EventSource`][event_source]:
+[`fuchsia.component.EventStream`][event_stream]:
 
-- **Started**: Sent by component manager when a component starts, the [runner] might still
-  need to launch the component, but the component has started from the framework perspective.
-- **Stopped**: Sent by component manager when a component stops, the runner might still need to to
-  tear down the component, but the component is gone from the framework perspective.
-- **Running**: Sent by component manager for all components that are running at the moment the
-  archivist starts listening for events. In other words, a synthesized started event. This event
-  is provided to the reader as **Started**, but consumed from the framework as “Running”.
 - **Directory ready**: The archivist listens for directory ready of the `out/diagnostics`
   directory. When the component starts serving this directory, the component manager sends this
   event to the Archivist.
+- **Capability requested**: The archivist receives `Capability requested` events for connections to
+  `fuchsia.logger.LogSink` and `fuchsia.inspect.InspectSink` which allows it to attribute Inspect
+  and logs.
 
 ## Related docs
 
-- [Event capabilities][event_capabilities]
+- [Event stream capabilities][event_capabilities]
 - [Inspect discovery and hosting - Archivist section][inspect_discovery_hosting]
 
 
 [archivist]: /docs/reference/diagnostics/inspect/tree.md#archivist
-[event_source]: https://fuchsia.dev/reference/fidl/fuchsia.sys2#EventSource
+[event_source]: https://fuchsia.dev/reference/fidl/fuchsia.component#EventStream
 [event_capabilities]: /docs/concepts/components/v2/capabilities/event.md
 [inspect_discovery_hosting]: /docs/reference/diagnostics/inspect/tree.md#archivist
 [runner]: /docs/glossary#runner

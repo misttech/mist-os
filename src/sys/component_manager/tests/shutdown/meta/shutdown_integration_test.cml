@@ -16,6 +16,5 @@
             event_stream: "stopped",
             from: "parent",
         },
-        { protocol: "fuchsia.sys2.EventSource" },
     ],
 }

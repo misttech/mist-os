@@ -32,7 +32,6 @@
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
-                "fuchsia.sys2.EventSource",
             ],
             from: "parent",
             to: [ "#vfs-compliance-tests" ],

@@ -957,7 +957,6 @@ impl RealmBuilder {
                 Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
                     .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
-                    .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
                     .capability(Capability::protocol_by_name("fuchsia.component.EventStream"))
                     .from(Ref::child("component_manager"))
                     .to(Ref::parent()),

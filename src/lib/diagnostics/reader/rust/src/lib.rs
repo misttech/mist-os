@@ -799,7 +799,6 @@ mod tests {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                    .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
                     .capability(
                         Capability::protocol_by_name("fuchsia.tracing.provider.Registry")
                             .optional(),

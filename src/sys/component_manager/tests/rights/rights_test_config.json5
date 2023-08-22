@@ -53,7 +53,6 @@
         {
             protocol: [
                 "fuchsia.sys2.CrashIntrospect",
-                "fuchsia.sys2.EventSource",
                 "fuchsia.sys2.SystemController",
             ],
         },

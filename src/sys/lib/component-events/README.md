@@ -1,7 +1,7 @@
 # Component Events Client Library
 
 This library provides convenience functions for clients that interact with the
-`fuchsia.sys2.EventSource` protocol.
+`fuchsia.component.EventStream` protocol.
 
 The library is primarily used in OpaqueTest integration tests.
 

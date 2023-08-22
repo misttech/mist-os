@@ -68,7 +68,6 @@ async fn run_test(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
                 .capability(Capability::protocol_by_name("fuchsia.component.resolution.Resolver"))
                 .capability(Capability::storage("tmp"))
                 .capability(Capability::storage("data"))

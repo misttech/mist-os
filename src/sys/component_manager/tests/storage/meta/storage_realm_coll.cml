@@ -37,10 +37,6 @@
             from: "framework",
         },
         {
-            protocol: "fuchsia.sys2.EventSource",
-            from: "parent",
-        },
-        {
             event_stream: [
                 "destroyed",
                 "stopped",

@@ -19,9 +19,6 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.sys2.EventSource" ],
-        },
-        {
             protocol: [ "fidl.examples.routing.echo.Echo" ],
             from: "framework",
         },

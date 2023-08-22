@@ -36,7 +36,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     let parent_to_archivist = Route::new()
         .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
         .capability(Capability::directory("config-data"))
-        .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
         .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry").optional())
         .capability(Capability::protocol_by_name("fuchsia.boot.ReadOnlyLog"));
 

@@ -192,14 +192,6 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
-                    .from(Ref::parent())
-                    .to(&test_case_archivist),
-            )
-            .await?;
-        wrapper_realm
-            .add_route(
-                Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
                     .capability(Capability::protocol_by_name("fuchsia.logger.Log"))
                     .from(&test_case_archivist)

@@ -265,7 +265,6 @@ Instance ID: None
       Provider
  [✓]  fuchsia.sys.internal.LogConnector    N/A
  [✓]  config-data                          N/A
- [✓]  fuchsia.sys2.EventSource             N/A
 
       Exposed Capability                   Error
  [✓]  fuchsia.diagnostics.FeedbackArchive  N/A

@@ -32,8 +32,5 @@
             event_stream: "started",
             from: "parent",
         },
-        {
-            protocol: [ "fuchsia.sys2.EventSource" ],
-        },
     ],
 }

@@ -60,7 +60,6 @@ async fn setup_archivist(builder: &RealmBuilder, wlan_components: &ChildRef) -> 
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
                 .capability(Capability::event_stream("directory_ready"))
                 .capability(Capability::event_stream("capability_requested"))
                 .from(Ref::parent())
