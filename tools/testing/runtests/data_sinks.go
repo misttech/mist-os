@@ -119,7 +119,9 @@ func (v sftpViewer) getAllDataSinks(remoteDir string) ([]string, error) {
 	var sinks []string
 	walker := v.client.Walk(remoteDir)
 	for walker.Step() {
-		if filepath.Ext(walker.Path()) != ".profraw" {
+		// TODO(fxbug.dev/132081): Remove hardcoded check for logs once they
+		// are moved to a separate location.
+		if walker.Stat() == nil || walker.Stat().IsDir() || filepath.Ext(walker.Path()) == ".log" {
 			continue
 		}
 		relPath, err := filepath.Rel(remoteDir, walker.Path())

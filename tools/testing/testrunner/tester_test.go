@@ -344,7 +344,7 @@ type fakeDataSinkCopier struct {
 
 func (c *fakeDataSinkCopier) GetAllDataSinks(remoteDir string) ([]runtests.DataSink, error) {
 	c.remoteDirs[remoteDir] = struct{}{}
-	return []runtests.DataSink{{Name: "sink", File: "sink"}}, nil
+	return []runtests.DataSink{{Name: "sink", File: filepath.Join("sink_type", "sink")}}, nil
 }
 
 func (c *fakeDataSinkCopier) GetReferences(remoteDir string) (map[string]runtests.DataSinkReference, error) {
@@ -640,8 +640,8 @@ func TestSSHTester(t *testing.T) {
 				for _, test := range outputs.Summary.Tests {
 					if test.Name == "early_boot_sinks" {
 						foundEarlyBootSinks = true
-						if len(test.DataSinks["llvm-profile"]) != 1 {
-							t.Errorf("got %d early boot sinks, want 1", len(test.DataSinks["llvm-profile"]))
+						if len(test.DataSinks["sink_type"]) != 1 {
+							t.Errorf("got %d early boot sinks, want 1", len(test.DataSinks["sink_type"]))
 						}
 						break
 					}

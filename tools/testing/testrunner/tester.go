@@ -48,7 +48,7 @@ const (
 	dataOutputDirV2 = "/tmp/test_manager:0/data/debug"
 
 	// The output data directory for early boot coverage.
-	dataOutputDirEarlyBoot = "/tmp/test_manager:0/data/kernel_debug"
+	dataOutputDirEarlyBoot = "/tmp/test_manager:0/data/kernel_debug/debugdata"
 
 	// Various tools for running tests.
 	runtestsName     = "runtests"
@@ -876,6 +876,7 @@ func (t *FFXTester) getEarlyBootSink(path string, sinksPerTest map[string]runtes
 	if !ok {
 		earlyBootSinks = runtests.DataSinkReference{Sinks: runtests.DataSinkMap{}}
 	}
+	// TODO(fxbug.dev/132081): Don't hardcode llvm-profile sink type.
 	earlyBootSinks.Sinks["llvm-profile"] = append(earlyBootSinks.Sinks["llvm-profile"], runtests.DataSink{Name: sinkFile, File: sinkFile})
 	sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
 	return nil
@@ -1075,7 +1076,16 @@ func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.
 			Result: runtests.TestSuccess,
 		}
 		outputs.Record(ctx, *earlyBootSinksTest)
-		earlyBootSinkRef := runtests.DataSinkReference{Sinks: runtests.DataSinkMap{"llvm-profile": earlyBootSinks}, RemoteDir: dataOutputDirEarlyBoot}
+		// The directory under dataOutputDirEarlyBoot is named after the type of sinks it contains.
+		sinkMap := runtests.DataSinkMap{}
+		for _, sink := range earlyBootSinks {
+			sinkType := strings.Split(filepath.ToSlash(sink.File), "/")[0]
+			if _, ok := sinkMap[sinkType]; !ok {
+				sinkMap[sinkType] = []runtests.DataSink{}
+			}
+			sinkMap[sinkType] = append(sinkMap[sinkType], sink)
+		}
+		earlyBootSinkRef := runtests.DataSinkReference{Sinks: sinkMap, RemoteDir: dataOutputDirEarlyBoot}
 		if err := t.copySinks(ctx, []runtests.DataSinkReference{earlyBootSinkRef}, filepath.Join(t.localOutputDir, "early-boot")); err != nil {
 			return err
 		}
