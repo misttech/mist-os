@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     if args.circuit {
         rcs_proxy.add_overnet_link(args.id.unwrap_or(0), remote_socket).await?;
     } else {
-        panic!("Legacy overnet is no longer supported.")
+        return Err(anyhow::format_err!("Legacy overnet is no longer supported."));
     }
 
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
