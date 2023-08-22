@@ -37,7 +37,7 @@ pub use self::fuchsia::{
 };
 
 #[cfg(target_os = "fuchsia")]
-pub(crate) use self::fuchsia::executor::{need_signal, schedule_packet};
+pub(crate) use self::fuchsia::executor::need_signal_or_peer_closed;
 
 use futures::prelude::*;
 use pin_utils::{unsafe_pinned, unsafe_unpinned};

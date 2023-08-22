@@ -262,6 +262,7 @@ mod tests {
             task::noop_waker_ref,
             FutureExt,
         },
+        std::pin::pin,
     };
 
     #[test]
@@ -361,17 +362,26 @@ mod tests {
         let mut executor = TestExecutor::new();
 
         let (s1, s2) = zx::Socket::create_stream();
-        let async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
+        let mut async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
+
+        // The socket won't start watching for peer-closed until we actually try reading from it.
+        let _ = executor.run_until_stalled(&mut pin!(async {
+            let mut buf = [0; 16];
+            let _ = async_s2.read(&mut buf).await;
+        }));
+
         let on_closed_fut = async_s2.on_closed();
 
         drop(s1);
 
-        // Dropping s1 raises a closed signal on s2 when the executor next polls the signal port.
-        // Run once to ensure all packets are processed before actually polling.
+        // Now make sure all packets get processed before we poll the socket.
         let _ = executor.run_until_stalled(&mut future::pending::<()>());
+
+        // Dropping s1 raises a closed signal on s2 when the executor next polls the signal port.
         let mut rx_fut = poll_fn(|cx| async_s2.poll_readable(cx));
+
         if let Poll::Ready(Ok(state)) = executor.run_until_stalled(&mut rx_fut) {
-            assert_eq!(state, ReadableState::ReadableAndClosed);
+            assert_eq!(state, ReadableState::Closed);
         } else {
             panic!("Expected future to be ready and Ok");
         }

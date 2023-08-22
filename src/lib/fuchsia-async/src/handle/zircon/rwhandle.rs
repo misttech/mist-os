@@ -167,12 +167,7 @@ where
             write_task: AtomicWaker::new(),
         }));
 
-        let rwhandle = RWHandle { handle, receiver };
-
-        // Make sure we get notifications when the handle closes.
-        rwhandle.schedule_packet(OBJECT_PEER_CLOSED)?;
-
-        Ok(rwhandle)
+        Ok(RWHandle { handle, receiver })
     }
 
     /// Returns a reference to the underlying handle.
@@ -234,7 +229,7 @@ where
         task: &AtomicWaker,
         signal: zx::Signals,
     ) -> Result<(), zx::Status> {
-        crate::runtime::need_signal(
+        crate::runtime::need_signal_or_peer_closed(
             cx,
             task,
             &self.receiver.signals,
@@ -242,15 +237,6 @@ where
             self.handle.as_handle_ref(),
             self.receiver.port(),
             self.receiver.key(),
-        )
-    }
-
-    fn schedule_packet(&self, signals: zx::Signals) -> Result<(), zx::Status> {
-        crate::runtime::schedule_packet(
-            self.handle.as_handle_ref(),
-            self.receiver.port(),
-            self.receiver.key(),
-            signals,
         )
     }
 }

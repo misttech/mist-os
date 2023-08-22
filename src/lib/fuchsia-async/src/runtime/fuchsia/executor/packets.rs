@@ -17,12 +17,12 @@ use std::{
 
 use super::common::EHandle;
 
-/// Clears `signal` on `atomic_signals`, then schedules a packet to wake `task`
-/// when the object referred to by `handle` asserts `signal` or
-/// `OBJECT_PEER_CLOSED`. If `atomic_signals` contains `OBJECT_PEER_CLOSED`
-/// already, wakes `task` immediately. To avoid unnecessary packets, does
-/// nothing if `signal` was already cleared.
-pub fn need_signal(
+/// Clears `signal` on `atomic_signals`, then schedules a packet to wake `task` when the object
+/// referred to by `handle` asserts `signal` or `OBJECT_PEER_CLOSED`.  If `atomic_signals` contains
+/// `OBJECT_PEER_CLOSED` already, wakes `task` immediately. To avoid unnecessary packets, does
+/// nothing if `signal` was already cleared.  If a packet is scheduled, the `OBJECT_PEER_CLOSED`
+/// signal is _always_ included as a signal of interest.
+pub fn need_signal_or_peer_closed(
     cx: &mut Context<'_>,
     task: &AtomicWaker,
     atomic_signals: &AtomicU32,
@@ -37,7 +37,7 @@ pub fn need_signal(
     if old.contains(zx::Signals::OBJECT_PEER_CLOSED) {
         cx.waker().wake_by_ref();
     } else if old.contains(signal) {
-        schedule_packet(handle, port, key, signal)?;
+        schedule_packet(handle, port, key, signal | zx::Signals::OBJECT_PEER_CLOSED)?;
     }
     Ok(())
 }
