@@ -18,7 +18,7 @@ When updating, please add the value in alphabetical order.
 :                                         : invoked.  Defaults to `true`.      :
 | `daemon.host_pipe_ssh_timeout`          | Time the daemon waits for an       |
 :                                         : initial response from ssh on the   :
-:                                         : target. Defaults to 30 seconds.    :
+:                                         : target. Defaults to 50 seconds.    :
 | `discovery.expire_targets`              | Determines if targets discovered   |
 :                                         : should expire. Defaults to `true`  :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |
