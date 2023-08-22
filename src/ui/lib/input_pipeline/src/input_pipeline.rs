@@ -135,7 +135,8 @@ impl InputPipelineAssembly {
         let h = DisplayOwnership::new(display_ownership_event, input_handlers_node);
         let metrics_logger_clone = metrics_logger.clone();
         tasks.push(fasync::Task::local(async move {
-            h.handle_input_events(autorepeat_receiver, autorepeat_sender)
+            h.clone().set_handler_healthy();
+            h.clone().handle_input_events(autorepeat_receiver, autorepeat_sender)
                 .await
                 .map_err(|e| {
                     metrics_logger_clone.log_error(
@@ -143,6 +144,7 @@ impl InputPipelineAssembly {
                         std::format!(
                             "display ownership is not supposed to terminate - this is likely a problem: {:?}", e));
                 }).unwrap();
+            h.set_handler_unhealthy("Receive loop terminated for handler: DisplayOwnership");
         }));
         InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
@@ -156,7 +158,9 @@ impl InputPipelineAssembly {
         let metrics_logger_clone = metrics_logger.clone();
         let a = Autorepeater::new(autorepeat_receiver, input_handlers_node, metrics_logger.clone());
         tasks.push(fasync::Task::local(async move {
-            a.run(autorepeat_sender)
+            a.clone().set_handler_healthy();
+            a.clone()
+                .run(autorepeat_sender)
                 .await
                 .map_err(|e| {
                     metrics_logger_clone.log_error(
@@ -165,6 +169,7 @@ impl InputPipelineAssembly {
                     );
                 })
                 .expect("autorepeater should never error out");
+            a.set_handler_unhealthy("Receive loop terminated for handler: Autorepeater");
         }));
         InputPipelineAssembly { sender, receiver, tasks, metrics_logger }
     }
