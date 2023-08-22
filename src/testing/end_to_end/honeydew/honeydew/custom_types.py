@@ -111,3 +111,15 @@ class FFXConfig:
     """
     isolate_dir: Optional[fuchsia_controller.IsolateDir] = None
     logs_dir: Optional[str] = None
+
+
+@dataclass
+class FidlEndpoint:
+    """Dataclass that holds FIDL end point information.
+
+    Args:
+        moniker: moniker pointing to the FIDL end point
+        protocol: protocol name of the FIDL end point
+    """
+    moniker: str
+    protocol: str

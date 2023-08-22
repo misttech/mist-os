@@ -36,6 +36,8 @@
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:ffx_test --host --output
 
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:fuchsia_controller_test --host --output
+
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:ssh_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests:sl4f_test --host --output

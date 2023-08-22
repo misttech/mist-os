@@ -25,6 +25,16 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
+  python_host_test("fuchsia_controller_test") {
+    main_source = "fuchsia_controller_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("ssh_test") {
     main_source = "ssh_test.py"
     libraries = [
@@ -51,6 +61,7 @@ group("tests") {
   public_deps = [
     ":fastboot_test($host_toolchain)",
     ":ffx_test($host_toolchain)",
+    ":fuchsia_controller_test($host_toolchain)",
     ":sl4f_test($host_toolchain)",
     ":ssh_test($host_toolchain)",
   ]

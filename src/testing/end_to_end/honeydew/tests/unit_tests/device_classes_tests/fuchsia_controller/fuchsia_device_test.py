@@ -79,17 +79,18 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
-    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch.object(
-        fuchsia_device.ffx_transport,
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True)
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.ffx_transport,
         "get_config",
         return_value=_MOCK_ARGS["ffx_config"],
         autospec=True)
     def setUp(
             self, mock_ffx_get_config, mock_fc_context,
             mock_ssh_check_connection, mock_ffx_check_connection) -> None:
-        super().setUp()
-
         self.fd_obj = fuchsia_device.FuchsiaDevice(
             device_name=_INPUT_ARGS["device_name"],
             ssh_private_key=_INPUT_ARGS["ssh_private_key"])
@@ -151,11 +152,19 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         return_value=f_buildinfo.ProviderGetBuildInfoResponse(
             build_info=_MOCK_DEVICE_PROPERTIES["build_info"]),
     )
-    def test_build_info(self, mock_buildinfo_provider) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True)
+    def test_build_info(
+            self, mock_fc_connect_device_proxy,
+            mock_buildinfo_provider) -> None:
         """Testcase for FuchsiaDevice._build_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
             self.fd_obj._build_info, _MOCK_DEVICE_PROPERTIES["build_info"])
+
+        mock_fc_connect_device_proxy.assert_called_once()
         mock_buildinfo_provider.assert_called()
 
     @mock.patch.object(
@@ -165,7 +174,13 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         return_value=f_buildinfo.ProviderGetBuildInfoResponse(
             build_info=_MOCK_DEVICE_PROPERTIES["build_info"]),
     )
-    def test_build_info_error(self, mock_buildinfo_provider) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True)
+    def test_build_info_error(
+            self, mock_fc_connect_device_proxy,
+            mock_buildinfo_provider) -> None:
         """Testcase for FuchsiaDevice._build_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -175,6 +190,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             # pylint: disable=protected-access
             _ = self.fd_obj._build_info
 
+        mock_fc_connect_device_proxy.assert_called_once()
+
     @mock.patch.object(
         f_hwinfo.Device.Client,
         "get_info",
@@ -182,11 +199,18 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         return_value=f_hwinfo.DeviceGetInfoResponse(
             info=_MOCK_DEVICE_PROPERTIES["device_info"]),
     )
-    def test_device_info(self, mock_hwinfo_device) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True)
+    def test_device_info(
+            self, mock_fc_connect_device_proxy, mock_hwinfo_device) -> None:
         """Testcase for FuchsiaDevice._device_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
             self.fd_obj._device_info, _MOCK_DEVICE_PROPERTIES["device_info"])
+
+        mock_fc_connect_device_proxy.assert_called_once()
         mock_hwinfo_device.assert_called()
 
     @mock.patch.object(
@@ -196,7 +220,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         return_value=f_hwinfo.DeviceGetInfoResponse(
             info=_MOCK_DEVICE_PROPERTIES["device_info"]),
     )
-    def test_device_info_error(self, mock_hwinfo_device) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True)
+    def test_device_info_error(
+            self, mock_fc_connect_device_proxy, mock_hwinfo_device) -> None:
         """Testcase for FuchsiaDevice._device_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -206,6 +235,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             # pylint: disable=protected-access
             _ = self.fd_obj._device_info
 
+        mock_fc_connect_device_proxy.assert_called_once()
+
     @mock.patch.object(
         f_hwinfo.Product.Client,
         "get_info",
@@ -213,11 +244,18 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         return_value=f_hwinfo.ProductGetInfoResponse(
             info=_MOCK_DEVICE_PROPERTIES["product_info"]),
     )
-    def test_product_info(self, mock_hwinfo_product) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True)
+    def test_product_info(
+            self, mock_fc_connect_device_proxy, mock_hwinfo_product) -> None:
         """Testcase for FuchsiaDevice._product_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
             self.fd_obj._product_info, _MOCK_DEVICE_PROPERTIES["product_info"])
+
+        mock_fc_connect_device_proxy.assert_called_once()
         mock_hwinfo_product.assert_called()
 
     @mock.patch.object(
@@ -227,7 +265,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         return_value=f_hwinfo.ProductGetInfoResponse(
             info=_MOCK_DEVICE_PROPERTIES["product_info"]),
     )
-    def test_product_info_error(self, mock_hwinfo_product) -> None:
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        "connect_device_proxy",
+        autospec=True)
+    def test_product_info_error(
+            self, mock_fc_connect_device_proxy, mock_hwinfo_product) -> None:
         """Testcase for FuchsiaDevice._product_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -237,22 +280,17 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             # pylint: disable=protected-access
             _ = self.fd_obj._product_info
 
-    # List all the tests related to private methods in alphabetical order
-    @mock.patch("fuchsia_controller_py.Context", autospec=True)
-    def test_context_create_init_error(self, mock_fc_context) -> None:
-        """Verify _context_create when the fuchsia controller Context creation
-        raises an error."""
-        mock_fc_context.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS)
-        with self.assertRaises(errors.FuchsiaControllerError):
-            # pylint: disable=protected-access
-            self.fd_obj._context_create()
+        mock_fc_connect_device_proxy.assert_called_once()
 
+    # List all the tests related to private methods in alphabetical order
     @mock.patch.object(
         fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
-    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch.object(
-        fuchsia_device.ffx_transport,
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True)
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.ffx_transport,
         "get_config",
         return_value=_MOCK_ARGS["ffx_config"],
         autospec=True)
@@ -292,7 +330,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     @mock.patch.object(
-        fd_remotecontrol.RemoteControl.Client,
+        fuchsia_device.fuchsia_controller_transport.fd_remotecontrol.
+        RemoteControl.Client,
         "log_message",
         new_callable=mock.AsyncMock,
     )

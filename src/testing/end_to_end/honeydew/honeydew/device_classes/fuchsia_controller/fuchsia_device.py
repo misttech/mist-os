@@ -5,12 +5,10 @@
 """FuchsiaDevice abstract base class implementation using Fuchsia-Controller."""
 
 import asyncio
-import collections
 import logging
 from typing import Any, Dict, Optional
 
 import fidl.fuchsia_buildinfo as f_buildinfo
-import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fidl.fuchsia_diagnostics as f_diagnostics
 import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
@@ -32,23 +30,24 @@ from honeydew.interfaces.affordances.bluetooth import \
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import \
+    fuchsia_controller as fuchsia_controller_transport
 from honeydew.utils import properties
 
-_FidlEndpoint = collections.namedtuple("_FidlEndpoint", ["moniker", "protocol"])
-_FC_PROXIES: Dict[str, _FidlEndpoint] = {
+_FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
     "BuildInfo":
-        _FidlEndpoint("/core/build-info", "fuchsia.buildinfo.Provider"),
+        custom_types.FidlEndpoint(
+            "/core/build-info", "fuchsia.buildinfo.Provider"),
     "DeviceInfo":
-        _FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Device"),
+        custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Device"),
     "ProductInfo":
-        _FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Product"),
+        custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Product"),
     "PowerAdmin":
-        _FidlEndpoint(
+        custom_types.FidlEndpoint(
             "/bootstrap/shutdown_shim",
             "fuchsia.hardware.power.statecontrol.Admin"),
     "RemoteControl":
-        _FidlEndpoint(
+        custom_types.FidlEndpoint(
             "/core/remote-control",
             "fuchsia.developer.remotecontrol.RemoteControl"),
 }
@@ -60,29 +59,6 @@ _LOG_SEVERITIES: Dict[custom_types.LEVEL, f_diagnostics.Severity] = {
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
-
-def _connect_device_proxy(
-        ctx: fuchsia_controller.Context,
-        proxy_name: str) -> fuchsia_controller.Channel:
-    """Opens a proxy to the device, according to a lookup table of names.
-
-    Args:
-        proxy_name: Name of the lookup table entry to use for the proxy's
-        moniker and protocol name.
-
-    Raises:
-        errors.FuchsiaControllerError: On FIDL communication failure.
-
-    Returns:
-        FIDL channel to proxy.
-    """
-    try:
-        return ctx.connect_device_proxy(
-            _FC_PROXIES[proxy_name].moniker, _FC_PROXIES[proxy_name].protocol)
-    except fuchsia_controller.ZxStatus as status:
-        raise errors.FuchsiaControllerError(
-            "Fuchsia Controller FIDL Error") from status
 
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
@@ -103,6 +79,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
     Raises:
         errors.SSHCommandError: if SSH connection check fails.
         errors.FFXCommandError: if FFX connection check fails.
+        errors.FuchsiaControllerError: if failed to instantiate
+            Fuchsia-Controller transport.
     """
 
     def __init__(
@@ -110,12 +88,26 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             device_name: str,
             ssh_private_key: Optional[str] = None,
             ssh_user: Optional[str] = None) -> None:
-        self._ctx: fuchsia_controller.Context
-        self._rcs_proxy: fd_remotecontrol.RemoteControl.Client
         super().__init__(device_name, ssh_private_key, ssh_user)
+        _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
+        self.fuchsia_controller.create_context()
 
-        _LOGGER.debug("Initializing FC-based FuchsiaDevice")
-        self._context_create()
+    # List all the transports in alphabetical order
+    @properties.Transport
+    def fuchsia_controller(
+            self) -> fuchsia_controller_transport.FuchsiaController:
+        """Returns the Fuchsia-Controller transport object.
+
+        Returns:
+            Fuchsia-Controller transport object.
+
+        Raises:
+            errors.FuchsiaControllerError: Failed to instantiate.
+        """
+        fuchsia_controller_obj: fuchsia_controller_transport.FuchsiaController \
+            = fuchsia_controller_transport.FuchsiaController(
+                device_name=self.device_name)
+        return fuchsia_controller_obj
 
     # List all the affordances in alphabetical order
     @properties.Affordance
@@ -159,7 +151,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """Clean up method."""
         # Explicitly destroy the context to close the fuchsia controller
         # connection.
-        self._context_destroy()
+        self.fuchsia_controller.destroy_context()
 
     def on_device_boot(self) -> None:
         """Take actions after the device is rebooted.
@@ -168,7 +160,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             errors.FuchsiaControllerError: On FIDL communication failure.
         """
         # Create a new Fuchsia controller context for new device connection.
-        self._context_create()
+        self.fuchsia_controller.create_context()
 
         # Ensure device is healthy
         self.health_check()
@@ -188,7 +180,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             buildinfo_provider_proxy = f_buildinfo.Provider.Client(
-                _connect_device_proxy(self._ctx, "BuildInfo"))
+                self.fuchsia_controller.connect_device_proxy(
+                    _FC_PROXIES["BuildInfo"]))
             build_info_resp = asyncio.run(
                 buildinfo_provider_proxy.get_build_info())
             return build_info_resp.build_info
@@ -208,7 +201,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             hwinfo_device_proxy = f_hwinfo.Device.Client(
-                _connect_device_proxy(self._ctx, "DeviceInfo"))
+                self.fuchsia_controller.connect_device_proxy(
+                    _FC_PROXIES["DeviceInfo"]))
             device_info_resp = asyncio.run(hwinfo_device_proxy.get_info())
             return device_info_resp.info
         except fuchsia_controller.ZxStatus as status:
@@ -227,7 +221,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             hwinfo_product_proxy = f_hwinfo.Product.Client(
-                _connect_device_proxy(self._ctx, "ProductInfo"))
+                self.fuchsia_controller.connect_device_proxy(
+                    _FC_PROXIES["ProductInfo"]))
             product_info_resp = asyncio.run(hwinfo_product_proxy.get_info())
             return product_info_resp.info
         except fuchsia_controller.ZxStatus as status:
@@ -235,67 +230,6 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                 "Fuchsia Controller FIDL Error") from status
 
     # List all private methods in alphabetical order
-    def _context_create(self) -> None:
-        """Creates the fuchsia-controller context and any long-lived proxies.
-
-        Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
-        """
-        try:
-            target: str = self.device_name
-
-            ffx_config: custom_types.FFXConfig = ffx_transport.get_config()
-
-            # To run Fuchsia-Controller in isolation
-            isolate_dir: Optional[fuchsia_controller.IsolateDir] = \
-                ffx_config.isolate_dir
-
-            # To collect Fuchsia-Controller logs
-            config: Dict[str, str] = {}
-            if ffx_config.logs_dir:
-                config["log.dir"] = ffx_config.logs_dir
-                config["log.level"] = "debug"
-
-            # Do not autostart the daemon if it is not running.
-            # If Fuchsia-Controller need to start a daemon then it needs to know
-            # SDK path to find FFX CLI.
-            # However, HoneyDew calls FFX CLI (and thus starts the FFX daemon)
-            # even before it instantiates Fuchsia-Controller. So tell
-            # Fuchsia-Controller to use the same daemon (by pointing to same
-            # isolate-dir and logs-dir path used to start the daemon) and set
-            # "daemon.autostart" to "false".
-            config["daemon.autostart"] = "false"
-
-            # Overnet, the legacy implementation has known issues and is
-            # deprecated, but at the moment it is still active by default, for
-            # compatibility reasons. It should be disabled when those
-            # compatibility concerns are not relevant. "overnet.cso" disables
-            # legacy code in favor of its modern replacement,
-            # CSO (Circuit-Switched Overnet).
-            config["overnet.cso"] = "only"
-
-            self._ctx = fuchsia_controller.Context(
-                config=config, isolate_dir=isolate_dir, target=target)
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FuchsiaControllerError(
-                "Failed to create Fuchsia-Controller context") from err
-
-        try:
-            # TODO(fxb/128575): Make connect_remote_control_proxy() work, or
-            # remove it.
-            self._rcs_proxy = fd_remotecontrol.RemoteControl.Client( \
-                    _connect_device_proxy(self._ctx, "RemoteControl"))
-        except fuchsia_controller.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
-                "Failed to create RemoteControl proxy") from status
-
-    def _context_destroy(self) -> None:
-        """Destroys the fuchsia-controller context and any long-lived proxies,
-        closing the fuchsia-controller connection.
-        """
-        self._ctx = None
-        self._rcs_proxy = None
-
     def _send_log_command(
             self, tag: str, message: str, level: custom_types.LEVEL) -> None:
         """Send a device command to write to the syslog.
@@ -310,7 +244,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             asyncio.run(
-                self._rcs_proxy.log_message(
+                self.fuchsia_controller.rcs_proxy.log_message(
                     tag=tag, message=message, severity=_LOG_SEVERITIES[level]))
         except fuchsia_controller.ZxStatus as status:
             raise errors.FuchsiaControllerError(
@@ -324,7 +258,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             power_proxy = fhp_statecontrol.Admin.Client(
-                _connect_device_proxy(self._ctx, "PowerAdmin"))
+                self.fuchsia_controller.connect_device_proxy(
+                    _FC_PROXIES["PowerAdmin"]))
             asyncio.run(
                 power_proxy.reboot(
                     reason=fhp_statecontrol.RebootReason.USER_REQUEST))

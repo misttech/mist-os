@@ -59,6 +59,7 @@ python_library("honeydew") {
     "transports/__init__.py",
     "transports/fastboot.py",
     "transports/ffx.py",
+    "transports/fuchsia_controller.py",
     "transports/sl4f.py",
     "transports/ssh.py",
     "utils/__init__.py",
