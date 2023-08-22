@@ -13,6 +13,7 @@ foreach(board,
           "qemu-x64",
           "vim3",
           "riscv64",
+          "qemu-riscv64",
         ]) {
   target_label = "verify_${board}"
   verification_targets += [ ":${target_label}" ]

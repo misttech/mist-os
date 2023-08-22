@@ -4,7 +4,7 @@
 
 import("//build/assembly/board_configuration.gni")
 
-board_configuration("qemu-riscv64") {
+board_configuration("riscv64") {
   verify_against = "board_information.json5"
 
   provided_features = [

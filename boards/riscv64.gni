@@ -10,7 +10,7 @@ _imports = {  # Import into hidden scope, to avoid importing into args.gn.
 
 # BoardInformation for Product Assembly
 board_information_for_assembly = "//boards/riscv64/board_information.json5"
-board_configuration_label = "//boards/riscv64:qemu-riscv64"
+board_configuration_label = "//boards/riscv64"
 
 board_name = "riscv64"
 board_description = "A generic emulated riscv64 device."
