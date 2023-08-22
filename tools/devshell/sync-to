@@ -277,7 +277,7 @@ class SyncToCommand:
             snapshot_file,
             dry_run_safe=True,
             stdout=subprocess.PIPE,
-        ).stdout.strip()
+        ).stdout.strip().splitlines()[-1]
         self.assert_correct_integration_repo(integration_remote)
         print(f"Syncing to Jiri snapshot {str(snapshot_file)!r}")
         self.jiri("update", "-local-manifest", "-gc", snapshot_file)
@@ -333,7 +333,7 @@ class SyncToCommand:
             jiri_manifest,
             dry_run_safe=True,
             stdout=subprocess.PIPE,
-        ).stdout.strip()
+        ).stdout.strip().splitlines()[-1]
         if local_remote != remote:
             raise Error(
                 f"Integration remote {remote!r} does not match local"
@@ -356,7 +356,7 @@ class SyncToCommand:
             jiri_manifest,
             dry_run_safe=True,
             stdout=subprocess.PIPE,
-        ).stdout.strip()
+        ).stdout.strip().splitlines()[-1]
         manifest = checkout_info["manifest"]
         if local_manifest != manifest:
             workaround = (
