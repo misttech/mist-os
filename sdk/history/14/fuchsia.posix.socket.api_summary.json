@@ -3855,12 +3855,6 @@
     },
     {
         "kind": "const",
-        "name": "fuchsia.posix.socket/SIGNAL_STREAM_UNCONNECTED",
-        "type": "uint32",
-        "value": "1073741824"
-    },
-    {
-        "kind": "const",
         "name": "fuchsia.posix.socket/STREAM_SOCKET_PROTOCOL_NAME",
         "type": "string",
         "value": "fuchsia.posix.socket/StreamSocket"
@@ -6296,12 +6290,6 @@
         "name": "fuchsia.posix.socket/USER_SIGNAL_5",
         "type": "uint32",
         "value": "536870912"
-    },
-    {
-        "kind": "const",
-        "name": "fuchsia.posix.socket/USER_SIGNAL_6",
-        "type": "uint32",
-        "value": "1073741824"
     },
     {
         "kind": "enum/member",

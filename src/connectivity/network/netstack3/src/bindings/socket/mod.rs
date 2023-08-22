@@ -50,8 +50,6 @@ const ZXSIO_SIGNAL_OUTGOING: zx::Signals =
     const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_OUTGOING));
 const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
     const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_STREAM_CONNECTED));
-const ZXSIO_SIGNAL_UNCONNECTED: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_STREAM_UNCONNECTED));
 
 /// Common properties for socket workers.
 #[derive(Debug)]

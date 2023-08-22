@@ -58,7 +58,7 @@ use crate::bindings::{
     socket::{
         worker::{self, CloseResponder, SocketWorker},
         IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
-        ZXSIO_SIGNAL_INCOMING, ZXSIO_SIGNAL_UNCONNECTED,
+        ZXSIO_SIGNAL_INCOMING,
     },
     trace_duration,
     util::{
@@ -445,15 +445,12 @@ struct BindingData<I: IpExt> {
 }
 
 impl<I: IpExt> BindingData<I> {
-    fn new_for_created_socket(
+    fn new(
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         properties: SocketWorkerProperties,
     ) -> Self {
         let (local, peer) = zx::Socket::create_stream();
-        local
-            .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_UNCONNECTED)
-            .expect("the peer-end is always held alongside the local-end");
         let local = Arc::new(local);
         let SocketWorkerProperties {} = properties;
         let notifier = NeedsDataNotifier::default();
@@ -530,7 +527,7 @@ pub(super) fn spawn_worker(
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
             fasync::Task::spawn(SocketWorker::serve_stream_with(
                 ctx,
-                BindingData::<Ipv4>::new_for_created_socket,
+                BindingData::<Ipv4>::new,
                 SocketWorkerProperties {},
                 request_stream,
             ))
@@ -538,7 +535,7 @@ pub(super) fn spawn_worker(
         (fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp) => {
             fasync::Task::spawn(SocketWorker::serve_stream_with(
                 ctx,
-                BindingData::<Ipv6>::new_for_created_socket,
+                BindingData::<Ipv6>::new,
                 SocketWorkerProperties {},
                 request_stream,
             ))
@@ -661,12 +658,6 @@ struct RequestHandler<'a, I: IpExt> {
     ctx: &'a mut Ctx,
 }
 
-fn handle_socket_not_unconnected(local: &zx::Socket) {
-    local
-        .signal_peer(ZXSIO_SIGNAL_UNCONNECTED, zx::Signals::NONE)
-        .expect("the peer-end is always held alongside the local-end")
-}
-
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
 where
     DeviceId<BindingsNonSyncCtxImpl>:
@@ -686,7 +677,7 @@ where
     }
 
     fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { id, peer: _, local_socket_and_watcher }, ctx } = self;
+        let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let (ip, remote_port) =
@@ -695,8 +686,7 @@ where
         let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
         let connection = connect::<I, _>(sync_ctx, non_sync_ctx, *id, SocketAddr { ip, port })
             .map_err(IntoErrno::into_errno)?;
-        if let Some((local, watcher)) = local_socket_and_watcher.take() {
-            handle_socket_not_unconnected(&local);
+        if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
             spawn_send_task::<I>(ctx.clone(), local, watcher, connection);
             *id = connection;
             Err(fposix::Errno::Einprogress)
@@ -706,7 +696,7 @@ where
     }
 
     fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { id, peer: _, local_socket_and_watcher }, ctx } = self;
+        let Self { data: BindingData { id, peer: _, local_socket_and_watcher: _ }, ctx } = self;
         let sync_ctx = ctx.sync_ctx();
         // The POSIX specification for `listen` [1] says
         //
@@ -731,12 +721,6 @@ where
         });
 
         *id = listen::<I, _>(sync_ctx, *id, backlog).map_err(IntoErrno::into_errno)?;
-
-        let (local, _watcher) = local_socket_and_watcher
-            .as_ref()
-            .expect("local socket should be available when listening");
-        handle_socket_not_unconnected(local);
-
         Ok(())
     }
 

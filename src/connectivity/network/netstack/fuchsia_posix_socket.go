@@ -62,7 +62,6 @@ const (
 
 	signalStreamIncoming        = zx.Signals(socket.SignalStreamIncoming)
 	signalStreamConnected       = zx.Signals(socket.SignalStreamConnected)
-	signalStreamUnconnected     = zx.Signals(socket.SignalStreamUnconnected)
 	signalDatagramIncoming      = zx.Signals(socket.SignalDatagramIncoming)
 	signalDatagramOutgoing      = zx.Signals(socket.SignalDatagramOutgoing)
 	signalDatagramError         = zx.Signals(socket.SignalDatagramError)
@@ -1260,21 +1259,6 @@ func newEndpointWithSocket(
 	return eps, nil
 }
 
-func (eps *endpointWithSocket) handleSocketNotUnconnected() {
-	err := eps.local.Handle().SignalPeer(signalStreamUnconnected, 0)
-	switch err := err.(type) {
-	case nil:
-		return
-	case *zx.Error:
-		switch err.Status {
-		case zx.ErrBadHandle:
-			return
-		}
-	}
-
-	panic(fmt.Sprintf("socketEP.local.Handle().SignalPeer(signalStreamUnconnected, 0) = %s", err))
-}
-
 func (eps *endpointWithSocket) HUp() {
 	eps.onHUpOnce.Do(func() {
 		if !eps.endpoint.ns.onRemoveEndpoint(eps.endpoint.key) {
@@ -1435,8 +1419,6 @@ func (s *streamSocketImpl) Listen(_ fidl.Context, backlog int16) (socket.StreamS
 		return socket.StreamSocketListenResultWithErr(tcpipErrorToCode(err)), nil
 	}
 
-	s.endpointWithSocket.handleSocketNotUnconnected()
-
 	// It is possible to call `listen` on a connected socket - such a call would
 	// fail above, so we register the callback only in the success case to avoid
 	// incorrectly handling events on connected sockets.
@@ -1544,8 +1526,6 @@ func (s *streamSocketImpl) Connect(_ fidl.Context, address fnet.SocketAddress) (
 
 	switch err.(type) {
 	case *tcpip.ErrConnectStarted, nil:
-		s.endpointWithSocket.handleSocketNotUnconnected()
-
 		// It is possible to call `connect` on a listening socket - such a call
 		// would fail above, so we register the callback only in the success case
 		// to avoid incorrectly handling events on connected sockets.
@@ -4253,9 +4233,6 @@ func (sp *providerImpl) StreamSocket(_ fidl.Context, domain socket.Domain, proto
 	streamSocketInterface, err := newStreamSocket(makeStreamSocketImpl(socketEp))
 	if err != nil {
 		return socket.ProviderStreamSocketResult{}, err
-	}
-	if err := socketEp.local.Handle().SignalPeer(0, signalStreamUnconnected); err != nil {
-		panic(fmt.Sprintf("socketEP.local.Handle().SignalPeer(0, signalStreamUnconnected) = %s", err))
 	}
 	return socket.ProviderStreamSocketResultWithResponse(socket.ProviderStreamSocketResponse{
 		S: socket.StreamSocketWithCtxInterface{Channel: streamSocketInterface.Channel},

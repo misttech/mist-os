@@ -30,11 +30,6 @@
 #include "socket_address.h"
 #include "src/connectivity/network/netstack/udp_serde/udp_serde.h"
 
-// Indicates if this library is built with an API level where a (user) signal
-// was introduced to be asserted on created stream sockets until connect or
-// listen is called on the socket.
-#define FUCHSIA_API_SUPPORTS_UNCONNECTED_SIGNAL (__Fuchsia_API_level__ >= 14)
-
 namespace fio = fuchsia_io;
 namespace fsocket = fuchsia_posix_socket;
 namespace frawsocket = fuchsia_posix_socket_raw;
@@ -2844,48 +2839,22 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
       : socket_with_zx_socket(stream_socket.client), stream_socket_(stream_socket) {}
 
   void wait_begin(zxio_signals_t zxio_signals, zx_handle_t* handle, zx_signals_t* out_signals) {
-#if FUCHSIA_API_SUPPORTS_UNCONNECTED_SIGNAL
-    bool use_unconnected = false;
-#endif
     zxio_signals_t pipe_signals = ZXIO_SIGNAL_PEER_CLOSED;
-
-    auto add_listening_signals = []() {};
-
-    auto add_connecting_signals = [&zxio_signals, &pipe_signals]() {
-      if (zxio_signals & ZXIO_SIGNAL_READABLE) {
-        pipe_signals |= ZXIO_SIGNAL_READABLE;
-      }
-    };
 
     auto [state, has_error] = GetState();
     switch (state) {
       case zxio_stream_socket_state_t::UNCONNECTED:
-#if FUCHSIA_API_SUPPORTS_UNCONNECTED_SIGNAL
-        // Handle signal registration for the unconnected state like we would
-        // for a union of listening and connecting states.
-        //
-        // Although stream sockets which are non-listening or unconnected do not
-        // have a potential peer to generate any waitable signals, the caller
-        // may change the state of the socket after performing this wait_begin.
-        // To accommodate such applications, we allow the registration of signals
-        // of other states that may be reached directly from an unconnected
-        // socket.
-        use_unconnected = true;
-        add_listening_signals();
-        add_connecting_signals();
-        break;
-#else
         // Stream sockets which are non-listening or unconnected do not have a potential peer
         // to generate any waitable signals, skip signal waiting and notify the caller of the
         // same.
         *out_signals = ZX_SIGNAL_NONE;
         return;
-#endif
       case zxio_stream_socket_state_t::LISTENING:
-        add_listening_signals();
         break;
       case zxio_stream_socket_state_t::CONNECTING:
-        add_connecting_signals();
+        if (zxio_signals & ZXIO_SIGNAL_READABLE) {
+          pipe_signals |= ZXIO_SIGNAL_READABLE;
+        }
         break;
       case zxio_stream_socket_state_t::CONNECTED:
         if (zxio_signals & ZXIO_SIGNAL_READABLE) {
@@ -2919,43 +2888,40 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
       // signal when a listening socket gets an incoming connection.
       zx_signals |= fsocket::wire::kSignalStreamIncoming;
     }
-#if FUCHSIA_API_SUPPORTS_UNCONNECTED_SIGNAL
-    if (use_unconnected) {
-      zx_signals |= fsocket::wire::kSignalStreamUnconnected;
-    }
-#endif
     *out_signals = zx_signals;
   }
 
   void wait_end(zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
     zxio_signals_t zxio_signals = ZXIO_SIGNAL_NONE;
 
-    bool use_pipe = false;
+    bool use_pipe;
     {
       std::lock_guard lock(stream_socket_.state_lock);
       auto [state, has_error] = StateLocked();
       switch (state) {
         case zxio_stream_socket_state_t::UNCONNECTED:
+          ZX_ASSERT_MSG(zx_signals == ZX_SIGNAL_NONE, "zx_signals=%s on unconnected socket",
+                        std::bitset<sizeof(zx_signals)>(zx_signals).to_string().c_str());
           *out_zxio_signals = ZXIO_SIGNAL_WRITABLE | ZXIO_SIGNAL_PEER_CLOSED;
+          use_pipe = false;
           return;
+
         case zxio_stream_socket_state_t::LISTENING:
           if (zx_signals & fsocket::wire::kSignalStreamIncoming) {
             zxio_signals |= ZXIO_SIGNAL_READABLE;
           }
+          use_pipe = false;
+          break;
+        case zxio_stream_socket_state_t::CONNECTING:
+          if (zx_signals & fsocket::wire::kSignalStreamConnected) {
+            stream_socket_.state = zxio_stream_socket_state_t::CONNECTED;
+            zxio_signals |= ZXIO_SIGNAL_WRITABLE;
+          }
+          zx_signals &= ~fsocket::wire::kSignalStreamConnected;
+          use_pipe = false;
           break;
         case zxio_stream_socket_state_t::CONNECTED:
           use_pipe = true;
-          // Fallthrough in case wait_begin was called while we were unconnected
-          // and we need to translate the kSignalStreamConnected signal to
-          // a writable signal.
-          __FALLTHROUGH;
-        case zxio_stream_socket_state_t::CONNECTING:
-          if (zx_signals & fsocket::wire::kSignalStreamConnected) {
-            zx_signals &= ~fsocket::wire::kSignalStreamConnected;
-            stream_socket_.state = zxio_stream_socket_state_t::CONNECTED;
-            zxio_signals |= ZXIO_SIGNAL_WRITABLE;
-            use_pipe = true;
-          }
           break;
       }
     }
