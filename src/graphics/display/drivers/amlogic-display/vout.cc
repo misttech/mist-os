@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/device-protocol/display-panel.h>
+#include <zircon/status.h>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
@@ -137,40 +138,7 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware
 
 zx_status_t Vout::RestartDisplay() {
   zxlogf(INFO, "restarting display");
-  zx_status_t status;
-  switch (type_) {
-    case VoutType::kDsi:
-
-      // Enable all display related clocks
-      status = dsi_.clock->Enable(dsi_.disp_setting);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Could not enable display clocks!");
-        return status;
-      }
-
-      dsi_.clock->SetVideoOn(false);
-      // Program and Enable DSI Host Interface
-      status = dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate());
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "DSI Host On failed: %s", zx_status_get_string(status));
-        return status;
-      }
-      dsi_.clock->SetVideoOn(true);
-
-      break;
-    case VoutType::kHdmi:
-      status = hdmi_.hdmi_host->HostOn();
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "HDMI initialization failed: %s", zx_status_get_string(status));
-        return status;
-      }
-      break;
-    default:
-      zxlogf(ERROR, "Unrecognized Vout type %u", type_);
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  return ZX_OK;
+  return PowerOn().status_value();
 }
 
 void Vout::PopulateAddedDisplayArgs(
@@ -205,7 +173,7 @@ void Vout::PopulateAddedDisplayArgs(
 void Vout::DisplayConnected() {
   switch (type_) {
     case kHdmi:
-      memset(&hdmi_.cur_display_mode_, 0, sizeof(display_mode_t));
+      hdmi_.cur_display_mode_ = {};
       break;
     default:
       break;
@@ -223,20 +191,61 @@ void Vout::DisplayDisconnected() {
 }
 
 zx::result<> Vout::PowerOff() {
-  if (type_ == kDsi) {
-    dsi_.clock->Disable();
-    dsi_.dsi_host->Disable(dsi_.disp_setting);
-    return zx::ok();
+  switch (type_) {
+    case VoutType::kDsi: {
+      dsi_.clock->Disable();
+      dsi_.dsi_host->Disable(dsi_.disp_setting);
+      return zx::ok();
+    }
+    case VoutType::kHdmi: {
+      hdmi_.hdmi_host->HostOff();
+      return zx::ok();
+    }
+    case VoutType::kUnknown:
+      break;
   }
+  zxlogf(ERROR, "Unrecognized Vout type %u", type_);
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<> Vout::PowerOn() {
-  if (type_ == kDsi) {
-    dsi_.clock->Enable(dsi_.disp_setting);
-    dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate());
-    return zx::ok();
+  switch (type_) {
+    case VoutType::kDsi: {
+      zx::result<> clock_enable_result = zx::make_result(dsi_.clock->Enable(dsi_.disp_setting));
+      if (!clock_enable_result.is_ok()) {
+        zxlogf(ERROR, "Could not enable display clocks: %s", clock_enable_result.status_string());
+        return clock_enable_result;
+      }
+
+      dsi_.clock->SetVideoOn(false);
+      // Configure and enable DSI host interface.
+      zx::result<> dsi_host_enable_result =
+          zx::make_result(dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate()));
+      if (!dsi_host_enable_result.is_ok()) {
+        zxlogf(ERROR, "Could not enable DSI Host: %s", dsi_host_enable_result.status_string());
+        return dsi_host_enable_result;
+      }
+      dsi_.clock->SetVideoOn(true);
+      return zx::ok();
+    }
+    case VoutType::kHdmi: {
+      zx::result<> hdmi_host_on_result = zx::make_result(hdmi_.hdmi_host->HostOn());
+      if (!hdmi_host_on_result.is_ok()) {
+        zxlogf(ERROR, "Could not enable HDMI host: %s", hdmi_host_on_result.status_string());
+        return hdmi_host_on_result;
+      }
+
+      // After HDMI host is on, the display timings is reset and the driver
+      // must perform modeset again.
+      // This clears the previously set display mode to force an HDMI modeset
+      // on the next ApplyConfiguration().
+      hdmi_.cur_display_mode_ = {};
+      return zx::ok();
+    }
+    case VoutType::kUnknown:
+      break;
   }
+  zxlogf(ERROR, "Unrecognized Vout type %u", type_);
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
