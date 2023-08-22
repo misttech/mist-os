@@ -8,12 +8,18 @@ welcome!
 
 ### Configure your build
 
-In order to run starnix, we need to build `//src/starnix`:
+In order to run starnix, we need to build `//src/starnix`.
+
+For faster iteration, configure your build with incremental compilation:
 
 ```sh
-fx set core.x64 --with //src/starnix,//src/starnix:tests
+fx set core.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix,//src/starnix:tests
 fx build
 ```
+
+> Note: While we recommend using incremental compilation, you may experience a rust
+> internal compiler error.
+> If so, simply `rm -rf out/default/incremental/*` and try again.
 
 > Note: If you have `//vendor/google` in your source tree, you might want to add
 > `//vendor/google/starnix:tests` to the `fx set` command above to include some
