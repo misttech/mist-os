@@ -7,13 +7,13 @@ import("//build/sdk/sdk.gni")
 
 # The list of FIDLs to include in the core IDK.
 sdk_fidl_targets = [
+  # keep-sorted: begin
   "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture",
   "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics",
   "//sdk/fidl/fuchsia.accessibility.tts:fuchsia.accessibility.tts",
   "//sdk/fidl/fuchsia.accessibility.virtualkeyboard:fuchsia.accessibility.virtualkeyboard",
   "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects",
   "//sdk/fidl/fuchsia.auth:fuchsia.auth",
-  "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs",
   "//sdk/fidl/fuchsia.auth.oldtokens:fuchsia.auth.oldtokens",
   "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth",
   "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp",
@@ -43,7 +43,9 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.component.test:fuchsia.component.test",
   "//sdk/fidl/fuchsia.component.types:fuchsia.component.types",
   "//sdk/fidl/fuchsia.data:fuchsia.data",
+  "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
   "//sdk/fidl/fuchsia.developer.tiles:fuchsia.developer.tiles",
+  "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs",
   "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics",
   "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types",
   "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework",
@@ -123,6 +125,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.sys.test:fuchsia.sys.test",
   "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo",
   "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem",
+  "//sdk/fidl/fuchsia.test:fuchsia.test",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal",
   "//sdk/fidl/fuchsia.tracing:fuchsia.tracing",
   "//sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto",
@@ -163,9 +166,12 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.wlan.product.deprecatedconfiguration:fuchsia.wlan.product.deprecatedconfiguration",
   "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac",
   "//zircon/vdso/zx:zx",
+
+  # keep-sorted: end
 ]
 
-# The list of FIDLs to include in the core testing IDK.
+# TODO(fxbug.dev/111461): Delete `core_testing`.
+# DO NOT ADD anything here!
 sdk_fidl_testing_targets = [
   "//sdk/fidl/fuchsia.test:fuchsia.test",
   "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
@@ -201,7 +207,8 @@ sdk_molecule("fidl") {
   ]
 }
 
-# Fuchsia IDL (FIDL) files defining testing API for the SDK.
+# TODO(fxbug.dev/111461): Delete `core_testing`.
+# DO NOT ADD anything here!
 sdk_molecule("fidl_testing") {
   testonly = true
   visibility = [

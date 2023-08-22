@@ -9,6 +9,7 @@ sdk://docs/low_level
 sdk://docs/metadata_schemas
 sdk://docs/musl_license
 sdk://docs/open_source
+sdk://docs/ref_docs
 sdk://docs/sdk_notice
 sdk://docs/vulkan_license
 sdk://fidl/fuchsia.accessibility.gesture
@@ -46,6 +47,7 @@ sdk://fidl/fuchsia.component.runner
 sdk://fidl/fuchsia.component.test
 sdk://fidl/fuchsia.component.types
 sdk://fidl/fuchsia.data
+sdk://fidl/fuchsia.debugdata
 sdk://fidl/fuchsia.developer.tiles
 sdk://fidl/fuchsia.device.fs
 sdk://fidl/fuchsia.diagnostics
@@ -127,6 +129,7 @@ sdk://fidl/fuchsia.sys
 sdk://fidl/fuchsia.sys.test
 sdk://fidl/fuchsia.sysinfo
 sdk://fidl/fuchsia.sysmem
+sdk://fidl/fuchsia.test
 sdk://fidl/fuchsia.thermal
 sdk://fidl/fuchsia.tracing
 sdk://fidl/fuchsia.tracing.perfetto
@@ -174,6 +177,7 @@ sdk://pkg/async-loop
 sdk://pkg/async-loop-cpp
 sdk://pkg/async-loop-default
 sdk://pkg/async-loop-testing
+sdk://pkg/async-testing
 sdk://pkg/component_incoming_cpp
 sdk://pkg/component_outgoing_cpp
 sdk://pkg/driver_component_cpp
@@ -190,8 +194,6 @@ sdk://pkg/driver_runtime_testing
 sdk://pkg/driver_runtime_testing_cpp
 sdk://pkg/driver_symbols
 sdk://pkg/driver_testing_cpp
-sdk://pkg/fidl_driver
-sdk://pkg/fidl_driver_transport
 sdk://pkg/fdio
 sdk://pkg/fidl
 sdk://pkg/fidl_base
@@ -203,6 +205,10 @@ sdk://pkg/fidl_cpp_natural_ostream
 sdk://pkg/fidl_cpp_sync
 sdk://pkg/fidl_cpp_v2
 sdk://pkg/fidl_cpp_wire
+sdk://pkg/fidl_driver
+sdk://pkg/fidl_driver
+sdk://pkg/fidl_driver_transport
+sdk://pkg/fidl_driver_transport
 sdk://pkg/fit
 sdk://pkg/fit-promise
 sdk://pkg/images_cpp
@@ -214,11 +220,14 @@ sdk://pkg/magma_common
 sdk://pkg/media_cpp
 sdk://pkg/media_cpp_no_converters
 sdk://pkg/scenic_cpp
+sdk://pkg/scenic_cpp_testing
 sdk://pkg/stdcompat
 sdk://pkg/svc
 sdk://pkg/sync
 sdk://pkg/sync_cpp
+sdk://pkg/sys_component_cpp_testing
 sdk://pkg/sys_cpp
+sdk://pkg/sys_cpp_testing
 sdk://pkg/sys_inspect_cpp
 sdk://pkg/sys_service_cpp
 sdk://pkg/syslog
@@ -234,8 +243,8 @@ sdk://pkg/vulkan_layers
 sdk://pkg/zx
 sdk://tools/arm64/aemu_internal
 sdk://tools/arm64/bindc
-sdk://tools/arm64/blobfs-compression
 sdk://tools/arm64/blobfs_do_not_depend
+sdk://tools/arm64/blobfs-compression
 sdk://tools/arm64/bootserver
 sdk://tools/arm64/cmc
 sdk://tools/arm64/configc
@@ -265,8 +274,8 @@ sdk://tools/arm64/zbi
 sdk://tools/arm64/zxdb
 sdk://tools/x64/aemu_internal
 sdk://tools/x64/bindc
-sdk://tools/x64/blobfs-compression
 sdk://tools/x64/blobfs_do_not_depend
+sdk://tools/x64/blobfs-compression
 sdk://tools/x64/bootserver
 sdk://tools/x64/cmc
 sdk://tools/x64/configc

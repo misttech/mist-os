@@ -13,7 +13,6 @@ zx_library("async-testing") {
     "lib/async-testing/test_loop_dispatcher.h",
     "lib/async-testing/test_subloop.h",
   ]
-  testonly = true
   sources = [
     "dispatcher_stub.cc",
     "test_loop.cc",

@@ -5,8 +5,6 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("cpp") {
-  testonly = true
-
   category = "partner"
 
   sdk_name = "sys_cpp_testing"

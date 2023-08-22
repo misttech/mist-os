@@ -35,6 +35,7 @@
 //sdk/fidl/fuchsia.component.types:fuchsia.component.types_sdk
 //sdk/fidl/fuchsia.component:fuchsia.component_sdk
 //sdk/fidl/fuchsia.data:fuchsia.data_sdk
+//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_sdk
 //sdk/fidl/fuchsia.developer.tiles:fuchsia.developer.tiles_sdk
 //sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_sdk
 //sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_sdk
@@ -116,6 +117,7 @@
 //sdk/fidl/fuchsia.sys:fuchsia.sys_sdk
 //sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_sdk
 //sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_sdk
+//sdk/fidl/fuchsia.test:fuchsia.test_sdk
 //sdk/fidl/fuchsia.thermal:fuchsia.thermal_sdk
 //sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto_sdk
 //sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_sdk
@@ -192,7 +194,9 @@
 //sdk/lib/media/cpp:no_converters_sdk
 //sdk/lib/stdcompat:stdcompat_sdk
 //sdk/lib/svc:svc_sdk_manifest
+//sdk/lib/sys/component/cpp/testing:cpp_library_sdk
 //sdk/lib/sys/component:realm_builder_shard_sdk
+//sdk/lib/sys/cpp/testing:cpp_sdk
 //sdk/lib/sys/cpp:cpp_sdk
 //sdk/lib/sys/inspect/cpp:cpp_sdk
 //sdk/lib/sys/service/cpp:cpp_sdk
@@ -200,6 +204,7 @@
 //sdk/lib/syslog/structured_backend:structured_backend_sdk
 //sdk/lib/syslog:syslog
 //sdk/lib/trace:trace
+//sdk/lib/ui/scenic/cpp/testing:testing_sdk
 //sdk/lib/ui/scenic/cpp:cpp_sdk
 //sdk/lib/utf-utils:utf-utils_sdk
 //sdk/lib/vfs/cpp:cpp_sdk
@@ -235,6 +240,7 @@
 //tools/bootserver_old:bootserver_sdk
 //tools/cmc:cmc_sdk
 //tools/configc:configc_sdk
+//tools/docsgen:ref_docs_sdk
 //tools/fidl/fidlc:fidl-format_sdk
 //tools/fidl/fidlc:fidlc_sdk
 //tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk
@@ -251,6 +257,7 @@
 //zircon/system/ulib/async-loop:async-loop-cpp_sdk
 //zircon/system/ulib/async-loop:async-loop-default_sdk_manifest
 //zircon/system/ulib/async-loop:async-loop_sdk
+//zircon/system/ulib/async-testing:async-testing_sdk
 //zircon/system/ulib/async:async-cpp_sdk
 //zircon/system/ulib/async:async_sdk
 //zircon/system/ulib/inspect:inspect_sdk

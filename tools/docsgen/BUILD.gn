@@ -69,13 +69,12 @@ clidoc_tarfile = "clidoc_out.tar.gz"
 compiled_action("invoke_clidoc") {
   tool = "//tools/clidoc:clidoc_bin"
   tool_output_name = "clidoc"
-  testonly = true
   depfile = "$target_out_dir/$target_name.d"
   deps = [
     "//sdk:host_tools.all",
 
     # TODO(https://fxbug.dev/86553) check if triage belongs in sdk docs.
-    "//src/diagnostics/triage:triage",
+    "//src/diagnostics/triage:triage_bin",
   ]
   metadata = {
     # Record metadata for the //tools/docsgen build API.
@@ -130,7 +129,6 @@ action("invoke_helpdoc") {
 
   script_output = get_target_outputs(":${_helpdoc_script_target}")
   script = script_output[0]
-  testonly = true
   depfile = "$target_out_dir/$target_name.d"
   metadata = {
     # Record metadata for the //tools/docsgen build API.
@@ -168,7 +166,6 @@ action("invoke_helpdoc") {
 compiled_action("invoke_cmldoc") {
   tool = "//tools/cmc:cmc"
   tool_output_name = "cmc"
-  testonly = true
   metadata = {
     # Record metadata for the //tools/docsgen build API.
     generated_docset = [
@@ -281,7 +278,6 @@ foreach(sdk_doc, sdk_docs) {
 
 sdk_documentation("ref_docs_sdk") {
   name = "ref_docs"
-  testonly = true
   category = "partner"
 
   files = sdk_doc_files

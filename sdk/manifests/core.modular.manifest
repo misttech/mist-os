@@ -8,6 +8,7 @@ sdk://docs/low_level
 sdk://docs/metadata_schemas
 sdk://docs/musl_license
 sdk://docs/open_source
+sdk://docs/ref_docs
 sdk://docs/vulkan_license
 sdk://fidl/fuchsia.accessibility.gesture
 sdk://fidl/fuchsia.accessibility.semantics
@@ -42,6 +43,7 @@ sdk://fidl/fuchsia.component.runner
 sdk://fidl/fuchsia.component.test
 sdk://fidl/fuchsia.component.types
 sdk://fidl/fuchsia.data
+sdk://fidl/fuchsia.debugdata
 sdk://fidl/fuchsia.developer.tiles
 sdk://fidl/fuchsia.diagnostics
 sdk://fidl/fuchsia.diagnostics.types
@@ -116,6 +118,7 @@ sdk://fidl/fuchsia.sys
 sdk://fidl/fuchsia.sys.test
 sdk://fidl/fuchsia.sysinfo
 sdk://fidl/fuchsia.sysmem
+sdk://fidl/fuchsia.test
 sdk://fidl/fuchsia.thermal
 sdk://fidl/fuchsia.tracing
 sdk://fidl/fuchsia.tracing.perfetto
@@ -155,6 +158,12 @@ sdk://pkg/async-loop
 sdk://pkg/async-loop-cpp
 sdk://pkg/async-loop-default
 sdk://pkg/async-loop-testing
+sdk://pkg/async-testing
+sdk://pkg/driver_runtime_env
+sdk://pkg/driver_runtime_env_cpp
+sdk://pkg/driver_runtime_testing
+sdk://pkg/driver_runtime_testing_cpp
+sdk://pkg/driver_testing_cpp
 sdk://pkg/fdio
 sdk://pkg/fidl
 sdk://pkg/fidl_base
@@ -171,10 +180,14 @@ sdk://pkg/media_cpp_no_converters
 sdk://pkg/memfs
 sdk://pkg/modular_cpp
 sdk://pkg/scenic_cpp
+sdk://pkg/scenic_cpp_testing
 sdk://pkg/stdcompat
 sdk://pkg/svc
 sdk://pkg/sync
+sdk://pkg/sync_cpp
+sdk://pkg/sys_component_cpp_testing
 sdk://pkg/sys_cpp
+sdk://pkg/sys_cpp_testing
 sdk://pkg/sys_inspect_cpp
 sdk://pkg/sys_service_cpp
 sdk://pkg/syslog

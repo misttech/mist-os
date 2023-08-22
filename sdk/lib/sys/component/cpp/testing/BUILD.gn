@@ -15,8 +15,6 @@ group("cpp") {
 }
 
 sdk_source_set("cpp_library") {
-  testonly = true
-
   category = "partner"
 
   sdk_name = "sys_component_cpp_testing"
