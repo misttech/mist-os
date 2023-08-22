@@ -767,7 +767,6 @@ assembly_input_bundle("core_realm_development_access") {
     # ffx's remote-control (remote access) components:
     "//src/developer/remote-control:remote-control-package",
     "//src/developer/remote-control:pkg-diagnostics-bridge",
-    "//src/connectivity/overnet/overnetstack",
 
     # The developer snapshot tool.
     "//src/developer/forensics/snapshot:pkg",

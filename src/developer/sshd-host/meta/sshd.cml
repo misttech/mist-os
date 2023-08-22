@@ -305,15 +305,5 @@
             ],
             availability: "optional",
         },
-
-        // TODO(https://fxbug.dev/97617): If there's no v1 dependencies these should not be routed here.
-        {
-            protocol: [
-                "fuchsia.overnet.MeshController",
-                "fuchsia.overnet.Overnet",
-                "fuchsia.overnet.ServiceConsumer",
-                "fuchsia.overnet.ServicePublisher",
-            ],
-        },
     ],
 }

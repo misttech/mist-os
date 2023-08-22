@@ -113,11 +113,6 @@
             url: "fuchsia-pkg://fuchsia.com/fonts#meta/fonts.cm",
         },
         {
-            name: "overnetstack",
-            url: "fuchsia-pkg://fuchsia.com/overnetstack#meta/overnetstack.cm",
-            environment: "#core-env",
-        },
-        {
             name: "remote-diagnostics-bridge",
             url: "fuchsia-pkg://fuchsia.com/remote-diagnostics-bridge#meta/remote-diagnostics-bridge.cm",
             environment: "#core-env",

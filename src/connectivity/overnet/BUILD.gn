@@ -24,7 +24,6 @@ group("tests_no_e2e") {
   deps = [
     "examples:tests($host_toolchain)",
     "lib:tests",
-    "overnetstack:tests",
     "tests:tests_no_e2e",
     "tools:tests",
     "usb:tests",
@@ -32,7 +31,7 @@ group("tests_no_e2e") {
 }
 
 # TODO(ctiller): This is clearly not great and we should not be hardcoding certificates
-# and private keys into the overnetstack package. Design and implement security.
+# and private keys into packages. Design and implement security.
 resource("certificates") {
   sources = [
     "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",

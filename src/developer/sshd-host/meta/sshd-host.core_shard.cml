@@ -142,18 +142,6 @@
             to: "#sshd-host",
         },
 
-        // Used by `remote_control_runner`
-        {
-            protocol: [
-                "fuchsia.overnet.MeshController",
-                "fuchsia.overnet.Overnet",
-                "fuchsia.overnet.ServiceConsumer",
-                "fuchsia.overnet.ServicePublisher",
-            ],
-            from: "#overnetstack",
-            to: "#sshd-host",
-        },
-
         // Used by component + iquery shell tool, in use for bringup.
         {
             protocol: [

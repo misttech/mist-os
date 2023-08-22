@@ -109,15 +109,6 @@ size_checker_input = {
       creep_limit = 81920  # 80.0 KiB
     },
     {
-      component = "Connectivity/Overnet"
-      src = [
-        "packages/base/overnetstack",
-        "packages/cache/overnetstack",
-      ]
-      limit = 1236271  # 1.179 MiB
-      creep_limit = 81920  # 80.0 KiB
-    },
-    {
       component = "Connectivity/Wlan"
       src = [
         "packages/base/wlancfg",
@@ -265,7 +256,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       src = []
-      limit = 5095326449
+      limit = 5096562720
       creep_limit = 0
     },
   ]

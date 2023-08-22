@@ -190,11 +190,6 @@
         moniker: "core/trace_manager/ktrace_provider",
     },
     {
-        id: 140,
-        label: "Overnet",
-        moniker: "overnetstack.cmx",
-    },
-    {
         id: 141,
         label: "SSHD Host",
         moniker: "sshd-host.cmx",
@@ -623,11 +618,6 @@
         id: 230,
         label: "Scenic",
         moniker: "core/ui/scenic",
-    },
-    {
-        id: 231,
-        label: "Overnet",
-        moniker: "core/overnetstack",
     },
     {
         id: 232,
