@@ -57,6 +57,8 @@ test("adc-buttons-test") {
   sources = [ "adc-buttons-test.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/driver/runtime/testing/cpp",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/testing/mock-mmio-reg",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <unistd.h>
 
 #include <mock-mmio-reg/mock-mmio-reg.h>
@@ -61,11 +62,15 @@ class AdcButtonsDeviceTest : public zxtest::Test {
                                                              .press_threshold(kPressThreshold)))}}};
     const std::set<fuchsia_input_report::ConsumerControlButton> kButtons = {
         fuchsia_input_report::ConsumerControlButton::kFunction};
-    device_ = std::make_unique<AdcButtonsDevice>(loop_.dispatcher(), std::move(test_adc),
-                                                 kPollingRateUsec, std::move(kConfig),
-                                                 std::move(kButtons));
 
     loop_.StartThread("adc-buttons-test-thread");
+    auto result = fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
+      device_ = std::make_unique<AdcButtonsDevice>(loop_.dispatcher(), std::move(test_adc),
+                                                   kPollingRateUsec, std::move(kConfig),
+                                                   std::move(kButtons));
+    });
+    ASSERT_OK(result);
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
     ASSERT_OK(endpoints.status_value());
     fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_.get());
@@ -73,7 +78,11 @@ class AdcButtonsDeviceTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    device_->Shutdown();
+    auto result = fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
+      device_->Shutdown();
+      device_.reset();
+    });
+    ASSERT_OK(result);
     loop_.Shutdown();
   }
 
