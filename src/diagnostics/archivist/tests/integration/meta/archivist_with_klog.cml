@@ -12,10 +12,7 @@
     },
     use: [
         {
-            protocol: [
-                "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.WriteOnlyLog",
-            ],
+            protocol: [ "fuchsia.boot.ReadOnlyLog" ],
         },
     ],
 }
