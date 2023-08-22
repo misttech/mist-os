@@ -918,7 +918,7 @@ impl BuiltinEnvironment {
         // Install the root fuchsia.sys2.LifecycleController
         if let Some(lifecycle_controller) = &self.lifecycle_controller {
             let lifecycle_controller = lifecycle_controller.clone();
-            let scope = self.model.top_instance().task_group().clone();
+            let scope = self.model.top_instance().task_scope().clone();
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let lifecycle_controller = lifecycle_controller.clone();
                 let scope = scope.clone();
@@ -926,7 +926,7 @@ impl BuiltinEnvironment {
                 // component manager's task scope.
                 fasync::Task::spawn(async move {
                     scope
-                        .spawn(async move {
+                        .add_task(async move {
                             lifecycle_controller.serve(Moniker::root(), stream).await;
                         })
                         .await;
@@ -938,7 +938,7 @@ impl BuiltinEnvironment {
         // Install the root fuchsia.sys2.RealmQuery
         if let Some(realm_query) = &self.realm_query {
             let realm_query = realm_query.clone();
-            let scope = self.model.top_instance().task_group().clone();
+            let scope = self.model.top_instance().task_scope().clone();
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let realm_query = realm_query.clone();
                 let scope = scope.clone();
@@ -946,7 +946,7 @@ impl BuiltinEnvironment {
                 // component manager's task scope.
                 fasync::Task::spawn(async move {
                     scope
-                        .spawn(async move {
+                        .add_task(async move {
                             realm_query.serve(Moniker::root(), stream).await;
                         })
                         .await;

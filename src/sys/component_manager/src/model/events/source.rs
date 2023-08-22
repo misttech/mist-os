@@ -19,8 +19,8 @@ use {
         },
     },
     async_trait::async_trait,
+    cm_task_scope::TaskScope,
     cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{SinkExt, StreamExt},
@@ -141,7 +141,7 @@ impl EventSource {
 impl CapabilityProvider for EventSource {
     async fn open(
         mut self: Box<Self>,
-        _task_group: TaskGroup,
+        _task_scope: TaskScope,
         _flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -149,18 +149,18 @@ impl CapabilityProvider for EventSource {
         // Spawn the task in the component's task scope so that when the component is destroyed,
         // the task is cancelled and does not leak (similar to how framework capabilities are
         // scoped).
-        let task_group = match self
+        let task_scope = match self
             .subscriber
             .upgrade()
             .map_err(|err| CapabilityProviderError::EventSourceError { err })?
         {
-            ExtendedInstance::Component(target) => target.nonblocking_task_group(),
-            ExtendedInstance::AboveRoot(target) => target.task_group(),
+            ExtendedInstance::Component(target) => target.nonblocking_task_scope(),
+            ExtendedInstance::AboveRoot(target) => target.task_scope(),
         };
         let server_end = channel::take_channel(server_end);
         let stream = ServerEnd::<fcomponent::EventStreamMarker>::new(server_end);
-        task_group
-            .spawn(async move {
+        task_scope
+            .add_task(async move {
                 let moniker = self.subscriber.extended_moniker();
                 if let Ok(Some(event_stream)) = self
                     .subscribe_all(moniker, relative_path.into_os_string().into_string().unwrap())

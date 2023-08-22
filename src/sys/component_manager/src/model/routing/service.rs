@@ -15,9 +15,9 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
+    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
-    cm_util::TaskGroup,
     fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
     fidl_fuchsia_io as fio,
     flyweights::FlyStr,
@@ -210,7 +210,7 @@ impl DirectoryEntry for FilteredServiceDirectoryEntry {
 impl CapabilityProvider for FilteredServiceProvider {
     async fn open(
         mut self: Box<Self>,
-        _task_group: TaskGroup,
+        _task_scope: TaskScope,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -262,7 +262,7 @@ impl AggregateServiceDirectoryProvider {
 impl CapabilityProvider for AggregateServiceDirectoryProvider {
     async fn open(
         self: Box<Self>,
-        _task_group: TaskGroup,
+        _task_scope: TaskScope,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -502,7 +502,7 @@ impl CollectionServiceDirectory {
         moniker: &ChildName,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
-        let task_group = self.parent.upgrade()?.nonblocking_task_group();
+        let task_scope = self.parent.upgrade()?.nonblocking_task_scope();
         // Lazily add entries for instances from the service exposed by this component.
         // This has to happen after this function, the Started hook handler, returns because
         // `add_entries_from_capability_source` reads from the exposed service directory
@@ -518,7 +518,7 @@ impl CollectionServiceDirectory {
                 })
                 .await;
         };
-        task_group.spawn(add_instances_to_dir).await;
+        task_scope.add_task(add_instances_to_dir).await;
         Ok(())
     }
 
@@ -1457,8 +1457,8 @@ mod tests {
             .await
             .expect("failed to create FilteredServiceProvider"),
         );
-        let task_group = TaskGroup::new();
-        host.open(task_group.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
+        let task_scope = TaskScope::new();
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
             .await
             .expect("failed to serve");
 
@@ -1518,8 +1518,8 @@ mod tests {
             .expect("failed to create FilteredServiceProvider"),
         );
 
-        let task_group = TaskGroup::new();
-        host.open(task_group.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
+        let task_scope = TaskScope::new();
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
             .await
             .expect("failed to open path in filtered service directory.");
 
@@ -1580,8 +1580,8 @@ mod tests {
             .expect("failed to create FilteredServiceProvider"),
         );
 
-        let task_group = TaskGroup::new();
-        host.open(task_group.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
+        let task_scope = TaskScope::new();
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, PathBuf::new(), &mut server_end)
             .await
             .expect("failed to open path in filtered service directory.");
 
@@ -1638,11 +1638,11 @@ mod tests {
             .expect("failed to create FilteredServiceProvider"),
         );
 
-        let task_group = TaskGroup::new();
+        let task_scope = TaskScope::new();
         // expect that opening an instance that is filtered out
         let mut path_buf = PathBuf::new();
         path_buf.push("one");
-        host.open(task_group.clone(), fio::OpenFlags::DIRECTORY, path_buf, &mut server_end)
+        host.open(task_scope.clone(), fio::OpenFlags::DIRECTORY, path_buf, &mut server_end)
             .await
             .expect("failed to open path in filtered service directory.");
         assert_matches!(

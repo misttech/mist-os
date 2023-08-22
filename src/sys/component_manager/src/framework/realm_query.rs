@@ -17,9 +17,9 @@ use {
     },
     async_trait::async_trait,
     cm_rust::NativeIntoFidl,
+    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
-    cm_util::TaskGroup,
     fidl::{
         endpoints::{ClientEnd, ServerEnd},
         prelude::*,
@@ -238,7 +238,7 @@ impl RealmQueryCapabilityProvider {
 impl CapabilityProvider for RealmQueryCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_group: TaskGroup,
+        task_scope: TaskScope,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -262,8 +262,8 @@ impl CapabilityProvider for RealmQueryCapabilityProvider {
         let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
         let stream: fsys::RealmQueryRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
+        task_scope
+            .add_task(async move {
                 self.query.serve(self.scope_moniker, stream).await;
             })
             .await;
@@ -361,8 +361,8 @@ pub async fn get_resolved_declaration(
         fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();
 
     // Attach the iterator task to the scope root.
-    let task_group = scope_root.nonblocking_task_group();
-    task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes)).await;
+    let task_scope = scope_root.nonblocking_task_scope();
+    task_scope.add_task(serve_manifest_bytes_iterator(server_end, bytes)).await;
 
     Ok(client_end)
 }
@@ -441,8 +441,8 @@ async fn resolve_declaration(
 
     // Attach the iterator task to the scope root.
     trace!("spawning bytes iterator task");
-    let task_group = scope_root.nonblocking_task_group();
-    task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes)).await;
+    let task_scope = scope_root.nonblocking_task_scope();
+    task_scope.add_task(serve_manifest_bytes_iterator(server_end, bytes)).await;
     Ok(client_end)
 }
 
@@ -596,7 +596,7 @@ async fn connect_to_storage_admin(
         model.find(&moniker).await.ok_or(fsys::ConnectToStorageAdminError::InstanceNotFound)?;
 
     let storage_admin = StorageAdmin::new(Arc::downgrade(model));
-    let task_group = instance.nonblocking_task_group();
+    let task_scope = instance.nonblocking_task_scope();
 
     let storage_decl = {
         let mut state = instance.lock_state().await;
@@ -614,8 +614,8 @@ async fn connect_to_storage_admin(
         }
     };
 
-    task_group
-        .spawn(async move {
+    task_scope
+        .add_task(async move {
             if let Err(error) = Arc::new(storage_admin)
                 .serve(storage_decl, instance.as_weak(), server_end.into_channel().into())
                 .await
@@ -656,8 +656,8 @@ async fn get_all_instances(
         fidl::endpoints::create_endpoints::<fsys::InstanceIteratorMarker>();
 
     // Attach the iterator task to the scope root.
-    let task_group = scope_root.nonblocking_task_group();
-    task_group.spawn(serve_instance_iterator(server_end, instances)).await;
+    let task_scope = scope_root.nonblocking_task_scope();
+    task_scope.add_task(serve_instance_iterator(server_end, instances)).await;
 
     Ok(client_end)
 }

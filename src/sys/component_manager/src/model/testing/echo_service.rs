@@ -9,9 +9,9 @@ use {
         model::hooks::*,
     },
     async_trait::async_trait,
+    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream},
     fidl_fuchsia_io as fio,
@@ -41,7 +41,7 @@ impl EchoCapabilityProvider {
 impl CapabilityProvider for EchoCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_group: TaskGroup,
+        task_scope: TaskScope,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -49,8 +49,8 @@ impl CapabilityProvider for EchoCapabilityProvider {
         let server_end = channel::take_channel(server_end);
         let server_end = ServerEnd::<EchoMarker>::new(server_end);
         let mut stream: EchoRequestStream = server_end.into_stream().unwrap();
-        task_group
-            .spawn(async move {
+        task_scope
+            .add_task(async move {
                 while let Some(EchoRequest::EchoString { value, responder }) =
                     stream.try_next().await.unwrap()
                 {

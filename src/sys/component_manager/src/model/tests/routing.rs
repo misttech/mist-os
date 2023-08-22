@@ -38,8 +38,8 @@ use {
     async_trait::async_trait,
     cm_rust::*,
     cm_rust_testing::*,
+    cm_task_scope::TaskScope,
     cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -86,7 +86,7 @@ async fn use_framework_service() {
     impl CapabilityProvider for MockRealmCapabilityProvider {
         async fn open(
             self: Box<Self>,
-            task_group: TaskGroup,
+            task_scope: TaskScope,
             _flags: fio::OpenFlags,
             _relative_path: PathBuf,
             server_end: &mut zx::Channel,
@@ -97,8 +97,8 @@ async fn use_framework_service() {
                 .expect("could not convert channel into stream");
             let scope_moniker = self.scope_moniker.clone();
             let host = self.host.clone();
-            task_group
-                .spawn(async move {
+            task_scope
+                .add_task(async move {
                     if let Err(e) = host.serve(scope_moniker, stream).await {
                         // TODO: Set an epitaph to indicate this was an unexpected error.
                         warn!("serve_realm failed: {}", e);
@@ -1829,7 +1829,7 @@ async fn use_runner_from_environment_failed() {
     impl CapabilityProvider for RunnerCapabilityProvider {
         async fn open(
             self: Box<Self>,
-            _task_group: TaskGroup,
+            _task_scope: TaskScope,
             _flags: fio::OpenFlags,
             _relative_path: PathBuf,
             server_end: &mut zx::Channel,

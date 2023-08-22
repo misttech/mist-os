@@ -226,12 +226,12 @@ impl EventRegistry {
             event_stream.route = events[0].route.clone();
         }
 
-        let task_group = match subscriber.upgrade()? {
-            ExtendedInstance::Component(subscriber) => subscriber.nonblocking_task_group(),
-            ExtendedInstance::AboveRoot(subscriber) => subscriber.task_group(),
+        let task_scope = match subscriber.upgrade()? {
+            ExtendedInstance::Component(subscriber) => subscriber.nonblocking_task_scope(),
+            ExtendedInstance::AboveRoot(subscriber) => subscriber.task_scope(),
         };
         let events = events.into_iter().map(|event| (event.source_name, event.scopes)).collect();
-        self.event_synthesizer.spawn_synthesis(event_stream.sender(), events, &task_group).await;
+        self.event_synthesizer.spawn_synthesis(event_stream.sender(), events, &task_scope).await;
 
         Ok(event_stream)
     }

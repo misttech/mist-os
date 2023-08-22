@@ -12,8 +12,8 @@ use {
     },
     ::routing::event::EventFilter,
     async_trait::async_trait,
+    cm_task_scope::TaskScope,
     cm_types::Name,
-    cm_util::TaskGroup,
     futures::{channel::mpsc, future::join_all, stream, SinkExt, StreamExt},
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     std::{
@@ -78,7 +78,7 @@ impl EventSynthesizer {
         &self,
         sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
         events: HashMap<Name, Vec<EventDispatcherScope>>,
-        scope: &TaskGroup,
+        scope: &TaskScope,
     ) {
         SynthesisTask::new(&self, sender, events).spawn(scope).await
     }
@@ -126,12 +126,12 @@ impl SynthesisTask {
 
     /// Spawns a task that will synthesize all events that were requested when creating the
     /// `SynthesisTask`
-    pub async fn spawn(self, scope: &TaskGroup) {
+    pub async fn spawn(self, scope: &TaskScope) {
         if self.event_infos.is_empty() {
             return;
         }
         scope
-            .spawn(async move {
+            .add_task(async move {
                 // If we can't find the component then we can't synthesize events.
                 // This isn't necessarily an error as the model or component might've been
                 // destroyed in the intervening time, so we just exit early.

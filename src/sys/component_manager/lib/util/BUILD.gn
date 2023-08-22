@@ -18,17 +18,14 @@ rustc_library("util") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:futures",
   ]
 
   sources = [
     "src/channel.rs",
     "src/io.rs",
     "src/lib.rs",
-    "src/task_group.rs",
   ]
 }
 

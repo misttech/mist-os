@@ -121,12 +121,12 @@ async fn add_use_decls(
     //
     // TODO(fxbug.dev/76579): It would probably be more correct to run this in an execution_scope
     // attached to the namespace (but that requires a bigger refactor)
-    let task_group = component.nonblocking_task_group();
+    let task_scope = component.nonblocking_task_scope();
     for waiter in directory_waiters {
         // The future for a directory waiter will only terminate once the directory channel is
         // first used. Run the future in a task bound to the component's scope instead of
         // calling await on it directly.
-        task_group.spawn(waiter).await;
+        task_scope.add_task(waiter).await;
     }
 
     Ok(())
@@ -216,7 +216,10 @@ fn add_directory_helper(
         let server_end = server_end.into_zx_channel();
         // Spawn a separate task to perform routing in the blocking scope. This way it won't
         // block namespace teardown, but it will block component destruction.
-        target.blocking_task_group().spawn(route_directory(target, use_, flags, server_end)).await;
+        target
+            .blocking_task_scope()
+            .add_task(route_directory(target, use_, flags, server_end))
+            .await;
     };
 
     waiters.push(Box::pin(route_on_usage));
@@ -337,7 +340,7 @@ fn add_service_or_protocol_use(
                 .await;
             }
         };
-        scope.spawn(async move { component.blocking_task_group().spawn(task).await })
+        scope.spawn(async move { component.blocking_task_scope().add_task(task).await })
     };
 
     let service_dir =

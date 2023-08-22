@@ -69,7 +69,7 @@ mod tests {
             capability::CapabilitySource,
             model::hooks::{Event, EventPayload, Hooks},
         },
-        cm_util::TaskGroup,
+        cm_task_scope::TaskScope,
         fidl::endpoints::ClientEnd,
         fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol,
@@ -133,10 +133,10 @@ mod tests {
         hooks.dispatch(&event).await;
 
         let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
+        let task_scope = TaskScope::new();
         if let Some(provider) = provider.lock().await.take() {
             provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
+                .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
                 .await?;
         }
 

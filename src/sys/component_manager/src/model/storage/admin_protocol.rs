@@ -27,9 +27,9 @@ use {
     async_trait::async_trait,
     cm_moniker::InstancedMoniker,
     cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
+    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
-    cm_util::TaskGroup,
     fidl::{endpoints::ServerEnd, prelude::*},
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},
@@ -169,7 +169,7 @@ impl StorageAdminProtocolProvider {
 impl CapabilityProvider for StorageAdminProtocolProvider {
     async fn open(
         self: Box<Self>,
-        task_group: TaskGroup,
+        task_scope: TaskScope,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -193,8 +193,8 @@ impl CapabilityProvider for StorageAdminProtocolProvider {
         let storage_decl = self.storage_decl.clone();
         let component = self.component.clone();
         let storage_admin = self.storage_admin.clone();
-        task_group
-            .spawn(async move {
+        task_scope
+            .add_task(async move {
                 if let Err(error) = storage_admin.serve(storage_decl, component, server_end).await {
                     warn!(?error, "failed to serve storage admin protocol");
                 }
