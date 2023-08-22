@@ -17,6 +17,8 @@
         },
     ],
     offer: [
+        // TODO(fxbug.dev/296305908): Remove once Bluetooth streaming E2E tests
+        // no longer use this capability.
         {
             protocol: "fuchsia.media.SessionAudioConsumerFactory",
             from: "#audio_consumer",
