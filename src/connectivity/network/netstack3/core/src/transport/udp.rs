@@ -38,6 +38,7 @@ pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
     context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
+    convert::BidirectionalConverter,
     data_structures::{
         id_map::EntryKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
@@ -56,9 +57,9 @@ use crate::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
-            DualStackDatagramBoundStateContext, EitherIpSocket, ExpectedConnError,
-            ExpectedUnboundError, FoundSockets, InUseError, IpOptions, LocalIdentifierAllocator,
-            MaybeDualStack, MulticastMembershipInterfaceSelector,
+            DualStackConnState, DualStackDatagramBoundStateContext, EitherIpSocket,
+            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, IpOptions,
+            LocalIdentifierAllocator, MaybeDualStack, MulticastMembershipInterfaceSelector,
             NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
             SetMulticastMembershipError, ShutdownType, SocketHopLimits,
             SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
@@ -416,6 +417,7 @@ impl DatagramSocketSpec for Udp {
     type SocketId<I: IpExt> = SocketId<I>;
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
     type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<NonZeroU16>;
+    type ConnState<I: IpExt, D: Debug + Eq + Hash> = I::DualStackConnState<D, Self>;
     type UnboundSharingState<I: IpExt> = Sharing;
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
     type ListenerSharingState = Sharing;
@@ -1222,12 +1224,30 @@ fn try_deliver<
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     buffer: &B,
 ) -> bool {
-    sync_ctx.with_sockets_state(|_sync_ctx, state| {
+    sync_ctx.with_sockets_state(|sync_ctx, state| {
         let should_deliver = match state.get_socket_state(&id).expect("socket ID is valid") {
             DatagramSocketState::Bound(DatagramBoundSocketState::Connected {
                 state,
                 sharing: _,
-            }) => state.should_receive(),
+            }) => {
+                let state = match transport::udp::BoundStateContext::dual_stack_context(sync_ctx) {
+                    MaybeDualStack::DualStack(dual_stack) => {
+                        match dual_stack.converter().convert(state) {
+                            DualStackConnState::ThisStack(state) => state,
+                            DualStackConnState::OtherStack(state) => {
+                                dual_stack.assert_dual_stack_enabled(state);
+                                todo!(
+                                    "https://fxbug.dev/21198: Support dual-stack udp try_deliver"
+                                );
+                            }
+                        }
+                    }
+                    MaybeDualStack::NotDualStack(not_dual_stack) => {
+                        not_dual_stack.converter().convert(state)
+                    }
+                };
+                state.should_receive()
+            }
             DatagramSocketState::Bound(DatagramBoundSocketState::Listener {
                 state: _,
                 sharing: _,

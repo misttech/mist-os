@@ -72,6 +72,21 @@ impl<I, O> BidirectionalConverter<I, O> for UninstantiableConverter {
     }
 }
 
+/// A marker trait for [`BidirectionalConverter`] of owned or reference types.
+pub(crate) trait OwnedOrRefsBidirectionalConverter<Input, Output>:
+    BidirectionalConverter<Input, Output>
+    + for<'a> BidirectionalConverter<&'a Input, &'a Output>
+    + for<'a> BidirectionalConverter<&'a mut Input, &'a mut Output>
+{
+}
+
+impl<I, O, B> OwnedOrRefsBidirectionalConverter<I, O> for B where
+    B: BidirectionalConverter<I, O>
+        + for<'a> BidirectionalConverter<&'a I, &'a O>
+        + for<'a> BidirectionalConverter<&'a mut I, &'a mut O>
+{
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
