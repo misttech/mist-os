@@ -346,7 +346,9 @@ class FakeSysmemTest : public testing::Test {
     display_->SetCanvasForTesting(std::move(endpoints.value().client));
 
     auto vout = std::make_unique<Vout>();
-    vout->InitDsiForTesting(/*panel_type=*/PANEL_TV070WSM_FT, /*width=*/1024, /*height=*/600);
+    zx::result<> init_dsi_result =
+        vout->InitDsiForTesting(/*panel_type=*/PANEL_TV070WSM_FT, /*width=*/1024, /*height=*/600);
+    ASSERT_OK(init_dsi_result.status_value());
     display_->SetVoutForTesting(std::move(vout));
 
     allocator_ = std::make_unique<MockAllocator>(loop_.dispatcher());

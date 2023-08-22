@@ -122,7 +122,7 @@ zx_status_t AmlogicDisplay::RestartDisplay() {
   // Need to call this function since VPU/VPP registers were reset
   vpu_->CheckAndClaimHardwareOwnership();
 
-  return vout_->RestartDisplay();
+  return vout_->RestartDisplay().status_value();
 }
 
 zx_status_t AmlogicDisplay::DisplayInit() {
@@ -166,7 +166,11 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     added_display_args_t args;
     vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
     dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
-    vout_->OnDisplaysChanged(info);
+    zx::result<> vout_result = vout_->OnDisplaysChanged(info);
+    if (!vout_result.is_ok()) {
+      zxlogf(ERROR, "Failed to propagate default display info to Vout: %s",
+             vout_result.status_string());
+    }
   }
 }
 
@@ -472,9 +476,9 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     // Setting up OSD may require Vout framebuffer information, which may be
     // changed on each ApplyConfiguration(), so we need to apply the
     // configuration to Vout first before initializing the display and OSD.
-    if (zx_status_t status = vout_->ApplyConfiguration(&display_configs[0]->mode);
-        status != ZX_OK) {
-      zxlogf(ERROR, "Failed to apply config to Vout: %s", zx_status_get_string(status));
+    zx::result<> apply_config_result = vout_->ApplyConfiguration(&display_configs[0]->mode);
+    if (!apply_config_result.is_ok()) {
+      zxlogf(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
       return;
     }
 
@@ -1101,10 +1105,9 @@ void AmlogicDisplay::HpdThreadEntryPoint() {
           /*display_info_count=*/added_display_count, /*out_display_info_actual=*/nullptr);
       if (display_added) {
         // See if we need to change output color to RGB
-        zx_status_t status = vout_->OnDisplaysChanged(added_display_info);
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "Failed to change Vout display configuration: %s",
-                 zx_status_get_string(status));
+        zx::result<> result = vout_->OnDisplaysChanged(added_display_info);
+        if (!result.is_ok()) {
+          zxlogf(ERROR, "Failed to change Vout display configuration: %s", result.status_string());
           break;
         }
       }
@@ -1186,10 +1189,10 @@ zx_status_t AmlogicDisplay::InitializeHdmiVout() {
     return hdmi_client_result.status_value();
   }
 
-  zx_status_t status = vout_->InitHdmi(parent_, std::move(hdmi_client_result.value()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s", zx_status_get_string(status));
-    return status;
+  zx::result<> init_hdmi_result = vout_->InitHdmi(parent_, std::move(hdmi_client_result.value()));
+  if (!init_hdmi_result.is_ok()) {
+    zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s", init_hdmi_result.status_string());
+    return init_hdmi_result.status_value();
   }
 
   root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
@@ -1201,11 +1204,11 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
          panel_info.width, panel_info.height, panel_info.panel_type);
   {
     fbl::AutoLock lock(&display_mutex_);
-    zx_status_t status =
+    zx::result<> init_dsi_result =
         vout_->InitDsi(parent_, panel_info.panel_type, panel_info.width, panel_info.height);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to initialize DSI Vout device: %s", zx_status_get_string(status));
-      return status;
+    if (!init_dsi_result.is_ok()) {
+      zxlogf(ERROR, "Failed to initialize DSI Vout device: %s", init_dsi_result.status_string());
+      return init_dsi_result.status_value();
     }
     display_attached_ = true;
   }

@@ -24,12 +24,12 @@ enum VoutType { kDsi, kHdmi, kUnknown };
 class Vout : public ddk::I2cImplProtocol<Vout> {
  public:
   Vout() = default;
-  zx_status_t InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width, uint32_t height);
-  zx_status_t InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi);
+  zx::result<> InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width, uint32_t height);
+  zx::result<> InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi);
   // Sets only the display size, feature bits and panel settings for testing.
-  zx_status_t InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height);
+  zx::result<> InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height);
 
-  zx_status_t RestartDisplay();
+  zx::result<> RestartDisplay();
 
   void PopulateAddedDisplayArgs(
       added_display_args_t* args, display::DisplayId display_id,
@@ -91,8 +91,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   void DisplayConnected();
   void DisplayDisconnected();
   bool CheckMode(const display_mode_t* mode);
-  zx_status_t ApplyConfiguration(const display_mode_t* mode);
-  zx_status_t OnDisplaysChanged(added_display_info_t& info);
+  zx::result<> ApplyConfiguration(const display_mode_t* mode);
+  zx::result<> OnDisplaysChanged(added_display_info_t& info);
 
   // Required functions for I2cImpl
   zx_status_t I2cImplGetMaxTransferSize(size_t* out_size) {

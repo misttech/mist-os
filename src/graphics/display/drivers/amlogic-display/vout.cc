@@ -60,8 +60,8 @@ zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
 
 }  // namespace
 
-zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width,
-                          uint32_t height) {
+zx::result<> Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width,
+                           uint32_t height) {
   type_ = VoutType::kDsi;
 
   supports_hpd_ = kDsiSupportedFeatures.hpd;
@@ -72,21 +72,21 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   auto dsi_host = DsiHost::Create(parent, panel_type);
   if (dsi_host.is_error()) {
     zxlogf(ERROR, "Could not create DSI host: %s", dsi_host.status_string());
-    return dsi_host.status_value();
+    return dsi_host.take_error();
   }
   dsi_.dsi_host = std::move(dsi_host.value());
   ZX_ASSERT(dsi_.dsi_host);
 
   ddk::PDevFidl pdev;
-  auto status = ddk::PDevFidl::FromFragment(parent, &pdev);
+  zx_status_t status = ddk::PDevFidl::FromFragment(parent, &pdev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not get PDEV protocol");
-    return status;
+    return zx::error(status);
   }
   auto clock = Clock::Create(pdev, kBootloaderDisplayEnabled);
   if (clock.is_error()) {
     zxlogf(ERROR, "Could not create Clock: %s", clock.status_string());
-    return clock.status_value();
+    return clock.take_error();
   }
 
   dsi_.clock = std::move(clock.value());
@@ -95,13 +95,13 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   zxlogf(INFO, "Fixed panel type is %d", dsi_.dsi_host->panel_type());
   zx::result display_setting = GetDisplaySettingForPanel(dsi_.dsi_host->panel_type());
   if (display_setting.is_error()) {
-    return display_setting.error_value();
+    return display_setting.take_error();
   }
   dsi_.disp_setting = display_setting.value();
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Vout::InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height) {
+zx::result<> Vout::InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height) {
   type_ = VoutType::kDsi;
 
   supports_hpd_ = kDsiSupportedFeatures.hpd;
@@ -111,13 +111,14 @@ zx_status_t Vout::InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_
 
   zx::result display_setting = GetDisplaySettingForPanel(panel_type);
   if (display_setting.is_error()) {
-    return display_setting.error_value();
+    return display_setting.take_error();
   }
   dsi_.disp_setting = display_setting.value();
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi) {
+zx::result<> Vout::InitHdmi(zx_device_t* parent,
+                            fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi) {
   type_ = VoutType::kHdmi;
 
   supports_hpd_ = kHdmiSupportedFeatures.hpd;
@@ -125,20 +126,20 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware
   fbl::AllocChecker ac;
   hdmi_.hdmi_host = fbl::make_unique_checked<HdmiHost>(&ac, parent, std::move(hdmi));
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   if (zx_status_t status = hdmi_.hdmi_host->Init(); status != ZX_OK) {
     zxlogf(ERROR, "Could not initialize HDMI host: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Vout::RestartDisplay() {
+zx::result<> Vout::RestartDisplay() {
   zxlogf(INFO, "restarting display");
-  return PowerOn().status_value();
+  return PowerOn();
 }
 
 void Vout::PopulateAddedDisplayArgs(
@@ -261,46 +262,47 @@ bool Vout::CheckMode(const display_mode_t* mode) {
   }
 }
 
-zx_status_t Vout::ApplyConfiguration(const display_mode_t* mode) {
-  zx_status_t status;
+zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
   switch (type_) {
     case kDsi:
-      return ZX_OK;
-    case kHdmi:
+      return zx::ok();
+    case kHdmi: {
       if (!memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t))) {
         // No new configs
-        return ZX_OK;
+        return zx::ok();
       }
 
       display_mode_t modified_mode;
       memcpy(&modified_mode, mode, sizeof(display_mode_t));
-      status = hdmi_.hdmi_host->GetVic(&modified_mode);
+      zx_status_t status = hdmi_.hdmi_host->GetVic(&modified_mode);
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Apply with bad mode");
-        return status;
+        zxlogf(ERROR, "Failed to get video clock for current HDMI display mode: %s",
+               zx_status_get_string(status));
+        return zx::error(status);
       }
 
       memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
       // FIXME: Need documentation for HDMI PLL initialization
       hdmi_.hdmi_host->ConfigurePll();
       hdmi_.hdmi_host->ModeSet(modified_mode);
-      return ZX_OK;
+      return zx::ok();
+    }
     default:
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 }
 
-zx_status_t Vout::OnDisplaysChanged(added_display_info_t& info) {
+zx::result<> Vout::OnDisplaysChanged(added_display_info_t& info) {
   switch (type_) {
     case kDsi:
-      return ZX_OK;
+      return zx::ok();
     case kHdmi:
       hdmi_.hdmi_host->UpdateOutputColorFormat(
           info.is_standard_srgb_out ? fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb
                                     : fuchsia_hardware_hdmi::wire::ColorFormat::kCf444);
-      return ZX_OK;
+      return zx::ok();
     default:
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 }
 
