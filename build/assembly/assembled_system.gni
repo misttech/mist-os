@@ -116,13 +116,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [scope] Arguments to add to fshost's configuration. These
 #     arguments come before other arguments set by build args.
 #
-#   use_assembly_fshost (default: false)
-#     [boolean] Whether to build the fshost component
-#
-#   skip_fshost_validator (default: false)
-#     [boolean] Whether to skip the comparison of the GN fshost to the assembly
-#     fshost. This is only valid when use_assembly_fshost=true.
-#
 #   cmdline (optional)
 #     [list of strings] Kernel command line text.
 #
@@ -224,8 +217,13 @@ template("assembled_system") {
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
   assert(defined(invoker.product_assembly_config_label),
          "Need to define product_assembly_config_label")
-  assert(defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost,
-         "use_assembly_fshost must be set to true")
+
+  # TODO(b/295031019): Remove once all clients have stopped providing.
+  not_needed(invoker,
+             [
+               "use_assembly_fshost",
+               "skip_fshost_validator",
+             ])
 
   # One of these is necessary in order to _run_ assembly, but some of the
   # builders have configurations that don't define any board, yet also end up
@@ -544,14 +542,6 @@ template("assembled_system") {
     _additional_boot_args = invoker.additional_boot_args
   }
 
-  _use_assembly_fshost =
-      defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
-
-  _skip_fshost_validator = !_use_assembly_fshost
-  if (_use_assembly_fshost && defined(invoker.skip_fshost_validator)) {
-    _skip_fshost_validator = invoker.skip_fshost_validator
-  }
-
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
   _include_shell_commands = _supports_blobs
   if (defined(invoker.include_shell_commands)) {
@@ -672,8 +662,6 @@ template("assembled_system") {
     cache_packages = _cache_packages
     universe_packages = _universe_packages
     additional_boot_args = _additional_boot_args
-    use_assembly_fshost = _use_assembly_fshost
-    ramdisk_in_zbi = ramdisk_in_zbi
   }
 
   # Run product assembly.
@@ -755,61 +743,6 @@ template("assembled_system") {
     output = files.image_assembly_inputs
   }
 
-  if (!_skip_fshost_validator) {
-    configc_tool_target = "//tools/configc($host_toolchain)"
-    configc_tool_path = get_label_info(configc_tool_target, "root_out_dir")
-    configc_tool_path += "/configc"
-
-    python_action("${labels.fshost_validator}") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      deps = [
-        ":${labels.fshost}",
-        ":${labels.product_assembler}",
-        configc_tool_target,
-      ]
-      outputs = [ "$target_out_dir/${labels.fshost_validator}.txt" ]
-      depfile = "$target_out_dir/$target_name.d"
-      binary_label = "//build/assembly/scripts:fshost_validator"
-      args = [
-        "--output",
-        rebase_path(outputs[0], root_build_dir),
-        "--configc-bin",
-        rebase_path(configc_tool_path, root_build_dir),
-        "--gn-fshost-component",
-        rebase_path("${target_out_dir}/cml/${labels.fshost}.manifest/fshost.cm",
-                    root_build_dir),
-        "--assembly-fshost-component",
-        rebase_path("${files.outdir}/fshost/fshost/fshost.cm", root_build_dir),
-        "--gn-fshost-cml",
-        rebase_path("${target_out_dir}/${files.fshost_merged_cml}",
-                    root_build_dir),
-        "--assembly-fshost-cml",
-        rebase_path("${files.outdir}/fshost/fshost/fshost.cml", root_build_dir),
-        "--gn-fshost-cvf",
-        rebase_path("${target_out_dir}/${labels.fshost}.config_cvf.cvf",
-                    root_build_dir),
-        "--assembly-fshost-cvf",
-        rebase_path(
-            "${files.outdir}/bootfs/repackaging/components/meta/fshost.cvf",
-            root_build_dir),
-        "--depfile",
-        rebase_path(depfile, root_build_dir),
-      ]
-      metadata = {
-        # We insert these barriers to prevent the dependencies of these images
-        # from leaking into Bazel assembly, which depends on this check
-        # TODO(b/287558873) Remove once fshost is migrated
-        package_barrier = []
-        config_package_barrier = []
-        distribution_entries_barrier = []
-      }
-    }
-  }
-
   ffx_action(labels.image_assembler) {
     no_output_dir_leaks = false
 
@@ -860,12 +793,6 @@ template("assembled_system") {
       deps += invoker.deps
     }
     deps += [ ":${labels.product_assembler}" ]
-
-    # Validate that the Assembly-built fshost is identical to the GN-built
-    # fshost until the latter is removed.
-    if (!_skip_fshost_validator) {
-      deps += [ ":${labels.fshost_validator}" ]
-    }
 
     inputs = [ files.regenerated_image_assembly_config ]
     if (defined(invoker.inputs)) {
@@ -1218,10 +1145,6 @@ template("assembled_system") {
     dest_dir = rebase_path("${files.outdir}/${labels.bazel_legacy_aib}",
                            root_build_dir)
     deps = [ ":${labels.legacy_assembly_input_bundle}" ]
-    if (!_skip_fshost_validator && use_bazel_images_only) {
-      # TODO(b/287558873) Remove once fshost is migrated
-      deps += [ ":${labels.fshost_validator}" ]
-    }
   }
 
   group(target_name) {

@@ -7,6 +7,7 @@ import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/product.gni")
 import("//build/testing/zbi_test.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 cuckoo_kernel_zbi_test_params = {
   # List of assembly input groups that the kernel cuckoo zbi will use. Each one may provide
@@ -70,12 +71,10 @@ template("_cuckoo_kernel_zbi_test") {
         ]
     cmdline_deps = []
     system_image_deps = board_system_image_deps
-    fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
     board_config = board_information_for_assembly
     board_config_label = board_configuration_label
     allow_eng_platform_bundle_use = true
-    use_assembly_fshost = true
 
     if (fxfs_blob) {
       product_assembly_config_label =

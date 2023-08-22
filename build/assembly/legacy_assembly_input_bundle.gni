@@ -8,8 +8,6 @@ import("//build/assembly/generated_image_assembly_config.gni")
 import("//build/assembly/package_manifests_list.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/python/python_action.gni")
-import("//src/storage/fshost/fshost.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 # Create a "legacy" assembly input bundle from an image assembly configuration,
 # so that product assembly can use it to produce a matching image assembly
@@ -58,9 +56,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
-#
-#   use_assembly_fshost [optional; default: false]
-#     [boolean] Whether to build the fshost component
 #
 #   fshost_config [optional; default: {}]
 #     [scope] Arguments to add to fshost's configuration. These arguments come
@@ -165,9 +160,6 @@ template("legacy_assembly_input_bundle") {
   if (defined(invoker.core_realm_definition)) {
     _core_realm_definition = invoker.core_realm_definition
   }
-
-  use_assembly_fshost =
-      defined(invoker.use_assembly_fshost) && invoker.use_assembly_fshost
 
   labels = {
     image_assembly_config = "${target_name}.generated_image_assembly_config"
@@ -477,40 +469,6 @@ template("legacy_assembly_input_bundle") {
     }
   }
 
-  # Compile the fshost component and configuration needed for this assembly
-  fshost_component_and_config(labels.fshost) {
-    # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
-    # changes behavior to create a non-bootable fshost if testonly is set to
-    # true.
-    testonly = false
-
-    # Correct the component name since the target_name is per-image.
-    component_name = "fshost"
-
-    # This is picked up by the `cmc_merge()` within `fshost_cml()`, through its
-    # use of foward_variables_from(invoker, ["output_name" ...]).
-    output_name = files.fshost_merged_cml
-
-    options = {
-      # Use the defaults from the build args set in generated_fshost_config.gni
-      data_filesystem_format = data_filesystem_format
-      use_disk_migration = use_disk_migration
-
-      if (defined(invoker.fshost_config)) {
-        # Override with anything passed from `fshost_config`
-        forward_variables_from(invoker.fshost_config, "*")
-      }
-
-      # Always set ramdisk_image if the assmebled ZBI contains a ramdisk.
-      if (defined(invoker.ramdisk_in_zbi) && invoker.ramdisk_in_zbi) {
-        ramdisk_image = true
-      }
-
-      fxfs_blob = fxfs_blob
-      fxfs_vmex = fxfs_blob
-    }
-  }
-
   # Search for BootFS files in these targets.
   bootfs_files_for_assembly(labels.bootfs_files) {
     forward_variables_from(invoker,
@@ -519,9 +477,6 @@ template("legacy_assembly_input_bundle") {
                              "visibility",
                            ])
     deps = invoker.bootfs_labels + component_id_index_dep + [ kernel_zbi ]
-    if (!use_assembly_fshost) {
-      deps += [ ":${labels.fshost}" ]
-    }
   }
 
   fuchsia_package(labels.bootfs_files_package) {

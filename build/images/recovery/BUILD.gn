@@ -53,12 +53,10 @@ if (is_fuchsia) {
     }
     board_config = board_information_for_assembly
     board_config_label = board_configuration_label
-    fshost_config = board_fshost_config
 
     include_component_id_index = true
     additional_boot_args =
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
-    use_assembly_fshost = true
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
     bootfs_labels +=
@@ -364,7 +362,6 @@ if (is_fuchsia) {
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
     generate_vbmeta = use_vbmeta
-    use_assembly_fshost = true
 
     if (!fxfs_blob) {
       generate_fvm = !bootfs_only
@@ -384,7 +381,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":for-fdr"
     board_config = board_information_for_assembly
     board_config_label = board_configuration_label
-    fshost_config = board_fshost_config
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
     bootfs_labels +=

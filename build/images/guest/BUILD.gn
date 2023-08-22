@@ -99,7 +99,6 @@ if (labels.images == "//build/images/bringup") {
     product_assembly_config_label = ":product_assembly_config"
     board_config = board_information_for_assembly
     board_config_label = board_configuration_label
-    use_assembly_fshost = true
 
     # As `:product_assembly_config` specifies an `eng` build-type, the assembly
     # needs to be allowed to use the "eng" platform bundles as deps / inputs.
@@ -138,11 +137,6 @@ if (labels.images == "//build/images/bringup") {
       "//src/ui/input/drivers/hid-input-report",
       "//src/ui/input/drivers/virtio:virtio_input",
     ]
-
-    fshost_config = {
-      forward_variables_from(board_fshost_config, "*")
-      no_zxcrypt = true
-    }
 
     if (current_cpu == "x64") {
       bootfs_labels += [

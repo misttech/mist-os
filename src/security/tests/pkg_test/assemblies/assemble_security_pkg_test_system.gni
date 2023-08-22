@@ -342,11 +342,6 @@ template("assemble_security_pkg_test_system") {
 
     board_config_label = ":${labels.board_config}"
     use_bringup_platform_bundles_only = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     bootfs_labels = []
     base_packages = packages_for_assembly
   }

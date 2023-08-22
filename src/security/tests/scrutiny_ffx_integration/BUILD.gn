@@ -90,11 +90,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     bootfs_labels = []
     base_packages = [
       ":empty-pkg",
@@ -111,11 +106,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_config_recovery"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     bootfs_labels = []
     ramdisk_in_zbi = true
     base_packages = [

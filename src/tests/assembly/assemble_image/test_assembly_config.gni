@@ -145,7 +145,6 @@ template("test_assembly_config") {
       forward_variables_from(invoker, [ "core_realm_definition" ])
 
       supports_blobs = true
-      use_assembly_fshost = true
       base_packages = base_packages_param
       meta_packages = []
       cache_packages = []

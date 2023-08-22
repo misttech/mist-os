@@ -91,11 +91,6 @@ template("assemble_network_conformance_system") {
 
     board_config_label = ":${labels.board_config}"
     allow_eng_platform_bundle_use = true
-    use_assembly_fshost = true
-
-    # This test uses an explicit board, therefore the arguments should not be
-    # compared with the arguments from the global GN args.
-    skip_fshost_validator = true
     base_packages = [
       "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/netcfg:config-default",
