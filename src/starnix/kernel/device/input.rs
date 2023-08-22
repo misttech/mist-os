@@ -27,7 +27,7 @@ use fidl_fuchsia_ui_pointer::{
 };
 use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::{self, health::Reporter, NumericProperty};
 use fuchsia_zircon as zx;
 use futures::{
     future::{self, Either},
@@ -54,6 +54,7 @@ impl InputDevice {
             input_files_node.create_child("touch_input_file"),
         );
         let keyboard_input_file = InputFile::new_keyboard();
+        kernel_node.record(input_files_node);
         std::mem::drop(fb_state);
         Arc::new(InputDevice { touch_input_file, keyboard_input_file })
     }
@@ -92,7 +93,7 @@ pub struct InspectStatus {
     _inspect_node: fuchsia_inspect::Node,
 
     /// The number of FIDL events received from Fuchsia input system.
-    _fidl_events_received_count: fuchsia_inspect::UintProperty,
+    fidl_events_received_count: fuchsia_inspect::UintProperty,
 
     /// The number of FIDL events converted to this module’s representation of TouchEvent.
     _fidl_events_converted_count: fuchsia_inspect::UintProperty,
@@ -121,13 +122,17 @@ impl InspectStatus {
         let uapi_events_read_count = node.create_uint("uapi_events_read_count", 0);
         Self {
             _inspect_node: node,
-            _fidl_events_received_count: fidl_events_received_count,
+            fidl_events_received_count,
             _fidl_events_converted_count: fidl_events_converted_count,
             _fidl_events_discarded_count: fidl_events_discarded_count,
             _uapi_events_generated_count: uapi_events_generated_count,
             _uapi_events_read_count: uapi_events_read_count,
             health_node,
         }
+    }
+
+    fn count_received_events(&self, count: u64) {
+        self.fidl_events_received_count.add(count);
     }
 }
 
@@ -154,7 +159,7 @@ struct InputFileMutableState {
     // TODO: fxb/131759 - remove `Optional` when implementing Inspect for Keyboard InputFiles
     // Touch InputFile will be initialized with a InspectStatus that holds Inspect data
     // `None` for Keyboard InputFile
-    _inspect_status: Option<InspectStatus>,
+    inspect_status: Option<InspectStatus>,
 }
 
 #[derive(Copy, Clone)]
@@ -220,7 +225,7 @@ impl InputFile {
             inner: Mutex::new(InputFileMutableState {
                 events: VecDeque::new(),
                 waiters: WaitQueue::default(),
-                _inspect_status: Some(InspectStatus::new(inspect_node)),
+                inspect_status: Some(InspectStatus::new(inspect_node)),
             }),
         })
     }
@@ -242,7 +247,7 @@ impl InputFile {
             inner: Mutex::new(InputFileMutableState {
                 events: VecDeque::new(),
                 waiters: WaitQueue::default(),
-                _inspect_status: None,
+                inspect_status: None,
             }),
         })
     }
@@ -302,6 +307,7 @@ impl InputFile {
                         };
                         match query_res {
                             Ok(touch_events) => {
+                                let num_received_events = touch_events.len();
                                 previous_event_disposition =
                                     touch_events.iter().map(make_response_for_fidl_event).collect();
                                 let new_events = touch_events
@@ -312,6 +318,12 @@ impl InputFile {
                                     // not a `Vec<Vec<uapi::input_event>>`.
                                     .flat_map(make_uapi_events);
                                 let mut inner = slf.inner.lock();
+                                match &inner.inspect_status {
+                                    Some(inspect_status) => inspect_status.count_received_events(
+                                        num_received_events.try_into().unwrap(),
+                                    ),
+                                    None => (),
+                                }
                                 // TODO(https://fxbug.dev/124597): Reading from an `InputFile` should
                                 // not provide access to events that occurred before the file was
                                 // opened.
@@ -1409,5 +1421,52 @@ mod test {
                 },
             }
         });
+    }
+
+    #[::fuchsia::test]
+    async fn touch_input_file_inspect_counts_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let input_file =
+            InputFile::new_touch(720, 1200, inspector.root().create_child("touch_input_file"));
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let relay_thread = input_file.start_touch_relay(touch_source_proxy);
+
+        // Reply to first `Watch` with five `TouchEvent`s that should be counted as `received` by InputFile
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => responder
+                .send(&vec![TouchEvent::default(); 5])
+                .expect("failure sending Watch reply"),
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Wait for second `Watch` call and verify it has five elements in `responses`.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, .. })) => {
+                assert_matches!(responses.as_slice(), [_, _, _, _, _])
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            touch_input_file: {
+                fidl_events_received_count: 5u64,
+                fidl_events_converted_count: 0u64,
+                fidl_events_discarded_count: 0u64,
+                uapi_events_generated_count: 0u64,
+                uapi_events_read_count: 0u64,
+                "fuchsia.inspect.Health": {
+                    status: "STARTING_UP",
+                    // Timestamp value is unpredictable and not relevant in this context,
+                    // so we only assert that the property is present.
+                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                },
+            }
+        });
+
+        // Cleanly tear down the client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("client thread failed"); // Wait for client thread to finish.
     }
 }
