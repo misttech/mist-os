@@ -5,7 +5,6 @@
 #include "zircon/syscalls/profile.h"
 
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
-#include <inttypes.h>
 #include <lib/fit/result.h>
 #include <lib/profile/profile.h>
 #include <lib/syslog/cpp/macros.h>
@@ -22,6 +21,7 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
+#include <string_view>
 
 #include "zircon/system/ulib/profile/config.h"
 
@@ -64,8 +64,8 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
 
 void ProfileProvider::GetProfile(GetProfileRequestView request,
                                  GetProfileCompleter::Sync& completer) {
-  const std::string name{request->name.get()};
-  FX_SLOG(INFO, "Priority requested", KV("name", name.c_str()), KV("priority", request->priority),
+  const std::string_view name{request->name.get()};
+  FX_SLOG(INFO, "Priority requested", KV("name", name), KV("priority", request->priority),
           KV("tag", "ProfileProvider"));
 
   zx_profile_info_t info = {
@@ -81,10 +81,10 @@ void ProfileProvider::GetProfile(GetProfileRequestView request,
 
 void ProfileProvider::GetDeadlineProfile(GetDeadlineProfileRequestView request,
                                          GetDeadlineProfileCompleter::Sync& completer) {
-  const std::string name{request->name.get()};
+  const std::string_view name{request->name.get()};
   const double utilization =
       static_cast<double>(request->capacity) / static_cast<double>(request->deadline);
-  FX_SLOG(INFO, "Deadline requested", KV("name", name.c_str()), KV("capacity", request->capacity),
+  FX_SLOG(INFO, "Deadline requested", KV("name", name), KV("capacity", request->capacity),
           KV("deadline", request->deadline), KV("period", request->period),
           KV("utilization", utilization), KV("tag", "ProfileProvider"));
 
@@ -128,36 +128,33 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
                                                 sizeof(handle_info), nullptr, nullptr);
   if (status != ZX_OK) {
     FX_SLOG(WARNING, "Failed to get info for thread handle",
-            KV("status", zx_status_get_string(status)));
+            KV("status", zx_status_get_string(status)), KV("tag", "ProfileProvider"));
     handle_info.koid = ZX_KOID_INVALID;
     handle_info.related_koid = ZX_KOID_INVALID;
   }
   if (handle_info.type != ZX_OBJ_TYPE_THREAD) {
-    return completer.Reply(ZX_ERR_WRONG_TYPE);
+    completer.Reply(ZX_ERR_WRONG_TYPE);
+    return;
   }
 
-  const std::string role_selector{request->role.get()};
-  FX_SLOG(DEBUG, "Role requested", KV("ProfileProvider", role_selector.c_str()),
-          KV("pid", handle_info.related_koid), KV("tid", handle_info.koid),
-          KV("tag", "ProfileProvider"));
+  const std::string_view role_selector{request->role.get()};
+  FX_SLOG(DEBUG, "Role requested:", KV("role", role_selector), KV("pid", handle_info.related_koid),
+          KV("tid", handle_info.koid), KV("tag", "ProfileProvider"));
 
   const fit::result role_result = ParseRoleSelector(role_selector);
   if (role_result.is_error()) {
-    return completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.Reply(ZX_ERR_INVALID_ARGS);
+    return;
   }
 
-  // Select the profile parameters based on the role selector. The builtin roles cannot be
-  // overridden.
-  zx_profile_info_t info = {};
-  if (role_result->name == "fuchsia.default") {
-    info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
-    info.priority = ZX_PRIORITY_DEFAULT;
-  } else if (role_result->name == "fuchsia.test-role" && role_result->has("not-found")) {
-    return completer.Reply(ZX_ERR_NOT_FOUND);
+  // Select the profile parameters based on the role selector.
+  if (role_result->name == "fuchsia.test-role" && role_result->has("not-found")) {
+    completer.Reply(ZX_ERR_NOT_FOUND);
   } else if (role_result->name == "fuchsia.test-role" && role_result->has("ok")) {
-    return completer.Reply(ZX_OK);
+    completer.Reply(ZX_OK);
   } else if (auto search = profiles_.find(role_result->name); search != profiles_.cend()) {
-    info = search->second.info;
+    status = zx_object_set_profile(request->handle.get(), search->second.profile.get(), 0);
+    completer.Reply(status);
   } else if (const auto media_role = MaybeMediaRole(*role_result); media_role.is_ok()) {
     // TODO(fxbug.dev/40858): If a media profile is not found in the system config, use the
     // forwarded parameters. This can be removed once clients are migrated to use defined roles.
@@ -166,39 +163,37 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
         media_role->capacity > media_role->deadline) {
       FX_SLOG(WARNING, "Skipping media profile with no override and invalid selectors",
               KV("capacity", media_role->capacity), KV("deadline", media_role->deadline),
-              KV("role", role_result->name.c_str()), KV("tag", "ProfileProvider"));
-      return completer.Reply(ZX_OK);
+              KV("role", role_result->name), KV("tag", "ProfileProvider"));
+      completer.Reply(ZX_OK);
+      return;
     }
 
     FX_SLOG(INFO, "Using selector parameters for media profile with no override",
             KV("capacity", media_role->capacity), KV("deadline", media_role->deadline),
-            KV("role", role_result->name.c_str()), KV("tag", "ProfileProvider"));
+            KV("role", role_result->name), KV("tag", "ProfileProvider"));
 
+    zx_profile_info_t info = {};
     info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
     info.deadline_params.capacity = media_role->capacity;
     info.deadline_params.relative_deadline = media_role->deadline;
     info.deadline_params.period = media_role->deadline;
+
+    zx::profile profile;
+    status = zx::profile::create(*root_job_, 0u, &info, &profile);
+    if (status != ZX_OK) {
+      FX_SLOG(ERROR, "Failed to create media profile:", KV("status", zx_status_get_string(status)),
+              KV("tag", "ProfileProvider"));
+      // Failing to create a profile is likely due to invalid profile parameters.
+      completer.Reply(ZX_ERR_INTERNAL);
+      return;
+    }
+    status = zx_object_set_profile(request->handle.get(), profile.get(), 0);
+    completer.Reply(status);
   } else {
-    FX_SLOG(DEBUG, "Requested role not found", KV("role", role_result->name.c_str()),
+    FX_SLOG(DEBUG, "Requested role not found", KV("role", role_result->name),
             KV("tag", "ProfileProvider"));
-    return completer.Reply(ZX_ERR_NOT_FOUND);
+    completer.Reply(ZX_ERR_NOT_FOUND);
   }
-
-  zx::profile profile;
-  status = zx::profile::create(*root_job_, 0u, &info, &profile);
-  if (status != ZX_OK) {
-    // Failing to create a profile is likely due to invalid profile parameters.
-    return completer.Reply(ZX_ERR_INTERNAL);
-  }
-
-  if (handle_info.type == ZX_OBJ_TYPE_THREAD) {
-    status = zx::unowned_thread(request->handle.get())->set_profile(profile, 0);
-  } else {
-    // Should never get here as the type was checked at the start of the method so generate a fatal
-    // error.
-    FX_SLOG(FATAL, "Unsupported object type", KV("type", handle_info.type));
-  }
-  completer.Reply(status);
 }
 
 constexpr const char* profile_svc_names[] = {
@@ -209,26 +204,32 @@ constexpr const char* profile_svc_names[] = {
 zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
   auto result = zircon_profile::LoadConfigs(kConfigPath);
   if (result.is_error()) {
-    FX_SLOG(ERROR, "Failed to load configs", KV("error", result.error_value().c_str()),
+    FX_SLOG(ERROR, "Failed to load configs", KV("error", result.error_value()),
             KV("tag", "ProfileProvider"));
     return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  // Create profiles for each configured role. If creating the profile fails, remove the role entry.
+  for (auto iter = result->begin(); iter != result->end();) {
+    const zx_status_t status =
+        zx::profile::create(root_job, 0, &iter->second.info, &iter->second.profile);
+    if (status != ZX_OK) {
+      FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
+              KV("role", iter->first), KV("status", zx_status_get_string(status)));
+      iter = result->erase(iter);
+    } else {
+      ++iter;
+    }
   }
 
   // Apply the dispatch role if defined.
   const std::string dispatch_role = "fuchsia.system.profile-provider.dispatch";
   const auto search = result->find(dispatch_role);
   if (search != result->end()) {
-    zx::profile profile;
-    zx_status_t status = zx::profile::create(root_job, 0u, &search->second.info, &profile);
+    const zx_status_t status = zx::thread::self()->set_profile(search->second.profile, 0);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to create profile for role", KV("role", dispatch_role.c_str()),
-              KV("error", zx_status_get_string(status)), KV("tag", "ProfileProvider"));
-    } else {
-      status = zx_object_set_profile(zx_thread_self(), profile.get(), 0);
-      if (status != ZX_OK) {
-        FX_SLOG(ERROR, "Failed to set profile", KV("error", zx_status_get_string(status)),
-                KV("tag", "ProfileProvider"));
-      }
+      FX_SLOG(ERROR, "Failed to set profile", KV("error", zx_status_get_string(status)),
+              KV("tag", "ProfileProvider"));
     }
   }
 

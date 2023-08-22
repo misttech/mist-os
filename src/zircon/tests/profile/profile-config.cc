@@ -2,17 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/io.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/object.h>
 #include <lib/zx/profile.h>
-#include <lib/zx/thread.h>
-#include <threads.h>
-#include <zircon/errors.h>
-#include <zircon/syscalls.h>
+#include <lib/zx/result.h>
 
 #include <string>
 #include <unordered_set>
@@ -24,8 +15,16 @@
 namespace {
 
 TEST(ProfileConfig, Parse) {
-  auto result = zircon_profile::LoadConfigs("/pkg/data");
+  fit::result result = zircon_profile::LoadConfigs("/pkg/data");
   ASSERT_TRUE(result.is_ok());
+
+  {
+    const auto iter = result->find("fuchsia.default");
+    ASSERT_TRUE(iter != result->end());
+    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Builtin);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 16);
+  }
 
   {
     const auto iter = result->find("test.bringup.a:affinity");
@@ -96,7 +95,7 @@ TEST(ProfileConfig, Parse) {
   const std::unordered_set<std::string> expected_profiles{
       "test.product.a", "test.core.a:affinity",    "test.bringup.a:affinity",
       "test.bringup.b", "test.bringup.b:affinity", "test.core.a",
-      "test.bringup.a",
+      "test.bringup.a", "fuchsia.default",
   };
 
   for (const auto& [key, value] : *result) {
