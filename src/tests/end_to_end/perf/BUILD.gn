@@ -46,7 +46,10 @@ if (target_cpu != "arm64") {
 
 if (target_cpu == "x64" && !is_asan) {
   if (host_os == "linux") {
-    test_list += [ "starnix_benchmarks_test" ]
+    test_list += [
+      "starnix_benchmarks_test",
+      "netstack_starnix_benchmarks_test",
+    ]
   }
 }
 
@@ -237,6 +240,9 @@ if (is_host) {
     "fuchsia.network.socket.loopback.fake_netstack.txt",
     "fuchsia.network.socket.loopback.fastudp.txt",
     "fuchsia.network.socket.loopback.netstack3.txt",
+    "fuchsia.network.socket.loopback.starnix.fake_netstack.txt",
+    "fuchsia.network.socket.loopback.starnix.netstack3.txt",
+    "fuchsia.network.socket.loopback.starnix.txt",
     "fuchsia.network.socket.loopback.txt",
     "fuchsia.network.socket.tun.netstack3.txt",
     "fuchsia.network.socket.tun.txt",

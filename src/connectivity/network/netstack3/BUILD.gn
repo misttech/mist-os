@@ -141,6 +141,13 @@ fuchsia_component("component-debug") {
   testonly = true
 }
 
+# Drop-in component with the name "netstack" rather than "netstack3."
+fuchsia_component("component-dropin") {
+  component_name = "netstack"
+  manifest = "meta/netstack3.cml"
+  deps = [ ":bin" ]
+}
+
 fuchsia_unittest_component("netstack3-bin_test") {
   deps = [
     ":bin_test",

@@ -44,6 +44,7 @@ fuchsia_package("netstack2") {
   visibility = [
     ":*",
     "//bundles/assembly:*",
+    "//src/connectivity/network/tests/benchmarks/socket-loopback:*",
   ]
 }
 

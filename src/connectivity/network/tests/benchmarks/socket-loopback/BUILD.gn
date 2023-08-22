@@ -8,6 +8,7 @@ import("//build/components/fuchsia_unittest_component.gni")
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/test.gni")
 import("//build/testing/environments.gni")
+import("//src/starnix/tests/build/starnix_host_test_component.gni")
 
 test("loopback_socket_benchmarks") {
   sources = [
@@ -148,10 +149,90 @@ if (target_cpu != "riscv64") {
   ns2_test_targets = []
 }
 
+if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
+  starnix_host_test_component("loopback-socket-benchmarks-starnix") {
+    test_label = ":loopback_socket_benchmarks"
+    test_binary = "loopback_socket_benchmarks"
+
+    manifest = "meta/loopback-socket-benchmarks-starnix.cml"
+
+    test_type = "starnix"
+  }
+
+  starnix_host_test_component(
+      "loopback-socket-benchmarks-starnix-with-netstack3") {
+    test_label = ":loopback_socket_benchmarks"
+    test_binary = "loopback_socket_benchmarks"
+
+    manifest = "meta/loopback-socket-benchmarks-starnix-with-netstack3.cml"
+
+    test_type = "starnix"
+  }
+
+  starnix_host_test_component(
+      "loopback-socket-benchmarks-starnix-with-fake-netstack") {
+    test_label = ":loopback_socket_benchmarks"
+    test_binary = "loopback_socket_benchmarks"
+
+    manifest = "meta/loopback-socket-benchmarks-starnix-with-fake-netstack.cml"
+
+    test_type = "starnix"
+  }
+
+  fuchsia_test_package("loopback-socket-benchmarks-starnix-pkg") {
+    package_name = "loopback-socket-benchmarks-starnix"
+    test_components = [ ":loopback-socket-benchmarks-starnix" ]
+
+    subpackages = [
+      "//src/starnix/containers/debian:debian_package",
+      "//src/starnix/kernel:starnix_kernel_package",
+      "//src/connectivity/network:netstack2",
+    ]
+  }
+
+  fuchsia_package("netstack3") {
+    package_name = "netstack"
+    deps = [ "//src/connectivity/network/netstack3:component-dropin" ]
+  }
+
+  fuchsia_test_package(
+      "loopback-socket-benchmarks-starnix-with-netstack3-pkg") {
+    package_name = "loopback-socket-benchmarks-starnix-with-netstack3"
+    test_components = [ ":loopback-socket-benchmarks-starnix-with-netstack3" ]
+
+    subpackages = [
+      "//src/starnix/containers/debian:debian_package",
+      "//src/starnix/kernel:starnix_kernel_package",
+      ":netstack3",
+    ]
+  }
+
+  fuchsia_test_package(
+      "loopback-socket-benchmarks-starnix-with-fake-netstack-pkg") {
+    package_name = "loopback-socket-benchmarks-starnix-with-fake-netstack"
+    test_components =
+        [ ":loopback-socket-benchmarks-starnix-with-fake-netstack" ]
+
+    subpackages = [
+      "//src/starnix/containers/debian:debian_package",
+      "//src/starnix/kernel:starnix_kernel_package",
+      "//src/connectivity/network/tests/benchmarks/fake-netstack:fake-netstack-pkg",
+    ]
+  }
+
+  starnix_benchmarks = [
+    ":loopback-socket-benchmarks-starnix-pkg",
+    ":loopback-socket-benchmarks-starnix-with-netstack3-pkg",
+    ":loopback-socket-benchmarks-starnix-with-fake-netstack-pkg",
+  ]
+} else {
+  starnix_benchmarks = []
+}
+
 all_test_targets = [
                      ":loopback-socket-benchmarks-tests",
                      ":loopback-socket-benchmarks-with-tracing-pkg-netstack3",
-                   ] + ns2_test_targets
+                   ] + ns2_test_targets + starnix_benchmarks
 
 group("tests") {
   testonly = true

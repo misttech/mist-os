@@ -39,3 +39,16 @@ fuchsia_component("fake-netstack") {
   manifest = "meta/fake-netstack.cml"
   deps = [ ":bin" ]
 }
+
+fuchsia_component("component-dropin") {
+  component_name = "netstack"
+  testonly = true
+  manifest = "meta/fake-netstack.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("fake-netstack-pkg") {
+  package_name = "netstack"
+  testonly = true
+  deps = [ ":component-dropin" ]
+}
