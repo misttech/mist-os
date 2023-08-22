@@ -14,9 +14,6 @@ use futures::TryStreamExt;
 use protocols::prelude::*;
 use std::rc::Rc;
 
-/// Disables fastboot usb discovery if set to true.
-const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
-
 struct Inner {
     events_in: async_channel::Receiver<ffx::FastbootTarget>,
     events_out: async_channel::Sender<ffx::FastbootTarget>,
@@ -55,8 +52,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::new(Inner { events_in: receiver, events_out: sender });
         self.inner.replace(inner.clone());
         let inner = Rc::downgrade(&inner);
-        let is_disabled: bool =
-            ffx_config::get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false);
+        let is_disabled: bool = ffx_daemon_target::fastboot::is_usb_discovery_enabled().await;
         // Probably could avoid creating the entire inner object but that refactoring can wait
         if is_disabled {
             return Ok(());

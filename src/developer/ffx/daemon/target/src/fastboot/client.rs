@@ -27,7 +27,7 @@ use future::select;
 use futures::{
     io::{AsyncRead, AsyncWrite},
     prelude::*,
-    try_join,
+    select_biased, try_join,
 };
 use std::{net::SocketAddr, rc::Rc, time::Duration, time::Instant};
 
@@ -41,6 +41,7 @@ const FASTBOOT_PORT: u16 = 5554;
 pub trait InterfaceFactory<T: AsyncRead + AsyncWrite + Unpin> {
     async fn open(&mut self, target: &Target) -> Result<T>;
     async fn close(&self);
+    async fn is_target_discovery_enabled(&self) -> bool;
 }
 
 pub struct FastbootImpl<T: AsyncRead + AsyncWrite + Unpin> {
@@ -370,26 +371,65 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                     .await;
                 match res.map_err(|_| RebootError::FastbootError) {
                     Ok(_) => {
-                        let reboot_timeout: u64 =
-                            get(FASTBOOT_REBOOT_RECONNECT_TIMEOUT).await.unwrap_or(10);
+                        let reboot_timeout = Duration::from_secs(
+                            get(FASTBOOT_REBOOT_RECONNECT_TIMEOUT).await.unwrap_or(10),
+                        );
                         self.clear_interface().await;
-                        match try_join!(
-                            self.target
-                                .events
-                                .wait_for(Some(Duration::from_secs(reboot_timeout)), |e| {
-                                    e == TargetEvent::Rediscovered
-                                })
-                                .map_err(|_| RebootError::TimedOut),
-                            async move {
-                                let proxy = listener
-                                    .into_proxy()
-                                    .map_err(|_| RebootError::FailedToSendOnReboot)?;
-                                if proxy.is_closed() {
-                                    return Err(RebootError::FailedToSendOnReboot);
+
+                        let rediscovery = async {
+                            if self.interface_factory.is_target_discovery_enabled().await {
+                                // Target can be rediscovered by target collection. Wait for it.
+                                self.target
+                                    .events
+                                    .wait_for(None, |e| e == TargetEvent::Rediscovered)
+                                    .map_err(|_| RebootError::TimedOut)
+                                    .await
+                            } else {
+                                // Enter an interface polling loop. Attempt to acquire the
+                                // interface under the specified timeout.
+                                loop {
+                                    match self.interface().await {
+                                        Ok(_) => return Ok(()),
+                                        Err(err) => {
+                                            tracing::debug!(
+                                                "Could not open fastboot interface: {:?}. Retrying...",
+                                                err
+                                            );
+                                        }
+                                    }
+
+                                    // Some interfaces (TCP) contain their own retry loops.
+                                    fuchsia_async::Timer::new(Duration::from_millis(250)).await;
                                 }
-                                proxy.on_reboot().map_err(|_| RebootError::FailedToSendOnReboot)
                             }
-                        ) {
+                        };
+
+                        let timeout = fuchsia_async::Timer::new(reboot_timeout);
+
+                        let rediscovery = async move {
+                            futures::pin_mut!(rediscovery);
+                            select_biased! {
+                                res = rediscovery.fuse() => res,
+                                _ = timeout.fuse() => Err(RebootError::TimedOut),
+                            }
+                        };
+
+                        let notify_listener = async move {
+                            let proxy = listener.into_proxy().map_err(|err| {
+                                tracing::error!("Could not open reboot listener proxy: {err:?}");
+                                RebootError::FailedToSendOnReboot
+                            })?;
+                            if proxy.is_closed() {
+                                tracing::error!("Reboot listener proxy unexpectedly closed");
+                                return Err(RebootError::FailedToSendOnReboot);
+                            }
+                            proxy.on_reboot().map_err(|err| {
+                                tracing::error!("Failed to send reboot: {err:?}");
+                                RebootError::FailedToSendOnReboot
+                            })
+                        };
+
+                        match try_join!(rediscovery, notify_listener) {
                             Ok(_) => {
                                 tracing::debug!("Rediscovered reboot target");
                                 responder.send(Ok(()))?;
@@ -628,38 +668,58 @@ mod test {
     struct TestFactory {
         replies: Vec<ReadResult>,
         timeout_at_end: bool,
+        /// Bitmap denoting which calls to InterfaceFactory::open should fail.
+        ///
+        /// The bitmap is interpreted from LSB to MSB.
+        ///
+        /// A `0` bit indicates success, a `1` bit indicates failure. A bitmap of 0b01101 indicates
+        /// a failure, a success, two failures, and then remaining success.
+        open_failure_pattern: u64,
+        has_discovery: bool,
     }
 
     impl TestFactory {
         pub fn new(replies: Vec<ReadResult>, timeout_at_end: bool) -> Self {
-            Self { replies, timeout_at_end }
+            Self { replies, timeout_at_end, open_failure_pattern: 0, has_discovery: true }
         }
     }
 
     #[async_trait(?Send)]
     impl InterfaceFactory<TestTransport> for TestFactory {
         async fn open(&mut self, _target: &Target) -> Result<TestTransport> {
+            let succeed = (self.open_failure_pattern & 1) == 0;
+            self.open_failure_pattern = self.open_failure_pattern >> 1;
+
+            if !succeed {
+                bail!("Intermittent failure");
+            }
+
             let mut transport = TestTransport::new(self.timeout_at_end);
             self.replies.iter().rev().for_each(|r| transport.push(r.clone()));
             return Ok(transport);
         }
 
         async fn close(&self) {}
+
+        async fn is_target_discovery_enabled(&self) -> bool {
+            self.has_discovery
+        }
     }
 
     async fn setup(replies: Vec<Reply>) -> (Rc<Target>, FastbootProxy) {
-        setup_with_timeout(replies.into_iter().map(|r| ReadResult::Ok(r)).collect(), false).await
+        setup_with_timeout(replies.into_iter().map(|r| ReadResult::Ok(r)).collect(), false, |_| {})
+            .await
     }
 
     async fn setup_with_timeout(
         replies: Vec<ReadResult>,
         timeout_at_end: bool,
+        init: impl FnOnce(&mut TestFactory),
     ) -> (Rc<Target>, FastbootProxy) {
         let target = Target::new_named("scooby-dooby-doo");
-        let mut fb = FastbootImpl::<TestTransport>::new(
-            target.clone(),
-            Box::new(TestFactory::new(replies, timeout_at_end)),
-        );
+        let mut factory = TestFactory::new(replies, timeout_at_end);
+        init(&mut factory);
+        let mut fb = FastbootImpl::<TestTransport>::new(target.clone(), Box::new(factory));
         let (proxy, mut stream) = create_proxy_and_stream::<FastbootMarker>().unwrap();
         fuchsia_async::Task::local(async move {
             loop {
@@ -849,6 +909,39 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_reboot_bootloader_polling_rediscovery() -> Result<()> {
+        let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
+        let mut stream = reboot_server.into_stream()?;
+        let (_, proxy) = setup_with_timeout(
+            vec![ReadResult::Ok(Reply::Okay("".to_string()))],
+            false,
+            |factory| {
+                // Succeed the first time, then fail several times before succeeding again.
+                factory.open_failure_pattern = 0b11111110;
+                factory.has_discovery = false;
+            },
+        )
+        .await;
+        try_join!(
+            async move {
+                // Should only need to wait for the first request.
+                if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) =
+                    stream.try_next().await?
+                {
+                    return Ok(());
+                }
+                bail!("did not receive reboot event");
+            },
+            proxy
+                .reboot_bootloader(reboot_client)
+                .map_err(|e| anyhow!("error rebooting to bootloader: {:?}", e)),
+        )
+        .and_then(|(_, reboot)| {
+            reboot.map_err(|e| anyhow!("failed booting to bootloader: {:?}", e))
+        })
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_continue_boot() -> Result<()> {
         let (_, proxy) = setup(vec![Reply::Okay("".to_string())]).await;
         proxy.continue_boot().await?.map_err(|e| anyhow!("error continue boot: {:?}", e))
@@ -946,7 +1039,7 @@ mod test {
     #[fuchsia::test]
     #[serial]
     async fn test_timeout_on_boot_is_ok() -> Result<()> {
-        let (_, proxy) = setup_with_timeout(vec![], true).await;
+        let (_, proxy) = setup_with_timeout(vec![], true, |_| {}).await;
         proxy
             .boot()
             .map_err(|e| anyhow!("FIDL failure: {e:?}"))
@@ -985,7 +1078,7 @@ mod test {
     #[fuchsia::test]
     #[serial]
     async fn test_usb_timeout_on_boot_is_ok() -> Result<()> {
-        let (_, proxy) = setup_with_timeout(vec![ReadResult::TimeoutErr], true).await;
+        let (_, proxy) = setup_with_timeout(vec![ReadResult::TimeoutErr], true, |_| {}).await;
         proxy
             .boot()
             .map_err(|e| anyhow!("FIDL failure: {e:?}"))

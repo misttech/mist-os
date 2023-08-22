@@ -1217,6 +1217,7 @@ impl PartialEq for Target {
 #[cfg(test)]
 mod test {
     use super::*;
+    use anyhow::Context;
     use assert_matches::assert_matches;
     use chrono::TimeZone;
     use ffx::TargetIp;

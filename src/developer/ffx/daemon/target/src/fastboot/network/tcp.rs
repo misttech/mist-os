@@ -225,4 +225,8 @@ impl InterfaceFactory<TcpNetworkInterface> for TcpNetworkFactory {
     }
 
     async fn close(&self) {}
+
+    async fn is_target_discovery_enabled(&self) -> bool {
+        ffx_config::get("discovery.mdns.enabled").await.unwrap_or(true)
+    }
 }

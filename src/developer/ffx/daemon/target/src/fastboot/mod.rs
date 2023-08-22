@@ -43,6 +43,9 @@ const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
 /// The minimum flash timeout (in seconds) for flashing to a target device
 const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
 
+/// Disables fastboot usb discovery if set to true.
+const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
+
 /// Fastboot Service that handles communicating with a target over the Fastboot protocol.
 ///
 /// Since this service can handle establishing communication with a target in any state (Product,
@@ -131,6 +134,10 @@ impl InterfaceFactory<Interface> for UsbFactory {
             tracing::debug!("dropping in use serial: {s}");
         }
     }
+
+    async fn is_target_discovery_enabled(&self) -> bool {
+        is_usb_discovery_enabled().await
+    }
 }
 
 impl Drop for UsbFactory {
@@ -139,6 +146,10 @@ impl Drop for UsbFactory {
             self.close().await;
         });
     }
+}
+
+pub async fn is_usb_discovery_enabled() -> bool {
+    get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false)
 }
 
 //TODO(fxbug.dev/52733) - this info will probably get rolled into the target struct
