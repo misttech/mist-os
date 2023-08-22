@@ -173,8 +173,5 @@ pub enum BlobfsLayout {
 #[serde(deny_unknown_fields)]
 pub struct ReservedFvmVolumeConfig {
     /// The number of slices to reserve in the fvm.
-    /// TODO(b/295030306): Delete the alias once all products use
-    /// reserved_slices.
-    #[serde(alias = "reserved_bytes")]
     pub reserved_slices: u64,
 }
