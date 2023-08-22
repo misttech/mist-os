@@ -4,6 +4,7 @@
 
 use crate::{
     device::{DeviceOps, RemoteBinderConnection},
+    drop_notifier::DropWaiter,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
@@ -12,7 +13,7 @@ use crate::{
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
-    task::{CurrentTask, ThreadGroup, WaitQueue, Waiter},
+    task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     types::{
         errno,
         errno::{EAGAIN, EINTR},
@@ -31,8 +32,11 @@ use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{
-    channel::oneshot, future::FutureExt, pin_mut, select, task::Poll, Future, Stream, StreamExt,
-    TryStreamExt,
+    channel::oneshot,
+    future::{FutureExt, TryFutureExt},
+    pin_mut, select,
+    task::Poll,
+    Future, Stream, StreamExt, TryStreamExt,
 };
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -578,6 +582,80 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         Ok(())
     }
 
+    /// Serve the LutexController protocol.
+    async fn serve_lutex_controller(
+        kernel: Arc<Kernel>,
+        server_end: ServerEnd<fbinder::LutexControllerMarker>,
+    ) -> Result<(), Error> {
+        async fn handle_request(
+            kernel: &Arc<Kernel>,
+            event: fbinder::LutexControllerRequest,
+        ) -> Result<(), Error> {
+            match event {
+                fbinder::LutexControllerRequest::WaitBitset { payload, responder } => {
+                    let deadline_and_receiver = (|| {
+                        let vmo = payload.vmo.ok_or_else(|| errno!(EINVAL))?;
+                        let offset = payload.offset.ok_or_else(|| errno!(EINVAL))?;
+                        let value = payload.value.ok_or_else(|| errno!(EINVAL))?;
+                        let mask = payload.mask.unwrap_or(u32::MAX);
+                        let deadline = payload.deadline.map(zx::Time::from_nanos);
+                        kernel
+                            .shared_futexes
+                            .external_wait(vmo, offset, value, mask)
+                            .map(|receiver| (deadline, receiver))
+                    })();
+                    let result = match deadline_and_receiver {
+                        Ok((deadline, receiver)) => {
+                            let receiver = receiver.map_err(|_| errno!(EINTR));
+                            if let Some(deadline) = deadline {
+                                let timer = fasync::Timer::new(deadline).map(|_| error!(ETIMEDOUT));
+                                select_first(timer, receiver).await
+                            } else {
+                                receiver.await
+                            }
+                        }
+                        Err(e) => Err(e),
+                    };
+                    let result = result.map_err(|e: Errno| {
+                        fposix::Errno::from_primitive(e.code.error_code() as i32)
+                            .unwrap_or(fposix::Errno::Einval)
+                    });
+                    responder
+                        .send(result)
+                        .context("Unable to send LutexControllerRequest::WaitBitset response")
+                }
+                fbinder::LutexControllerRequest::WakeBitset { payload, responder } => {
+                    let result = (|| {
+                        let vmo = payload.vmo.ok_or_else(|| errno!(EINVAL))?;
+                        let offset = payload.offset.ok_or_else(|| errno!(EINVAL))?;
+                        let count = payload.count.ok_or_else(|| errno!(EINVAL))?;
+                        let mask = payload.mask.unwrap_or(u32::MAX);
+                        kernel.shared_futexes.external_wake(vmo, offset, count as usize, mask)
+                    })();
+                    let result = result
+                        .map(|count| fbinder::WakeResponse {
+                            count: Some(count as u64),
+                            ..fbinder::WakeResponse::default()
+                        })
+                        .map_err(|e: Errno| {
+                            fposix::Errno::from_primitive(e.code.error_code() as i32)
+                                .unwrap_or(fposix::Errno::Einval)
+                        });
+                    responder
+                        .send(result)
+                        .context("Unable to send LutexControllerRequest::WakeBitset response")
+                }
+            }
+        }
+        let stream = fbinder::LutexControllerRequestStream::from_channel(
+            fasync::Channel::from_channel(server_end.into_channel())?,
+        );
+        stream
+            .map(|result| result.context("failed fbinder::LutexController request"))
+            .try_for_each_concurrent(None, |event| handle_request(&kernel, event))
+            .await
+    }
+
     /// Serve the given `binder` handle, by opening `path`.
     async fn open_binder(
         self: Arc<Self>,
@@ -809,9 +887,11 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         let remote_controller =
             fbinder::RemoteControllerSynchronousProxy::new(remote_controller_client.into_channel());
         let (dev_binder_server_end, dev_binder_client_end) = zx::Channel::create();
+        let (lutex_controller_server_end, lutex_controller_client_end) = zx::Channel::create();
         remote_controller
             .start(fbinder::RemoteControllerStartRequest {
                 dev_binder: Some(dev_binder_client_end.into()),
+                lutex_controller: Some(lutex_controller_client_end.into()),
                 ..Default::default()
             })
             .map_err(|_| errno!(EINVAL))?;
@@ -821,27 +901,28 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             let result = executor.run_singlethreaded({
                 let handle = handle.clone();
                 async {
-                    // Retrieve a `DropWaiter` for the thread_group, taking care not to keep a
-                    // strong reference to the thread_group itself.
-                    let drop_waiter = handle
+                    // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
+                    // to keep a strong reference to the thread_group itself.
+                    let kernel_and_drop_waiter = handle
                         .state
                         .lock()
                         .thread_group
                         .upgrade()
-                        .map(|tg| tg.drop_notifier.waiter());
-                    let Some(drop_waiter) = drop_waiter else { return Ok(()); };
+                        .map(|tg| (tg.kernel.clone(), tg.drop_notifier.waiter()));
+                    let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
+                        return Ok(());
+                    };
+                    // Start the 2 servers.
                     let dev_binder_server =
-                        handle.serve_dev_binder(dev_binder_server_end.into()).fuse();
-                    let on_task_end = drop_waiter
-                        .on_closed()
-                        .map(|r| r.map(|_| ()).map_err(anyhow::Error::from))
-                        .fuse();
-
-                    pin_mut!(dev_binder_server, on_task_end);
-                    select! {
-                        dev_binder_server = dev_binder_server => dev_binder_server,
-                        on_task_end = on_task_end => on_task_end,
-                    }
+                        fasync::Task::local(handle.serve_dev_binder(dev_binder_server_end.into()));
+                    let lutex_controller_server = fasync::Task::local(
+                        Self::serve_lutex_controller(kernel, lutex_controller_server_end.into()),
+                    );
+                    // Wait until both are done, or the task exits.
+                    let binder_result = future_or_task_end(&drop_waiter, dev_binder_server).await;
+                    let lutex_controller_result =
+                        future_or_task_end(&drop_waiter, lutex_controller_server).await;
+                    binder_result.and(lutex_controller_result)
                 }
             });
             if let Err(e) = &result {
@@ -916,6 +997,24 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     }
 }
 
+async fn future_or_task_end(
+    drop_waiter: &DropWaiter,
+    fut: impl Future<Output = Result<(), Error>>,
+) -> Result<(), Error> {
+    let on_task_end = drop_waiter.on_closed().map(|r| r.map(|_| ()).map_err(anyhow::Error::from));
+    select_first(fut, on_task_end).await
+}
+
+async fn select_first<O>(f1: impl Future<Output = O>, f2: impl Future<Output = O>) -> O {
+    let f1 = f1.fuse();
+    let f2 = f2.fuse();
+    pin_mut!(f1, f2);
+    select! {
+        f1 = f1 => f1,
+        f2 = f2 => f2,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -927,7 +1026,10 @@ mod tests {
         testing::*,
         types::{mode, MountFlags},
     };
-    use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
+    use fidl::{
+        endpoints::{create_endpoints, create_proxy, Proxy},
+        HandleBased,
+    };
     use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
     use std::{collections::BTreeMap, ffi::CString, future::Future};
@@ -954,7 +1056,7 @@ mod tests {
     async fn run_remote_binder_test<F, Fut>(f: F)
     where
         Fut: Future<Output = fbinder::BinderProxy>,
-        F: FnOnce(fbinder::BinderProxy) -> Fut,
+        F: FnOnce(fbinder::BinderProxy, fbinder::LutexControllerProxy) -> Fut,
     {
         let service_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let (remote_controller_client, remote_controller_server) =
@@ -1030,12 +1132,16 @@ mod tests {
             fasync::Channel::from_channel(remote_controller_server.into_channel())
                 .expect("from_channel"),
         );
-        let dev_binder_client_end = match remote_controller_stream.try_next().await {
-            Ok(Some(fbinder::RemoteControllerRequest::Start { payload, .. })) => {
-                payload.dev_binder.expect("dev_binder")
-            }
-            x => panic!("Expected a start request, got: {x:?}"),
-        };
+        let (dev_binder_client_end, lutex_controller_client_end) =
+            match remote_controller_stream.try_next().await {
+                Ok(Some(fbinder::RemoteControllerRequest::Start { payload, .. })) => (
+                    payload.dev_binder.expect("dev_binder"),
+                    payload.lutex_controller.expect("lutex_controller"),
+                ),
+                x => panic!("Expected a start request, got: {x:?}"),
+            };
+
+        let lutex_controller = lutex_controller_client_end.into_proxy().expect("into_proxy");
 
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();
@@ -1060,7 +1166,7 @@ mod tests {
             .expect("open");
 
         // Do the test.
-        let binder = f(binder).await;
+        let binder = f(binder, lutex_controller).await;
 
         // Notify of the close binder
         dev_binder
@@ -1077,7 +1183,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn external_binder_connection() {
-        run_remote_binder_test(|binder| async move {
+        run_remote_binder_test(|binder, _| async move {
             const VMO_SIZE: usize = 10 * 1024 * 1024;
             let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("Vmo::create");
             let addr = fuchsia_runtime::vmar_root_self()
@@ -1102,5 +1208,70 @@ mod tests {
             binder
         })
         .await;
+    }
+
+    #[::fuchsia::test]
+    async fn lutex_controller() {
+        run_remote_binder_test(|binder, lutex_controller| async move {
+            const VMO_SIZE: usize = 4 * 1024;
+            let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("Vmo::create");
+            // Wait on an incorrect value.
+            let wait = lutex_controller
+                .wait_bitset(fbinder::WaitBitsetRequest {
+                    vmo: Some(
+                        vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate vmo"),
+                    ),
+                    offset: Some(0),
+                    value: Some(1),
+                    ..Default::default()
+                })
+                .await
+                .expect("got_answer");
+            assert_eq!(wait, Err(fposix::Errno::Eagain));
+
+            // Wait with a timeout
+            let wait = lutex_controller
+                .wait_bitset(fbinder::WaitBitsetRequest {
+                    vmo: Some(
+                        vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate vmo"),
+                    ),
+                    offset: Some(0),
+                    value: Some(0),
+                    deadline: Some(0),
+                    ..Default::default()
+                })
+                .await
+                .expect("got_answer");
+            assert_eq!(wait, Err(fposix::Errno::Etimedout));
+
+            let mut wait = lutex_controller.wait_bitset(fbinder::WaitBitsetRequest {
+                vmo: Some(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate vmo")),
+                offset: Some(0),
+                value: Some(0),
+                ..Default::default()
+            });
+            // The wait is correct, the future should stay pending until a wake.
+            assert!(futures::poll!(&mut wait).is_pending());
+
+            let waken_up = lutex_controller
+                .wake_bitset(fbinder::WakeBitsetRequest {
+                    vmo: Some(
+                        vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate vmo"),
+                    ),
+                    offset: Some(0),
+                    count: Some(1),
+                    ..Default::default()
+                })
+                .await
+                .expect("wake_answer")
+                .expect("wake_response");
+            assert_eq!(waken_up.count, Some(1));
+
+            // The wait should now return.
+            assert!(wait.await.expect("await_answer").is_ok());
+
+            binder
+        })
+        .await
     }
 }

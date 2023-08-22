@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use futures::channel::oneshot;
 use starnix_sync::{InterruptibleEvent, WakeReason};
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap, VecDeque},
     hash::Hash,
-    ops::DerefMut,
     sync::{Arc, Weak},
 };
 
@@ -25,12 +25,12 @@ pub struct FutexTable<Key: FutexKey> {
     /// The futexes associated with each address in each VMO.
     ///
     /// This HashMap is populated on-demand when futexes are used.
-    state: Mutex<HashMap<Key, Arc<FutexWaitQueue>>>,
+    state: Mutex<FutexTableState<Key>>,
 }
 
 impl<Key: FutexKey> Default for FutexTable<Key> {
     fn default() -> Self {
-        Self { state: Default::default() }
+        Self { state: Mutex::new(FutexTableState(Default::default())) }
     }
 }
 
@@ -48,17 +48,18 @@ impl<Key: FutexKey> FutexTable<Key> {
     ) -> Result<(), Errno> {
         let (FutexOperand { vmo, offset }, key) = Key::get_operand_and_key(current_task, addr)?;
 
+        let mut state = self.state.lock();
+        // As the state is locked, no wake can happen before the waiter is registered.
+        Self::check_futex_value(&vmo, offset, value)?;
+
         let event = InterruptibleEvent::new();
         let guard = event.begin_wait();
-        self.wait_queue_for_key(key).add(Arc::downgrade(&event), mask as u64);
-        // TODO: This read should be atomic.
-        let mut buf = [0u8; 4];
-        vmo.read(&mut buf, offset).map_err(impossible_error)?;
-        if u32::from_ne_bytes(buf) != value {
-            return error!(EAGAIN);
-        }
-        // TODO(tbodt): Delete the wait queue from the hashmap when it becomes empty. Not doing
-        // this is a memory leak.
+        state.get_waiters_or_default(key).add(FutexWaiter {
+            mask,
+            notifiable: FutexNotifiable::new_internal(Arc::downgrade(&event)),
+        });
+        std::mem::drop(state);
+
         current_task.run_in_state(RunState::Event(event.clone()), move || {
             guard.block_until(deadline).map_err(|e| match e {
                 WakeReason::Interrupted => errno!(EINTR),
@@ -79,7 +80,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         mask: u32,
     ) -> Result<usize, Errno> {
         let key = Key::get_key(task, addr)?;
-        Ok(self.wait_queue_for_key(key).notify(mask as u64, count))
+        self.state.lock().wake(key, count, mask)
     }
 
     /// Requeue the waiters to another address.
@@ -94,20 +95,65 @@ impl<Key: FutexKey> FutexTable<Key> {
     ) -> Result<usize, Errno> {
         let key = Key::get_key(current_task, addr)?;
         let new_key = Key::get_key(current_task, new_addr)?;
-        let waiters = FutexWaitQueue::default();
-        if let Some(old_waiters) = self.state.lock().remove(&key) {
-            waiters.take_waiters(&old_waiters);
+        let mut state = self.state.lock();
+        let mut old_waiters = if let Some(old_waiters) = state.remove(&key) {
+            old_waiters
+        } else {
+            return Ok(0);
+        };
+        let woken = old_waiters.notify(FUTEX_BITSET_MATCH_ANY, count);
+        if !old_waiters.is_empty() {
+            state.get_waiters_or_default(new_key).transfer(old_waiters);
         }
-        let woken = waiters.notify(FUTEX_BITSET_MATCH_ANY as u64, count);
-        self.wait_queue_for_key(new_key).take_waiters(&waiters);
         Ok(woken)
     }
 
-    /// Returns the WaitQueue for a given address.
-    fn wait_queue_for_key(&self, key: Key) -> Arc<FutexWaitQueue> {
+    fn check_futex_value(vmo: &zx::Vmo, offset: u64, value: u32) -> Result<(), Errno> {
+        // TODO: This read should be atomic.
+        let mut buf = [0u8; 4];
+        vmo.read(&mut buf, offset).map_err(impossible_error)?;
+        if u32::from_ne_bytes(buf) != value {
+            return error!(EAGAIN);
+        }
+        Ok(())
+    }
+}
+
+impl FutexTable<SharedFutexKey> {
+    /// Wait on the futex at the given offset in the vmo.
+    ///
+    /// See FUTEX_WAIT.
+    pub fn external_wait(
+        &self,
+        vmo: zx::Vmo,
+        offset: u64,
+        value: u32,
+        mask: u32,
+    ) -> Result<oneshot::Receiver<()>, Errno> {
+        let key = SharedFutexKey::new(&vmo, offset)?;
         let mut state = self.state.lock();
-        let waiters = state.entry(key).or_default();
-        Arc::clone(waiters)
+        // As the state is locked, no wake can happen before the waiter is registered.
+        Self::check_futex_value(&vmo, offset, value)?;
+
+        let (sender, receiver) = oneshot::channel::<()>();
+        state
+            .get_waiters_or_default(key)
+            .add(FutexWaiter { mask, notifiable: FutexNotifiable::new_external(sender) });
+        Ok(receiver)
+    }
+
+    /// Wake the given number of waiters on futex at the given offset in the vmo. Returns the
+    /// number of waiters actually woken.
+    ///
+    /// See FUTEX_WAKE.
+    pub fn external_wake(
+        &self,
+        vmo: zx::Vmo,
+        offset: u64,
+        count: usize,
+        mask: u32,
+    ) -> Result<usize, Errno> {
+        self.state.lock().wake(SharedFutexKey::new(&vmo, offset)?, count, mask)
     }
 }
 
@@ -154,49 +200,134 @@ impl FutexKey for SharedFutexKey {
 
     fn get_operand_and_key(task: &Task, addr: UserAddress) -> Result<(FutexOperand, Self), Errno> {
         let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
+        let key = SharedFutexKey::new(&vmo, offset)?;
+        Ok((FutexOperand { vmo, offset }, key))
+    }
+}
+
+impl SharedFutexKey {
+    fn new(vmo: &zx::Vmo, offset: u64) -> Result<Self, Errno> {
         let koid = vmo.info().map_err(impossible_error)?.koid;
-        Ok((FutexOperand { vmo, offset }, SharedFutexKey { koid, offset }))
+        Ok(Self { koid, offset })
+    }
+}
+
+struct FutexTableState<Key: FutexKey>(
+    // TODO(tbodt): Delete the wait queue from the hashmap when it becomes empty. Not doing
+    // this is a memory leak.
+    HashMap<Key, FutexWaiters>,
+);
+
+impl<Key: FutexKey> std::ops::Deref for FutexTableState<Key> {
+    type Target = HashMap<Key, FutexWaiters>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<Key: FutexKey> std::ops::DerefMut for FutexTableState<Key> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<Key: FutexKey> FutexTableState<Key> {
+    /// Returns the FutexWaiters for a given address, creating an empty one if none is registered.
+    fn get_waiters_or_default(&mut self, key: Key) -> &mut FutexWaiters {
+        self.entry(key).or_default()
+    }
+
+    fn wake(&mut self, key: Key, count: usize, mask: u32) -> Result<usize, Errno> {
+        let entry = self.entry(key);
+        match entry {
+            Entry::Vacant(_) => Ok(0),
+            Entry::Occupied(mut entry) => {
+                let count = entry.get_mut().notify(mask, count);
+                if entry.get().is_empty() {
+                    entry.remove();
+                }
+                Ok(count)
+            }
+        }
+    }
+}
+
+/// Abstraction over a process waiting on a Futex that can be notified.
+enum FutexNotifiable {
+    /// An internal process waiting on a Futex.
+    Internal(Weak<InterruptibleEvent>),
+    /// An external process waiting on a Futex.
+    // The sender needs to be an option so that one can send the notification while only holding a
+    // mut reference on the ExternalWaiter.
+    External(Option<oneshot::Sender<()>>),
+}
+
+impl FutexNotifiable {
+    fn new_internal(event: Weak<InterruptibleEvent>) -> Self {
+        Self::Internal(event)
+    }
+
+    fn new_external(sender: oneshot::Sender<()>) -> Self {
+        Self::External(Some(sender))
+    }
+
+    /// Tries to notify the process. Returns `true` is the process have been notified. Returns
+    /// `false` otherwise. This means the process is stale and will never be available again.
+    fn notify(&mut self) -> bool {
+        match self {
+            Self::Internal(event) => {
+                if let Some(event) = event.upgrade() {
+                    event.notify();
+                    true
+                } else {
+                    false
+                }
+            }
+            Self::External(ref mut sender) => {
+                if let Some(sender) = sender.take() {
+                    sender.send(()).is_ok()
+                } else {
+                    false
+                }
+            }
+        }
     }
 }
 
 struct FutexWaiter {
-    event: Weak<InterruptibleEvent>,
-    mask: u64,
+    mask: u32,
+    notifiable: FutexNotifiable,
 }
 
 #[derive(Default)]
-struct FutexWaitQueue {
-    waiters: Mutex<Vec<FutexWaiter>>,
-}
+struct FutexWaiters(VecDeque<FutexWaiter>);
 
-impl FutexWaitQueue {
-    fn add(&self, event: Weak<InterruptibleEvent>, mask: u64) {
-        let mut waiters = self.waiters.lock();
-        waiters.push(FutexWaiter { event, mask });
+impl FutexWaiters {
+    fn add(&mut self, waiter: FutexWaiter) {
+        self.0.push_back(waiter);
     }
 
-    fn notify(&self, mask: u64, limit: usize) -> usize {
+    fn notify(&mut self, mask: u32, count: usize) -> usize {
         let mut woken = 0;
-        // Using `retain` means we end up walking more than `limit` entries in this list, but that
-        // lets us remove the stale waiters.
-        self.waiters.lock().retain(|waiter| {
-            if let Some(event) = waiter.event.upgrade() {
-                if woken < limit && waiter.mask & mask != 0 {
-                    event.notify();
-                    woken += 1;
-                    false
-                } else {
-                    true
-                }
-            } else {
-                false
+        self.0.retain_mut(|waiter| {
+            if woken == count || waiter.mask & mask == 0 {
+                return true;
             }
+            // The send will fail if the receiver is gone, which means nothing was actualling
+            // waiting on the futex.
+            if waiter.notifiable.notify() {
+                woken += 1;
+            }
+            false
         });
         woken
     }
 
-    fn take_waiters(&self, other: &FutexWaitQueue) {
-        let mut other_entries = std::mem::take(other.waiters.lock().deref_mut());
-        self.waiters.lock().append(&mut other_entries);
+    fn transfer(&mut self, mut other: Self) {
+        self.0.append(&mut other.0);
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }

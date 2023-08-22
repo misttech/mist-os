@@ -120,7 +120,7 @@ closed protocol RemoteController {
 /// of a process running inside starnix.
 closed protocol LutexController {
     /// FUTEX_WAIT_BITSET command
-    strict WaitBitSet(resource table {
+    strict WaitBitset(@generated_name("WaitBitsetRequest") resource table {
         /// The vmo containing the shared address of the futex.
         /// Mandatory
         1: vmo zx.Handle:VMO;
@@ -139,7 +139,7 @@ closed protocol LutexController {
     }) -> () error fuchsia.posix.Errno;
 
     /// FUTEX_WAKE_BITSET command
-    strict WakeBitSet(resource table {
+    strict WakeBitset(@generated_name("WakeBitsetRequest") resource table {
         /// The vmo containing the shared address of the futex.
         /// Mandatory
         1: vmo zx.Handle:VMO;
@@ -152,7 +152,10 @@ closed protocol LutexController {
         /// The bit mask.
         /// Optional. If not present, as mask with all bits present will be used.
         4: mask uint32;
-    }) -> () error fuchsia.posix.Errno;
+    }) -> (@generated_name("WakeResponse") resource table {
+        /// The number of waiters that were woken up.
+        1: count uint64;
+    }) error fuchsia.posix.Errno;
 };
 
 /// An opened connection to a binder driver.
