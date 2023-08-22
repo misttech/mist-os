@@ -9,7 +9,6 @@
     program: {
         runner: "elf",
         binary: "bin/minfs",
-        args: [ "component" ],
         lifecycle: { stop_event: "notify" },
     },
     capabilities: [
