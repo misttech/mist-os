@@ -11,7 +11,7 @@ from mobly import asserts
 from mobly import base_test
 from mobly import test_runner
 
-from honeydew.mobly_controller import fuchsia_device
+from mobly_controller import fuchsia_device
 
 
 class MoblyDriverHoneydewIntegrationTest(base_test.BaseTestClass):

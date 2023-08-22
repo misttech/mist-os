@@ -4,10 +4,8 @@
 
 group("tests") {
   testonly = true
-  public_deps = [ "smoke_test:smoke_test($host_toolchain)" ]
-}
-
-group("fyi") {
-  testonly = true
-  public_deps = [ "test_honeydew_integration:fyi" ]
+  public_deps = [
+    "smoke_test($host_toolchain)",
+    "test_honeydew_integration($host_toolchain)",
+  ]
 }

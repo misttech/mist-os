@@ -10,9 +10,11 @@ if (is_host) {
   python_mobly_test("test_honeydew_integration") {
     main_source = "test_honeydew_integration.py"
 
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [ "//src/testing/end_to_end/mobly_controller" ]
 
     local_config_source = "local_mobly_config.yaml"
+
+    transport = "fuchsia-controller"
 
     # Used for infra Swarming bot allocation.
     environments = [
@@ -23,11 +25,4 @@ if (is_host) {
       },
     ]
   }
-}
-
-# Tests that we want to run in an FYI builder.
-# We do not want failures from these tests to break the tree.
-group("fyi") {
-  testonly = true
-  deps = [ ":test_honeydew_integration($host_toolchain)" ]
 }
