@@ -243,7 +243,7 @@ TEST(VmoTestCase, MapRead) {
 //
 // See fxbug.dev/66978 for more details.
 TEST(VmoTestCase, ParallelWriteAndDecommit) {
-  constexpr size_t kVmoSize = 8 * (1UL << 30);
+  const size_t kVmoSize = zx_system_get_page_size();
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
@@ -258,9 +258,10 @@ TEST(VmoTestCase, ParallelWriteAndDecommit) {
 
   ASSERT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, kVmoSize, nullptr, 0));
 
-  constexpr size_t kNumThreads = 2;
+  constexpr size_t kNumWriters = 2;
+  constexpr size_t kNumDecommitters = 2;
 
-  void *dst = reinterpret_cast<void *>(base + kVmoSize / 2);
+  void *dst = reinterpret_cast<void *>(base);
 
   std::atomic<size_t> running = 0;
   std::atomic<bool> start = false;
@@ -270,29 +271,31 @@ TEST(VmoTestCase, ParallelWriteAndDecommit) {
     while (!start) {
       sched_yield();
     }
-    for (int i = 0; i < 100000; i++) {
+    for (size_t i = 0; i < 100000; i++) {
       mandatory_memset(dst, 0x1, 128);
     }
   };
 
-  auto decommitter = [&vmo, &running, &start] {
+  auto decommitter = [&vmo, &running, &start, kVmoSize] {
     running++;
     while (!start) {
       sched_yield();
     }
-    for (int i = 0; i < 100000; i++) {
-      EXPECT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, kVmoSize / 2, 4096, nullptr, 0));
+    for (size_t i = 0; i < 100000; i++) {
+      EXPECT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, kVmoSize, nullptr, 0));
     }
   };
 
   std::vector<std::thread> threads;
 
-  for (size_t i = 0; i < kNumThreads; i++) {
-    threads.push_back(std::thread(writer));
+  for (size_t i = 0; i < kNumDecommitters; i++) {
     threads.push_back(std::thread(decommitter));
   }
+  for (size_t i = 0; i < kNumWriters; i++) {
+    threads.push_back(std::thread(writer));
+  }
 
-  while (running < kNumThreads * 2) {
+  while (running < kNumDecommitters + kNumWriters) {
     sched_yield();
   }
   start = true;
