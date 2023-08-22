@@ -469,7 +469,7 @@ produced by the test.
 A test is *hermetic* if it:
 
 1. Does not [use][manifests-use] or [offer][manifests-offer] any
-capabilities from the [test root's](#tests-as-components) parent.
+capabilities from the [test root's](#test-roles) parent.
 1. Does not [resolve][resolvers] any components outside of the test package.
 
 The tests are by default hermetic unless explicitly stated otherwise.
@@ -705,10 +705,16 @@ extra overhead per process launched.
 
 Components in the test realm may play various roles in the test, as follows:
 
+- Test root: The component at the top of a test's component tree. The URL for
+  the test identifies this component, and the test manager will invoke the
+  [`fuchsia.test.Suite`][test-suite-protocol] exposed by this component to
+  drive the test.
 - Test driver: The component that actually runs the test, and implements
-    (either directly or through a [test runner](#test-runners)) the
-    [`fuchsia.test.Suite`][test-suite-protocol] protocol. This role may be, but
-    is not necessarily, owned by the [test root](#tests-as-components).
+  (either directly or through a [test runner](#test-runners) the
+  [`fuchsia.test.Suite`][test-suite-protocol] protocol. Note that the test
+  driver and test root may be, but are not necessarily, the same component:
+  the test driver could be a subcomponent of the test root which re-exposes its
+  `fuchsia.test.Suite`, for example.
 - Capability provider: A component that provides a capability that the test
     will exercise somehow. The component may either provide a "fake"
     implementation of the capability for test, or a "real" implementation that
