@@ -5,7 +5,6 @@
 """Contains errors raised by HoneyDew."""
 
 import logging
-from typing import Union
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ class HoneyDewError(Exception):
     More specific exceptions will be created by inheriting from this exception.
     """
 
-    def __init__(self, msg: Union[str, Exception]) -> None:
+    def __init__(self, msg: str | Exception) -> None:
         """Inits HoneyDewError with 'msg' (an error message string).
 
         Args:

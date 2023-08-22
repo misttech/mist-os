@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import enum
 import ipaddress
-from typing import NamedTuple, Optional, Union
+from typing import NamedTuple, Optional
 
 import fuchsia_controller_py as fuchsia_controller
 
@@ -28,7 +28,7 @@ class IpPort(NamedTuple):
         ip: Ip Address
         port: Port Number
     """
-    ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address
     port: int
 
     def __str__(self) -> str:
