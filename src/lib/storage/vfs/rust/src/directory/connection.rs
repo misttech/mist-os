@@ -25,7 +25,8 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{convert::TryInto as _, default::Default, sync::Arc},
+    futures::future::poll_fn,
+    std::{convert::TryInto as _, default::Default, sync::Arc, task::Poll},
 };
 
 /// Return type for `BaseConnection::handle_request` and [`DerivedConnection::handle_request`].
@@ -58,6 +59,22 @@ pub trait DerivedConnection: Send + Sync {
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, zx::Status>;
+}
+
+async fn yield_to_executor() {
+    // Yield to the executor now, which should provide an opportunity for the spawned future to
+    // run.
+    let mut done = false;
+    poll_fn(|cx| {
+        if done {
+            Poll::Ready(())
+        } else {
+            done = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await;
 }
 
 /// Handles functionality shared between mutable and immutable FIDL connections to a directory.  A
@@ -211,6 +228,9 @@ where
             fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "Directory::Open");
                 self.handle_open(flags, path, object);
+                // Since open typically spawns a task, yield to the executor now to give that task a
+                // chance to run before we try and process the next request for this directory.
+                yield_to_executor().await;
             }
             fio::DirectoryRequest::Open2 {
                 path,
@@ -253,6 +273,9 @@ where
                 protocols
                     .to_object_request(object_request)
                     .handle(|req| self.handle_open2(path, protocols, req));
+                // Since open typically spawns a task, yield to the executor now to give that task a
+                // chance to run before we try and process the next request for this directory.
+                yield_to_executor().await;
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::AdvisoryLock");
