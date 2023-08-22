@@ -285,6 +285,12 @@ impl<T> From<ClientEnd<T>> for Handle {
     }
 }
 
+impl<T> From<ClientEnd<T>> for Channel {
+    fn from(client: ClientEnd<T>) -> Channel {
+        client.into_channel()
+    }
+}
+
 impl<T> From<Handle> for ClientEnd<T> {
     fn from(handle: Handle) -> Self {
         ClientEnd { inner: handle.into(), phantom: PhantomData }
@@ -366,6 +372,12 @@ impl<T> AsHandleRef for ServerEnd<T> {
 impl<T> From<ServerEnd<T>> for Handle {
     fn from(server: ServerEnd<T>) -> Handle {
         server.into_channel().into()
+    }
+}
+
+impl<T> From<ServerEnd<T>> for Channel {
+    fn from(server: ServerEnd<T>) -> Channel {
+        server.into_channel()
     }
 }
 
