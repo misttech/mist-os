@@ -18,52 +18,38 @@ configuration. A container is simply a package that contains the Starnix kernel
 component along with a system image and configuration values for its
 `starnix_kernel.cml`.
 
-The Starnix test runner expects each test component to provide its container
-configuration via the `program` block in the test's `.cml`.  The Starnix test
-runner then instantiates the bundled Starnix kernel for each test, and uses
-that runner to actually run the test binary.
+The Starnix test runner expects each test component to use a
+`fuchsia.component.runner/ComponentRunner` FIDL protocol capability, which will
+be used to run the test binary. Such capability is exposed from a starnix
+container component. Typically the container and the use declaration is included
+from an existing test cml shard, e.g.
+[`debian_container_for_test.shard.cml`][debian-shard].
 
 This means that the same test runner can be used for all Starnix containers, and
 each test component runs hermetically.
 
-To create a new Starnix test component, first add the following include to the
-test `.cml`:
+To create a new Starnix test component, it needs to include
+`starnix_test.shard.cml`, and include the appropriate container used by the test.
+Here's an example that is using `bionic_container`.
 
 ```
-include: [ "//src/starnix/tests/starnix_test.shard.cml" ]
+include: [
+    "//src/starnix/containers/bionic/meta/bionic_container_for_test.shard.cml",
+    "//src/starnix/tests/starnix_test.shard.cml",
+]
 ```
 
-This shard sets the `runner` of the component to `starnix_test_runner` and
-creates the collection that `starnix_test_runner` will use to instantiate the
-test's `starnix_kernel` instance.
+Then we need to add a `program` block describing the command that will be run
+using this container. Here's an example running `/system/bin/sh -c ls`.
 
-Once the `.cml` is defined, the test needs to be updated to include the
-appropriate container configuration values. For example,
-`chromiumos_container.shard.cml` contains:
-
-```{
-    program: {
-        features: [
-            "wayland",
-            "custom_artifacts",
-            "test_data",
-        ],
-        init: [],
-        kernel_cmdline: "",
-        mounts: [
-            "/:remote_bundle:data/system",
-            "/data:remotefs:data",
-            "/dev:devtmpfs",
-            "/data/tmp:tmpfs",
-            "/tmp:tmpfs",
-            "/dev/pts:devpts",
-            "/sys:sysfs",
-            "/sys/fs/bpf:bpf",
-        ],
-        name: "chromiumos_test",
-        startup_file_path: "",
-    },
-}
+```
+program: {
+    binary: "/system/bin/sh",
+    args: [
+        "-c",
+        "ls",
+    ],
+},
 ```
 
 ## Starnix Unit Test Runner
@@ -75,3 +61,4 @@ components.
 
 [test-runner]: ../README.md
 [bionic]: https://android.googlesource.com/platform/bionic/
+[debian-shard]: https://cs.opensource.google/search?q=src%2Fstarnix%2Fcontainers%2Fdebian%2Fmeta%2Fdebian_container_for_test.shard.cml&ss=fuchsia%2Ffuchsia
