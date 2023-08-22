@@ -187,7 +187,8 @@ pub struct ucred {
 #[repr(C)]
 pub struct msghdr {
     pub msg_name: UserAddress,
-    pub msg_namelen: u64,
+    pub msg_namelen: u32,
+    pub _pad0: u32,
     pub msg_iov: UserAddress,
     pub msg_iovlen: u64,
     pub msg_control: UserAddress,

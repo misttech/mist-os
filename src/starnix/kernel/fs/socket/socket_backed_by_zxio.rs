@@ -175,11 +175,17 @@ impl SocketOps for ZxioBackedSocket {
 
     fn read(
         &self,
-        _socket: &Socket,
+        socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
+        // MSG_ERRQUEUE is not supported for TCP sockets, but it's expected to fail with EAGAIN.
+        if socket.socket_type == SocketType::Stream && flags.contains(SocketMessageFlags::ERRQUEUE)
+        {
+            return error!(EAGAIN);
+        }
+
         let iovec_length = data.available();
         let mut info = self.recvmsg(iovec_length, flags)?;
 

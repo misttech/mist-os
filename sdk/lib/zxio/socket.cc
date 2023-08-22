@@ -2978,6 +2978,11 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
       }
       return err.status_value();
     }
+
+    if (msg->msg_name) {
+      msg->msg_namelen = 0;
+    }
+
     *out_code = 0;
     return ZX_OK;
   }

@@ -325,8 +325,10 @@ fn write_socket_address(
         return error!(EINVAL);
     }
     let length = address_bytes.len() as socklen_t;
-    let actual = std::cmp::min(length, capacity) as usize;
-    current_task.write_memory(user_socket_address, &address_bytes[..actual])?;
+    if length > 0 {
+        let actual = std::cmp::min(length, capacity) as usize;
+        current_task.write_memory(user_socket_address, &address_bytes[..actual])?;
+    }
     current_task.write_object(user_address_length, &length)?;
     Ok(())
 }
@@ -396,6 +398,22 @@ pub fn sys_socketpair(
     Ok(())
 }
 
+fn read_iovec_from_msghdr(
+    current_task: &CurrentTask,
+    message_header: &msghdr,
+) -> Result<Vec<UserBuffer>, Errno> {
+    let iovec_count = message_header.msg_iovlen as usize;
+
+    // In `CurrentTask::read_iovec()` the same check fails with `EINVAL`. This works for all
+    // syscalls that use `iovec`, except `sendmsg()` and `recvmsg()`, which need to fail with
+    // EMSGSIZE.
+    if iovec_count > UIO_MAXIOV as usize {
+        return error!(EMSGSIZE);
+    }
+
+    current_task.read_objects_to_vec(message_header.msg_iov.into(), iovec_count)
+}
+
 fn recvmsg_internal(
     current_task: &CurrentTask,
     file: &FileHandle,
@@ -404,10 +422,9 @@ fn recvmsg_internal(
     deadline: Option<zx::Time>,
 ) -> Result<usize, Errno> {
     let mut message_header = current_task.read_object(user_message_header.clone())?;
-    let iovec =
-        current_task.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
+    let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
-    let flags = SocketMessageFlags::from_bits_truncate(flags);
+    let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
     let info = socket_ops.recvmsg(
         current_task,
@@ -462,14 +479,17 @@ fn recvmsg_internal(
 
     message_header.msg_controllen = cmsg_bytes_written;
 
-    match info.address {
-        Some(address) if !message_header.msg_name.is_null() => {
-            let bytes = address.to_bytes();
-            let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
+    if !message_header.msg_name.is_null() {
+        if message_header.msg_namelen > i32::MAX as u32 {
+            return error!(EINVAL);
+        }
+        let bytes = info.address.map(|a| a.to_bytes()).unwrap_or_else(|| vec![]);
+        let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
+        message_header.msg_namelen = bytes.len() as u32;
+        if num_bytes > 0 {
             current_task.write_memory(message_header.msg_name, &bytes[..num_bytes])?;
         }
-        _ => {}
-    };
+    }
 
     if info.bytes_read != info.message_length {
         message_header.msg_flags |= MSG_TRUNC as u64;
@@ -560,7 +580,7 @@ pub fn sys_recvfrom(
         return error!(ENOTSOCK);
     }
 
-    let flags = SocketMessageFlags::from_bits_truncate(flags);
+    let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
     let info = socket_ops.recvmsg(
         current_task,
@@ -571,16 +591,8 @@ pub fn sys_recvfrom(
     )?;
 
     if !user_src_address.is_null() {
-        if let Some(address) = info.address {
-            write_socket_address(
-                current_task,
-                user_src_address,
-                user_src_address_length,
-                &address.to_bytes(),
-            )?;
-        } else {
-            current_task.write_object(user_src_address_length, &0)?;
-        }
+        let bytes = info.address.map(|a| a.to_bytes()).unwrap_or_else(|| vec![]);
+        write_socket_address(current_task, user_src_address, user_src_address_length, &bytes)?;
     }
 
     if flags.contains(SocketMessageFlags::TRUNC) {
@@ -603,8 +615,7 @@ fn sendmsg_internal(
         message_header.msg_name,
         message_header.msg_namelen as usize,
     )?;
-    let iovec =
-        current_task.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
+    let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
     let mut next_message_offset = 0;
     let mut ancillary_data = Vec::new();

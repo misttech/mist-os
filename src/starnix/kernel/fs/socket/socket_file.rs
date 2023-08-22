@@ -180,7 +180,9 @@ impl SocketFile {
             Ok(())
         };
 
-        let result = if flags.contains(SocketMessageFlags::DONTWAIT) {
+        let dont_wait =
+            flags.intersects(SocketMessageFlags::DONTWAIT | SocketMessageFlags::ERRQUEUE);
+        let result = if dont_wait {
             op()
         } else {
             let deadline = deadline.or_else(|| self.socket.receive_timeout().map(zx::Time::after));
