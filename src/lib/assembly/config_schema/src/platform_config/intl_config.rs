@@ -31,5 +31,6 @@ pub enum Type {
 #[serde(deny_unknown_fields)]
 pub struct IntlConfig {
     /// The intl configuration type in use.
+    #[serde(default)]
     pub config_type: Type,
 }

@@ -118,19 +118,10 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub virtualization: virtualization_config::PlatformVirtualizationConfig,
 
-    /// Platform configuration options for ICU library choice. If not specified,
-    /// then assembly should use the unflavored components.
-    ///
-    /// Platform components can be 'flavored' by the ICU version they're
-    /// compiled to use, or be 'unflavored' and using the tree's implicit
-    /// ICU version.
-    ///
-    /// If not specified, the 'unflavored' components are used. If the default
-    /// ICU version is specified, then the 'default' flavor is used (which is
-    /// a distinct set of components from the 'unflavored' components).
-    /// Assemblies are being transitioned from the 'unflavored'
-    /// components to 'flavored' components`.
-    pub icu: Option<icu_config::ICUConfig>,
+    /// Platform configuration options for ICU library choice. Platform components are 'flavored'
+    /// by the ICU version they're compiled to use.
+    #[serde(default)]
+    pub icu: icu_config::ICUConfig,
 
     /// Platform configuration options for fonts.
     #[serde(default)]
@@ -142,12 +133,8 @@ pub struct PlatformConfig {
 
     /// SetUi configuration.
     ///
-    /// If not specified, then the legacy configuration is used. If specified,
-    /// and `enabled` is set, then ICU-aware components are used. If specified,
-    /// and `enabled` is `false`, then the default (non-ICU-aware) components
-    /// are used.
-    #[serde(default)]
-    pub setui: setui_config::SetUiConfig,
+    /// If not specified, SetUI is not added to the platform config.
+    pub setui: Option<setui_config::SetUiConfig>,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///

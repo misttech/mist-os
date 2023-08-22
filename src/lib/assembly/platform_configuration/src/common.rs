@@ -108,7 +108,8 @@ pub(crate) struct ConfigurationContext<'a> {
 /// Usage:
 /// ```
 /// use crate::subsystems::prelude::*;
-/// let builder = ConfigurationBuilder::new(&None);
+/// let icu_cfg = Default::default();
+/// let builder = ConfigurationBuilder::new(&icu_cfg);
 /// builder.platform_bundle("wlan")?;
 ///
 /// // to set a single field on a single component in a package:
@@ -205,7 +206,7 @@ impl ComponentConfigBuilderExt for &mut dyn ComponentConfigBuilder {
 }
 
 /// The in-progress builder, which hides its state.
-pub(crate) struct ConfigurationBuilderImpl<'a> {
+pub(crate) struct ConfigurationBuilderImpl {
     /// The Assembly Input Bundles to add.
     bundles: BTreeSet<String>,
 
@@ -222,13 +223,21 @@ pub(crate) struct ConfigurationBuilderImpl<'a> {
     /// ICU-flavor aware.
     ///
     /// If not set, use the unflavored version of the component.
-    icu_config: &'a Option<ICUConfig>,
+    icu_config: ICUConfig,
 }
 
-impl<'a> ConfigurationBuilderImpl<'a> {
-    /// Create a new builder. `icu_config` is an optional configuration for the
+#[cfg(test)]
+impl Default for ConfigurationBuilderImpl {
+    /// Bypasses the need to define an [ICUConfig] in tests.
+    fn default() -> Self {
+        ConfigurationBuilderImpl::new(ICUConfig::default())
+    }
+}
+
+impl ConfigurationBuilderImpl {
+    /// Create a new builder. `icu_config` is a configuration for the
     /// ICU library.
-    pub fn new(icu_config: &'a Option<ICUConfig>) -> Self {
+    pub fn new(icu_config: ICUConfig) -> Self {
         Self {
             bundles: BTreeSet::default(),
             bootfs: BootfsConfig::default(),
@@ -361,7 +370,7 @@ impl<'a> ICUMapExt<'a> for ICUMap {
     }
 }
 
-impl ConfigurationBuilder for ConfigurationBuilderImpl<'_> {
+impl ConfigurationBuilder for ConfigurationBuilderImpl {
     fn platform_bundle(&mut self, name: &str) {
         self.bundles.insert(name.to_string());
     }
@@ -388,17 +397,12 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl<'_> {
     }
 
     fn icu_platform_bundle(&mut self, name: &str) -> Result<()> {
-        let bundle_name = match &self.icu_config {
-            // Use the unflavored platform bundle if icu_config is left unspecified.
-            None => name.into(),
-            // Use the ICU flavored platform bundle.
-            Some(ref icu_config) => {
-                let (revision, commit_id) =
-                    ICU_CONFIG_INFO.resolve_revision(&icu_config.revision).with_context(|| {
-                        format!("while resolving revision: {}", &icu_config.revision)
-                    })?;
-                format!("{}.icu_{}_{}", name, &revision, commit_id)
-            }
+        let icu_config = &self.icu_config;
+        let bundle_name = {
+            let (revision, commit_id) = ICU_CONFIG_INFO
+                .resolve_revision(&icu_config.revision)
+                .with_context(|| format!("while resolving revision: {}", &icu_config.revision))?;
+            format!("{}.icu_{}_{}", name, &revision, commit_id)
         };
         self.platform_bundle(&bundle_name);
         Ok(())
@@ -638,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_config_builder() {
-        let mut builder = ConfigurationBuilderImpl::new(&None);
+        let mut builder = ConfigurationBuilderImpl::default();
 
         // using an inner
         fn make_config(builder: &mut dyn ConfigurationBuilder) -> Result<()> {
@@ -777,7 +781,7 @@ mod tests {
 
     #[test]
     fn test_multiple_adds_fail() {
-        let mut builder = ConfigurationBuilderImpl::new(&None);
+        let mut builder = ConfigurationBuilderImpl::default();
 
         assert!(builder.bootfs().component("foo").is_ok());
         assert!(builder.bootfs().component("foo").is_err());
@@ -828,7 +832,7 @@ mod tests {
             }
         }
 
-        let mut builder = ConfigurationBuilderImpl::new(&None);
+        let mut builder = ConfigurationBuilderImpl::default();
 
         builder.bootfs().component("foo").unwrap();
         let result = builder.bootfs().component("foo").context("Configuring Subsystem");

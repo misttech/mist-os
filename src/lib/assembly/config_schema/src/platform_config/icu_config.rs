@@ -16,7 +16,7 @@ pub static ICU_CONFIG_INFO: Lazy<ICUMap> = Lazy::new(|| {
     .unwrap()
 });
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Hash, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Hash, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Revision {
     /// Whatever revision is currently 'default'.
@@ -53,11 +53,12 @@ impl std::fmt::Display for Revision {
 }
 
 /// System assembly configuration for the ICU subsystem.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone)]
 pub struct ICUConfig {
     /// The revision (corresponding to either one of the labels, or a git commit ID) of the ICU
     /// library to use in system assembly. This revision is constrained to the commit IDs available
     /// in the repos at `//third_party/icu/{default,stable,latest}`,
+    #[serde(default)]
     pub revision: Revision,
 }
 
@@ -80,6 +81,7 @@ mod tests {
                 input: r#"{ "revision": "stable" }"#,
                 expected: ICUConfig { revision: Revision::Stable },
             },
+            TestCase { input: r#"{}"#, expected: ICUConfig { revision: Revision::Default } },
         ];
         for test in tests {
             let json = serde_json::from_str(test.input).unwrap();

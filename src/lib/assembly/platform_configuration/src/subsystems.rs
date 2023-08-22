@@ -59,7 +59,7 @@ pub fn define_configuration(
     board_info: &BoardInformation,
 ) -> anyhow::Result<CompletedConfiguration> {
     let icu_config = &config.platform.icu;
-    let mut builder = ConfigurationBuilderImpl::new(icu_config);
+    let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
 
     // The emulator support bundle is always added, even to an empty build.
     builder.platform_bundle("emulator_support");
