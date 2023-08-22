@@ -38,7 +38,6 @@ and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
 * Refactoring I/O queue
-* Support large size I/O
 * Support FLUSH command
 * Support FUA flag
 * Support TRIM command (unmap)
@@ -56,7 +55,7 @@ and provides reliable data transfer through the M-PHY physical layer.
 
 ## How to test
 
-### Ufs driver unit tests (not yet ready)
+### Ufs driver unit tests
 * Build configuration for ufs tests
 > $ fx set core.x64 --with //src/devices/block/drivers/ufs:tests
 

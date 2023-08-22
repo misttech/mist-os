@@ -126,7 +126,7 @@ class Ufs : public UfsDeviceType {
   // Create a scsi transfer and add it to the transfer list. The added transfer is processed by the
   // scsi thread. If |event| is nullptr, then the SCSI command is executed synchronously.
   zx::result<> QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_t lun,
-                                std::array<zx_paddr_t, 2> buffer_phys, sync_completion_t *event);
+                                std::vector<zx_paddr_t> buffer_phys, sync_completion_t *event);
 
   // for test
   BlockDevice &GetBlockDevice(uint8_t lun) {

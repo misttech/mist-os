@@ -13,10 +13,6 @@
 namespace ufs {
 
 constexpr uint8_t kMaxTransferRequestListSize = kMaxRequestListSize;
-constexpr uint32_t kMaxPrdtLength = 2048;
-constexpr uint32_t kMaxPrdtNum = kMaxPrdtLength / sizeof(PhysicalRegionDescriptionTableEntry);
-constexpr uint32_t kPrdtEntryDataLength = 4096;                              // 4KiB
-constexpr uint32_t kMaxPrdtDataLength = kMaxPrdtNum * kPrdtEntryDataLength;  // 512KiB
 
 // Owns and processes the UTP transfer request list.
 class TransferRequestProcessor : public RequestProcessor {

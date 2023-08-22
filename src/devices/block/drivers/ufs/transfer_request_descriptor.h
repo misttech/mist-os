@@ -64,20 +64,6 @@ struct TransferRequestDescriptor {
 static_assert(sizeof(TransferRequestDescriptor) == 32,
               "TransferRequestDescriptor struct must be 32 bytes");
 
-// UFSHCI Specification Version 3.0, section 6.1.2 "UTP Command Descriptor".
-struct PhysicalRegionDescriptionTableEntry {
-  uint32_t dwords[4];
-
-  // dword 0
-  DEF_SUBFIELD(dwords[0], 31, 0, data_base_address);
-  // dword 1
-  DEF_SUBFIELD(dwords[1], 31, 0, data_base_address_upper);
-  // dword 3
-  DEF_SUBFIELD(dwords[3], 17, 0, data_byte_count);  // Maximum byte count is 256KB
-} __PACKED;
-static_assert(sizeof(PhysicalRegionDescriptionTableEntry) == 16,
-              "PhysicalRegionDescriptionTableEntry struct must be 16 bytes");
-
 }  // namespace ufs
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_UFS_TRANSFER_REQUEST_DESCRIPTOR_H_

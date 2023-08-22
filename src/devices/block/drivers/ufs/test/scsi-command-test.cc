@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include "src/devices/block/drivers/ufs/transfer_request_descriptor.h"
 #include "src/devices/block/drivers/ufs/upiu/attributes.h"
@@ -30,7 +31,7 @@ class ScsiCommandTest : public UfsTest {
     auto paddrs_or =
         MapAndPinVmo(ZX_BTI_PERM_WRITE, unowned_vmo, mapper_, pmt_, 0, block_count_ * block_size_);
     ASSERT_OK(paddrs_or);
-    paddrs_ = paddrs_or.value();
+    paddrs_ = std::move(paddrs_or.value());
   }
 
   void TearDown() override {
@@ -39,7 +40,7 @@ class ScsiCommandTest : public UfsTest {
   }
 
   void *GetVirtualAddress() const { return mapper_.start(); }
-  std::array<zx_paddr_t, 2> GetPhysicalAddress() const { return paddrs_; }
+  std::vector<zx_paddr_t> GetPhysicalAddress() const { return paddrs_; }
 
   uint16_t GetBlockCount() const { return block_count_; }
   uint32_t GetBlockSize() const { return block_size_; }
@@ -48,7 +49,7 @@ class ScsiCommandTest : public UfsTest {
   zx::vmo vmo_;
   zx::pmt pmt_;
   fzl::VmoMapper mapper_;
-  std::array<zx_paddr_t, 2> paddrs_;
+  std::vector<zx_paddr_t> paddrs_;
 
   const uint16_t block_count_ = 1;
   const uint32_t block_size_ = kMockBlockSize;
@@ -126,7 +127,8 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
   uint32_t block_offset = 0;
 
   auto cache_upiu = std::make_unique<ScsiSynchronizeCache10Upiu>(block_offset, GetBlockCount());
-  auto result = ufs_->QueueScsiCommand(std::move(cache_upiu), kTestLun, {0, 0}, nullptr);
+  auto result =
+      ufs_->QueueScsiCommand(std::move(cache_upiu), kTestLun, GetPhysicalAddress(), nullptr);
   ASSERT_EQ(result.status_value(), ZX_OK);
 }
 

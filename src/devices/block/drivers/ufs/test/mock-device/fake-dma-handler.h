@@ -14,7 +14,7 @@
 namespace ufs {
 namespace ufs_mock_device {
 
-constexpr uint32_t kFakeBtiAddrsCount = 256;
+constexpr uint32_t kFakeBtiAddrsCount = 1024;
 class FakeDmaHandler {
  public:
   FakeDmaHandler();

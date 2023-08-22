@@ -105,6 +105,9 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   geometry_desc_.bLength = sizeof(GeometryDescriptor);
   geometry_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kGeometry);
   geometry_desc_.qTotalRawDeviceCapacity = htobe64(kMockTotalDeviceCapacity >> 9);  // 16MB
+  geometry_desc_.bMinAddrBlockSize = 0x08;
+  geometry_desc_.bMaxInBufferSize = 0x08;
+  geometry_desc_.bMaxOutBufferSize = 0x08;
   static_assert(kMaxLun == 8 || kMaxLun == 32, "Max Number of Logical Unit should be 8 or 32.");
   if constexpr (kMaxLun == 8) {
     geometry_desc_.bMaxNumberLU = 0x00;

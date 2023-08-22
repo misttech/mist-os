@@ -56,23 +56,25 @@ zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot,
       slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count, sync);
 }
 
-zx::result<std::array<zx_paddr_t, 2>> UfsTest::MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,
-                                                            fzl::VmoMapper &mapper, zx::pmt &pmt,
-                                                            uint64_t offset, uint64_t length) {
+zx::result<std::vector<zx_paddr_t>> UfsTest::MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,
+                                                          fzl::VmoMapper &mapper, zx::pmt &pmt,
+                                                          uint64_t offset, uint64_t length) {
   if (zx_status_t status = mapper.Map(*vmo, offset, length); status != ZX_OK) {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
   const uint32_t kPageSize = zx_system_get_page_size();
-  std::array<zx_paddr_t, 2> paddrs;
+  std::vector<zx_paddr_t> paddrs;
+  ZX_DEBUG_ASSERT(length % kPageSize == 0);
+  paddrs.resize(length / kPageSize, 0);
   if (zx_status_t status = mock_device_->GetFakeBti().pin(option, *vmo, offset, length,
                                                           paddrs.data(), length / kPageSize, &pmt);
       status != ZX_OK) {
     zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-  return zx::ok(paddrs);
+  return zx::ok(std::move(paddrs));
 }
 
 }  // namespace ufs

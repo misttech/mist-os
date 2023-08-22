@@ -9,7 +9,7 @@
 
 namespace ufs {
 
-zx_status_t LogicalUnit::AddDevice() { return DdkAdd(ddk::DeviceAddArgs(LunName().c_str())); }
+zx_status_t LogicalUnit::AddLogicalUnit() { return DdkAdd(ddk::DeviceAddArgs(LunName().c_str())); }
 
 zx_status_t LogicalUnit::Bind(Ufs &controller, BlockDevice &block_device, const uint8_t lun_id) {
   fbl::AllocChecker ac;
@@ -20,7 +20,7 @@ zx_status_t LogicalUnit::Bind(Ufs &controller, BlockDevice &block_device, const 
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (zx_status_t status = lun_driver->AddDevice(); status != ZX_OK) {
+  if (zx_status_t status = lun_driver->AddLogicalUnit(); status != ZX_OK) {
     zxlogf(ERROR, "Failed to make LogicalUnit:%d", lun_id);
     return status;
   }
@@ -33,6 +33,29 @@ zx_status_t LogicalUnit::Bind(Ufs &controller, BlockDevice &block_device, const 
 void LogicalUnit::DdkRelease() {
   zxlogf(DEBUG, "Releasing driver.");
   delete this;
+}
+
+void LogicalUnit::DdkInit(ddk::InitTxn txn) {
+  // The driver initialization has numerous error conditions. Wrap the initialization here to ensure
+  // we always call txn.Reply() in any outcome.
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Driver initialization failed: %s", zx_status_get_string(status));
+  }
+  txn.Reply(status);
+}
+
+zx_status_t LogicalUnit::Init() {
+  // UFS r/w commands operate in block units, maximum of 65535 blocks.
+  const uint32_t max_bytes_per_cmd = block_info_.block_size * 65535;
+
+  // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
+  // maximum transfer size to 1MiB for performance reason.
+  const uint32_t max_transfer_bytes = std::min(kMaxTransferSize1MiB, max_bytes_per_cmd);
+  block_info_.max_transfer_size = max_transfer_bytes;
+  ZX_DEBUG_ASSERT(max_transfer_bytes % block_info_.block_size == 0);
+  max_transfer_blocks_ = max_transfer_bytes / block_info_.block_size;
+  return ZX_OK;
 }
 
 void LogicalUnit::BlockImplQuery(block_info_t *info_out, size_t *block_op_size_out) {
@@ -52,7 +75,8 @@ void LogicalUnit::BlockImplQueue(block_op_t *op, block_impl_queue_callback callb
   switch (opcode) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE:
-      if (zx_status_t status = block::CheckIoRange(op->rw, block_info_.block_count);
+      if (zx_status_t status =
+              block::CheckIoRange(op->rw, block_info_.block_count, max_transfer_blocks_);
           status != ZX_OK) {
         io_cmd->Complete(status);
         return;

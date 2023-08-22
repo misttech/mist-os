@@ -9,18 +9,17 @@
 #include <safemath/checked_math.h>
 #include <safemath/safe_conversions.h>
 
+#include "src/devices/block/drivers/ufs/ufs.h"
 #include "src/devices/block/drivers/ufs/upiu/upiu_transactions.h"
-#include "ufs.h"
 
 namespace ufs {
 
 namespace {
 void FillPrdt(PhysicalRegionDescriptionTableEntry *prdt,
-              std::array<zx_paddr_t, 2> buffer_physical_addresses, uint32_t prdt_count,
+              const std::vector<zx_paddr_t> &buffer_physical_addresses, uint32_t prdt_count,
               uint32_t data_length) {
-  ZX_ASSERT(prdt_count <= 2);
-
   for (uint32_t i = 0; i < prdt_count; ++i) {
+    // It only supports 4KB data buffers for each entry in the scatter-gather.
     ZX_ASSERT(buffer_physical_addresses[i] != 0);
     uint32_t byte_count = data_length < kPrdtEntryDataLength ? data_length : kPrdtEntryDataLength;
     prdt->set_data_base_address(static_cast<uint32_t>(buffer_physical_addresses[i] & 0xffffffff));
@@ -48,7 +47,7 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
   // Prepare PRDT(physical region description table).
   const uint32_t prdt_entry_count =
       fbl::round_up(data_transfer_length, kPrdtEntryDataLength) / kPrdtEntryDataLength;
-  ZX_DEBUG_ASSERT(prdt_entry_count <= kMaxPrdtNum);
+  ZX_DEBUG_ASSERT(prdt_entry_count <= kMaxPrdtEntryCount);
 
   uint16_t prdt_offset = response_offset + response_length;
   uint32_t prdt_length_in_bytes = prdt_entry_count * sizeof(PhysicalRegionDescriptionTableEntry);
@@ -67,7 +66,6 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
 
   // TODO(fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
   // the xfer->count value differently.
-  // TODO(fxbug.dev/124835): Support large size transfer.
 
   if (zxlog_level_enabled(TRACE)) {
     std::lock_guard lock(request_list_lock_);
@@ -166,7 +164,6 @@ void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &req
   TRACE_DURATION("ufs", "ScsiCompletion", "offset", request_slot.xfer->start_lba, "length",
                  request_slot.xfer->block_count, "slot", slot_num);
 
-  // TODO(fxbug.dev/124835): Support large size transfer.
   ResponseUpiu response(
       request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, sizeof(CommandUpiuData)));
 

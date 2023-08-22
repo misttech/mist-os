@@ -20,10 +20,6 @@ namespace ufs {
 
 // UFS 3.1 only supports 32 inflight requests.
 constexpr uint8_t kMaxRequestListSize = 32;
-// The size of the transfer request and the transfer response is less than 1024 bytes. The PRDT
-// region limits the number of scatter gathers to 128, using a total of 2048 bytes. Therefore, only
-// one page size is allocated for the UTP command descriptor.
-constexpr size_t kUtpCommandDescriptorSize = 4096;
 
 enum class SlotState {
   kFree = 0,

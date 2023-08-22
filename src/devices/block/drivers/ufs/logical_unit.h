@@ -9,42 +9,40 @@
 
 namespace ufs {
 
+constexpr uint32_t kMaxTransferSize1MiB = 1024 * 1024;
+
 class Ufs;
 class LogicalUnit;
-using LunDeviceType = ddk::Device<LogicalUnit>;
+using LunDeviceType = ddk::Device<LogicalUnit, ddk::Initializable>;
 class LogicalUnit : public LunDeviceType,
                     public ddk::BlockImplProtocol<LogicalUnit, ddk::base_protocol> {
  public:
   LogicalUnit(zx_device_t *parent, uint8_t lun_id, BlockDevice *bdev, Ufs &controller)
-      : LunDeviceType(parent),
-        controller_(controller),
-        lun_id_(lun_id),
-        block_info_(block_info_t{
-            .block_count = bdev->block_count,
-            // TODO(fxbug.dev/124835): Support block_size=512 and support group request
-            .block_size = static_cast<uint32_t>(bdev->block_size),
-            // TODO(fxbug.dev/124835): |max_transfer_size| should be changed to the PRDT size.
-            .max_transfer_size = 8192,
-            // TODO(fxbug.dev/124835): Support TRIM command
-        }) {}
+      : LunDeviceType(parent), controller_(controller), lun_id_(lun_id) {
+    block_info_.block_count = bdev->block_count;
+    block_info_.block_size = safemath::checked_cast<uint32_t>(bdev->block_size);
+  }
 
   // Create a logical unit on |controller| with |lun_id|.
   static zx_status_t Bind(Ufs &controller, BlockDevice &block_device, uint8_t lun_id);
-  zx_status_t AddDevice();
+  fbl::String LunName() const { return fbl::StringPrintf("lun-%u", lun_id_); }
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
   // BlockImpl implementations
   void BlockImplQuery(block_info_t *info_out, uint64_t *block_op_size_out);
   void BlockImplQueue(block_op_t *op, block_impl_queue_callback callback, void *cookie);
 
-  fbl::String LunName() const { return fbl::StringPrintf("lun-%u", lun_id_); }
-
  private:
+  zx_status_t AddLogicalUnit();
+  zx_status_t Init();
+
   Ufs &controller_;
   const uint8_t lun_id_;
 
-  block_info_t block_info_;
+  block_info_t block_info_ = {};
+  uint32_t max_transfer_blocks_;
 };
 
 }  // namespace ufs

@@ -9,6 +9,8 @@
 #include <lib/scsi/controller.h>
 #include <lib/sync/completion.h>
 
+#include <vector>
+
 #include <fbl/intrusive_double_list.h>
 
 #include "upiu_transactions.h"
@@ -26,7 +28,7 @@ struct scsi_xfer
   scsi::Opcode op;
   uint64_t start_lba;
   uint64_t block_count;
-  std::array<zx_paddr_t, 2> buffer_phys;
+  std::vector<zx_paddr_t> buffer_phys;
   sync_completion_t *done;
   sync_completion_t local_event;
   zx_status_t status;
