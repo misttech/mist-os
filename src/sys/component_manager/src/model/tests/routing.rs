@@ -234,7 +234,7 @@ async fn capability_requested_event_at_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
@@ -332,8 +332,8 @@ async fn use_in_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("foo_data").build())
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
                     source: OfferSource::Self_,
@@ -466,8 +466,8 @@ async fn use_in_collection_not_offered() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("foo_data").build())
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
                     source: OfferSource::Self_,
@@ -568,7 +568,7 @@ async fn dynamic_offer_from_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "foo_svc".parse().unwrap(),
                     source: OfferSource::Self_,
@@ -703,7 +703,7 @@ async fn dynamic_offer_siblings_same_collection() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -806,7 +806,7 @@ async fn dynamic_offer_siblings_cross_collection() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -906,7 +906,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -1030,7 +1030,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("hippo_data").build())
+                .directory(DirectoryDeclBuilder::new("hippo_data").path("/data/foo").build())
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -1159,7 +1159,7 @@ async fn dynamic_offer_to_static_offer() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -1321,8 +1321,8 @@ async fn destroying_instance_blocks_on_routing() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
-                .directory(DirectoryDeclBuilder::new("foo_data").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
@@ -1988,7 +1988,7 @@ async fn use_with_destroyed_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
@@ -2093,8 +2093,8 @@ async fn use_from_destroyed_but_not_removed() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("foo_data").build())
-                .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
@@ -2695,7 +2695,7 @@ async fn offer_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").build())
+                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2768,7 +2768,7 @@ async fn offer_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").build())
+                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2858,7 +2858,7 @@ async fn offer_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").build())
+                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2923,7 +2923,7 @@ async fn expose_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").build())
+                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2998,7 +2998,7 @@ async fn expose_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").build())
+                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -3088,7 +3088,7 @@ async fn expose_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").build())
+                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));

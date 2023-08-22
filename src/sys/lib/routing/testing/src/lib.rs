@@ -405,8 +405,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .protocol(ProtocolDeclBuilder::new("file").path("/svc/file").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -520,8 +520,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -559,7 +559,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let components = vec![(
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo").build())
+                .protocol(ProtocolDeclBuilder::new("hippo").path("/svc/foo").build())
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Self_,
                     source_name: "hippo".parse().unwrap(),
@@ -642,8 +642,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -693,8 +693,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -912,8 +912,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -988,8 +988,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -1131,8 +1131,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -1187,7 +1187,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
@@ -1272,7 +1272,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -1342,7 +1342,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "h",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
@@ -1771,8 +1771,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("hippo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("hippo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
                         source: ExposeSource::Self_,
@@ -1906,8 +1906,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -1979,8 +1979,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .directory(DirectoryDeclBuilder::new("hippo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("hippo_data").path("/data").build())
+                    .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::Self_,
@@ -2484,8 +2484,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2577,7 +2577,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2666,7 +2666,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2724,8 +2724,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2793,8 +2793,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
-                    .protocol(ProtocolDeclBuilder::new("foo_svc").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -3439,7 +3439,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                    .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "hippo_svc".parse().unwrap(),
@@ -3498,7 +3498,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").build())
+                    .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -3560,7 +3560,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                    .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "hippo_svc".parse().unwrap(),
@@ -3657,7 +3657,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("hippo_svc").build())
+                    .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "hippo_svc".parse().unwrap(),
@@ -3818,8 +3818,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("svc_allowed").build())
-                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_allowed").path("/svc/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").path("/svc/foo").build())
                     .add_environment(
                         EnvironmentDeclBuilder::new()
                             .name("env_a")
@@ -3935,8 +3935,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("svc_allowed").build())
-                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_allowed").path("/svc/foo").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").path("/svc/foo").build())
                     .add_environment(
                         EnvironmentDeclBuilder::new()
                             .name("env_b")
@@ -4095,9 +4095,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("svc_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_allowed").path("/svc/foo").build())
                     .expose(cm_rust::ExposeDecl::Protocol(expose_decl_svc_allowed))
-                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").path("/svc/foo").build())
                     .expose(cm_rust::ExposeDecl::Protocol(expose_decl_svc_not_allowed))
                     .build(),
             ),
@@ -4255,9 +4255,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "e",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("svc_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_allowed").path("/svc/foo").build())
                     .expose(cm_rust::ExposeDecl::Protocol(expose_decl_svc_allowed))
-                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").path("/svc/foo").build())
                     .expose(cm_rust::ExposeDecl::Protocol(expose_decl_svc_not_allowed))
                     .build(),
             ),
@@ -4382,9 +4382,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDeclBuilder::new("svc_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_allowed").path("/svc/foo").build())
                     .expose(cm_rust::ExposeDecl::Protocol(expose_decl_svc_allowed))
-                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").build())
+                    .protocol(ProtocolDeclBuilder::new("svc_not_allowed").path("/svc/foo").build())
                     .expose(cm_rust::ExposeDecl::Protocol(expose_decl_svc_not_allowed))
                     .build(),
             ),

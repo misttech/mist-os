@@ -1277,7 +1277,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let protocol_decl = ProtocolDeclBuilder::new("foo_svc").build();
+        let protocol_decl = ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build();
         let components = vec![
             (
                 "a",
@@ -1335,7 +1335,7 @@ mod tests {
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         });
-        let protocol_decl = ProtocolDeclBuilder::new("foo_svc").build();
+        let protocol_decl = ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).add_lazy_child("b").build()),
             (
@@ -1369,17 +1369,17 @@ mod tests {
         )
     }
 
-    /// a: uses protocol /svc/hippo from self
+    /// a: uses protocol /svc/foo from self under the path /svc/hippo
     #[fuchsia::test]
     async fn map_route_use_from_self() {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Self_,
-            source_name: "hippo".parse().unwrap(),
+            source_name: "foo_svc".parse().unwrap(),
             target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let protocol_decl = ProtocolDeclBuilder::new("hippo").build();
+        let protocol_decl = ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build();
         let components = vec![(
             "a",
             ComponentDeclBuilder::new()

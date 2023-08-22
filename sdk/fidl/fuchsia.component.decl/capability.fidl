@@ -27,8 +27,10 @@ type Service = table {
     /// (Required) The name of this service.
     1: name name;
 
-    /// (Required) The path to the service in the component's outgoing
+    /// (Optional) The path to the service in the component's outgoing
     /// directory.
+    ///
+    /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
 };
 
@@ -40,8 +42,10 @@ type Protocol = table {
     /// (Required) The name of this protocol.
     1: name name;
 
-    /// (Required) The path to the protocol in the component's outgoing
+    /// (Optional) The path to the protocol in the component's outgoing
     /// directory.
+    ///
+    /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
 };
 
@@ -53,8 +57,10 @@ type Directory = table {
     /// (Required) The name of this directory.
     1: name name;
 
-    /// (Required) The path to the directory in the component's outgoing
+    /// (Optional) The path to the directory in the component's outgoing
     /// directory.
+    ///
+    /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
 
     /// (Required) The maximum rights that can be set by a component using this
@@ -107,8 +113,10 @@ type Runner = table {
     /// Must unique among runners declared in the same `ComponentDecl`.
     1: name name;
 
-    /// (Required) The path to the runner protocol in the component's outgoing
+    /// (Optional) The path to the runner protocol in the component's outgoing
     /// directory.
+    ///
+    /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
 };
 
@@ -121,8 +129,10 @@ type Resolver = table {
     /// Must be unique among resolvers declared in the same `ComponentDecl`.
     1: name name;
 
-    /// (Required) The path to the resolver protocol in the component's outgoing
+    /// (Optional) The path to the resolver protocol in the component's outgoing
     /// directory
+    ///
+    /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
 };
 

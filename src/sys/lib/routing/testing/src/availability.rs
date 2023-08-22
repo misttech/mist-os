@@ -158,7 +158,11 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
-                        .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
+                        .protocol(
+                            ProtocolDeclBuilder::new("fuchsia.examples.Echo")
+                                .path("/svc/foo")
+                                .build(),
+                        )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "fuchsia.examples.Echo".parse().unwrap(),
@@ -375,7 +379,11 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
                         }))
-                        .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
+                        .protocol(
+                            ProtocolDeclBuilder::new("fuchsia.examples.Echo")
+                                .path("/svc/foo")
+                                .build(),
+                        )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "fuchsia.examples.Echo".parse().unwrap(),
@@ -524,7 +532,11 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             availability: test_case.provider_availability.clone(),
                         }))
-                        .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
+                        .protocol(
+                            ProtocolDeclBuilder::new("fuchsia.examples.Echo")
+                                .path("/svc/foo")
+                                .build(),
+                        )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "fuchsia.examples.Echo".parse().unwrap(),
@@ -690,7 +702,11 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             availability: test_case.expose_availability.clone(),
                         }))
-                        .protocol(ProtocolDeclBuilder::new("fuchsia.examples.Echo").build())
+                        .protocol(
+                            ProtocolDeclBuilder::new("fuchsia.examples.Echo")
+                                .path("/svc/foo")
+                                .build(),
+                        )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: test_case.source.clone(),
                             source_name: "fuchsia.examples.Echo".parse().unwrap(),

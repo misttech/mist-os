@@ -42,7 +42,10 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
+                        DirectoryDeclBuilder::new("foo_data")
+                            .path("/data/foo")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -102,7 +105,10 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
+                        DirectoryDeclBuilder::new("foo_data")
+                            .path("/data/foo")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -162,7 +168,10 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
+                        DirectoryDeclBuilder::new("foo_data")
+                            .path("/data/foo")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -222,7 +231,10 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
+                        DirectoryDeclBuilder::new("foo_data")
+                            .path("/data/foo")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -282,7 +294,10 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
+                        DirectoryDeclBuilder::new("foo_data")
+                            .path("/data/foo")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -342,7 +357,10 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data").rights(fio::W_STAR_DIR).build(),
+                        DirectoryDeclBuilder::new("foo_data")
+                            .path("/data/foo")
+                            .rights(fio::W_STAR_DIR)
+                            .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,

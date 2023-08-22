@@ -387,10 +387,7 @@ pub struct ProtocolDeclBuilder(cm_rust::ProtocolDecl);
 impl ProtocolDeclBuilder {
     /// Creates a new builder.
     pub fn new(name: &str) -> Self {
-        Self(cm_rust::ProtocolDecl {
-            name: name.parse().unwrap(),
-            source_path: Some(format!("/svc/foo").parse().unwrap()),
-        })
+        Self(cm_rust::ProtocolDecl { name: name.parse().unwrap(), source_path: None })
     }
 
     /// Sets the source path.
@@ -418,10 +415,7 @@ pub struct ServiceDeclBuilder(cm_rust::ServiceDecl);
 impl ServiceDeclBuilder {
     /// Creates a new builder.
     pub fn new(name: &str) -> Self {
-        Self(cm_rust::ServiceDecl {
-            name: name.parse().unwrap(),
-            source_path: Some(format!("/svc/foo.service").parse().unwrap()),
-        })
+        Self(cm_rust::ServiceDecl { name: name.parse().unwrap(), source_path: None })
     }
 
     /// Sets the source path.
@@ -451,7 +445,7 @@ impl DirectoryDeclBuilder {
     pub fn new(name: &str) -> Self {
         Self(cm_rust::DirectoryDecl {
             name: name.parse().unwrap(),
-            source_path: Some(format!("/data/foo").parse().unwrap()),
+            source_path: None,
             rights: fio::R_STAR_DIR,
         })
     }
