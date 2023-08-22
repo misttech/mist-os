@@ -96,10 +96,7 @@ pub struct InspectStatus {
     fidl_events_received_count: fuchsia_inspect::UintProperty,
 
     /// The number of FIDL events converted to this module’s representation of TouchEvent.
-    _fidl_events_converted_count: fuchsia_inspect::UintProperty,
-
-    /// The number of invalid incoming FIDL events discarded by this InputFile.
-    _fidl_events_discarded_count: fuchsia_inspect::UintProperty,
+    fidl_events_converted_count: fuchsia_inspect::UintProperty,
 
     /// The number of uapi::input_events generated from TouchEvents.
     _uapi_events_generated_count: fuchsia_inspect::UintProperty,
@@ -117,14 +114,12 @@ impl InspectStatus {
         health_node.set_starting_up();
         let fidl_events_received_count = node.create_uint("fidl_events_received_count", 0);
         let fidl_events_converted_count = node.create_uint("fidl_events_converted_count", 0);
-        let fidl_events_discarded_count = node.create_uint("fidl_events_discarded_count", 0);
         let uapi_events_generated_count = node.create_uint("uapi_events_generated_count", 0);
         let uapi_events_read_count = node.create_uint("uapi_events_read_count", 0);
         Self {
             _inspect_node: node,
             fidl_events_received_count,
-            _fidl_events_converted_count: fidl_events_converted_count,
-            _fidl_events_discarded_count: fidl_events_discarded_count,
+            fidl_events_converted_count,
             _uapi_events_generated_count: uapi_events_generated_count,
             _uapi_events_read_count: uapi_events_read_count,
             health_node,
@@ -133,6 +128,10 @@ impl InspectStatus {
 
     fn count_received_events(&self, count: u64) {
         self.fidl_events_received_count.add(count);
+    }
+
+    fn count_converted_events(&self, count: u64) {
+        self.fidl_events_converted_count.add(count);
     }
 }
 
@@ -307,21 +306,24 @@ impl InputFile {
                         };
                         match query_res {
                             Ok(touch_events) => {
-                                let num_received_events = touch_events.len();
+                                let num_received_events: u64 =
+                                    touch_events.len().try_into().unwrap();
                                 previous_event_disposition =
                                     touch_events.iter().map(make_response_for_fidl_event).collect();
-                                let new_events = touch_events
-                                    .iter()
-                                    .filter_map(parse_fidl_touch_event)
-                                    // `flat`: each FIDL event yields a `Vec<uapi::input_event>`,
-                                    // but the end result should be a single vector of UAPI events,
-                                    // not a `Vec<Vec<uapi::input_event>>`.
-                                    .flat_map(make_uapi_events);
+                                let converted_events =
+                                    touch_events.iter().filter_map(parse_fidl_touch_event);
+                                let num_converted_events: u64 =
+                                    converted_events.clone().count().try_into().unwrap();
+                                // `flat`: each FIDL event yields a `Vec<uapi::input_event>`,
+                                // but the end result should be a single vector of UAPI events,
+                                // not a `Vec<Vec<uapi::input_event>>`.
+                                let new_events = converted_events.flat_map(make_uapi_events);
                                 let mut inner = slf.inner.lock();
                                 match &inner.inspect_status {
-                                    Some(inspect_status) => inspect_status.count_received_events(
-                                        num_received_events.try_into().unwrap(),
-                                    ),
+                                    Some(inspect_status) => {
+                                        inspect_status.count_received_events(num_received_events);
+                                        inspect_status.count_converted_events(num_converted_events);
+                                    }
                                     None => (),
                                 }
                                 // TODO(https://fxbug.dev/124597): Reading from an `InputFile` should
@@ -1410,7 +1412,6 @@ mod test {
             touch_input_file: {
                 fidl_events_received_count: 0u64,
                 fidl_events_converted_count: 0u64,
-                fidl_events_discarded_count: 0u64,
                 uapi_events_generated_count: 0u64,
                 uapi_events_read_count: 0u64,
                 "fuchsia.inspect.Health": {
@@ -1433,15 +1434,26 @@ mod test {
                 .expect("failed to create TouchSource channel");
         let relay_thread = input_file.start_touch_relay(touch_source_proxy);
 
-        // Reply to first `Watch` with five `TouchEvent`s that should be counted as `received` by InputFile
+        // Send 2 TouchEvents to proxy that should be counted as `received` by InputFile
+        // A TouchEvent::default() has no pointer sample so these events should be discarded.
         match touch_source_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responder, .. })) => responder
-                .send(&vec![TouchEvent::default(); 5])
+                .send(&vec![TouchEvent::default(); 2])
                 .expect("failure sending Watch reply"),
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
 
-        // Wait for second `Watch` call and verify it has five elements in `responses`.
+        // Send 5 TouchEvents with pointer sample to proxy.
+        // These should be `received` and `converted`
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
+                assert_matches!(responses.as_slice(), [_, _]);
+                responder.send(&vec![make_touch_event(); 5]).expect("failure sending Watch reply");
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Wait for next `Watch` call and verify it has five elements in `responses`.
         match touch_source_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responses, .. })) => {
                 assert_matches!(responses.as_slice(), [_, _, _, _, _])
@@ -1451,9 +1463,8 @@ mod test {
 
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             touch_input_file: {
-                fidl_events_received_count: 5u64,
-                fidl_events_converted_count: 0u64,
-                fidl_events_discarded_count: 0u64,
+                fidl_events_received_count: 7u64,
+                fidl_events_converted_count: 5u64,
                 uapi_events_generated_count: 0u64,
                 uapi_events_read_count: 0u64,
                 "fuchsia.inspect.Health": {
