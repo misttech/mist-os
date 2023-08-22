@@ -623,6 +623,12 @@ where
                                 ffxfs::BlobCreatorMarker::PROTOCOL_NAME
                             )),
                         )
+                        .capability(
+                            Capability::protocol::<ffxfs::BlobReaderMarker>().path(format!(
+                                "/blob-svc/{}",
+                                ffxfs::BlobReaderMarker::PROTOCOL_NAME
+                            )),
+                        )
                         .from(&service_reflector)
                         .to(&pkg_cache),
                 )

@@ -540,6 +540,7 @@
             to: [
                 "#base_resolver",
                 "#fshost",
+                "#pkg-cache",
             ],
         },
         {
@@ -1065,7 +1066,10 @@
         {
             protocol: "fuchsia.fxfs.BlobReader",
             from: "#fshost",
-            to: "#base_resolver",
+            to: [
+                "#base_resolver",
+                "#pkg-cache",
+            ],
             availability: "optional",
         },
         {

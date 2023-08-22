@@ -109,7 +109,7 @@ async fn main_inner() -> Result<(), Error> {
 
     let mut package_index = PackageIndex::new(inspector.root().create_child("index"));
     let builder = blobfs::Client::builder().readable().writable().executable();
-    let blobfs = if use_fxblob { builder.use_creator() } else { builder }
+    let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
         .build()
         .await
         .context("error opening blobfs")?;

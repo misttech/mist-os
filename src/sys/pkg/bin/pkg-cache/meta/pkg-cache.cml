@@ -61,6 +61,7 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
+                "fuchsia.kernel.VmexResource",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.update.CommitStatusProvider",
             ],
@@ -71,6 +72,10 @@
         },
         {
             protocol: "fuchsia.fxfs.BlobCreator",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
             availability: "optional",
         },
     ],
