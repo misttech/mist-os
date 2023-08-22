@@ -9,7 +9,8 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect, fuchsia_zircon as zx,
+    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_zircon as zx,
     keymaps::{self, LockStateChecker, ModifierChecker},
     metrics_registry::*,
     std::rc::Rc,
@@ -89,6 +90,14 @@ impl UnhandledInputHandler for ImeHandler {
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

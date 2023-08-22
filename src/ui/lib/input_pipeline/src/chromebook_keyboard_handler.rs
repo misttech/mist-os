@@ -21,7 +21,7 @@ use crate::keyboard_binding::{KeyboardDeviceDescriptor, KeyboardEvent};
 use async_trait::async_trait;
 use fidl_fuchsia_input::Key;
 use fidl_fuchsia_ui_input3::KeyEventType;
-use fuchsia_inspect;
+use fuchsia_inspect::{self, health::Reporter};
 use fuchsia_trace as ftrace;
 use fuchsia_zircon as zx;
 use keymaps::KeyState;
@@ -131,6 +131,14 @@ impl UnhandledInputHandler for ChromebookKeyboardHandler {
             // Pass other events unchanged.
             _ => vec![InputEvent::from(input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

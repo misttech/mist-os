@@ -89,6 +89,10 @@ pub trait UnhandledInputHandler: AsRcAny {
         self: std::rc::Rc<Self>,
         unhandled_input_event: input_device::UnhandledInputEvent,
     ) -> Vec<input_device::InputEvent>;
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>);
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str);
 }
 
 #[async_trait(?Send)]
@@ -117,9 +121,13 @@ where
         }
     }
 
-    fn set_handler_healthy(self: std::rc::Rc<Self>) {}
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        T::set_handler_healthy(self);
+    }
 
-    fn set_handler_unhealthy(self: std::rc::Rc<Self>, _msg: &str) {}
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        T::set_handler_unhealthy(self, msg);
+    }
 }
 
 pub struct InputHandlerStatus {
@@ -219,6 +227,14 @@ mod tests {
                 .unbounded_send(unhandled_input_event.clone())
                 .expect("failed to send");
             vec![InputEvent::from(unhandled_input_event).into_handled_if(self.mark_events_handled)]
+        }
+
+        fn set_handler_healthy(self: std::rc::Rc<Self>) {
+            // No inspect data on FakeUnhandledInputHandler. Do nothing.
+        }
+
+        fn set_handler_unhealthy(self: std::rc::Rc<Self>, _msg: &str) {
+            // No inspect data on FakeUnhandledInputHandler. Do nothing.
         }
     }
 

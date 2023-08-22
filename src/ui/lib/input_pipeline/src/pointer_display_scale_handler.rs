@@ -12,7 +12,7 @@ use {
     anyhow::{format_err, Error},
     async_trait::async_trait,
     derivative::Derivative,
-    fuchsia_inspect,
+    fuchsia_inspect::{self, health::Reporter},
     metrics_registry::*,
     std::{convert::From, rc::Rc},
 };
@@ -123,6 +123,14 @@ impl UnhandledInputHandler for PointerDisplayScaleHandler {
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

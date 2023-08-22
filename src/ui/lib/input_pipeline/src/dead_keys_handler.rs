@@ -43,7 +43,7 @@ use crate::keyboard_binding::KeyboardEvent;
 use async_trait::async_trait;
 use core::fmt;
 use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
-use fuchsia_inspect;
+use fuchsia_inspect::{self, health::Reporter};
 use fuchsia_zircon as zx;
 use rust_icu_sys as usys;
 use rust_icu_unorm2 as unorm;
@@ -308,6 +308,14 @@ impl UnhandledInputHandler for DeadKeysHandler {
         unhandled_input_event: UnhandledInputEvent,
     ) -> Vec<InputEvent> {
         self.handle_unhandled_input_event_internal(unhandled_input_event)
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

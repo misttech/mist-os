@@ -9,7 +9,8 @@ use {
     async_trait::async_trait,
     fidl::endpoints::Proxy,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_inspect,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
+    fuchsia_inspect::{self, health::Reporter},
     fuchsia_zircon::AsHandleRef,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
     metrics_registry::*,
@@ -72,6 +73,14 @@ impl UnhandledInputHandler for MediaButtonsHandler {
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

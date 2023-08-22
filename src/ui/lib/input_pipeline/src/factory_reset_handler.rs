@@ -21,7 +21,9 @@ use {
         FactoryResetCountdownWatchResponder,
     },
     fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer},
-    fuchsia_component, fuchsia_inspect, fuchsia_zircon as zx,
+    fuchsia_component,
+    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_zircon as zx,
     futures::StreamExt,
     metrics_registry::*,
     std::{
@@ -447,6 +449,14 @@ impl UnhandledInputHandler for FactoryResetHandler {
         };
 
         vec![input_device::InputEvent::from(unhandled_input_event)]
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

@@ -14,7 +14,8 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect, fuchsia_zircon as zx,
+    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_zircon as zx,
     futures::stream::StreamExt,
     metrics_registry::*,
     std::{cell::RefCell, collections::HashMap, option::Option, rc::Rc},
@@ -104,6 +105,14 @@ impl UnhandledInputHandler for TouchInjectorHandler {
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

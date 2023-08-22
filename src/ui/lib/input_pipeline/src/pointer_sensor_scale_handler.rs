@@ -11,7 +11,8 @@ use {
         utils::Position,
     },
     async_trait::async_trait,
-    fuchsia_inspect, fuchsia_zircon as zx,
+    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_zircon as zx,
     metrics_registry::*,
     std::{cell::RefCell, convert::From, num::FpCategory, option::Option, rc::Rc},
 };
@@ -169,6 +170,14 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
             }
             _ => vec![input_device::InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 

@@ -6,7 +6,7 @@ use crate::input_device::{Handled, InputDeviceEvent, InputEvent, UnhandledInputE
 use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use async_trait::async_trait;
 use fidl_fuchsia_ui_input3::{KeyMeaning, Modifiers, NonPrintableKey};
-use fuchsia_inspect;
+use fuchsia_inspect::{self, health::Reporter};
 use keymaps::{LockStateKeys, ModifierState};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -63,6 +63,14 @@ impl UnhandledInputHandler for ModifierHandler {
             // Pass other events through.
             _ => vec![InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 
@@ -143,6 +151,14 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
             // Pass other events through.
             _ => vec![InputEvent::from(unhandled_input_event)],
         }
+    }
+
+    fn set_handler_healthy(self: std::rc::Rc<Self>) {
+        self.inspect_status.health_node.borrow_mut().set_ok();
+    }
+
+    fn set_handler_unhealthy(self: std::rc::Rc<Self>, msg: &str) {
+        self.inspect_status.health_node.borrow_mut().set_unhealthy(msg);
     }
 }
 
