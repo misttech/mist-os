@@ -225,7 +225,8 @@ func (t *QEMU) SSHClient() (*sshutil.Client, error) {
 }
 
 // Start starts the QEMU target.
-func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string) (err error) {
+// TODO(fxbug.dev/95938): Add logic to use PB with ffx emu
+func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) (err error) {
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
 	}

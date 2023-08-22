@@ -14,7 +14,7 @@ import (
 
 // AddImageDeps selects and adds the subset of images needed by a shard to
 // that shard's list of dependencies.
-func AddImageDeps(s *Shard, buildDir string, images []build.Image, pave bool) error {
+func AddImageDeps(s *Shard, buildDir string, images []build.Image, pave bool, pbPath string) error {
 	// Host-test only shards do not require any image deps because they are not running
 	// against a Fuchsia target.
 	if s.Env.Dimensions.DeviceType() == "" {
@@ -38,6 +38,12 @@ func AddImageDeps(s *Shard, buildDir string, images []build.Image, pave bool) er
 			}
 		}
 	}
+
+	// Add product bundle related artifacts.
+	if pbPath != "" {
+		imageDeps = append(imageDeps, "product_bundles.json", pbPath)
+	}
+
 	s.AddDeps(imageDeps)
 	return nil
 }

@@ -26,6 +26,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
+	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
@@ -97,7 +98,7 @@ type FuchsiaTarget interface {
 	SSHKey() string
 
 	// Start starts the target.
-	Start(ctx context.Context, images []bootserver.Image, args []string) error
+	Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) error
 
 	// StartSerialServer starts the serial server for the target iff one
 	// does not exist.
@@ -600,6 +601,12 @@ type StartOptions struct {
 
 	// ZirconArgs are kernel command-line arguments to pass to zircon on boot.
 	ZirconArgs []string
+
+	// ProductBundles is a path to product_bundles.json file.
+	ProductBundles string
+
+	// ProductBundleName is a name of product bundle getting used.
+	ProductBundleName string
 }
 
 // StartTargets starts all the targets given the opts.
@@ -620,7 +627,18 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 			}
 			defer closeFunc()
 
-			return t.Start(startCtx, imgs, opts.ZirconArgs)
+			// Parse the product bundles
+			var pbPath string
+			if opts.ProductBundles != "" {
+				var productBundles []build.ProductBundle
+				if err := jsonutil.ReadFromFile(opts.ProductBundles, &productBundles); err != nil {
+					return err
+				}
+
+				pbPath = build.GetPbPathByName(productBundles, opts.ProductBundleName)
+			}
+
+			return t.Start(startCtx, imgs, opts.ZirconArgs, pbPath)
 		})
 	}
 	return eg.Wait()

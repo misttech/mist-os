@@ -202,7 +202,7 @@ func (t *Device) mustLoadThroughZedboot() bool {
 }
 
 // Start starts the device target.
-func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string) error {
+func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) error {
 	serialSocketPath := t.SerialSocketPath()
 
 	// Set up log listener and dump kernel output to stdout.
@@ -300,7 +300,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				return err
 			}
 		} else {
-			if err := t.flash(ctx, imgs); err != nil {
+			if err := t.flash(ctx, imgs, pbPath); err != nil {
 				return err
 			}
 		}
@@ -452,7 +452,7 @@ func (t *Device) writePubKey() (string, error) {
 	return pubkey.Name(), nil
 }
 
-func (t *Device) flash(ctx context.Context, images []bootserver.Image) error {
+func (t *Device) flash(ctx context.Context, images []bootserver.Image, productBundle string) error {
 	var pubkey string
 	var err error
 	if len(t.signers) > 0 {
@@ -474,11 +474,16 @@ func (t *Device) flash(ctx context.Context, images []bootserver.Image) error {
 
 	// TODO(fxbug.dev/87634): Need support for ffx target flash for cuckoo tests.
 	if pubkey != "" && t.UseFFX() {
-		flashManifest := getImageByName(images, "manifest_flash-manifest")
-		if flashManifest == nil {
-			return errors.New("flash manifest not found")
+		var flashManifestPath string
+		if productBundle == "" {
+			flashManifest := getImageByName(images, "manifest_flash-manifest")
+			if flashManifest == nil {
+				return errors.New("flash manifest not found")
+			}
+			flashManifestPath = flashManifest.Path
 		}
-		return t.ffx.Flash(ctx, t.config.FastbootSernum, flashManifest.Path, pubkey)
+
+		return t.ffx.Flash(ctx, t.config.FastbootSernum, flashManifestPath, pubkey, productBundle)
 	}
 
 	flashScript := getImageByName(images, "script_flash-script")

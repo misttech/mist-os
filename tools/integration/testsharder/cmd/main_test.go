@@ -551,6 +551,7 @@ type fakeModules struct {
 	testList            string
 	testDurations       []build.TestDuration
 	packageRepositories []build.PackageRepo
+	productBundles      []build.ProductBundle
 }
 
 func (m *fakeModules) Platforms() []build.DimensionSet {
@@ -593,6 +594,7 @@ func (m *fakeModules) TestListLocation() []string               { return []strin
 func (m *fakeModules) TestSpecs() []build.TestSpec              { return m.testSpecs }
 func (m *fakeModules) TestDurations() []build.TestDuration      { return m.testDurations }
 func (m *fakeModules) PackageRepositories() []build.PackageRepo { return m.packageRepositories }
+func (m *fakeModules) ProductBundles() []build.ProductBundle    { return m.productBundles }
 
 func packageURL(basename string) string {
 	return fmt.Sprintf("fuchsia-pkg://fuchsia.com/%s#meta/%s.cm", basename, basename)

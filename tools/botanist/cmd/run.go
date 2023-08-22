@@ -49,6 +49,12 @@ type RunCommand struct {
 	// ImageManifest is a path to an image manifest.
 	imageManifest string
 
+	// ProductBundle is a path to product_bundles.json file.
+	productBundles string
+
+	// ProductBundleName is a name of product bundle getting used.
+	productBundleName string
+
 	// Netboot tells botanist to netboot (and not to pave).
 	netboot bool
 
@@ -134,6 +140,8 @@ func (*RunCommand) Synopsis() string {
 func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.configFile, "config", "", "path to file of device config")
 	f.StringVar(&r.imageManifest, "images", "", "path to an image manifest")
+	f.StringVar(&r.productBundles, "product-bundles", "", "path to product_bundles.json file")
+	f.StringVar(&r.productBundleName, "product-bundle-name", "", "name of product bundle to use")
 	f.BoolVar(&r.netboot, "netboot", false, "if set, botanist will not pave; but will netboot instead")
 	f.Var(&r.zirconArgs, "zircon-args", "kernel command-line arguments")
 	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
@@ -345,9 +353,11 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 		defer cancel()
 
 		startOpts := targets.StartOptions{
-			Netboot:       r.netboot,
-			ImageManifest: r.imageManifest,
-			ZirconArgs:    r.zirconArgs,
+			Netboot:           r.netboot,
+			ImageManifest:     r.imageManifest,
+			ZirconArgs:        r.zirconArgs,
+			ProductBundles:    r.productBundles,
+			ProductBundleName: r.productBundleName,
 		}
 
 		if err := targets.StartTargets(ctx, startOpts, fuchsiaTargets); err != nil {

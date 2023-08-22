@@ -92,13 +92,15 @@ func TestAddImageDeps(t *testing.T) {
 		pave           bool
 		imageOverrides build.ImageOverrides
 		deviceType     string
+		pbPath         string
 		want           []string
 	}{
 		{
 			name:       "emulator image deps",
 			deviceType: "AEMU",
 			pave:       false,
-			want:       []string{"fuchsia.zbi", "images.json", "multiboot.bin", "obj/build/images/fuchsia/fuchsia/fvm.blk"},
+			pbPath:     "obj/build/images/fuchsia/product_bundle",
+			want:       []string{"fuchsia.zbi", "images.json", "multiboot.bin", "obj/build/images/fuchsia/fuchsia/fvm.blk", "obj/build/images/fuchsia/product_bundle", "product_bundles.json"},
 		},
 		{
 			name:       "paving image deps",
@@ -154,7 +156,7 @@ func TestAddImageDeps(t *testing.T) {
 					},
 				},
 			}
-			AddImageDeps(s, imgDir, imgs, tc.pave)
+			AddImageDeps(s, imgDir, imgs, tc.pave, tc.pbPath)
 			if diff := cmp.Diff(tc.want, s.Deps); diff != "" {
 				t.Errorf("AddImageDeps(%v, %v, %t) failed: (-want +got): \n%s", s, imgs, tc.pave, diff)
 			}

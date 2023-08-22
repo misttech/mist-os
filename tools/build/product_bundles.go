@@ -29,3 +29,13 @@ type ProductBundle struct {
 // ProductBundlesManifest is a JSON list of product bundles produced by the
 // Fuchsia build.
 type ProductBundlesManifest = []ProductBundle
+
+// GetPbPathByName gets the path to a product bundle based on name
+func GetPbPathByName(pbs []ProductBundle, name string) string {
+	for _, pb := range pbs {
+		if pb.Name == name {
+			return pb.Path
+		}
+	}
+	return ""
+}

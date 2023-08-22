@@ -53,6 +53,7 @@ type testsharderFlags struct {
 	skipUnaffected                 bool
 	perShardPackageRepos           bool
 	cacheTestPackages              bool
+	productBundleName              string
 }
 
 func parseFlags() testsharderFlags {
@@ -82,6 +83,7 @@ func parseFlags() testsharderFlags {
 	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
 	flag.BoolVar(&flags.perShardPackageRepos, "per-shard-package-repos", false, "whether to construct a local package repo for each shard")
 	flag.BoolVar(&flags.cacheTestPackages, "cache-test-packages", false, "whether the test packages should be cached on disk in the local package repo")
+	flag.StringVar(&flags.productBundleName, "product-bundle-name", "", "name of product bundle to use")
 	flag.Usage = usage
 
 	flag.Parse()
@@ -125,6 +127,7 @@ type buildModules interface {
 	TestListLocation() []string
 	TestDurations() []build.TestDuration
 	PackageRepositories() []build.PackageRepo
+	ProductBundles() []build.ProductBundle
 }
 
 func execute(ctx context.Context, flags testsharderFlags, m buildModules) error {
@@ -296,7 +299,8 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 					return err
 				}
 			}
-			if err := testsharder.AddImageDeps(s, flags.buildDir, m.Images(), flags.pave); err != nil {
+			pbPath := build.GetPbPathByName(m.ProductBundles(), flags.productBundleName)
+			if err := testsharder.AddImageDeps(s, flags.buildDir, m.Images(), flags.pave, pbPath); err != nil {
 				return err
 			}
 		}
