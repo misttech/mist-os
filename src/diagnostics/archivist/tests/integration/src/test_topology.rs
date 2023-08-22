@@ -43,7 +43,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     builder
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("stopped").with_scope(&test_realm))
                 .capability(Capability::event_stream("directory_ready").with_scope(&test_realm))
                 .capability(Capability::event_stream("capability_requested"))
                 .from(Ref::parent())
@@ -54,7 +53,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     test_realm
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("stopped"))
                 .capability(Capability::event_stream("directory_ready"))
                 .capability(Capability::event_stream("capability_requested"))
                 .from(Ref::parent())
