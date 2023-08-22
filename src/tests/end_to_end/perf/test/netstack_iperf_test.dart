@@ -349,7 +349,9 @@ void main(List<String> args) {
                 final resultsFile = '/tmp/iperf_results_$i.json';
                 final result = await helper.sl4fDriver.ssh
                     .run('iperf3 $args > $resultsFile');
-                expect(result.exitCode, equals(0));
+                expect(result.exitCode, equals(0),
+                    reason:
+                        "stdout: ${result.stdout}\nstderr: ${result.stderr}");
                 return resultsFile;
               }));
             } else {
@@ -359,7 +361,9 @@ void main(List<String> args) {
               clientFutures.add(Future(() async {
                 final result =
                     await Process.run(hostPath, cmdArgs, runInShell: true);
-                expect(result.exitCode, equals(0));
+                expect(result.exitCode, equals(0),
+                    reason:
+                        "stdout: ${result.stdout}\nstderr: ${result.stderr}");
                 final iperfFile = (await Dump()
                     .writeAsString('iperf', 'json', result.stdout))!;
                 return iperfFile.path;
