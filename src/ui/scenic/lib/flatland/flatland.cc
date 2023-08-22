@@ -555,27 +555,7 @@ void Flatland::ReleaseView() {
   link_to_parent_.reset();
 
   // Delay the actual destruction of the Link until the next Present().
-  pending_link_operations_.push_back(
-      [old_link_to_parent = std::move(old_link_to_parent), debug_name = debug_name_]() mutable {
-        ViewCreationToken return_token;
-
-        auto error_reporter = scenic_impl::ErrorReporter::DefaultUnique();
-        error_reporter->SetPrefix(std::move(debug_name));
-
-        // If the link is still valid, return the original token. If not, create an orphaned
-        // zx::channel and return it since the ObjectLinker does not retain the orphaned token.
-        auto link_token = old_link_to_parent.exporter.ReleaseToken();
-        if (link_token.has_value()) {
-          return_token.value = zx::channel(std::move(link_token.value()));
-        } else {
-          error_reporter->ERROR() << "No valid ViewCreationToken found.";
-          // |peer_token| immediately falls out of scope, orphaning |return_token|.
-          zx::channel peer_token;
-          zx::channel::create(0, &return_token.value, &peer_token);
-        }
-
-        // TODO(fxbug.dev/81576): Consider returning |return_token| for re-linking..
-      });
+  pending_link_operations_.push_back([old_link_to_parent = std::move(old_link_to_parent)]() {});
 }
 
 void Flatland::Clear() {
