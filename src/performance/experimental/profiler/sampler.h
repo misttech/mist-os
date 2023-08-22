@@ -48,7 +48,7 @@ class Sampler {
   // Return the information needed to symbolize the samples
   zx::result<profiler::SymbolizationContext> GetContexts();
 
-  std::vector<Sample> GetSamples() { return samples_; }
+  std::unordered_map<zx_koid_t, std::vector<Sample>> GetSamples() { return samples_; }
   std::vector<zx::ticks> SamplingDurations() { return inspecting_durations_; }
   zx::result<> AddTarget(JobTarget&& target);
 
@@ -64,7 +64,7 @@ class Sampler {
 
   TargetTree targets_;
   std::vector<zx::ticks> inspecting_durations_;
-  std::vector<Sample> samples_;
+  std::unordered_map<zx_koid_t, std::vector<Sample>> samples_;
 
   // Watchers cannot be moved, so we need to box them
   std::unordered_map<zx_koid_t, std::unique_ptr<ProcessWatcher>> process_watchers_;

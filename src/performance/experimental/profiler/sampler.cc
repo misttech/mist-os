@@ -219,7 +219,7 @@ zx::result<> profiler::Sampler::Start() {
 
 zx::result<> profiler::Sampler::Stop() {
   sample_task_.Cancel();
-  FX_LOGS(INFO) << "Stopped! Collected " << samples_.size() << " samples";
+  FX_LOGS(INFO) << "Stopped! Collected " << inspecting_durations_.size() << " samples";
   sample_task_.Cancel();
   return zx::ok();
 }
@@ -236,7 +236,7 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
           auto [time_sampling, pcs] = SampleThread(target.handle.borrow(), thread.handle.borrow(),
                                                    target.unwinder_data->fp_unwinder);
           if (time_sampling != zx::ticks()) {
-            samples_.push_back({target.pid, thread.tid, pcs});
+            samples_[target.pid].push_back({target.pid, thread.tid, pcs});
             inspecting_durations_.push_back(time_sampling);
           }
         }

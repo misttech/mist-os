@@ -377,18 +377,19 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 }
 
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
+  zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
+  if (modules.is_error()) {
+    Reset();
+    completer.Close(modules.status_value());
+    return;
+  }
+
   zx::result<> stop_res = sampler_->Stop();
   if (stop_res.is_error()) {
     FX_PLOGS(ERROR, stop_res.status_value()) << "Sampler failed to stop";
     Reset();
     completer.Close(stop_res.status_value());
     return;
-  }
-
-  // Start by writing out symbolization information to the sockets
-  zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
-  if (modules.is_error()) {
-    completer.Close(modules.status_value());
   }
 
   if (component_target_) {
@@ -401,24 +402,24 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     }
   }
 
-  if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
-    completer.Close(ZX_ERR_IO);
-    return;
-  }
-
-  for (const auto& [_, modules] : modules->process_contexts) {
-    for (const profiler::Module& mod : modules) {
+  for (const auto& [pid, samples] : sampler_->GetSamples()) {
+    if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
+      completer.Close(ZX_ERR_IO);
+      return;
+    }
+    auto process_modules = modules->process_contexts[pid];
+    for (const profiler::Module& mod : process_modules) {
       if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatModule(mod), socket_)) {
         completer.Close(ZX_ERR_IO);
         return;
       }
     }
-  }
-
-  for (const Sample& sample : sampler_->GetSamples()) {
-    if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatSample(sample), socket_)) {
-      completer.Close(ZX_ERR_IO);
-      return;
+    for (const Sample& sample : samples) {
+      if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatSample(sample),
+                                       socket_)) {
+        completer.Close(ZX_ERR_IO);
+        return;
+      }
     }
   }
 
@@ -426,7 +427,7 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
 
   std::vector<zx::ticks> inspecting_durations = sampler_->SamplingDurations();
   fuchsia_cpu_profiler::SessionStopResponse stats;
-  stats.samples_collected() = sampler_->GetSamples().size();
+  stats.samples_collected() = inspecting_durations.size();
   if (!inspecting_durations.empty()) {
     zx::ticks total_ticks;
     for (zx::ticks ticks : inspecting_durations) {
