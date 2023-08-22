@@ -24,7 +24,7 @@ dependencies = []
 test = [
     "colorama==0.4.6",        # for testing
     "jellyfish==0.11.0",      # for type checking
-    "parameterized==0.7.4",   # for testing
+    "parameterized==0.9.0",   # for testing
 ]
 # Coding guidelines related dependencies
 guidelines = [
