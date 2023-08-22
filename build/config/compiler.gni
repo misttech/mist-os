@@ -77,3 +77,20 @@ declare_args() {
 
 assert(dwarf_version >= 2 && dwarf_version <= 5,
        "`dwarf_version=\"...\"` must be between 2 and 5")
+
+default_compress_debuginfo = "none"
+
+declare_args() {
+  # Enable compression of debug sections.
+  compress_debuginfo = default_compress_debuginfo
+}
+
+_compress_debuginfo_valid = [
+  "none",
+  "zlib",
+  "zstd",
+]
+
+assert(_compress_debuginfo_valid + [ compress_debuginfo ] -
+           [ compress_debuginfo ] != _compress_debuginfo_valid,
+       "`compress_debuginfo=\"...\"` must be one of $_compress_debuginfo_valid")
