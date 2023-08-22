@@ -46,6 +46,9 @@ def normalize(config, root_dir, file_path, extra_files_read):
         "uses_file_relative_paths", False)
     config.pop("uses_file_relative_paths")
 
+    if "provided_features" in config:
+        config["provided_features"] = sorted(config["provided_features"])
+
     if "filesystems" in config:
         filesystems = config["filesystems"]
 
