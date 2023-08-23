@@ -1029,7 +1029,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverEmpty) {
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_TRUE(diag.errors().empty());
 
-  EXPECT_TRUE(info.strtab().empty());
+  EXPECT_EQ(info.strtab().size(), 1u);
   EXPECT_TRUE(info.symtab().empty());
   EXPECT_TRUE(info.soname().empty());
   EXPECT_FALSE(info.compat_hash());

@@ -269,8 +269,8 @@ TYPED_TEST(ElfldltlLoaderTests, BasicSymbol) {
 TYPED_TEST(ElfldltlLoaderTests, ResolveSymbolic) {
   ASSERT_NO_FATAL_FAILURE(this->Load(kSymbolic));
 
-  EXPECT_EQ(this->template lookup_sym<decltype(NeedsPlt)>("NeedsPlt")(), 2);
-  EXPECT_EQ(this->template lookup_sym<decltype(NeedsGot)>("NeedsGot")(), 3);
+  EXPECT_EQ(this->template lookup_sym<decltype(NeedsPlt)>(elfldltl::SymbolName{"NeedsPlt"})(), 2);
+  EXPECT_EQ(this->template lookup_sym<decltype(NeedsGot)>(elfldltl::SymbolName{"NeedsGot"})(), 3);
 }
 
 }  // namespace
