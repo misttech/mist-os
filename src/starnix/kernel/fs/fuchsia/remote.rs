@@ -152,12 +152,25 @@ impl RemoteFs {
         if use_remote_ids {
             root_node.node_id = node_id;
         }
+        // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
+        // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
+        // selinux support is further along, we might want to remove this mount option.
+        let context = if kernel.selinux_enabled() {
+            fs_args::generic_parse_mount_options(&options.params)
+                .get(&b"defcontext"[..])
+                .map(|c| c.to_vec())
+        } else {
+            None
+        };
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached,
             RemoteFs { supports_open2, use_remote_ids },
             options,
         );
+        if let Some(context) = context {
+            fs.selinux_context.set(context).unwrap();
+        }
         fs.set_root_node(root_node);
         Ok(fs)
     }

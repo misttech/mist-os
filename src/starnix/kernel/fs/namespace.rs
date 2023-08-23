@@ -17,6 +17,7 @@ use crate::{
     time::*,
     types::*,
 };
+use fidl_fuchsia_io as fio;
 use ref_cast::RefCast;
 use std::{
     collections::{HashMap, HashSet},
@@ -530,6 +531,14 @@ impl Kernel {
             b"devpts" => dev_pts_fs(self, options).clone(),
             b"devtmpfs" => dev_tmp_fs(self).clone(),
             b"proc" => proc_fs(self, options).clone(),
+            b"remotefs" => crate::execution::create_remotefs_filesystem(
+                self,
+                self.container_data_dir
+                    .as_ref()
+                    .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                options,
+            )?,
             b"selinuxfs" => selinux_fs(self, options).clone(),
             b"sysfs" => sys_fs(self, options).clone(),
             b"tmpfs" => {

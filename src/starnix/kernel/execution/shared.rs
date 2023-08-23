@@ -175,14 +175,15 @@ pub fn create_remotefs_filesystem(
     root: &fio::DirectorySynchronousProxy,
     rights: fio::OpenFlags,
     options: FileSystemOptions,
-) -> Result<FileSystemHandle, Error> {
+) -> Result<FileSystemHandle, Errno> {
     let root = syncio::directory_open_directory_async(
         root,
-        std::str::from_utf8(&options.source).map_err(|_| anyhow!("source path is not utf8"))?,
+        std::str::from_utf8(&options.source)
+            .map_err(|_| errno!(EINVAL, "source path is not utf8"))?,
         rights,
     )
-    .map_err(|e| anyhow!("Failed to open root: {}", e))?;
-    RemoteFs::new_fs(kernel, root.into_channel(), options, rights).map_err(|e| e.into())
+    .map_err(|e| errno!(EIO, format!("Failed to open root: {e}")))?;
+    RemoteFs::new_fs(kernel, root.into_channel(), options, rights)
 }
 
 pub fn create_filesystem_from_spec<'a>(
