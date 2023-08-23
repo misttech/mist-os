@@ -39,12 +39,5 @@
             to: "#realm_builder",
             availability: "optional",
         },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: [ "#realm_builder" ],
-            rights: [ "r*" ],
-            subdir: "archivist",
-        },
     ],
 }
