@@ -103,7 +103,7 @@ async fn test_stop_timeouts() {
     EventSequence::new()
         .has_subset(
             vec![
-                EventMatcher::ok().moniker(parent.clone()).stop(Some(ExitStatusMatcher::AnyCrash)),
+                EventMatcher::ok().moniker(parent.clone()).stop(Some(ExitStatusMatcher::Clean)),
                 EventMatcher::ok().r#type(Destroyed::TYPE).moniker(parent.clone()),
             ],
             Ordering::Unordered,

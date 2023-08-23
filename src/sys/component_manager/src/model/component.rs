@@ -27,7 +27,7 @@ use {
             OpenOptions, RouteRequest,
         },
     },
-    crate::runner::{builtin::NullRunner, builtin::RemoteRunner, NamespaceEntry, Runner},
+    crate::runner::{builtin::RemoteRunner, NamespaceEntry},
     ::routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_id_index::{ComponentIdIndex, ComponentInstanceId},
@@ -508,9 +508,11 @@ impl ComponentInstance {
     }
 
     /// Resolves the runner that can start this component.
+    ///
+    /// If the component has no program declaration, returns `None`.
     pub async fn resolve_runner<'a>(
         self: &'a Arc<Self>,
-    ) -> Result<Arc<dyn Runner>, StartActionError> {
+    ) -> Result<Option<RemoteRunner>, StartActionError> {
         // Fetch component declaration.
         let runner = {
             let state = self.lock_state().await;
@@ -527,30 +529,28 @@ impl ComponentInstance {
             }
         };
 
-        // Find any explicit "use" runner declaration, resolve that.
-        if let Some(runner) = runner {
-            // Open up a channel to the runner.
-            let (client, server) =
-                endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-            let mut server_channel = server.into_channel();
-            let options = OpenOptions {
-                flags: fio::OpenFlags::NOT_DIRECTORY,
-                relative_path: "".into(),
-                server_chan: &mut server_channel,
-            };
-            route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
-                .await
-                .map_err(|err| StartActionError::ResolveRunnerError {
-                    err: Box::new(err),
-                    moniker: self.moniker.clone(),
-                    runner,
-                })?;
+        let Some(runner) = runner else {
+            return Ok(None);
+        };
 
-            return Ok(Arc::new(RemoteRunner::new(client)) as Arc<dyn Runner>);
-        }
+        // Open up a channel to the runner.
+        let (client, server) =
+            endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+        let mut server_channel = server.into_channel();
+        let options = OpenOptions {
+            flags: fio::OpenFlags::NOT_DIRECTORY,
+            relative_path: "".into(),
+            server_chan: &mut server_channel,
+        };
+        route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
+            .await
+            .map_err(|err| StartActionError::ResolveRunnerError {
+                err: Box::new(err),
+                moniker: self.moniker.clone(),
+                runner,
+            })?;
 
-        // Otherwise, use a null runner.
-        Ok(Arc::new(NullRunner {}) as Arc<dyn Runner>)
+        return Ok(Some(RemoteRunner::new(client)));
     }
 
     /// Adds the dynamic child defined by `child_decl` to the given `collection_name`. Once
@@ -1722,6 +1722,9 @@ pub struct Runtime {
     pub runtime_dir: Option<fio::DirectoryProxy>,
 
     /// Used to interact with the Runner to influence the component's execution.
+    ///
+    /// If `program` is `None`, that means this component has started, but the
+    /// component does not have a program.
     pub program: Option<Program>,
 
     /// Approximates when the component was started.
@@ -1844,7 +1847,6 @@ impl Runtime {
         if let Some(ref program) = self.program {
             stop_component_internal(program, stop_timer, kill_timer).await
         } else {
-            // TODO(jmatt) Need test coverage
             Ok(ComponentStopOutcome {
                 request: StopRequestSuccess::NoController,
                 component_exit_status: zx::Status::OK,
@@ -2377,6 +2379,21 @@ pub mod tests {
                 component_exit_status: zx::Status::OK
             })),
             exec.run_until_stalled(&mut stop_fut)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn stop_component_without_program() {
+        let mut runtime = Runtime::start_from(None, None, StartReason::Debug, None, None);
+        let stop_timer = Box::pin(std::future::ready(()));
+        let kill_timer = Box::pin(std::future::ready(()));
+        let result = runtime.stop_component(stop_timer, kill_timer).await.unwrap();
+        assert_eq!(
+            result,
+            ComponentStopOutcome {
+                request: StopRequestSuccess::NoController,
+                component_exit_status: zx::Status::OK,
+            }
         );
     }
 

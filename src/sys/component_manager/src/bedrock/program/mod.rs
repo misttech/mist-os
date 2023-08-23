@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::runner::{Namespace, Runner};
+use crate::runner::{builtin::RemoteRunner, Namespace, Runner};
 use fidl::endpoints;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -49,7 +49,7 @@ impl Program {
     /// TODO(fxbug.dev/122024): Since diagnostic information is only available once,
     /// the framework should be the one that get it. That's another reason to limit this API.
     pub async fn start(
-        runner: &dyn Runner,
+        runner: &RemoteRunner,
         start_info: StartInfo,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
     ) -> Program {

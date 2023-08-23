@@ -69,7 +69,7 @@ async fn test_stop_timeouts() {
             vec![
                 EventMatcher::ok()
                     .moniker(root_moniker.clone())
-                    .stop(Some(ExitStatusMatcher::AnyCrash)),
+                    .stop(Some(ExitStatusMatcher::Clean)),
                 EventMatcher::ok().r#type(Destroyed::TYPE).moniker(root_moniker.clone()),
             ],
             // TODO(https://fxbug.dev/130280): Strengthen ordering

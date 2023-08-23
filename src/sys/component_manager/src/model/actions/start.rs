@@ -15,7 +15,7 @@ use {
         namespace::create_namespace,
         routing::{route_and_open_capability, OpenOptions, RouteRequest},
     },
-    crate::runner::{NamespaceEntry, Runner},
+    crate::runner::{builtin::RemoteRunner, NamespaceEntry},
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
@@ -78,7 +78,7 @@ impl Action for StartAction {
 }
 
 struct StartContext {
-    runner: Arc<dyn Runner>,
+    runner: Option<RemoteRunner>,
     start_info: StartInfo,
     diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
 }
@@ -212,9 +212,11 @@ async fn start_component(
     }
 
     let StartContext { runner, start_info, diagnostics_sender } = start_context;
-    pending_runtime.program =
-        Some(Program::start(runner.as_ref(), start_info, diagnostics_sender).await);
-    pending_runtime.watch_for_exit(component.as_weak());
+    if let Some(runner) = runner {
+        pending_runtime.program =
+            Some(Program::start(&runner, start_info, diagnostics_sender).await);
+        pending_runtime.watch_for_exit(component.as_weak());
+    }
     execution.runtime = Some(pending_runtime);
     Ok(fsys::StartResult::Started)
 }
