@@ -1952,4 +1952,67 @@ mod test {
 
         fixture.close().await;
     }
+
+    #[::fuchsia::test]
+    async fn test_update_atime_mtime() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns: Arc<Namespace> = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let child = ns
+                .root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+
+            let info_original =
+                child.entry.node.refresh_info(&current_task).expect("refresh_info failed").clone();
+
+            child
+                .entry
+                .node
+                .update_atime_mtime(
+                    &current_task,
+                    TimeUpdateType::Time(zx::Time::from_nanos(30)),
+                    TimeUpdateType::Omit,
+                )
+                .expect("update_atime_mtime failed");
+            let info_after_update =
+                child.entry.node.refresh_info(&current_task).expect("refresh info failed").clone();
+            assert_eq!(info_after_update.time_modify, info_original.time_modify);
+            assert_eq!(info_after_update.time_access, zx::Time::from_nanos(30));
+
+            child
+                .entry
+                .node
+                .update_atime_mtime(
+                    &current_task,
+                    TimeUpdateType::Omit,
+                    TimeUpdateType::Time(zx::Time::from_nanos(50)),
+                )
+                .expect("update_atime_mtime failed");
+            let info_after_update2 =
+                child.entry.node.refresh_info(&current_task).expect("refresh_info failed").clone();
+            assert_eq!(info_after_update2.time_modify, zx::Time::from_nanos(50));
+            assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
+        })
+        .await;
+        fixture.close().await;
+    }
 }
