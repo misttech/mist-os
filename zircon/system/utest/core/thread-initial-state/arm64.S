@@ -5,58 +5,50 @@
 #include <lib/arch/asm.h>
 
 .macro check_simd reg1 reg2
-  fmov x0, \reg1
-  cbnz x0, .Lfail
-  fmov x0, \reg2
-  cbnz x0, .Lfail
+  fmov x16, \reg1
+  cbnz x16, .Lexit
+  fmov x16, \reg2
+  cbnz x16, .Lexit
 .endm
 
-// int thread_entry(void *arg)
-.function thread_entry, global
+// [[noreturn]] void InitialStateTestThread(uint64_t* ptr, uint64_t value);
+// Arguments are in x0, x1.
+.function InitialStateTestThread, global
 
-  bmi .Lfail
-  beq .Lfail
-  bcs .Lfail
-  bvs .Lfail
+  bmi .Lexit
+  beq .Lexit
+  bcs .Lexit
+  bvs .Lexit
 
-  cbnz x1, .Lfail
-  cbnz x2, .Lfail
-  cbnz x3, .Lfail
-  cbnz x4, .Lfail
-  cbnz x5, .Lfail
-  cbnz x6, .Lfail
-  cbnz x7, .Lfail
-  cbnz x8, .Lfail
-  cbnz x9, .Lfail
-  cbnz x10, .Lfail
-  cbnz x11, .Lfail
-  cbnz x12, .Lfail
-  cbnz x13, .Lfail
-  cbnz x14, .Lfail
-  cbnz x15, .Lfail
-  cbnz x16, .Lfail
-  cbnz x17, .Lfail
-  cbnz x18, .Lfail
-  cbnz x19, .Lfail
-  cbnz x20, .Lfail
-  cbnz x21, .Lfail
-  cbnz x22, .Lfail
-  cbnz x23, .Lfail
-  cbnz x24, .Lfail
-  cbnz x25, .Lfail
-  cbnz x26, .Lfail
-  cbnz x27, .Lfail
-  cbnz x28, .Lfail
-  cbnz x29, .Lfail
-  cbnz x30, .Lfail
-
-  // test thread arg
-  movlit x1, 0x12345678
-  lsl x1, x1, 32
-  movlit x2, 0x90abcdef
-  orr x1, x2, x1
-  sub x0, x0, x1
-  cbnz x0, .Lfail
+  cbnz x2, .Lexit
+  cbnz x3, .Lexit
+  cbnz x4, .Lexit
+  cbnz x5, .Lexit
+  cbnz x6, .Lexit
+  cbnz x7, .Lexit
+  cbnz x8, .Lexit
+  cbnz x9, .Lexit
+  cbnz x10, .Lexit
+  cbnz x11, .Lexit
+  cbnz x12, .Lexit
+  cbnz x13, .Lexit
+  cbnz x14, .Lexit
+  cbnz x15, .Lexit
+  cbnz x16, .Lexit
+  cbnz x17, .Lexit
+  cbnz x18, .Lexit
+  cbnz x19, .Lexit
+  cbnz x20, .Lexit
+  cbnz x21, .Lexit
+  cbnz x22, .Lexit
+  cbnz x23, .Lexit
+  cbnz x24, .Lexit
+  cbnz x25, .Lexit
+  cbnz x26, .Lexit
+  cbnz x27, .Lexit
+  cbnz x28, .Lexit
+  cbnz x29, .Lexit
+  cbnz x30, .Lexit
 
   check_simd d0, v0.D[1]
   check_simd d1, v1.D[1]
@@ -90,8 +82,17 @@
   check_simd d29, v29.D[1]
   check_simd d30, v30.D[1]
   check_simd d31, v31.D[1]
+
+  // Store the expected value at the top of the stack.
+  movlit x16, 0x1234567890abcdef
+  // Use a double store to maintain the 16-byte SP alignment for the vDSO call.
+  stp xzr, x16, [sp, #-16]!
+
+  // Store the value from the second argument register to the pointer passed in
+  // the first argument register, which tests that each had the expected value.
+  str x1, [x0]
+
+.Lexit:
   b zx_thread_exit
-.Lfail:
-  b print_fail
 
 .end_function

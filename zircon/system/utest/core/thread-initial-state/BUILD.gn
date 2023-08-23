@@ -10,8 +10,8 @@ source_set("thread-initial-state") {
     ]
   }
   deps = [
-    "//src/zircon/lib/zircon",
     "//zircon/kernel/lib/arch",
+    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }

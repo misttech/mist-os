@@ -6,7 +6,7 @@
 
 .macro check_general_purpose reg
   cmpq $0, \reg
-  jne .Lfail
+  jne .Lexit
 .endm
 
 .macro check_xmm reg
@@ -16,42 +16,41 @@
   // only present in SSE4.1
   movdqu \reg, -16(%rsp)
   cmpq $0, -16(%rsp)
-  jnz .Lfail
+  jnz .Lexit
   cmpq $0, -8(%rsp)
-  jnz .Lfail
+  jnz .Lexit
 .endm
 
 .macro check_ymm reg
   vptest \reg, \reg
-  jnz .Lfail
+  jnz .Lexit
 .endm
 
 .macro check_mm reg
   movq \reg, %rax
   cmpq $0, %rax
-  jne .Lfail
+  jne .Lexit
 .endm
 
 .macro check_segment reg
   mov \reg, %ax
   cmpw $0, %ax
-  jne .Lfail
+  jne .Lexit
 .endm
 
-// int thread_entry(void *arg)
-.function thread_entry, global
-
-  jz .Lfail
-  jc .Lfail
-  js .Lfail
-  jp .Lfail
+// [[noreturn]] void InitialStateTestThread(uint64_t* ptr, uint64_t value);
+// Arguments are in %rdi, %rsi.
+.function InitialStateTestThread, global
+  jz .Lexit
+  jc .Lexit
+  js .Lexit
+  jp .Lexit
 
   check_general_purpose %rax
   check_general_purpose %rbx
   check_general_purpose %rcx
   check_general_purpose %rdx
   check_general_purpose %rbp
-  check_general_purpose %rsi
   check_general_purpose %r8
   check_general_purpose %r9
   check_general_purpose %r10
@@ -60,11 +59,6 @@
   check_general_purpose %r13
   check_general_purpose %r14
   check_general_purpose %r15
-
-  // test thread arg
-  movq $0x1234567890abcdef, %rax
-  cmpq %rax, %rdi
-  jne .Lfail
 
   // Don't check cs/ss since those are set by the kernel explicitly
   check_segment %ds
@@ -133,8 +127,16 @@
   check_ymm %ymm15
 .Lno_avx:
 
+  // Store the expected value just below the incoming SP.
+  // This leaves the SP correctly aligned to enter the vDSO (without a call).
+  movabs $0x1234567890abcdef, %rax
+  pushq %rax
+
+  // Store the value from the second argument register to the pointer passed in
+  // the first argument register, which tests that each had the expected value.
+  mov %rsi, (%rdi)
+
+.Lexit:
   jmp zx_thread_exit@PLT
-.Lfail:
-  jmp print_fail
 
 .end_function
