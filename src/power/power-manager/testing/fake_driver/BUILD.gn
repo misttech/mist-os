@@ -1,0 +1,43 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+
+driver_bind_rules("power-manager-fake-bind") {
+  rules = "power-manager-fake-bind.bind"
+  bind_output = "power-manager-fake-bind.bindbc"
+  deps = [ "//src/devices/bind/fuchsia.test" ]
+}
+
+source_set("power-manager-fake-driver-lib") {
+  sources = [
+    "driver.cc",
+    "temperature_driver.cc",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp_wire",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp",
+  ]
+}
+
+fuchsia_driver("power-manager-fake-driver") {
+  output_name = "power-manager-fake-driver"
+
+  deps = [
+    ":power-manager-fake-bind",
+    ":power-manager-fake-driver-lib",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("component") {
+  component_name = "power-manager-fake-driver"
+  manifest = "meta/power-manager-fake-driver.cml"
+  deps = [ ":power-manager-fake-driver" ]
+  info = "power-manager-fake-driver.json"
+}

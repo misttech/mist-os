@@ -24,7 +24,10 @@ group("battery") {
 }
 
 group("drivers") {
-  deps = [ "fake-battery/:fake_battery_component" ]
+  deps = [
+    "fake-battery/:fake_battery_component",
+    "power-manager/testing/fake_driver:component",
+  ]
 }
 
 group("tests") {
