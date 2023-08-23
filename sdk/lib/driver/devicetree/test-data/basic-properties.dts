@@ -5,6 +5,7 @@
 /dts-v1/;
 
 #include "sdk/lib/driver/devicetree/test-data/basic-properties.h"
+#include <lib/ddk/platform-defs.h>
 
 / {
     compatible = "fuchsia,sample-dt";

@@ -32,7 +32,10 @@ template("_preprocessed_dts") {
     outputs = [ "$target_gen_dir/$raw_dts_dir/$source_root_relative" ]
     depfile = "$target_gen_dir/$source_name.d"
 
-    include_dir = rebase_path("//", root_build_dir)
+    configs = [
+      "//build/config:relative_paths",
+      "//build/config:default_include_dirs",
+    ]
 
     args = [
       "-undef",
@@ -40,7 +43,9 @@ template("_preprocessed_dts") {
       "-MF",
       rebase_path(depfile, root_build_dir),
       "-E",
-      "-iquote$include_dir",
+      "-P",
+      "{{include_dirs}}",
+      "{{defines}}",
       "-x",
       "assembler-with-cpp",
       rebase_path(sources[0], root_build_dir),

@@ -76,6 +76,7 @@ devicetree("basic-properties") {
   sources = [ "test-data/basic-properties.dts" ]
   golden = "test-data/basic-properties.golden.dts"
   outputs = [ "$target_out_dir/basic-properties.dtb" ]
+  deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
 }
 
 resource("basic-properties-dtb") {

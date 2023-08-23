@@ -42,6 +42,7 @@ devicetree("example-board-dt") {
   sources = [ "../../test-data/basic-properties.dts" ]
   golden = "../../test-data/basic-properties.golden.dts"
   outputs = [ "$target_out_dir/basic-properties.dtb" ]
+  deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
 }
 
 # Add this target to |kernel_zbi_extra_deps| to include the devicetree blob

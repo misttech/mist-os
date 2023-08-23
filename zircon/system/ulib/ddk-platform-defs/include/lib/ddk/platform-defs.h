@@ -5,10 +5,6 @@
 #ifndef LIB_DDK_PLATFORM_DEFS_H_
 #define LIB_DDK_PLATFORM_DEFS_H_
 
-#include <zircon/compiler.h>
-
-__BEGIN_CDECLS
-
 // clang-format off
 // Vendor, Product and Device IDs for generic platform drivers
 #define PDEV_VID_GENERIC            0x00
@@ -416,7 +412,5 @@ __BEGIN_CDECLS
 #define PDEV_DID_DIALOG_DA7219          0x01
 
 // clang-format on
-
-__END_CDECLS
 
 #endif  // LIB_DDK_PLATFORM_DEFS_H_
