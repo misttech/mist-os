@@ -1895,7 +1895,6 @@ where
 mod tests {
     use super::*;
 
-    use anyhow::Error;
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -2391,12 +2390,13 @@ mod tests {
 
     fn socket_clone(
         socket: &fposix_socket::SynchronousDatagramSocketProxy,
-    ) -> Result<fposix_socket::SynchronousDatagramSocketProxy, Error> {
+    ) -> fposix_socket::SynchronousDatagramSocketProxy {
         let (client, server) =
-            fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>()?;
+            fidl::endpoints::create_proxy::<fposix_socket::SynchronousDatagramSocketMarker>()
+                .expect("create proxy");
         let server = ServerEnd::new(server.into_channel());
-        let () = socket.clone2(server)?;
-        Ok(client)
+        let () = socket.clone2(server).expect("socket clone");
+        client
     }
 
     async fn clone<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
@@ -2422,7 +2422,7 @@ mod tests {
             .await;
 
         let (alice_socket, alice_events) = get_socket_and_event::<A>(t.get(0), proto).await;
-        let alice_cloned = socket_clone(&alice_socket).expect("cannot clone socket");
+        let alice_cloned = socket_clone(&alice_socket);
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event: alice_event, .. } =
             alice_cloned.describe().await.expect("Describe call succeeds");
         let _: zx::EventPair = alice_event.expect("Describe call returns event");
@@ -2439,7 +2439,7 @@ mod tests {
         );
 
         let (bob_socket, bob_events) = get_socket_and_event::<A>(t.get(1), proto).await;
-        let bob_cloned = socket_clone(&bob_socket).expect("failed to clone socket");
+        let bob_cloned = socket_clone(&bob_socket);
         let () = bob_cloned
             .bind(&A::create(A::REMOTE_ADDR, 200))
             .await
@@ -2588,7 +2588,7 @@ mod tests {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket = get_socket::<A>(test_stack, proto).await;
-        let cloned = socket_clone(&socket).unwrap();
+        let cloned = socket_clone(&socket);
         let () = socket
             .close()
             .await
@@ -2641,7 +2641,7 @@ mod tests {
         let test_stack = t.get(0);
         let cloned = {
             let socket = get_socket::<A>(test_stack, proto).await;
-            socket_clone(&socket).unwrap()
+            socket_clone(&socket)
             // socket goes out of scope indicating an implicit close.
         };
         // Using an explicit close here.

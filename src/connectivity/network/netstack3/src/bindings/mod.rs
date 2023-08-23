@@ -46,10 +46,7 @@ use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc, lock::Mutex as AsyncMutex, FutureExt as _, SinkExt as _, StreamExt as _,
-    TryStreamExt as _,
-};
+use futures::{lock::Mutex as AsyncMutex, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use tracing::{debug, error, info};
@@ -976,11 +973,6 @@ pub enum Service {
     Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
 }
 
-enum WorkItem {
-    Incoming(Service),
-    Task(fasync::Task<()>),
-}
-
 trait RequestStreamExt: RequestStream {
     fn serve_with<F, Fut, E>(self, f: F) -> futures::future::Map<Fut, fn(Result<(), E>) -> ()>
     where
@@ -1088,14 +1080,6 @@ impl NetstackSeed {
             futures::future::ok(inspect::devices(&devices_ctx)).boxed()
         });
 
-        // Buffer size doesn't matter much, we're just trying to reduce
-        // allocations.
-        const TASK_CHANNEL_BUFFER_SIZE: usize = 16;
-        let (task_sink, task_stream) = mpsc::channel(TASK_CHANNEL_BUFFER_SIZE);
-        let work_items = futures::stream::select(
-            services.map(WorkItem::Incoming),
-            task_stream.map(WorkItem::Task),
-        );
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
@@ -1104,25 +1088,25 @@ impl NetstackSeed {
         //
         // TODO(https://github.com/rust-lang/rust/issues/64552): Remove this
         // workaround.
-        let work_items_fut = async move {
-            work_items
-                .for_each_concurrent(None, |wi| async {
-                    match wi {
-                        WorkItem::Incoming(Service::Stack(stack)) => {
+        let services_fut = async move {
+            services
+                .for_each_concurrent(None, |s| async {
+                    match s {
+                        Service::Stack(stack) => {
                             stack
                                 .serve_with(|rs| {
                                     stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
                                 })
                                 .await
                         }
-                        WorkItem::Incoming(Service::Socket(socket)) => {
+                        Service::Socket(socket) => {
                             // Run on a separate task so socket requests are not
                             // bound to the same thread as the main services
                             // loop.
                             fuchsia_async::Task::spawn(socket::serve(netstack.ctx.clone(), socket))
                                 .await;
                         }
-                        WorkItem::Incoming(Service::PacketSocket(socket)) => {
+                        Service::PacketSocket(socket) => {
                             // Run on a separate task so socket requests are not
                             // bound to the same thread as the main services
                             // loop.
@@ -1132,50 +1116,40 @@ impl NetstackSeed {
                             ))
                             .await;
                         }
-                        WorkItem::Incoming(Service::RawSocket(socket)) => {
+                        Service::RawSocket(socket) => {
                             socket.serve_with(|rs| socket::raw::serve(rs)).await
                         }
-                        WorkItem::Incoming(Service::RootInterfaces(root_interfaces)) => {
+                        Service::RootInterfaces(root_interfaces) => {
                             root_interfaces
                                 .serve_with(|rs| {
                                     root_fidl_worker::serve_interfaces(netstack.clone(), rs)
                                 })
                                 .await
                         }
-                        WorkItem::Incoming(Service::RoutesState(rs)) => {
+                        Service::RoutesState(rs) => {
                             routes_fidl_worker::serve_state(rs, netstack.ctx.clone()).await
                         }
-                        WorkItem::Incoming(Service::RoutesStateV4(rs)) => {
+                        Service::RoutesStateV4(rs) => {
                             routes_fidl_worker::serve_state_v4(rs, netstack.ctx.clone()).await
                         }
-                        WorkItem::Incoming(Service::RoutesStateV6(rs)) => {
+                        Service::RoutesStateV6(rs) => {
                             routes_fidl_worker::serve_state_v6(rs, netstack.ctx.clone()).await
                         }
-                        WorkItem::Incoming(Service::Interfaces(interfaces)) => {
+                        Service::Interfaces(interfaces) => {
                             interfaces
                                 .serve_with(|rs| {
                                     interfaces_watcher::serve(rs, interfaces_watcher_sink.clone())
                                 })
                                 .await
                         }
-                        WorkItem::Incoming(Service::InterfacesAdmin(installer)) => {
+                        Service::InterfacesAdmin(installer) => {
                             tracing::debug!(
                                 "serving {}",
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
                             );
-                            interfaces_admin::serve(netstack.clone(), installer)
-                                .map_err(anyhow::Error::from)
-                                .forward(task_sink.clone().sink_map_err(anyhow::Error::from))
-                                .await
-                                .unwrap_or_else(|e| {
-                                    tracing::warn!(
-                                "error serving {}: {:?}",
-                                fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
-                                e
-                            )
-                                })
+                            interfaces_admin::serve(netstack.clone(), installer).await;
                         }
-                        WorkItem::Incoming(Service::DebugInterfaces(debug_interfaces)) => {
+                        Service::DebugInterfaces(debug_interfaces) => {
                             debug_interfaces
                                 .serve_with(|rs| {
                                     debug_fidl_worker::serve_interfaces(
@@ -1185,27 +1159,26 @@ impl NetstackSeed {
                                 })
                                 .await
                         }
-                        WorkItem::Incoming(Service::DebugDiagnostics(debug_diagnostics)) => {
+                        Service::DebugDiagnostics(debug_diagnostics) => {
                             diagnostics_handler.serve_diagnostics(debug_diagnostics).await
                         }
-                        WorkItem::Incoming(Service::Filter(filter)) => {
+                        Service::Filter(filter) => {
                             filter.serve_with(|rs| filter_worker::serve(rs)).await
                         }
-                        WorkItem::Incoming(Service::Neighbor(neighbor)) => {
+                        Service::Neighbor(neighbor) => {
                             neighbor
                                 .serve_with(|rs| neighbor_worker::serve(netstack.clone(), rs))
                                 .await
                         }
-                        WorkItem::Incoming(Service::Verifier(verifier)) => {
+                        Service::Verifier(verifier) => {
                             verifier.serve_with(|rs| verifier_worker::serve(rs)).await
                         }
-                        WorkItem::Task(task) => task.await,
                     }
                 })
                 .await
         };
 
-        let ((), ()) = futures::join!(work_items_fut, no_finish_tasks_fut);
+        let ((), ()) = futures::join!(services_fut, no_finish_tasks_fut);
         debug!("Services stream finished");
     }
 }

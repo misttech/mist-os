@@ -63,17 +63,26 @@ use crate::bindings::{
     DeviceIdExt as _, Netstack, StackTime,
 };
 
-pub(crate) fn serve(
-    ns: Netstack,
-    req: fnet_interfaces_admin::InstallerRequestStream,
-) -> impl futures::Stream<Item = Result<fasync::Task<()>, fidl::Error>> {
-    req.map_ok(
-        move |fnet_interfaces_admin::InstallerRequest::InstallDevice {
-                  device,
-                  device_control,
-                  control_handle: _,
-              }| {
-            fasync::Task::spawn(
+pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
+    req.filter_map(|req| {
+        let req = match req {
+            Ok(req) => req,
+            Err(e) => {
+                if !e.is_closed() {
+                    tracing::error!(
+                        "{} request error {e:?}",
+                        fnet_interfaces_admin::InstallerMarker::DEBUG_NAME
+                    );
+                }
+                return futures::future::ready(None);
+            }
+        };
+        match req {
+            fnet_interfaces_admin::InstallerRequest::InstallDevice {
+                device,
+                device_control,
+                control_handle: _,
+            } => futures::future::ready(Some(fasync::Task::spawn(
                 run_device_control(
                     ns.clone(),
                     device,
@@ -82,9 +91,14 @@ pub(crate) fn serve(
                 .map(|r| {
                     r.unwrap_or_else(|e| tracing::warn!("device control finished with {:?}", e))
                 }),
-            )
-        },
-    )
+            ))),
+        }
+    })
+    .for_each_concurrent(None, |task| {
+        // Wait for all created devices on this installer to finish.
+        task
+    })
+    .await;
 }
 
 #[derive(thiserror::Error, Debug)]
