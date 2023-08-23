@@ -60,7 +60,6 @@ template("verify_deps_in_sdk") {
       deps = []
       inputs = [
         "//sdk/manifests/atoms/core.golden",
-        "//sdk/manifests/atoms/core_testing.golden",
         "//sdk/manifests/atoms/e2e_testing.golden",
         "//sdk/manifests/atoms/zircon_sysroot.golden",
       ]

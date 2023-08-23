@@ -105,7 +105,6 @@ golden_files("golden_files") {
 
 _idks = [
   "core",
-  "core_testing",
   "e2e_testing",
 ]
 _verify_idk_deps = []

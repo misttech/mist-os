@@ -170,13 +170,6 @@ sdk_fidl_targets = [
   # keep-sorted: end
 ]
 
-# TODO(fxbug.dev/111461): Delete `core_testing`.
-# DO NOT ADD anything here!
-sdk_fidl_testing_targets = [
-  "//sdk/fidl/fuchsia.test:fuchsia.test",
-  "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
-]
-
 # The FIDL portion of the platform surface area (plasa).
 group("plasa") {
   testonly = true
@@ -207,24 +200,8 @@ sdk_molecule("fidl") {
   ]
 }
 
-# TODO(fxbug.dev/111461): Delete `core_testing`.
-# DO NOT ADD anything here!
-sdk_molecule("fidl_testing") {
-  testonly = true
-  visibility = [
-    ":*",
-    "//build/fidl:sdk_fidl",
-    "//sdk:*",
-  ]
-
-  deps = []
-  foreach(target, sdk_fidl_testing_targets) {
-    deps += [ "${target}_sdk($fidl_toolchain)" ]
-  }
-}
-
 group("sdk_fidl_partner_allowlist") {
-  visibility = sdk_fidl_targets + sdk_fidl_testing_targets
+  visibility = sdk_fidl_targets
 }
 
 group("sdk_partner_libs") {
