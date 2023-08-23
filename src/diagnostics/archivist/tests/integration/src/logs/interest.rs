@@ -46,11 +46,7 @@ async fn register_interest() {
         (Severity::Error, "error msg"),
     ];
 
-    let selector = selectors::parse_component_selector::<VerboseError>(&format!(
-        "realm_builder\\:{}/test/child",
-        instance.root.child_name()
-    ))
-    .unwrap();
+    let selector = selectors::parse_component_selector::<VerboseError>("child").unwrap();
 
     // 1. Assert logs for default interest registration (info)
     assert_messages(&mut logs, &expected_logs[1..], LOGGER_COMPONENT_FOR_INTEREST_URL).await;
@@ -95,11 +91,7 @@ async fn set_interest_before_startup() {
         .root
         .connect_to_protocol_at_exposed_dir::<LogSettingsMarker>()
         .expect("connect to log settings");
-    let selector = selectors::parse_component_selector::<VerboseError>(&format!(
-        "realm_builder\\:{}/test/**",
-        instance.root.child_name()
-    ))
-    .unwrap();
+    let selector = selectors::parse_component_selector::<VerboseError>("**").unwrap();
     let interests = &[LogInterestSelector {
         selector,
         interest: Interest { min_severity: Some(FidlSeverity::Debug), ..Default::default() },

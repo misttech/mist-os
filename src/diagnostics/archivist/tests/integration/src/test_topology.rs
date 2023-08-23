@@ -34,16 +34,17 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
         test_realm.add_child("archivist", opts.archivist_url, ChildOptions::new().eager()).await?;
 
     let parent_to_archivist = Route::new()
+        .capability(Capability::protocol_by_name("fuchsia.boot.ReadOnlyLog"))
         .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-        .capability(Capability::directory("config-data"))
-        .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry").optional())
-        .capability(Capability::protocol_by_name("fuchsia.boot.ReadOnlyLog"));
+        .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry").optional());
 
     builder
         .add_route(
             Route::new()
                 .capability(Capability::event_stream("directory_ready").with_scope(&test_realm))
-                .capability(Capability::event_stream("capability_requested"))
+                .capability(
+                    Capability::event_stream("capability_requested").with_scope(&test_realm),
+                )
                 .from(Ref::parent())
                 .to(&test_realm),
         )

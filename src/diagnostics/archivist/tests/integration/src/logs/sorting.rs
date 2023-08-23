@@ -7,17 +7,55 @@ use diagnostics_message::fx_log_packet_t;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMarker, LogMessage, LogSinkMarker};
 use fuchsia_async as fasync;
-use fuchsia_component_test::RealmInstance;
+use fuchsia_component_test::{Capability, ChildOptions, RealmInstance, Ref, Route};
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, StreamExt};
+use futures::{channel::mpsc, FutureExt, StreamExt};
+use std::sync::{Arc, Mutex};
 
 #[fuchsia::test]
 async fn timestamp_sorting_for_batches() {
-    // launch archivist
-    let (builder, _test_realm) = test_topology::create(test_topology::Options::default())
+    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
         .await
         .expect("create base topology");
+
+    // TODO(b/297211132): this is a workaround to a current bug due to which unattributed
+    // connections don't currently work. In an ideal world, we'd be able to connect ot
+    // fuchsia.logger.LogSink directly without requiring a local child.
+    let (connect_socket_snd, connect_socket_rcv) = mpsc::unbounded();
+    let rcv_arc = Arc::new(Mutex::new(Some(connect_socket_rcv)));
+    let logger = test_realm
+        .add_local_child(
+            "logger",
+            move |handles| {
+                // Note: ok to unwrap, for the test purposes, this will be called once.
+                let rcv = rcv_arc.clone();
+                async move {
+                    let log_sink = handles
+                        .connect_to_protocol::<LogSinkMarker>()
+                        .expect("logsink is available");
+                    // Unwrap is fine, we call this once.
+                    let mut rcv = rcv.lock().unwrap().take().unwrap();
+                    while let Some(socket) = rcv.next().await {
+                        log_sink.connect(socket).unwrap();
+                    }
+                    Ok(())
+                }
+                .boxed()
+            },
+            ChildOptions::new().eager(),
+        )
+        .await
+        .expect("add logger");
+    test_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .from(Ref::child("archivist"))
+                .to(&logger),
+        )
+        .await
+        .expect("route logsink to logger");
 
     let instance = builder.build().await.expect("create instance");
 
@@ -43,7 +81,7 @@ async fn timestamp_sorting_for_batches() {
             time: p.metadata.time,
             dropped_logs: 0,
             msg: "timing log".to_owned(),
-            tags: vec![format!("realm_builder:{}", instance.root.child_name())],
+            tags: vec!["logger".into()],
             pid: p.metadata.pid,
             tid: p.metadata.tid,
         })
@@ -61,17 +99,16 @@ async fn timestamp_sorting_for_batches() {
 
         // connect to log_sink and make sure we have a clean slate
         let mut early_listener = listen_to_archivist(&instance);
-        let log_sink = instance.root.connect_to_protocol_at_exposed_dir::<LogSinkMarker>().unwrap();
 
         // connect the tortoise's socket
-        log_sink.connect(recv_tort).unwrap();
+        connect_socket_snd.unbounded_send(recv_tort).expect("send socket");
         let tort_expected = messages[tort_times.0].clone();
         let mut expected_dump = vec![tort_expected.clone()];
         assert_eq!(early_listener.next().await.unwrap(), tort_expected);
         assert_eq!(dump_from_archivist(&instance).await, expected_dump);
 
         // connect hare's socket
-        log_sink.connect(recv_hare).unwrap();
+        connect_socket_snd.unbounded_send(recv_hare).expect("send socket");
         let hare_expected = messages[hare_times.0].clone();
         expected_dump.push(hare_expected.clone());
         expected_dump.sort_by_key(|m| m.time);

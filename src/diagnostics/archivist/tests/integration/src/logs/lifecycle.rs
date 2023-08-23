@@ -45,7 +45,7 @@ async fn test_logs_lifecycle() {
         }
     });
 
-    let moniker = format!("realm_builder:{}/test/coll:log_and_exit", realm.root.child_name());
+    let moniker = "coll:log_and_exit";
 
     let mut event_stream = EventStream::open().await.unwrap();
     reader.retry_if_empty(true);

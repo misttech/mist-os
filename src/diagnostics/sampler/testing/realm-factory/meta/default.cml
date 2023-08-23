@@ -24,14 +24,6 @@
             from: "parent",
             to: "#realm_builder",
         },
-        {
-            event_stream: [
-                "capability_requested",
-                "directory_ready",
-            ],
-            from: "parent",
-            to: "#realm_builder",
-        },
     ],
     expose: [
         {

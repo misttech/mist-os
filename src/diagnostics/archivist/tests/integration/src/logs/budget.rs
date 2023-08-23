@@ -205,8 +205,7 @@ impl PuppetEnv {
             _ => panic!("did not expect that"),
         };
 
-        let moniker =
-            format!("realm_builder:{}/test/puppet-{}", self.instance.root.child_name(), id);
+        let moniker = format!("puppet-{id}");
         let puppet = Puppet { moniker: moniker.clone(), proxy };
 
         info!("having the puppet connect to LogSink");

@@ -41,10 +41,7 @@ async fn log_attribution() {
     for log_str in &["This is a syslog message", "This is another syslog message"] {
         let log_record = result.next().await.expect("received log").expect("log is not an error");
 
-        assert_eq!(
-            log_record.moniker,
-            format!("realm_builder:{}/test/child", instance.root.child_name())
-        );
+        assert_eq!(log_record.moniker, "child");
         assert_eq!(log_record.metadata.component_url, Some(STUB_INSPECT_COMPONENT_URL.to_string()));
         assert_eq!(log_record.metadata.severity, Severity::Info);
         assert_data_tree!(log_record.payload.unwrap(), root: contains {
@@ -55,6 +52,8 @@ async fn log_attribution() {
     }
 }
 
+// TODO(fxbug.dev/297211132): re-enable when we actually support unattributed connections again.
+#[ignore]
 #[fuchsia::test]
 async fn log_unattributed_stream() {
     let (builder, _test_realm) = test_topology::create(test_topology::Options::default())
