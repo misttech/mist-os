@@ -5,10 +5,7 @@
 group("mocks") {
   testonly = true
 
-  public_deps = [
-    ":mock_magnification_handler",
-    ":mock_magnifier",
-  ]
+  public_deps = [ ":mock_magnifier" ]
 }
 
 source_set("mock_magnifier") {
@@ -22,32 +19,4 @@ source_set("mock_magnifier") {
       [ "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp" ]
 
   deps = [ "//third_party/googletest:gtest" ]
-}
-
-source_set("mock_magnification_handler") {
-  testonly = true
-
-  public = [ "mock_magnification_handler.h" ]
-
-  sources = [ "mock_magnification_handler.cc" ]
-
-  public_deps = [
-    ":clip_space_transform",
-    "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//src/lib/callback",
-    "//zircon/system/ulib/zx",
-  ]
-
-  deps = [ "//third_party/googletest:gtest" ]
-}
-
-source_set("clip_space_transform") {
-  testonly = true
-
-  public = [ "clip_space_transform.h" ]
-
-  sources = [ "clip_space_transform.cc" ]
-
-  public_deps = [ "//third_party/glm" ]
 }

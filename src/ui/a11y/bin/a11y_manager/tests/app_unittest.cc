@@ -26,7 +26,6 @@
 #include "src/ui/a11y/bin/a11y_manager/tests/util/util.h"
 #include "src/ui/a11y/lib/annotation/tests/mocks/mock_annotation_view.h"
 #include "src/ui/a11y/lib/gesture_manager/recognizers/one_finger_n_tap_recognizer.h"
-#include "src/ui/a11y/lib/magnifier/tests/mocks/mock_magnification_handler.h"
 #include "src/ui/a11y/lib/screen_reader/tests/mocks/mock_screen_reader_context.h"
 #include "src/ui/a11y/lib/screen_reader/tests/mocks/mock_tts_engine.h"
 #include "src/ui/a11y/lib/semantics/tests/mocks/mock_semantic_listener.h"

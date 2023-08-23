@@ -29,7 +29,6 @@ executable("magnifier_tests") {
     "//src/ui/a11y/lib/gesture_manager/arena/tests/mocks",
     "//src/ui/a11y/lib/gesture_manager/tests/mocks",
     "//src/ui/a11y/lib/magnifier",
-    "//src/ui/a11y/lib/magnifier/tests/mocks:mock_magnification_handler",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",

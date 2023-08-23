@@ -5,8 +5,6 @@
 #ifndef SRC_UI_A11Y_LIB_MAGNIFIER_MAGNIFIER_2_H_
 #define SRC_UI_A11Y_LIB_MAGNIFIER_MAGNIFIER_2_H_
 
-#include <fuchsia/accessibility/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/zx/time.h>
 
 #include <memory>
