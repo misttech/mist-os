@@ -943,27 +943,20 @@ impl LinkLocalAddress for IpAddr {
     }
 }
 
-impl MappedAddress for Ipv4Addr {
+impl<A: IpAddress> MappedAddress for A {
     /// Is this address non-mapped?
     ///
-    /// Always true; IPv4 address do not have a mapped address space.
-    #[inline]
-    fn is_non_mapped(&self) -> bool {
-        true
-    }
-}
-
-impl MappedAddress for Ipv6Addr {
-    /// Is this address non-mapped?
+    /// For IPv4 addresses, this always returns true because they do not have a
+    /// mapped address space.
     ///
-    /// `is_non_mapped` returns true if `self` is outside of the IPv4 mapped
-    /// Ipv6 address subnet, as defined in [RFC 4291 Section 2.5.5.2] (e.g.
-    /// `::FFFF:0:0/96`).
+    /// For Ipv6 addresses, this returns true if `self` is outside of the IPv4
+    /// mapped Ipv6 address subnet, as defined in [RFC 4291 Section 2.5.5.2]
+    /// (e.g. `::FFFF:0:0/96`).
     ///
     /// [RFC 4291 Section 2.5.5.2]: https://tools.ietf.org/html/rfc4291#section-2.5.5.2
     #[inline]
     fn is_non_mapped(&self) -> bool {
-        self.to_ipv4_mapped().is_none()
+        A::Version::map_ip(self, |_addr_v4| true, |addr_v6| addr_v6.to_ipv4_mapped().is_none())
     }
 }
 
