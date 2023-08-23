@@ -265,12 +265,10 @@ class Ssh {
         '-o', 'StrictHostKeyChecking=no',
         // Timeout to connect, short so the logs can make sense.
         '-o', 'ConnectTimeout=2',
-        // These five arguments allow ssh to reuse its connection.
+        // These three arguments allow ssh to reuse its connection.
         '-o', 'ControlPersist=yes',
         '-o', 'ControlMaster=auto',
         '-o', 'ControlPath=/tmp/fuchsia--%r@%h:%p',
-        '-o', 'ServerAliveInterval=1',
-        '-o', 'ServerAliveCountMax=1',
         // These two arguments determine the connection timeout,
         // in the case the ssh connection gets lost.
         // They say if the target doesn't respond within 10 seconds, six
