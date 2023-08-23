@@ -720,7 +720,8 @@ impl Task {
         }
         // A child process created via fork(2) inherits its parent's
         // resource limits.  Resource limits are preserved across execve(2).
-        *task.thread_group.limits.lock() = init_task.thread_group.limits.lock().clone();
+        let limits = init_task.thread_group.limits.lock().clone();
+        *task.thread_group.limits.lock() = limits;
         Ok(task)
     }
 
