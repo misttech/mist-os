@@ -390,13 +390,4 @@ closed protocol Target {
     strict Reboot(struct {
         state TargetRebootState;
     }) -> () error TargetRebootError;
-
-
-    /// Runs an iterator over diagnostics data. At present, this means cached log data.
-    strict StreamActiveDiagnostics(resource struct {
-        parameters DaemonDiagnosticsStreamParameters;
-        iterator server_end:rc.ArchiveIterator;
-    }) -> (struct {
-        log_session LogSession;
-    }) error DiagnosticsStreamError;
 };

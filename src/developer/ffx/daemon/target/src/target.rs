@@ -4,7 +4,6 @@
 
 use crate::{
     fastboot::{get_var, network::tcp::TcpNetworkFactory},
-    logger::{streamer::DiagnosticsStreamer, Logger},
     overnet::host_pipe::{spawn, HostAddr, LogBuffer},
     FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
@@ -34,7 +33,6 @@ use std::{
     hash::{Hash, Hasher},
     net::{IpAddr, Ipv6Addr, SocketAddr},
     rc::{Rc, Weak},
-    sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 use timeout::timeout;
@@ -131,7 +129,6 @@ pub struct Target {
     pub events: events::Queue<TargetEvent>,
 
     pub(crate) host_pipe: RefCell<Option<Task<()>>>,
-    logger: Rc<RefCell<Option<Task<()>>>>,
 
     // id is the locally created "primary identifier" for this target.
     id: u64,
@@ -150,7 +147,6 @@ pub struct Target {
     pub(crate) fastboot_interface: RefCell<Option<FastbootInterface>>,
     pub(crate) build_config: RefCell<Option<BuildConfig>>,
     boot_timestamp_nanos: RefCell<Option<u64>>,
-    diagnostics_info: Arc<DiagnosticsStreamer<'static>>,
     host_pipe_log_buffer: Rc<LogBuffer>,
 
     // The event synthesizer is retained on the target as a strong
@@ -181,11 +177,9 @@ impl Target {
             serial: RefCell::new(None),
             boot_timestamp_nanos: RefCell::new(None),
             build_config: Default::default(),
-            diagnostics_info: Arc::new(DiagnosticsStreamer::default()),
             events,
             host_pipe: Default::default(),
             host_pipe_log_buffer: Rc::new(LogBuffer::new(5)),
-            logger: Default::default(),
             target_event_synthesizer,
             fastboot_interface: RefCell::new(None),
             ssh_host_address: RefCell::new(None),
@@ -531,10 +525,6 @@ impl Target {
 
     pub fn update_boot_timestamp(&self, ts: Option<u64>) {
         self.boot_timestamp_nanos.replace(ts);
-    }
-
-    pub fn stream_info(&self) -> Arc<DiagnosticsStreamer<'static>> {
-        self.diagnostics_info.clone()
     }
 
     pub fn serial(&self) -> Option<String> {
@@ -993,24 +983,6 @@ impl Target {
 
     pub fn is_host_pipe_running(&self) -> bool {
         self.host_pipe.borrow().is_some()
-    }
-
-    #[tracing::instrument]
-    pub fn run_logger(self: &Rc<Self>) {
-        if self.logger.borrow().is_none() {
-            let logger = Rc::downgrade(&self.logger);
-            let weak_target = Rc::downgrade(self);
-            self.logger.replace(Some(Task::local(async move {
-                let r = Logger::new(weak_target).start().await;
-                // XXX(raggi): decide what to do with this log data:
-                tracing::info!("Logger returned: {:?}", r);
-                logger.upgrade().and_then(|logger| logger.replace(None));
-            })));
-        }
-    }
-
-    pub fn is_logger_running(&self) -> bool {
-        self.logger.borrow().is_some()
     }
 
     #[tracing::instrument]

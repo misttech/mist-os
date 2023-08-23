@@ -8,7 +8,6 @@ libs = [
   "addr",
   "buildid",
   "daemonize",
-  "diagnostics",
   "doctor_utils",
   "emulator_instance",
   "errors",

@@ -4,17 +4,14 @@
 
 use crate::reboot;
 use anyhow::{anyhow, Context as _, Result};
-use diagnostics::{get_streaming_min_timestamp, run_diagnostics_streaming};
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
-use ffx_daemon_target::{logger::streamer::GenericDiagnosticsStreamer, target::Target};
+use ffx_daemon_target::target::Target;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx::{self as ffx};
-use fuchsia_async::TimeoutExt;
-use futures::{FutureExt, TryStreamExt};
+use futures::TryStreamExt;
 use protocols::Context;
 use std::{cell::RefCell, future::Future, pin::Pin, rc::Rc, time::Duration};
-use tasks::TaskManager;
 
 // TODO(awdavies): Abstract this to use similar utilities to an actual protocol.
 // This functionally behaves the same with the only caveat being that some
@@ -29,7 +26,7 @@ impl TargetHandle {
         handle: ServerEnd<ffx::TargetMarker>,
     ) -> Result<Pin<Box<dyn Future<Output = ()>>>> {
         let reboot_controller = reboot::RebootController::new(target.clone());
-        let inner = TargetHandleInner { target, reboot_controller, tasks: TaskManager::default() };
+        let inner = TargetHandleInner { target, reboot_controller };
         let stream = handle.into_stream()?;
         let fut = Box::pin(async move {
             let _ = stream
@@ -42,7 +39,6 @@ impl TargetHandle {
 }
 
 struct TargetHandleInner {
-    tasks: TaskManager,
     target: Rc<Target>,
     reboot_controller: reboot::RebootController,
 }
@@ -129,47 +125,6 @@ impl TargetHandleInner {
             ffx::TargetRequest::Identity { responder } => {
                 let target_info = ffx::TargetInfo::from(&*self.target);
                 responder.send(&target_info).map_err(Into::into)
-            }
-            ffx::TargetRequest::StreamActiveDiagnostics { parameters, iterator, responder } => {
-                let target_identifier = self.target.nodename();
-                let stream = self.target.stream_info();
-                match stream
-                    .wait_for_setup()
-                    .map(|_| Ok(()))
-                    .on_timeout(Duration::from_secs(3), || {
-                        Err(ffx::DiagnosticsStreamError::NoStreamForTarget)
-                    })
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(e) => {
-                        return responder.send(Err(e)).context("sending error response");
-                    }
-                }
-                let min_timestamp = match get_streaming_min_timestamp(&parameters, &stream).await {
-                    Ok(n) => n,
-                    Err(e) => {
-                        responder.send(Err(e))?;
-                        return Ok(());
-                    }
-                };
-                let log_iterator =
-                    stream.stream_entries(parameters.stream_mode.unwrap(), min_timestamp).await?;
-                self.tasks.spawn(async move {
-                    let _ = run_diagnostics_streaming(log_iterator, iterator).await.map_err(|e| {
-                        tracing::warn!("failure running diagnostics streaming: {:?}", e);
-                    });
-                });
-                responder
-                    .send(Ok(&ffx::LogSession {
-                        target_identifier,
-                        session_timestamp_nanos: stream
-                            .session_timestamp_nanos()
-                            .await
-                            .map(|t| t as u64),
-                        ..Default::default()
-                    }))
-                    .map_err(Into::into)
             }
         }
     }

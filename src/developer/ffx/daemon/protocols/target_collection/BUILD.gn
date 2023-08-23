@@ -19,7 +19,6 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//src/developer/ffx/daemon/events:lib",
     "//src/developer/ffx/daemon/target:lib",
     "//src/developer/ffx/lib/addr:lib",
-    "//src/developer/ffx/lib/diagnostics:lib",
     "//src/developer/ffx/lib/emulator_instance:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/protocols:lib",

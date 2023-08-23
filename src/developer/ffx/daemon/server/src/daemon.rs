@@ -132,8 +132,7 @@ impl DaemonEventHandler {
         };
 
         tracing::trace!("Target from Overnet {} is {}", node_id, target.nodename_str());
-        let target = self.target_collection.merge_insert(target);
-        target.run_logger();
+        self.target_collection.merge_insert(target);
     }
 
     #[tracing::instrument(skip(self))]
