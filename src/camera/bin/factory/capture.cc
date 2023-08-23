@@ -18,7 +18,7 @@ fpromise::result<std::unique_ptr<Capture>, zx_status_t> Capture::Create(uint32_t
   auto capture = std::make_unique<Capture>();
   capture->stream_ = stream;
   capture->want_image_ = want_image;
-  capture->image_ = std::make_unique<std::basic_string<uint8_t>>();
+  capture->image_ = std::vector<uint8_t>();
   capture->callback_ = std::move(callback);
   return fpromise::ok(std::move(capture));
 }
@@ -134,7 +134,7 @@ zx_status_t Capture::WriteImage(FILE* fp, WriteFlags flags, Crop& crop) {
   if ((flags & WriteFlags::MOD_UNPROCESSED) != WriteFlags::NONE) {
     // unprocessed means return whole frame, even it it's non-image data
     iformat.coded_width = iformat.bytes_per_row;
-    iformat.coded_height = static_cast<uint32_t>(image_->size() / iformat.bytes_per_row);
+    iformat.coded_height = static_cast<uint32_t>(image_.size() / iformat.bytes_per_row);
   }
 
   IntersectCrop(crop, flags);
@@ -238,7 +238,7 @@ zx_status_t Capture::WriteImage(FILE* fp, WriteFlags flags, Crop& crop) {
 
 // 8-bit Y to 16-bit gray
 void Capture::YOnly(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row) {
-  auto in = image_->data() + plane[0].pos;
+  auto in = image_.data() + plane[0].pos;
   auto out = row.data();
   for (uint32_t i = 0; i < crop.width; i++) {
     *out++ = *in;
@@ -248,7 +248,7 @@ void Capture::YOnly(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row) {
 
 // 8-bit sensor data to 16-bit gray
 void Capture::RawBayer8(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row) {
-  auto in = image_->data() + plane[0].pos;
+  auto in = image_.data() + plane[0].pos;
   auto out = row.data();
   for (uint32_t i = 0; i < crop.width; i++) {
     // fxbug.dev(58283) should copy 10 bit bayer to 16-bit gray
@@ -259,7 +259,7 @@ void Capture::RawBayer8(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& ro
 
 // 10+-bit sensor data to 16-bit gray
 void Capture::RawBayer16(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row) {
-  auto in = image_->data() + plane[0].pos;
+  auto in = image_.data() + plane[0].pos;
   auto out = row.data();
   for (uint32_t i = 0; i < crop.width; i++) {
     // fxbug.dev(58283) Do we need to shift?
@@ -269,8 +269,8 @@ void Capture::RawBayer16(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& r
 }
 
 void Capture::YUVToRGB(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row) {
-  auto ypos = image_->data() + plane[0].pos;
-  auto uvpos = image_->data() + plane[1].pos;
+  auto ypos = image_.data() + plane[0].pos;
+  auto uvpos = image_.data() + plane[1].pos;
   for (uint32_t j = 0; j < crop.width; j++) {
     int32_t y = ypos[j];
     int32_t u = uvpos[(j / 2) * 2];
@@ -292,7 +292,7 @@ void Capture::YUVToRGB(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row
 
 // just copy rows
 void Capture::Unprocessed(ImageIter plane[2], Crop& crop, std::vector<uint8_t>& row) {
-  auto in = image_->data() + plane[0].pos;
+  auto in = image_.data() + plane[0].pos;
   auto out = row.data();
   memcpy(out, in, crop.width);
 }

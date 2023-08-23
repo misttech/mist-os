@@ -92,7 +92,7 @@ class Capture {
   CaptureResponse callback_;
 
   // part of response
-  std::unique_ptr<std::basic_string<uint8_t>> image_;  // vmo bits if want_image_ is true
+  std::vector<uint8_t> image_;  // vmo bits if want_image_ is true
   fuchsia::camera3::StreamProperties properties_;
 
   // write frame data, converting, cropping and swapping if requested

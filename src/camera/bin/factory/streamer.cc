@@ -191,8 +191,8 @@ void Streamer::OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo fr
       auto size = stream_info.collection_info.settings.buffer_settings.size_bytes;
       auto& vmo = stream_info.collection_info.buffers[frame_info.buffer_index].vmo;
       ZX_ASSERT(vmo.is_valid());
-      capture_->image_->resize(size);
-      vmo.read(capture_->image_->data(), 0, size);
+      capture_->image_.resize(size);
+      vmo.read(capture_->image_.data(), 0, size);
     }
     capture_->callback_(ZX_OK, std::move(capture_));
     capture_ = nullptr;  // needed?
