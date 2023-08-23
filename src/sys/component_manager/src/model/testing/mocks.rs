@@ -7,7 +7,7 @@ use {
         bedrock::program::Program,
         builtin::runner::BuiltinRunnerFactory,
         model::{component::WeakComponentInstance, resolver::Resolver, routing::RouteRequest},
-        runner::{Namespace, Runner},
+        runner::Namespace,
     },
     ::routing::{
         capability_source::ComponentCapability,
@@ -384,33 +384,7 @@ impl MockRunner {
     pub fn last_checker(&self) -> Option<ScopedPolicyChecker> {
         self.inner.lock().unwrap().last_checker.take()
     }
-}
 
-impl BuiltinRunnerFactory for MockRunner {
-    fn get_scoped_runner(
-        self: Arc<Self>,
-        checker: ScopedPolicyChecker,
-        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
-    ) {
-        {
-            let mut state = self.inner.lock().unwrap();
-            state.last_checker = Some(checker);
-        }
-        let mut stream = server_end.into_stream().expect("should not fail to create stream");
-        let runner = self.clone();
-        fasync::Task::spawn(async move {
-            while let Ok(Some(request)) = stream.try_next().await {
-                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                    request;
-                runner.start(start_info, controller).await;
-            }
-        })
-        .detach();
-    }
-}
-
-#[async_trait]
-impl Runner for MockRunner {
     async fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,
@@ -472,6 +446,29 @@ impl Runner for MockRunner {
                 waiter.send(()).expect("failed to send url notice");
             }
         }
+    }
+}
+
+impl BuiltinRunnerFactory for MockRunner {
+    fn get_scoped_runner(
+        self: Arc<Self>,
+        checker: ScopedPolicyChecker,
+        server_end: ServerEnd<fcrunner::ComponentRunnerMarker>,
+    ) {
+        {
+            let mut state = self.inner.lock().unwrap();
+            state.last_checker = Some(checker);
+        }
+        let mut stream = server_end.into_stream().expect("should not fail to create stream");
+        let runner = self.clone();
+        fasync::Task::spawn(async move {
+            while let Ok(Some(request)) = stream.try_next().await {
+                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
+                    request;
+                runner.start(start_info, controller).await;
+            }
+        })
+        .detach();
     }
 }
 

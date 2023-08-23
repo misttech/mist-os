@@ -7,17 +7,3 @@ pub mod namespace;
 
 pub use namespace::Entry as NamespaceEntry;
 pub use namespace::{Namespace, NamespaceError};
-
-use {
-    async_trait::async_trait, fidl::endpoints::ServerEnd, fidl_fuchsia_component_runner as fcrunner,
-};
-
-/// Executes a component instance.
-#[async_trait]
-pub trait Runner: Sync + Send {
-    async fn start(
-        &self,
-        start_info: fcrunner::ComponentStartInfo,
-        server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
-    );
-}

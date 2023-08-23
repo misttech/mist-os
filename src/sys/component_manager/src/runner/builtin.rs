@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::runner::Runner, async_trait::async_trait, fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
-    thiserror::Error, tracing::warn,
+    fidl::endpoints::ServerEnd, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_runner as fcrunner, thiserror::Error, tracing::warn,
 };
 
 /// Wrapper for converting fcomponent::Error into the anyhow::Error type.
@@ -35,11 +34,8 @@ impl RemoteRunner {
     pub fn new(client: fcrunner::ComponentRunnerProxy) -> RemoteRunner {
         RemoteRunner { client }
     }
-}
 
-#[async_trait]
-impl Runner for RemoteRunner {
-    async fn start(
+    pub async fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
