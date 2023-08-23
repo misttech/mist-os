@@ -608,7 +608,7 @@ mod tests {
                 write_offset += len;
             }
         }
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
         fixture.close().await;
     }
 
@@ -750,7 +750,7 @@ mod tests {
                 count += 1;
             }
         }
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
         fixture.close().await;
     }
 
@@ -840,7 +840,7 @@ mod tests {
                 write_offset += len;
             }
         }
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
         fixture.close().await;
     }
 
@@ -871,7 +871,7 @@ mod tests {
                 .expect("transport error on bytes_ready")
                 .expect("failed to write data to vmo");
 
-            assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+            assert_eq!(fixture.read_blob(hash).await, data);
             assert_eq!(
                 fixture.create_blob(&hash.into(), false).await.expect_err("rewrite succeeded"),
                 CreateBlobError::AlreadyExists
@@ -922,7 +922,7 @@ mod tests {
                 write_offset += len;
             }
         }
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
         fixture.close().await;
     }
 }

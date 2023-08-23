@@ -4,8 +4,10 @@
 
 use {
     fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback,
+    fidl_fuchsia_fxfs::BlobReaderMarker,
+    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
+    fuchsia_component::client::connect_to_protocol_at_dir_root,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_zircon as zx,
@@ -235,6 +237,17 @@ impl TestFixture {
             .expect("open failed");
         println!("About to query the blob file");
         blob.query().await.expect("open file failed");
+    }
+
+    pub async fn check_test_blob_fxblob(&self) {
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&disk_builder::BLOB_CONTENTS);
+        let expected_blob_hash = builder.finish().root();
+
+        let reader =
+            connect_to_protocol_at_dir_root::<BlobReaderMarker>(self.realm.root.get_exposed_dir())
+                .expect("failed to connect to the BlobReader");
+        let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
     }
 
     /// Check for the existence of a well-known test file in the data volume. This file is placed

@@ -4,14 +4,13 @@
 
 use {
     crate::fuchsia::{
-        testing::{open_file_checked, TestFixture, TestFixtureOptions},
+        testing::{TestFixture, TestFixtureOptions},
         volume::FxVolume,
     },
     async_trait::async_trait,
     blob_writer::BlobWriter,
     delivery_blob::{CompressionMode, Type1Blob},
-    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobWriterProxy, CreateBlobError},
-    fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
+    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError},
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_merkle::{Hash, MerkleTreeBuilder},
     fuchsia_zircon as zx,
@@ -30,9 +29,9 @@ pub async fn new_blob_fixture() -> TestFixture {
 #[async_trait]
 pub trait BlobFixture {
     async fn write_blob(&self, data: &[u8]) -> Hash;
-    async fn read_blob(&self, name: &str) -> Vec<u8>;
+    async fn read_blob(&self, hash: Hash) -> Vec<u8>;
     async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume>;
-    async fn get_blob_vmo(&self, name: &str) -> zx::Vmo;
+    async fn get_blob_vmo(&self, hash: Hash) -> zx::Vmo;
     async fn create_blob(
         &self,
         hash: &[u8; 32],
@@ -55,19 +54,11 @@ impl BlobFixture for TestFixture {
         hash
     }
 
-    async fn read_blob(&self, name: &str) -> Vec<u8> {
-        let blob = open_file_checked(self.root(), fio::OpenFlags::RIGHT_READABLE, name).await;
-        let mut data = Vec::new();
-        loop {
-            let chunk =
-                blob.read(MAX_TRANSFER_SIZE).await.expect("FIDL call failed").expect("read failed");
-            let done = chunk.len() < MAX_TRANSFER_SIZE as usize;
-            data.extend(chunk);
-            if done {
-                break;
-            }
-        }
-        data
+    async fn read_blob(&self, hash: Hash) -> Vec<u8> {
+        let vmo = self.get_blob_vmo(hash).await;
+        let mut buf = vec![0; vmo.get_content_size().unwrap() as usize];
+        vmo.read(&mut buf[..], 0).expect("vmo read failed");
+        buf
     }
 
     async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume> {
@@ -82,12 +73,14 @@ impl BlobFixture for TestFixture {
             .expect("open_object failed")
     }
 
-    async fn get_blob_vmo(&self, name: &str) -> zx::Vmo {
-        let blob = open_file_checked(self.root(), fio::OpenFlags::RIGHT_READABLE, name).await;
-        blob.get_backing_memory(fio::VmoFlags::READ)
+    async fn get_blob_vmo(&self, hash: Hash) -> zx::Vmo {
+        let blob_reader = connect_to_protocol_at_dir_svc::<BlobReaderMarker>(self.volume_out_dir())
+            .expect("failed to connect to the BlobReader service");
+        blob_reader
+            .get_vmo(&hash.into())
             .await
-            .expect("FIDL call failed")
-            .expect("get_backing_memory failed")
+            .expect("transport error on BlobReader.GetVmo")
+            .expect("get_vmo failed")
     }
 
     async fn create_blob(

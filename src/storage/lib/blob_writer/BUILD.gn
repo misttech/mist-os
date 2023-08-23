@@ -43,8 +43,6 @@ fuchsia_unittest_package("blob-writer-unittests") {
 rustc_test("blob-writer-test") {
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/storage/delivery_blob",

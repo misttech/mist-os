@@ -9,32 +9,25 @@ use {
     crate::fuchsia::{
         directory::FxDirectory,
         errors::map_to_status,
-        node::{FxNode, OpenedNode},
+        node::FxNode,
         pager::{PagerBackedVmo, TransferBuffers, TRANSFER_BUFFER_MAX_SIZE},
-        volume::info_to_filesystem_info,
         volume::FxVolume,
     },
     anyhow::{anyhow, ensure, Context, Error},
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
-        NodeMarker, VmoFlags,
-    },
-    fuchsia_component::client::connect_to_protocol,
     fuchsia_merkle::{hash_block, MerkleTree},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{future::BoxFuture, join},
+    futures::join,
     fxfs::{
         async_enter,
         errors::FxfsError,
         log::*,
-        object_handle::{GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle},
+        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::DataObjectHandle,
         round::{round_down, round_up},
     },
-    once_cell::sync::{Lazy, OnceCell},
+    once_cell::sync::Lazy,
     std::{
         io::Read,
         ops::Range,
@@ -44,15 +37,6 @@ use {
         },
     },
     storage_device::buffer,
-    vfs::{
-        attributes,
-        common::rights_to_posix_mode_bits,
-        directory::entry::{DirectoryEntry, EntryInfo},
-        execution_scope::ExecutionScope,
-        file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
-        path::Path,
-        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-    },
 };
 
 pub const BLOCK_SIZE: u64 = fuchsia_merkle::BLOCK_SIZE as u64;
@@ -63,15 +47,6 @@ pub const READ_AHEAD_SIZE: u64 = 131_072;
 // drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
 // (assertions will fire).
 const PURGED: usize = 1 << (usize::BITS - 1);
-
-static VMEX_RESOURCE: OnceCell<zx::Resource> = OnceCell::new();
-
-/// Attempt to initialize the vmex resource routed to this component. Without a vmex, attempts to
-/// get the backing memory of a blob with executable rights will fail with NOT_SUPPORTED.
-pub async fn init_vmex_resource() -> Result<(), Error> {
-    let client = connect_to_protocol::<fidl_fuchsia_kernel::VmexResourceMarker>()?;
-    VMEX_RESOURCE.set(client.get().await?).map_err(|_| anyhow!(FxfsError::AlreadyBound))
-}
 
 /// Represents an immutable blob stored on Fxfs with associated an merkle tree.
 pub struct FxBlob {
@@ -110,15 +85,6 @@ impl FxBlob {
         file
     }
 
-    pub fn create_connection_async(
-        this: OpenedNode<Self>,
-        scope: ExecutionScope,
-        protocols: impl ProtocolsExt,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
-        object_request.create_connection(scope, this.take(), protocols, StreamIoConnection::create)
-    }
-
     /// Marks the blob as being purged.  Returns true if there are no open references.
     pub fn mark_purged(&self) -> bool {
         let mut old = self.open_count.load(Ordering::Relaxed);
@@ -144,30 +110,6 @@ impl FxBlob {
             self.open_count_add_one();
         }
         Ok(child_vmo)
-    }
-}
-
-/// Implement VFS pseudo-directory entry for a blob.
-impl DirectoryEntry for FxBlob {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                if !path.is_empty() {
-                    return Err(Status::NOT_FILE);
-                }
-                Self::create_connection_async(OpenedNode::new(self), scope, flags, object_request)
-            })
-        });
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(self.object_id(), fio::DirentType::File)
     }
 }
 
@@ -299,144 +241,6 @@ impl FxNode for FxBlob {
     }
 }
 
-#[async_trait]
-impl vfs::node::Node for FxBlob {
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
-        Ok(NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
-            id: self.handle.object_id(),
-            content_size: self.uncompressed_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
-        Ok(attributes!(
-            requested_attributes,
-            Mutable {
-                creation_time: props.creation_time.as_nanos(),
-                modification_time: props.modification_time.as_nanos(),
-                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
-                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
-                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
-                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
-            },
-            Immutable {
-                protocols: fio::NodeProtocolKinds::FILE,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::READ_BYTES
-                    | fio::Operations::EXECUTE,
-                content_size: self.uncompressed_size,
-                storage_size: props.allocated_size,
-                link_count: props.refs,
-                id: self.handle.object_id(),
-            }
-        ))
-    }
-
-    fn close(self: Arc<Self>) {
-        self.open_count_sub_one();
-    }
-}
-
-/// Implement VFS trait so blobs can be accessed as files.
-#[async_trait]
-impl File for FxBlob {
-    fn executable(&self) -> bool {
-        true
-    }
-
-    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
-        Ok(())
-    }
-
-    async fn truncate(&self, _length: u64) -> Result<(), Status> {
-        Err(Status::ACCESS_DENIED)
-    }
-
-    async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        // We do not support exact/duplicate sharing mode.
-        if flags.contains(VmoFlags::SHARED_BUFFER) {
-            error!("get_backing_memory does not support exact sharing mode!");
-            return Err(Status::NOT_SUPPORTED);
-        }
-        // We only support the combination of WRITE when a private COW clone is explicitly
-        // specified. This implicitly restricts any mmap call that attempts to use MAP_SHARED +
-        // PROT_WRITE.
-        if flags.contains(VmoFlags::WRITE) && !flags.contains(VmoFlags::PRIVATE_CLONE) {
-            error!("get_buffer only supports VmoFlags::WRITE with VmoFlags::PRIVATE_CLONE!");
-            return Err(Status::NOT_SUPPORTED);
-        }
-
-        let size = self.uncompressed_size;
-        let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
-        // By default, SNAPSHOT includes WRITE, so we explicitly remove it if not required.
-        if !flags.contains(VmoFlags::WRITE) {
-            child_options |= zx::VmoChildOptions::NO_WRITE
-        }
-        let mut child_vmo = self.vmo.create_child(child_options, 0, size)?;
-
-        if flags.contains(VmoFlags::EXECUTE) {
-            // TODO(fxbug.dev/122125): Filter out other flags.
-            child_vmo = child_vmo
-                .replace_as_executable(VMEX_RESOURCE.get().ok_or(Status::NOT_SUPPORTED)?)?;
-        }
-
-        if self.handle.owner().pager().watch_for_zero_children(self).map_err(map_to_status)? {
-            // Take an open count so that we keep this object alive if it is otherwise closed.
-            self.open_count_add_one();
-        }
-
-        Ok(child_vmo)
-    }
-
-    async fn get_size(&self) -> Result<u64, Status> {
-        Ok(self.uncompressed_size)
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: NodeAttributeFlags,
-        _attrs: NodeAttributes,
-    ) -> Result<(), Status> {
-        Err(Status::ACCESS_DENIED)
-    }
-
-    async fn update_attributes(&self, _attributes: MutableNodeAttributes) -> Result<(), Status> {
-        Err(Status::ACCESS_DENIED)
-    }
-
-    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
-        Ok(())
-    }
-
-    fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {
-        let store = self.handle.store();
-        Ok(info_to_filesystem_info(
-            store.filesystem().get_info(),
-            store.filesystem().block_size(),
-            store.object_count(),
-            self.handle.owner().id(),
-        ))
-    }
-
-    fn event(&self) -> Result<Option<zx::Event>, Status> {
-        let event = zx::Event::create();
-        // The file is immediately readable (see `fuchsia.io2.File.Describe`).
-        event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0)?;
-        Ok(Some(event))
-    }
-}
-
 impl PagerBackedVmo for FxBlob {
     fn pager_key(&self) -> u64 {
         self.handle.object_id()
@@ -553,22 +357,12 @@ impl PagerBackedVmo for FxBlob {
     }
 }
 
-impl GetVmo for FxBlob {
-    fn get_vmo(&self) -> &zx::Vmo {
-        &self.vmo
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        crate::fuchsia::{
-            fxblob::testing::{new_blob_fixture, BlobFixture},
-            testing::open_file_checked,
-        },
+        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
         assert_matches::assert_matches,
-        fidl_fuchsia_io::MAX_TRANSFER_SIZE,
         fuchsia_async as fasync,
         fuchsia_merkle::MerkleTreeBuilder,
         fxfs::{
@@ -589,7 +383,7 @@ mod tests {
 
         let data = vec![];
         let hash = fixture.write_blob(&data).await;
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
 
         fixture.close().await;
     }
@@ -601,7 +395,7 @@ mod tests {
         let data = vec![3; 3_000_000];
         let hash = fixture.write_blob(&data).await;
 
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
 
         fixture.close().await;
     }
@@ -671,7 +465,7 @@ mod tests {
             handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await.unwrap();
         }
 
-        assert_eq!(fixture.read_blob(&format!("{}", tree.root())).await, data);
+        assert_eq!(fixture.read_blob(tree.root()).await, data);
 
         fixture.close().await;
     }
@@ -683,10 +477,10 @@ mod tests {
         let page_size = zx::system_get_page_size() as usize;
         let data = vec![0xffu8; page_size - 1];
         let hash = fixture.write_blob(&data).await;
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
 
         {
-            let vmo = fixture.get_blob_vmo(&format!("{}", hash)).await;
+            let vmo = fixture.get_blob_vmo(hash).await;
             let mut buf = vec![0x11u8; page_size];
             vmo.read(&mut buf[..], 0).expect("vmo read failed");
             assert_eq!(data, buf[..data.len()]);
@@ -720,19 +514,11 @@ mod tests {
         }
 
         {
-            let blob =
-                open_file_checked(fixture.root(), fio::OpenFlags::RIGHT_READABLE, &name).await;
-            assert_matches!(blob.read(MAX_TRANSFER_SIZE).await.expect("FIDL call failed"), Ok(_));
-            blob.seek(fio::SeekOrigin::Start, READ_AHEAD_SIZE as i64)
-                .await
-                .expect("FIDL call failed")
-                .map_err(zx::Status::from_raw)
-                .expect("seek failed");
+            let blob_vmo = fixture.get_blob_vmo(hash).await;
+            let mut buf = vec![0; BLOCK_SIZE as usize];
+            assert_matches!(blob_vmo.read(&mut buf[..], 0), Ok(_));
             assert_matches!(
-                blob.read(MAX_TRANSFER_SIZE)
-                    .await
-                    .expect("FIDL call failed")
-                    .map_err(zx::Status::from_raw),
+                blob_vmo.read(&mut buf[..], READ_AHEAD_SIZE),
                 Err(zx::Status::IO_DATA_INTEGRITY)
             );
         }

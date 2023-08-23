@@ -32,7 +32,7 @@ use {
 #[cfg(feature = "fxblob")]
 use {
     blob_writer::BlobWriter,
-    fidl_fuchsia_fxfs::BlobCreatorMarker,
+    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker},
     fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions},
 };
 
@@ -108,8 +108,11 @@ async fn blobfs_and_data_mounted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    fixture.check_test_blob().await;
-
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
     fixture.tear_down().await;
 }
 
@@ -126,7 +129,11 @@ async fn blobfs_and_data_mounted_legacy_label() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.tear_down().await;
 }
@@ -153,7 +160,11 @@ async fn data_partition_nonexistent() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.tear_down().await;
 }
@@ -179,8 +190,11 @@ async fn data_reformatted_when_corrupt() {
     fixture.check_fs_type("data", data_fs_type()).await;
     // Ensure blobs are not reformatted.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob().await;
-
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
     let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
     fixture
         .dir("data", fio::OpenFlags::RIGHT_READABLE)
@@ -276,7 +290,11 @@ async fn ramdisk_blob_and_data_mounted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.tear_down().await;
 }
@@ -293,7 +311,11 @@ async fn ramdisk_blob_and_data_mounted_no_existing_data_partition() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.tear_down().await;
 }
@@ -604,7 +626,11 @@ async fn fvm_within_gpt() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.tear_down().await;
 }
@@ -647,7 +673,11 @@ async fn pausing_block_watcher_ignores_devices() {
     // Only the second disk we attached has a file inside. We use it as a proxy for testing that
     // only the second one was processed.
     fixture.check_test_data_file().await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.tear_down().await;
 }
@@ -1136,18 +1166,18 @@ async fn delivery_blob_support_enabled_fxblob() {
     blob_writer.write(&payload).await.unwrap();
 
     // We should now be able to open the blob by its hash and read the contents back.
-    let blob = fuchsia_fs::directory::open_file(
-        &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE),
-        &hash.to_string(),
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .expect("Failed to open delivery blob for reading.");
+    let blob_reader = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<BlobReaderMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed");
+    let vmo = blob_reader.get_vmo(&hash.into()).await.unwrap().unwrap();
+
     // Read the last 1024 bytes of the file and ensure the bytes match the original `data`.
-    let len: u64 = 1024;
+    let mut buf = vec![0; 1024];
     let offset: u64 = data.len().checked_sub(1024).unwrap() as u64;
-    let contents = blob.read_at(len, offset).await.unwrap().map_err(zx::Status::from_raw).unwrap();
-    assert_eq!(contents.as_slice(), &data[offset as usize..]);
+    let () = vmo.read(&mut buf, offset).unwrap();
+    assert_eq!(&buf, &data[offset as usize..]);
 
     fixture.tear_down().await;
 }

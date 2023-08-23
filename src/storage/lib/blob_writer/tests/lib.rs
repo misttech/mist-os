@@ -7,9 +7,7 @@ mod tests {
     use {
         blob_writer::BlobWriter,
         delivery_blob::{CompressionMode, Type1Blob},
-        fidl::endpoints::{create_proxy, ServerEnd},
         fidl_fuchsia_fxfs::MountOptions,
-        fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
         fs_management::{filesystem::Filesystem, Fxfs},
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_merkle::MerkleTreeBuilder,
@@ -31,10 +29,15 @@ mod tests {
             .create_volume("blob", MountOptions { crypt: None, as_blob: true })
             .await
             .expect("Failed to create volume");
-        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+        let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
             vol.exposed_dir(),
         )
-        .expect("failed to connect to the Blob service");
+        .expect("failed to connect to the BlobCreator");
+
+        let blob_reader = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobReaderMarker>(
+            vol.exposed_dir(),
+        )
+        .expect("failed to connect to the BlobReader");
 
         let mut data = vec![1; 196608];
         thread_rng().fill(&mut data[..]);
@@ -45,7 +48,7 @@ mod tests {
 
         let compressed_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Always);
 
-        let writer_client_end = blob_proxy
+        let writer_client_end = blob_creator
             .create(&hash.into(), false)
             .await
             .expect("transport error on BlobCreator.Create")
@@ -57,27 +60,13 @@ mod tests {
 
         blob_writer.write(&compressed_data).await.unwrap();
 
-        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
-        vol.root()
-            .open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                &hash.to_string(),
-                ServerEnd::new(server_end.into_channel()),
-            )
-            .expect("failed to open blob");
-        let _: Vec<_> = blob.query().await.expect("failed to query blob");
-
-        let mut read_data = Vec::new();
-        loop {
-            let chunk =
-                blob.read(MAX_TRANSFER_SIZE).await.expect("FIDL call failed").expect("read failed");
-            let done = chunk.len() < MAX_TRANSFER_SIZE as usize;
-            read_data.extend(chunk);
-            if done {
-                break;
-            }
-        }
+        let vmo = blob_reader
+            .get_vmo(&hash.into())
+            .await
+            .expect("transport error on the BlobReader")
+            .expect("get_vmo failed");
+        let mut read_data = vec![0; vmo.get_content_size().unwrap() as usize];
+        let () = vmo.read(&mut read_data, 0).expect("vmo read failed");
         assert_eq!(data, read_data)
     }
 
@@ -92,10 +81,15 @@ mod tests {
             .create_volume("blob", MountOptions { crypt: None, as_blob: true })
             .await
             .expect("Failed to create volume");
-        let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+        let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
             vol.exposed_dir(),
         )
         .expect("failed to connect to the Blob service");
+
+        let blob_reader = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobReaderMarker>(
+            vol.exposed_dir(),
+        )
+        .expect("failed to connect to the BlobReader");
 
         let mut data = vec![1; 499712];
         thread_rng().fill(&mut data[..]);
@@ -106,7 +100,7 @@ mod tests {
 
         let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 
-        let writer_client_end = blob_proxy
+        let writer_client_end = blob_creator
             .create(&hash.into(), false)
             .await
             .expect("transport error on BlobCreator.Create")
@@ -120,27 +114,13 @@ mod tests {
 
         blob_writer.write(&compressed_data).await.unwrap();
 
-        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
-        vol.root()
-            .open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                &hash.to_string(),
-                ServerEnd::new(server_end.into_channel()),
-            )
-            .expect("failed to open blob");
-        let _: Vec<_> = blob.query().await.expect("failed to query blob");
-
-        let mut read_data = Vec::new();
-        loop {
-            let chunk =
-                blob.read(MAX_TRANSFER_SIZE).await.expect("FIDL call failed").expect("read failed");
-            let done = chunk.len() < MAX_TRANSFER_SIZE as usize;
-            read_data.extend(chunk);
-            if done {
-                break;
-            }
-        }
+        let vmo = blob_reader
+            .get_vmo(&hash.into())
+            .await
+            .expect("transport error on the BlobReader")
+            .expect("get_vmo failed");
+        let mut read_data = vec![0; vmo.get_content_size().unwrap() as usize];
+        let () = vmo.read(&mut read_data, 0).expect("vmo read failed");
         assert_eq!(data, read_data)
     }
 }

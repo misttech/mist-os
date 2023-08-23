@@ -12,6 +12,7 @@ use {
         FSConfig,
     },
     fuchsia_merkle::{Hash, MerkleTree},
+    fuchsia_zircon as zx,
     std::path::Path,
     storage_benchmarks::{block_device::BlockDevice, CacheClearableFilesystem, Filesystem},
 };
@@ -50,6 +51,10 @@ pub trait BlobFilesystem: CacheClearableFilesystem {
     /// Blobfs and Fxblob write blobs using different protocols. How a blob is written is
     /// implemented in the filesystem so benchmarks don't have to know which protocol to use.
     async fn write_blob(&self, blob: &DeliveryBlob);
+
+    /// Blobfs and Fxblob open and read blobs using different protocols. Benchmarks should remain
+    /// agnostic to which protocol is being used.
+    async fn get_vmo(&self, blob: &DeliveryBlob) -> zx::Vmo;
 }
 
 enum FsType {

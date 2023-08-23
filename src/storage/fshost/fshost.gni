@@ -14,7 +14,6 @@ import("//tools/cmc/build/cmc.gni")
 #             data_filesystem_format is mandatory.  The following options are also supported:
 #
 #     bootfs_only - if set, the blob and data partitions will not get mounted.
-#     fxfs_vmex - if set, Fxfs will be given the vmex resource (iff fxfs_blob is enabled).
 #
 #   testonly - the component will only be used for testing
 template("fshost_cml") {
@@ -79,12 +78,10 @@ template("fshost_cml") {
       ]
 
       if (options.data_filesystem_format == "fxfs") {
-        if (defined(options.fxfs_vmex) && options.fxfs_vmex) {
-          deps += [ "//src/storage/fxfs:fxfs_with_vmex_component" ]
-        } else {
-          deps += [ "//src/storage/fxfs:fxfs_component" ]
-        }
-        deps += [ "//src/storage/fxfs-crypt" ]
+        deps += [
+          "//src/storage/fxfs:fxfs_component",
+          "//src/storage/fxfs-crypt",
+        ]
       } else if (options.data_filesystem_format == "f2fs") {
         deps += [ "//src/storage/bin/f2fs:f2fs-component" ]
       }
@@ -149,12 +146,7 @@ template("fshost_component_and_config") {
   # The config
   generated_fshost_config(_config_target) {
     options = {
-      forward_variables_from(invoker.options,
-                             "*",
-                             [
-                               "bootfs_only",
-                               "fxfs_vmex",
-                             ])
+      forward_variables_from(invoker.options, "*", [ "bootfs_only" ])
     }
   }
 

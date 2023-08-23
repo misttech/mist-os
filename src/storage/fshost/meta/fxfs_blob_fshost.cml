@@ -76,11 +76,6 @@
             ],
         },
         {
-            protocol: [ "fuchsia.kernel.VmexResource" ],
-            from: "parent",
-            to: [ "#fxfs" ],
-        },
-        {
             protocol: [
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.tracing.provider.Registry",

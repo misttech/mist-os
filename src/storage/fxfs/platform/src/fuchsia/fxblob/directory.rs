@@ -424,11 +424,15 @@ impl DirectoryEntry for BlobDirectory {
                         MutableConnection::create,
                     )
                 } else if node.is::<FxBlob>() {
-                    let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
-                    FxBlob::create_connection_async(node, scope, flags, object_request)
+                    tracing::error!(
+                        "Tried to open an existing blob via open(). Reading blobs is only supported
+                            via the BlobReader."
+                    );
+                    return Err(Status::NOT_SUPPORTED);
                 } else if node.is::<FxDeliveryBlob>() {
                     tracing::error!(
-                        "Tried to create a delivery blob via open(). Blob creation is only supported via the BlobCreator."
+                        "Tried to create a delivery blob via open(). Blob creation is only
+                            supported via the BlobCreator."
                     );
                     return Err(Status::NOT_SUPPORTED);
                 } else {
@@ -519,7 +523,7 @@ mod tests {
 
         let hash = fixture.write_blob(&data).await;
 
-        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
 
         fixture
             .root()

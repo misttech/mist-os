@@ -6,8 +6,9 @@ use {
     crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance},
     async_trait::async_trait,
     blob_writer::BlobWriter,
-    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobCreatorProxy},
+    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobCreatorProxy, BlobReaderMarker, BlobReaderProxy},
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
+    fuchsia_zircon as zx,
     std::path::Path,
     storage_benchmarks::{
         BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem,
@@ -42,7 +43,9 @@ impl FilesystemConfig for Fxblob {
         let blob_creator =
             connect_to_protocol_at_dir_svc::<BlobCreatorMarker>(fxblob.exposed_dir())
                 .expect("failed to connect to the BlobCreator service");
-        FxblobInstance { blob_creator, fxblob }
+        let blob_reader = connect_to_protocol_at_dir_svc::<BlobReaderMarker>(fxblob.exposed_dir())
+            .expect("failed to connect to the BlobReader service");
+        FxblobInstance { blob_creator, blob_reader, fxblob }
     }
 
     fn name(&self) -> String {
@@ -52,6 +55,7 @@ impl FilesystemConfig for Fxblob {
 
 pub struct FxblobInstance {
     blob_creator: BlobCreatorProxy,
+    blob_reader: BlobReaderProxy,
     fxblob: FsManagementFilesystemInstance,
 }
 
@@ -69,12 +73,23 @@ impl Filesystem for FxblobInstance {
 #[async_trait]
 impl CacheClearableFilesystem for FxblobInstance {
     async fn clear_cache(&mut self) {
-        self.fxblob.clear_cache().await
+        let () = self.fxblob.clear_cache().await;
+        self.blob_reader =
+            connect_to_protocol_at_dir_svc::<BlobReaderMarker>(self.fxblob.exposed_dir())
+                .expect("failed to connect to the BlobCreator service");
     }
 }
 
 #[async_trait]
 impl BlobFilesystem for FxblobInstance {
+    async fn get_vmo(&self, blob: &DeliveryBlob) -> zx::Vmo {
+        self.blob_reader
+            .get_vmo(&blob.name.into())
+            .await
+            .expect("transport error on BlobReader.GetVmo")
+            .expect("failed to get vmo")
+    }
+
     async fn write_blob(&self, blob: &DeliveryBlob) {
         let writer_client_end = self
             .blob_creator

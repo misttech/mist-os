@@ -57,11 +57,10 @@ pub async fn check_blob_filesystem<T: BlobFilesystem>(
     let mut fs = filesystem.start_filesystem(&ramdisk_factory).await;
     fs.write_blob(&blob).await;
     fs.clear_cache().await;
-    let blob_path = fs.benchmark_dir().join(blob.name.to_string());
 
-    let mut file = OpenOptions::new().read(true).open(&blob_path).unwrap();
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).expect("Failed to read blob");
+    let vmo = fs.get_vmo(&blob).await;
+    let mut buf = vec![0; vmo.get_content_size().unwrap() as usize];
+    let () = vmo.read(&mut buf, 0).unwrap();
     assert_eq!(buf, blob_contents);
 
     fs.shutdown().await;

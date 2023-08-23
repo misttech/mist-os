@@ -8,7 +8,7 @@
 use {
     super::{
         blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec,
-        VolumesSpec,
+        VolumesSpec, DATA_FILESYSTEM_VARIANT,
     },
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fshost::{AdminProxy, AdminWriteDataFileResult},
@@ -119,7 +119,11 @@ async fn unformatted_netboot() {
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
@@ -165,7 +169,11 @@ async fn unformatted_small_disk() {
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
@@ -202,7 +210,11 @@ async fn formatted() {
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
@@ -251,7 +263,11 @@ async fn formatted_file_in_root() {
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
@@ -287,7 +303,11 @@ async fn formatted_netboot() {
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_test_blob().await;
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        fixture.check_test_blob_fxblob().await
+    } else {
+        fixture.check_test_blob().await;
+    }
 
     fixture.check_fs_type("data", data_fs_type()).await;
 

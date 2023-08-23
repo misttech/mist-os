@@ -8,7 +8,7 @@ use {
     fuchsia_component::server::MissingStartupHandle,
     fuchsia_runtime::HandleType,
     fxfs::{log::*, serialized_types::LATEST_VERSION},
-    fxfs_platform::{component::Component, fxblob::init_vmex_resource},
+    fxfs_platform::component::Component,
 };
 
 #[fasync::run(6)]
@@ -19,12 +19,6 @@ async fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     info!(version = %LATEST_VERSION, "Started");
-
-    // Tests won't be able to get the VMEX resource, so logging errors will be spam.  Only log
-    // success.
-    if init_vmex_resource().await.is_ok() {
-        info!("Got vmex resource");
-    }
 
     Component::new()
         .run(

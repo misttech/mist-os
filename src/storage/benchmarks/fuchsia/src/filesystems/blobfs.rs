@@ -6,7 +6,7 @@ use {
     crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance},
     async_trait::async_trait,
     delivery_blob::delivery_blob_path,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::path::Path,
     storage_benchmarks::{
         BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem,
@@ -67,12 +67,28 @@ impl Filesystem for BlobfsInstance {
 #[async_trait]
 impl CacheClearableFilesystem for BlobfsInstance {
     async fn clear_cache(&mut self) {
-        self.blobfs.clear_cache().await
+        let () = self.blobfs.clear_cache().await;
+        self.root = fuchsia_fs::directory::open_in_namespace(
+            self.blobfs.benchmark_dir().to_str().unwrap(),
+            fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
     }
 }
 
 #[async_trait]
 impl BlobFilesystem for BlobfsInstance {
+    async fn get_vmo(&self, blob: &DeliveryBlob) -> zx::Vmo {
+        let blob = fuchsia_fs::directory::open_file(
+            &self.root,
+            &delivery_blob_path(blob.name),
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
+        blob.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap()
+    }
+
     async fn write_blob(&self, blob: &DeliveryBlob) {
         let blob_proxy = fuchsia_fs::directory::open_file(
             &self.root,

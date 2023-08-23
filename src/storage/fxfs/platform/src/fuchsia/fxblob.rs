@@ -12,4 +12,4 @@ mod writer;
 #[cfg(test)]
 mod testing;
 
-pub use crate::fxblob::{blob::init_vmex_resource, directory::BlobDirectory};
+pub use crate::fxblob::directory::BlobDirectory;

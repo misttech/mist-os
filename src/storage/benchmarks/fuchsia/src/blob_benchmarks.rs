@@ -6,7 +6,7 @@ use {
     crate::filesystems::{BlobFilesystem, DeliveryBlob},
     async_trait::async_trait,
     delivery_blob::CompressionMode,
-    fuchsia_zircon as zx,
+    fuchsia_runtime, fuchsia_zircon as zx,
     futures::stream::{self, StreamExt},
     rand::{
         distributions::{Distribution, WeightedIndex},
@@ -15,11 +15,8 @@ use {
     },
     rand_xorshift::XorShiftRng,
     std::{
-        fs::OpenOptions,
         iter::{Iterator, StepBy},
         ops::Range,
-        os::unix::io::AsRawFd,
-        path::Path,
         vec::Vec,
     },
     storage_benchmarks::{trace_duration, Benchmark, OperationDuration, OperationTimer},
@@ -168,37 +165,29 @@ impl<T: BlobFilesystem> Benchmark<T> for WriteRealisticBlobs {
 }
 
 struct MappedBlob {
-    addr: *mut libc::c_void,
-    size: libc::size_t,
+    addr: usize,
+    size: usize,
 }
 
 impl MappedBlob {
-    fn new(blob_path: &Path) -> Self {
-        let file = OpenOptions::new().read(true).open(blob_path).unwrap();
-        let size = file.metadata().unwrap().len() as libc::size_t;
-        let addr = unsafe {
-            libc::mmap(
-                std::ptr::null_mut(),
-                size,
-                libc::PROT_READ,
-                libc::MAP_SHARED,
-                file.as_raw_fd(),
-                0,
-            )
-        };
-        assert!(addr != libc::MAP_FAILED, "Failed to mmap blob: {:?}", errno_error());
+    fn new(vmo: &zx::Vmo) -> Self {
+        let size = vmo.get_size().unwrap() as usize;
+        let addr = fuchsia_runtime::vmar_root_self()
+            .map(0, vmo, 0, size, zx::VmarFlags::PERM_READ)
+            .unwrap();
         Self { addr, size }
     }
 
     fn data(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.addr as *const u8, self.size) }
+        unsafe { std::slice::from_raw_parts_mut(self.addr as *mut u8, self.size) }
     }
 }
 
 impl Drop for MappedBlob {
     fn drop(&mut self) {
-        let ret = unsafe { libc::munmap(self.addr, self.size) };
-        assert!(ret == 0, "Failed to munmap blob: {:?}", errno_error());
+        unsafe {
+            fuchsia_runtime::vmar_root_self().unmap(self.addr, self.size).expect("unmap");
+        }
     }
 }
 
@@ -267,7 +256,6 @@ async fn page_in_blob_benchmark(
     blob: DeliveryBlob,
     page_iter: impl Iterator<Item = usize>,
 ) -> Vec<OperationDuration> {
-    let blob_path = fs.benchmark_dir().join(blob.name.to_string());
     {
         trace_duration!("benchmark", "write-blob");
         fs.write_blob(&blob).await;
@@ -275,7 +263,8 @@ async fn page_in_blob_benchmark(
 
     fs.clear_cache().await;
 
-    let mapped_blob = MappedBlob::new(&blob_path);
+    let vmo = fs.get_vmo(&blob).await;
+    let mapped_blob = MappedBlob::new(&vmo);
     let data = mapped_blob.data();
     let mut durations = Vec::new();
     for i in page_iter {
@@ -285,10 +274,6 @@ async fn page_in_blob_benchmark(
         durations.push(timer.stop());
     }
     durations
-}
-
-fn errno_error() -> std::io::Error {
-    std::io::Error::last_os_error()
 }
 
 #[cfg(test)]

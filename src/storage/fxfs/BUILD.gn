@@ -212,37 +212,10 @@ rustc_binary("fxfs") {
   features = [ "tracing" ]
 }
 
-cmc_merge("fxfs_with_vmex.cml") {
-  sources = [
-    "meta/fxfs.cml",
-    "meta/use_vmex.shard.cml",
-  ]
-  visibility = [ ":*" ]
-}
-
-fuchsia_component_manifest("fxfs_with_vmex_manifest") {
-  component_name = "fxfs"
-  deps = [ ":fxfs_with_vmex.cml" ]
-  _target_outputs = get_target_outputs(":fxfs_with_vmex.cml")
-  manifest = _target_outputs[0]
-  visibility = [ ":*" ]
-}
-
 fuchsia_component("fxfs_component") {
   component_name = "fxfs"
   deps = [ ":fxfs" ]
   manifest = "meta/fxfs.cml"
-}
-
-# TODO(fxbug.dev/122055): Don't give vmex to Fxfs.
-fuchsia_component("fxfs_with_vmex_component") {
-  component_name = "fxfs"
-
-  cm_label = ":fxfs_with_vmex_manifest"
-  deps = [
-    ":fxfs",
-    ":fxfs_with_vmex_manifest",
-  ]
 }
 
 fuchsia_shell_package("fxfs-bin") {
