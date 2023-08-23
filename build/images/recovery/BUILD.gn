@@ -208,7 +208,6 @@ if (is_fuchsia) {
       storage = {
         configure_fshost = true
         filesystems = {
-          image_mode = "ramdisk"
           volume = {
             fvm = {
               data = {
@@ -226,7 +225,6 @@ if (is_fuchsia) {
       storage = {
         configure_fshost = true
         filesystems = {
-          image_mode = "ramdisk"
           volume = "fxfs"
         }
       }

@@ -48,7 +48,6 @@ template("assemble_network_conformance_system") {
         configure_fshost = true
         filesystems = {
           image_name = _image_name
-          image_mode = "ramdisk"
           volume = {
             fvm = {
               data = {
@@ -70,7 +69,6 @@ template("assemble_network_conformance_system") {
         configure_fshost = true
         filesystems = {
           image_name = _image_name
-          image_mode = "ramdisk"
           volume = "fxfs"
         }
       }

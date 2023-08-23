@@ -27,6 +27,7 @@ $FFX \
     --board-info $BOARD_CONFIG_PATH \
     --legacy-bundle $LEGACY_AIB \
     --input-bundles-dir $PLATFORM_AIB_DIR \
+    {mode_arg} \
     --outdir $OUTDIR
 """
 
@@ -98,7 +99,9 @@ def _fuchsia_product_assembly_impl(ctx):
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
 
-    shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE
+    shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
+        mode_arg = "--mode " + ctx.attr.mode if ctx.attr.mode else "",
+    )
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
@@ -180,6 +183,9 @@ fuchsia_product_assembly = rule(
             doc = "A board configuration target.",
             providers = [[FuchsiaBoardConfigInfo], [FuchsiaBoardConfigDirectoryInfo]],
             mandatory = True,
+        ),
+        "mode": attr.string(
+            doc = "Mode indicating where to place packages",
         ),
         "legacy_aib": attr.label(
             doc = "Legacy AIB for this product.",
@@ -290,6 +296,7 @@ def fuchsia_product_image(
         name = name + "_product_assembly",
         board_config = board_config,
         product_config = product_config,
+        mode = create_system_mode,
         legacy_aib = legacy_aib,
         platform_aibs = platform_aibs,
     )

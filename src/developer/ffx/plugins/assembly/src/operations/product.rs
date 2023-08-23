@@ -10,7 +10,7 @@ use assembly_images_config::ImagesConfig;
 use assembly_tool::SdkToolProvider;
 use assembly_util as util;
 use camino::Utf8PathBuf;
-use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
+use ffx_assembly_args::{PackageMode, PackageValidationHandling, ProductArgs};
 use tracing::info;
 
 mod assembly_builder;
@@ -25,6 +25,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         legacy_bundle,
         additional_packages_path,
         package_validation,
+        mode,
     } = args;
 
     info!("Loading configuration files.");
@@ -51,8 +52,9 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let mut builder = ImageAssemblyConfigBuilder::default();
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
+    let ramdisk_image = mode == PackageMode::DiskImageInZbi;
     let configuration =
-        assembly_platform_configuration::define_configuration(&config, &board_info)?;
+        assembly_platform_configuration::define_configuration(&config, &board_info, ramdisk_image)?;
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {

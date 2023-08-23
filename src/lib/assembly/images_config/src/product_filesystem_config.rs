@@ -68,6 +68,7 @@ pub enum FilesystemImageMode {
     NoImage,
 
     /// The filesystem image should be placed in a ramdisk in the ZBI.
+    /// TODO(awolter): Delete this once all clients pass this via the CLI.
     #[serde(rename = "ramdisk")]
     Ramdisk,
 

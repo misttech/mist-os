@@ -98,6 +98,7 @@ pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
     pub board_info: &'a BoardInformation,
+    pub ramdisk_image: bool,
 }
 
 /// A struct for collecting multiple kinds of platform configuration.
@@ -620,6 +621,7 @@ impl ConfigurationContext<'_> {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
+            ramdisk_image: false,
         }
     }
 }

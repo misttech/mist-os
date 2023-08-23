@@ -311,6 +311,10 @@ pub struct ProductArgs {
     /// disable validation of the assembly's packages
     #[argh(option, default = "Default::default()")]
     pub package_validation: PackageValidationHandling,
+
+    /// mode indicating where to place packages.
+    #[argh(option, default = "default_package_mode()")]
+    pub mode: PackageMode,
 }
 
 #[derive(Debug, Default, PartialEq)]
