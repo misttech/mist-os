@@ -48,8 +48,8 @@ Example usage:
 
 ```
 $ iquery list
-archivist.cmx
 bootstrap/device_manager
+core/archivist
 ...
 ```
 
@@ -113,12 +113,12 @@ If a full selector (component + tree) is provided, it lists all selectors under 
 Example usage:
 
 ```
-$ iquery selectors 'archivist.cmx:root/fuchsia.inspect.Health' 'timekeeper.cmx'
-archivist.cmx:root/fuchsia.inspect.Health:start_timestamp_nanos
-archivist.cmx:root/fuchsia.inspect.Health:status
-timekeeper.cmx:root/current:system_uptime_monotonic_nanos
-timekeeper.cmx:root/current:utc_nanos
-timekeeper.cmx:root:start_time_monotonic_nanos
+$ iquery selectors 'core/archivist:root/fuchsia.inspect.Health' 'core/timekeeper'
+core/archivist:root/fuchsia.inspect.Health:start_timestamp_nanos
+core/archivist:root/fuchsia.inspect.Health:status
+core/timekeeper:root/current:system_uptime_monotonic_nanos
+core/timekeeper:root/current:utc_nanos
+core/timekeeper:root:start_time_monotonic_nanos
 ```
 
 #### `--manifest`
@@ -139,13 +139,13 @@ Prints the inspect hierarchies that match the given selectors.
 Example usage:
 
 ```
-$ iquery show 'archivist.cmx:root/fuchsia.inspect.Health' 'timekeeper.cmx'
-archivist.cmx:
+$ iquery show 'archivist.cm:root/fuchsia.inspect.Health' 'core/timekeeper'
+core/archivist:
   root:
     fuchsia.inspect.Health:
       start_timestamp_nanos = 30305104656
       status = OK
-timekeeper.cmx:
+core/timekeeper:
   root:
     start_time_monotonic_nanos = 30347000053
     current:

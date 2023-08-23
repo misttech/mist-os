@@ -40,8 +40,7 @@ established:
 The text manager entry point is [main.rs][5].
 
 All the services that text manager provides are declared in [`main` itself][6].
-This is useful to know for CFv2 migration, since the CFv1 `.cmx` files do not
-specify the outgoing APIs, and so the CFv2 "capabilities" and "offer" sections
+This is useful to know because the `.cml` "capabilities" and "offer" sections
 must be reconstructed from the code.
 
 [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.ui.input/ime_service.fidl;l=8;drc=e3b39f2b57e720770773b857feca4f770ee0619e

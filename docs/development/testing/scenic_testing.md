@@ -90,7 +90,7 @@ To run tests locally during development:
 
 Some of these tests require the test Scenic to connect to the real display controller.
 
-Run `fx shell killall scenic.cmx` to kill an active instance of Scenic.
+Run `fx shell killall scenic.cm` to kill an active instance of Scenic.
 
 * Run all Scenic tests:
 
@@ -160,10 +160,10 @@ Run `fx shell killall scenic.cmx` to kill an active instance of Scenic.
   From your host workstation:
 
   ```
-  fx test fuchsia-pkg://fuchsia.com/gfx_unittests#meta/gfx_unittests.cmx
+  fx test fuchsia-pkg://fuchsia.com/gfx_unittests#meta/gfx_unittests.cm
   ```
 
-  Note: `gfx_unittests.cmx` can be swapped for [any test component](/src/ui/scenic/BUILD.gn) . There is also fuzzy matching!
+  Note: `gfx_unittests.cm` can be swapped for [any test component](/src/ui/scenic/BUILD.gn) . There is also fuzzy matching!
 
 * Pixel tests
 
@@ -178,7 +178,7 @@ Run `fx shell killall scenic.cmx` to kill an active instance of Scenic.
   Then run the pixel tests:
 
   ```
-  fx test fuchsia-pkg://fuchsia.com/gfx_pixeltests#meta/gfx_pixeltests.cmx
+  fx test fuchsia-pkg://fuchsia.com/gfx_pixeltests#meta/gfx_pixeltests.cm
   ```
 
   Alternatively, run:

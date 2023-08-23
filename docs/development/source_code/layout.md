@@ -243,7 +243,7 @@ executable("test") {
 }
 
 fuchsia_component("component") {
-  manifest = "meta/fortune.cmx"
+  manifest = "meta/fortune.cml"
   deps = [ ":bin" ]
 }
 

@@ -148,7 +148,7 @@ calculations. Inspect selectors without wildcards return a one-item
 vector unless the same moniker occurs multiple times in inspect.json.
 
 Selectors with wildcards, selectors for `bootstrap/driver_manager` and
-`netstack.cmx`, and (eventually) selectors on logs, may return
+`core/network/netstack`, and (eventually) selectors on logs, may return
 multiple items in a vector. To process such values, Triage provides the
 following functions:
 

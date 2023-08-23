@@ -4,27 +4,16 @@ Zxdb is a console debugger for native code compiled with DWARF symbols (C, C++
 and Rust). The frontend runs on the host computer and connects to the on-device
 `debug_agent`. This document describes how to set up these processes.
 
-## Running the agent
-
-The `debug_agent` is run on the target device along with the port number that
-it should listen to for incoming client connections. Typically this command
-will be run from a console after [ssh-ing](ssh.md) in to the system:
-
-```
-run fuchsia-pkg://fuchsia.com/debug_agent#meta/debug_agent.cmx --port=2345
-```
-
 ## Connecting the client
 
 The `zxdb` client program is run on the host computer. It can be connected to
 the `debug_agent` via the interactive `connect` debugger command or it can
 automatically connect based on a command-line flag. Both IPv4 and IPv6
 addresses are supported (see [ffx](https://fuchsia.dev/reference/tools/sdk/ffx.md) to find
-the address). The port should match the port number passed to the
-agent.
+the address).
 
 ```
-zxdb -c "[f370::5051:ff:1e53:589a%qemu]:2345"
+zxdb -c "[f370::5051:ff:1e53:589a%qemu]"
 ```
 
 ### Connecting via a script

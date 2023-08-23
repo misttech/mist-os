@@ -210,16 +210,10 @@ run a component from the installed package.
 
 ## Run a component from an installed package {#run-component}
 
-(On the target device) run the component in a package:
+To run the component, use the `ffx component run` tool. For help: `ffx component run --help`.
 
-```
-run {{ '<var>' }}COMPONENT_URI{{ '</var>' }}
-```
-
-Replace <var>COMPONENT_URI</var> with a package URL in the form of
-`fuchsia-pkg://<REPO>/<PACKAGE_NAME>#meta/<COMPONET_NAME>.cmx`.
-
-You have successfully run a component from the installed package.
+For the `url` parameter provide a URL in the form of
+`fuchsia-pkg://<REPO>/<PACKAGE_NAME>#meta/<COMPONET_NAME>.cm`.
 
 ## Build a package using the legacy pm tool {#build-package-legacy-pm}
 

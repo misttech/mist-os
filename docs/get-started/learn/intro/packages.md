@@ -145,7 +145,6 @@ package contents:
 /meta/contents
 /meta/package
 /meta/spinning-square-rs.cm
-/meta/spinning-square-rs.cmx
 /data/fonts/RobotoSlab-Regular.ttf
 /meta/fuchsia.abi/abi-revision
 /data/vulkan/explicit_layer.d/VkLayer_khronos_validation.json

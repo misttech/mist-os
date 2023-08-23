@@ -68,8 +68,8 @@ fx set core.x64 --with-base=//src/graphics/lib/magma/gnbuild/magma-intel-gen:mag
 If you have an attached display, execute the spinning [vkcube](/src/graphics/examples/vkcube).
 This test uses an imagepipe swapchain to pass frames to the system compositor.
 Build with `--with-base //src/graphics/bundles:vulkan --with src/graphics/lib/magma/tests:l1`.
-Test with present direct to display: `run fuchsia-pkg://fuchsia.com/vkcube-on-fb#meta/vkcube-on-fb.cmx --c 500`
-Test with present via Scenic: `ffx session add fuchsia-pkg://fuchsia.com/vkcube-on-scenic#meta/vkcube-on-scenic.cmx`.
+
+Test with present via Scenic: `ffx session add fuchsia-pkg://fuchsia.com/vkcube-on-scenic#meta/vkcube-on-scenic.cm`.
 
 #### S0
 

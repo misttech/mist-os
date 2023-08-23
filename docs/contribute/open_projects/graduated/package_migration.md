@@ -28,7 +28,7 @@ Some of the benefits of the new templates include:
     targets that define what you want your component to use or your package to
     contain.
 *   It's easier to define simple tests that don't require manually writing a
-    component manifest (`.cml` or `.cmx` file).
+    component manifest (`.cml` file).
 *   Better documentation is available, covering more languages and use cases.
 
 Migrating to the new templates makes our build definitions more readable and

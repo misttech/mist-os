@@ -7,7 +7,7 @@ be leaked or misused (e.g use-after-close).
 ## Handles tool
 
 To help developers diagnose handle issues use the `handles` tool, below
-is a sample of process 29831 which is wlancfg.cmx :
+is a sample of process 29831 which is wlancfg.cm :
 
 ```
 $ handles 29831

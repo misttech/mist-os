@@ -40,7 +40,7 @@ runner. For Dart JIT-executed code, run `ps` on the target, and look for the pro
 host$ fx shell ps
 [...]
         j:21102           17.6M   17.6M
-          p:21107         17.6M   17.6M     32k         dart_jit_runner.cmx
+          p:21107         17.6M   17.6M     32k         dart_jit_runner.cm
 ```
 
 You can then attach directly to that process, and view all FIDL messages sent by
@@ -61,14 +61,14 @@ ffx debug fidl --remote-pid <pid1> --remote-pid <pid2>
 Alternatively, you can launch a component directly using its URL:
 
 ```sh
-ffx debug fidl -- run fuchsia-pkg://fuchsia.com/echo_client_rust#meta/echo_client_rust.cmx
+ffx debug fidl -- run fuchsia-pkg://fuchsia.com/echo_client_rust#meta/echo_client_rust.cm
 ```
 
 You can also specify the URL with a bash regex that matches a unique URL known to the build:
 
 ```sh
 ffx debug fidl -- run "echo_client_cpp_synchronous.*"
-ffx debug fidl -- run echo_client_cpp.cmx
+ffx debug fidl -- run echo_client_cpp.cm
 ```
 
 ### Attaching to a program on startup

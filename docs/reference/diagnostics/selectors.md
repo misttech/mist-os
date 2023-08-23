@@ -247,23 +247,23 @@ eg: a*b*c will match any string that starts with a and ends with c, with b in th
 
 ## Full Selector Examples {#full-selector-examples}
 
-The following selector will select data from any `echo.cmx` instance on the system that exists in
+The following selector will select data from any `echo.cm` instance on the system that exists in
 any realm that itself is under `realm1`. The data retrieved will be the `active_connections`
-property on the node at `root/a/b/c`.
+property on the node at `a/b/c`.
 
 
 ```
-root/realm1/*/echo.cmx:root/a/b/c:active_connections
+realm1/*/echo:a/b/c:active_connections
 ```
 
 
-The following selector will select inspect data from any `echo.cmx` instance on the system that
+The following selector will select inspect data from any `echo.cm` instance on the system that
 exists in any realm that itself is directly under `realm1`. The inspect data will be the
 `memory_usage property` on the node at `a/b/c/d`.
 
 
 ```
-root/realm1/echo.cmx:a/b/c/d:*
+realm1/echo:a/b/c/d:*
 ```
 
 

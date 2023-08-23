@@ -55,14 +55,14 @@ The tip-of-tree version of the test has a package name without a release version
 For example:
 
 ```
-fuchsia-pkg://fuchsia.com/memfs-test-package#meta/memfs-component.cmx
+fuchsia-pkg://fuchsia.com/memfs-test-package#meta/memfs-component.cm
 ```
 
 The canary or milestone versions of the test include the release version. For
 example:
 
 ```
-fuchsia-pkg://fuchsia.com/memfs-test-package_6.20211109.1.3166058#meta/memfs-component.cmx
+fuchsia-pkg://fuchsia.com/memfs-test-package_6.20211109.1.3166058#meta/memfs-component.cm
 ```
 
 

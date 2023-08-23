@@ -25,7 +25,7 @@ Examples:
 
 ```none {:.devsite-disable-click-to-copy}
 $ ffx inspect show
-a.cmx:
+core/a:
   root:
     fuchsia.inspect.Health:
       start_timestamp_nanos = ...
@@ -40,12 +40,12 @@ a.cmx:
         start_timestamp_nanos = ...
         status = UNHEALTHY
         message = "Cannot open local.file"
-b.cmx:
+core/a:
   root:
     fuchsia.inspect.Health:
       start_timestamp_nanos = ...
       status = OK
-c.cmx:
+core/a:
   root:
     fuchsia.inspect.Health:
       start_timestamp_nanos = ...
@@ -54,7 +54,7 @@ c.cmx:
 ```
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx inspect show a.cmx:root/fuchsia.inspect.Health:status b.cmx:root/fuchsia.inspect.Healh:status c.cmx:root/fuchsia.inspect.Health:status
+$ ffx inspect show a.cm:root/fuchsia.inspect.Health:status b.cm:root/fuchsia.inspect.Healh:status c.cm:root/fuchsia.inspect.Health:status
 a:
   root:
     fuchsia.inspectHealth:
