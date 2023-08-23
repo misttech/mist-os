@@ -33,19 +33,20 @@ class Lcd {
       fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio, bool already_enabled);
 
   // Turn the panel on
-  zx_status_t Enable();
+  zx::result<> Enable();
 
   // Turn the panel off
-  zx_status_t Disable();
-
-  // Fetch the panel ID, storing it in the lower 24 bits of id_out. Assumes that
-  // dsiimpl is in DSI_COMMAND_MODE.
-  static zx_status_t GetDisplayId(ddk::DsiImplProtocolClient dsiimpl, uint32_t* id_out);
+  zx::result<> Disable();
 
  private:
-  zx_status_t LoadInitTable(cpp20::span<const uint8_t> buffer);
-  // Print the display ID to the console.
-  zx_status_t GetDisplayId();
+  // Decodes and performs the Amlogic-specific display initialization command
+  // sequence stored in `encoded_commands` which is a packed buffer of all
+  // encoded commands.
+  //
+  // The Amlogic-specific display initialization commands are defined in:
+  // Amlogic MIPI DSI Panel Tuning User Guide, Version 0.1 (Google internal),
+  // Section 3.2.6 "Init table config", page 19.
+  zx::result<> PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> encoded_commands);
 
   uint32_t panel_type_;
   fit::function<void(bool)> set_signal_power_;

@@ -14,7 +14,6 @@
 namespace amlogic_display {
 
 namespace {
-constexpr uint8_t kMaxPllLockAttempt = 3;
 constexpr uint32_t kKHZ = 1000;
 
 void DumpPllCfg(const PllConfig& pll_cfg) {
@@ -108,29 +107,33 @@ LcdTiming Clock::CalculateLcdTiming(const display_setting_t& d) {
   return out;
 }
 
-zx_status_t Clock::PllLockWait() {
+zx::result<> Clock::WaitForHdmiPllToLock() {
   uint32_t pll_lock;
 
+  constexpr int kMaxPllLockAttempt = 3;
   for (int lock_attempts = 0; lock_attempts < kMaxPllLockAttempt; lock_attempts++) {
     zxlogf(TRACE, "Waiting for PLL Lock: (%d/3).", lock_attempts + 1);
+
+    // The configurations used in retries are from Amlogic-provided code which
+    // is undocumented.
     if (lock_attempts == 1) {
       SET_BIT32(HHI, HHI_HDMI_PLL_CNTL3, 1, 31, 1);
     } else if (lock_attempts == 2) {
       WRITE32_REG(HHI, HHI_HDMI_PLL_CNTL6, 0x55540000);  // more magic
     }
+
     int retries = 1000;
     while ((pll_lock = GET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, LCD_PLL_LOCK_HPLL_G12A, 1)) != 1 &&
            retries--) {
       zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
     }
     if (pll_lock) {
-      return ZX_OK;
+      return zx::ok();
     }
   }
 
-  // We got here, which means we never locked!
-  zxlogf(ERROR, "PLL not locked! exiting");
-  return ZX_ERR_UNAVAILABLE;
+  zxlogf(ERROR, "Failed to lock HDMI PLL after %d attempts.", kMaxPllLockAttempt);
+  return zx::error(ZX_ERR_UNAVAILABLE);
 }
 
 // static
@@ -247,9 +250,9 @@ void Clock::Disable() {
   clock_enabled_ = false;
 }
 
-zx_status_t Clock::Enable(const display_setting_t& d) {
+zx::result<> Clock::Enable(const display_setting_t& d) {
   if (clock_enabled_) {
-    return ZX_OK;
+    return zx::ok();
   }
 
   // Populate internal LCD timing structure based on predefined tables
@@ -289,10 +292,10 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
   SET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, 0, LCD_PLL_RST_HPLL_G12A, 1);
 
   zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
-  zx_status_t status = PllLockWait();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "hpll lock failed");
-    return status;
+  zx::result<> wait_for_pll_lock_result = WaitForHdmiPllToLock();
+  if (!wait_for_pll_lock_result.is_ok()) {
+    zxlogf(ERROR, "Failed to lock HDMI PLL: %s", wait_for_pll_lock_result.status_string());
+    return wait_for_pll_lock_result.take_error();
   }
 
   // Disable Video Clock mux 2 since we are changing its input selection.
@@ -423,7 +426,7 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
 
   // Ready to be used
   clock_enabled_ = true;
-  return ZX_OK;
+  return zx::ok();
 }
 
 void Clock::SetVideoOn(bool on) { WRITE32_REG(VPU, ENCL_VIDEO_EN, on); }

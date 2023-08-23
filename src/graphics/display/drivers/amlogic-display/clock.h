@@ -31,7 +31,7 @@ class Clock {
   // and is therefore safe to use when adopting a bootloader initialized device.
   static zx::result<std::unique_ptr<Clock>> Create(ddk::PDevFidl& pdev, bool already_enabled);
 
-  zx_status_t Enable(const display_setting_t& d);
+  zx::result<> Enable(const display_setting_t& d);
   void Disable();
   void Dump();
 
@@ -49,9 +49,7 @@ class Clock {
   static zx::result<PllConfig> GenerateHPLL(const display_setting_t& disp_setting);
 
  private:
-  // This function wait for hdmi_pll to lock. The retry algorithm is
-  // undocumented and comes from U-Boot.
-  zx_status_t PllLockWait();
+  zx::result<> WaitForHdmiPllToLock();
 
   std::optional<fdf::MmioBuffer> vpu_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;

@@ -171,14 +171,13 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   return zx::ok(std::move(self));
 }
 
-zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
-                                    fit::callback<zx_status_t()> power_on) {
+zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands,
+                                             fit::callback<zx::result<>()> power_on) {
   if (commands.size() == 0) {
     zxlogf(ERROR, "No power commands to execute");
-    return ZX_OK;
+    return zx::ok();
   }
   uint8_t wait_count = 0;
-  zx_status_t status = ZX_OK;
 
   for (const auto op : commands) {
     zxlogf(TRACE, "power_op %d index=%d value=%d sleep_ms=%d", op.op, op.index, op.value,
@@ -186,7 +185,7 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
     switch (op.op) {
       case kPowerOpExit:
         zxlogf(TRACE, "power_exit");
-        return ZX_OK;
+        return zx::ok();
       case kPowerOpGpio: {
         zxlogf(TRACE, "power_set_gpio pin #%d value=%d", op.index, op.value);
         if (op.index != 0) {
@@ -196,21 +195,24 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
         fidl::WireResult result = lcd_gpio_->Write(op.value);
         if (!result.ok()) {
           zxlogf(ERROR, "Failed to send Write request to lcd gpio: %s", result.status_string());
-          return result.status();
+          return zx::error(result.status());
         }
         if (result->is_error()) {
           zxlogf(ERROR, "Failed to write to lcd gpio: %s",
                  zx_status_get_string(result->error_value()));
-          return result->error_value();
+          return result->take_error();
         }
         break;
       }
-      case kPowerOpSignal:
+      case kPowerOpSignal: {
         zxlogf(TRACE, "power_signal dsi_init");
-        if ((status = power_on()) != ZX_OK) {
-          return status;
+        zx::result<> power_on_result = power_on();
+        if (!power_on_result.is_ok()) {
+          zxlogf(ERROR, "Failed to power on MIPI DSI display: %s", power_on_result.status_string());
+          return power_on_result.take_error();
         }
         break;
+      }
       case kPowerOpAwaitGpio:
         zxlogf(TRACE, "power_await_gpio pin #%d value=%d timeout=%d msec", op.index, op.value,
                op.sleep_ms);
@@ -224,12 +226,14 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
           if (!result.ok()) {
             zxlogf(ERROR, "Failed to send ConfigIn request to lcd gpio: %s",
                    result.status_string());
-            return result.status();
+            return zx::error(result.status());
           }
-          if (result->is_error()) {
+
+          auto& response = result.value();
+          if (response.is_error()) {
             zxlogf(ERROR, "Failed to configure lcd gpio to input: %s",
-                   zx_status_get_string(result->error_value()));
-            return result->error_value();
+                   zx_status_get_string(response.error_value()));
+            return response.take_error();
           }
         }
         for (wait_count = 0; wait_count < op.sleep_ms; wait_count++) {
@@ -237,12 +241,14 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
           if (!read_result.ok()) {
             zxlogf(ERROR, "Failed to send Read request to lcd gpio: %s",
                    read_result.status_string());
-            return read_result.status();
+            return zx::error(read_result.status());
           }
-          if (read_result->is_error()) {
+
+          auto& read_response = read_result.value();
+          if (read_response.is_error()) {
             zxlogf(ERROR, "Failed to read lcd gpio: %s",
-                   zx_status_get_string(read_result->error_value()));
-            return read_result->error_value();
+                   zx_status_get_string(read_response.error_value()));
+            return read_response.take_error();
           }
           if (read_result.value()->value == op.value) {
             break;
@@ -262,10 +268,10 @@ zx_status_t DsiHost::LoadPowerTable(cpp20::span<const PowerOp> commands,
       zx::nanosleep(zx::deadline_after(zx::msec(op.sleep_ms)));
     }
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t DsiHost::HostModeInit(const display_setting_t& disp_setting) {
+zx::result<> DsiHost::ConfigureDsiHostController(const display_setting_t& disp_setting) {
   // Setup relevant TOP_CNTL register -- Undocumented --
   SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, SUPPORTED_DPI_FORMAT, TOP_CNTL_DPI_CLR_MODE_START,
             TOP_CNTL_DPI_CLR_MODE_BITS);
@@ -292,7 +298,7 @@ zx_status_t DsiHost::HostModeInit(const display_setting_t& disp_setting) {
 
   dsiimpl_.Config(&dsi_cfg);
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 void DsiHost::PhyEnable() {
@@ -331,38 +337,40 @@ void DsiHost::Disable(const display_setting_t& disp_setting) {
 
   // Place dsi in command mode first
   dsiimpl_.SetMode(DSI_MODE_COMMAND);
-  fit::callback<zx_status_t()> power_off = [this]() {
-    auto status = lcd_->Disable();
-    if (status != ZX_OK) {
-      return status;
+  fit::callback<zx::result<>()> power_off = [this]() -> zx::result<> {
+    zx::result<> result = lcd_->Disable();
+    if (!result.is_ok()) {
+      return result.take_error();
     }
     PhyDisable();
     phy_->Shutdown();
-    return ZX_OK;
+    return zx::ok();
   };
 
-  auto status = LoadPowerTable(panel_config_->power_off, std::move(power_off));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Powering off a DSI display failed: %s", zx_status_get_string(status));
+  zx::result<> power_off_result =
+      PerformPowerOpSequence(panel_config_->power_off, std::move(power_off));
+  if (!power_off_result.is_ok()) {
+    zxlogf(ERROR, "Failed to power off the DSI display: %s", power_off_result.status_string());
   }
 
   enabled_ = false;
 }
 
-zx_status_t DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bitrate) {
+zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bitrate) {
   if (enabled_) {
-    return ZX_OK;
+    return zx::ok();
   }
 
-  fit::callback<zx_status_t()> power_on = [&]() {
+  fit::callback<zx::result<>()> power_on = [&]() -> zx::result<> {
     // Enable MIPI PHY
     PhyEnable();
 
     // Load Phy configuration
-    zx_status_t status = phy_->PhyCfgLoad(bitrate);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Error during phy config calculations: %s", zx_status_get_string(status));
-      return status;
+    zx::result<> phy_config_load_result = phy_->PhyCfgLoad(bitrate);
+    if (!phy_config_load_result.is_ok()) {
+      zxlogf(ERROR, "Error during phy config calculations: %s",
+             phy_config_load_result.status_string());
+      return phy_config_load_result.take_error();
     }
 
     // Enable dwc mipi_dsi_host's clock
@@ -379,33 +387,41 @@ zx_status_t DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bitr
 
     // Initialize host in command mode first
     dsiimpl_.SetMode(DSI_MODE_COMMAND);
-    if ((status = HostModeInit(disp_setting)) != ZX_OK) {
-      zxlogf(ERROR, "Error during dsi host init: %s", zx_status_get_string(status));
-      return status;
+    zx::result<> dsi_host_config_result = ConfigureDsiHostController(disp_setting);
+    if (!dsi_host_config_result.is_ok()) {
+      zxlogf(ERROR, "Failed to configure the MIPI DSI Host Controller: %s",
+             dsi_host_config_result.status_string());
+      return dsi_host_config_result.take_error();
     }
 
     // Initialize mipi dsi D-phy
-    if ((status = phy_->Startup()) != ZX_OK) {
-      zxlogf(ERROR, "Error during MIPI D-PHY Initialization: %s", zx_status_get_string(status));
-      return status;
+    zx::result<> phy_startup_result = phy_->Startup();
+    if (!phy_startup_result.is_ok()) {
+      zxlogf(ERROR, "Error during MIPI D-PHY Initialization: %s",
+             phy_startup_result.status_string());
+      return phy_startup_result.take_error();
     }
 
     // Load LCD Init values while in command mode
-    lcd_->Enable();
+    zx::result<> lcd_enable_result = lcd_->Enable();
+    if (!lcd_enable_result.is_ok()) {
+      zxlogf(ERROR, "Failed to enable LCD: %s", lcd_enable_result.status_string());
+    }
 
     // switch to video mode
     dsiimpl_.SetMode(DSI_MODE_VIDEO);
-    return ZX_OK;
+    return zx::ok();
   };
 
-  auto status = LoadPowerTable(panel_config_->power_on, std::move(power_on));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to power on LCD: %s", zx_status_get_string(status));
-    return status;
+  zx::result<> power_on_result =
+      PerformPowerOpSequence(panel_config_->power_on, std::move(power_on));
+  if (!power_on_result.is_ok()) {
+    zxlogf(ERROR, "Failed to power on the DSI Display: %s", power_on_result.status_string());
+    return power_on_result.take_error();
   }
   // Host is On and Active at this point
   enabled_ = true;
-  return ZX_OK;
+  return zx::ok();
 }
 
 void DsiHost::Dump() {

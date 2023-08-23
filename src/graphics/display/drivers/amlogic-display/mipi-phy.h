@@ -27,10 +27,10 @@ class MipiPhy {
                                                      ddk::DsiImplProtocolClient dsi,
                                                      bool already_enabled);
   // This function enables and starts up the Mipi Phy
-  zx_status_t Startup();
+  zx::result<> Startup();
   // This function stops Mipi Phy
   void Shutdown();
-  zx_status_t PhyCfgLoad(uint32_t bitrate);
+  zx::result<> PhyCfgLoad(uint32_t bitrate);
   void Dump();
   uint32_t GetLowPowerEscaseTime() { return dsi_phy_cfg_.lp_tesc; }
 

@@ -21,7 +21,7 @@ constexpr inline uint8_t NsToLaneByte(T x, uint32_t lanebytetime) {
 
 constexpr uint32_t kUnit = (1 * 1000 * 1000 * 100);
 
-zx_status_t MipiPhy::PhyCfgLoad(uint32_t bitrate) {
+zx::result<> MipiPhy::PhyCfgLoad(uint32_t bitrate) {
   // According to MIPI -PHY Spec, we need to define Unit Interval (UI).
   // This UI is defined as the time it takes to send a bit (i.e. bitrate)
   // The x100 is to ensure the ui is not rounded too much (i.e. 2.56 --> 256)
@@ -86,7 +86,7 @@ zx_status_t MipiPhy::PhyCfgLoad(uint32_t bitrate) {
     zxlogf(ERROR, "Invalid clk-trail and/or hs-trail exceed Teot!");
     zxlogf(ERROR, "clk-trail = 0x%02x, hs-trail =  0x%02x, Teot = 0x%02x", dsi_phy_cfg_.clk_trail,
            dsi_phy_cfg_.hs_trail, time_req_max);
-    return ZX_ERR_OUT_OF_RANGE;
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
   zxlogf(TRACE,
@@ -111,7 +111,7 @@ zx_status_t MipiPhy::PhyCfgLoad(uint32_t bitrate) {
          dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_post,
          dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.init,
          dsi_phy_cfg_.wakeup);
-  return ZX_OK;
+  return zx::ok();
 }
 
 void MipiPhy::PhyInit() {
@@ -161,9 +161,9 @@ void MipiPhy::Shutdown() {
   phy_enabled_ = false;
 }
 
-zx_status_t MipiPhy::Startup() {
+zx::result<> MipiPhy::Startup() {
   if (phy_enabled_) {
-    return ZX_OK;
+    return zx::ok();
   }
 
   // Power up DSI
@@ -185,14 +185,14 @@ zx_status_t MipiPhy::Startup() {
   zx_status_t status;
   if ((status = dsiimpl_.PhyWaitForReady()) != ZX_OK) {
     // no need to print additional info.
-    return status;
+    return zx::error(status);
   }
 
   // Trigger a sync active for esc_clk
   SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 1, 1, 1);
 
   phy_enabled_ = true;
-  return ZX_OK;
+  return zx::ok();
 }
 
 zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(ddk::PDevFidl& pdev,

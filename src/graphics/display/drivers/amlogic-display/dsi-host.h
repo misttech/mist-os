@@ -39,7 +39,7 @@ class DsiHost {
   // The DesignWare setup could technically be moved to the dw_mipi_dsi driver. However,
   // given the highly configurable nature of this block, we'd have to provide a lot of
   // information to the generic driver. Therefore, it's just simpler to configure it here
-  zx_status_t Enable(const display_setting_t& disp_setting, uint32_t bitrate);
+  zx::result<> Enable(const display_setting_t& disp_setting, uint32_t bitrate);
 
   // This function will turn off DSI Host. It is a "best-effort" function. We will attempt
   // to shutdown whatever we can. Error during shutdown path is ignored and function proceeds
@@ -55,11 +55,23 @@ class DsiHost {
 
   void PhyEnable();
   void PhyDisable();
-  zx_status_t HostModeInit(const display_setting_t& disp_setting);
+
+  // Configures the MIPI DSI Host controller (transmitter) hardware for video
+  // data transmission.
+  zx::result<> ConfigureDsiHostController(const display_setting_t& disp_setting);
+
   // Controls the shutdown register on the DSI host side.
   void SetSignalPower(bool on);
-  zx_status_t LoadPowerTable(cpp20::span<const PowerOp> commands,
-                             fit::callback<zx_status_t()> power_on);
+
+  // Performs the Amlogic-specific power operation sequence.
+  //
+  // The Amlogic-specific power operations are defined in the Amlogic MIPI DSI
+  // Panel Tuning User Guide, Version 0.1 (Google internal), Section 2.4.10
+  // "Power on/off step", pages 16-17.
+  //
+  // `power_on` is called for each command of type Signal.
+  zx::result<> PerformPowerOpSequence(cpp20::span<const PowerOp> power_ops,
+                                      fit::callback<zx::result<>()> power_on);
   std::optional<fdf::MmioBuffer> mipi_dsi_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;
 

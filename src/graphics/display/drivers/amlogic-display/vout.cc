@@ -212,7 +212,7 @@ zx::result<> Vout::PowerOff() {
 zx::result<> Vout::PowerOn() {
   switch (type_) {
     case VoutType::kDsi: {
-      zx::result<> clock_enable_result = zx::make_result(dsi_.clock->Enable(dsi_.disp_setting));
+      zx::result<> clock_enable_result = dsi_.clock->Enable(dsi_.disp_setting);
       if (!clock_enable_result.is_ok()) {
         zxlogf(ERROR, "Could not enable display clocks: %s", clock_enable_result.status_string());
         return clock_enable_result;
@@ -221,7 +221,7 @@ zx::result<> Vout::PowerOn() {
       dsi_.clock->SetVideoOn(false);
       // Configure and enable DSI host interface.
       zx::result<> dsi_host_enable_result =
-          zx::make_result(dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate()));
+          dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate());
       if (!dsi_host_enable_result.is_ok()) {
         zxlogf(ERROR, "Could not enable DSI Host: %s", dsi_host_enable_result.status_string());
         return dsi_host_enable_result;
