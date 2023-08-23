@@ -11,5 +11,4 @@ metrics_registry("metrics") {
   namespace = "media_metrics"
   generate_cc = true
   generate_rust = false
-  generate_dart = false
 }
