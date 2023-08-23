@@ -17,6 +17,8 @@ import types
 from typing import Dict, List, Optional, Mapping, ForwardRef, Set, Union, Sequence, Tuple, Callable, Iterable, Any
 from fidl_codec import add_ir_path
 from ._client import FidlClient
+from ._server import ServerBase, MethodInfo
+from ._fidl_common import camel_case_to_snake_case
 
 LIB_MAP: Dict[str, str] = {}
 MAP_INIT = False
@@ -50,6 +52,9 @@ class Method(dict):
         """
         assert "maybe_request_payload" in self
         return self["maybe_request_payload"]["identifier"]
+
+    def ordinal(self) -> int:
+        return self["ordinal"]
 
     def name(self) -> str:
         return self["name"]
@@ -448,6 +453,12 @@ def normalize_member_name(name) -> str:
     return name
 
 
+def struct_and_table_subscript(self, item: str):
+    if not isinstance(item, str):
+        raise TypeError("Subscripted item must be a string")
+    return getattr(self, item)
+
+
 def struct_type(ir, root_ir, recurse_guard=None) -> type:
     """Constructs a Python type from a FIDL IR struct declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
@@ -461,6 +472,7 @@ def struct_type(ir, root_ir, recurse_guard=None) -> type:
     setattr(ty, "__fidl_kind__", "struct")
     setattr(ty, "__fidl_type__", ir.name())
     setattr(ty, "__doc__", docstring(ir))
+    setattr(ty, "__getitem__", struct_and_table_subscript)
     return ty
 
 
@@ -481,6 +493,7 @@ def table_type(ir, root_ir, recurse_guard=None) -> type:
     setattr(ty, "__fidl_kind__", "table")
     setattr(ty, "__fidl_type__", ir.name())
     setattr(ty, "__doc__", docstring(ir))
+    setattr(ty, "__getitem__", struct_and_table_subscript)
     return ty
 
 
@@ -573,39 +586,74 @@ def protocol_type(ir, root_ir, recurse_guard=None) -> type:
             "__doc__": docstring(ir),
             "__fidl_kind__": "protocol",
             "Client": protocol_client_type(ir, root_ir),
+            "Server": protocol_server_type(ir, root_ir),
             "MARKER": fidl_ident_to_marker(ir.name()),
         },
     )
+
+
+def protocol_server_type(ir: IR, root_ir) -> type:
+    name = fidl_ident_to_py_library_member(ir.name())
+    properties = {
+        "__doc__": docstring(ir),
+        "__fidl_kind__": "server",
+        "library": root_ir.name(),
+        "method_map": {},
+    }
+    for method in ir.methods():
+        if not method.has_request():
+            # This is an event.
+            continue
+        method_snake_case = camel_case_to_snake_case(method.name())
+        properties[method_snake_case] = protocol_method(
+            method, root_ir, get_fidl_request_server_lambda)
+        ident = ""
+        if "maybe_request_payload" in method:
+            ident = method.request_payload_identifier()
+        properties["method_map"][method.ordinal()] = MethodInfo(
+            name=method_snake_case,
+            request_ident=ident,
+            requires_response=method.has_response() and
+            "maybe_response_payload" in method,
+            empty_response=method.has_response() and
+            "maybe_response_payload" not in method)
+    return type(name, (ServerBase,), properties)
 
 
 def protocol_client_type(ir: IR, root_ir) -> type:
     name = fidl_ident_to_py_library_member(ir.name())
     properties = {
         "__doc__": docstring(ir),
-        "__fidl__kind__": "client",
+        "__fidl_kind__": "client",
     }
     for method in ir.methods():
         if not method.has_request():
             # This is an event. This needs to be handled on its own.
             continue
-        method_snake_case = re.sub(r"(?<!^)(?=[A-Z])", "_",
-                                   method.name()).lower()
-        properties[method_snake_case] = protocol_client_method(method, root_ir)
+        method_snake_case = camel_case_to_snake_case(method.name())
+        properties[method_snake_case] = protocol_method(
+            method, root_ir, get_fidl_request_client_lambda)
     return type(name, (FidlClient,), properties)
 
 
-def get_fidl_request_lambda(ir: Method, root_ir, msg) -> Callable:
+def get_fidl_method_response_payload_ident(ir: Method, root_ir) -> str:
+    assert ir.has_response()
+    response_ident = ""
+    if ir.get("maybe_response_payload"):
+        response_kind = ir["maybe_response_payload"]["kind"]
+        if response_kind == "identifier":
+            ident = ir["maybe_response_payload"]["identifier"]
+            # Just ensures the module for this is going to be imported.
+            get_kind_by_identifier(ident, root_ir)
+            response_ident = ident
+        else:
+            response_ident = response_kind
+    return response_ident
+
+
+def get_fidl_request_client_lambda(ir: Method, root_ir, msg) -> Callable:
     if ir.has_response():
-        response_ident = ""
-        if ir.get("maybe_response_payload"):
-            response_kind = ir["maybe_response_payload"]["kind"]
-            if response_kind == "identifier":
-                ident = ir["maybe_response_payload"]["identifier"]
-                # Just ensures the module for this is going to be imported.
-                get_kind_by_identifier(ident, root_ir)
-                response_ident = ident
-            else:
-                response_ident = response_kind
+        response_ident = get_fidl_method_response_payload_ident(ir, root_ir)
         if msg:
             return lambda self, **args: self._send_two_way_fidl_request(
                 ir["ordinal"], root_ir.name(), msg(**args), response_ident)
@@ -618,15 +666,36 @@ def get_fidl_request_lambda(ir: Method, root_ir, msg) -> Callable:
         0, ir["ordinal"], root_ir.name(), msg)
 
 
-def protocol_client_method(
-        method: Method, root_ir, recurse_guard=None) -> Callable:
+def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
+    snake_case_name = camel_case_to_snake_case(ir.name())
+    if msg:
+
+        def server_lambda(self, request):
+            raise NotImplementedError(
+                f"Method {snake_case_name} not implemented")
+
+        return lambda self, request: server_lambda(self, request)
+    else:
+
+        def server_lambda(self):
+            raise NotImplementedError(
+                f"Method {snake_case_name} not implemented")
+
+        return lambda self: server_lamdba(self)
+
+
+def protocol_method(
+        method: Method,
+        root_ir,
+        lambda_constructor: Callable,
+        recurse_guard=None) -> Callable:
     assert method.has_request()
     if "maybe_request_payload" in method:
         req_id = method.request_payload_identifier()
         (req_kind, req_ir) = root_ir.resolve_kind(req_id)
     else:
         req_kind = None
-        method_impl = get_fidl_request_lambda(method, root_ir, None)
+        method_impl = lambda_constructor(method, root_ir, None)
     if req_kind == "struct":
         params = [
             inspect.Parameter(
@@ -636,7 +705,7 @@ def protocol_client_method(
                     member["type"], root_ir, recurse_guard),
             ) for member in req_ir["members"]
         ]
-        method_impl = get_fidl_request_lambda(
+        method_impl = lambda_constructor(
             method, root_ir, get_type_by_identifier(req_id, root_ir))
     elif req_kind == "table":
         params = [
@@ -648,7 +717,7 @@ def protocol_client_method(
                     member["type"], root_ir, recurse_guard),
             ) for member in req_ir["members"] if not member["reserved"]
         ]
-        method_impl = get_fidl_request_lambda(
+        method_impl = lambda_constructor(
             method, root_ir, get_type_by_identifier(req_id, root_ir))
     elif req_kind == "union":
         params = [
@@ -660,7 +729,7 @@ def protocol_client_method(
             for member in req_ir["members"]
             if not member["reserved"]
         ]
-        method_impl = get_fidl_request_lambda(
+        method_impl = lambda_constructor(
             method, root_ir, get_type_by_identifier(req_id, root_ir))
     elif req_kind == None:
         params = []
@@ -728,6 +797,7 @@ class FIDLLibraryModule(types.ModuleType):
         # Shove ourselves into the import map so that composite types can be looked up as they are
         # exported.
         sys.modules[fullname] = self
+        self.fullname = fullname
         ir_path = fidl_import_to_library_path(fullname)
         add_ir_path(ir_path)
         self.__ir__ = load_ir_from_import(fullname)
@@ -798,5 +868,6 @@ class FIDLLibraryModule(types.ModuleType):
         self.__all__.append(c.name)
 
     def export_type(self, t):
+        setattr(t, "__module__", self.fullname)
         setattr(self, t.__name__, t)
         self.__all__.append(t.__name__)

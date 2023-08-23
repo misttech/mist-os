@@ -210,6 +210,12 @@ PyObject *Channel_take(Channel *self, PyObject *Py_UNUSED(arg)) {
   return result;
 }
 
+PyObject *Channel_close(Channel *self, PyObject *Py_UNUSED(arg)) {
+  ffx_close_handle(self->super.handle);
+  self->super.handle = 0;
+  Py_RETURN_NONE;
+}
+
 PyMethodDef Channel_methods[] = {
     {"write", reinterpret_cast<PyCFunction>(Channel_write), METH_O, nullptr},
     {"read", reinterpret_cast<PyCFunction>(Channel_read), METH_NOARGS, nullptr},
@@ -217,6 +223,8 @@ PyMethodDef Channel_methods[] = {
     {"take", reinterpret_cast<PyCFunction>(Channel_take), METH_NOARGS,
      "Takes the underlying fidl handle, setting it internally to zero (thus invalidating the "
      "underlying channel). This is used for sending a handle through FIDL function calls."},
+    {"close", reinterpret_cast<PyCFunction>(Channel_close), METH_NOARGS,
+     "Closes the underlying channel. This will invalidate any other copies of this channel."},
     {"create", reinterpret_cast<PyCFunction>(Channel_create), METH_NOARGS | METH_CLASS,
      "classmethod for creating a pair of FIDL channels. These are connected bidirectionally."},
     {nullptr, nullptr, 0, nullptr}};

@@ -68,6 +68,8 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             txid=txid,
             ordinal=method_ordinal(
                 protocol="fuchsia.developer.ffx/Echo", method="EchoString"))
+        ordinal = method_ordinal(
+            protocol="fuchsia.developer.ffx/Echo", method="EchoString")
         self.assertEqual(buf, encoded_bytes)
         msg = encode_fidl_message(
             object=ffx_fidl.EchoEchoStringResponse(response="otherthing"),

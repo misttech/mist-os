@@ -39,11 +39,6 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
     PyErr_SetString(PyExc_TypeError, "Expected handles to be a list");
     return nullptr;
   }
-  auto display_options = DisplayOptions{
-      .pretty_print = true,
-      .with_process_info = false,
-      .needs_colors = false,
-  };
   char *c_bytes = PyByteArray_AsString(bytes);
   if (c_bytes == nullptr) {
     return nullptr;

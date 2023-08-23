@@ -37,11 +37,19 @@ PyObject *Handle_take(Handle *self, PyObject *Py_UNUSED(arg)) {
   return result;
 }
 
+PyObject *Handle_close(Handle *self, PyObject *Py_UNUSED(arg)) {
+  ffx_close_handle(self->handle);
+  self->handle = 0;
+  Py_RETURN_NONE;
+}
+
 PyMethodDef Channel_methods[] = {
     {"as_int", reinterpret_cast<PyCFunction>(Handle_as_int), METH_NOARGS, nullptr},
     {"take", reinterpret_cast<PyCFunction>(Handle_take), METH_NOARGS,
      "Takes the underlying fidl handle, setting it internally to zero (thus invalidating the "
      "underlying channel). This is used for sending a handle through FIDL function calls."},
+    {"close", reinterpret_cast<PyCFunction>(Handle_close), METH_NOARGS,
+     "Closes the underlying handle. This will invalidate any other copies of this channel."},
     {nullptr, nullptr, 0, nullptr}};
 
 DES_MIX PyTypeObject HandleType = {

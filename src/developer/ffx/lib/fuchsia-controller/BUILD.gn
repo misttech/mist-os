@@ -116,9 +116,11 @@ python_library("fidl_bindings") {
   sources = [
     "__init__.py",
     "_client.py",
+    "_fidl_common.py",
     "_import.py",
     "_ipc.py",
     "_library.py",
+    "_server.py",
   ]
 }
 
@@ -156,6 +158,8 @@ group("tests") {
       "tests:fuchsia_controller_errors_test",
       "tests:fuchsia_controller_fidl_channel_test",
       "tests:fuchsia_controller_fidl_client_test",
+      "tests:fuchsia_controller_fidl_common_test",
+      "tests:fuchsia_controller_fidl_server_test",
       "tests:fuchsia_controller_importing_test",
       "tests:fuchsia_controller_isolate_directory_test",
       "tests:fuchsia_controller_socket_test",
