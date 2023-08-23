@@ -174,6 +174,7 @@ impl DeviceHandler {
         (
             BindingId,
             impl futures::Stream<Item = netdevice_client::Result<netdevice_client::PortStatus>>,
+            fuchsia_async::Task<()>,
         ),
         Error,
     > {
@@ -334,7 +335,8 @@ impl DeviceHandler {
         let devices::StaticCommonInfo { binding_id, name: _, tx_notifier } =
             external_state.static_common_info();
         let binding_id = *binding_id;
-        crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
+        let task =
+            crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         netstack3_core::device::set_tx_queue_configuration(
             sync_ctx,
@@ -386,7 +388,7 @@ impl DeviceHandler {
 
         non_sync_ctx.devices.add_device(binding_id, core_id.clone());
 
-        Ok((binding_id, status_stream))
+        Ok((binding_id, status_stream, task))
     }
 }
 

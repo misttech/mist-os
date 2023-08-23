@@ -136,7 +136,7 @@ async fn run_device_control(
                     options,
                     control_handle: _,
                 } => {
-                    if let Some(interface_control_task) = create_interface(
+                    if let Some(interface_tasks) = create_interface(
                         port,
                         control,
                         options,
@@ -146,7 +146,7 @@ async fn run_device_control(
                     )
                     .await
                     {
-                        tasks.push(interface_control_task);
+                        tasks.extend(interface_tasks);
                     }
                 }
                 fnet_interfaces_admin::DeviceControlRequest::Detach { control_handle: _ } => {
@@ -230,8 +230,8 @@ impl OwnedControlHandle {
 /// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface
 /// request.
 ///
-/// Returns `Some(fuchsia_async::Task)` if an interface was created
-/// successfully. The returned `Task` must be polled to completion and is tied
+/// Returns `Some([fuchsia_async::Task;2])` if an interface was created
+/// successfully. The returned `Task`s must be polled to completion and are tied
 /// to the created interface's lifetime.
 async fn create_interface(
     port: fhardware_network::PortId,
@@ -240,7 +240,7 @@ async fn create_interface(
     ns: &mut Netstack,
     handler: &netdevice_worker::DeviceHandler,
     device_stopped_fut: async_utils::event::EventWaitResult,
-) -> Option<fuchsia_async::Task<()>> {
+) -> Option<[fuchsia_async::Task<()>; 2]> {
     tracing::debug!("creating interface from {:?} with {:?}", port, options);
     let fnet_interfaces_admin::Options { name, metric, .. } = options;
     let (control_sender, mut control_receiver) =
@@ -249,14 +249,15 @@ async fn create_interface(
         .add_port(ns, netdevice_worker::InterfaceOptions { name, metric }, port, control_sender)
         .await
     {
-        Ok((binding_id, status_stream)) => {
-            Some(fasync::Task::spawn(run_netdevice_interface_control(
+        Ok((binding_id, status_stream, tx_task)) => {
+            let interface_control_task = fasync::Task::spawn(run_netdevice_interface_control(
                 ns.ctx.clone(),
                 binding_id,
                 status_stream,
                 device_stopped_fut,
                 control_receiver,
-            )))
+            ));
+            Some([interface_control_task, tx_task])
         }
         Err(e) => {
             tracing::warn!("failed to add port {:?} to device: {:?}", port, e);

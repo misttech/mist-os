@@ -840,7 +840,7 @@ impl Netstack {
     ) -> (
         futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
         BindingId,
-        fasync::Task<()>,
+        [NamedTask; 3],
     ) {
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
@@ -891,14 +891,19 @@ impl Netstack {
 
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             loopback.external_state();
-        crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
+        let rx_task =
+            crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
         let loopback: DeviceId<_> = loopback.into();
         let external_state = loopback.external_state();
         let StaticCommonInfo { binding_id, name: _, tx_notifier } =
             external_state.static_common_info();
         let binding_id = *binding_id;
         devices.add_device(binding_id, loopback.clone());
-        crate::bindings::devices::spawn_tx_task(tx_notifier, self.ctx.clone(), loopback.clone());
+        let tx_task = crate::bindings::devices::spawn_tx_task(
+            tx_notifier,
+            self.ctx.clone(),
+            loopback.clone(),
+        );
 
         // Don't need DAD and IGMP/MLD on loopback.
         let ip_config = Some(IpDeviceConfigurationUpdate {
@@ -939,9 +944,17 @@ impl Netstack {
 
         // Loopback interface can't be removed.
         let removable = false;
-        let task =
+        let control_task =
             self.spawn_interface_control(binding_id, stop_receiver, control_receiver, removable);
-        (stop_sender, binding_id, task)
+        (
+            stop_sender,
+            binding_id,
+            [
+                NamedTask::new("loopback control", control_task),
+                NamedTask::new("loopback tx", tx_task),
+                NamedTask::new("loopback rx", rx_task),
+            ],
+        )
     }
 }
 
@@ -987,6 +1000,34 @@ impl<D: DiscoverableProtocolMarker, S: RequestStream<Protocol = D>> RequestStrea
     }
 }
 
+/// A helper struct to have named tasks.
+///
+/// Tasks are already tracked in the executor by spawn location, but long
+/// running tasks are not expected to terminate except during clean shutdown.
+/// Naming these helps root cause debug assertions.
+#[derive(Debug)]
+pub(crate) struct NamedTask {
+    name: &'static str,
+    task: fuchsia_async::Task<()>,
+}
+
+impl NamedTask {
+    /// Creates a new named task from `fut` with `name`.
+    #[track_caller]
+    fn spawn(name: &'static str, fut: impl futures::Future<Output = ()> + Send + 'static) -> Self {
+        Self { name, task: fuchsia_async::Task::spawn(fut) }
+    }
+
+    fn new(name: &'static str, task: fuchsia_async::Task<()>) -> Self {
+        Self { name, task }
+    }
+
+    fn into_future(self) -> impl futures::Future<Output = &'static str> + Send + 'static {
+        let Self { name, task } = self;
+        task.map(move |()| name)
+    }
+}
+
 impl NetstackSeed {
     /// Consumes the netstack and starts serving all the FIDL services it
     /// implements to the outgoing service directory.
@@ -1000,20 +1041,39 @@ impl NetstackSeed {
         let Self { mut netstack, interfaces_worker, interfaces_watcher_sink } = self;
 
         // Start servicing timers.
-        netstack.ctx.non_sync_ctx().timers.spawn(netstack.clone());
+        let timers_task =
+            NamedTask::new("timers", netstack.ctx.non_sync_ctx().timers.spawn(netstack.clone()));
 
         // The Sender is unused because Loopback should never be canceled.
-        let (_sender, _, loopback_interface_control_task): (
-            futures::channel::oneshot::Sender<_>,
-            BindingId,
-            _,
-        ) = netstack.add_loopback();
+        let (_sender, _, loopback_tasks): (futures::channel::oneshot::Sender<_>, BindingId, _) =
+            netstack.add_loopback();
 
-        let interfaces_worker_task = fuchsia_async::Task::spawn(async move {
+        let interfaces_worker_task = NamedTask::spawn("interfaces worker", async move {
             let result = interfaces_worker.run().await;
-            // The worker is not expected to end for the lifetime of the stack.
-            panic!("interfaces worker finished unexpectedly {:?}", result);
+            let _: futures::stream::FuturesUnordered<_> =
+                result.expect("interfaces worker ended with an error");
         });
+
+        let no_finish_tasks =
+            loopback_tasks.into_iter().chain([interfaces_worker_task, timers_task]);
+        let no_finish_tasks = no_finish_tasks.map(NamedTask::into_future);
+        let no_finish_tasks = futures::stream::FuturesUnordered::from_iter(no_finish_tasks);
+        let no_finish_tasks_fut = no_finish_tasks.into_future().map(
+            |(name, _): (_, futures::stream::FuturesUnordered<_>)| match name {
+                Some(name) => panic!("task {name} ended unexpectedly"),
+                None => panic!("unexpected end of infinite task stream"),
+            },
+        );
+        // Code generation for this async fn is bugging out very far away (where
+        // `NetstackSeed::serve` is called). Looks like:
+        // error: higher-ranked lifetime error
+        // --> ...
+        //     |
+        //     |  fasync::Task::spawn(async move { seed.serve(services, &inspector_cloned).await });
+        //     |
+        // We can get around that by boxing this future and everything is okay
+        // again. This only happens once, we can pay the allocation.
+        let no_finish_tasks_fut = no_finish_tasks_fut.boxed();
 
         let socket_ctx = netstack.ctx.clone();
         let _sockets = inspector.root().create_lazy_child("Sockets", move || {
@@ -1056,12 +1116,21 @@ impl NetstackSeed {
                                 .await
                         }
                         WorkItem::Incoming(Service::Socket(socket)) => {
-                            socket.serve_with(|rs| socket::serve(netstack.ctx.clone(), rs)).await
+                            // Run on a separate task so socket requests are not
+                            // bound to the same thread as the main services
+                            // loop.
+                            fuchsia_async::Task::spawn(socket::serve(netstack.ctx.clone(), socket))
+                                .await;
                         }
                         WorkItem::Incoming(Service::PacketSocket(socket)) => {
-                            socket
-                                .serve_with(|rs| socket::packet::serve(netstack.ctx.clone(), rs))
-                                .await
+                            // Run on a separate task so socket requests are not
+                            // bound to the same thread as the main services
+                            // loop.
+                            fuchsia_async::Task::spawn(socket::packet::serve(
+                                netstack.ctx.clone(),
+                                socket,
+                            ))
+                            .await;
                         }
                         WorkItem::Incoming(Service::RawSocket(socket)) => {
                             socket.serve_with(|rs| socket::raw::serve(rs)).await
@@ -1136,8 +1205,7 @@ impl NetstackSeed {
                 .await
         };
 
-        let ((), (), ()) =
-            futures::join!(work_items_fut, interfaces_worker_task, loopback_interface_control_task);
+        let ((), ()) = futures::join!(work_items_fut, no_finish_tasks_fut);
         debug!("Services stream finished");
     }
 }

@@ -39,6 +39,10 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// A responder for a "close" request.
     type CloseResponder: CloseResponder;
 
+    /// Type of futures spawned by the worker that must be polled to
+    /// completion when the worker terminates.
+    type TaskFuture: futures::Future<Output = ()>;
+
     /// Handles a single request.
     ///
     /// Implementations should handle the incoming request in the appropriate
@@ -46,14 +50,16 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// - [`ControlFlow::Break`] to signal that the stream that produced the
     ///   request should be closed, with the responder to signal when the close
     ///   operation is complete;
-    /// - [`ControlFlow::Continue`] with `Some(new_stream)` when an operation
-    ///   resulted in a new stream of requests for the same socket ("clone");
-    /// - `ControlFlow::Continue(None)` otherwise.
+    /// - [`ControlFlow::Continue`] to continue operating the request stream. If
+    ///   `(Some(_), _)`, the yielded request stream is also operated on by this
+    ///   same worker, as part of initiating a new workflow on the same socket
+    ///   ("clone"). If `(_, Some(_)))`, a task spawned while handling the
+    ///   request is being yielded to be polled to completion by the caller.
     fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>>;
+    ) -> ControlFlow<Self::CloseResponder, (Option<Self::RequestStream>, Option<Self::TaskFuture>)>;
 
     /// Closes the socket managed by this handler.
     ///
@@ -112,9 +118,19 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
     ///
     /// Returns when getting the first `Close` request.
     async fn handle_stream(mut self, events: H::RequestStream) -> Result<(), fidl::Error> {
-        let mut futures = OneOrMany::new(events.into_future());
+        let mut request_streams = OneOrMany::new(events.into_future());
+        let mut tasks = futures::stream::FuturesUnordered::new();
         let respond_close = loop {
-            let Some((request, request_stream)) = futures.next().await else {
+            let request = futures::select! {
+                request = request_streams.next() => request,
+                // Continuously poll tasks to pop them from the collection and
+                // avoid unbounded memory growth.
+                r = tasks.by_ref().next() => {
+                    r.unwrap_or(());
+                    continue;
+                }
+            };
+            let Some((request, request_stream)) = request else {
                 // There are no more streams left, so there's no close responder
                 // to defer responding to.
                 break None
@@ -136,7 +152,14 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
             };
             let Self { ctx, data } = &mut self;
             match data.handle_request(ctx, request) {
-                ControlFlow::Continue(None) => {}
+                ControlFlow::Continue((stream, task)) => {
+                    if let Some(stream) = stream {
+                        request_streams.push(stream.into_future());
+                    }
+                    if let Some(task) = task {
+                        tasks.push(task);
+                    }
+                }
                 ControlFlow::Break(close_responder) => {
                     let respond_close = move || {
                         close_responder
@@ -144,7 +167,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                             .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                         request_stream.control_handle().shutdown();
                     };
-                    if futures.is_empty() {
+                    if request_streams.is_empty() {
                         // Save the final close request to be performed after
                         // the socket state is removed from Core.
                         break Some(respond_close);
@@ -156,9 +179,8 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                         continue;
                     }
                 }
-                ControlFlow::Continue(Some(stream)) => futures.push(stream.into_future()),
             };
-            futures.push(request_stream.into_future());
+            request_streams.push(request_stream.into_future());
         };
 
         let Self { mut ctx, data } = self;
@@ -168,6 +190,8 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         if let Some(respond_close) = respond_close {
             respond_close();
         }
+        // Socket should be closed, join on all spawned tasks.
+        tasks.collect::<()>().await;
         Ok(())
     }
 }

@@ -693,31 +693,29 @@ pub(super) fn spawn_worker(
     ctx: crate::bindings::Ctx,
     events: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
-) -> Result<(), fposix::Errno> {
+) -> Result<fasync::Task<()>, fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            fasync::Task::spawn(SocketWorker::serve_stream_with(
+            Ok(fasync::Task::spawn(SocketWorker::serve_stream_with(
                 ctx,
                 BindingData::<Ipv4, Udp>::new,
                 properties,
                 events,
-            ))
+            )))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            fasync::Task::spawn(SocketWorker::serve_stream_with(
+            Ok(fasync::Task::spawn(SocketWorker::serve_stream_with(
                 ctx,
                 BindingData::<Ipv6, Udp>::new,
                 properties,
                 events,
-            ))
+            )))
         }
         (
             fposix_socket::Domain::Ipv4 | fposix_socket::Domain::Ipv6,
             fposix_socket::DatagramSocketProtocol::IcmpEcho,
-        ) => return Err(fposix::Errno::Enoprotoopt),
+        ) => Err(fposix::Errno::Enoprotoopt),
     }
-    .detach();
-    Ok(())
 }
 
 impl worker::CloseResponder for fposix_socket::SynchronousDatagramSocketCloseResponder {
@@ -743,13 +741,19 @@ where
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
     type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
+    type TaskFuture = crate::bindings::util::UninstantiableFuture<()>;
 
     fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
-        RequestHandler { ctx, data: self }.handle_request(request)
+    ) -> ControlFlow<Self::CloseResponder, (Option<Self::RequestStream>, Option<Self::TaskFuture>)>
+    {
+        let flow = RequestHandler { ctx, data: self }.handle_request(request);
+        match flow {
+            ControlFlow::Break(b) => ControlFlow::Break(b),
+            ControlFlow::Continue(c) => ControlFlow::Continue((c, None)),
+        }
     }
 
     fn close(
@@ -2759,33 +2763,27 @@ mod tests {
             fposix::Errno::Einval,
         );
 
-        let (e1, e2) = zx::EventPair::create();
-        fasync::Task::spawn(async move {
+        let left = async {
             assert_eq!(
                 fasync::OnSignals::new(&events, ZXSIO_SIGNAL_INCOMING).await,
                 Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
             );
+        };
 
-            assert_eq!(e1.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING), Ok(()));
-        })
-        .detach();
-
-        let () = socket
-            .shutdown(fposix_socket::ShutdownMode::READ)
-            .await
-            .unwrap()
-            .expect("failed to shutdown");
-        let (_, data, _, _) = socket
-            .recv_msg(false, 2048, false, fposix_socket::RecvMsgFlags::empty())
-            .await
-            .unwrap()
-            .expect("recvmsg should return empty data");
-        assert!(data.is_empty());
-
-        assert_eq!(
-            fasync::OnSignals::new(&e2, ZXSIO_SIGNAL_INCOMING).await,
-            Ok(ZXSIO_SIGNAL_INCOMING | zx::Signals::EVENTPAIR_PEER_CLOSED)
-        );
+        let right = async {
+            let () = socket
+                .shutdown(fposix_socket::ShutdownMode::READ)
+                .await
+                .unwrap()
+                .expect("failed to shutdown");
+            let (_, data, _, _) = socket
+                .recv_msg(false, 2048, false, fposix_socket::RecvMsgFlags::empty())
+                .await
+                .unwrap()
+                .expect("recvmsg should return empty data");
+            assert!(data.is_empty());
+        };
+        let ((), ()) = futures::future::join(left, right).await;
 
         let () = socket
             .shutdown(fposix_socket::ShutdownMode::READ)

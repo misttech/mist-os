@@ -8,10 +8,13 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fpsocket;
 use fidl_fuchsia_posix_socket_packet as fppacket;
 
-use fidl::{endpoints::RequestStream as _, Peered as _};
+use fidl::{
+    endpoints::{ProtocolMarker as _, RequestStream as _},
+    Peered as _,
+};
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, HandleBased as _};
-use futures::TryStreamExt as _;
+use futures::StreamExt as _;
 use net_types::ethernet::Mac;
 use netstack3_core::{
     device::{
@@ -75,34 +78,46 @@ impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
     }
 }
 
-pub(crate) async fn serve(
-    ctx: Ctx,
-    stream: fppacket::ProviderRequestStream,
-) -> Result<(), fidl::Error> {
+pub(crate) async fn serve(ctx: Ctx, stream: fppacket::ProviderRequestStream) {
     let ctx = &ctx;
     stream
-        .try_for_each(|req| async {
+        .filter_map(|req| {
+            let req = match req {
+                Ok(req) => req,
+                Err(e) => {
+                    if !e.is_closed() {
+                        tracing::error!(
+                            "{} request error {e:?}",
+                            fppacket::ProviderMarker::DEBUG_NAME
+                        );
+                    }
+                    return futures::future::ready(None);
+                }
+            };
             match req {
                 fppacket::ProviderRequest::Socket { responder, kind } => {
                     let (client, request_stream) = fidl::endpoints::create_request_stream()
                         .unwrap_or_else(|e: fidl::Error| {
                             panic!("failed to create a new request stream: {e}")
                         });
-                    fasync::Task::spawn(SocketWorker::serve_stream_with(
+                    let task = fasync::Task::spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
                         move |sync_ctx, non_sync_ctx, properties| {
                             BindingData::new(sync_ctx, non_sync_ctx, kind, properties)
                         },
                         SocketWorkerProperties {},
                         request_stream,
-                    ))
-                    .detach();
+                    ));
                     responder
                         .send(Ok(client))
                         .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    futures::future::ready(Some(task))
                 }
             }
-            Ok(())
+        })
+        .for_each_concurrent(None, |task| {
+            // Wait for all the socket tasks on this provider to finish.
+            task
         })
         .await
 }
@@ -224,13 +239,19 @@ impl worker::SocketWorkerHandler for BindingData {
     type Request = fppacket::SocketRequest;
     type RequestStream = fppacket::SocketRequestStream;
     type CloseResponder = fppacket::SocketCloseResponder;
+    type TaskFuture = crate::bindings::util::UninstantiableFuture<()>;
 
     fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
-        RequestHandler { ctx, data: self }.handle_request(request)
+    ) -> ControlFlow<Self::CloseResponder, (Option<Self::RequestStream>, Option<Self::TaskFuture>)>
+    {
+        let flow = RequestHandler { ctx, data: self }.handle_request(request);
+        match flow {
+            ControlFlow::Break(b) => ControlFlow::Break(b),
+            ControlFlow::Continue(r) => ControlFlow::Continue((r, None)),
+        }
     }
 
     fn close(

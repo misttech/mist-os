@@ -154,7 +154,7 @@ pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
     mut ctx: Ctx,
     device_id: &LoopbackDeviceId<BindingsNonSyncCtxImpl>,
-) {
+) -> fuchsia_async::Task<()> {
     let mut watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
@@ -165,14 +165,13 @@ pub(crate) fn spawn_rx_task(
             handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
         }
     })
-    .detach()
 }
 
 pub(crate) fn spawn_tx_task(
     notifier: &NeedsDataNotifier,
     mut ctx: Ctx,
     device_id: DeviceId<BindingsNonSyncCtxImpl>,
-) {
+) -> fuchsia_async::Task<()> {
     let mut watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
@@ -191,7 +190,6 @@ pub(crate) fn spawn_tx_task(
             }
         }
     })
-    .detach()
 }
 
 /// Static information common to all devices.

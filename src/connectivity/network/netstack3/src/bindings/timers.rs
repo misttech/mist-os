@@ -323,7 +323,7 @@ where
     /// # Panics
     ///
     /// Panics if this `TimerDispatcher` was already spawned.
-    pub(crate) fn spawn<C: TimerContext<T> + Send + Sync>(&self, ctx: C) {
+    pub(crate) fn spawn<C: TimerContext<T> + Send + Sync>(&self, ctx: C) -> fasync::Task<()> {
         let (sender, mut recv) = mpsc::unbounded();
         {
             let Self { inner } = self;
@@ -472,7 +472,6 @@ where
                 }
             }
         })
-        .detach()
     }
 
     /// Schedule a new timer with identifier `timer_id` at `time`.
@@ -658,7 +657,10 @@ mod tests {
         fn new() -> (Self, mpsc::UnboundedReceiver<usize>) {
             let (fired, receiver) = mpsc::unbounded();
             let this = TestContext { dispatcher: TestDispatcher::default().into(), fired };
-            this.dispatcher.spawn(this.clone());
+            let task = this.dispatcher.spawn(this.clone());
+            // TODO(https://fxbug.dev/132457): Don't detach this task once the
+            // timer task has a clean shutdown signal.
+            task.detach();
             (this, receiver)
         }
 
