@@ -14,8 +14,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/va
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
-  --gtest_repeat*) ARGS+=(--cmdline="$arg") ;;
-  --gtest_filter*) ARGS+=(--cmdline="$arg") ;;
+  --gtest_*) ARGS+=(--cmdline="$arg") ;;
   -*) ARGS+=("$arg") ;;
   esac
 done
