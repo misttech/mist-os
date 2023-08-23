@@ -21,8 +21,7 @@ The versioning rules are simple:
 `"https://fuchsia.dev/schema/product_bundle/hardware-f6f47515.json"`.
 
 ## Organization
-Each significant effort, such as Modular SDK, should allocate a sub-directory
-to house its schemata.
+Each significant effort should allocate a sub-directory to house its schemata.
 
 ### Common definitions
 Keep common definitions private to your projects unless they can actually be
