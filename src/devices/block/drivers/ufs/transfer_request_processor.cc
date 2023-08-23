@@ -159,6 +159,75 @@ zx::result<uint8_t> TransferRequestProcessor::ReserveSlot() {
   return zx::error(ZX_ERR_NO_RESOURCES);
 }
 
+template <class RequestType>
+zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
+    RequestType &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer) {
+  const bool is_scsi = std::is_base_of<ScsiCommandUpiu, RequestType>::value;
+
+  const uint16_t response_offset = request.GetResponseOffset();
+  const uint16_t response_length = request.GetResponseLength();
+
+  if (is_scsi) {
+    ZX_ASSERT(xfer != std::nullopt && xfer.value() != nullptr);
+    TRACE_DURATION_BEGIN("ufs", "SendRequestUsingSlot SCSI command", "offset",
+                         xfer.value()->start_lba, "length", xfer.value()->block_count);
+  }
+
+  // Record the slot number to |task_tag| for debugging.
+  request.GetHeader().task_tag = slot;
+  auto [prdt_offset, prdt_entry_count] = PreparePrdt<RequestType>(
+      request, slot, (is_scsi ? xfer->get() : nullptr), response_offset, response_length);
+
+  // Copy request and prepare response.
+  void *response;
+  {
+    std::lock_guard lock(request_list_lock_);
+    RequestSlot &request_slot = request_list_.GetSlot(slot);
+    ZX_ASSERT_MSG(request_slot.state == SlotState::kReserved, "Invalid slot state");
+    ZX_ASSERT_MSG(request_slot.xfer == nullptr, "Slot already occupied");
+
+    const size_t length = static_cast<size_t>(response_offset) + response_length;
+    ZX_DEBUG_ASSERT_MSG(length <= request_list_.GetDescriptorBufferSize(slot), "Invalid UPIU size");
+
+    memcpy(request_list_.GetDescriptorBuffer(slot), request.GetData(), response_offset);
+    memset(request_list_.GetDescriptorBuffer<uint8_t>(slot) + response_offset, 0, response_length);
+    response = request_list_.GetDescriptorBuffer(slot, response_offset);
+
+    if (is_scsi) {
+      request_slot.xfer = std::move(xfer.value());
+    }
+  }
+
+  if (zx::result<> result = FillDescriptorAndSendRequest(
+          slot, request.GetDataDirection(), response_offset, response_length, prdt_offset,
+          prdt_entry_count, /*sync=*/true);
+      result.is_error()) {
+    if (is_scsi) {
+      auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
+          ResponseUpiu(response).GetSenseData());
+      zxlogf(ERROR, "Failed to send scsi command upiu, response code 0x%x, sense key 0x%x",
+             sense_data->response_code(), sense_data->sense_key());
+    } else {
+      zxlogf(ERROR, "Failed to send upiu: %s", result.status_string());
+    }
+
+    return result.take_error();
+  }
+
+  if (is_scsi) {
+    TRACE_DURATION_END("ufs", "SendRequestUsingSlot SCSI command");
+  }
+
+  return zx::ok(response);
+}
+
+template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<QueryRequestUpiu>(
+    QueryRequestUpiu &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer);
+template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<ScsiCommandUpiu>(
+    ScsiCommandUpiu &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer);
+template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<NopOutUpiu>(
+    NopOutUpiu &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer);
+
 void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                                               TransferRequestDescriptor *descriptor) {
   TRACE_DURATION("ufs", "ScsiCompletion", "offset", request_slot.xfer->start_lba, "length",
