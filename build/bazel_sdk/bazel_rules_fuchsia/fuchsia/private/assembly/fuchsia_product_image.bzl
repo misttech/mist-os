@@ -5,6 +5,7 @@
 
 load(
     ":providers.bzl",
+    "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
     "FuchsiaProductAssemblyBundleInfo",
     "FuchsiaProductAssemblyInfo",
@@ -64,14 +65,44 @@ def _fuchsia_product_assembly_impl(ctx):
         ],
     )
 
+    # Calculate the path to the board configuration file, if it's not directly
+    # provided.
+    board_config_file_path = None
+    board_config_input = None
+
+    if FuchsiaBoardConfigInfo in ctx.attr.board_config:
+        board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
+
+        # Add all files from the `board_config` attribute as inputs
+        board_config_input = ctx.files.board_config
+
+        # The path to the json file itself will be in the provider's board_config
+        # field, this needs to be in the arguments to assembly.
+        board_config_file_path = board_config.board_config.path
+
+    elif FuchsiaBoardConfigDirectoryInfo in ctx.attr.board_config:
+        board_config = ctx.attr.board_config[FuchsiaBoardConfigDirectoryInfo]
+
+        # Add all files from the directory specified in the provider as inputs
+        board_config_input = board_config.config_directory
+
+        # Locate the file that is the board_configuration.json, and pass the
+        # path to that file as an argument to assembly.
+        for file in board_config.config_directory:
+            if not board_config_file_path and file.path.endswith("board_configuration.json"):
+                board_config_file_path = file.path
+
+        if not board_config_file_path:
+            fail("Unable to locate 'board_configuration.json' in BoardConfigDirectoryInfo")
+
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
-    board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config
+
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
-    ffx_inputs += ctx.files.board_config
+    ffx_inputs += board_config_input
     ffx_inputs += legacy_aib.files
     ffx_inputs += platform_aibs.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
@@ -82,10 +113,14 @@ def _fuchsia_product_assembly_impl(ctx):
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
         "PRODUCT_CONFIG_PATH": product_config_file.path,
-        "BOARD_CONFIG_PATH": board_config_file.path,
+        "BOARD_CONFIG_PATH": board_config_file_path,
         "LEGACY_AIB": legacy_aib.dir.path,
         "PLATFORM_AIB_DIR": platform_aibs.dir.path,
     }
+
+    for (key, value) in shell_env.items():
+        if not value:
+            fail("{} was not set".format(key))
 
     ctx.actions.run_shell(
         inputs = ffx_inputs,
@@ -143,7 +178,7 @@ fuchsia_product_assembly = rule(
         ),
         "board_config": attr.label(
             doc = "A board configuration target.",
-            providers = [FuchsiaBoardConfigInfo],
+            providers = [[FuchsiaBoardConfigInfo], [FuchsiaBoardConfigDirectoryInfo]],
             mandatory = True,
         ),
         "legacy_aib": attr.label(

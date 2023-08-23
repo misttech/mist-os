@@ -9,11 +9,17 @@ import("//build/python/python_binary.gni")
 verification_targets = []
 foreach(board,
         [
-          "x64",
-          "qemu-x64",
-          "vim3",
-          "riscv64",
-          "qemu-riscv64",
+          # These are disabled since these boards are currently not being
+          # defined in Bazel, Bazel assembly is using the GN-defined boards
+          # as "prebuilt" boards.  This logic, however, is left so that when the
+          # boards are migrated back to being defined in assembly, this can be
+          # used to validate that they match during that transition.
+          #
+          # "x64",
+          # "qemu-x64",
+          # "vim3",
+          # "riscv64",
+          # "qemu-riscv64",
         ]) {
   target_label = "verify_${board}"
   verification_targets += [ ":${target_label}" ]

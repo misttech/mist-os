@@ -5,6 +5,7 @@
 # buildifier: disable=module-docstring
 load(
     ":providers.bzl",
+    "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
 )
 load(":util.bzl", "extract_labels", "replace_labels_with_files")
@@ -71,3 +72,28 @@ def fuchsia_board_configuration(
         filesystems = json.encode_indent(filesystems, indent = "    "),
         filesystems_labels = filesystem_labels,
     )
+
+def _fuchsia_prebuilt_board_configuration_impl(ctx):
+    return [
+        FuchsiaBoardConfigDirectoryInfo(
+            config_directory = ctx.files.board_config_directory,
+        ),
+    ]
+
+_fuchsia_prebuilt_board_configuration = rule(
+    doc = """A prebuilt board configuration file and its main hardware support bundle.""",
+    implementation = _fuchsia_prebuilt_board_configuration_impl,
+    provides = [FuchsiaBoardConfigDirectoryInfo],
+    attrs = {
+        "board_config_directory": attr.label(
+            doc = "Path to the directory containing the prebuilt board configuration.",
+            mandatory = True,
+        ),
+    },
+)
+
+def fuchsia_prebuilt_board_configuration(
+        name,
+        directory):
+    """A board configuration that has been prebuilt and exists in a specific folder."""
+    _fuchsia_prebuilt_board_configuration(name = name, board_config_directory = directory)

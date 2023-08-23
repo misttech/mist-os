@@ -36,6 +36,7 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
     _fuchsia_board_configuration = "fuchsia_board_configuration",
+    _fuchsia_prebuilt_board_configuration = "fuchsia_prebuilt_board_configuration",
 )
 load(
     "//fuchsia/private/assembly:providers.bzl",
@@ -103,6 +104,7 @@ fuchsia_assemble_package = _fuchsia_assemble_package
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
+fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_product_image = _fuchsia_product_image
 fuchsia_product_create_system = _fuchsia_product_create_system
 fuchsia_product_assembly = _fuchsia_product_assembly

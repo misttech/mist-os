@@ -15,6 +15,7 @@ bazel_product_bundle("workbench_eng.x64") {
   bazel_recovery_image_target = "//products/zedboot:x64"
   bazel_elf_sizes_target = "//products/workbench:elf_sizes.x64"
   bazel_inputs_from_gn = [
+    "//boards/x64:x64.bazel_input",
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
@@ -31,6 +32,7 @@ bazel_product_bundle("workbench_eng.qemu-x64") {
   bazel_recovery_image_target = "//products/zedboot:qemu-x64"
   bazel_elf_sizes_target = "//products/workbench:elf_sizes.qemu-x64"
   bazel_inputs_from_gn = [
+    "//boards/qemu-x64:qemu-x64.bazel_input",
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
@@ -46,6 +48,7 @@ bazel_product_bundle("workbench_eng.vim3") {
   bazel_recovery_image_target = "//products/zedboot:vim3"
   bazel_elf_sizes_target = "//products/workbench:elf_sizes.vim3"
   bazel_inputs_from_gn = [
+    "//boards/vim3:vim3.bazel_input",
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",

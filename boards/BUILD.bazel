@@ -2,113 +2,31 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_board_configuration")
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_prebuilt_board_configuration")
 
 package(default_visibility = ["//visibility:public"])
 
-fuchsia_board_configuration(
+fuchsia_prebuilt_board_configuration(
     name = "x64",
-    board_name = "x64",
-    filesystems = {
-        "vbmeta": {
-            "key": "LABEL(//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem)",
-            "key_metadata": "LABEL(//:third_party/android/platform/external/avb/test/data/atx_metadata.bin)",
-        },
-        "fvm": {
-            "blobfs": {
-                "size_checker_maximum_bytes": 5216665600,
-            },
-            "sparse_output": {},
-            "fastboot_output": {
-                "truncate_to_length": 17179869184,
-            },
-        },
-        "gpt_all": True,
-    },
-    provided_features = [
-        "fuchsia::driver_framework_v2_support",
-        "fuchsia::wlan_softmac",
-    ],
+    directory = "@legacy_ninja_build_outputs//:x64.bazel_input",
 )
 
-fuchsia_board_configuration(
+fuchsia_prebuilt_board_configuration(
     name = "qemu-x64",
-    board_name = "qemu-x64",
-    filesystems = {
-        "fvm": {
-            "sparse_output": {},
-        },
-    },
-    provided_features = [
-        "fuchsia::driver_framework_v2_support",
-        "fuchsia::wlan_softmac",
-    ],
+    directory = "@legacy_ninja_build_outputs//:qemu-x64.bazel_input",
 )
 
-fuchsia_board_configuration(
+fuchsia_prebuilt_board_configuration(
     name = "vim3",
-    board_name = "vim3",
-    filesystems = {
-        "vbmeta": {
-            "key": "LABEL(//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_devkey_atx_psk.pem)",
-            "key_metadata": "LABEL(//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_dev_atx_metadata.bin)",
-        },
-        "fvm": {
-            "blobfs": {
-                "size_checker_maximum_bytes": 5216665600,
-            },
-            "sparse_output": {},
-            "fastboot_output": {
-                "compress": True,
-
-                # For VIM3, FVM partition uses all of the remaining eMMC.
-                # However, the total size of the eMMC storage maybe 16G or 32G
-                # depending on whether it is a basic or pro version. In
-                # addition, the actual size of the user block allocated by
-                # Fuchsia can be further different. (i.e. 'lsblk' shows a 29G
-                # size user block for the 32Gb version). To avoid the risk of
-                # overflowing available size, here we set it to be the same as
-                # sherlock (3280mb), which is clearly safe and sufficient for
-                # now.
-                "truncate_to_length": 3439329280,
-            },
-        },
-    },
-    provided_features = [
-        "fuchsia::driver_framework_v2_support",
-        "fuchsia::fan",
-        "fuchsia::usb_peripheral_support",
-    ],
+    directory = "@legacy_ninja_build_outputs//:vim3.bazel_input",
 )
 
-fuchsia_board_configuration(
+fuchsia_prebuilt_board_configuration(
     name = "riscv64",
-    board_name = "riscv64",
-    filesystems = {
-        "fvm": {
-            "sparse_output": {},
-        },
-    },
-    provided_features = [
-        "fuchsia::driver_framework_v2_support",
-        "fuchsia::network_require_netstack3",
-    ],
+    directory = "@legacy_ninja_build_outputs//:riscv64.bazel_input",
 )
 
-fuchsia_board_configuration(
+fuchsia_prebuilt_board_configuration(
     name = "qemu-riscv64",
-    board_name = "qemu-riscv64",
-    filesystems = {
-        "fvm": {
-            "slice_size": 8388608,
-            "blobfs": {
-                "size_checker_maximum_bytes": 5216665600,
-            },
-            "sparse_output": {},
-        },
-    },
-    provided_features = [
-        "fuchsia::driver_framework_v2_support",
-        "fuchsia::network_require_netstack3",
-    ],
+    directory = "@legacy_ninja_build_outputs//:qemu-riscv64.bazel_input",
 )

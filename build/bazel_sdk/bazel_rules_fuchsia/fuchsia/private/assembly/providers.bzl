@@ -30,11 +30,30 @@ FuchsiaProductConfigInfo = provider(
     },
 )
 
-FuchsiaBoardConfigInfo = provider(
-    doc = "A board-info used to containing the board_config.json and deps.",
+def _board_config_info_init(*, board_config):
+    if not board_config:
+        fail("board_config may not be empty")
+    return {"board_config": board_config}
+
+FuchsiaBoardConfigInfo, _new_board_config_info = provider(
+    doc = "A board-info used to containing only the board_config.json",
     fields = {
         "board_config": "The JSON board configuration file.",
     },
+    init = _board_config_info_init,
+)
+
+def _board_config_directory_info_init(*, config_directory):
+    if not config_directory:
+        fail("config_directory may not be empty")
+    return {"config_directory": config_directory}
+
+FuchsiaBoardConfigDirectoryInfo, _new_board_config_directory_info = provider(
+    doc = "A prebuilt board configuration in a directory, containing the board_config.json and deps",
+    fields = {
+        "config_directory": "The directory containing the board_config file and the main HardwareSupportBundle",
+    },
+    init = _board_config_directory_info_init,
 )
 
 FuchsiaAssemblyConfigInfo = provider(
