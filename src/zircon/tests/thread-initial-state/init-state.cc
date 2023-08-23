@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <assert.h>
-#include <stdio.h>
 #include <zircon/compiler.h>
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
 
 #include <zxtest/zxtest.h>
 
-extern void thread_entry(uintptr_t arg);
+extern "C" void thread_entry(uintptr_t arg);
 
-int print_fail(void) {
+extern "C" int print_fail(void) {
   EXPECT_TRUE(false, "Failed");
   zx_thread_exit();
   return 1;  // Not reached

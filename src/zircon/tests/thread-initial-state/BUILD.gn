@@ -9,7 +9,7 @@ test("thread-initial-state") {
   output_name = "thread-initial-state-test"
   sources = [
     "${current_cpu}.S",
-    "init-state.c",
+    "init-state.cc",
   ]
   deps = [
     "//sdk/lib/fdio",
