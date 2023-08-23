@@ -233,8 +233,6 @@ on virtualized targets, and address it to close testing workflow gaps as needed.
 
 - The FFX tool and associated stack.
 - The Fuchsia IDK, and any SDK frontends used by out-of-tree developers.
-- The ongoing {Components v2 migration][cfv2-migration] project as it enables
-  out-of-tree component development.
 - Making [RealmBuilder][realm-builder] available out-of-tree.
 - Exposing [RealmBuilder][realm-builder] via the SDK. This includes the
   underlying protocol, and at least one client library.
@@ -243,23 +241,7 @@ on virtualized targets, and address it to close testing workflow gaps as needed.
 
 ## Risks and mitigations
 
-At the time of writing, the most risky dependency is the
-[Components v2 migration][cfv2-migration] effort. This is a critical dependency
-since out-of-tree components are v2 components moving forward, and the
-[Test Runner Framework][trf] assumes that tests are v2 components. The v2
-migration project is a multi-year migration to pay back multi-year tech debt.
-Ongoing work [over the past year][cfv2-roadmap-2020] exposed a long tail of
-issues that need to be addressed.
-
-The risk is primarily of overloading the Component Framework team with work
-that’s needed to unblock many other teams. To mitigate this risk, we are
-distributing and sharing this work across multiple stakeholder teams.
-
-Specifically the work to introduce
-[more language support to RealmBuilder][realm-builder-languages] can easily be
-distributed, since the underlying protocols that RealmBuilder client libraries
-are using are already stable. Though there may be centralized prerequisite tasks
-such as API polish.
+N/A
 
 ## Not in scope
 
@@ -302,7 +284,6 @@ Since system tests are so uniquely different than component tests, this topic is
 covered in a [separate roadmap document][oot-system-testing].
 
 [botanist]: /tools/botanist/
-[cfv2-migration]: /docs/contribute/open_projects/graduated/cfv2_migration.md
 [cfv2-roadmap-2020]: /docs/contribute/roadmap/2020/overview.md#components_v2
 [components]: /docs/concepts/components/v2/introduction.md
 [components-build]: /docs/development/components/build.md
