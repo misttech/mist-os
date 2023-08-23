@@ -37,19 +37,26 @@ def get_meta_far_contents(ffx_bin, far_bin, meta_far_source_path):
                 continue
 
             content = subprocess.run(
-                [ffx_bin, '--isolate-dir', tmpdir, 'package', 'far', 'cat', meta_far_source_path, file_path],
+                [
+                    ffx_bin, '--isolate-dir', tmpdir, 'package', 'far', 'cat',
+                    meta_far_source_path, file_path
+                ],
                 stdout=subprocess.PIPE)
 
             with tempfile.NamedTemporaryFile("wb") as temp_file:
                 temp_file.write(content.stdout)
                 temp_file.flush()
                 file_hash = subprocess.run(
-                    [ffx_bin, '--isolate-dir', tmpdir, 'package', 'file-hash', temp_file.name],
+                    [
+                        ffx_bin, '--isolate-dir', tmpdir, 'package',
+                        'file-hash', temp_file.name
+                    ],
                     stdout=subprocess.PIPE,
                     text=True)
 
                 file_content_hash = file_hash.stdout.split()[0]
-                meta_far_paths_and_merkles.append((file_path, file_content_hash))
+                meta_far_paths_and_merkles.append(
+                    (file_path, file_content_hash))
 
     return meta_far_paths_and_merkles
 
@@ -88,6 +95,11 @@ def main():
         action='store_true')
     parser.add_argument(
         '--depfile', help='Path for generating depfile.', required=False)
+    parser.add_argument(
+        '--is-coverage',
+        help=
+        'If yes, hash check will be downgraded to presence check to avoid hash differences from inclusion of debug data (see `//tools/cmc/build/cml.gni` for more).',
+        action='store_true')
 
     args = parser.parse_args()
 
@@ -139,17 +151,44 @@ def main():
                 "present": True
             }
         if path in args.expected_files_exact:
-            # Add as an 'exact' file.
-            generated_package_content_checklist['content']['files'][path] = {
-                "hash": merkle
-            }
+            if args.is_coverage:
+                # Add as a 'present' file.
+                generated_package_content_checklist['content']['files'][
+                    path] = {
+                        "present": True
+                    }
+            else:
+                # Add as an 'exact' file.
+                generated_package_content_checklist['content']['files'][
+                    path] = {
+                        "hash": merkle
+                    }
 
-    # Ensure all expected 'present' files seen in manifest.
-    for expected_file_present in args.expected_files_present:
+    # Ensure all expected files seen in manifest.
+    expected_files_present = args.expected_files_present
+    expected_files_exact = args.expected_files_exact
+    if args.is_coverage:
+        print(
+            f"Warning: Hash checks downgraded to presence-checks. See 'is-coverage' flag in `//build/packages/generate_sdk_package_content_checklist.py` for more.",
+            file=sys.stdout)
+        expected_files_present += args.expected_files_exact
+        expected_files_exact = []
+
+    for expected_file_present in expected_files_present:
         if expected_file_present not in generated_package_content_checklist[
                 'content']['files'].keys():
             print(
                 f"File declared 'present' not found manifest: '{expected_file_present}'. Files available from manifest and meta far are:",
+                file=sys.stderr)
+            print(
+                "\n".join(sorted([path for path, _ in paths_and_merkles])),
+                file=sys.stderr)
+            return 1
+    for expected_file_exact in expected_files_exact:
+        if expected_file_exact not in generated_package_content_checklist[
+                'content']['files'].keys():
+            print(
+                f"File declared 'exact' not found manifest: '{expected_file_exact}'. Files available from manifest and meta far are:",
                 file=sys.stderr)
             print(
                 "\n".join(sorted([path for path, _ in paths_and_merkles])),
@@ -176,6 +215,10 @@ def main():
             with open(args.reference, 'r') as manifest_file:
                 golden = json.load(manifest_file)
 
+            if args.is_coverage:
+                # Must change golden to only use presence in case of debugdata.
+                for path in golden['content']['files']:
+                    golden['content']['files'][path] = {"present": True}
             golden_str = json.dumps(golden, indent=2)
 
             if not generated_package_content_checklist_str == golden_str:

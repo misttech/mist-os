@@ -5,6 +5,7 @@
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/sdk_atom.gni")
 import("//tools/check-licenses/build/license_data.gni")
+import("//tools/cmc/build/expect_includes.gni")
 
 # Defines an in-tree package for distribution in the SDK, landing
 # the end package manifest at
@@ -172,6 +173,11 @@ template("sdk_fuchsia_package") {
         "--depfile",
         rebase_path(depfile, root_build_dir),
       ]
+
+      # FIXME(https://fxbug.dev/132644)
+      if (is_coverage) {
+        args += [ "--is-coverage" ]
+      }
 
       foreach(exact_file, expected_files_exact) {
         args += [
