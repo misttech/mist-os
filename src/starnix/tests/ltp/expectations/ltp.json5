@@ -142,6 +142,7 @@
                 "io_submit01",
                 "io_submit02",
                 "io_submit03",
+                "io_uring01",
                 "ioctl07",
                 "ioctl_loop04",
                 "ioctl_loop05",
@@ -159,7 +160,6 @@
                 "keyctl03",
                 "keyctl05",
                 "keyctl06",
-                "kill10",
                 "leapsec01",
                 "lseek11",
                 "madvise01",
@@ -262,6 +262,7 @@
                 "sendmsg01",
                 "sendto01",
                 "set_thread_area01",
+                "setitimer01",
                 "setitimer02",
                 "setpgid01",
                 "setpriority01",
@@ -376,20 +377,10 @@
 
                 // These tests hang
                 "creat07",
-
-                // Tests reach unexpected Abort
                 "fork14",
-                "getdtablesize01",
-                "gettimeofday02",
-                "io_uring01",
+
+                // Makes all following tests to fail.
                 "kill10",
-                "mmapstress01",
-                "perf_event_open02",
-                "pipe07",
-                "rename14",
-                "rt_sigsuspend01",
-                "setitimer01",
-                "sysfs02",
 
                 // TODO(fxbug.dev/129388) Removing these skip tests leads to the entire ltp_tests_bundle_w
                 // to fail on core.x64-vg-debug. No failure was observed on vg-release.
