@@ -214,7 +214,7 @@ TEST(VmoZeroTestCase, MergeZeroChildren) {
 
   // Close the child. Pages should cease being committed and not move to the parent.
   child.reset();
-  EXPECT_EQ(0, VmoCommittedBytes(parent));
+  ASSERT_TRUE(PollVmoCommittedBytes(parent, 0));
 }
 
 // Tests that after merging a child with its hidden parent that hidden pages are correctly preserved
@@ -241,7 +241,7 @@ TEST(VmoZeroTestCase, AllocateAfterMerge) {
 
   // Should only have 1 page attributed to us, and reading should still give us our expected pages
   // and not those of our merge partner.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child));
+  ASSERT_TRUE(PollVmoCommittedBytes(child, zx_system_get_page_size()));
   VmoCheck(child, 0, 0);
   VmoCheck(child, 2, zx_system_get_page_size());
 }
@@ -290,6 +290,10 @@ TEST(VmoZeroTestCase, AllocateAfterMergeHiddenChild) {
   VmoCheck(child2, 0, 0);
   VmoCheck(child2, 2, zx_system_get_page_size());
   VmoCheck(child2, 3, zx_system_get_page_size() * 2);
+  // The reset of child1 may be ongoing due to another part of the system holding a reference, so
+  // poll the committed bytes individually until we know things are stable before continuing.
+  ASSERT_TRUE(PollVmoCommittedBytes(parent, 2 * zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoCommittedBytes(child2, 0));
   EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(parent) + VmoCommittedBytes(child2));
 
   // Write to a different byte in our zero page to see if we can uncover child1's data.
@@ -335,7 +339,7 @@ TEST(VmoZeroTestCase, WriteCowParent) {
   // Close the parent. No pages should get merged.
   parent.reset();
   VmoCheck(child, 0, 0);
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  ASSERT_TRUE(PollVmoCommittedBytes(child, 0));
 }
 
 TEST(VmoZeroTestCase, ChildZeroThenWrite) {
@@ -365,7 +369,7 @@ TEST(VmoZeroTestCase, ChildZeroThenWrite) {
   // Reset the parent. The two committed pages should be different, and the parents page should be
   // dropped.
   parent.reset();
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child));
+  ASSERT_TRUE(PollVmoCommittedBytes(child, zx_system_get_page_size()));
 }
 
 TEST(VmoZeroTestCase, Nested) {

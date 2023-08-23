@@ -347,13 +347,13 @@ TEST_F(VmoClone2TestCase, SplitPageClosure) {
   vmo.reset();
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone1, 3));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
-  ASSERT_EQ(VmoCommittedBytes(clone1), zx_system_get_page_size());
-  ASSERT_EQ(VmoCommittedBytes(clone2), zx_system_get_page_size());
+  ASSERT_TRUE(PollVmoCommittedBytes(clone1, zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoCommittedBytes(clone2, zx_system_get_page_size()));
 
   // Close the first clone, check that data is correct and things were freed.
   clone1.reset();
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 4));
-  ASSERT_EQ(VmoCommittedBytes(clone2), zx_system_get_page_size());
+  ASSERT_TRUE(PollVmoCommittedBytes(clone2, zx_system_get_page_size()));
 }
 
 // Tests that a clone with an offset accesses the right data and doesn't
@@ -381,7 +381,7 @@ TEST_F(VmoClone2TestCase, Offset) {
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 0, 2 * zx_system_get_page_size()));
 
   // Check that the clone doesn't unnecessarily retain pages.
-  ASSERT_EQ(VmoCommittedBytes(clone), 2 * zx_system_get_page_size());
+  ASSERT_TRUE(PollVmoCommittedBytes(clone, 2 * zx_system_get_page_size()));
 }
 
 // Tests writing to the clones of a clone created with an offset.
@@ -421,16 +421,16 @@ TEST_F(VmoClone2TestCase, OffsetTest2) {
   // forked), but no vmo can be blamed for more pages than its total size.
   const uint64_t kImplCost1 = 4 * zx_system_get_page_size();
   const uint64_t kImplCost2 = zx_system_get_page_size();
-  ASSERT_EQ(VmoCommittedBytes(vmo), kImplCost1);
-  ASSERT_EQ(VmoCommittedBytes(clone1), kImplCost2);
-  ASSERT_EQ(VmoCommittedBytes(clone2), 0);
+  ASSERT_TRUE(PollVmoCommittedBytes(vmo, kImplCost1));
+  ASSERT_TRUE(PollVmoCommittedBytes(clone1, kImplCost2));
+  ASSERT_TRUE(PollVmoCommittedBytes(clone2, 0));
   assert(kImplCost1 <= 4 * zx_system_get_page_size() &&
          kImplCost2 <= 2 * zx_system_get_page_size());
 
   // Clone the first clone and check that any extra pages were freed.
   clone1.reset();
-  ASSERT_EQ(VmoCommittedBytes(vmo), 4 * zx_system_get_page_size());
-  ASSERT_EQ(VmoCommittedBytes(clone2), 0);
+  ASSERT_TRUE(PollVmoCommittedBytes(vmo, 4 * zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoCommittedBytes(clone2, 0));
 
   clone2.reset();
 }
@@ -473,7 +473,7 @@ TEST_F(VmoClone2TestCase, OffsetProgressiveWrite) {
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 4));
 
   // Check that the clone doesn't unnecessarily retain pages.
-  ASSERT_EQ(VmoCommittedBytes(clone), zx_system_get_page_size());
+  ASSERT_TRUE(PollVmoCommittedBytes(clone, zx_system_get_page_size()));
 }
 
 // Tests that a clone of a clone which overflows its parent properly interacts with
@@ -539,8 +539,8 @@ TEST_F(VmoClone2TestCase, Overflow) {
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 5, zx_system_get_page_size()));
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone2, 3, 2 * zx_system_get_page_size()));
 
-  ASSERT_EQ(VmoCommittedBytes(vmo), zx_system_get_page_size());
-  ASSERT_EQ(VmoCommittedBytes(clone2), 3 * zx_system_get_page_size());
+  ASSERT_TRUE(PollVmoCommittedBytes(vmo, zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoCommittedBytes(clone2, 3 * zx_system_get_page_size()));
 }
 
 // Test that a clone that does not overlap the parent at all behaves correctly.
@@ -601,7 +601,7 @@ TEST_F(VmoClone2TestCase, SmallClone) {
   // Check that clone has the right data after closing the parent and that
   // all the extra pages are freed.
   ASSERT_NO_FATAL_FAILURE(VmoCheck(clone, 2));
-  ASSERT_EQ(VmoCommittedBytes(clone), zx_system_get_page_size());
+  ASSERT_TRUE(PollVmoCommittedBytes(clone, zx_system_get_page_size()));
 }
 
 // Tests that a small clone properly interrupts access into the parent.
@@ -704,7 +704,7 @@ struct VmoCloneDisjointClonesTests : public VmoClone2TestCase {
     // is unnecessary retained/allocated.
     for (unsigned i = 0; i < 4; i++) {
       ASSERT_NO_FATAL_FAILURE(VmoCheck(leaf_clones[i], i + 5));
-      ASSERT_EQ(VmoCommittedBytes(leaf_clones[i]), zx_system_get_page_size());
+      ASSERT_TRUE(PollVmoCommittedBytes(leaf_clones[i], zx_system_get_page_size()));
     }
   }
 };
@@ -757,7 +757,7 @@ TEST_F(VmoClone2TestCase, DisjointCloneTest2) {
       for (unsigned j = 0; j < 4; j++) {
         if (!closed[j]) {
           ASSERT_NO_FATAL_FAILURE(VmoCheck(leaf_clones[j], j + 1));
-          ASSERT_EQ(VmoCommittedBytes(leaf_clones[j]), zx_system_get_page_size());
+          ASSERT_TRUE(PollVmoCommittedBytes(leaf_clones[j], zx_system_get_page_size()));
         }
       }
     }
@@ -915,7 +915,7 @@ class VmoCloneResizeTests : public VmoClone2TestCase {
     }
 
     ASSERT_NO_FATAL_FAILURE(VmoCheck(resize_target, 1));
-    ASSERT_EQ(VmoCommittedBytes(resize_target), zx_system_get_page_size());
+    ASSERT_TRUE(PollVmoCommittedBytes(resize_target, zx_system_get_page_size()));
   }
 };
 
