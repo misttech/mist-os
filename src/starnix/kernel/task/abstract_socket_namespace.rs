@@ -58,7 +58,11 @@ where
         Ok(())
     }
 
-    pub fn lookup(&self, address: &K) -> Result<SocketHandle, Errno> {
+    pub fn lookup<Q: ?Sized>(&self, address: &Q) -> Result<SocketHandle, Errno>
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: std::hash::Hash + Eq,
+    {
         let table = self.table.lock();
         table.get(address).and_then(|weak| weak.upgrade()).ok_or_else(|| errno!(ECONNREFUSED))
     }

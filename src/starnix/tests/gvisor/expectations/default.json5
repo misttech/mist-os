@@ -702,11 +702,6 @@
                 "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/3",
                 "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
 
-                // socket_unix_unbound_dgram_test
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.Sendto/*",
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.SendtoWithoutConnect/*",
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.SendtoWithoutConnectPassCreds/*",
-
                 // socket_unix_unbound_stream_test
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassPartialRead/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CredPassPartialRead/*",
@@ -715,7 +710,6 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCredsNoPasscred/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCreds2/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
-                "AllUnixDomainSockets/UnboundUnixStreamSocketPairTest.SendtoWithoutConnect/*",
 
                 // splice_test, tee() isn't implemented.
                 "TeeTest.SamePipe",

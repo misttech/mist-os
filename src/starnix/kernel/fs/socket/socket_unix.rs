@@ -482,19 +482,23 @@ impl SocketOps for UnixSocket {
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let (peer, local_address, creds) = {
+        let (connected_peer, local_address, creds) = {
             let inner = self.lock();
-            (
-                inner.peer().ok_or_else(|| errno!(ENOTCONN))?.clone(),
-                inner.address.clone(),
-                inner.credentials.clone(),
-            )
+            (inner.peer().map(|p| p.clone()), inner.address.clone(), inner.credentials.clone())
         };
 
-        // TODO allow non-connected datagrams
-        if dest_address.is_some() {
-            return error!(EISCONN);
-        }
+        let peer = match (connected_peer, dest_address, socket.socket_type) {
+            (Some(peer), None, _) => peer,
+            (None, Some(_), SocketType::Stream) => return error!(EOPNOTSUPP),
+            (None, Some(_), SocketType::SeqPacket) => return error!(ENOTCONN),
+            (Some(_), Some(_), _) => return error!(EISCONN),
+            (_, Some(SocketAddress::Unix(ref name)), _) => {
+                resolve_unix_socket_address(current_task, name)?
+            }
+            (_, Some(_), _) => return error!(EINVAL),
+            (None, None, _) => return error!(ENOTCONN),
+        };
+
         let unix_socket = downcast_socket_to_unix(&peer);
         let mut peer = unix_socket.lock();
         if peer.passcred {
@@ -869,6 +873,27 @@ impl UnixSocketInner {
     fn shutdown_one_end(&mut self) {
         self.is_shutdown = true;
         self.waiters.notify_fd_events(FdEvents::POLLIN | FdEvents::POLLOUT | FdEvents::POLLHUP);
+    }
+}
+
+pub fn resolve_unix_socket_address(
+    current_task: &CurrentTask,
+    name: &FsStr,
+) -> Result<SocketHandle, Errno> {
+    if name[0] == b'\0' {
+        current_task.abstract_socket_namespace.lookup(name)
+    } else {
+        let mut context = LookupContext::default();
+        let (parent, basename) =
+            current_task.lookup_parent_at(&mut context, FdNumber::AT_FDCWD, name)?;
+        let name = parent.lookup_child(current_task, &mut context, basename).map_err(|errno| {
+            if matches!(errno.code, EACCES | EPERM | EINTR) {
+                errno
+            } else {
+                errno!(ECONNREFUSED)
+            }
+        })?;
+        name.entry.node.socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
     }
 }
 

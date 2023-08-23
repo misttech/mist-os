@@ -251,7 +251,6 @@
                 // Two skipped test cases for select variants that do not exist in 64 bit.
                 "select01",
                 "select02",
-                "send01",
                 "send02",
                 "sendfile02",
                 "sendfile02_64",
@@ -259,8 +258,6 @@
                 "sendfile04_64",
                 "sendfile05",
                 "sendfile05_64",
-                "sendmsg01",
-                "sendto01",
                 "set_thread_area01",
                 "setitimer01",
                 "setitimer02",

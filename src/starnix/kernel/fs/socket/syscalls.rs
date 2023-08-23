@@ -107,6 +107,9 @@ fn maybe_parse_socket_address(
     user_socket_address: UserAddress,
     address_length: usize,
 ) -> Result<Option<SocketAddress>, Errno> {
+    if address_length > i32::MAX as usize {
+        return error!(EINVAL);
+    }
     Ok(if user_socket_address.is_null() {
         None
     } else {
@@ -120,13 +123,6 @@ fn generate_autobind_address() -> Vec<u8> {
     zx::cprng_draw(&mut bytes);
     let value = u32::from_ne_bytes(bytes) & 0xFFFFF;
     format!("\0{value:05x}").into_bytes()
-}
-
-fn translate_fs_error(errno: Errno) -> Errno {
-    match errno {
-        errno if errno == EACCES || errno == EPERM || errno == EINTR => errno,
-        _ => errno!(ECONNREFUSED),
-    }
 }
 
 pub fn sys_bind(
@@ -258,19 +254,7 @@ pub fn sys_connect(
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
-            if name[0] == b'\0' {
-                SocketPeer::Handle(current_task.abstract_socket_namespace.lookup(name)?)
-            } else {
-                let mut context = LookupContext::default();
-                let (parent, basename) =
-                    current_task.lookup_parent_at(&mut context, FdNumber::AT_FDCWD, name)?;
-                let name = parent
-                    .lookup_child(current_task, &mut context, basename)
-                    .map_err(translate_fs_error)?;
-                SocketPeer::Handle(
-                    name.entry.node.socket().ok_or_else(|| errno!(ECONNREFUSED))?.clone(),
-                )
-            }
+            SocketPeer::Handle(resolve_unix_socket_address(current_task, &name)?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
@@ -610,6 +594,9 @@ fn sendmsg_internal(
 ) -> Result<usize, Errno> {
     let message_header = current_task.read_object(user_message_header)?;
 
+    if message_header.msg_namelen > i32::MAX as u32 {
+        return error!(EINVAL);
+    }
     let dest_address = maybe_parse_socket_address(
         current_task,
         message_header.msg_name,
@@ -645,7 +632,7 @@ fn sendmsg_internal(
         )?);
     }
 
-    let flags = SocketMessageFlags::from_bits_truncate(flags);
+    let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
     socket_ops.sendmsg(
         current_task,
@@ -727,9 +714,9 @@ pub fn sys_sendto(
         maybe_parse_socket_address(current_task, user_dest_address, dest_address_length as usize)?;
     let mut data = UserBuffersInputBuffer::new_at(&current_task.mm, user_buffer, buffer_length)?;
 
-    let flags = SocketMessageFlags::from_bits_truncate(flags);
-    let socket_ops = file.downcast_file::<SocketFile>().unwrap();
-    socket_ops.sendmsg(current_task, &file, &mut data, dest_address, vec![], flags)
+    let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
+    let socket_file = file.downcast_file::<SocketFile>().unwrap();
+    socket_file.sendmsg(current_task, &file, &mut data, dest_address, vec![], flags)
 }
 
 pub fn sys_getsockopt(

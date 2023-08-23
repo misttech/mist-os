@@ -83,12 +83,12 @@ impl ZxioBackedSocket {
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno> {
         let addr = match addr {
-            Some(sockaddr) => match sockaddr {
+            Some(
                 SocketAddress::Inet(sockaddr)
                 | SocketAddress::Inet6(sockaddr)
-                | SocketAddress::Packet(sockaddr) => sockaddr.clone(),
-                _ => return error!(EINVAL),
-            },
+                | SocketAddress::Packet(sockaddr),
+            ) => sockaddr.clone(),
+            Some(_) => return error!(EINVAL),
             None => vec![],
         };
 
@@ -207,7 +207,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn write(
         &self,
-        _socket: &Socket,
+        socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
@@ -221,6 +221,9 @@ impl SocketOps for ZxioBackedSocket {
             }
         }
 
+        // Ignore destination address if this is a stream socket.
+        let dest_address =
+            if socket.socket_type == SocketType::Stream { &None } else { dest_address };
         self.sendmsg(dest_address, data, cmsgs, SocketMessageFlags::empty())
     }
 
