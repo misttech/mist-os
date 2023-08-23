@@ -1,0 +1,31 @@
+#!/bin/bash
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Other
+### Create pb.zip based on product_bundles.json file. The created zip file will
+## be located in $(fx get-build-dir)/pb.zip
+
+## usage: fx create-pb-zip
+
+set -o errexit
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh
+fx-config-read
+
+main() {
+    local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+    local product_bundle_path="${FUCHSIA_BUILD_DIR}/$(fx-command-run jq -r '.[0].path' ${product_bundles_path})"
+
+    fx-info "Start creating pb.zip..."
+    (
+        cd "${product_bundle_path}/.."
+        zip -r pb.zip product_bundle
+        mv pb.zip "${FUCHSIA_BUILD_DIR}"
+    )
+
+    fx-info "Done! Output: ${FUCHSIA_BUILD_DIR}/pb.zip"
+}
+
+main "$@"
