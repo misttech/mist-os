@@ -117,7 +117,7 @@ driver_bind_rules("nelson_wifi_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.broadcom.platform",
-    "//src/devices/bind/fuchsia.broadcom.sdio",
+    "//src/devices/bind/fuchsia.broadcom.platform.sdio",
     "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sdmmc",

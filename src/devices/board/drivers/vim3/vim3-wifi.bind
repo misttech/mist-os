@@ -7,7 +7,7 @@ composite wifi;
 using fuchsia.amlogic.platform.a311d;
 using fuchsia.hardware.gpio;
 using fuchsia.sdio;
-using fuchsia.broadcom.sdio;
+using fuchsia.broadcom.platform.sdio;
 using fuchsia.broadcom.platform;
 using fuchsia.platform;
 
@@ -16,7 +16,7 @@ primary node "sdio-function-1" {
   fuchsia.BIND_SDIO_VID == 0x02d0;
   fuchsia.BIND_SDIO_FUNCTION == 1;
   accept fuchsia.BIND_SDIO_PID {
-    fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4359
+    fuchsia.broadcom.platform.sdio.BIND_SDIO_PID.BCM4359
   }
 }
 
@@ -25,7 +25,7 @@ node "sdio-function-2" {
   fuchsia.BIND_SDIO_VID == 0x02d0;
   fuchsia.BIND_SDIO_FUNCTION == 2;
   accept fuchsia.BIND_SDIO_PID {
-    fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4359
+    fuchsia.broadcom.platform.sdio.BIND_SDIO_PID.BCM4359
   }
 }
 
