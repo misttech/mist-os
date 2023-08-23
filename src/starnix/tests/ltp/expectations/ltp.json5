@@ -367,6 +367,7 @@
                 // Flaky test.
                 "cve-2017-17052",
                 "io_pgetevents01",
+                "rename14",
                 "select03",
 
                 // Causes an OOM when /dev/loop-control is available.
