@@ -1516,6 +1516,16 @@ From //third_party/pigweed/src/pw_build/defaults.gni:25
 
 From //third_party/pigweed/src/pw_build/defaults.gni:26
 
+### delegated_network_provisioning
+
+DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR DEVELOPER USE ONLY
+TODO(https://fxbug.dev/132635): Remove this when we have a solution for
+changing the netcfg configuration at runtime.
+
+**Current value (from the default):** `false`
+
+From //src/connectivity/network/netcfg/delegated_network_provisioning.gni:9
+
 ### delivery_blob_type
 
 Controls what type of delivery blob pkg-resolver fetches and blobfs accepts.
