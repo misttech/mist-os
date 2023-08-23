@@ -12,7 +12,8 @@
 
 class TestDriver : public fdf::DriverBase,
                    public fidl::WireServer<fuchsia_driver_component_test::ZirconProtocol>,
-                   public fdf::WireServer<fuchsia_driver_component_test::DriverProtocol> {
+                   public fdf::WireServer<fuchsia_driver_component_test::DriverProtocol>,
+                   public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController> {
  public:
   TestDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase("test_driver", std::move(start_args), std::move(driver_dispatcher)),
@@ -35,6 +36,9 @@ class TestDriver : public fdf::DriverBase,
 
   bool async_added_child() const { return async_added_child_; }
   bool sync_added_child() const { return sync_added_child_; }
+
+  // fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>
+  void on_fidl_error(fidl::UnbindInfo error) override;
 
  private:
   // fidl::WireServer<fuchsia_driver_component_test::ZirconProtocol>
@@ -77,6 +81,9 @@ class TestDriver : public fdf::DriverBase,
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> devfs_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> devfs_node_controller_;
+
+  std::optional<fdf::PrepareStopCompleter> stop_completer_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> child_controller_;
 };
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_TESTS_TEST_DRIVER_H_

@@ -179,7 +179,17 @@ void TestNode::SetProperties(std::vector<fuchsia_driver_framework::NodeProperty>
 void TestNode::RemoveFromParent() {
   std::lock_guard guard(checker_);
   children_.clear();
+
+  if (node_binding_.has_value()) {
+    node_binding_.value().Close(ZX_OK);
+  }
+
   node_binding_.reset();
+
+  if (controller_binding_.has_value()) {
+    controller_binding_.value().Close(ZX_OK);
+  }
+
   controller_binding_.reset();
 
   if (!parent_.has_value()) {

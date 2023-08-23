@@ -119,10 +119,22 @@ zx::result<> TestDriver::ValidateIncomingZirconService() {
 }
 
 void TestDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  // Delay the completion to simulate an async workload.
-  async::PostDelayedTask(
-      dispatcher(), [completer = std::move(completer)]() mutable { completer(zx::ok()); },
-      zx::msec(100));
+  if (child_controller_.is_valid()) {
+    fidl::OneWayStatus status = child_controller_->Remove();
+    if (!status.ok()) {
+      completer(zx::make_result(status.status()));
+      return;
+    }
+
+    // The closing of the node controller will trigger on_fidl_error as this class is the event
+    // handler. There it will complete the stop completer.
+    stop_completer_.emplace(std::move(completer));
+  } else {
+    // Delay the completion to simulate an async workload.
+    async::PostDelayedTask(
+        dispatcher(), [completer = std::move(completer)]() mutable { completer(zx::ok()); },
+        zx::msec(100));
+  }
 }
 
 void TestDriver::CreateChildNodeSync() {
@@ -136,6 +148,7 @@ void TestDriver::CreateChildNodeSync() {
   ZX_ASSERT(result.ok());
   ZX_ASSERT(result->is_ok());
   sync_added_child_ = true;
+  child_controller_.Bind(std::move(node_controller->client), dispatcher(), this);
 }
 
 void TestDriver::CreateChildNodeAsync() {
@@ -146,11 +159,24 @@ void TestDriver::CreateChildNodeAsync() {
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, "child").Build();
 
   node_client_->AddChild(args, std::move(node_controller->server), {})
-      .Then([this](fidl::WireUnownedResult<fuchsia_driver_framework::Node::AddChild>& result) {
+      .Then([this, client = std::move(node_controller->client)](
+                fidl::WireUnownedResult<fuchsia_driver_framework::Node::AddChild>& result) mutable {
         ZX_ASSERT_MSG(result.ok(), "%s", result.FormatDescription().c_str());
         ZX_ASSERT_MSG(result->is_ok(), "%s", result.FormatDescription().c_str());
         async_added_child_ = true;
+        child_controller_.Bind(std::move(client), dispatcher(), this);
       });
+}
+
+void TestDriver::on_fidl_error(fidl::UnbindInfo error) {
+  if (error.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Child controller binding closed with error: %s", error.status_string());
+  }
+
+  if (stop_completer_.has_value()) {
+    stop_completer_.value()(zx::make_result(error.status()));
+    stop_completer_.reset();
+  }
 }
 
 FUCHSIA_DRIVER_EXPORT(TestDriver);
