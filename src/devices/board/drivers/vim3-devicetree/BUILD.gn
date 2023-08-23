@@ -31,7 +31,7 @@ zbi_input("vim3-dtb-item") {
   deps = [ ":vim3" ]
   type = "devicetree"
 
-  dtb_file = get_target_outputs(":vim3_dtb")
+  dtb_file = get_target_outputs(":vim3.dtb")
   sources = [ dtb_file[0] ]
 }
 
@@ -80,7 +80,7 @@ test("vim3-devicetree-test") {
 }
 
 resource("test-dtb") {
-  sources = get_target_outputs(":vim3_dtb")
+  sources = get_target_outputs(":vim3.dtb")
   outputs = [ "test-data/{{source_file_part}}" ]
   deps = [ ":vim3" ]
 }

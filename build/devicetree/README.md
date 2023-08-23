@@ -23,7 +23,7 @@ GN templates and scripts for compiling device tree source files and validating a
     golden = "dts/board-x.golden.dts"
   }
   ```
-  The output dtb is available by default at `get_target_outputs(":board-x_dtb")` which is equivalent
+  The output dtb is available by default at `get_target_outputs(":board-x.dtb")` which is equivalent
   to `$target_out_dir/board-x.dtb`. The output path can also be specified by defining `outputs`
   variable during invocation.
 

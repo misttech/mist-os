@@ -111,8 +111,8 @@ template("dtb") {
   assert(get_path_info(dts_file[0], "extension") == "dts",
          "Only .dts source files accepted.")
 
-  processed_dts_target = target_name + "_dts"
-  dts_include_dirs_target = target_name + "_all_dts"
+  processed_dts_target = "_dtb.$target_name.preprocessed"
+  dts_include_dirs_target = "_dtb.$target_name.includes"
   dts_include_dirs_filename = dts_include_dirs_target + ".txt"
 
   # Each devicetree_fragment() call puts a devicetree in a directory tree that
@@ -224,6 +224,11 @@ template("dts") {
 
 # Defines a devicetree to be built into a devicetree blob.
 #
+# There are two public targets. The main target compiles the devicetree source
+# and runs all the necessary verification checks. The additional target
+# "$target_name.dtb" can be used to get the output devicetree blob using
+# `get_target_output("$target_name.dtb")`.
+#
 # Parameters
 #
 #   * sources
@@ -249,11 +254,11 @@ template("dts") {
 #     - Default: target_out_dir + "/" + get_path_info(sources[0], "name) + ".dtb"
 #
 template("devicetree") {
-  compiled_dtb_target = target_name + "_dtb"
+  compiled_dtb_target = "$target_name.dtb"
 
-  decompiled_dtb_target = target_name + "_decompiled_dtb"
+  decompiled_dts_target = "_devicetree.$target_name.decompiled"
 
-  golden_dts_target = target_name + "_golden_dts"
+  golden_dts_target = "_devicetree.$target_name.golden"
 
   # Compile the dts
   dtb(compiled_dtb_target) {
@@ -269,17 +274,15 @@ template("devicetree") {
   # Decompile the compiled DTS so we can use it for the golden comparison.
   # We use the decompiled DTS instead of the original DTS as all includes and
   # C headers are resolved in the final dtb.
-  dts(decompiled_dtb_target) {
+  dts(decompiled_dts_target) {
     deps = [ ":$compiled_dtb_target" ]
-    dts_source = invoker.sources
-    dtb_name = get_path_info(dts_source[0], "name")
-    sources = [ "$target_out_dir/$dtb_name.dtb" ]
+    sources = get_target_outputs(":$compiled_dtb_target")
   }
 
   # Compare golden dts and decompiled dts file.
   golden_files(golden_dts_target) {
-    deps = [ ":$decompiled_dtb_target" ]
-    dts_outputs = get_target_outputs(":$decompiled_dtb_target")
+    deps = [ ":$decompiled_dts_target" ]
+    dts_outputs = get_target_outputs(":$decompiled_dts_target")
     comparisons = [
       {
         forward_variables_from(invoker, [ "golden" ])

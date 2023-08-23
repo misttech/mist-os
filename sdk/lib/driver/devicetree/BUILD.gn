@@ -67,7 +67,7 @@ devicetree("simple") {
 }
 
 resource("simple-dtb") {
-  sources = get_target_outputs(":simple_dtb")
+  sources = get_target_outputs(":simple.dtb")
   outputs = [ "test-data/{{source_file_part}}" ]
   deps = [ ":simple" ]
 }
