@@ -8,6 +8,8 @@
 
 #include <zxtest/zxtest.h>
 
+namespace {
+
 extern "C" void thread_entry(uintptr_t arg);
 
 extern "C" int print_fail(void) {
@@ -49,3 +51,5 @@ TEST(TisTests, tis_test) {
   status = zx_object_wait_one(handle, ZX_THREAD_TERMINATED, ZX_TIME_INFINITE, NULL);
   ASSERT_GE(status, 0, "Error while thread wait");
 }
+
+}  // namespace

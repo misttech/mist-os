@@ -17,7 +17,6 @@ group("tests") {
     "restricted-mode-shared:tests",
     "status:tests",
     "stress-tests:tests",
-    "thread-initial-state:tests",
     "vmo:tests",
   ]
 }
