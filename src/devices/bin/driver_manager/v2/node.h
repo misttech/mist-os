@@ -62,6 +62,9 @@ class NodeManager {
   // Destroys the dynamic child component that runs the driver associated with
   // `node`.
   virtual void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) = 0;
+
+  virtual void RebindComposite(std::string spec, std::optional<std::string> driver_url,
+                               fit::callback<void(zx::result<>)> callback) {}
 };
 
 enum class Collection : uint8_t {
@@ -77,6 +80,14 @@ enum class Collection : uint8_t {
 enum class RemovalSet {
   kAll,      // Remove the boot drivers and the package drivers
   kPackage,  // Remove the package drivers
+};
+
+// Represents the actions of the node after shutdown is completed.
+enum class ShutdownIntent {
+  kRemoval,          // Removes the node from the topology. The default shutdown intention.
+  kRestart,          // Restarts the node and attempts to bind it to a new driver.
+  kRebindComposite,  // Removes the composite node from the topology for rebind. Only invoked if the
+                     // node is a composite.
 };
 
 enum class NodeState {
@@ -146,6 +157,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // difference being once the children are removed, and the driver stopped, we don't remove the
   // node from the topology but instead bind the node again.
   void RestartNode();
+
+  void RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> completer);
 
   // Restarting a node WithRematch, means that instead of re-using the currently bound driver,
   // another MatchDriver call will be made into the driver index to find a new driver to bind.
@@ -262,6 +275,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     can_multibind_composites_ = can_multibind_composites;
   }
 
+  ShutdownIntent shutdown_intent() const { return shutdown_intent_; }
+
  private:
   struct DriverComponent {
     DriverComponent(Node& node, std::string url,
@@ -369,14 +384,20 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   NodeState node_state_ = NodeState::kRunning;
   std::optional<NodeId> removal_id_;
   NodeRemovalTracker* removal_tracker_ = nullptr;
-  bool node_restarting_ = false;
+
+  ShutdownIntent shutdown_intent_ = ShutdownIntent::kRemoval;
+
   // An outstanding rebind request.
   std::optional<fit::callback<void(zx::result<>)>> pending_bind_completer_;
+
+  // Set by RemoveCompositeNodeForRebind(). Invoked when the node finished shutting down.
+  std::optional<fit::callback<void(zx::result<>)>> composite_rebind_completer_;
 
   std::optional<std::string> restart_driver_url_suffix_;
 
   // Invoked when the node has been fully removed.
   fit::callback<void()> remove_complete_callback_;
+
   std::optional<DriverComponent> driver_component_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;

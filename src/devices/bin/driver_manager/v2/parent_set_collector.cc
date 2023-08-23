@@ -17,11 +17,6 @@ zx::result<> ParentSetCollector::AddNode(uint32_t index, std::weak_ptr<Node> nod
   return zx::ok();
 }
 
-void ParentSetCollector::RemoveNode(uint32_t index) {
-  ZX_ASSERT(index < parents_.size());
-  parents_[index] = std::weak_ptr<Node>();
-}
-
 zx::result<std::shared_ptr<Node>> ParentSetCollector::TryToAssemble(
     NodeManager* node_manager, async_dispatcher_t* dispatcher) {
   if (completed_composite_node_ && !completed_composite_node_->expired()) {

@@ -158,10 +158,9 @@ void CompositeNodeSpecManager::Rebind(std::string spec_name,
     return;
   }
 
-  RequestRebindCallback rebind_request_callback =
-      [this, spec_name, rebind_spec_completer = std::move(rebind_spec_completer)](
-          zx::result<fuchsia_driver_index::DriverIndexRebindCompositeNodeSpecResponse>
-              result) mutable {
+  auto rebind_request_callback =
+      [this, spec_name,
+       rebind_spec_completer = std::move(rebind_spec_completer)](zx::result<> result) mutable {
         if (!result.is_ok()) {
           rebind_spec_completer(result.take_error());
           return;

@@ -29,9 +29,6 @@ class ParentSetCollector {
   // Only a weak_ptr of the node is stored by this class (until collection in GetIfComplete).
   zx::result<> AddNode(uint32_t index, std::weak_ptr<Node> node);
 
-  // Remove a node at a specific index from the parent set.
-  void RemoveNode(uint32_t index);
-
   // Check if all parents are found. If so, then create and return the composite node. If the
   // node is already created, return ZX_ERR_ALREADY_EXISTS.
   zx::result<std::shared_ptr<Node>> TryToAssemble(NodeManager* node_manager,

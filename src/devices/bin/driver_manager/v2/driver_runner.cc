@@ -375,6 +375,11 @@ void DriverRunner::BindToUrl(Node& node, std::string_view driver_url_suffix,
   bind_manager_.Bind(node, driver_url_suffix, std::move(result_tracker));
 }
 
+void DriverRunner::RebindComposite(std::string spec, std::optional<std::string> driver_url,
+                                   fit::callback<void(zx::result<>)> callback) {
+  composite_node_spec_manager_.Rebind(spec, driver_url, std::move(callback));
+}
+
 void DriverRunner::DestroyDriverComponent(dfv2::Node& node,
                                           DestroyDriverComponentCallback callback) {
   auto name = node.MakeComponentMoniker();
@@ -451,6 +456,32 @@ void DriverRunner::RequestMatchFromDriverIndex(
     fuchsia_driver_index::wire::MatchDriverArgs args,
     fit::callback<void(fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>&)> match_callback) {
   driver_index()->MatchDriver(args).Then(std::move(match_callback));
+}
+
+void DriverRunner::RequestRebindFromDriverIndex(std::string spec,
+                                                std::optional<std::string> driver_url_suffix,
+                                                fit::callback<void(zx::result<>)> callback) {
+  fidl::Arena allocator;
+  fidl::StringView fidl_driver_url = driver_url_suffix == std::nullopt
+                                         ? fidl::StringView()
+                                         : fidl::StringView(allocator, driver_url_suffix.value());
+  driver_index_->RebindCompositeNodeSpec(fidl::StringView(allocator, spec), fidl_driver_url)
+      .Then(
+          [callback = std::move(callback)](
+              fidl::WireUnownedResult<fdi::DriverIndex::RebindCompositeNodeSpec>& result) mutable {
+            if (!result.ok()) {
+              LOGF(ERROR, "Failed to send a composite rebind request to the Driver Index failed %s",
+                   result.error().FormatDescription().c_str());
+              callback(zx::error(result.status()));
+              return;
+            }
+
+            if (result->is_error()) {
+              callback(result->take_error());
+              return;
+            }
+            callback(zx::ok());
+          });
 }
 
 zx::result<> DriverRunner::CreateDriverHostComponent(

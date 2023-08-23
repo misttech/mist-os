@@ -50,6 +50,8 @@ class CompositeNodeSpec {
   // Exposed for testing.
   const std::vector<std::optional<DeviceOrNode>>& parent_specs() const { return parent_specs_; }
 
+  const std::string& name() const { return name_; }
+
  protected:
   // Subclass implementation for binding the DeviceOrNode to its composite. If the composite is not
   // yet created, the implementation is expected to create one with |info|. In DFv1, it returns
@@ -63,8 +65,6 @@ class CompositeNodeSpec {
   // Subclass implementation for Remove(). Subclasses are expected to remove the underlying
   // composite node and unmatch all of the parents from it.
   virtual void RemoveImpl(RemoveCompositeNodeCallback callback) = 0;
-
-  const std::string& name() const { return name_; }
 
   size_t size() const { return parent_specs_.size(); }
 

@@ -27,6 +27,10 @@ namespace {
 
 const std::string kUnboundUrl = "unbound";
 
+// TODO(fxb/124976): Remove this flag once composite node spec rebind once all clients are updated
+// to the new Rebind() behavior and this is fully implemented on both DFv1 and DFv2.
+constexpr bool kEnableCompositeNodeSpecRebind = false;
+
 const char* State2String(NodeState state) {
   switch (state) {
     case NodeState::kRunning:
@@ -385,6 +389,11 @@ Node::~Node() {
     pending_bind_completer_.value()(zx::error(ZX_ERR_CANCELED));
     pending_bind_completer_.reset();
   }
+
+  if (composite_rebind_completer_.has_value() && composite_rebind_completer_.value()) {
+    composite_rebind_completer_.value()(zx::ok());
+    composite_rebind_completer_.reset();
+  }
 }
 
 const std::string& Node::driver_url() const {
@@ -463,6 +472,9 @@ void Node::AddToParents() {
   }
 }
 
+// TODO(fxb/124976): If the node invoking this function cannot multibind to composites,
+// is parenting one composite node, and is not in a state for removal, then it
+// should attempt to bind to something else.
 void Node::RemoveChild(const std::shared_ptr<Node>& child) {
   LOGF(DEBUG, "RemoveChild %s from parent %s", child->name().c_str(), name().c_str());
   children_.erase(std::find(children_.begin(), children_.end(), child));
@@ -497,7 +509,6 @@ void Node::CheckForRemoval() {
     // We'd better continue to close, since we can't talk to the driver.
   }
 
-  LOGF(INFO, "Node: %s Scheduling stop component", MakeComponentMoniker().c_str());
   ScheduleStopComponent();
 }
 
@@ -506,7 +517,7 @@ void Node::FinishRemoval() {
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
                 "FinishRemoval called in invalid node state: %s", State2String(node_state_));
 
-  if (node_restarting_) {
+  if (shutdown_intent_ == ShutdownIntent::kRestart) {
     FinishRestart();
     return;
   }
@@ -534,11 +545,18 @@ void Node::FinishRemoval() {
   if (remove_complete_callback_) {
     remove_complete_callback_();
   }
+
+  if (shutdown_intent_ == ShutdownIntent::kRebindComposite && composite_rebind_completer_ &&
+      composite_rebind_completer_.value()) {
+    composite_rebind_completer_.value()(zx::ok());
+    composite_rebind_completer_.reset();
+  }
 }
 
 void Node::FinishRestart() {
-  ZX_ASSERT_MSG(node_restarting_, "FinishRestart called when node is not restarting.");
-  node_restarting_ = false;
+  ZX_ASSERT_MSG(shutdown_intent_ == ShutdownIntent::kRestart,
+                "FinishRestart called when node is not restarting.");
+  shutdown_intent_ = ShutdownIntent::kRemoval;
   node_state_ = NodeState::kRunning;
 
   if (restart_driver_url_suffix_.has_value()) {
@@ -666,10 +684,11 @@ void Node::Remove(std::stack<std::shared_ptr<Node>> nodes, RemovalSet removal_se
 }
 
 void Node::RestartNode() {
-  node_restarting_ = true;
+  shutdown_intent_ = ShutdownIntent::kRestart;
   Remove(RemovalSet::kAll, nullptr);
 }
 
+// TODO(fxb/132254): Handle the case in which this function is called during node removal.
 void Node::RestartNodeWithRematch(std::optional<std::string> restart_driver_url_suffix,
                                   fit::callback<void(zx::result<>)> completer) {
   if (pending_bind_completer_.has_value()) {
@@ -684,6 +703,23 @@ void Node::RestartNodeWithRematch(std::optional<std::string> restart_driver_url_
 
 void Node::RestartNodeWithRematch() {
   RestartNodeWithRematch("", [](zx::result<> result) {});
+}
+
+// TODO(fxb/132254): Handle the case in which this function is called during node removal.
+void Node::RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> completer) {
+  if (composite_rebind_completer_.has_value()) {
+    completer(zx::error(ZX_ERR_ALREADY_EXISTS));
+    return;
+  }
+
+  if (type_ != NodeType::kComposite) {
+    completer(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  composite_rebind_completer_ = std::move(completer);
+  shutdown_intent_ = ShutdownIntent::kRebindComposite;
+  Remove(RemovalSet::kAll, nullptr);
 }
 
 std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
@@ -1161,13 +1197,20 @@ void Node::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
     url = std::string(request->driver.get());
   }
 
-  RestartNodeWithRematch(url, [completer = completer.ToAsync()](zx::result<> result) mutable {
+  auto rebind_callback = [completer = completer.ToAsync()](zx::result<> result) mutable {
     if (result.is_ok()) {
       completer.ReplySuccess();
     } else {
       completer.ReplyError(result.error_value());
     }
-  });
+  };
+
+  if (kEnableCompositeNodeSpecRebind && type_ == NodeType::kComposite) {
+    node_manager_.value()->RebindComposite(name_, url, std::move(rebind_callback));
+    return;
+  }
+
+  RestartNodeWithRematch(url, std::move(rebind_callback));
 }
 
 void Node::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {

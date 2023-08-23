@@ -22,16 +22,19 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
     return parent_set_collector_ ? parent_set_collector_->completed_composite_node() : std::nullopt;
   }
 
+  // Exposed for testing.
+  bool has_parent_set_collector_for_testing() const { return parent_set_collector_.has_value(); }
+
  protected:
   zx::result<std::optional<DeviceOrNode>> BindParentImpl(
       fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
       const DeviceOrNode& device_or_node) override;
 
  private:
-  void RemoveImpl(RemoveCompositeNodeCallback callback) override;
-
   fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
       fidl::AnyArena& arena) const override;
+
+  void RemoveImpl(RemoveCompositeNodeCallback callback) override;
 
   std::optional<ParentSetCollector> parent_set_collector_;
 

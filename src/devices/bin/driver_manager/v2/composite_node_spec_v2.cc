@@ -53,8 +53,23 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
 }
 
 void CompositeNodeSpecV2::RemoveImpl(RemoveCompositeNodeCallback callback) {
-  // TODO(fxb/124976): Implement this.
-  callback(zx::error(ZX_ERR_NOT_SUPPORTED));
+  if (!parent_set_collector_) {
+    callback(zx::ok());
+  }
+
+  // TODO(fxb/124976): Once we start enforcing the multibind composite flag, move
+  // the parent nodes back to the orphaned nodes if they can't multibind.
+  auto node = parent_set_collector_->completed_composite_node();
+  if (node && !node->expired()) {
+    node->lock()->RemoveCompositeNodeForRebind(std::move(callback));
+    parent_set_collector_.reset();
+    driver_url_ = "";
+    return;
+  }
+
+  parent_set_collector_.reset();
+  driver_url_ = "";
+  callback(zx::ok());
 }
 
 fdd::wire::CompositeInfo CompositeNodeSpecV2::GetCompositeInfo(fidl::AnyArena& arena) const {

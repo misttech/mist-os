@@ -93,8 +93,8 @@ class FakeDeviceManagerBridge : public CompositeManagerBridge {
   }
 
   void RequestRebindFromDriverIndex(std::string spec, std::optional<std::string> driver_url_suffix,
-                                    RequestRebindCallback callback) override {
-    callback(zx::ok(fuchsia_driver_index::DriverIndexRebindCompositeNodeSpecResponse{}));
+                                    fit::callback<void(zx::result<>)> callback) override {
+    callback(zx::ok());
   }
 
   void AddSpecMatch(std::string_view name, fdi::MatchedCompositeNodeSpecInfo match) {

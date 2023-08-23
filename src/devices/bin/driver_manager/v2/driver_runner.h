@@ -82,6 +82,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
     removal_tracker_.FinishEnumeration();
   }
 
+  void RebindComposite(std::string spec, std::optional<std::string> driver_url,
+                       fit::callback<void(zx::result<>)> callback) override;
+
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
   void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
@@ -137,6 +140,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
       fuchsia_driver_index::wire::MatchDriverArgs args,
       fit::callback<void(fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>&)>
           match_callback) override;
+  void RequestRebindFromDriverIndex(std::string spec, std::optional<std::string> driver_url_suffix,
+                                    fit::callback<void(zx::result<>)> callback) override;
 
   zx::result<> CreateDriverHostComponent(std::string moniker,
                                          fidl::ServerEnd<fuchsia_io::Directory> exposed_dir);
