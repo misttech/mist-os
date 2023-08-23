@@ -9,6 +9,7 @@ import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/images/vbmeta.gni")
 import("//build/product.gni")
 import("//build/toolchain/rbe.gni")
+import("//src/connectivity/network/netcfg/delegated_network_provisioning.gni")
 
 assert(
     current_toolchain == default_toolchain,
@@ -197,6 +198,14 @@ generated_file(_build_args_bzl_target) {
   } else {
     contents += [ "authorized_ssh_keys_label = None" ]
   }
+
+  # Pass the delegated_network_provisioning GN arg to bazel.
+  if (delegated_network_provisioning) {
+    contents += [ "delegated_network_provisioning = True" ]
+  } else {
+    contents += [ "delegated_network_provisioning = False" ]
+  }
+
   outputs = [ _build_args_bzl_output ]
 }
 

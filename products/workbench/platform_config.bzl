@@ -9,6 +9,7 @@ products. This platform configuration is meant to feed into Fuchsia's product
 assembly process.
 """
 
+load("@legacy_ninja_build_outputs//:build_args.bzl", "delegated_network_provisioning")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
@@ -22,7 +23,7 @@ workbench_platform_config = {
     "connectivity": {
         "network": {
             "networking": "standard",
-            "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:default.json)",
+            "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:%s.json)" % ("delegated_network_provisioning" if delegated_network_provisioning else "default"),
         },
     },
     "input": {
