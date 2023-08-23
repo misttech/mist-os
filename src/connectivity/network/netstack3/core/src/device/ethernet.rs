@@ -1293,7 +1293,6 @@ impl Device for EthernetLinkDevice {}
 
 impl LinkDevice for EthernetLinkDevice {
     type Address = Mac;
-    type State = EthernetDeviceState;
 }
 
 /// Resolve the link-address of an Ethernet device's neighbor.

@@ -56,9 +56,6 @@ impl LinkAddress for Mac {
 pub(crate) trait LinkDevice: Device + Debug {
     /// The type of address used to address link devices of this type.
     type Address: LinkAddress + UnicastAddress;
-
-    /// The state for the link device.
-    type State;
 }
 
 /// Utilities for testing link devices.
@@ -115,7 +112,6 @@ pub(crate) mod testutil {
 
     impl LinkDevice for FakeLinkDevice {
         type Address = FakeLinkAddress;
-        type State = ();
     }
 
     /// A fake ID identifying a [`FakeLinkDevice`].

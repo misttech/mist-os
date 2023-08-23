@@ -995,7 +995,7 @@ pub(crate) mod testutil {
 
     pub(crate) fn assert_dynamic_neighbor_with_addr<
         I: Ip,
-        D: LinkDevice + core::fmt::Debug,
+        D: LinkDevice,
         C: NonSyncNudContext<I, D, SC::DeviceId>,
         SC: NudContext<I, D, C>,
     >(
@@ -1019,7 +1019,7 @@ pub(crate) mod testutil {
 
     pub(crate) fn assert_dynamic_neighbor_state<
         I: Ip,
-        D: LinkDevice + core::fmt::Debug + core::cmp::PartialEq,
+        D: LinkDevice + core::cmp::PartialEq,
         C: NonSyncNudContext<I, D, SC::DeviceId>,
         SC: NudContext<I, D, C>,
     >(
@@ -1039,7 +1039,7 @@ pub(crate) mod testutil {
     }
     pub(crate) fn assert_neighbor_unknown<
         I: Ip,
-        D: LinkDevice + core::fmt::Debug,
+        D: LinkDevice,
         C: NonSyncNudContext<I, D, SC::DeviceId>,
         SC: NudContext<I, D, C>,
     >(
@@ -1270,12 +1270,8 @@ enum TransmitProbe<A> {
     Unicast(A),
 }
 
-impl<
-        I: Ip,
-        D: LinkDevice + core::fmt::Debug,
-        C: NonSyncNudContext<I, D, SC::DeviceId>,
-        SC: NudContext<I, D, C>,
-    > TimerHandler<C, NudTimerId<I, D, SC::DeviceId>> for SC
+impl<I: Ip, D: LinkDevice, C: NonSyncNudContext<I, D, SC::DeviceId>, SC: NudContext<I, D, C>>
+    TimerHandler<C, NudTimerId<I, D, SC::DeviceId>> for SC
 {
     fn handle_timer(
         &mut self,
