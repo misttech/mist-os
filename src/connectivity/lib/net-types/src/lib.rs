@@ -1175,7 +1175,7 @@ mod tests {
     }
 
     #[test]
-    fn test_specified_addr() {
+    fn specified_addr() {
         assert_eq!(
             SpecifiedAddr::new(Address::GlobalUnicast),
             Some(SpecifiedAddr(Address::GlobalUnicast))
@@ -1184,7 +1184,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unicast_addr() {
+    fn unicast_addr() {
         assert_eq!(
             UnicastAddr::new(Address::GlobalUnicast),
             Some(UnicastAddr(Address::GlobalUnicast))
@@ -1197,7 +1197,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multicast_addr() {
+    fn multicast_addr() {
         assert_eq!(
             MulticastAddr::new(Address::GlobalMulticast),
             Some(MulticastAddr(Address::GlobalMulticast))
@@ -1210,7 +1210,7 @@ mod tests {
     }
 
     #[test]
-    fn test_broadcast_addr() {
+    fn broadcast_addr() {
         assert_eq!(
             BroadcastAddr::new(Address::GlobalBroadcast),
             Some(BroadcastAddr(Address::GlobalBroadcast))
@@ -1223,7 +1223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_local_addr() {
+    fn link_local_addr() {
         assert_eq!(
             LinkLocalAddr::new(Address::LinkLocalUnicast),
             Some(LinkLocalAddr(Address::LinkLocalUnicast))
@@ -1236,7 +1236,7 @@ mod tests {
     }
 
     #[test]
-    fn test_non_mapped_addr() {
+    fn non_mapped_addr() {
         assert_eq!(
             NonMappedAddr::new(Address::LinkLocalUnicast),
             Some(NonMappedAddr(Address::LinkLocalUnicast))
@@ -1263,7 +1263,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nested_link_local() {
+    fn nested_link_local() {
         // Test UnicastAddr<LinkLocalAddr>, MulticastAddr<LinkLocalAddr>,
         // BroadcastAddr<LinkLocalAddr>, LinkLocalAddr<UnicastAddr>,
         // LinkLocalAddr<MulticastAddr>, LinkLocalAddr<BroadcastAddr>.
@@ -1327,7 +1327,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nested_non_mapped() {
+    fn nested_non_mapped() {
         // Test:
         //   UnicastAddr<NonMappedAddr>, NonMappedAddr<UnicastAddr>,
         //   MulticastAddr<NonMappedAddr>, NonMappedAddr<MulticastAddr>,
@@ -1397,7 +1397,7 @@ mod tests {
     }
 
     #[test]
-    fn test_addr_and_zone() {
+    fn addr_and_zone() {
         let addr_and_zone = AddrAndZone::new(Address::LinkLocalUnicast, ());
         assert_eq!(addr_and_zone, Some(AddrAndZone(Address::LinkLocalUnicast, ())));
         assert_eq!(addr_and_zone.unwrap().into_addr_scope_id(), (Address::LinkLocalUnicast, ()));
@@ -1409,7 +1409,7 @@ mod tests {
     }
 
     #[test]
-    fn test_addr_and_zone_map_zone() {
+    fn addr_and_zone_map_zone() {
         let addr_and_zone = AddrAndZone::new(Address::LinkLocalUnicast, 65).unwrap();
         assert_eq!(
             addr_and_zone.map_zone(|x| char::from_u32(x).unwrap()),
@@ -1418,7 +1418,7 @@ mod tests {
     }
 
     #[test]
-    fn test_addr_and_zone_try_map_zone() {
+    fn addr_and_zone_try_map_zone() {
         let addr_and_zone = AddrAndZone::new(Address::LinkLocalUnicast, 32).unwrap();
         assert_eq!(
             addr_and_zone.try_map_zone(|x| Ok::<_, ()>(x + 1)),
@@ -1430,7 +1430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_scoped_address() {
+    fn scoped_address() {
         // Type alias to help the compiler when the scope type can't be
         // inferred.
         type ZonedAddr = crate::ZonedAddr<Address, ()>;
