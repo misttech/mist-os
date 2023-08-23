@@ -80,7 +80,8 @@ lazy_static! {
 /// writing.
 pub struct AsyncInterface {
     serial: String,
-    task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>> + Send>>>,
+    write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>> + Send>>>,
+    read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<Vec<u8>>> + Send>>>,
 }
 
 impl Interface {
@@ -206,7 +207,7 @@ impl Open<AsyncInterface> for AsyncInterface {
                     .write()
                     .expect("could not acquire write lock on interface registry");
                 (*write_guard).insert(s.clone(), Mutex::new(iface));
-                Ok(AsyncInterface { serial: s, task: None })
+                Ok(AsyncInterface { serial: s, write_task: None, read_task: None })
             }
             None => Err(Error::SerialNumberMissing),
         })
@@ -219,10 +220,10 @@ impl AsyncWrite for AsyncInterface {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        if self.task.is_none() {
+        if self.write_task.is_none() {
             let buffer = buf[..].to_vec();
             let serial_clone = self.serial.clone();
-            self.task.replace(Box::pin(unblock(move || {
+            self.write_task.replace(Box::pin(unblock(move || {
                 let read_guard = IFACE_REGISTRY
                     .read()
                     .expect("could not acquire read lock on interface registry");
@@ -237,10 +238,10 @@ impl AsyncWrite for AsyncInterface {
             })));
         }
 
-        if let Some(ref mut task) = self.task {
+        if let Some(ref mut task) = self.write_task {
             match task.as_mut().poll(cx) {
                 Poll::Ready(s) => {
-                    self.task = None;
+                    self.write_task = None;
                     Poll::Ready(s)
                 }
                 Poll::Pending => Poll::Pending,
@@ -265,18 +266,49 @@ impl AsyncWrite for AsyncInterface {
 
 impl AsyncRead for AsyncInterface {
     fn poll_read(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-        buf: &mut [u8],
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        mut buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
-        let read_guard =
-            IFACE_REGISTRY.read().expect("could not acquire read lock on interface registry");
-        if let Some(iface_lock) = (*read_guard).get(&self.serial) {
-            Poll::Ready(iface_lock.lock().unwrap().read(buf))
+        if self.read_task.is_none() {
+            let mut buffer = buf[..].to_vec();
+            let serial_clone = self.serial.clone();
+            self.read_task.replace(Box::pin(unblock(move || {
+                let read_guard = IFACE_REGISTRY
+                    .read()
+                    .expect("could not acquire read lock on interface registry");
+                if let Some(iface_lock) = (*read_guard).get(&serial_clone) {
+                    let read = iface_lock.lock().unwrap().read(&mut buffer)?;
+                    buffer.truncate(read);
+                    Ok(buffer)
+                } else {
+                    Err(std::io::Error::new(
+                        ErrorKind::Other,
+                        format!("Interface missing from registry"),
+                    ))
+                }
+            })));
+        }
+
+        if let Some(ref mut task) = self.read_task {
+            match task.as_mut().poll(cx) {
+                Poll::Ready(s) => {
+                    self.read_task = None;
+                    match s {
+                        Ok(v) => {
+                            Poll::Ready(buf.write(&v))
+                        }
+                        Err(e) => Poll::Ready(Err(e)),
+                    }
+                }
+                Poll::Pending => {
+                    Poll::Pending
+                }
+            }
         } else {
             Poll::Ready(Err(std::io::Error::new(
                 ErrorKind::Other,
-                format!("Interface missing from registry"),
+                format!("Could not add async task to read"),
             )))
         }
     }
