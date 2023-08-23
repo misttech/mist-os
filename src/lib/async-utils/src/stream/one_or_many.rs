@@ -19,15 +19,39 @@ use pin_project::pin_project;
 #[pin_project]
 pub struct OneOrMany<F>(#[pin] Impl<F>);
 
+/// Maintains internal state for the [`Impl::One`] case, keeping track of when
+/// `None` is already yielded to provide a correct `FusedFuture` implementation.
+#[pin_project(project=OneInnerProj)]
+enum OneInner<F> {
+    Present(#[pin] F),
+    Absent,
+    AbsentNoneYielded,
+}
+
+impl<F> OneInner<F> {
+    fn take(&mut self) -> Option<F> {
+        let v = std::mem::replace(self, Self::Absent);
+        match v {
+            Self::Present(f) => Some(f),
+            Self::Absent => None,
+            Self::AbsentNoneYielded => {
+                // Restore back the NoneYieldedState.
+                *self = Self::AbsentNoneYielded;
+                None
+            }
+        }
+    }
+}
+
 #[pin_project(project=OneOrManyProj)]
 enum Impl<F> {
-    One(#[pin] Option<F>),
+    One(#[pin] OneInner<F>),
     Many(#[pin] FuturesUnordered<F>),
 }
 
 impl<F> Default for OneOrMany<F> {
     fn default() -> Self {
-        Self(Impl::One(None))
+        Self(Impl::One(OneInner::Absent))
     }
 }
 
@@ -39,7 +63,7 @@ impl<F> OneOrMany<F> {
     /// identical to constructing a stream by providing the future to
     /// [`futures::stream::once`].
     pub fn new(f: F) -> Self {
-        Self(Impl::One(Some(f)))
+        Self(Impl::One(OneInner::Present(f)))
     }
 
     /// Appends a new future to the set of pending futures.
@@ -52,7 +76,7 @@ impl<F> OneOrMany<F> {
         let Self(this) = self;
         match this {
             Impl::One(o) => match o.take() {
-                None => *o = Some(f),
+                None => *o = OneInner::Present(f),
                 Some(first) => *this = Impl::Many([first, f].into_iter().collect()),
             },
             Impl::Many(unordered) => {
@@ -64,7 +88,7 @@ impl<F> OneOrMany<F> {
                     // Otherwise the cost of allocating and deallocating a
                     // `FuturesUnordered` would outweigh the gains of less
                     // indirection.
-                    *this = Impl::One(Some(f))
+                    *this = Impl::One(OneInner::Present(f))
                 } else {
                     unordered.push(f);
                 }
@@ -76,8 +100,8 @@ impl<F> OneOrMany<F> {
     pub fn is_empty(&self) -> bool {
         let Self(this) = self;
         match this {
-            Impl::One(None) => true,
-            Impl::One(Some(_)) => false,
+            Impl::One(OneInner::Absent | OneInner::AbsentNoneYielded) => true,
+            Impl::One(OneInner::Present(_)) => false,
             Impl::Many(many) => many.is_empty(),
         }
     }
@@ -89,12 +113,15 @@ impl<F: Future> Stream for OneOrMany<F> {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
         match this.0.project() {
-            OneOrManyProj::One(mut p) => match p.as_mut().as_pin_mut() {
-                None => Poll::Ready(None),
-                Some(f) => match f.poll(cx) {
+            OneOrManyProj::One(mut p) => match p.as_mut().project() {
+                OneInnerProj::Absent | OneInnerProj::AbsentNoneYielded => {
+                    p.set(OneInner::AbsentNoneYielded);
+                    Poll::Ready(None)
+                }
+                OneInnerProj::Present(f) => match f.poll(cx) {
                     Poll::Ready(t) => {
                         let output = Poll::Ready(Some(t));
-                        p.set(None);
+                        p.set(OneInner::Absent);
                         output
                     }
                     Poll::Pending => Poll::Pending,
@@ -121,7 +148,8 @@ impl<F: Future> FusedStream for OneOrMany<F> {
     fn is_terminated(&self) -> bool {
         let Self(this) = self;
         match this {
-            Impl::One(f) => f.is_none(),
+            Impl::One(OneInner::Present(_) | OneInner::Absent) => false,
+            Impl::One(OneInner::AbsentNoneYielded) => true,
             Impl::Many(unordered) => unordered.is_terminated(),
         }
     }
@@ -132,9 +160,9 @@ impl<F> FromIterator<F> for OneOrMany<F> {
         let mut iter = iter.into_iter();
 
         Self(match iter.next() {
-            None => Impl::One(None),
+            None => Impl::One(OneInner::Absent),
             Some(first) => match iter.next() {
-                None => Impl::One(Some(first)),
+                None => Impl::One(OneInner::Present(first)),
                 Some(second) => Impl::Many([first, second].into_iter().chain(iter).collect()),
             },
         })
@@ -333,5 +361,37 @@ mod tests {
         pin_mut!(fut);
         let all: HashSet<_> = assert_matches!(fut.poll(&mut context), Poll::Ready(x) => x);
         assert_eq!(all, HashSet::from_iter(1..=5));
+    }
+
+    #[test]
+    fn fused_stream() {
+        let waker = futures_test::task::panic_waker();
+        let mut context = Context::from_waker(&waker);
+
+        let one_or_many = OneOrMany::<_>::default();
+        pin_mut!(one_or_many);
+        assert!(!one_or_many.is_terminated());
+        assert_eq!(one_or_many.as_mut().poll_next(&mut context), Poll::Ready(None));
+        assert!(one_or_many.is_terminated());
+
+        one_or_many.as_mut().push(futures::future::ready(()));
+        assert!(!one_or_many.is_terminated());
+        assert_eq!(one_or_many.as_mut().poll_next(&mut context), Poll::Ready(Some(())));
+        assert!(!one_or_many.is_terminated());
+        assert_eq!(one_or_many.as_mut().poll_next(&mut context), Poll::Ready(None));
+        assert!(one_or_many.is_terminated());
+
+        // Do it again with two futures to test the FuturesUnordered passthrough
+        // case.
+        one_or_many.as_mut().push(futures::future::ready(()));
+        assert!(!one_or_many.is_terminated());
+        one_or_many.as_mut().push(futures::future::ready(()));
+        assert!(!one_or_many.is_terminated());
+        assert_eq!(one_or_many.as_mut().poll_next(&mut context), Poll::Ready(Some(())));
+        assert!(!one_or_many.is_terminated());
+        assert_eq!(one_or_many.as_mut().poll_next(&mut context), Poll::Ready(Some(())));
+        assert!(!one_or_many.is_terminated());
+        assert_eq!(one_or_many.as_mut().poll_next(&mut context), Poll::Ready(None));
+        assert!(one_or_many.is_terminated());
     }
 }
