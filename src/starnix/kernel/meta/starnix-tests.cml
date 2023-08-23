@@ -16,6 +16,7 @@
             protocol: [
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
+                "fuchsia.sysinfo.SysInfo",
             ],
         },
     ],

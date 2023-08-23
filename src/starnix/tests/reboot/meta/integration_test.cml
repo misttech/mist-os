@@ -22,6 +22,7 @@
         {
             protocol: [
                 "fuchsia.kernel.Stats",
+                "fuchsia.sysinfo.SysInfo",
                 "fuchsia.kernel.VmexResource",
             ],
             from: "parent",

@@ -16,7 +16,7 @@ use crate::{
 };
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 
 use maplit::btreemap;
 use std::{
@@ -346,6 +346,37 @@ impl KernelStatsStore {
     }
 }
 
+struct SysInfo {
+    board_name: String,
+}
+
+impl SysInfo {
+    fn is_qemu(&self) -> bool {
+        matches!(
+            self.board_name.as_str(),
+            "Standard PC (Q35 + ICH9, 2009)" | "qemu-arm64" | "qemu-riscv64"
+        )
+    }
+
+    fn fetch() -> Result<SysInfo, anyhow::Error> {
+        let (client_end, server_end) = zx::Channel::create();
+        connect_channel_to_protocol::<fidl_fuchsia_sysinfo::SysInfoMarker>(server_end)?;
+        let sysinfo = fidl_fuchsia_sysinfo::SysInfoSynchronousProxy::new(client_end);
+        let board_name = match sysinfo.get_board_name(zx::Time::INFINITE)? {
+            (zx::sys::ZX_OK, Some(name)) => name,
+            (_, _) => "Unknown".to_string(),
+        };
+        Ok(SysInfo { board_name })
+    }
+}
+
+const SYSINFO: Lazy<SysInfo> = Lazy::new(|| {
+    SysInfo::fetch().unwrap_or_else(|e| {
+        log_error!("Failed to fetch sysinfo: {e}");
+        SysInfo { board_name: "Unknown".to_string() }
+    })
+});
+
 #[derive(Clone)]
 struct CpuinfoFile {}
 impl CpuinfoFile {
@@ -355,8 +386,17 @@ impl CpuinfoFile {
 }
 impl DynamicFileSource for CpuinfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let is_qemu = SYSINFO.is_qemu();
+
         for i in 0..fuchsia_zircon::system_get_num_cpus() {
             writeln!(sink, "processor\t: {}", i)?;
+
+            // Report emulated CPU as "QEMU Virtual CPU". Some LTP tests rely on this to detect
+            // that they running in a VM.
+            if is_qemu {
+                writeln!(sink, "model name\t: QEMU Virtual CPU")?;
+            }
+
             writeln!(sink)?;
         }
         Ok(())
