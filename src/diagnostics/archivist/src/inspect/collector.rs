@@ -191,7 +191,7 @@ mod tests {
         fuchsia_zircon as zx,
         fuchsia_zircon::Peered,
         futures::{FutureExt, StreamExt},
-        inspect_runtime::service::{spawn_tree_server, TreeServerSettings},
+        inspect_runtime::{service::spawn_tree_server_with_stream, PublishOptions},
     };
 
     fn get_vmo(text: &[u8]) -> zx::Vmo {
@@ -211,11 +211,11 @@ mod tests {
         insp3.root().record_int("three", 3);
 
         let (tree1, request_stream) = create_request_stream::<TreeMarker>().unwrap();
-        spawn_tree_server(insp1, TreeServerSettings::default(), request_stream).detach();
+        spawn_tree_server_with_stream(insp1, PublishOptions::default(), request_stream).detach();
         let (tree2, request_stream) = create_request_stream::<TreeMarker>().unwrap();
-        spawn_tree_server(insp2, TreeServerSettings::default(), request_stream).detach();
+        spawn_tree_server_with_stream(insp2, PublishOptions::default(), request_stream).detach();
         let (tree3, request_stream) = create_request_stream::<TreeMarker>().unwrap();
-        spawn_tree_server(insp3, TreeServerSettings::default(), request_stream).detach();
+        spawn_tree_server_with_stream(insp3, PublishOptions::default(), request_stream).detach();
 
         let name1 = Some(InspectHandleName::name("tree1"));
         let name2 = Some(InspectHandleName::name("tree2"));

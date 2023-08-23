@@ -5,7 +5,7 @@
 use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
 use fuchsia_inspect::Inspector;
 use futures::{future::BoxFuture, FutureExt};
-use inspect_runtime::service::{handle_request_stream, TreeServerSettings};
+use inspect_runtime::{service::handle_request_stream, PublishOptions};
 
 /// Spawns a tree server for the test purposes.
 pub fn spawn_server(
@@ -13,6 +13,6 @@ pub fn spawn_server(
 ) -> Result<(TreeProxy, BoxFuture<'static, Result<(), anyhow::Error>>), anyhow::Error> {
     let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>()?;
     let tree_server_fut =
-        handle_request_stream(inspector, TreeServerSettings::default(), request_stream);
+        handle_request_stream(inspector, PublishOptions::default(), request_stream);
     Ok((tree, tree_server_fut.boxed()))
 }

@@ -4,10 +4,11 @@
 
 //! Implementation of the `fuchsia.inspect.Tree` protocol server.
 
+use crate::{PublishOptions, TreeServerSendPreference};
 use anyhow::Error;
 use fidl;
 use fidl_fuchsia_inspect::{
-    TreeContent, TreeNameIteratorRequest, TreeNameIteratorRequestStream, TreeRequest,
+    TreeContent, TreeMarker, TreeNameIteratorRequest, TreeNameIteratorRequestStream, TreeRequest,
     TreeRequestStream,
 };
 use fidl_fuchsia_mem::Buffer;
@@ -17,76 +18,22 @@ use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::warn;
 
-#[derive(Clone)]
-pub enum TreeServerSendPreference {
-    /// Frozen denotes sending a copy-on-write VMO.
-    /// The payload refers to failure behavior, as not all VMOs
-    /// can be frozen. Failure behavior should be one of Live or
-    /// DeepCopy.
-    ///
-    /// Frozen(Live) is the default value of TreeServerSendPreference.
-    Frozen(Box<TreeServerSendPreference>),
-
-    /// Live denotes sending a live handle to the VMO.
-    ///
-    /// A client might want this behavior if they have time sensitive writes
-    /// to the VMO, because copy-on-write behavior causes the initial write
-    /// to a page to be somewhat slower (~1%).
-    Live,
-
-    /// DeepCopy will send a private copy of the VMO. This should probably
-    /// not be a client's first choice, as Frozen(DeepCopy) will provide the
-    /// same semantic behavior while possibly avoiding an expensive copy.
-    ///
-    /// A client might want this behavior if they have time sensitive writes
-    /// to the VMO, because copy-on-write behavior causes the initial write
-    /// to a page to be somewhat slower (~1%).
-    DeepCopy,
-}
-
-impl TreeServerSendPreference {
-    /// Create a new [`TreeServerSendPreference`] that sends a frozen/copy-on-write VMO of the tree,
-    /// falling back to the specified `failure_mode` if a frozen VMO cannot be provided.
-    ///
-    /// # Arguments
-    ///
-    /// * `failure_mode` - Fallback behavior to use if freezing the Inspect VMO fails.
-    ///
-    pub fn frozen_or(failure_mode: TreeServerSendPreference) -> Self {
-        TreeServerSendPreference::Frozen(Box::new(failure_mode))
-    }
-}
-
-impl Default for TreeServerSendPreference {
-    fn default() -> Self {
-        TreeServerSendPreference::frozen_or(TreeServerSendPreference::Live)
-    }
-}
-
-/// Optional settings for serving `fuchsia.inspect.Tree`
-#[derive(Default, Clone)]
-pub struct TreeServerSettings {
-    /// This specifies how the VMO should be sent over the tree server.
-    /// Default behavior is TreeServerSendPreference::Frozen(TreeServerSendPreference::Live).
-    pub send_vmo_preference: TreeServerSendPreference,
-}
-
 /// Runs a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
 /// associated with the given tree on `get_content` and allows to open linked trees (lazy nodes).
 pub async fn handle_request_stream(
     inspector: Inspector,
-    settings: TreeServerSettings,
+    settings: PublishOptions,
     mut stream: TreeRequestStream,
 ) -> Result<(), Error> {
     while let Some(request) = stream.try_next().await? {
         match request {
             TreeRequest::GetContent { responder } => {
                 // If freezing fails, full snapshot algo needed on live duplicate
-                let vmo = match settings.send_vmo_preference {
+                let vmo = match settings.vmo_preference {
                     TreeServerSendPreference::DeepCopy => inspector.copy_vmo(),
                     TreeServerSendPreference::Live => inspector.duplicate_vmo(),
-                    TreeServerSendPreference::Frozen(ref failure) => {
-                        inspector.frozen_vmo_copy().or_else(|| match **failure {
+                    TreeServerSendPreference::Frozen { ref on_failure } => {
+                        inspector.frozen_vmo_copy().or_else(|| match **on_failure {
                             TreeServerSendPreference::DeepCopy => inspector.copy_vmo(),
                             TreeServerSendPreference::Live => inspector.duplicate_vmo(),
                             _ => None,
@@ -108,7 +55,8 @@ pub async fn handle_request_stream(
             }
             TreeRequest::OpenChild { child_name, tree, .. } => {
                 if let Ok(inspector) = inspector.read_tree(&child_name).await {
-                    spawn_tree_server(inspector, settings.clone(), tree.into_stream()?).detach()
+                    spawn_tree_server_with_stream(inspector, settings.clone(), tree.into_stream()?)
+                        .detach()
                 }
             }
         }
@@ -118,17 +66,33 @@ pub async fn handle_request_stream(
 
 /// Spawns a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
 /// associated with the given tree on `get_content` and allows to open linked trees (lazy nodes).
+///
+/// This version of the function accepts a `TreeRequestStream`, making it suitable for the
+/// recursive calls performed by the `OpenChild` method on `fuchsia.inspect.Tree`.
+/// `spawn_tree_server` is a more ergonomic option for spawning the root tree.
 #[must_use]
-pub fn spawn_tree_server(
+pub fn spawn_tree_server_with_stream(
     inspector: Inspector,
-    settings: TreeServerSettings,
+    settings: PublishOptions,
     stream: TreeRequestStream,
 ) -> fasync::Task<()> {
     fasync::Task::spawn(async move {
-        handle_request_stream(inspector, settings, stream)
-            .await
-            .unwrap_or_else(|err: Error| warn!(?err, "failed to run tree server"));
+        handle_request_stream(inspector, settings, stream).await.unwrap_or_else(|err: Error| {
+            warn!(?err, "failed to run `fuchsia.inspect.Tree` server")
+        });
     })
+}
+
+/// Spawns a `fuchsia.inspect.Tree` server and returns the task handling
+/// `fuchsia.inspect.Tree requests and a `ClientEnd` handle to the tree.
+#[must_use]
+pub fn spawn_tree_server(
+    inspector: Inspector,
+    settings: PublishOptions,
+) -> Result<(fasync::Task<()>, fidl::endpoints::ClientEnd<TreeMarker>), Error> {
+    let (tree, server_end) = fidl::endpoints::create_endpoints::<TreeMarker>();
+    let task = spawn_tree_server_with_stream(inspector, settings, server_end.into_stream()?);
+    Ok((task, tree))
 }
 
 /// Runs a server for the `fuchsia.inspect.TreeNameIterator` protocol. This protocol returns the
@@ -173,9 +137,7 @@ fn spawn_tree_name_iterator_server(values: Vec<String>, mut stream: TreeNameIter
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_inspect::{
-        TreeMarker, TreeNameIteratorMarker, TreeNameIteratorProxy, TreeProxy,
-    };
+    use fidl_fuchsia_inspect::{TreeNameIteratorMarker, TreeNameIteratorProxy, TreeProxy};
     use fuchsia_async::DurationExt;
     use fuchsia_inspect::{
         assert_data_tree, assert_json_diff,
@@ -187,9 +149,20 @@ mod tests {
     use std::convert::TryFrom;
     use std::time::Duration;
 
+    /// Spawns a `fuchsia.inspect.Tree` server and returns the task handling
+    /// `fuchsia.inspect.Tree` requests and a `TreeProxy` handle to the tree.
+    #[must_use]
+    pub fn spawn_server_proxy(
+        inspector: Inspector,
+        settings: PublishOptions,
+    ) -> Result<(fasync::Task<()>, TreeProxy), Error> {
+        Ok(spawn_tree_server(inspector, settings)
+            .map(|(t, p)| (t, p.into_proxy().expect("ClientEnd is convertible to TreeProxy")))?)
+    }
+
     #[fuchsia::test]
     async fn get_contents() -> Result<(), Error> {
-        let tree = spawn_server(test_inspector(), TreeServerSettings::default())?;
+        let (_server, tree) = spawn_server_proxy(test_inspector(), PublishOptions::default())?;
         let tree_content = tree.get_content().await?;
         let hierarchy = parse_content(tree_content)?;
         assert_data_tree!(hierarchy, root: {
@@ -200,7 +173,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn list_child_names() -> Result<(), Error> {
-        let tree = spawn_server(test_inspector(), TreeServerSettings::default())?;
+        let (_server, tree) = spawn_server_proxy(test_inspector(), PublishOptions::default())?;
         let (name_iterator, server_end) =
             fidl::endpoints::create_proxy::<TreeNameIteratorMarker>()?;
         tree.list_child_names(server_end)?;
@@ -210,7 +183,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn open_children() -> Result<(), Error> {
-        let tree = spawn_server(test_inspector(), TreeServerSettings::default())?;
+        let (_server, tree) = spawn_server_proxy(test_inspector(), PublishOptions::default())?;
         let (child_tree, server_end) = fidl::endpoints::create_proxy::<TreeMarker>()?;
         tree.open_child("lazy-0", server_end)?;
         let tree_content = child_tree.get_content().await?;
@@ -241,7 +214,8 @@ mod tests {
     #[fuchsia::test]
     async fn default_snapshots_are_private_on_success() -> Result<(), Error> {
         let inspector = test_inspector();
-        let tree_copy = spawn_server(inspector.clone(), TreeServerSettings::default())?;
+        let (_server, tree_copy) =
+            spawn_server_proxy(inspector.clone(), PublishOptions::default())?;
         let tree_content_copy = tree_copy.get_content().await?;
 
         inspector.root().record_int("new", 6);
@@ -257,10 +231,11 @@ mod tests {
     #[fuchsia::test]
     async fn force_live_snapshot() -> Result<(), Error> {
         let inspector = test_inspector();
-        let tree_cow = spawn_server(inspector.clone(), TreeServerSettings::default())?;
-        let tree_live = spawn_server(
+        let (_server1, tree_cow) =
+            spawn_server_proxy(inspector.clone(), PublishOptions::default())?;
+        let (_server2, tree_live) = spawn_server_proxy(
             inspector.clone(),
-            TreeServerSettings { send_vmo_preference: TreeServerSendPreference::Live },
+            PublishOptions::default().send_vmo_preference(TreeServerSendPreference::Live),
         )?;
         let tree_content_live = tree_live.get_content().await?;
         let tree_content_cow = tree_cow.get_content().await?;
@@ -298,7 +273,7 @@ mod tests {
 
         root.record_int("int", 3);
 
-        let proxy = spawn_server(inspector, TreeServerSettings::default())?;
+        let (_server, proxy) = spawn_server_proxy(inspector, PublishOptions::default())?;
         let result = read_with_timeout(&proxy, Duration::from_secs(5)).await?;
         assert_json_diff!(result, root: {
             child: "value",
@@ -323,15 +298,6 @@ mod tests {
     fn parse_content(tree_content: TreeContent) -> Result<DiagnosticsHierarchy, Error> {
         let buffer = tree_content.buffer.unwrap();
         Ok(PartialNodeHierarchy::try_from(&buffer.vmo)?.into())
-    }
-
-    fn spawn_server(
-        inspector: Inspector,
-        settings: TreeServerSettings,
-    ) -> Result<TreeProxy, Error> {
-        let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>()?;
-        spawn_tree_server(inspector, settings, request_stream).detach();
-        Ok(tree)
     }
 
     fn test_inspector() -> Inspector {

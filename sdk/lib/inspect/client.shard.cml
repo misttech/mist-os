@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "inspect/use.shard.cml",
+    ],
 
     // TODO(fxbug.dev/93344): Remove diagnostics dir
     capabilities: [

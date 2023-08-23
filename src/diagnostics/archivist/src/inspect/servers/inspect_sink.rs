@@ -144,7 +144,7 @@ mod tests {
     };
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::Future;
-    use inspect_runtime::service::{spawn_tree_server, TreeServerSettings};
+    use inspect_runtime::{service::spawn_tree_server_with_stream, PublishOptions};
     use std::sync::Arc;
 
     struct TestHarness {
@@ -218,10 +218,10 @@ mod tests {
             &mut self,
             component: Arc<ComponentIdentity>,
             inspector: Inspector,
-            settings: TreeServerSettings,
+            settings: PublishOptions,
         ) -> ClientEnd<TreeMarker> {
             let (tree, request_stream) = create_request_stream::<TreeMarker>().unwrap();
-            let server = spawn_tree_server(inspector, settings, request_stream);
+            let server = spawn_tree_server_with_stream(inspector, settings, request_stream);
             self.tree_pairs.push((component, Some(server)));
             tree
         }
@@ -285,7 +285,7 @@ mod tests {
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
-        let tree = test.serve(Arc::clone(&identity), insp, TreeServerSettings::default());
+        let tree = test.serve(Arc::clone(&identity), insp, PublishOptions::default());
         test.publish(&identity, tree);
 
         let koid = test.published_koids()[0];
@@ -315,12 +315,11 @@ mod tests {
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
-        let tree = test.serve(Arc::clone(&identity), insp, TreeServerSettings::default());
+        let tree = test.serve(Arc::clone(&identity), insp, PublishOptions::default());
 
         let other_insp = Inspector::default();
         other_insp.root().record_double("double", 1.24);
-        let other_tree =
-            test.serve(Arc::clone(&identity), other_insp, TreeServerSettings::default());
+        let other_tree = test.serve(Arc::clone(&identity), other_insp, PublishOptions::default());
 
         test.publish(&identity, tree);
         test.publish(&identity, other_tree);
@@ -363,7 +362,7 @@ mod tests {
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
-        let tree = test.serve(Arc::clone(&identity), insp, TreeServerSettings::default());
+        let tree = test.serve(Arc::clone(&identity), insp, PublishOptions::default());
         test.publish(&identity, tree);
 
         let koid = test.published_koids()[0];
@@ -415,11 +414,11 @@ mod tests {
 
         let insp = Inspector::default();
         insp.root().record_int("int", 0);
-        let tree = test.serve(Arc::clone(&identities[0]), insp, TreeServerSettings::default());
+        let tree = test.serve(Arc::clone(&identities[0]), insp, PublishOptions::default());
 
         let insp2 = Inspector::default();
         insp2.root().record_bool("is_insp2", true);
-        let tree2 = test.serve(Arc::clone(&identities[1]), insp2, TreeServerSettings::default());
+        let tree2 = test.serve(Arc::clone(&identities[1]), insp2, PublishOptions::default());
 
         test.publish(&identities[0], tree);
         test.publish(&identities[1], tree2);
@@ -467,7 +466,7 @@ mod tests {
         let mut test = TestHarness::new(vec![Arc::clone(&identity)]).await;
 
         let tree =
-            test.serve(Arc::clone(&identity), Inspector::default(), TreeServerSettings::default());
+            test.serve(Arc::clone(&identity), Inspector::default(), PublishOptions::default());
         test.publish(&identity, tree);
 
         test.stop_all().await;

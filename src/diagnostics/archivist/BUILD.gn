@@ -47,7 +47,10 @@ rustc_library("lib") {
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/format/rust",
-    "//src/lib/diagnostics/inspect/runtime/rust",
+
+    # Archivist needs to use InspectSink from itself, so it does not
+    # include the normal inspect/client.shard.cml.
+    "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/message/rust",
     "//src/lib/diagnostics/selectors",

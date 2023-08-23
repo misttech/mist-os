@@ -1373,6 +1373,11 @@ assembly_input_bundle("fshost_common") {
         },
         {
           source =
+              rebase_path("//sdk/lib/inspect/use.shard.cml", root_build_dir)
+          destination = "inspect/use.shard.cml"
+        },
+        {
+          source =
               rebase_path("//sdk/lib/syslog/client.shard.cml", root_build_dir)
           destination = "syslog/client.shard.cml"
         },

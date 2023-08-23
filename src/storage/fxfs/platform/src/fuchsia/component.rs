@@ -36,7 +36,7 @@ use {
         object_store::volume::root_volume,
         serialized_types::LATEST_VERSION,
     },
-    inspect_runtime::service::{TreeServerSendPreference, TreeServerSettings},
+    inspect_runtime::{PublishOptions, TreeServerSendPreference},
     remote_block_device::{BlockClient as _, RemoteBlockClient},
     std::ops::Deref,
     std::sync::{Arc, Weak},
@@ -159,11 +159,9 @@ impl Component {
                 "diagnostics",
                 inspect_runtime::create_diagnostics_dir_with_options(
                     fuchsia_inspect::component::inspector().clone(),
-                    TreeServerSettings {
-                        send_vmo_preference: TreeServerSendPreference::frozen_or(
-                            TreeServerSendPreference::DeepCopy,
-                        ),
-                    },
+                    PublishOptions::default().send_vmo_preference(
+                        TreeServerSendPreference::frozen_or(TreeServerSendPreference::DeepCopy),
+                    ),
                 ),
             )
             .expect("unable to create diagnostics dir");

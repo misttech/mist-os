@@ -60,11 +60,9 @@
 //!
 //! ```rust
 //! use fuchsia_inspect::component;
-//! use fuchsia_component::server::ServiceFs;
 //! use inspect_runtime;
 //!
-//! let mut fs = ServiceFs::new();
-//! inspect_runtime::serve(component::inspector(), &mut fs)?;
+//! let _inspect_server_task = inspect_runtime::publish(component::inspector());
 //!
 //! // Now you can create nodes and properties anywhere!
 //! let child = component::inspector().root().create_child("foo");

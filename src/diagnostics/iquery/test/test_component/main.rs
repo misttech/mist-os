@@ -186,9 +186,9 @@ async fn main() -> Result<(), Error> {
         // service in the ServiceFs, an exception occurs. This is purely a workaround for
         // ServiceFS and for the test purpose. A regular component wouldn't do this. It would
         // just do `inspect_runtime::serve(inspector, &mut fs);`.
-        inspect_runtime::service::spawn_tree_server(
+        inspect_runtime::service::spawn_tree_server_with_stream(
             inspector_clone.clone(),
-            inspect_runtime::service::TreeServerSettings::default(),
+            inspect_runtime::PublishOptions::default(),
             stream,
         )
         .detach();

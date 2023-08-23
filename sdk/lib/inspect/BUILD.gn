@@ -9,6 +9,7 @@ sdk_component_manifests("inspect") {
   name = "inspect"
   manifests = [
     "client.shard.cml",
+    "use.shard.cml",
     "offer.shard.cml",
   ]
   category = "partner"

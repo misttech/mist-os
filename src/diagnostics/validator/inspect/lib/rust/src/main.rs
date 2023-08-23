@@ -20,7 +20,7 @@ use {
     fuchsia_inspect::*,
     fuchsia_zircon::HandleBased,
     futures::prelude::*,
-    inspect_runtime::service,
+    inspect_runtime::{service, PublishOptions},
     std::collections::HashMap,
     std::sync::Arc,
     tracing::{error, info, warn},
@@ -91,7 +91,7 @@ impl Publisher {
                     async move {
                         service::handle_request_stream(
                             inspector_clone,
-                            service::TreeServerSettings::default(),
+                            PublishOptions::default(),
                             stream,
                         )
                         .await
@@ -541,9 +541,9 @@ async fn run_driver_service(
             InspectPuppetRequest::InitializeTree { params, responder } => {
                 let actor = Actor::new(new_inspector(&params));
                 let (tree, request_stream) = create_request_stream::<TreeMarker>()?;
-                service::spawn_tree_server(
+                service::spawn_tree_server_with_stream(
                     actor.inspector.clone(),
-                    service::TreeServerSettings::default(),
+                    PublishOptions::default(),
                     request_stream,
                 )
                 .detach();
