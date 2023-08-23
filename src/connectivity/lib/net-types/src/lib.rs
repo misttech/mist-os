@@ -145,6 +145,41 @@ pub trait Witness<A>: AsRef<A> + Sized + sealed::Sealed {
     /// [`Cell::get`]: core::cell::Cell::get
     /// [`Cell::into_inner`]: core::cell::Cell::into_inner
     fn into_addr(self) -> A;
+
+    /// Transposes this witness type with another witness type layered inside of
+    /// it.
+    /// (e.g. UnicastAddr<SpecifiedAddr<T>> -> SpecifiedAddr<UnicastAddr<T>>)
+    fn transpose<T>(self) -> A::Map<Self::Map<T>>
+    where
+        Self: TransposableWitness<A>,
+        A: TransposableWitness<T>,
+        Self::Map<T>: Witness<T>,
+        A::Map<Self::Map<T>>: Witness<Self::Map<T>>,
+    {
+        let middle = self.into_addr();
+        let innermost = middle.into_addr();
+        unsafe {
+            // SAFETY: We're transposing two witness layers, so we know that the
+            // inner address upheld both invariants that are witnessed.
+            let new_middle = Self::Map::<T>::new_unchecked(innermost);
+            A::Map::<Self::Map<T>>::new_unchecked(new_middle)
+        }
+    }
+}
+
+/// Witness types that can be transposed with other witness wrapper types.
+// Technically, this could be merged directly into the `Witness` trait rather
+// than exist as a separate trait. However, this ends up impeding type
+// inference, as the trait solver gets confused by the existence of `Witness`
+// impls both for single wrapper layers (`SpecifiedAddr<T>` impls `Witness<T>`)
+// and for nested wrappers (`UnicastAddr<SpecifiedAddr<T>>` also impls
+// `Witness<T>`). Since `transpose` is most useful for swapping single-layer
+// `Witness` impls nested within each other, we only want to impl
+// `TransposableWitness` for one wrapper layer at a time, which allows type
+// inference to work properly.
+pub trait TransposableWitness<A>: Witness<A> {
+    /// Maps the type wrapped by this witness.
+    type Map<T>;
 }
 
 // NOTE: The "witness" types UnicastAddr, MulticastAddr, and LinkLocalAddr -
@@ -501,6 +536,10 @@ more details."),
             fn into_addr(self) -> A {
                 self.0
             }
+        }
+
+        impl<A: $trait> TransposableWitness<A> for $type<A> {
+            type Map<T> = $type<T>;
         }
 
         impl<A: $trait> AsRef<A> for $type<A> {
@@ -1458,5 +1497,41 @@ mod tests {
             ZonedAddr::new(Address::LinkLocalUnicast, Some(())).unwrap().into_addr_zone(),
             (SpecifiedAddr(Address::LinkLocalUnicast), Some(()))
         );
+    }
+
+    #[test]
+    fn transpose_with_fully_qualified_types() {
+        let addr: SpecifiedAddr<NonMappedAddr<Address>> =
+            <NonMappedAddr<SpecifiedAddr<Address>> as Witness<SpecifiedAddr<Address>>>::transpose::<
+                Address,
+            >(
+                NonMappedAddr::new(
+                    SpecifiedAddr::new(Address::LinkLocalUnicast)
+                        .expect("should be specified addr"),
+                )
+                .expect("should be non-mapped addr"),
+            );
+        assert_eq!(
+            addr,
+            SpecifiedAddr::new(
+                NonMappedAddr::new(Address::LinkLocalUnicast).expect("should be non-mapped addr")
+            )
+            .expect("should be specified addr")
+        )
+    }
+
+    #[test]
+    fn transpose_with_inferred_types() {
+        assert_eq!(
+            NonMappedAddr::new(
+                SpecifiedAddr::new(Address::LinkLocalUnicast).expect("should be specified addr")
+            )
+            .expect("should be non-mapped addr")
+            .transpose(),
+            SpecifiedAddr::new(
+                NonMappedAddr::new(Address::LinkLocalUnicast).expect("should be non-mapped addr")
+            )
+            .expect("should be specified addr")
+        )
     }
 }
