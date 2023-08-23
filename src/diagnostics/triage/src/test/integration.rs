@@ -330,7 +330,7 @@ integration_test!(
     vec![],
     vec![],
     1,
-    "[WARNING] Error rate for app.cmx is too high"
+    "[WARNING] Error rate for app.cm is too high"
 );
 
 integration_test!(

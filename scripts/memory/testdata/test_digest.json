@@ -19,9 +19,7 @@
         "dns_resolver\\.cm",
         "netcfg.*\\.cm",
         "netstack\\.cm",
-        "netsvc\\.cm",
-        "network-tun\\.cmx",
-        "mdns\\.cmx"
+        "netsvc\\.cm"
       ]
     },
     {
@@ -41,8 +39,7 @@
         "bin/bootsvc",
         "bin/component_manager",
         "miscsvc\\.cm",
-        "svchost\\.cm",
-        "sysmgr\\.cmx"
+        "svchost\\.cm"
       ]
     },
     {

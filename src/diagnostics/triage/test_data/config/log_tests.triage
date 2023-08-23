@@ -3,17 +3,17 @@
         syslog_foo: {
             type: "Warning",
             trigger: "SyslogHas('foo')",
-            print: "Error rate for app.cmx is too high",
+            print: "Error rate for app.cm is too high",
         },
         klog_foo: {
             type: "Warning",
             trigger: "KlogHas('foo')",
-            print: "Error rate for app.cmx is too high",
+            print: "Error rate for app.cm is too high",
         },
         bootlog_foo: {
             type: "Warning",
             trigger: "BootlogHas('foo')",
-            print: "Error rate for app.cmx is too high",
+            print: "Error rate for app.cm is too high",
         },
     },
     test: {

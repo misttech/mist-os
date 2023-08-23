@@ -402,7 +402,7 @@ mod tests {
     triage_integration_test!(
         error_rate_with_moniker_payload,
         configs: "error_rate.triage",
-        substring: "[WARNING] Error rate for app.cmx is too high",
+        substring: "[WARNING] Error rate for app.cm is too high",
         golden_structured_outfile: "error_rate_with_moniker_payload"
     );
 

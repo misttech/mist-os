@@ -33,7 +33,7 @@
                         "Bool": true
                     }
                 },
-                "print": "Error rate for app.cmx is too high",
+                "print": "Error rate for app.cm is too high",
                 "file_bug": null,
                 "tag": null
             }
@@ -74,9 +74,9 @@
                 "metric": {
                     "Selector": [
                         {
-                            "full_selector": "INSPECT:session-*/app.cmx:root:errors",
+                            "full_selector": "INSPECT:core/session-manager/session*/app:root:errors",
                             "selector_type": "Inspect",
-                            "body": "session-*/app.cmx:root:errors"
+                            "body": "core/session-manager/session*/app:root:errors"
                         }
                     ]
                 },
@@ -92,9 +92,9 @@
                 "metric": {
                     "Selector": [
                         {
-                            "full_selector": "INSPECT:session-*/app.cmx:root:requests",
+                            "full_selector": "INSPECT:core/session-manager/session*/app:root:requests",
                             "selector_type": "Inspect",
-                            "body": "session-*/app.cmx:root:requests"
+                            "body": "core/session-manager/session*/app:root:requests"
                         }
                     ]
                 },

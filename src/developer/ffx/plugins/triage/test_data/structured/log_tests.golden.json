@@ -26,7 +26,7 @@
                         "Bool": false
                     }
                 },
-                "print": "Error rate for app.cmx is too high",
+                "print": "Error rate for app.cm is too high",
                 "file_bug": null,
                 "tag": null
             },
@@ -55,7 +55,7 @@
                         "Bool": false
                     }
                 },
-                "print": "Error rate for app.cmx is too high",
+                "print": "Error rate for app.cm is too high",
                 "file_bug": null,
                 "tag": null
             },
@@ -84,7 +84,7 @@
                         "Bool": false
                     }
                 },
-                "print": "Error rate for app.cmx is too high",
+                "print": "Error rate for app.cm is too high",
                 "file_bug": null,
                 "tag": null
             }

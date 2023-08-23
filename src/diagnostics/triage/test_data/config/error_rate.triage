@@ -1,7 +1,7 @@
 {
     select: {
-        requests: "INSPECT:session-*/app.cmx:root:requests",
-        errors: "INSPECT:session-*/app.cmx:root:errors",
+        requests: "INSPECT:core/session-manager/session*/app:root:requests",
+        errors: "INSPECT:core/session-manager/session*/app:root:errors",
     },
     eval: {
         error_rate: "errors / requests",
@@ -10,7 +10,7 @@
         error_rate_too_high: {
             type: "Warning",
             trigger: "error_rate > 0.9",
-            print: "Error rate for app.cmx is too high",
+            print: "Error rate for app.cm is too high",
         },
     },
     test: {

@@ -123,9 +123,9 @@
                 "metric": {
                     "Selector": [
                         {
-                            "full_selector": "INSPECT:foo_agent.cmx:root:current_num_connections",
+                            "full_selector": "INSPECT:core/foo_agent:root:current_num_connections",
                             "selector_type": "Inspect",
-                            "body": "foo_agent.cmx:root:current_num_connections"
+                            "body": "core/foo_agent:root:current_num_connections"
                         }
                     ]
                 },

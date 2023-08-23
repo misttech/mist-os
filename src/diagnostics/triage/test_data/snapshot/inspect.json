@@ -1,6 +1,6 @@
 [
     {
-        "moniker": "foo_agent.cmx",
+        "moniker": "core/foo_agent",
         "payload": {
             "root": {
                 "current_num_connections": 1,
@@ -22,7 +22,7 @@
         }
     },
     {
-        "moniker": "session-1/app.cmx",
+        "moniker": "core/session-manager/session:1/app",
         "payload": {
             "root": {
                 "requests": 100,
