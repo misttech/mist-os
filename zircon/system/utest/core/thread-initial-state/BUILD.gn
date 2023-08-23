@@ -3,12 +3,10 @@
 # found in the LICENSE file.
 
 source_set("thread-initial-state") {
-  if (current_cpu != "riscv64") {  # TODO(fxbug.dev/132495): no riscv64.S yet
-    sources = [
-      "${current_cpu}.S",
-      "init-state.cc",
-    ]
-  }
+  sources = [
+    "${current_cpu}.S",
+    "init-state.cc",
+  ]
   deps = [
     "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/zx",
