@@ -32,6 +32,19 @@ zx::result<> MappedVmoFile::Init(zx::unowned_vmo vmo, zx::unowned_vmar vmar) {
   return zx::ok();
 }
 
+zx::result<> MappedVmoFile::InitMutable(zx::unowned_vmo vmo, size_t size, uintptr_t base,
+                                        zx::unowned_vmar vmar) {
+  uintptr_t mapped;
+  zx_status_t status = vmar->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, *vmo, 0, size, &mapped);
+  if (status == ZX_OK) {
+    set_image({reinterpret_cast<std::byte*>(mapped), size});
+    set_base(base);
+    mapped_size_ = size;
+    vmar_ = vmar->borrow();
+  }
+  return zx::make_result(status);
+}
+
 MappedVmoFile::~MappedVmoFile() {
   if (mapped_size_ != 0) {
     [[maybe_unused]] zx_status_t status =

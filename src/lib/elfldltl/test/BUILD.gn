@@ -44,7 +44,10 @@ test("elfldltl-unittests") {
     sources += [ "self-tests.cc" ]
   }
   if (is_fuchsia) {
-    sources += [ "mapped-vmo-file-tests.cc" ]
+    sources += [
+      "mapped-vmo-file-tests.cc",
+      "segment-with-vmo-tests.cc",
+    ]
   }
 
   deps = [

@@ -5,11 +5,13 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SEGMENT_WITH_VMO_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SEGMENT_WITH_VMO_H_
 
+#include <lib/fit/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 
 #include "diagnostics.h"
 #include "load.h"
+#include "mapped-vmo-file.h"
 #include "vmar-loader.h"
 #include "zircon.h"
 
@@ -40,7 +42,7 @@ namespace elfldltl {
 // zero-fills the partial page directly in the VMO contents.  Using this with
 // an elfldltl::SegmentWithVmo::NoCopy instantiation of elfldltl::LoadInfo
 // really just does the zeroing work ahead of time; elfldltl::RemoteVmarLoader
-// would do the same thing when mapping.  A elfldltl::SegmentWithVmo::Copy
+// would do the same thing when mapping.  An elfldltl::SegmentWithVmo::Copy
 // instantiation can be used either for a full zygote model where the
 // relocations are applied in the stored VMOs, or simply to share the zeroing
 // work across multiple separate loads with their own relocations applied to
@@ -50,6 +52,9 @@ namespace elfldltl {
 // elfldltl::SegmentWithVmo::MakeMutable can be applied to a particular segment
 // to install its own copied VMO.  This is what out-of-process dynamic linking
 // must do before applying relocations that touch that segment's contents.
+//
+// The elfldltl::SegmentWithVmo::GetMutableMemory class is meant for use with
+// the elfldltl::LoadInfoMutableMemory adapter object.
 
 class SegmentWithVmo {
  public:
@@ -187,12 +192,82 @@ class SegmentWithVmo {
     });
   }
 
+  // elfldltl::SegmentWithVmo::GetMutableMemory must be instantiated with a
+  // LoadInfo type using SegmentWithVmo wrapper types, and created with a
+  // zx::unowned_vmo for the original file contents.  It can then be used to
+  // construct an elfldltl::LoadInfoMutableMemory adapter object (see details
+  // in <lib/elfldltl/loadinfo-mutable-memory.h>), which provides the mutation
+  // calls in the Memory API.  When mutation requests are made on that Memory
+  // object, the GetMutableMemory callback will be used to map in the mutable
+  // VMO for the segment contents.  The mutable VMO is created via MakeMutable
+  // if needed, and then stored in the LoadInfo::Segment object for later use.
+  //
+  // The callable object itself is copyable and default-constructible
+  // (requiring later copy-assignment to be usable).  Note that it holds (and
+  // copies) the unowned handles passed in the constructor, so users are
+  // responsible for ensuring those handles remain valid for the lifetime of
+  // the callable object.  The optional second argument to the constructor is a
+  // zx::unowned_vmar used for making mappings, default zx::vmar::root_self().
+  template <class LoadInfo>
+  class GetMutableMemory {
+   public:
+    using Result = fit::result<bool, MappedVmoFile>;
+    using Segment = typename LoadInfo::Segment;
+
+    GetMutableMemory() = default;
+
+    GetMutableMemory(const GetMutableMemory&) = default;
+
+    explicit GetMutableMemory(zx::unowned_vmo vmo, zx::unowned_vmar vmar = zx::vmar::root_self())
+        : vmo_{vmo->borrow()}, vmar_{vmar->borrow()} {}
+
+    GetMutableMemory& operator=(const GetMutableMemory&) = default;
+
+    template <class Diagnostics>
+    Result operator()(Diagnostics& diag, Segment& segment) const {
+      auto get_memory = [this, &diag](auto& segment) -> Result {
+        using SegmentType = std::decay_t<decltype(segment)>;
+        if constexpr (kSegmentHasFilesz<SegmentType>) {
+          // Make sure there's a mutable VMO available.
+          if (!MakeMutable(diag, segment, vmo_->borrow())) [[unlikely]] {
+            return fit::error(false);
+          }
+          if (!segment.vmo()) [[unlikely]] {
+            // MakeMutable failed but Diagnostics said to keep going.
+            // No sense also reporting the failure to map the invalid handle.
+            return fit::error{true};
+          }
+
+          // Now map it in for mutation.
+          MappedVmoFile memory;
+          if (auto result = memory.InitMutable(segment.vmo().borrow(), segment.filesz(),
+                                               segment.vaddr(), vmar_->borrow());
+              result.is_error()) {
+            return fit::error{SystemError(diag, segment, kMapFail, result.error_value())};
+          }
+
+          return fit::ok(std::move(memory));
+        } else {
+          // This should be impossible via LoadInfoMutableMemory.
+          return fit::error{diag.FormatError(kMutableZeroFill)};
+        }
+      };
+      return std::visit(get_memory, segment);
+    }
+
+   private:
+    zx::unowned_vmo vmo_;
+    zx::unowned_vmar vmar_;
+  };
+
  private:
   static constexpr std::string_view kCopyVmoFail =
       "cannot create copy-on-write VMO for segment contents";
   static constexpr std::string_view kZeroVmoFail =
       "cannot zero partial page in VMO for data segment";
   static constexpr std::string_view kColonSpace = ": ";
+  static constexpr std::string_view kMapFail = "cannot map segment to apply relocations";
+  static constexpr std::string_view kMutableZeroFill = "cannot make zero-fill segment mutable";
 
   template <class Diagnostics, class Segment>
   static constexpr bool SystemError(Diagnostics& diag, const Segment& segment,

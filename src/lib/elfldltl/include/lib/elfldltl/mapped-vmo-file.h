@@ -43,7 +43,15 @@ class MappedVmoFile : public DirectMemory {
     return *this;
   }
 
+  // This initializes for read-only access to the whole VMO.
+  // The Memory API considers the start of the VMO to be address zero.
   zx::result<> Init(zx::unowned_vmo vmo, zx::unowned_vmar vmar = zx::vmar::root_self());
+
+  // This initializes for read-write access to the VMO of the given size.  The
+  // base address for the Memory API to assign the beginning of the VMO can be
+  // set with the optional third argument.
+  zx::result<> InitMutable(zx::unowned_vmo vmo, size_t size, uintptr_t base = 0,
+                           zx::unowned_vmar vmar = zx::vmar::root_self());
 
   ~MappedVmoFile();
 
