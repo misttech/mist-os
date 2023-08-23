@@ -252,6 +252,9 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// an error if logged by unit tests.
 		&stringInLogCheck{String: "intel-i915: No displays detected.", Type: serialLogType},
 		&stringInLogCheck{String: "intel-i915: No displays detected.", Type: syslogType},
+		// for fxbug.dev/132130. Broken HDMI emulator on vim3.
+		&stringInLogCheck{String: "Failed to parse edid (0 bytes) \"Failed to validate base edid\"", Type: serialLogType},
+		&stringInLogCheck{String: "Failed to parse edid (0 bytes) \"Failed to validate base edid\"", Type: syslogType},
 		// For fxbug.dev/105382 dwc2 bug that breaks usb cdc networking
 		&stringInLogCheck{String: "diepint.timeout", Type: serialLogType, SkipAllPassedTests: true},
 		// For devices which, typically as a result of wear, fail to read any copy of the
