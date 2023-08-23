@@ -38,6 +38,7 @@ if (is_kernel) {
     ]
     public_deps = [ "//zircon/kernel/vm:headers" ]
     deps = [
+      ":headers",
       "//src/lib/llvm-profdata",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/object",
@@ -48,6 +49,7 @@ if (is_kernel) {
   source_set("profile") {
     sources = [ "profile.cc" ]
     deps = [
+      ":headers",
       ":private",
       "//src/lib/llvm-profdata",
       "//zircon/kernel/lib/ktl",

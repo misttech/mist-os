@@ -26,6 +26,7 @@
 #include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls/object.h>
 
 #include <cstdint>
@@ -43,16 +44,10 @@ namespace {
 
 constexpr auto kFlags = fuchsia::io::OpenFlags::RIGHT_READABLE;
 
-zx_koid_t GetKoid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
-}
-
-// Serve the vmos from /somepath/kernel/vmofile.name.
+// Serve vmos from arbitrary paths in the local namespace.
 class FakeBootItemsFixture : public testing::Test {
  public:
+  // Root path from where to serve the hierarchy.
   void Serve(const std::string& path) {
     zx::channel dir_server, dir_client;
     ASSERT_EQ(zx::channel::create(0, &dir_server, &dir_client), 0);
@@ -62,21 +57,11 @@ class FakeBootItemsFixture : public testing::Test {
     ASSERT_EQ(fdio_ns_get_installed(&root_ns), ZX_OK);
     ASSERT_EQ(fdio_ns_bind(root_ns, path.c_str(), dir_client.release()), ZX_OK);
 
-    ASSERT_EQ(kernel_dir_.Serve(kFlags, std::move(dir_server), loop_.dispatcher()), ZX_OK);
+    ASSERT_EQ(debugdata_dir_.Serve(kFlags, std::move(dir_server), loop_.dispatcher()), ZX_OK);
     loop_.StartThread("kernel_data_dir");
   }
 
-  void BindFile(std::string_view path) {
-    zx::vmo path_vmo;
-    ASSERT_EQ(zx::vmo::create(4096, 0, &path_vmo), 0);
-    zx_koid_t koid = GetKoid(path_vmo.get());
-    ASSERT_NE(koid, ZX_KOID_INVALID);
-    auto str_path = std::string(path);
-    path_to_koid_[str_path] = koid;
-
-    auto file = std::make_unique<vfs::VmoFile>(std::move(path_vmo), 4096);
-    ASSERT_EQ(kernel_dir_.AddEntry(str_path, std::move(file)), ZX_OK);
-  }
+  void BindFile(std::string_view path) { BindHierarchy(debugdata_dir_, path); }
 
   void TearDown() override {
     // Best effort.
@@ -87,165 +72,118 @@ class FakeBootItemsFixture : public testing::Test {
   }
 
  private:
-  async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  vfs::PseudoDir kernel_dir_;
+  // directory components end with '/' and all paths are relative (no leading /).
+  void BindHierarchy(vfs::PseudoDir& root, std::string_view path) {
+    auto curr = path.find("/");
+    // path is a file to be bound.
+    if (curr == std::string_view::npos) {
+      zx::vmo path_vmo;
+      ASSERT_EQ(zx::vmo::create(4096, 0, &path_vmo), 0);
+      auto file = std::make_unique<vfs::VmoFile>(std::move(path_vmo), 4096);
+      ASSERT_EQ(root.AddEntry(std::string(path), std::move(file)), ZX_OK);
+      return;
+    }
 
-  std::map<std::string, zx_koid_t> path_to_koid_;
+    // curr is a directory, and we continue to bind directories and strip components.
+    std::string dir_name(path.substr(0, curr));
+    path = path.substr(curr + 1, path.length());
+    // see if dir exists.
+    vfs::internal::Node* existing_entry = nullptr;
+    if (root.Lookup(dir_name, &existing_entry) == ZX_ERR_NOT_FOUND) {
+      std::unique_ptr<vfs::PseudoDir> new_dir = std::make_unique<vfs::PseudoDir>();
+      existing_entry = new_dir.get();
+      root.AddEntry(dir_name, std::move(new_dir));
+    }
+
+    ASSERT_NE(existing_entry, nullptr);
+    ASSERT_TRUE(existing_entry->IsDirectory());
+    BindHierarchy(*reinterpret_cast<vfs::PseudoDir*>(existing_entry), path);
+  }
+
+  async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  vfs::PseudoDir debugdata_dir_;
+
   std::string path_;
 };
 
-using ExposeKernelProfileDataTest = FakeBootItemsFixture;
-using ExposePhysbootProfileDataTest = FakeBootItemsFixture;
+using ExposeDebugdataTest = FakeBootItemsFixture;
 
-TEST_F(ExposeKernelProfileDataTest, WithSymbolizerLogExposesBoth) {
-  BindFile("zircon.elf.profraw");
-  BindFile("symbolizer.log");
-  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data"));
+TEST_F(ExposeDebugdataTest, SingleSinkStatic) {
+  BindFile("random-sink/s/my-sink-data.my-data");
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/i"));
 
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
-  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
+  fbl::unique_fd debugdata_dir(open("/boot/kernel/i", O_RDONLY));
+  ASSERT_TRUE(debugdata_dir) << strerror(errno);
 
   SinkDirMap sink_map;
 
-  zx::result result = ExposeKernelProfileData(kernel_data_dir, sink_map);
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(ExposeBootDebugdata(debugdata_dir, sink_map).is_ok());
   vfs::PseudoDir* lookup = nullptr;
   ASSERT_EQ(
-      sink_map["llvm-profile"]->Lookup("dynamic", reinterpret_cast<vfs::internal::Node**>(&lookup)),
-      ZX_OK);
-  vfs::PseudoDir& out_dir = *lookup;
-
-  ASSERT_FALSE(out_dir.IsEmpty());
-
-  std::string kernel_file(kKernelFile);
-  vfs::internal::Node* node = nullptr;
-  ASSERT_EQ(out_dir.Lookup(kernel_file, &node), ZX_OK);
-  ASSERT_NE(node, nullptr);
-
-  node = nullptr;
-  std::string symbolizer_file(kKernelSymbolizerFile);
-  ASSERT_EQ(out_dir.Lookup(symbolizer_file, &node), ZX_OK);
-  ASSERT_NE(node, nullptr);
-}
-
-TEST_F(ExposeKernelProfileDataTest, OnlyKernelFileIsOk) {
-  // Dispatcher
-  BindFile("zircon.elf.profraw");
-  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data"));
-
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
-  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
-
-  SinkDirMap sink_map;
-
-  zx::result result = ExposeKernelProfileData(kernel_data_dir, sink_map);
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
-  vfs::PseudoDir* lookup = nullptr;
-  ASSERT_EQ(
-      sink_map["llvm-profile"]->Lookup("dynamic", reinterpret_cast<vfs::internal::Node**>(&lookup)),
+      sink_map["random-sink"]->Lookup("static", reinterpret_cast<vfs::internal::Node**>(&lookup)),
       ZX_OK);
   vfs::PseudoDir& out_dir = *lookup;
   ASSERT_FALSE(out_dir.IsEmpty());
 
-  std::string kernel_file(kKernelFile);
   vfs::internal::Node* node = nullptr;
-  ASSERT_EQ(out_dir.Lookup(kernel_file, &node), ZX_OK);
+  ASSERT_EQ(out_dir.Lookup("my-sink-data.my-data", &node), ZX_OK);
   ASSERT_NE(node, nullptr);
-
-  node = nullptr;
-  std::string symbolizer_file(kKernelSymbolizerFile);
-  ASSERT_NE(out_dir.Lookup(symbolizer_file, &node), ZX_OK);
 }
 
-TEST_F(ExposeKernelProfileDataTest, KernelProfrawFileDoesNotExist) {
-  // Don't bind profraw file to the directory
-  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data"));
+TEST_F(ExposeDebugdataTest, SingleSinkDynamic) {
+  BindFile("random-sink/d/my-sink-data.my-data");
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/i"));
 
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
-  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
+  fbl::unique_fd debugdata_dir(open("/boot/kernel/i", O_RDONLY));
+  ASSERT_TRUE(debugdata_dir) << strerror(errno);
 
   SinkDirMap sink_map;
 
-  zx::result result = ExposeKernelProfileData(kernel_data_dir, sink_map);
-  // We don't fail when profraw file does not exist.
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
-  ASSERT_EQ(sink_map.find("llvm-profile"), sink_map.end());
-}
-
-TEST_F(ExposePhysbootProfileDataTest, WithSymbolizerFileIsOk) {
-  // Dispatcher
-  BindFile("physboot.profraw");
-  BindFile("symbolizer.log");
-  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data/phys"));
-
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
-  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
-
-  SinkDirMap sink_map;
-
-  zx::result result = ExposePhysbootProfileData(kernel_data_dir, sink_map);
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(ExposeBootDebugdata(debugdata_dir, sink_map).is_ok());
   vfs::PseudoDir* lookup = nullptr;
   ASSERT_EQ(
-      sink_map["llvm-profile"]->Lookup("static", reinterpret_cast<vfs::internal::Node**>(&lookup)),
+      sink_map["random-sink"]->Lookup("dynamic", reinterpret_cast<vfs::internal::Node**>(&lookup)),
       ZX_OK);
   vfs::PseudoDir& out_dir = *lookup;
   ASSERT_FALSE(out_dir.IsEmpty());
 
-  std::string phys_file(kPhysFile);
   vfs::internal::Node* node = nullptr;
-  ASSERT_EQ(out_dir.Lookup(phys_file, &node), ZX_OK);
-  ASSERT_NE(node, nullptr);
-
-  node = nullptr;
-  std::string symbolizer_file(kPhysSymbolizerFile);
-  ASSERT_EQ(out_dir.Lookup(symbolizer_file, &node), ZX_OK);
+  ASSERT_EQ(out_dir.Lookup("my-sink-data.my-data", &node), ZX_OK);
   ASSERT_NE(node, nullptr);
 }
 
-TEST_F(ExposePhysbootProfileDataTest, OnlyProfrawFileIsOk) {
-  // Dispatcher
-  BindFile("physboot.profraw");
-  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data/phys"));
+TEST_F(ExposeDebugdataTest, MultipleSinks) {
+  BindFile("random-sink/s/my-sink-data.my-data");
+  BindFile("random-sink/d/my-dsink-data.my-data");
+  BindFile("other-random-sink/s/my-other-sink-data.my-data");
+  BindFile("other-random-sink/d/my-other-dsink-data.my-data");
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/i"));
 
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
-  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
-
-  SinkDirMap sink_map;
-
-  zx::result result = ExposePhysbootProfileData(kernel_data_dir, sink_map);
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
-  vfs::PseudoDir* lookup = nullptr;
-  ASSERT_EQ(
-      sink_map["llvm-profile"]->Lookup("static", reinterpret_cast<vfs::internal::Node**>(&lookup)),
-      ZX_OK);
-  vfs::PseudoDir& out_dir = *lookup;
-  ASSERT_FALSE(out_dir.IsEmpty());
-
-  std::string phys_file(kPhysFile);
-  vfs::internal::Node* node = nullptr;
-  ASSERT_EQ(out_dir.Lookup(phys_file, &node), ZX_OK);
-  ASSERT_NE(node, nullptr);
-
-  node = nullptr;
-  std::string symbolizer_file(kPhysSymbolizerFile);
-  ASSERT_NE(out_dir.Lookup(symbolizer_file, &node), ZX_OK);
-}
-
-TEST_F(ExposeKernelProfileDataTest, PhysbootProfrawFileDoesNotExist) {
-  // Don't bind profraw file to the directory
-  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data/phys"));
-
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
-  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
+  fbl::unique_fd debugdata_dir(open("/boot/kernel/i", O_RDONLY));
+  ASSERT_TRUE(debugdata_dir) << strerror(errno);
 
   SinkDirMap sink_map;
 
-  zx::result result = ExposePhysbootProfileData(kernel_data_dir, sink_map);
+  ASSERT_TRUE(ExposeBootDebugdata(debugdata_dir, sink_map).is_ok());
 
-  // We don't fail when profraw file does not exist.
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
-  ASSERT_EQ(sink_map.find("llvm-profile"), sink_map.end());
+  std::vector<std::tuple<std::string, std::string, std::string>> lookup_entries = {
+      {"random-sink", "static", "my-sink-data.my-data"},
+      {"random-sink", "dynamic", "my-dsink-data.my-data"},
+      {"other-random-sink", "static", "my-other-sink-data.my-data"},
+      {"other-random-sink", "dynamic", "my-other-dsink-data.my-data"},
+  };
+
+  for (const auto& [sink, data_dir, file_name] : lookup_entries) {
+    vfs::PseudoDir* lookup = nullptr;
+    ASSERT_EQ(sink_map[sink]->Lookup(data_dir, reinterpret_cast<vfs::internal::Node**>(&lookup)),
+              ZX_OK);
+    vfs::PseudoDir& out_dir = *lookup;
+    ASSERT_FALSE(out_dir.IsEmpty());
+
+    vfs::internal::Node* node = nullptr;
+    ASSERT_EQ(out_dir.Lookup(file_name, &node), ZX_OK);
+    ASSERT_NE(node, nullptr);
+  }
 }
 
 struct PublishRequest {
