@@ -7,16 +7,19 @@
 #include <lib/trace-provider/provider.h>
 #include <zircon/compiler.h>
 
+#include <latch>
 #include <mutex>
 #include <thread>
 
 __BEGIN_CDECLS
 
 void trace_provider_create_with_fdio_rust() __attribute__((visibility("default")));
+void trace_provider_wait_for_init() __attribute__((visibility("default")));
 
 __END_CDECLS
 
 static std::once_flag init_once;
+static std::latch provider_initialized(1);
 
 // The C++ trace provider API depends on libasync. Create a new thread here
 // to run a libasync loop here to host that trace provider.
@@ -32,6 +35,13 @@ static void trace_provider_with_fdio_thread_entry() {
                                                                   &trace_provider, nullptr);
 
   if (result && trace_provider && trace_provider->is_valid()) {
+    // Make sure the provider has a chance to acknowledge any already-running traces.
+    loop.RunUntilIdle();
+
+    // Tell the spawning thread that the provider has been fully initialized.
+    provider_initialized.count_down();
+
+    // Continue running the loop to handle future trace start/stop messages.
     loop.Run();
   }
 }
@@ -44,3 +54,5 @@ void trace_provider_create_with_fdio_rust() {
     thread.detach();
   });
 }
+
+void trace_provider_wait_for_init() { provider_initialized.wait(); }

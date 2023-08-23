@@ -15,10 +15,21 @@ pub fn trace_provider_create_with_fdio() {
     }
 }
 
+/// Wait for trace provider initialization to acknowledge already-running traces before returning.
+///
+/// If the current thread is expected to initialize the provider then this should only be called
+/// after doing so to avoid a deadlock.
+pub fn trace_provider_wait_for_init() {
+    unsafe {
+        sys::trace_provider_wait_for_init();
+    }
+}
+
 mod sys {
     #[link(name = "rust-trace-provider")]
     extern "C" {
-        // See the C++ documentation for this function in trace_provider.cc
-        pub fn trace_provider_create_with_fdio_rust();
+        // See the C++ documentation for these functions in trace_provider.cc
+        pub(super) fn trace_provider_create_with_fdio_rust();
+        pub(super) fn trace_provider_wait_for_init();
     }
 }
