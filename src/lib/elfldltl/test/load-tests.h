@@ -5,8 +5,17 @@
 #ifndef SRC_LIB_ELFLDLTL_TEST_LOAD_TESTS_H_
 #define SRC_LIB_ELFLDLTL_TEST_LOAD_TESTS_H_
 
+#include <lib/elfldltl/container.h>
 #include <lib/elfldltl/layout.h>
+#include <lib/elfldltl/load.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+
+#include <vector>
+
+#include <gtest/gtest.h>
+
+namespace elfldltl::testing {
 
 constexpr size_t kPageSize = 0x1000;
 
@@ -41,5 +50,17 @@ using DataWithZeroFillPhdr = CreatePhdr<elfldltl::PhdrBase::kRead | elfldltl::Ph
 
 template <typename Elf>
 using DataPhdr = CreatePhdr<elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite>::type<Elf>;
+
+template <class Elf, template <class> class... PhdrCreator>
+inline auto TestLoadInfo(bool merge = true) {
+  LoadInfo<Elf, StdContainer<std::vector>::Container> info;
+  typename Elf::size_type offset = 0;
+  auto diag = ExpectOkDiagnostics();
+  (([&] { ASSERT_TRUE(info.AddSegment(diag, kPageSize, PhdrCreator<Elf>{}(offset), merge)); }()),
+   ...);
+  return info;
+}
+
+}  // namespace elfldltl::testing
 
 #endif  // SRC_LIB_ELFLDLTL_TEST_LOAD_TESTS_H_

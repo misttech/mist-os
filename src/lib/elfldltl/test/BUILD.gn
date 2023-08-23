@@ -28,6 +28,7 @@ test("elfldltl-unittests") {
     "load-tests.cc",
     "load-tests.h",
     "loadinfo-mapped-memory-tests.cc",
+    "loadinfo-mutable-memory-tests.cc",
     "mapped-fd-file-tests.cc",
     "memory-tests.cc",
     "note-tests.cc",
@@ -53,6 +54,7 @@ test("elfldltl-unittests") {
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/symbolizer-markup",
     "//src/lib/trivial-allocator",
+    "//third_party/googletest:gmock",
   ]
 
   if (is_elf) {

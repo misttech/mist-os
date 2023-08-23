@@ -58,6 +58,7 @@ library_headers("headers") {
     "lib/elfldltl/layout.h",
     "lib/elfldltl/link.h",
     "lib/elfldltl/load.h",
+    "lib/elfldltl/loadinfo-mutable-memory.h",
     "lib/elfldltl/machine.h",
     "lib/elfldltl/mapped-fd-file.h",
     "lib/elfldltl/mapped-vmo-file.h",

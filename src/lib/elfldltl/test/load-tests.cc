@@ -18,8 +18,12 @@
 
 namespace {
 
+using elfldltl::testing::ConstantPhdr;
+using elfldltl::testing::DataPhdr;
+using elfldltl::testing::DataWithZeroFillPhdr;
 using elfldltl::testing::ExpectedSingleError;
 using elfldltl::testing::ExpectOkDiagnostics;
+using elfldltl::testing::ZeroFillPhdr;
 
 constexpr size_t kPageSize = 0x1000;
 

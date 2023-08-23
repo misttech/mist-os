@@ -242,14 +242,16 @@ class LoadInfo {
 
   constexpr size_type vaddr_size() const { return vaddr_size_; }
 
-  // Add a PT_LOAD segment.
+  // Add a PT_LOAD segment.  Merge with the preceding segment if they are
+  // adjacent and compatible, unless merge=false.
   template <class Diagnostics>
-  constexpr bool AddSegment(Diagnostics& diagnostics, size_type page_size, const Phdr& phdr) {
+  constexpr bool AddSegment(Diagnostics& diagnostics, size_type page_size, const Phdr& phdr,
+                            bool merge = true) {
     // Merge with the last segment if possible, or else append a new one.
     // SegmentMerger::Merge overloads match each specific type as it's created below.
-    auto add = [this, &diagnostics](auto&& segment) -> bool {
+    auto add = [this, &diagnostics, merge](auto&& segment) -> bool {
       using T = decltype(segment);
-      return (!segments_.empty() &&
+      return (merge && !segments_.empty() &&
               SegmentMerger::Merge(segments_.back(), std::forward<T>(segment))) ||
              segments_.emplace_back(diagnostics, internal::kTooManyLoads, std::forward<T>(segment));
     };
@@ -275,11 +277,14 @@ class LoadInfo {
     return add(DataSegment(offset, vaddr, memsz, filesz));
   }
 
-  // Get an ephemeral object to pass to elfldltl::DecodePhdrs.  The
-  // returned observer object must not outlive this LoadInfo object.
-  constexpr auto GetPhdrObserver(size_type page_size) {
-    auto add_segment = [this, page_size](auto& diagnostics, const Phdr& phdr) {
-      return this->AddSegment(diagnostics, page_size, phdr);
+  // Get an ephemeral object to pass to elfldltl::DecodePhdrs.  The returned
+  // observer object must not outlive this LoadInfo object.  The optional
+  // merge=false argument prevents merging adjacent segments that are
+  // apparently compatible.  This can be avoided if it will be done later after
+  // possibly changing segments' mergeability, as when ApplyRelro is used.
+  constexpr auto GetPhdrObserver(size_type page_size, bool merge = true) {
+    auto add_segment = [this, page_size, merge](auto& diagnostics, const Phdr& phdr) {
+      return this->AddSegment(diagnostics, page_size, phdr, merge);
     };
     return GetPhdrObserver(page_size, add_segment);
   }
@@ -297,7 +302,7 @@ class LoadInfo {
   }
 
   template <typename T>
-  constexpr bool VisitSegment(T&& visitor, const Segment& segment) const {
+  static constexpr bool VisitSegment(T&& visitor, const Segment& segment) {
     return internal::Visit(visitor, segment);
   }
 

@@ -12,6 +12,7 @@
 namespace elfldltl::testing {
 
 using AllFormatsTypedTest = elfldltl::AllFormats<::testing::Types>;
+using AllNativeFormatsTypedTest = elfldltl::AllNativeFormats<::testing::Types>;
 
 template <class ElfLayout>
 struct FormatTypedTest : public ::testing::Test {
@@ -22,6 +23,11 @@ struct FormatTypedTest : public ::testing::Test {
   template <class Elf>                                  \
   using Name = elfldltl::testing::FormatTypedTest<Elf>; \
   TYPED_TEST_SUITE(Name, elfldltl::testing::AllFormatsTypedTest)
+
+#define NATIVE_FORMAT_TYPED_TEST_SUITE(Name)            \
+  template <class Elf>                                  \
+  using Name = elfldltl::testing::FormatTypedTest<Elf>; \
+  TYPED_TEST_SUITE(Name, elfldltl::testing::AllNativeFormatsTypedTest)
 
 }  // namespace elfldltl::testing
 

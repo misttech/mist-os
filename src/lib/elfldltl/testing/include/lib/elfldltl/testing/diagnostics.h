@@ -46,6 +46,8 @@ class ExpectedSingleError {
   template <typename T>
   using expected_t = typename ExpectedType<T>::type;
 
+  ExpectedSingleError(const ExpectedSingleError& other) : expected_(other.expected) {}
+
   explicit ExpectedSingleError(Args... args) : expected_(std::move(args)...) {}
 
   auto& diag() { return diag_; }

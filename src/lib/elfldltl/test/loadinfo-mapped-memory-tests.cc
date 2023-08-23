@@ -15,6 +15,8 @@
 
 namespace {
 
+using elfldltl::testing::ConstantPhdr;
+using elfldltl::testing::DataPhdr;
 using elfldltl::testing::ExpectOkDiagnostics;
 using ::testing::Eq;
 using ::testing::Pointer;
