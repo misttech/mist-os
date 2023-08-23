@@ -1016,6 +1016,10 @@
                 "TkillTest.ValidTIDAndRealSignal",
                 "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",
 
+                // This test call exec from a process with multiple threads.
+                // Starnix doesnt' support this yet: https://fxbug.dev/132623
+                "ExecTest.WithSiblingThread",
+
                 // Causes some other wait tests to fail.
                 "WaitTest.TraceeWALL",
 

@@ -1772,7 +1772,7 @@ impl CurrentTask {
 
         // TODO: The termination signal is reset to SIGCHLD.
 
-        // TODO: All threads other than the calling thread are destroyed.
+        // TODO(https://fxbug.dev/132623): All threads other than the calling thread are destroyed.
 
         // TODO: The file descriptor table is unshared, undoing the effect of
         //       the CLONE_FILES flag of clone(2).
