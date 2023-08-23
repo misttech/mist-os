@@ -128,12 +128,50 @@ macro_rules! arg_from {
 #[rustfmt::skip]
 arg_from!(val,
     ((), sys::TRACE_ARG_NULL, sys::trace_arg_union_t { int32_value: 0 })
+    (bool, sys::TRACE_ARG_BOOL, sys::trace_arg_union_t { bool_value: val })
     (i32, sys::TRACE_ARG_INT32, sys::trace_arg_union_t { int32_value: val })
     (u32, sys::TRACE_ARG_UINT32, sys::trace_arg_union_t { uint32_value: val })
     (i64, sys::TRACE_ARG_INT64, sys::trace_arg_union_t { int64_value: val })
     (u64, sys::TRACE_ARG_UINT64, sys::trace_arg_union_t { uint64_value: val })
     (f64, sys::TRACE_ARG_DOUBLE, sys::trace_arg_union_t { double_value: val })
+    (zx::Koid, sys::TRACE_ARG_KOID, sys::trace_arg_union_t { koid_value: val.raw_koid() })
 );
+
+impl<T> ArgValue for *const T {
+    fn of<'a>(key: &'a str, val: Self) -> Arg<'a>
+    where
+        Self: 'a,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref: trace_make_inline_string_ref(key),
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_POINTER,
+                    value: sys::trace_arg_union_t { pointer_value: val as usize },
+                },
+            },
+            PhantomData,
+        )
+    }
+}
+
+impl<T> ArgValue for *mut T {
+    fn of<'a>(key: &'a str, val: Self) -> Arg<'a>
+    where
+        Self: 'a,
+    {
+        Arg(
+            sys::trace_arg_t {
+                name_ref: trace_make_inline_string_ref(key),
+                value: sys::trace_arg_value_t {
+                    type_: sys::TRACE_ARG_POINTER,
+                    value: sys::trace_arg_union_t { pointer_value: val as usize },
+                },
+            },
+            PhantomData,
+        )
+    }
+}
 
 impl<'a> ArgValue for &'a str {
     fn of<'b>(key: &'b str, val: Self) -> Arg<'b>
@@ -1192,6 +1230,7 @@ mod sys {
         pub string_value_ref: trace_string_ref_t,
         pub pointer_value: libc::uintptr_t,
         pub koid_value: zx_koid_t,
+        pub bool_value: bool,
         pub reserved_for_future_expansion: [libc::uintptr_t; 2],
     }
 
@@ -1205,6 +1244,7 @@ mod sys {
     pub const TRACE_ARG_STRING: trace_arg_type_t = 6;
     pub const TRACE_ARG_POINTER: trace_arg_type_t = 7;
     pub const TRACE_ARG_KOID: trace_arg_type_t = 8;
+    pub const TRACE_ARG_BOOL: trace_arg_type_t = 9;
 
     #[repr(C)]
     pub struct trace_arg_value_t {
