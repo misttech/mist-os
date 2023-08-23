@@ -213,9 +213,10 @@ async fn start_component(
 
     let StartContext { runner, start_info, diagnostics_sender } = start_context;
     if let Some(runner) = runner {
-        pending_runtime.program =
-            Some(Program::start(&runner, start_info, diagnostics_sender).await);
-        pending_runtime.watch_for_exit(component.as_weak());
+        pending_runtime.set_program(
+            Program::start(&runner, start_info, diagnostics_sender).await,
+            component.as_weak(),
+        );
     }
     execution.runtime = Some(pending_runtime);
     Ok(fsys::StartResult::Started)
@@ -325,13 +326,8 @@ async fn make_execution_runtime(
         None
     };
 
-    let runtime = Runtime::start_from(
-        outgoing_dir,
-        runtime_dir,
-        start_reason,
-        execution_controller_task,
-        logger,
-    );
+    let runtime =
+        Runtime::new(outgoing_dir, runtime_dir, start_reason, execution_controller_task, logger);
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
     let start_info = StartInfo {
@@ -606,7 +602,7 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime = Some(Runtime::start_from(None, None, StartReason::Debug, None, None));
+            es.runtime = Some(Runtime::new(None, None, StartReason::Debug, None, None));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),

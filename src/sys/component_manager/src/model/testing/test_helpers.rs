@@ -66,8 +66,7 @@ impl ComponentInfo {
         let koid = {
             let component = component.lock_execution().await;
             let runtime = component.runtime.as_ref().expect("runtime is unexpectedly missing");
-            let program = runtime.program.as_ref().expect("program is unexpectedly missing");
-            program.koid()
+            runtime.program_koid().expect("program is unexpectedly missing")
         };
 
         ComponentInfo { component, channel_id: koid }

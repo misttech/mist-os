@@ -688,7 +688,7 @@ impl ComponentInstance {
                         )));
                         timer.await;
                     });
-                    let ret = runtime.stop_component(stop_timer, kill_timer).await?;
+                    let ret = runtime.stop_program(stop_timer, kill_timer).await?;
                     if ret.request == StopRequestSuccess::KilledAfterTimeout
                         || ret.request == StopRequestSuccess::Killed
                     {
@@ -709,19 +709,6 @@ impl ComponentInstance {
                             .await
                             .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                         top_instance.trigger_reboot().await;
-                    }
-
-                    // Drop the program and join on the exit listener. Dropping the program
-                    // should cause the exit listener to stop waiting for the channel epitaph and
-                    // exit.
-                    //
-                    // Note: this is more reliable than just cancelling `exit_listener` because
-                    // even after cancellation future may still run for a short period of time
-                    // before getting dropped. If that happens there is a chance of scheduling a
-                    // duplicate Stop action.
-                    let _ = runtime.program.take();
-                    if let Some(exit_listener) = runtime.exit_listener.take() {
-                        exit_listener.await;
                     }
 
                     if let Some(execution_controller_task) =
@@ -1723,9 +1710,8 @@ pub struct Runtime {
 
     /// Used to interact with the Runner to influence the component's execution.
     ///
-    /// If `program` is `None`, that means this component has started, but the
-    /// component does not have a program.
-    pub program: Option<Program>,
+    /// If set, that means this component is associated with a running program.
+    program: Option<Program>,
 
     /// Approximates when the component was started.
     pub timestamp: zx::Time,
@@ -1786,7 +1772,7 @@ pub enum StopRequestSuccess {
 }
 
 impl Runtime {
-    pub fn start_from(
+    pub fn new(
         outgoing_dir: Option<fio::DirectoryProxy>,
         runtime_dir: Option<fio::DirectoryProxy>,
         start_reason: StartReason,
@@ -1807,45 +1793,60 @@ impl Runtime {
         }
     }
 
-    /// If the Runtime has a controller this creates a background context which
-    /// watches for the controller's channel to close. If the channel closes,
-    /// the background context attempts to use the WeakComponentInstance to stop the
-    /// component.
-    pub fn watch_for_exit(&mut self, component: WeakComponentInstance) {
-        if let Some(program) = &self.program {
-            let terminated_fut = program.on_terminate();
-            let exit_listener = fasync::Task::spawn(async move {
-                terminated_fut.await;
-                if let Ok(component) = component.upgrade() {
-                    let mut actions = component.lock_actions().await;
-                    let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
-                    drop(actions);
-                    component
-                        .nonblocking_task_scope()
-                        .add_task(fasync::Task::spawn(async move {
-                            let _ = stop_nf
-                                .await
-                                .map_err(|err| warn!(%err, "watch_for_exit: Stop failed"));
-                        }))
-                        .await;
-                }
-            });
-            self.exit_listener = Some(exit_listener);
-        }
+    /// Associates the [Runtime] with a running [Program].
+    ///
+    /// Creates a background task waiting for the program to terminate. When that happens, use the
+    /// [WeakComponentInstance] to stop the component.
+    pub fn set_program(&mut self, program: Program, component: WeakComponentInstance) {
+        let terminated_fut = program.on_terminate();
+        self.program = Some(program);
+        let exit_listener = fasync::Task::spawn(async move {
+            terminated_fut.await;
+            if let Ok(component) = component.upgrade() {
+                let mut actions = component.lock_actions().await;
+                let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
+                drop(actions);
+                component
+                    .nonblocking_task_scope()
+                    .add_task(fasync::Task::spawn(async move {
+                        let _ = stop_nf.await.map_err(
+                            |err| warn!(%err, "Watching for program termination: Stop failed"),
+                        );
+                    }))
+                    .await;
+            }
+        });
+        self.exit_listener = Some(exit_listener);
     }
 
-    /// Stop the component. The timer defines how long the component is given
-    /// to stop itself before we request the controller terminate the
-    /// component.
-    pub async fn stop_component<'a, 'b>(
+    /// Stop the program, if any. The timer defines how long the runner is given to stop the
+    /// program gracefully before we request the controller to terminate the program.
+    ///
+    /// Regardless if the runner honored our request, after this method, the [Runtime] is
+    /// no longer associated with a [Program].
+    pub async fn stop_program<'a, 'b>(
         &'a mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
     ) -> Result<ComponentStopOutcome, StopActionError> {
+        let program = self.program.take();
         // Potentially there is no program, perhaps because the component
         // has no running code. In this case this is a no-op.
-        if let Some(ref program) = self.program {
-            stop_component_internal(program, stop_timer, kill_timer).await
+        if let Some(program) = program {
+            let stop_result = stop_component_internal(&program, stop_timer, kill_timer).await;
+            // Drop the program and join on the exit listener. Dropping the program
+            // should cause the exit listener to stop waiting for the channel epitaph and
+            // exit.
+            //
+            // Note: this is more reliable than just cancelling `exit_listener` because
+            // even after cancellation future may still run for a short period of time
+            // before getting dropped. If that happens there is a chance of scheduling a
+            // duplicate Stop action.
+            drop(program);
+            if let Some(exit_listener) = self.exit_listener.take() {
+                exit_listener.await;
+            }
+            stop_result
         } else {
             Ok(ComponentStopOutcome {
                 request: StopRequestSuccess::NoController,
@@ -1857,6 +1858,12 @@ impl Runtime {
     /// Add a channel scoped to the lifetime of this object.
     pub fn add_scoped_server_end(&mut self, server_end: zx::Channel) {
         self.binder_server_ends.push(server_end);
+    }
+
+    /// Gets a [`Koid`] that will uniquely identify the program.
+    #[cfg(test)]
+    pub fn program_koid(&self) -> Option<fuchsia_zircon::Koid> {
+        self.program.as_ref().map(Program::koid)
     }
 }
 
@@ -2384,10 +2391,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn stop_component_without_program() {
-        let mut runtime = Runtime::start_from(None, None, StartReason::Debug, None, None);
+        let mut runtime = Runtime::new(None, None, StartReason::Debug, None, None);
         let stop_timer = Box::pin(std::future::ready(()));
         let kill_timer = Box::pin(std::future::ready(()));
-        let result = runtime.stop_component(stop_timer, kill_timer).await.unwrap();
+        let result = runtime.stop_program(stop_timer, kill_timer).await.unwrap();
         assert_eq!(
             result,
             ComponentStopOutcome {
