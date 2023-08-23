@@ -7,19 +7,22 @@ use {
         sender::Sender,
         AnyCapability, AnyCloneCapability, TryIntoOpen,
     },
-    anyhow::{Context, Error},
     fidl::{
-        endpoints::{create_request_stream, ProtocolMarker, RequestStream},
+        endpoints::{create_proxy, ProtocolMarker, Proxy, RequestStream},
         AsyncChannel,
     },
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
-        channel::mpsc, future::BoxFuture, lock::Mutex, stream::Peekable, FutureExt, StreamExt,
-        TryStreamExt,
+        channel::mpsc,
+        future::{self, BoxFuture, Either},
+        lock::Mutex,
+        stream::Peekable,
+        FutureExt, StreamExt,
     },
     moniker::Moniker,
     std::fmt::Debug,
+    std::pin::pin,
     std::sync::Arc,
 };
 
@@ -73,32 +76,31 @@ impl Capability for Receiver {}
 
 impl Remote for Receiver {
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        let (receiver_client_end, receiver_stream) =
-            create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        let (receiver_proxy, receiver_server) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
         let fut = async move {
             let receiver = *self;
-            receiver.serve_receiver(receiver_stream).await.expect("failed to serve Receiver");
+            receiver.handle_receiver(receiver_proxy).await;
         };
-        (receiver_client_end.into_handle(), Some(fut.boxed()))
+        (receiver_server.into_handle(), Some(fut.boxed()))
     }
 }
 
 impl Receiver {
-    pub async fn serve_receiver(
-        &self,
-        mut stream: fsandbox::ReceiverRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) =
-            stream.try_next().await.context("failed to read request from stream")?
-        {
-            match request {
-                fsandbox::ReceiverRequest::Receive { responder } => {
-                    let message = self.receive().await;
-                    let _ = responder.send(message.handle);
+    pub async fn handle_receiver(&self, receiver_proxy: fsandbox::ReceiverProxy) {
+        let mut on_closed = receiver_proxy.on_closed();
+        loop {
+            match future::select(pin!(self.receive()), on_closed).await {
+                Either::Left((message, fut)) => {
+                    on_closed = fut;
+                    if let Err(_) = receiver_proxy.receive(message.handle) {
+                        return;
+                    }
+                }
+                Either::Right((_, _)) => {
+                    return;
                 }
             }
         }
-        Ok(())
     }
 }
 

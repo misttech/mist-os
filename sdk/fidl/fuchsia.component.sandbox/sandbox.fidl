@@ -60,9 +60,7 @@ closed protocol Sender {
 
 closed protocol Receiver {
     /// Receives a single Capability handle.
-    ///
-    /// This is a hanging get that returns the next available handle.
-    strict Receive() -> (resource struct {
+    strict Receive(resource struct {
         capability Capability;
     });
 };
