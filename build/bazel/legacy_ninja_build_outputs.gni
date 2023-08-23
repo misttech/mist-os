@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_workspace.gni")
+import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/size_checker/size_checker_input.gni")
 import("//build/product.gni")
@@ -45,6 +46,13 @@ gn_labels_for_bazel_inputs = [
                                "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
                                "//sdk:core",
                              ] + eng_platform_aib_labels
+
+# If a board_configuration_label is defined, then add it's bazel input target.
+if (board_configuration_label != false) {
+  gn_labels_for_bazel_inputs +=
+      [ get_label_info(board_configuration_label, "label_no_toolchain") +
+        ".bazel_input" ]
+}
 
 if (size_checker_input != {
     }) {
