@@ -4,6 +4,7 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/sdk/config.gni")
+import("//build/testing/golden_files.gni")
 import("//build/toolchain/zircon/gcc.gni")
 
 # Verifies the list of public symbols from a prebuilt library to be added to
@@ -41,7 +42,6 @@ template("verify_public_symbols") {
   assert(defined(invoker.library_name), "library_name must be provided")
 
   abi_file = "$target_gen_dir/$target_name.abi.ifs"
-  stamp_file = "$target_gen_dir/$target_name.public_symbols.verified.stamp"
 
   main_target = target_name
 
@@ -73,33 +73,22 @@ template("verify_public_symbols") {
     args += ifs_extra_switches
   }
 
-  action(main_target) {
+  golden_files(main_target) {
     forward_variables_from(invoker,
                            [
                              "visibility",
                              "testonly",
                            ])
 
-    script = "//build/cpp/verify_public_symbols.sh"
-
     deps = [ ":$target_name.abi.ifs" ]
 
-    inputs = [
-      abi_file,
-      invoker.reference,
+    comparisons = [
+      {
+        candidate = abi_file
+        golden = invoker.reference
+      },
     ]
 
-    outputs = [ stamp_file ]
-
-    args = [
-      invoker.library_name,
-      rebase_path(abi_file, root_build_dir),
-      rebase_path(invoker.reference, root_build_dir),
-      rebase_path(stamp_file, root_build_dir),
-    ]
-
-    if (warn_on_sdk_changes) {
-      args += [ "--warn" ]
-    }
+    message = "ABI has changed! In library ${invoker.library_name}"
   }
 }

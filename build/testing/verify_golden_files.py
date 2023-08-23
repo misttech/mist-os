@@ -67,6 +67,9 @@ def main():
         '--warn',
         help='Whether API changes should only cause warnings',
         action='store_true')
+    parser.add_argument(
+        '--err-msg',
+        help="Additional error message to display if files don't match")
     args = parser.parse_args()
 
     with open(args.comparisons) as f:
@@ -95,7 +98,12 @@ def main():
 
         if current_comparison_failed:
             type = 'Warning' if args.warn or args.bless else 'Error'
-            print(f'\n{type}: Golden file mismatch: {comparison["golden"]}')
+            str = f'\n{type}: '
+            if args.err_msg:
+                str += args.err_msg
+            else:
+                str += f'Golden file mismatch: {comparison["golden"]}'
+            print(str)
 
             if args.bless:
                 os.makedirs(os.path.dirname(golden), exist_ok=True)

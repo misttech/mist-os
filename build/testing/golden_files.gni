@@ -70,6 +70,12 @@ import("//build/testing/config.gni")
 #    - Type: bool
 #    - Default: false
 #
+#  * message
+#    - Optional: If set, an additional error message will be printed if the files
+#      don't match.
+#    - Type: string
+#    - Default: No message gets printed
+#
 #  * visibility, testonly, deps, public_deps
 #    - Optional: Usual GN meanings.
 #
@@ -252,6 +258,10 @@ template("golden_files") {
         defined(invoker.warn_on_changes) && invoker.warn_on_changes
     if (warn_on_changes) {
       args += [ "--warn" ]
+    }
+
+    if (defined(invoker.message)) {
+      args += [ "--err-msg=${invoker.message}" ]
     }
 
     metadata = {
