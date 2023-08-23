@@ -7,36 +7,21 @@
 //! Memory Sampler is a component that serves the
 //! `fuchsia.memory.sampler/Sampler` protocol, used by applications to
 //! report their memory usage. It collects allocation information
-//! across the lifetime of a process('s connection), and writes
+//! across the lifetime of a process('s connection), and produces
 //! `pprof`-compatible profile files once done.
-
+mod crash_reporter;
 mod pprof;
 mod profile_builder;
 mod sampler_service;
 
 use anyhow::Error;
-use fidl_fuchsia_memory_sampler::SamplerRequestStream;
-use fuchsia_component::server::ServiceFs;
-use futures::prelude::*;
+use futures::try_join;
 
-enum IncomingServiceRequest {
-    Sampler(SamplerRequestStream),
-}
-
-/// Serve the `fuchsia.memory.sampler/Sampler` protocol.
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let mut service_fs = ServiceFs::new_local();
-    service_fs.dir("svc").add_fidl_service(IncomingServiceRequest::Sampler);
-    service_fs.take_and_serve_directory_handle()?;
-    const MAX_CONCURRENT: usize = 10000;
-    service_fs
-        .for_each_concurrent(MAX_CONCURRENT, |IncomingServiceRequest::Sampler(stream)| {
-            sampler_service::run_sampler_service(stream).unwrap_or_else(|e| {
-                tracing::error!("fuchsia.memory.sampler/Sampler protocol: {}", e)
-            })
-        })
-        .await;
-
+    crash_reporter::register_crash_product().await?;
+    let (tx, crash_reporter_service) = crash_reporter::setup_crash_reporter();
+    let sampler_service = sampler_service::setup_sampler_service(tx)?;
+    try_join!(crash_reporter_service, sampler_service)?;
     Ok(())
 }

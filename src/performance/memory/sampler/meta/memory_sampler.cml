@@ -14,9 +14,11 @@
     ],
     use: [
         {
-            storage: "cache",
-            rights: [ "rw*" ],
-            path: "/cache",
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
+            from: "parent",
         },
     ],
     expose: [

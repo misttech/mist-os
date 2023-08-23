@@ -4,7 +4,10 @@
 
 use std::collections::HashMap;
 
+use anyhow::Error;
 use fidl_fuchsia_memory_sampler::{ModuleMap, StackTrace};
+use fuchsia_zircon::Vmo;
+use prost::Message;
 
 use crate::pprof;
 
@@ -75,6 +78,16 @@ impl ProfileBuilder {
             ),
         )
     }
+}
+
+// Serialize a profile to a VMO. On success, returns a tuple of a
+// `Vmo` and the size of its content.
+pub fn profile_to_vmo(profile: &pprof::pproto::Profile) -> Result<(Vmo, u64), Error> {
+    let proto_profile = profile.encode_to_vec();
+    let size = proto_profile.len() as u64;
+    let vmo = Vmo::create(size)?;
+    vmo.write(&proto_profile[..], 0)?;
+    Ok((vmo, size as u64))
 }
 
 #[cfg(test)]

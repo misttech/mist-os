@@ -10,8 +10,11 @@
     ],
     offer: [
         {
-            storage: "cache",
-            from: "self",
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
+            from: "#feedback",
             to: "#memory_sampler",
         },
     ],

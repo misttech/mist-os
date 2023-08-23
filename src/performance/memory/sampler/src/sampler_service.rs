@@ -2,38 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! This modules contains most of the top-level logic of the
+//! This modules contains most of the top-level logic of the sampler
 //! service. It defines functions to process a stream of profiling
 //! requests and produce a complete profile, as well as utilities to
 //! persist it.
 
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+use crate::{crash_reporter::ProfileReport, pprof::pproto, profile_builder::ProfileBuilder};
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_memory_sampler::{
     SamplerRequest, SamplerRequestStream, SamplerSetProcessInfoRequest,
 };
-use futures::prelude::*;
-use prost::Message;
+use fuchsia_async::Task;
+use fuchsia_component::server::ServiceFs;
+use futures::{channel::mpsc, prelude::*, TryFutureExt};
 
-use crate::pprof::pproto;
-use crate::profile_builder::ProfileBuilder;
-
-/// Store the given profile on the filesystem. The name of the file is
-/// derived from the name of the process being profiled.
-///
-/// TODO(fxbug.dev/122384): Implement proper profile storage
-/// management. The current implementation simply serializes a profile
-/// to a file named like the process. In particular, this scheme does
-/// not handle name collisions nor support collecting several profiles
-/// of a given process.
-fn store_profile(profile: &pproto::Profile, process_name: &str) -> Result<(), Error> {
-    let mut file = File::create(Path::join(Path::new("/cache/"), process_name))?;
-    file.write_all(&profile.encode_to_vec()[..])?;
-    Ok(())
-}
+const MAX_CONCURRENT_REQUESTS: usize = 10_000;
 
 /// Accumulate profiling information in the builder.
 async fn process_sampler_request(
@@ -69,12 +53,49 @@ async fn process_sampler_requests(
 }
 
 /// Serves the `Sampler` protocol for a given process. Once a client
-/// closes their connection, writes a `pprof`-compatible profile to a
-/// file.
-pub async fn run_sampler_service(stream: SamplerRequestStream) -> Result<(), Error> {
+/// closes their connection, enqueues a `pprof`-compatible profile to
+/// the provided channel, for further processing.
+///
+/// Note: this function does not retry pushing profiles through the
+/// channel. Failure to handle profile reports in a timely manner will
+/// cause this component to shut down.
+///
+/// TODO(fxbug.dev/132410): Capture periodic snapshots while the
+/// instrumented process is running.
+async fn run_sampler_service(
+    stream: SamplerRequestStream,
+    mut tx: mpsc::Sender<ProfileReport>,
+) -> Result<(), Error> {
     let (process_name, profile) = process_sampler_requests(stream).await?;
-    store_profile(&profile, &process_name)?;
+    tx.try_send(ProfileReport { process_name, profile })?;
     Ok(())
+}
+
+enum IncomingServiceRequest {
+    Sampler(SamplerRequestStream),
+}
+
+/// Returns a task that serves the `fuchsia.memory.sampler/Sampler`
+/// protocol.
+///
+/// Note: any error will cause the sampler service to shutdown.
+pub fn setup_sampler_service(
+    tx: mpsc::Sender<ProfileReport>,
+) -> Result<Task<Result<(), Error>>, Error> {
+    let mut service_fs = ServiceFs::new();
+    service_fs.dir("svc").add_fidl_service(IncomingServiceRequest::Sampler);
+    service_fs.take_and_serve_directory_handle()?;
+    Ok(Task::spawn(
+        service_fs
+            .map(Ok)
+            .try_for_each_concurrent(
+                MAX_CONCURRENT_REQUESTS,
+                move |IncomingServiceRequest::Sampler(stream)| {
+                    run_sampler_service(stream, tx.clone())
+                },
+            )
+            .inspect_err(|e| tracing::error!("fuchsia.memory.sampler/Sampler protocol: {}", e)),
+    ))
 }
 
 #[cfg(test)]
