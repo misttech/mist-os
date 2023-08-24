@@ -4056,13 +4056,55 @@ static bool vmo_snapshot_modified_test() {
   status = clone2->Write(&data, PAGE_SIZE, sizeof(data));
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, status);
 
-  // Calling snapshot-modified on clone shouldn't be supported yet.
+  // Call snapshot-modified again on the full clone, which will create a hidden parent.
   fbl::RefPtr<VmObject> snapshot;
   status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
                               PAGE_SIZE * kNumPages, false,
                               AttributionObject::GetKernelAttribution(), &snapshot);
-  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "vmobject snapshot-modified\n");
-  ASSERT_NULL(snapshot, "vmobject snapshot-modified\n");
+  ASSERT_EQ(ZX_OK, status, "vmobject snapshot-modified\n");
+  ASSERT_NONNULL(snapshot, "vmobject snapshot-modified clone\n");
+
+  // Pages in hidden parent will be attributed to the left child.
+  EXPECT_EQ((size_t)PAGE_SIZE, PAGE_SIZE * clone->AttributedPages().uncompressed,
+            "clone attribution\n");
+  EXPECT_EQ(0u, PAGE_SIZE * snapshot->AttributedPages().uncompressed, "snapshot attribution\n");
+
+  // Calling CreateClone directly with SnapshotAtLeastOnWrite should upgrade to snapshot-modified.
+  fbl::RefPtr<VmObject> atleastonwrite;
+  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                              alloc_size, false, AttributionObject::GetKernelAttribution(),
+                              &atleastonwrite);
+  ASSERT_EQ(ZX_OK, status, "vmobject snapshot-at-least-on-write clone.\n");
+  ASSERT_NONNULL(atleastonwrite, "vmobject snapshot-at-least-on-write clone\n");
+
+  // Create a slice of the first two pages of the root VMO.
+  auto kSliceSize = 2 * PAGE_SIZE;
+  fbl::RefPtr<VmObject> slice;
+  ASSERT_OK(vmo->CreateChildSlice(0, kSliceSize, false, &slice));
+  ASSERT_NONNULL(slice, "slice root vmo");
+  slice->set_user_id(45);
+
+  // Snapshot-modified of root-slice should work.
+  fbl::RefPtr<VmObject> slicesnapshot;
+  status =
+      slice->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, kSliceSize,
+                         false, AttributionObject::GetKernelAttribution(), &slicesnapshot);
+  ASSERT_EQ(ZX_OK, status, "snapshot-modified root-slice\n");
+  ASSERT_NONNULL(slicesnapshot, "snapshot modified root-slice\n");
+  slicesnapshot->set_user_id(46);
+
+  // Create a slice of a clone
+  fbl::RefPtr<VmObject> cloneslice;
+  ASSERT_OK(clone->CreateChildSlice(0, kSliceSize, false, &cloneslice));
+  ASSERT_NONNULL(slice, "slice root vmo");
+
+  // Snapshot-modified should not be allowed on a slice of a clone.
+  fbl::RefPtr<VmObject> cloneslicesnapshot;
+  status = cloneslice->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+                                   kSliceSize, false, AttributionObject::GetKernelAttribution(),
+                                   &cloneslicesnapshot);
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified clone-slice\n");
+  ASSERT_NULL(cloneslicesnapshot, "snapshot modified clone-slice\n");
 
   END_TEST;
 }

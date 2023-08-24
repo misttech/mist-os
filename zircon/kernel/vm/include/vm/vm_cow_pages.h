@@ -109,32 +109,7 @@ class VmCowPages final : public VmHierarchyBase,
     return root->page_source_ && root->page_source_->properties().is_user_pager;
   }
 
-  bool is_snapshot_at_least_on_write_supported() const TA_REQ(lock()) {
-    canary_.Assert();
-    auto root = GetRootLocked();
-    // The root will never be null. It will either point to a valid parent, or |this| if there's no
-    // parent.
-    DEBUG_ASSERT(root);
-    bool result = root->page_source_ && root->page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
-
-    // Calling snapshot-at-least-on-write of a slice in a snapshot-modified tree is unsupported
-    // as it creates an inconsistent structure.
-    if (is_slice_locked()) {
-      DEBUG_ASSERT(parent_);
-      AssertHeld(parent_->lock_ref());
-      if (parent_->is_self_or_parent_hidden_locked()) {
-        result = false;
-      }
-    }
-
-    return result;
-  }
-
-  bool is_self_or_parent_hidden_locked() const TA_REQ(lock()) {
-    if (is_hidden_locked()) {
-      return true;
-    }
+  bool is_parent_hidden_locked() const TA_REQ(lock()) {
     if (parent_) {
       AssertHeld(parent_->lock_ref());
       if (parent_->is_hidden_locked()) {
@@ -746,9 +721,36 @@ class VmCowPages final : public VmHierarchyBase,
     return true;
   }
 
+  bool is_snapshot_at_least_on_write_supported() const TA_REQ(lock()) {
+    if (is_parent_hidden_locked()) {
+      return false;
+    }
+
+    canary_.Assert();
+    auto root = GetRootLocked();
+    // The root will never be null. It will either point to a valid parent, or |this| if there's no
+    // parent.
+    DEBUG_ASSERT(root);
+    bool result = root->page_source_ && root->page_source_->properties().is_preserving_page_content;
+    DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
+
+    // Calling snapshot-at-least-on-write of a slice in a snapshot-modified tree is unsupported
+    // as it creates an inconsistent structure.
+    if (is_slice_locked()) {
+      DEBUG_ASSERT(parent_);
+      DEBUG_ASSERT(!is_parent_hidden_locked());
+      AssertHeld(parent_->lock_ref());
+      if (parent_->is_parent_hidden_locked()) {
+        result = false;
+      }
+    }
+
+    return result;
+  }
+
   bool can_snapshot_modified_locked() const TA_REQ(lock()) {
-    // Snapshot-at-least-on-write must also be supported.
-    if (!is_snapshot_at_least_on_write_supported()) {
+    // Root must be pager-backed.
+    if (!is_root_source_user_pager_backed_locked()) {
       return false;
     }
 
@@ -757,10 +759,14 @@ class VmCowPages final : public VmHierarchyBase,
       return false;
     }
 
-    // Snapshots of slices aren't supported.
+    // Snapshots of slices aren't supported, unless it's a slice of the root VMO.
     // Bug: 36841
     if (is_slice_locked()) {
-      return false;
+      DEBUG_ASSERT(parent_);
+      AssertHeld(parent_->lock_ref());
+      if (parent_->parent_) {
+        return false;
+      }
     }
 
     // TODO(sagebarreda@) Don't allow snapshots in unidirectional chain.

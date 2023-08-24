@@ -748,8 +748,10 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // Upgrade clone type, if possible.
-  if (type == CloneType::SnapshotAtLeastOnWrite) {
-    if (!is_snapshot_at_least_on_write_supported()) {
+  if (type == CloneType::SnapshotAtLeastOnWrite && !is_snapshot_at_least_on_write_supported()) {
+    if (can_snapshot_modified_locked()) {
+      type = CloneType::SnapshotModified;
+    } else {
       type = CloneType::Snapshot;
     }
   }
@@ -775,6 +777,7 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       if (!is_snapshot_at_least_on_write_supported()) {
         return ZX_ERR_NOT_SUPPORTED;
       }
+
       break;
     }
     case CloneType::SnapshotModified: {
@@ -783,10 +786,6 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       }
       if (pinned_page_count_locked()) {
         return ZX_ERR_BAD_STATE;
-      }
-      // TODO(fxbug.dev/123742) Implement snapshots of clones.
-      if (parent_) {
-        return ZX_ERR_NOT_SUPPORTED;
       }
       break;
     }
@@ -872,10 +871,11 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
         AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
 
         *cow_child = ktl::move(cow_pages);
-        // Else make a snapshot (unsupported at the moment).
+        // Else, take a snapshot.
         return ZX_OK;
       } else {
-        return ZX_ERR_NOT_SUPPORTED;
+        return CloneBidirectionalLocked(offset, size, attribution_object, cow_child,
+                                        new_root_parent_offset, child_parent_limit);
       }
     }
   }
@@ -927,7 +927,15 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
     while (cur->parent_ != nullptr) {
       auto parent = cur->parent_.get();
       AssertHeld(parent->lock_ref());
-      DEBUG_ASSERT(parent->is_hidden_locked());
+
+      // Snapshot-modified case: hidden node with non-hidden parent.
+      // Pages will be attributed to the visible root.
+      if (!parent->is_hidden_locked()) {
+        // Parent must be root & pager-backed.
+        DEBUG_ASSERT(!parent->parent_);
+        DEBUG_ASSERT(parent->debug_is_user_pager_backed());
+        break;
+      }
 
       if (parent->page_attribution_user_id_ == page_attribution_user_id_) {
         uint64_t new_user_id = parent->left_child_locked().page_attribution_user_id_;
@@ -1418,6 +1426,14 @@ uint64_t VmCowPages::CountAttributedAncestorPagesLocked(uint64_t offset, uint64_
     bool overflowed = add_overflow(cur->parent_offset_, cur_offset, &parent_offset);
     DEBUG_ASSERT(!overflowed);                     // vmo creation should have failed
     DEBUG_ASSERT(parent_offset <= parent->size_);  // parent_limit_ prevents this
+
+    // Child of snapshot-modified root, pages will be attributed to parent
+    if (!parent->is_hidden_locked()) {
+      // Parent must be root & pager-backed.
+      DEBUG_ASSERT(!parent->parent_);
+      DEBUG_ASSERT(parent->debug_is_user_pager_backed());
+      break;
+    }
 
     const bool left = cur == &parent->left_child_locked();
     const auto& sib = left ? parent->right_child_locked() : parent->left_child_locked();
@@ -4321,6 +4337,14 @@ void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
       // Work out what the overlap with our sibling is
       auto parent = cur->parent_.get();
       AssertHeld(parent->lock_ref());
+      // Stop processing if we are the child of a snapshot-modified root, as any pages in the parent
+      // are owned by the root and should remain accessible to the pager.
+      if (!parent->is_hidden_locked()) {
+        // Parent must be root & pager-backed.
+        DEBUG_ASSERT(!parent->parent_);
+        DEBUG_ASSERT(parent->debug_is_user_pager_backed());
+        break;
+      }
       bool left = cur == &parent->left_child_locked();
       auto& other = left ? parent->right_child_locked() : parent->left_child_locked();
       AssertHeld(other.lock_ref());
