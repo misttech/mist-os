@@ -742,6 +742,7 @@ if (is_kernel) {
       ":zircon",
       "phys:physboot",
     ]
+    compress = "zstd.max"
 
     output_dir = root_out_dir
     output_extension = "zbi"
