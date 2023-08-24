@@ -66,9 +66,8 @@ TEST_F(ZirconSystemInterfaceTest, GetProcessTree) {
 
   // The process_name and component info should match
   EXPECT_EQ(zircon::NameForObject(*self), process_name);
-  // The moniker is empty because it's actually "." in the test environment and the "." is stripped.
   ASSERT_TRUE(component_info);
-  EXPECT_EQ("", component_info->moniker);
+  EXPECT_EQ(".", component_info->moniker);
   // The url will include a hash that cannot be compared.
   ASSERT_FALSE(component_info->url.empty());
   std::string_view prefix = "fuchsia-pkg://fuchsia.com/debug_agent_unit_tests";
@@ -91,8 +90,7 @@ TEST_F(ZirconSystemInterfaceTest, FindComponentInfo) {
   auto component_info = system_interface.GetComponentManager().FindComponentInfo(self);
 
   ASSERT_TRUE(component_info);
-  // The moniker is empty because it's actually "." in the test environment and the "." is stripped.
-  EXPECT_EQ("", component_info->moniker);
+  EXPECT_EQ(".", component_info->moniker);
   // The url will include a hash that cannot be compared.
   ASSERT_FALSE(component_info->url.empty());
   std::string_view prefix = "fuchsia-pkg://fuchsia.com/debug_agent_unit_tests";

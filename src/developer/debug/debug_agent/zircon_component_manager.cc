@@ -217,9 +217,10 @@ ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface
         // The component is not running.
         continue;
       }
+      std::string moniker = *instance.moniker();
       fidl::Client<fuchsia_io::Directory> runtime_dir;
       auto open_res = realm_query->Open(
-          {*instance.moniker(),
+          {moniker,
            fuchsia_sys2::OpenDirType::kRuntimeDir,
            fuchsia_io::OpenFlags::kRightReadable,
            {},
@@ -228,8 +229,6 @@ ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface
       if (!open_res.is_ok()) {
         continue;
       }
-      // Remove the "." at the beginning of the moniker. It's safe because moniker is not empty.
-      std::string moniker = instance.moniker()->substr(1);
       ReadElfJobId(std::move(runtime_dir), moniker,
                    [weak_this = weak_factory_.GetWeakPtr(), moniker, url = *instance.url(),
                     deferred_ready](zx_koid_t job_id) {
