@@ -69,45 +69,55 @@ DnsResource::DnsResource(const std::string& name, DnsType type)
     case DnsType::kA:
       new (&a_) DnsResourceDataA();
       time_to_live_ = kShortTimeToLive;
+      // cache_flush_ false, because multiple A resources can apply to the same name.
       break;
     case DnsType::kNs:
       new (&ns_) DnsResourceDataNs();
       time_to_live_ = kLongTimeToLive;
+      cache_flush_ = true;
       break;
     case DnsType::kCName:
       new (&cname_) DnsResourceDataCName();
       time_to_live_ = kLongTimeToLive;
+      cache_flush_ = true;
       break;
     case DnsType::kPtr:
       new (&ptr_) DnsResourceDataPtr();
       time_to_live_ = kLongTimeToLive;
+      // cache_flush_ false, because multiple PTR resources can apply to the same name.
       break;
     case DnsType::kTxt:
       new (&txt_) DnsResourceDataTxt();
       time_to_live_ = kLongTimeToLive;
+      cache_flush_ = true;
       break;
     case DnsType::kAaaa:
       new (&aaaa_) DnsResourceDataAaaa();
       time_to_live_ = kShortTimeToLive;
+      // cache_flush_ false, because multiple AAAA resources can apply to the same name.
       break;
     case DnsType::kSrv:
       new (&srv_) DnsResourceDataSrv();
       time_to_live_ = kShortTimeToLive;
+      cache_flush_ = true;
       break;
     case DnsType::kOpt:
       new (&opt_) DnsResourceDataOpt();
       time_to_live_ = kShortTimeToLive;
+      cache_flush_ = true;
       break;
     case DnsType::kNSec:
       new (&nsec_) DnsResourceDataNSec();
       time_to_live_ = kLongTimeToLive;
+      cache_flush_ = true;
       break;
     default:
       break;
   }
 }
 
-DnsResource::DnsResource(const std::string& name, inet::IpAddress address) : name_(DnsName(name)) {
+DnsResource::DnsResource(const std::string& name, inet::IpAddress address, bool cache_flush)
+    : name_(DnsName(name)), cache_flush_(cache_flush) {
   if (address.is_v4()) {
     type_ = DnsType::kA;
     new (&a_) DnsResourceDataA();

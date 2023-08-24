@@ -245,14 +245,33 @@ const std::vector<std::shared_ptr<DnsResource>>&
 MdnsInterfaceTransceiver::GetInterfaceAddressResources(const std::string& host_full_name) {
   FX_DCHECK(!interface_addresses_.empty());
 
+  // Generate new resources if there currently are none or if the host name has changed.
   if (interface_address_resources_.empty() ||
       interface_address_resources_[0]->name_.dotted_string_ != host_full_name) {
     interface_address_resources_.clear();
-    std::transform(interface_addresses_.begin(), interface_addresses_.end(),
-                   std::back_inserter(interface_address_resources_),
-                   [&host_full_name](const inet::IpAddress& address) {
-                     return std::make_shared<DnsResource>(host_full_name, address);
-                   });
+
+    // We need to generate new address resources for this interface. An A/AAAA resource
+    // is generated for each V4/V6 address in the |interface_addresses_| collection. The first
+    // A resource and the first AAAA resource should have the cache_flush bit and other resources
+    // should not.
+    bool v4_cache_flush = true;
+    bool v6_cache_flush = true;
+    std::transform(
+        interface_addresses_.begin(), interface_addresses_.end(),
+        std::back_inserter(interface_address_resources_),
+        [&host_full_name, &v4_cache_flush, &v6_cache_flush](const inet::IpAddress& address) {
+          bool cache_flush;
+          if (address.is_v4()) {
+            // Set cache_flush on the first A resource but not subsequent ones.
+            cache_flush = v4_cache_flush;
+            v4_cache_flush = false;
+          } else {
+            // Set cache_flush on the first AAAA resource but not subsequent ones.
+            cache_flush = v6_cache_flush;
+            v6_cache_flush = false;
+          }
+          return std::make_shared<DnsResource>(host_full_name, address, cache_flush);
+        });
   }
 
   return interface_address_resources_;

@@ -23,10 +23,17 @@ constexpr std::array<uint8_t, 16> kIPv6Address2 = {0xfe, 0x80, 0, 0, 0, 0, 0, 0,
                                                    0,    0,    0, 0, 4, 3, 2, 1};
 constexpr std::array<uint8_t, 16> kIPv6AddressNotLinkLocal = {0xff, 0x80, 0, 0, 0, 0, 0, 0,
                                                               0,    0,    0, 0, 4, 3, 2, 1};
+constexpr std::array<uint8_t, 16> kIPv6AddressNotLinkLocal2 = {0xff, 0x80, 0, 0, 0, 0, 0, 0,
+                                                               0,    0,    0, 0, 4, 3, 2, 2};
+constexpr std::array<uint8_t, 16> kIPv6AddressNotLinkLocal3 = {0xff, 0x80, 0, 0, 0, 0, 0, 0,
+                                                               0,    0,    0, 0, 4, 3, 2, 3};
+constexpr std::array<uint8_t, 16> kIPv6AddressNotLinkLocal4 = {0xff, 0x80, 0, 0, 0, 0, 0, 0,
+                                                               0,    0,    0, 0, 4, 3, 2, 4};
 constexpr uint8_t kIPv4PrefixLength = 24;
 constexpr uint8_t kIPv6PrefixLength = 64;
 constexpr uint8_t kID = 1;
 constexpr const char kName[] = "test01";
+constexpr const char kHostName[] = "testhostname";
 
 namespace {
 
@@ -68,12 +75,55 @@ std::vector<fuchsia::net::interfaces::Address> Addresses1() {
   return addresses;
 }
 
+std::vector<fuchsia::net::interfaces::Address> Addresses1Extra() {
+  std::vector<fuchsia::net::interfaces::Address> addresses;
+  addresses.reserve(2);
+  InitAddress(addresses.emplace_back(), kIPv4Address1);
+  InitAddress(addresses.emplace_back(), kIPv6Address1);
+  InitAddress(addresses.emplace_back(), kIPv6AddressNotLinkLocal);
+  InitAddress(addresses.emplace_back(), kIPv6AddressNotLinkLocal2);
+  InitAddress(addresses.emplace_back(), kIPv6AddressNotLinkLocal3);
+  InitAddress(addresses.emplace_back(), kIPv6AddressNotLinkLocal4);
+  return addresses;
+}
+
 std::vector<fuchsia::net::interfaces::Address> Addresses2() {
   std::vector<fuchsia::net::interfaces::Address> addresses;
   addresses.reserve(2);
   InitAddress(addresses.emplace_back(), kIPv4Address2);
   InitAddress(addresses.emplace_back(), kIPv6Address2);
   return addresses;
+}
+
+bool VerifyAddressResource(std::shared_ptr<DnsResource> resource, inet::IpAddress expected_address,
+                           bool cache_flush) {
+  EXPECT_TRUE(!!resource);
+  if (!resource) {
+    return false;
+  }
+
+  EXPECT_EQ(kHostName, resource->name_.dotted_string_);
+  EXPECT_EQ(expected_address.is_v4() ? DnsType::kA : DnsType::kAaaa, resource->type_);
+  EXPECT_EQ(DnsClass::kIn, resource->class_);
+  EXPECT_EQ(cache_flush, resource->cache_flush_);
+  EXPECT_EQ(DnsResource::kShortTimeToLive, resource->time_to_live_);
+
+  if (resource->type_ == DnsType::kA) {
+    EXPECT_EQ(expected_address, resource->a_.address_.address_);
+    if (expected_address != resource->a_.address_.address_) {
+      return false;
+    }
+  } else {
+    EXPECT_EQ(expected_address, resource->aaaa_.address_.address_);
+    if (expected_address != resource->aaaa_.address_.address_) {
+      return false;
+    }
+  }
+
+  return (kHostName == resource->name_.dotted_string_) &&
+         ((expected_address.is_v4() ? DnsType::kA : DnsType::kAaaa) == resource->type_) &&
+         (DnsClass::kIn == resource->class_) && (cache_flush == resource->cache_flush_) &&
+         (DnsResource::kShortTimeToLive == resource->time_to_live_);
 }
 
 }  // namespace
@@ -116,6 +166,11 @@ class StubInterfaceTransceiver : public MdnsInterfaceTransceiver {
     return std::make_unique<StubInterfaceTransceiver>(address, name, id, media);
   }
 
+  const std::vector<std::shared_ptr<DnsResource>>& GetInterfaceAddressResources(
+      const std::string& host_full_name) {
+    return MdnsInterfaceTransceiver::GetInterfaceAddressResources(host_full_name);
+  }
+
  protected:
   enum IpVersions IpVersions() override { return ip_versions_; }
   int SetOptionDisableMulticastLoop() override { return 0; }
@@ -145,7 +200,10 @@ class MdnsTransceiverTests : public gtest::TestLoopFixture {
         v4_address2_(inet::IpAddress(ToFIDL(kIPv4Address2))),
         v6_address1_(inet::IpAddress(ToFIDL(kIPv6Address1))),
         v6_address2_(inet::IpAddress(ToFIDL(kIPv6Address2))),
-        v6_address_not_link_local_(inet::IpAddress(ToFIDL(kIPv6AddressNotLinkLocal))) {
+        v6_address_not_link_local_(inet::IpAddress(ToFIDL(kIPv6AddressNotLinkLocal))),
+        v6_address_not_link_local_2_(inet::IpAddress(ToFIDL(kIPv6AddressNotLinkLocal2))),
+        v6_address_not_link_local_3_(inet::IpAddress(ToFIDL(kIPv6AddressNotLinkLocal3))),
+        v6_address_not_link_local_4_(inet::IpAddress(ToFIDL(kIPv6AddressNotLinkLocal4))) {
     properties_ = fuchsia::net::interfaces::Properties();
     properties_.set_id(kID);
     properties_.set_name(kName);
@@ -179,7 +237,8 @@ class MdnsTransceiverTests : public gtest::TestLoopFixture {
   const std::unique_ptr<fidl::Binding<fuchsia::net::interfaces::Watcher>> binding_;
   fuchsia::net::interfaces::Properties properties_;
   const inet::IpAddress v4_address1_, v4_address2_, v6_address1_, v6_address2_,
-      v6_address_not_link_local_;
+      v6_address_not_link_local_, v6_address_not_link_local_2_, v6_address_not_link_local_3_,
+      v6_address_not_link_local_4_;
 };
 
 TEST_F(MdnsTransceiverTests, IgnoreLoopback) {
@@ -328,6 +387,109 @@ TEST_F(MdnsTransceiverTests, OnlineAndAddressesChange) {
   EXPECT_EQ(transceiver_.GetInterfaceTransceiver(v4_address2_), nullptr);
   EXPECT_EQ(transceiver_.GetInterfaceTransceiver(v6_address2_), nullptr);
   EXPECT_EQ(transceiver_.GetInterfaceTransceiver(v6_address_not_link_local_), nullptr);
+}
+
+// Tests that interface address resources at the transceivers are updated properly when address
+// changes occur and that cache_flush and other resource properties are properly set.
+TEST_F(MdnsTransceiverTests, InterfaceAddressResources) {
+  RunLoopUntilIdle();
+
+  // Send the initial NIC configuration. Initial addresses are |v4_address1_|, |v6_address1_| and
+  // |v6_address_not_link_local_|.
+  ASSERT_TRUE(fake_watcher_impl_.CompleteWatchCallback(
+      fuchsia::net::interfaces::Event::WithExisting(std::move(properties_))));
+
+  RunLoopUntilIdle();
+
+  // Get the expected transceivers created based on the NIC configuration.
+  auto v4_transceiver = reinterpret_cast<StubInterfaceTransceiver*>(
+      transceiver_.GetInterfaceTransceiver(v4_address1_));
+  auto v6_transceiver = reinterpret_cast<StubInterfaceTransceiver*>(
+      transceiver_.GetInterfaceTransceiver(v6_address1_));
+
+  EXPECT_NE(v4_transceiver, nullptr);
+  EXPECT_NE(v6_transceiver, nullptr);
+
+  // Expect that the correct address resources are generated by the transceivers with the
+  // correct cache_flush bits. For a given transceiver, the first A (V4) and the first AAAA (V6)
+  // resource should have cache_flush set and the remainder of the A/AAAA resources should not.
+  auto& v4_addr = v4_transceiver->GetInterfaceAddressResources(kHostName);
+  EXPECT_EQ(3u, v4_addr.size());
+  EXPECT_TRUE(VerifyAddressResource(v4_addr[0], v4_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr[1], v6_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr[2], v6_address_not_link_local_, false));
+
+  auto& v6_addr = v6_transceiver->GetInterfaceAddressResources(kHostName);
+  EXPECT_EQ(3u, v6_addr.size());
+  EXPECT_TRUE(VerifyAddressResource(v6_addr[0], v4_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr[1], v6_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr[2], v6_address_not_link_local_, false));
+
+  // Send an address change that adds new V6 addresses.
+  fuchsia::net::interfaces::Properties addresses_change;
+  addresses_change.set_id(kID);
+  addresses_change.set_addresses(Addresses1Extra());
+  ASSERT_TRUE(fake_watcher_impl_.CompleteWatchCallback(
+      fuchsia::net::interfaces::Event::WithChanged(std::move(addresses_change))));
+
+  RunLoopUntilIdle();
+
+  // Ensure that the transceivers have not been deleted or replaced.
+  EXPECT_EQ(v4_transceiver, reinterpret_cast<StubInterfaceTransceiver*>(
+                                transceiver_.GetInterfaceTransceiver(v4_address1_)));
+  EXPECT_EQ(v6_transceiver, reinterpret_cast<StubInterfaceTransceiver*>(
+                                transceiver_.GetInterfaceTransceiver(v6_address1_)));
+
+  // Expect that the correct address resources are generated by the transceivers with the
+  // correct cache_flush bits. For a given transceiver, the first A (V4) and the first AAAA (V6)
+  // resource should have cache_flush set and the remainder of the A/AAAA resources should not.
+  auto& v4_addr_2 = v4_transceiver->GetInterfaceAddressResources(kHostName);
+  EXPECT_EQ(6u, v4_addr.size());
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_2[0], v4_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_2[1], v6_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_2[2], v6_address_not_link_local_, false));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_2[3], v6_address_not_link_local_2_, false));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_2[4], v6_address_not_link_local_3_, false));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_2[5], v6_address_not_link_local_4_, false));
+
+  auto& v6_addr_2 = v6_transceiver->GetInterfaceAddressResources(kHostName);
+  EXPECT_EQ(6u, v6_addr_2.size());
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_2[0], v4_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_2[1], v6_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_2[2], v6_address_not_link_local_, false));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_2[3], v6_address_not_link_local_2_, false));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_2[4], v6_address_not_link_local_3_, false));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_2[5], v6_address_not_link_local_4_, false));
+
+  // Send an address change that remove some V6 addresses.
+  fuchsia::net::interfaces::Properties addresses_change_2;
+  addresses_change_2.set_id(kID);
+  addresses_change_2.set_addresses(Addresses1());
+  ASSERT_TRUE(fake_watcher_impl_.CompleteWatchCallback(
+      fuchsia::net::interfaces::Event::WithChanged(std::move(addresses_change_2))));
+
+  RunLoopUntilIdle();
+
+  // Ensure that the transceivers have not been deleted or replaced.
+  EXPECT_EQ(v4_transceiver, reinterpret_cast<StubInterfaceTransceiver*>(
+                                transceiver_.GetInterfaceTransceiver(v4_address1_)));
+  EXPECT_EQ(v6_transceiver, reinterpret_cast<StubInterfaceTransceiver*>(
+                                transceiver_.GetInterfaceTransceiver(v6_address1_)));
+
+  // Expect that the correct address resources are generated by the transceivers with the
+  // correct cache_flush bits. For a given transceiver, the first A (V4) and the first AAAA (V6)
+  // resource should have cache_flush set and the remainder of the A/AAAA resources should not.
+  auto& v4_addr_3 = v4_transceiver->GetInterfaceAddressResources(kHostName);
+  EXPECT_EQ(3u, v4_addr_3.size());
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_3[0], v4_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_3[1], v6_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v4_addr_3[2], v6_address_not_link_local_, false));
+
+  auto& v6_addr_3 = v6_transceiver->GetInterfaceAddressResources(kHostName);
+  EXPECT_EQ(3u, v6_addr_3.size());
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_3[0], v4_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_3[1], v6_address1_, true));
+  EXPECT_TRUE(VerifyAddressResource(v6_addr_3[2], v6_address_not_link_local_, false));
 }
 
 }  // namespace mdns::test

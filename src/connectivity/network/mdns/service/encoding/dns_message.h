@@ -291,7 +291,7 @@ struct DnsResource {
 
   DnsResource();
   DnsResource(const std::string& name, DnsType type);
-  DnsResource(const std::string& name, inet::IpAddress address);
+  DnsResource(const std::string& name, inet::IpAddress address, bool cache_flush = false);
   DnsResource(const DnsResource& other);
   ~DnsResource();
 

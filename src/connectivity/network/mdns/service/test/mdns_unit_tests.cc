@@ -39,6 +39,8 @@ const std::vector<inet::IpAddress> kAddresses{inet::IpAddress(192, 168, 1, 200),
                                               inet::IpAddress(192, 168, 1, 201)};
 const inet::IpPort kPort = inet::IpPort::From_uint16_t(5353);
 
+bool DefaultCacheFlush(DnsType type);
+
 // Unit tests for the |Mdns| class.
 class MdnsUnitTests : public gtest::RealLoopFixture, public Mdns::Transceiver {
  public:
@@ -173,8 +175,12 @@ class MdnsUnitTests : public gtest::RealLoopFixture, public Mdns::Transceiver {
   // it.
   std::shared_ptr<DnsResource> ExpectResource(DnsMessage& message, MdnsResourceSection section,
                                               const std::string& name, DnsType type,
-                                              DnsClass dns_class = DnsClass::kIn,
-                                              bool cache_flush = false) {
+                                              DnsClass dns_class = DnsClass::kIn) {
+    return ExpectResource(message, section, name, type, dns_class, DefaultCacheFlush(type));
+  }
+  std::shared_ptr<DnsResource> ExpectResource(DnsMessage& message, MdnsResourceSection section,
+                                              const std::string& name, DnsType type,
+                                              DnsClass dns_class, bool cache_flush) {
     auto extracted = ExtractResources(1, message, section, name, type, dns_class, cache_flush);
 
     EXPECT_FALSE(extracted.empty()) << "No matching resource with name " << name << " and type "
@@ -662,8 +668,8 @@ TEST_F(MdnsUnitTests, PublishInstanceWithHostNameAndAddresses) {
   RunLoopUntilIdle();
   auto message = ExpectSendMessageCalled(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
 
-  auto resource = ExpectResource(message, MdnsResourceSection::kAnswer, kServiceFullName,
-                                 DnsType::kPtr, DnsClass::kIn, false);
+  auto resource =
+      ExpectResource(message, MdnsResourceSection::kAnswer, kServiceFullName, DnsType::kPtr);
   EXPECT_EQ(kInstanceFullName, resource->ptr_.pointer_domain_name_.dotted_string_);
 
   resource =

@@ -16,6 +16,17 @@ const std::string AgentTest::kLocalHostName = "testhost";
 const std::string AgentTest::kLocalHostFullName = "testhost.local.";
 const std::string AgentTest::kAlternateCaseLocalHostFullName = "tEsThOsT.loCal.";
 
+bool DefaultCacheFlush(DnsType type) {
+  switch (type) {
+    case DnsType::kPtr:
+    case DnsType::kA:
+    case DnsType::kAaaa:
+      return false;
+    default:
+      return true;
+  }
+}
+
 void AgentTest::PostTaskForTime(MdnsAgent* agent, fit::closure task, zx::time target_time) {
   EXPECT_EQ(agent_, agent);
   post_task_for_time_calls_.push(
@@ -209,6 +220,13 @@ void AgentTest::ExpectQuestion(DnsMessage* message, const std::string& name, Dns
 std::shared_ptr<DnsResource> AgentTest::ExpectResource(DnsMessage* message,
                                                        MdnsResourceSection section,
                                                        const std::string& name, DnsType type,
+                                                       DnsClass dns_class) {
+  return ExpectResource(message, section, name, type, dns_class, DefaultCacheFlush(type));
+}
+
+std::shared_ptr<DnsResource> AgentTest::ExpectResource(DnsMessage* message,
+                                                       MdnsResourceSection section,
+                                                       const std::string& name, DnsType type,
                                                        DnsClass dns_class, bool cache_flush) {
   EXPECT_NE(nullptr, message);
   if (!message) {
@@ -243,6 +261,14 @@ std::shared_ptr<DnsResource> AgentTest::ExpectResource(DnsMessage* message,
   EXPECT_TRUE(false) << "No matching resource with name " << name << " and type " << type
                      << " in section " << section << " of message.";
   return nullptr;
+}
+
+std::vector<std::shared_ptr<DnsResource>> AgentTest::ExpectResources(DnsMessage* message,
+                                                                     MdnsResourceSection section,
+                                                                     const std::string& name,
+                                                                     DnsType type,
+                                                                     DnsClass dns_class) {
+  return ExpectResources(message, section, name, type, dns_class, DefaultCacheFlush(type));
 }
 
 std::vector<std::shared_ptr<DnsResource>> AgentTest::ExpectResources(

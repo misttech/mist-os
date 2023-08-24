@@ -94,6 +94,12 @@ class MdnsInterfaceTransceiver {
   virtual int Bind() = 0;
   virtual ssize_t SendTo(const void* buffer, size_t size, const inet::SocketAddress& address) = 0;
 
+  // Returns address resource (A/AAAA) records with the given name and the
+  // addresses contained in |interface_addresses_|.
+  // This method is protected so it can be accessed by subclasses used in tests.
+  const std::vector<std::shared_ptr<DnsResource>>& GetInterfaceAddressResources(
+      const std::string& host_full_name);
+
  private:
   int SetOptionSharePort();
   int SetOptionBindToDevice();
@@ -105,11 +111,6 @@ class MdnsInterfaceTransceiver {
   // Returns an address resource (A/AAAA) record with the given name and the
   // address contained in |address_|, which must be valid.
   std::shared_ptr<DnsResource> GetAddressResource(const std::string& host_full_name);
-
-  // Returns address resource (A/AAAA) records with the given name and the
-  // addresses contained in |interface_addresses_|.
-  const std::vector<std::shared_ptr<DnsResource>>& GetInterfaceAddressResources(
-      const std::string& host_full_name);
 
   // Returns a new vector with the same resources as |resources| except that any placeholder address
   // records have been replaced by address records for |interface_addresses_|.

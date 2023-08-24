@@ -135,16 +135,21 @@ class AgentTest : public ::testing::Test, public MdnsAgent::Owner {
   // it.
   std::shared_ptr<DnsResource> ExpectResource(DnsMessage* message, MdnsResourceSection section,
                                               const std::string& name, DnsType type,
-                                              DnsClass dns_class = DnsClass::kIn,
-                                              bool cache_flush = false);
+                                              DnsClass dns_class = DnsClass::kIn);
+  std::shared_ptr<DnsResource> ExpectResource(DnsMessage* message, MdnsResourceSection section,
+                                              const std::string& name, DnsType type,
+                                              DnsClass dns_class, bool cache_flush);
 
   // Expects that |message| contains one or more resources in |section| with the given parameters
   // and returns them.
   std::vector<std::shared_ptr<DnsResource>> ExpectResources(DnsMessage* message,
                                                             MdnsResourceSection section,
                                                             const std::string& name, DnsType type,
-                                                            DnsClass dns_class = DnsClass::kIn,
-                                                            bool cache_flush = false);
+                                                            DnsClass dns_class = DnsClass::kIn);
+  std::vector<std::shared_ptr<DnsResource>> ExpectResources(DnsMessage* message,
+                                                            MdnsResourceSection section,
+                                                            const std::string& name, DnsType type,
+                                                            DnsClass dns_class, bool cache_flush);
 
   // Expects that |message| contains an address placeholder resource in |section|.
   void ExpectAddressPlaceholder(DnsMessage* message, MdnsResourceSection section);
