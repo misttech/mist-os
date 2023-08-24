@@ -428,6 +428,8 @@
             protocol: [
                 "fuchsia.update.channel.Provider",
                 "fuchsia.update.channelcontrol.ChannelControl",
+                "fuchsia.update.config.OptOut",
+                "fuchsia.update.config.OptOutAdmin",
                 "fuchsia.update.Manager",
             ],
             from: "#system-update",
@@ -438,15 +440,6 @@
             protocol: "fuchsia.update.installer.Installer",
             from: "#system-update",
             to: "#sshd-host",
-        },
-        {
-            protocol: [
-                "fuchsia.update.config.OptOut",
-                "fuchsia.update.config.OptOutAdmin",
-            ],
-            from: "#system-update-configurator",
-            to: "#sshd-host",
-            source_availability: "unknown",
         },
 
         // Media
