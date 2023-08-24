@@ -129,7 +129,7 @@ libc = { version = "0.2.138", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 lock_api = "0.4.7"
-log = { version = "0.4.11", features = ["std"] }
+log = { version = "0.4.20", features = ["std"] }
 loom = "0.5.6"
 lru-cache = "0.1.2"
 maplit = "1.0"
@@ -518,8 +518,7 @@ rustflags = ["--cfg=freebsd11"]
 [gn.package.lock_api."0.4.7"]
 rustflags = ["--cfg=has_const_fn_trait_bound"]
 
-[gn.package.log."0.4.11"]
-rustflags = ["--cfg=atomic_cas"]
+[gn.package.log."0.4.20"]
 group_visibility = { import = "//src/lib/diagnostics/log/log_visibility.gni", variable = "third_party_rust_crate_log_visibility" }
 
 # Loom has not gone through a thorough safety review yet, and needs to be
@@ -696,7 +695,7 @@ rustflags = [
 # log::Logger receive tracing events as logs. On Fuchsia we don't need that
 # since all binaries set up a tracing Subscriber.
 [gn.package.tracing."0.1.34".platform."cfg(not(target_os = \"fuchsia\"))"]
-deps = [ ":log-v0_4_11" ]
+deps = [ ":log-v0_4_20" ]
 rustflags = [
   "--cfg=feature=\\\"log\\\"",
 ]

@@ -438,7 +438,7 @@ group("lock_api") {
 import("//src/lib/diagnostics/log/log_visibility.gni")
 
 group("log") {
-  public_deps = [ ":log-v0_4_11" ]
+  public_deps = [ ":log-v0_4_20" ]
 
   visibility = third_party_rust_crate_log_visibility
 }
@@ -1548,7 +1548,7 @@ rust_library("async-io-v1_12_0") {
   deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":concurrent-queue-v2_1_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":parking-v2_0_0" ]
   deps += [ ":polling-v2_4_0" ]
   deps += [ ":slab-v0_4_7" ]
@@ -3838,7 +3838,7 @@ rust_library("fatfs-v0_3_6") {
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":chrono-v0_4_19" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
 
   rustenv = []
 
@@ -4466,7 +4466,7 @@ rust_library("generator-v0_7_5") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   if (true) {
     deps += [ ":libc-v0_2_142" ]
   }
@@ -4623,7 +4623,7 @@ rust_library("gpt-v3_0_0") {
   deps = []
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":crc-v1_8_1" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":uuid-v0_8_2" ]
 
   rustenv = []
@@ -4688,7 +4688,7 @@ rust_library("handlebars-v4_3_5") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":pest-v2_1_3" ]
   deps += [ ":pest_derive-v2_1_0($host_toolchain)" ]
   deps += [ ":serde-v1_0_147" ]
@@ -5056,7 +5056,7 @@ rust_library("hyper-rustls-v0_22_1") {
   deps = []
   deps += [ ":futures-util-v0_3_19" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":rustls-v0_19_1" ]
   deps += [ ":rustls-native-certs-v0_5_0" ]
   deps += [ ":tokio-v1_19_2" ]
@@ -5705,22 +5705,21 @@ rust_library("lock_api-v0_4_7") {
   visibility = [ ":*" ]
 }
 
-rust_library("log-v0_4_11") {
+rust_library("log-v0_4_20") {
   crate_name = "log"
-  crate_root = "//third_party/rust_crates/vendor/log-0.4.11/src/lib.rs"
-  output_name = "log-f850217d8dbd0f9a"
+  crate_root = "//third_party/rust_crates/vendor/log-0.4.20/src/lib.rs"
+  output_name = "log-3237885152c97e3d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cfg-if-v0_1_10" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=f850217d8dbd0f9a",
-    "-Cextra-filename=-f850217d8dbd0f9a",
+    "-Cmetadata=3237885152c97e3d",
+    "-Cextra-filename=-3237885152c97e3d",
     "--cfg=feature=\"std\"",
     "--cfg=atomic_cas",
   ]
@@ -6052,7 +6051,7 @@ rust_library("mio-v0_7_14") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   if (true) {
     deps += [ ":libc-v0_2_142" ]
   }
@@ -6085,7 +6084,7 @@ rust_library("mio-v0_8_5") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   if (false) {
     deps += [ ":libc-v0_2_142" ]
     deps += [ ":wasi-v0_11_0+wasi-snapshot-preview1" ]
@@ -7613,7 +7612,7 @@ rust_library("polling-v2_4_0") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   if (true || current_os == "fuchsia" || false) {
     deps += [ ":libc-v0_2_142" ]
   }
@@ -8045,7 +8044,7 @@ rust_library("prost-build-v0_11_1") {
   deps += [ ":heck-v0_4_0" ]
   deps += [ ":itertools-v0_10_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":multimap-v0_8_3" ]
   deps += [ ":petgraph-v0_6_2" ]
   deps += [ ":prost-v0_11_0" ]
@@ -9090,7 +9089,7 @@ icu_rust_library("rust_icu_ucal-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9121,7 +9120,7 @@ icu_rust_library("rust_icu_uchar-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9149,7 +9148,7 @@ icu_rust_library("rust_icu_udat-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9181,7 +9180,7 @@ icu_rust_library("rust_icu_udata-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9236,7 +9235,7 @@ icu_rust_library("rust_icu_uloc-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9267,7 +9266,7 @@ icu_rust_library("rust_icu_unorm2-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9300,7 +9299,7 @@ icu_rust_library("rust_icu_ustring-v4_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v4_0_0" ]
   deps += [ ":rust_icu_sys-v4_0_0" ]
@@ -9349,7 +9348,7 @@ rust_library("rustfix-v0_6_1") {
 
   deps = []
   deps += [ ":anyhow-v1_0_75" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":serde_json-v1_0_87" ]
 
@@ -9373,7 +9372,7 @@ rust_library("rustls-v0_19_1") {
 
   deps = []
   deps += [ ":base64-v0_13_0" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":ring-v0_16_12" ]
   deps += [ ":sct-v0_6_0" ]
   deps += [ ":webpki-v0_21_0" ]
@@ -9461,7 +9460,7 @@ rust_library("rustyline-v2_1_0") {
 
   deps = []
   deps += [ ":libc-v0_2_142" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":memchr-v2_4_0" ]
   deps += [ ":unicode-segmentation-v1_2_1" ]
   deps += [ ":unicode-width-v0_1_10" ]
@@ -10288,7 +10287,7 @@ rust_library("simplelog-v0_10_2") {
 
   deps = []
   deps += [ ":chrono-v0_4_19" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":termcolor-v1_1_2" ]
 
   rustenv = []
@@ -11374,7 +11373,7 @@ rust_library("tracing-v0_1_34") {
   deps += [ ":tracing-attributes-v0_1_22($host_toolchain)" ]
   deps += [ ":tracing-core-v0_1_26" ]
   if (!(current_os == "fuchsia")) {
-    deps += [ ":log-v0_4_11" ]
+    deps += [ ":log-v0_4_20" ]
   }
 
   rustenv = []
@@ -11456,7 +11455,7 @@ rust_library("tracing-log-v0_1_2") {
 
   deps = []
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":tracing-core-v0_1_26" ]
 
   rustenv = []
@@ -11696,7 +11695,7 @@ rust_library("tuf-v0_3_0-beta11") {
   deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
   deps += [ ":itoa-v0_4_3" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":percent-encoding-v2_2_0" ]
   deps += [ ":ring-v0_16_12" ]
   deps += [ ":serde-v1_0_147" ]
@@ -12559,7 +12558,7 @@ rust_library("want-v0_3_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":try-lock-v0_2_2" ]
 
   rustenv = []
@@ -12649,7 +12648,7 @@ rust_library("wasm-bindgen-backend-v0_2_63") {
   deps = []
   deps += [ ":bumpalo-v3_2_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":log-v0_4_11" ]
+  deps += [ ":log-v0_4_20" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
   deps += [ ":syn-v1_0_98" ]
