@@ -76,6 +76,8 @@ class ProcessDebugFixture : public zxtest::Test {
     ASSERT_OK(vmar_.map(kMapOpts, 0u, vmo_, 0u, kVmoSize, &map_addr_));
   }
 
+  void TearDown() override { ASSERT_OK(vmar_.destroy()); }
+
   zx::vmo vmo_;
   zx::vmar vmar_;
   zx_vaddr_t map_addr_ = 0u;
