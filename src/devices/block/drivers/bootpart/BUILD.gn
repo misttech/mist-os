@@ -11,7 +11,7 @@ driver_bind_rules("bootpart_bind") {
   disable_autobind = true
   rules = "bootpart.bind"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
+  deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 fuchsia_driver("bootpart-driver") {

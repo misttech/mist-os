@@ -12,8 +12,8 @@ driver_bind_rules("abr-shim-bind") {
   tests = "abr-shim-bind-test.json"
   deps = [
     "//src/devices/bind/fuchsia.block",
+    "//src/devices/bind/fuchsia.block",
     "//src/devices/bind/fuchsia.block.gpt",
-    "//src/devices/bind/fuchsia.hardware.block",
   ]
 }
 

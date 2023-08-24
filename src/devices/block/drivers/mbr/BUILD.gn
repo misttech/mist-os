@@ -19,7 +19,7 @@ driver_bind_rules("mbr_bind") {
   disable_autobind = true
   rules = "mbr.bind"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
+  deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 fuchsia_driver("mbr-driver") {

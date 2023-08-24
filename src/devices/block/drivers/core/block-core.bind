@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 using fuchsia.block;
-using fuchsia.hardware.block;
+using fuchsia.block;
 
-fuchsia.BIND_PROTOCOL == fuchsia.hardware.block.BIND_PROTOCOL.BLOCK_IMPL;
-fuchsia.block.IgnoreDevice != true;
+fuchsia.BIND_PROTOCOL == fuchsia.block.BIND_PROTOCOL.BLOCK_IMPL;
+fuchsia.block.IGNORE_DEVICE != true;

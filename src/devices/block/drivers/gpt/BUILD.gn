@@ -19,7 +19,7 @@ driver_bind_rules("gpt_bind") {
   rules = "gpt.bind"
   bind_output = "gpt.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
+  deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 fuchsia_driver("gpt-driver") {

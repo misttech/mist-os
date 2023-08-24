@@ -188,7 +188,7 @@ zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) 
   const zx_device_str_prop_t str_props[]{
       {bind_fuchsia_block_gpt::PARTITION_NAME.c_str(), str_prop_str_val(partition_name_)},
       {bind_fuchsia_block_gpt::PARTITION_TYPE_GUID.c_str(), str_prop_str_val(partition_type_guid_)},
-      {bind_fuchsia_block::IGNOREDEVICE.c_str(), str_prop_bool_val(ignore_device)},
+      {bind_fuchsia_block::IGNORE_DEVICE.c_str(), str_prop_bool_val(ignore_device)},
   };
 
   zx_status_t status =

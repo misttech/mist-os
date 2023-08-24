@@ -85,13 +85,13 @@ fuchsia_driver_package("package") {
 driver_bind_rules("bind") {
   rules = "zxcrypt.bind"
   bind_output = "zxcrypt.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
+  deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 bind_test("zxcrypt-bind-test") {
   rules = "zxcrypt.bind"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
+  deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 test("device-manager-test-bin") {

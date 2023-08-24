@@ -9,7 +9,7 @@
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.block.BIND_PROTOCOL.DEVICE"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.block.BIND_PROTOCOL.BLOCK"
         },
         "expected": "abort",
         "name": "WrongProtocol"

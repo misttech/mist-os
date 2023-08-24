@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.block.BIND_PROTOCOL.BLOCK"
         },
         "expected": "match",
         "name": "Vendor"
