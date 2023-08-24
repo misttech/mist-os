@@ -399,6 +399,12 @@
 
                 // Times out.
                 "cve-2017-10661",
+
+                // Timing-dependent tests that flake in QEMU and with ASan.
+                // TODO(b/297390005): Skip only in QEMU and with ASan.
+                "futex_wait_bitset01",
+                "timerfd01",
+                "pipe13"
             ],
         },
     ],
