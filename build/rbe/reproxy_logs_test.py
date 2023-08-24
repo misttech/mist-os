@@ -136,7 +136,7 @@ class LookupOutputFileDigestTests(unittest.TestCase):
         )
         with mock.patch.object(reproxy_logs, 'parse_log',
                                return_value=log) as mock_parse:
-            self.assertEqual(reproxy_logs.lookup_output_file_digest(args), 1)
+            self.assertEqual(reproxy_logs.lookup_output_file_digest_command(args), 1)
 
     def test_output_path_found(self):
         record = log_pb2.LogRecord()
@@ -162,7 +162,7 @@ class LookupOutputFileDigestTests(unittest.TestCase):
                 result = io.StringIO()
                 with contextlib.redirect_stdout(result):
                     self.assertEqual(
-                        reproxy_logs.lookup_output_file_digest(args), 0)
+                        reproxy_logs.lookup_output_file_digest_command(args), 0)
                 self.assertEqual(result.getvalue(), digest + '\n')
 
 

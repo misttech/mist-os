@@ -640,3 +640,33 @@ def subprocess_call(
 
 # end of subprocess_call section
 #####################################################################
+
+
+def subprocess_communicate(
+        cmd: Sequence[str], input_text: str, **kwargs) -> SubprocessResult:
+    """Pipes text through an external program.
+
+    Unlike subprocess_call, this does not come with `tee` capability.
+
+    Args:
+      cmd: command to run (operates as a pipe).
+      input_text: text to feed to command's stdin.
+      kwargs: additional Popen() kwargs.
+
+    Returns:
+      SubprocessResult containing output and exit code.
+    """
+    p = subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        **kwargs)
+    out, err = p.communicate(input=input_text)
+    return SubprocessResult(
+        returncode=p.returncode,
+        stdout=out.splitlines(False),
+        stderr=err.splitlines(False),
+        pid=p.pid,
+    )

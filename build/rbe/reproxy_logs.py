@@ -17,7 +17,7 @@ import sys
 
 from api.log import log_pb2
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Sequence, Tuple
+from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple
 
 import fuchsia
 
@@ -262,22 +262,38 @@ def diff_logs(args: argparse.Namespace) -> int:
     return 0
 
 
-def lookup_output_file_digest(args: argparse.Namespace) -> int:
-    log = parse_log(
-        log_path=args.log,
+def lookup_output_file_digest(log: Path, path: Path) -> Optional[str]:
+    """Lookup the digest of an output file in the reproxy log.
+
+    Args:
+      log: reproxy log location
+      path: path under the build output directory of a remote action output.
+
+    Returns:
+      digest: hash/size of the named output, or None if not found.
+    """
+    reproxy_log = parse_log(
+        log_path=log,
         reclient_bindir=fuchsia.RECLIENT_BINDIR,
         verbose=False,
     )
 
-    path = args.path
     try:
-        action_record = log.records_by_output_file[path]
+        action_record = reproxy_log.records_by_output_file[path]
     except KeyError:
         msg(f"No record with output {path} found.")
-        return 1
+        return None
 
     digest = action_record.remote_metadata.output_file_digests[str(path)]
     # lookup must succeed by construction, else would have failed above
+    return digest
+
+def lookup_output_file_digest_command(args: argparse.Namespace) -> int:
+    digest = lookup_output_file_digest(log=args.log, path=args.path)
+
+    if digest is None:
+        return 1
+
     print(digest)
     return 0
 
@@ -311,7 +327,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         'output_file_digest',
         help='prints the digest of a remote action output file',
     )
-    output_file_digest_parser.set_defaults(func=lookup_output_file_digest)
+    output_file_digest_parser.set_defaults(func=lookup_output_file_digest_command)
     output_file_digest_parser.add_argument(
         "--log",
         type=Path,

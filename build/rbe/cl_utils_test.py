@@ -821,5 +821,30 @@ class SubprocessCallTests(unittest.TestCase):
         self.assertGreater(result.pid, 0)
 
 
+class SubprocessCommunicateTests(unittest.TestCase):
+
+    def test_cat(self):
+        input = "echo\n"
+        result = cl_utils.subprocess_communicate(['cat'], input)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, ["echo"])
+        self.assertEqual(result.stderr, [])
+
+    def test_sed(self):
+        input = "aaabbbccc\n"
+        result = cl_utils.subprocess_communicate(
+            ['sed', '-e', 's|b|B|g'], input)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, ["aaaBBBccc"])
+        self.assertEqual(result.stderr, [])
+
+    def test_failure(self):
+        result = cl_utils.subprocess_communicate(['false'], "ignored_text")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, [])
+        self.assertEqual(result.stderr, [])
+        self.assertGreater(result.pid, 0)
+
+
 if __name__ == '__main__':
     unittest.main()
