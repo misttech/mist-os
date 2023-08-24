@@ -78,7 +78,12 @@ declare_args() {
 assert(dwarf_version >= 2 && dwarf_version <= 5,
        "`dwarf_version=\"...\"` must be between 2 and 5")
 
-default_compress_debuginfo = "none"
+if (is_gcc) {
+  # TODO(fxbug.dev/126220): GCC doesn't yet support zstd.
+  default_compress_debuginfo = "zlib"
+} else {
+  default_compress_debuginfo = "zstd"
+}
 
 declare_args() {
   # Enable compression of debug sections.
