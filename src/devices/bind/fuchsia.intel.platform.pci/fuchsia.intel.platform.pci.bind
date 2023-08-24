@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.intel.pci;
+library fuchsia.intel.platform.pci;
 
 extend uint fuchsia.BIND_PCI_DID {
   WILDCAT_POINT_SERIALIO_DMA = 0x9ce0,

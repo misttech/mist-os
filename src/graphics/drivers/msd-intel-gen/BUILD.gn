@@ -52,13 +52,13 @@ fuchsia_driver_component("msd_intel_test") {
 driver_bind_rules("msd_intel_bind") {
   rules = "msd_intel.bind"
   tests = "tests/bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.intel.gpucore" ]
+  deps = [ "//src/devices/bind/fuchsia.intel.platform.gpucore" ]
 }
 
 driver_bind_rules("msd_intel_test_bind") {
   rules = "msd_intel_test.bind"
   disable_autobind = true
-  deps = [ "//src/devices/bind/fuchsia.intel.gpucore" ]
+  deps = [ "//src/devices/bind/fuchsia.intel.platform.gpucore" ]
 }
 
 source_set("msd_intel_entry") {

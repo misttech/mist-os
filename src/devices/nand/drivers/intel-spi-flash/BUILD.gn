@@ -12,7 +12,7 @@ driver_bind_rules("intel_spi_flash_bind") {
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",
-    "//src/devices/bind/fuchsia.intel.pci",
+    "//src/devices/bind/fuchsia.intel.platform.pci",
     "//src/devices/bind/fuchsia.pci",
   ]
 }

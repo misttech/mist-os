@@ -5,6 +5,6 @@
 import("//build/bind/bind.gni")
 
 # TODO(fxb/131608): Move sdk category to partner.
-bind_library("fuchsia.intel.pci") {
-  source = "fuchsia.intel.pci.bind"
+bind_library("fuchsia.intel.platform.gpucore") {
+  source = "fuchsia.intel.platform.gpucore.bind"
 }

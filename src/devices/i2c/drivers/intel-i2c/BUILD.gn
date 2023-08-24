@@ -9,7 +9,7 @@ driver_bind_rules("intel_i2c_bind") {
   rules = "intel_i2c.bind"
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.intel.pci",
+    "//src/devices/bind/fuchsia.intel.platform.pci",
     "//src/devices/bind/fuchsia.pci",
   ]
 }
@@ -20,7 +20,7 @@ driver_bind_rules("intel_i2c_bind_dfv2") {
   deps = [
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.driver.framework",
-    "//src/devices/bind/fuchsia.intel.pci",
+    "//src/devices/bind/fuchsia.intel.platform.pci",
     "//src/devices/bind/fuchsia.pci",
   ]
 }

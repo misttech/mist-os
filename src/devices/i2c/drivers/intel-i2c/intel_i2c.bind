@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 
 using fuchsia.pci;
-using fuchsia.intel.pci;
+using fuchsia.intel.platform.pci;
 
 fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
 fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.INTEL;
 accept fuchsia.BIND_PCI_DID {
-  fuchsia.intel.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C0,
-  fuchsia.intel.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C1,
-  fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C0,
-  fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C1,
-  fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2,
-  fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C3,
-  fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C4,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C0,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C1,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C0,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C1,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C3,
+  fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C4,
 }
 fuchsia.BIND_COMPOSITE == 1;

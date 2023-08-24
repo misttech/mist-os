@@ -1,7 +1,7 @@
 [
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.intel.gpucore.BIND_PROTOCOL.DEVICE"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.intel.platform.gpucore.BIND_PROTOCOL.DEVICE"
         },
         "expected": "match",
         "name": "Match"

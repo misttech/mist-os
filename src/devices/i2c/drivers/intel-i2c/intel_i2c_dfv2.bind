@@ -6,7 +6,7 @@ composite inteli2c;
 
 using fuchsia.acpi;
 using fuchsia.pci;
-using fuchsia.intel.pci;
+using fuchsia.intel.platform.pci;
 using fuchsia.driver.framework;
 
 primary node "pci" {
@@ -17,7 +17,7 @@ primary node "pci" {
 
     accept fuchsia.BIND_PCI_DID {
         // For now we only add the DID for the touchpad.
-        fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2,
+        fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2,
     }
 }
 

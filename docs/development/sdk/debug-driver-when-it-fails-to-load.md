@@ -220,7 +220,7 @@ primary node "pci" {
     fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.INTEL;
     accept fuchsia.BIND_PCI_DID {
         // For now we only add the DID for the touchpad.
-        fuchsia.intel.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2,
+        fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2,
     }
 }
 
