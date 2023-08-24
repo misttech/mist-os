@@ -40,7 +40,14 @@ use core::fmt::{Debug, Display, Formatter};
 use core::mem::{size_of, take};
 use core::ops::DerefMut;
 use zbi_format::*;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, Ref};
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut};
+
+// This code is also required to run in Android tree. And it contains only `zerocopy-0.6` at the
+// moment. So we have this feature to make sure it works with both versions.
+#[cfg(not(feature = "zerocopy_0_6"))]
+use zerocopy::Ref;
+#[cfg(feature = "zerocopy_0_6")]
+type Ref<B, T> = zerocopy::LayoutVerified<B, T>;
 
 type ZbiResult<T> = Result<T, ZbiError>;
 
@@ -49,6 +56,13 @@ type ZbiResult<T> = Result<T, ZbiError>;
 // ZBI_ALIGNMENT is u32 and it is not productive to `try_into()` to usize all the time.
 // Expectation is that value should always fit in `u32` and `usize`, which we test.
 pub const ZBI_ALIGNMENT_USIZE: usize = ZBI_ALIGNMENT as usize;
+
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelArm64;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelX64;
+#[cfg(target_arch = "riscv")]
+const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelRiscv64;
 
 /// Aligns provided slice to [`ZBI_ALIGNMENT_USIZE`] bytes.
 ///
@@ -71,10 +85,19 @@ pub fn align_buffer<B: ByteSlice>(buffer: B) -> ZbiResult<B> {
 /// The length field specifies the actual payload length and does not include the size of padding.
 /// Since all headers in [`ZbiContainer`] are [`ZBI_ALIGNMENT_USIZE`] aligned payload may be followed by padding,
 /// which is included in [`ZbiContainer`] length, but not in each [`ZbiItem`]
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct ZbiItem<B: ByteSlice> {
+    /// ZBI header
     pub header: Ref<B, ZbiHeader>,
+    /// Payload corresponding to ZBI header
     pub payload: B,
+}
+
+impl<B: ByteSlice, C: ByteSlice> PartialEq<ZbiItem<C>> for ZbiItem<B> {
+    fn eq(&self, other: &ZbiItem<C>) -> bool {
+        self.header.as_bytes() == other.header.as_bytes()
+            && self.payload.as_bytes() == other.payload.as_bytes()
+    }
 }
 
 impl<B: ByteSlice + PartialEq> ZbiItem<B> {
@@ -251,7 +274,7 @@ pub struct ZbiContainer<B: ByteSlice> {
     buffer: B,
 }
 
-impl<B: ByteSlice + PartialEq> ZbiContainer<B> {
+impl<B: ByteSlice> ZbiContainer<B> {
     // Helper to construct [`ZbiContainer`] which handles `paload_length` value, which should be
     // in sync with `header.length`.
     fn construct(header: Ref<B, ZbiHeader>, buffer: B) -> ZbiResult<Self> {
@@ -293,21 +316,16 @@ impl<B: ByteSlice + PartialEq> ZbiContainer<B> {
     ///                                         on target platform.
     /// * Err([`ZbiError::Truncated`]) - if container is empty
     pub fn is_bootable(&self) -> ZbiResult<()> {
-        #[cfg(target_arch = "aarch64")]
-        let boot_type = ZbiType::KernelArm64;
-        #[cfg(target_arch = "x86_64")]
-        let boot_type = ZbiType::KernelX64;
-        #[cfg(target_arch = "riscv")]
-        let boot_type = ZbiType::KernelRiscv64;
-
         let hdr = &self.header;
         if hdr.length == 0 {
             return Err(ZbiError::Truncated);
         }
 
         match self.iter().next() {
-            Some(ZbiItem { header, payload: _ }) if header.type_ == boot_type as u32 => Ok(()),
-            Some(_) => return Err(ZbiError::IncompleteKernel),
+            Some(ZbiItem { header, payload: _ }) if header.type_ == ZBI_ARCH_KERNEL_TYPE as u32 => {
+                Ok(())
+            }
+            Some(_) => Err(ZbiError::IncompleteKernel),
             None => Err(ZbiError::Truncated),
         }
     }
@@ -347,7 +365,7 @@ impl<B: ByteSlice + PartialEq> ZbiContainer<B> {
         // Compiler thinks it is still borrowed when we reach Ok(res), so adding scope for it
         {
             let mut it = res.iter();
-            while let Some(b) = it.next() {
+            for b in &mut it {
                 b.is_valid()?;
             }
 
@@ -378,7 +396,7 @@ impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
         let (item, buffer) =
             ZbiItem::new(buffer, ZbiType::Container, ZBI_CONTAINER_MAGIC, ZbiFlags::default(), 0)?;
 
-        Ok(Self::construct(item.header, buffer)?)
+        Self::construct(item.header, buffer)
     }
 
     fn align_tail(&mut self) -> ZbiResult<()> {
@@ -414,7 +432,7 @@ impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
     /// let next_payload = container.get_next_payload().unwrap();
     /// next_payload[..payload_to_use.len()].copy_from_slice(&payload_to_use[..]);
     ///
-    /// let _ = container
+    /// container
     ///     .create_entry(ZbiType::KernelX64, 0, ZbiFlags::default(), payload_to_use.len())
     ///     .unwrap();
     ///
@@ -519,7 +537,7 @@ impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
     /// let next_payload = container.get_next_payload().unwrap();
     /// next_payload[..payload_to_use.len()].copy_from_slice(&payload_to_use[..]);
     ///
-    /// let _ = container
+    /// container
     ///     .create_entry(ZbiType::KernelX64, 0, ZbiFlags::default(), payload_to_use.len())
     ///     .unwrap();
     ///
@@ -846,6 +864,7 @@ pub enum ZbiType {
     // mBOR
     DrvBoardPrivate = ZBI_TYPE_DRV_BOARD_PRIVATE,
 
+    /// Information about reboot
     // 'HWRB'
     HwRebootReason = ZBI_TYPE_HW_REBOOT_REASON,
 
@@ -912,9 +931,9 @@ impl ZbiType {
     }
 }
 
-impl Into<u32> for ZbiType {
-    fn into(self) -> u32 {
-        self as u32
+impl From<ZbiType> for u32 {
+    fn from(val: ZbiType) -> Self {
+        val as u32
     }
 }
 
@@ -1107,17 +1126,29 @@ pub type ZbiKernel = zbi_kernel_t;
 #[derive(Debug, PartialEq)]
 /// Error values that can be returned by function in this library
 pub enum ZbiError {
+    /// Generic error
     Error,
+    /// Bad type
     BadType,
+    /// Bad magic
     BadMagic,
+    /// Bad version
     BadVersion,
+    /// Bad CRC
     BadCrc,
+    /// Bad Alignment
     BadAlignment,
+    /// Truncaded error
     Truncated,
+    /// Too big
     TooBig,
+    /// Incomplete Kernel
     IncompleteKernel,
+    /// Bad ZBI length for this platform
     PlatformBadLength,
+    /// CRC32 is not supported yet
     Crc32NotSupported,
+    /// Length type overflow
     LengthOverflow,
 }
 
@@ -1169,7 +1200,6 @@ fn is_zbi_aligned(buffer: &impl ByteSlice) -> ZbiResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex;
 
     #[derive(Debug, PartialEq, Default)]
     struct TestZbiBuilder<'a> {
@@ -1557,7 +1587,7 @@ mod tests {
 
         let mut it = zbi_container.iter();
         for (expected_hdr, expected_payload) in expected_items.iter() {
-            let Some(item) = it.next() else {panic!("expecting iterator with value")};
+            let Some(item) = it.next() else { panic!("expecting iterator with value") };
             assert_eq!(item.header.into_ref(), expected_hdr);
             assert_eq!(&item.payload[..], *expected_payload);
         }
@@ -1674,7 +1704,7 @@ mod tests {
 
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
         for (e, payload) in &new_entries {
-            container.get_next_payload().unwrap()[..payload.len()].copy_from_slice(&payload);
+            container.get_next_payload().unwrap()[..payload.len()].copy_from_slice(payload);
             container
                 .create_entry(e.type_.try_into().unwrap(), e.extra, e.get_flags(), payload.len())
                 .unwrap();
@@ -1708,7 +1738,7 @@ mod tests {
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
 
         for _ in 1..(ALIGNED_8_SIZE / ZBI_HEADER_SIZE) {
-            let _ = container
+            container
                 .create_entry(
                     new_entry.type_.try_into().unwrap(),
                     new_entry.extra,
@@ -1832,7 +1862,7 @@ mod tests {
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
 
         for _ in 1..(ALIGNED_8_SIZE / ZBI_HEADER_SIZE) {
-            let _ = container
+            container
                 .create_entry(
                     new_entry.type_.try_into().unwrap(),
                     new_entry.extra,
@@ -1864,7 +1894,7 @@ mod tests {
             .align()
             .update_container_length()
             .build();
-        let container_0 = ZbiContainer::parse(&buffer[..]).unwrap();
+        let container_0 = ZbiContainer::parse(buffer).unwrap();
         let mut buffer = ZbiAligned::default();
         let buffer = TestZbiBuilder::new(&mut buffer.0[..])
             .container_hdr(0)
@@ -1873,7 +1903,7 @@ mod tests {
             .align()
             .update_container_length()
             .build();
-        let container_1 = ZbiContainer::parse(&buffer[..]).unwrap();
+        let container_1 = ZbiContainer::parse(buffer).unwrap();
 
         let mut buffer = ZbiAligned::default();
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
@@ -1885,8 +1915,8 @@ mod tests {
         assert_eq!(container_0.iter().count(), 1);
         assert_eq!(container_1.iter().count(), 1);
         let mut it = container_check.iter();
-        assert_eq!(it.next(), container_0.iter().next());
-        assert_eq!(it.next(), container_1.iter().next());
+        assert_eq!(it.next().unwrap(), container_0.iter().next().unwrap());
+        assert_eq!(it.next().unwrap(), container_1.iter().next().unwrap());
         assert!(it.next().is_none());
     }
 
@@ -1927,7 +1957,7 @@ mod tests {
             .align()
             .update_container_length()
             .build();
-        let container = ZbiContainer::parse(&buffer[..]).unwrap();
+        let container = ZbiContainer::parse(buffer).unwrap();
 
         assert_eq!(container_full.extend(&container), Err(ZbiError::TooBig));
     }
@@ -1951,7 +1981,7 @@ mod tests {
             .align()
             .update_container_length()
             .build();
-        let container = ZbiContainer::parse(&buffer[..]).unwrap();
+        let container = ZbiContainer::parse(buffer).unwrap();
 
         assert_eq!(container_small.extend(&container), Err(ZbiError::TooBig));
     }
@@ -1976,7 +2006,7 @@ mod tests {
             .align()
             .update_container_length()
             .build();
-        let container = ZbiContainer::parse(&buffer[..]).unwrap();
+        let container = ZbiContainer::parse(buffer).unwrap();
 
         assert!(container_full.extend(&container).is_ok());
     }
@@ -2042,7 +2072,7 @@ mod tests {
         for (e, payload) in &new_entries {
             let next_payload: &mut [u8] = container.get_next_payload().unwrap();
             next_payload[..payload.len()].copy_from_slice(payload);
-            let _entry = container
+            container
                 .create_entry(e.type_.try_into().unwrap(), e.extra, e.get_flags(), payload.len())
                 .unwrap();
         }
@@ -2155,7 +2185,7 @@ mod tests {
 
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
         let (e, payload) = new_entry;
-        let _entry = container
+        container
             .create_entry_with_payload(e.type_.try_into().unwrap(), e.extra, e.get_flags(), payload)
             .unwrap();
 
@@ -2174,7 +2204,7 @@ mod tests {
 
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
         let (e, payload) = new_entry;
-        let _entry = container
+        container
             .create_entry_with_payload(e.type_.try_into().unwrap(), e.extra, e.get_flags(), payload)
             .unwrap();
 
@@ -2203,7 +2233,7 @@ mod tests {
         let new_entry = get_test_entry_nonempty_payload();
 
         let (e, payload) = new_entry;
-        let _entry = container
+        container
             .create_entry_with_payload(e.type_.try_into().unwrap(), e.extra, e.get_flags(), payload)
             .unwrap();
 
@@ -2240,9 +2270,7 @@ mod tests {
 
         assert_eq!(container.iter().count(), 4);
         assert!(container.iter().zip(get_test_entries_creference().iter()).all(
-            |(it, (entry, payload))| {
-                *it.header == *entry && byteslice_cmp(it.payload, *payload)
-            }
+            |(it, (entry, payload))| { *it.header == *entry && byteslice_cmp(it.payload, payload) }
         ));
     }
 
@@ -2359,15 +2387,10 @@ mod tests {
     fn zbi_test_is_bootable() {
         let mut buffer = ZbiAligned::default();
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
-        #[cfg(target_arch = "aarch64")]
-        let boot_type = ZbiType::KernelArm64;
-        #[cfg(target_arch = "x86_64")]
-        let boot_type = ZbiType::KernelX64;
-        #[cfg(target_arch = "riscv")]
-        let boot_type = ZbiType::KernelRiscv64;
 
-        let _entry =
-            container.create_entry_with_payload(boot_type, 0, ZbiFlags::default(), &[]).unwrap();
+        container
+            .create_entry_with_payload(ZBI_ARCH_KERNEL_TYPE, 0, ZbiFlags::default(), &[])
+            .unwrap();
 
         assert!(container.is_bootable().is_ok());
     }
@@ -2407,18 +2430,13 @@ mod tests {
     fn zbi_test_is_bootable_not_first_item_fail() {
         let mut buffer = ZbiAligned::default();
         let mut container = ZbiContainer::new(&mut buffer.0[..]).unwrap();
-        #[cfg(target_arch = "aarch64")]
-        let boot_type = ZbiType::KernelArm64;
-        #[cfg(target_arch = "x86_64")]
-        let boot_type = ZbiType::KernelX64;
-        #[cfg(target_arch = "riscv")]
-        let boot_type = ZbiType::KernelRiscv64;
 
-        let _entry = container
+        container
             .create_entry_with_payload(ZbiType::DebugData, 0, ZbiFlags::default(), &[])
             .unwrap();
-        let _entry =
-            container.create_entry_with_payload(boot_type, 0, ZbiFlags::default(), &[]).unwrap();
+        container
+            .create_entry_with_payload(ZBI_ARCH_KERNEL_TYPE, 0, ZbiFlags::default(), &[])
+            .unwrap();
 
         assert_eq!(container.is_bootable(), Err(ZbiError::IncompleteKernel));
     }

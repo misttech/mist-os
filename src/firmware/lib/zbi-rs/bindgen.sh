@@ -28,8 +28,12 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Allow non-conventional naming for imports from C/C++.
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(clippy::undocumented_unsafe_blocks)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes};
+
+#[cfg(not(feature = \"zerocopy_0_6\"))]
+use zerocopy::FromZeroes;
 
 // Configure linkage for MacOS.
 #[cfg(target_os = \"macos\")]
@@ -48,7 +52,7 @@ readonly INPUT=( \
 # #[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, FromZeroes)]
 
 tmp="$(mktemp --suffix=.h)"
-trap "rm ${tmp}" EXIT 
+trap "rm ${tmp}" EXIT
 for f in ${INPUT[@]}; do
   # TODO(https://github.com/rust-lang/rust-bindgen/issues/316): Remove this sed
   # invocation when bindgen supports macros containing type casts.
