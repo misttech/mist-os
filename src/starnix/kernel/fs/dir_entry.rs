@@ -27,6 +27,13 @@ bitflags! {
 
         // Create a "whiteout" object to replace the file.
         const WHITEOUT = RENAME_WHITEOUT;
+
+        // Allow replacing any file with a directory. This is an internal flag used only
+        // internally inside Starnix for OverlayFS.
+        const REPLACE_ANY = 0x80000000;
+
+        // Internal flags that cannot be passed to `sys_rename()`
+        const INTERNAL = Self::REPLACE_ANY.bits;
     }
 }
 
@@ -497,15 +504,14 @@ impl DirEntry {
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
-    ) -> Result<(), Errno> {
+    ) -> Result<DirEntryHandle, Errno> {
         if child.is_dir() {
             return error!(EPERM);
         }
         self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             self.node.link(current_task, name, child)?;
             Ok(child.clone())
-        })?;
-        Ok(())
+        })
     }
 
     pub fn unlink(
@@ -723,8 +729,14 @@ impl DirEntry {
                         if replaced.state.read().mount_count > 0 {
                             return error!(EBUSY);
                         }
-                    } else if renamed.node.is_dir() && !flags.contains(RenameFlags::EXCHANGE) {
-                        return error!(ENOTDIR);
+                    }
+
+                    if !flags.intersects(RenameFlags::EXCHANGE | RenameFlags::REPLACE_ANY) {
+                        if renamed.node.is_dir() && !replaced.node.is_dir() {
+                            return error!(ENOTDIR);
+                        } else if !renamed.node.is_dir() && replaced.node.is_dir() {
+                            return error!(EISDIR);
+                        }
                     }
                 }
                 // It's fine for the lookup to fail to find a child.

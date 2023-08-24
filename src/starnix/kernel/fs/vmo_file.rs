@@ -113,6 +113,7 @@ impl FsNodeOps for VmoFileNode {
     fn allocate(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
         length: u64,

@@ -801,6 +801,9 @@ pub fn sys_renameat2(
     flags: u32,
 ) -> Result<(), Errno> {
     let flags = RenameFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
+    if flags.intersects(RenameFlags::INTERNAL) {
+        return error!(EINVAL);
+    };
 
     // RENAME_EXCHANGE cannot be combined with the other flags.
     if flags.contains(RenameFlags::EXCHANGE)
@@ -2172,7 +2175,7 @@ pub fn sys_fallocate(
     }
 
     let mode = FallocMode::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
-    file.fallocate(mode, offset as u64, len as u64)?;
+    file.fallocate(current_task, mode, offset as u64, len as u64)?;
 
     Ok(())
 }

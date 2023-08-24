@@ -4,7 +4,11 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <sys/mount.h>
+#include <unistd.h>
+
+#include <fstream>
 
 #include <gtest/gtest.h>
 
@@ -13,7 +17,116 @@
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/test_helper.h"
 
+using testing::ElementsAre;
+using testing::IsEmpty;
+
 namespace {
+
+struct DirEntry {
+  std::string name;
+  uint8_t type;
+  ino_t inode_num;
+  off_t offset;
+
+  static DirEntry Dir(const std::string& name) {
+    return DirEntry{
+        .name = name,
+        .type = DT_DIR,
+    };
+  }
+
+  static DirEntry CharDev(const std::string& name) {
+    return DirEntry{
+        .name = name,
+        .type = DT_CHR,
+    };
+  }
+
+  static DirEntry File(const std::string& name) {
+    return DirEntry{
+        .name = name,
+        .type = DT_REG,
+    };
+  }
+
+  bool operator<(const DirEntry& rhs) const { return name < rhs.name; }
+  bool operator==(const DirEntry& rhs) const { return name == rhs.name && type == rhs.type; }
+};
+
+std::ostream& operator<<(std::ostream& stream, DirEntry const& value) {
+  return stream << "DirEntry(\"" << value.name << "\", type=" << static_cast<int>(value.type)
+                << ")";
+}
+
+std::vector<DirEntry> ReadDir(const std::string& path) {
+  std::vector<DirEntry> result;
+
+  DIR* dir = opendir(path.c_str());
+  if (!dir) {
+    ADD_FAILURE() << "opendir() failed for " << path << " errno=" << errno;
+    return result;
+  }
+  struct dirent* de;
+  errno = 0;
+
+  bool found_dot = false;
+  bool found_dot_dot = false;
+
+  while ((de = readdir(dir)) != nullptr) {
+    if (std::string(de->d_name) == ".") {
+      EXPECT_FALSE(found_dot);
+      EXPECT_EQ(de->d_type, DT_DIR);
+      found_dot = true;
+    } else if (std::string(de->d_name) == "..") {
+      EXPECT_FALSE(found_dot_dot);
+      EXPECT_EQ(de->d_type, DT_DIR);
+      found_dot_dot = true;
+    } else {
+      result.push_back(DirEntry{
+          .name = de->d_name,
+          .type = de->d_type,
+          .inode_num = de->d_ino,
+          .offset = de->d_off,
+      });
+    }
+  }
+  closedir(dir);
+
+  if (errno != 0) {
+    ADD_FAILURE() << "readdir() failed with errno=" << errno;
+    return result;
+  }
+
+  EXPECT_TRUE(found_dot);
+  EXPECT_TRUE(found_dot_dot);
+
+  std::sort(result.begin(), result.end());
+
+  return result;
+}
+
+std::string ReadFileContent(const std::string& path) {
+  std::string content;
+  EXPECT_TRUE(files::ReadFileToString(path.c_str(), &content));
+  return content;
+}
+
+bool IsWhiteout(const std::string& path) {
+  struct stat s;
+  return stat(path.c_str(), &s) == 0 && (s.st_mode & S_IFMT) == S_IFCHR && s.st_rdev == 0;
+}
+
+std::string Readlink(const std::string& path) {
+  std::string result;
+  result.resize(256);
+  ssize_t r = readlink(path.c_str(), result.data(), static_cast<int>(result.size()));
+  if (r < 0) {
+    ADD_FAILURE() << "readlink(" << path << ") failed with errno=" << errno;
+    return "";
+  }
+  result.resize(r);
+  return result;
+}
 
 class OverlayFsTest : public ::testing::Test {
  protected:
@@ -50,10 +163,8 @@ class OverlayFsTest : public ::testing::Test {
     ASSERT_THAT(mount(nullptr, overlay_.c_str(), "overlay", 0, options.c_str()), SyscallSucceeds());
   }
 
-  void CheckFileContent(const std::string& file, const std::string& expected) {
-    std::string content;
-    ASSERT_TRUE(files::ReadFileToString((overlay_ + file).c_str(), &content));
-    ASSERT_EQ(content, expected);
+  std::string ReadOverlayFileContent(const std::string& file) {
+    return ReadFileContent(overlay_ + file);
   }
 
   test_helper::ScopedTempDir temp_dir_;
@@ -64,40 +175,6 @@ class OverlayFsTest : public ::testing::Test {
   std::string overlay_;
 };
 
-struct DirEntry {
-  std::string name;
-  uint8_t type;
-  ino_t inode_num;
-  off_t offset;
-
-  bool operator<(const DirEntry& rhs) const { return name < rhs.name; }
-};
-
-void ReadDir(const std::string& path, std::vector<DirEntry>* out) {
-  out->clear();
-  DIR* dir = opendir(path.c_str());
-  if (!dir) {
-    FAIL() << "opendir() failed for " << path << " errno=" << errno;
-  }
-  struct dirent* de;
-  errno = 0;
-  while ((de = readdir(dir)) != nullptr) {
-    out->push_back(DirEntry{
-        .name = de->d_name,
-        .type = de->d_type,
-        .inode_num = de->d_ino,
-        .offset = de->d_off,
-    });
-  }
-  closedir(dir);
-
-  if (errno != 0) {
-    FAIL() << "readdir() failed with errno=" << errno;
-  }
-
-  std::sort(out->begin(), out->end());
-}
-
 TEST_F(OverlayFsTest, ListRoot) {
   ASSERT_TRUE(files::WriteFile(lower_ + "/a", "lower/a"));
   ASSERT_TRUE(files::WriteFile(lower_ + "/c", "lower/c"));
@@ -106,32 +183,16 @@ TEST_F(OverlayFsTest, ListRoot) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  std::vector<DirEntry> list;
-  ASSERT_NO_FATAL_FAILURE(ReadDir(overlay_, &list));
+  std::vector<DirEntry> list = ReadDir(overlay_);
+  EXPECT_THAT(list, ElementsAre(DirEntry::File("a"), DirEntry::File("b"), DirEntry::File("c")));
 
-  EXPECT_EQ(list.size(), 5u);
-
-  EXPECT_EQ(list[0].name, ".");
-  EXPECT_EQ(list[0].type, DT_DIR);
-  EXPECT_EQ(list[1].name, "..");
-  EXPECT_EQ(list[1].type, DT_DIR);
-
-  EXPECT_EQ(list[2].name, "a");
-  EXPECT_EQ(list[2].type, DT_REG);
-  EXPECT_EQ(list[3].name, "b");
-  EXPECT_EQ(list[3].type, DT_REG);
-  EXPECT_EQ(list[4].name, "c");
-  EXPECT_EQ(list[4].type, DT_REG);
-
-  std::vector<DirEntry> lower_list;
-  ASSERT_NO_FATAL_FAILURE(ReadDir(lower_, &lower_list));
-  std::vector<DirEntry> upper_list;
-  ASSERT_NO_FATAL_FAILURE(ReadDir(upper_, &upper_list));
+  std::vector<DirEntry> lower_list = ReadDir(lower_);
+  std::vector<DirEntry> upper_list = ReadDir(upper_);
 
   // Inode number copied from the source file systems.
-  EXPECT_EQ(list[2].inode_num, lower_list[2].inode_num);
-  EXPECT_EQ(list[3].inode_num, upper_list[2].inode_num);
-  EXPECT_EQ(list[4].inode_num, upper_list[3].inode_num);
+  EXPECT_EQ(list[0].inode_num, lower_list[0].inode_num);
+  EXPECT_EQ(list[1].inode_num, upper_list[0].inode_num);
+  EXPECT_EQ(list[2].inode_num, upper_list[1].inode_num);
 }
 
 TEST_F(OverlayFsTest, ListSubdir) {
@@ -143,19 +204,7 @@ TEST_F(OverlayFsTest, ListSubdir) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  std::vector<DirEntry> list;
-  ASSERT_NO_FATAL_FAILURE(ReadDir(overlay_ + "/sub", &list));
-  EXPECT_EQ(list.size(), 4u);
-
-  EXPECT_EQ(list[0].name, ".");
-  EXPECT_EQ(list[0].type, DT_DIR);
-  EXPECT_EQ(list[1].name, "..");
-  EXPECT_EQ(list[1].type, DT_DIR);
-
-  EXPECT_EQ(list[2].name, "a");
-  EXPECT_EQ(list[2].type, DT_REG);
-  EXPECT_EQ(list[3].name, "b");
-  EXPECT_EQ(list[3].type, DT_REG);
+  EXPECT_EQ(ReadDir(overlay_ + "/sub"), (std::vector{DirEntry::File("a"), DirEntry::File("b")}));
 }
 
 TEST_F(OverlayFsTest, DirAndFile) {
@@ -166,19 +215,10 @@ TEST_F(OverlayFsTest, DirAndFile) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  std::vector<DirEntry> list;
+  EXPECT_EQ(ReadDir(overlay_), (std::vector{DirEntry::Dir("sub")}));
+  EXPECT_EQ(ReadDir(overlay_ + "/sub"), (std::vector{DirEntry::File("b")}));
 
-  ASSERT_NO_FATAL_FAILURE(ReadDir(overlay_, &list));
-  EXPECT_EQ(list.size(), 3u);
-  EXPECT_EQ(list[2].name, "sub");
-  EXPECT_EQ(list[2].type, DT_DIR);
-
-  ASSERT_NO_FATAL_FAILURE(ReadDir(overlay_ + "/sub", &list));
-  EXPECT_EQ(list.size(), 3u);
-  EXPECT_EQ(list[2].name, "b");
-  EXPECT_EQ(list[2].type, DT_REG);
-
-  CheckFileContent("/sub/b", "b");
+  EXPECT_EQ(ReadOverlayFileContent("/sub/b"), "b");
 }
 
 TEST_F(OverlayFsTest, ReadFileLower) {
@@ -186,7 +226,7 @@ TEST_F(OverlayFsTest, ReadFileLower) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  CheckFileContent("/a", "1");
+  EXPECT_EQ(ReadOverlayFileContent("/a"), "1");
 }
 
 TEST_F(OverlayFsTest, ReadFileUpper) {
@@ -194,7 +234,7 @@ TEST_F(OverlayFsTest, ReadFileUpper) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  CheckFileContent("/a", "2");
+  EXPECT_EQ(ReadOverlayFileContent("/a"), "2");
 }
 
 TEST_F(OverlayFsTest, ReadFileBoth) {
@@ -203,7 +243,7 @@ TEST_F(OverlayFsTest, ReadFileBoth) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  CheckFileContent("/a", "2");
+  EXPECT_EQ(ReadOverlayFileContent("/a"), "2");
 }
 
 TEST_F(OverlayFsTest, UnmountBase) {
@@ -220,8 +260,8 @@ TEST_F(OverlayFsTest, UnmountBase) {
   ASSERT_THAT(umount(lower_.c_str()), SyscallSucceeds());
   ASSERT_THAT(umount(upper_base_.c_str()), SyscallSucceeds());
 
-  CheckFileContent("/a", "1");
-  CheckFileContent("/b", "2");
+  EXPECT_EQ(ReadOverlayFileContent("/a"), "1");
+  EXPECT_EQ(ReadOverlayFileContent("/b"), "2");
 }
 
 TEST_F(OverlayFsTest, MountSubdir) {
@@ -238,15 +278,10 @@ TEST_F(OverlayFsTest, MountSubdir) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  CheckFileContent("/sub/a", "1");
-  CheckFileContent("/sub/b", "2");
+  EXPECT_EQ(ReadOverlayFileContent("/sub/a"), "1");
+  EXPECT_EQ(ReadOverlayFileContent("/sub/b"), "2");
 
-  std::vector<DirEntry> list;
-  ASSERT_NO_FATAL_FAILURE(ReadDir(overlay_ + "/sub", &list));
-  EXPECT_EQ(list.size(), 4u);
-
-  EXPECT_EQ(list[2].name, "a");
-  EXPECT_EQ(list[3].name, "b");
+  EXPECT_EQ(ReadDir(overlay_ + "/sub"), (std::vector{DirEntry::File("a"), DirEntry::File("b")}));
 }
 
 TEST_F(OverlayFsTest, RemovedFiles) {
@@ -259,20 +294,347 @@ TEST_F(OverlayFsTest, RemovedFiles) {
 
   ASSERT_NO_FATAL_FAILURE(Mount());
 
-  std::vector<DirEntry> list;
-  ASSERT_NO_FATAL_FAILURE(ReadDir(overlay_, &list));
+  EXPECT_EQ(ReadDir(overlay_), (std::vector{DirEntry::CharDev("b"), DirEntry::CharDev("d")}));
+}
 
-  EXPECT_EQ(list.size(), 4u);
+TEST_F(OverlayFsTest, UnlinkLower) {
+  ASSERT_THAT(mkdir((lower_ + "/s").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/s/a", "a"));
 
-  EXPECT_EQ(list[0].name, ".");
-  EXPECT_EQ(list[0].type, DT_DIR);
-  EXPECT_EQ(list[1].name, "..");
-  EXPECT_EQ(list[1].type, DT_DIR);
+  ASSERT_NO_FATAL_FAILURE(Mount());
 
-  EXPECT_EQ(list[2].name, "b");
-  EXPECT_EQ(list[2].type, DT_CHR);
-  EXPECT_EQ(list[3].name, "d");
-  EXPECT_EQ(list[3].type, DT_CHR);
+  // Remove the file.
+  ASSERT_THAT(unlink((overlay_ + "/s/a").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_ + "/s"), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s/a").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  // Whiteout should be created in the upper dir.
+  EXPECT_TRUE(IsWhiteout(upper_ + "/s/a"));
+
+  // Remove the directory.
+  ASSERT_THAT(rmdir((overlay_ + "/s").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  // Whiteout should be created in the upper dir.
+  EXPECT_TRUE(IsWhiteout(upper_ + "/s"));
+
+  // Lower file should not be touched.
+  EXPECT_EQ(ReadFileContent(lower_ + "/s/a"), "a");
+}
+
+TEST_F(OverlayFsTest, UnlinkNonEmptyDir) {
+  ASSERT_THAT(mkdir((upper_ + "/d").c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(mkdir((lower_ + "/d").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  // Try removing non-empty dir. This is expected to fail.
+  ASSERT_THAT(rmdir((overlay_ + "/d").c_str()), SyscallFailsWithErrno(ENOTEMPTY));
+
+  // Directory should still exist.
+  EXPECT_EQ(ReadDir(overlay_), (std::vector{DirEntry::Dir("d")}));
+  EXPECT_EQ(ReadDir(overlay_ + "/d"), (std::vector{DirEntry::File("a")}));
+
+  // No changes to the lower and upper FS.
+  EXPECT_THAT(ReadDir(upper_ + "/d"), IsEmpty());
+  EXPECT_EQ(ReadDir(lower_ + "/d"), (std::vector{DirEntry::File("a")}));
+}
+
+TEST_F(OverlayFsTest, UnlinkUpper) {
+  ASSERT_THAT(mkdir((upper_ + "/s").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(upper_ + "/s/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_THAT(unlink((overlay_ + "/s/a").c_str()), SyscallSucceeds());
+
+  EXPECT_THAT(ReadDir(overlay_ + "/s"), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s/a").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  EXPECT_THAT(ReadDir(lower_), IsEmpty());
+  EXPECT_THAT(ReadDir(upper_ + "/s"), IsEmpty());
+
+  // Remove the directory.
+  ASSERT_THAT(rmdir((overlay_ + "/s").c_str()), SyscallSucceeds());
+  EXPECT_THAT(open((overlay_ + "/s").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  EXPECT_THAT(ReadDir(overlay_), IsEmpty());
+  EXPECT_THAT(ReadDir(lower_), IsEmpty());
+  EXPECT_THAT(ReadDir(upper_), IsEmpty());
+}
+
+TEST_F(OverlayFsTest, UnlinkBoth) {
+  ASSERT_THAT(mkdir((lower_ + "/s").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/s/a", "a"));
+  ASSERT_THAT(mkdir((upper_ + "/s").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(upper_ + "/s/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  // Remove the file.
+  ASSERT_THAT(unlink((overlay_ + "/s/a").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_ + "/s"), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s/a").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  // Whiteout should be created in the upper dir.
+  EXPECT_TRUE(IsWhiteout(upper_ + "/s/a"));
+
+  // Remove the directory.
+  ASSERT_THAT(rmdir((overlay_ + "/s").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  // Whiteout should be created in the upper dir.
+  EXPECT_TRUE(IsWhiteout(upper_ + "/s"));
+
+  // Lower file should not be touched.
+  EXPECT_EQ(ReadFileContent(lower_ + "/s/a"), "a");
+}
+
+TEST_F(OverlayFsTest, RecreateDir) {
+  ASSERT_THAT(mkdir((lower_ + "/s").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/s/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  // Remove the file.
+  ASSERT_THAT(unlink((overlay_ + "/s/a").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_ + "/s"), IsEmpty());
+
+  // Whiteout should be created in the upper dir.
+  EXPECT_TRUE(IsWhiteout(upper_ + "/s/a"));
+
+  // Remove the directory.
+  ASSERT_THAT(rmdir((overlay_ + "/s").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_), IsEmpty());
+
+  // Whiteout should be created in the upper dir.
+  EXPECT_TRUE(IsWhiteout(upper_ + "/s"));
+
+  // Create the dir again.
+  ASSERT_THAT(mkdir((overlay_ + "/s").c_str(), 0700), SyscallSucceeds());
+
+  // The new dir should be empty.
+  EXPECT_THAT(ReadDir(overlay_ + "/s"), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s/a").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  // Lower file should not be touched.
+  EXPECT_EQ(ReadFileContent(lower_ + "/s/a"), "a");
+}
+
+TEST_F(OverlayFsTest, RecreateFile) {
+  ASSERT_THAT(mkdir((lower_ + "/s").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/s/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  // Remove the file.
+  ASSERT_THAT(unlink((overlay_ + "/s/a").c_str()), SyscallSucceeds());
+  EXPECT_THAT(ReadDir(overlay_ + "/s"), IsEmpty());
+  EXPECT_THAT(open((overlay_ + "/s/a").c_str(), O_RDONLY), SyscallFailsWithErrno(ENOENT));
+
+  // Try creating the file again
+  ASSERT_TRUE(files::WriteFile(overlay_ + "/s/a", "b"));
+  EXPECT_EQ(ReadFileContent(overlay_ + "/s/a"), "b");
+
+  // It should be written to the upper dir.
+  EXPECT_EQ(ReadFileContent(upper_ + "/s/a"), "b");
+
+  // Lower file should not be touched.
+  EXPECT_EQ(ReadFileContent(lower_ + "/s/a"), "a");
+}
+
+TEST_F(OverlayFsTest, CreateDir) {
+  ASSERT_THAT(mkdir((lower_ + "/d1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(mkdir((lower_ + "/d2").c_str(), 0700), SyscallSucceeds());
+
+  ASSERT_THAT(mkdir((upper_ + "/d1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(mkdir((upper_ + "/d3").c_str(), 0700), SyscallSucceeds());
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  // Make new dirs.
+  ASSERT_THAT(mkdir((overlay_ + "/d1/1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(mkdir((overlay_ + "/d2/2").c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(mkdir((overlay_ + "/d3/3").c_str(), 0700), SyscallSucceeds());
+
+  // Verify that the dirs were created.
+  EXPECT_EQ(ReadDir(overlay_ + "/d1"), (std::vector{DirEntry::Dir("1")}));
+  EXPECT_EQ(ReadDir(overlay_ + "/d2"), (std::vector{DirEntry::Dir("2")}));
+  EXPECT_EQ(ReadDir(overlay_ + "/d3"), (std::vector{DirEntry::Dir("3")}));
+
+  // New dirs are empty.
+  EXPECT_THAT(ReadDir(overlay_ + "/d1/1"), IsEmpty());
+  EXPECT_THAT(ReadDir(overlay_ + "/d2/2"), IsEmpty());
+  EXPECT_THAT(ReadDir(overlay_ + "/d3/3"), IsEmpty());
+
+  // Lower FS should not change.
+  EXPECT_EQ(ReadDir(lower_), (std::vector{DirEntry::Dir("d1"), DirEntry::Dir("d2")}));
+  EXPECT_THAT(ReadDir(lower_ + "/d1"), IsEmpty());
+  EXPECT_THAT(ReadDir(lower_ + "/d2"), IsEmpty());
+
+  // New parent dir created in the upper FS.
+  EXPECT_EQ(ReadDir(upper_),
+            (std::vector{DirEntry::Dir("d1"), DirEntry::Dir("d2"), DirEntry::Dir("d3")}));
+}
+
+TEST_F(OverlayFsTest, CreateFile) {
+  ASSERT_THAT(mkdir((lower_ + "/d").c_str(), 0700), SyscallSucceeds());
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_TRUE(files::WriteFile(overlay_ + "/d/a", "foo"));
+  EXPECT_EQ(ReadFileContent(overlay_ + "/d/a"), "foo");
+
+  // New file should be created in the upper dir.
+  EXPECT_EQ(ReadDir(upper_), (std::vector{DirEntry::Dir("d")}));
+  EXPECT_EQ(ReadFileContent(upper_ + "/d/a"), "foo");
+
+  // Lower FS should not change.
+  EXPECT_THAT(ReadDir(lower_ + "/d"), IsEmpty());
+}
+
+TEST_F(OverlayFsTest, CreateSymlink) {
+  ASSERT_THAT(mkdir((lower_ + "/d").c_str(), 0700), SyscallSucceeds());
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_THAT(symlink("symlink_target", (overlay_ + "/d/a").c_str()), SyscallSucceeds());
+  EXPECT_EQ(Readlink(overlay_ + "/d/a"), "symlink_target");
+
+  // New file should be created in the upper dir.
+  EXPECT_EQ(ReadDir(upper_), (std::vector{DirEntry::Dir("d")}));
+  EXPECT_EQ(Readlink(upper_ + "/d/a"), "symlink_target");
+
+  // Lower FS should not change.
+  EXPECT_THAT(ReadDir(lower_ + "/d"), IsEmpty());
+}
+
+TEST_F(OverlayFsTest, RewriteFile) {
+  ASSERT_THAT(mkdir((lower_ + "/d").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_TRUE(files::WriteFile(overlay_ + "/d/a", "foo"));
+  EXPECT_EQ(ReadFileContent(overlay_ + "/d/a"), "foo");
+
+  // New file should be created in the upper dir.
+  EXPECT_EQ(ReadDir(upper_), (std::vector{DirEntry::Dir("d")}));
+  EXPECT_EQ(ReadFileContent(upper_ + "/d/a"), "foo");
+
+  // Lower FS should not change.
+  EXPECT_EQ(ReadFileContent(lower_ + "/d/a"), "a");
+}
+
+TEST_F(OverlayFsTest, AppendFile) {
+  ASSERT_THAT(mkdir((lower_ + "/d").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d/a", "a-"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  {
+    std::ofstream stream;
+    stream.open(overlay_ + "/d/a", std::ios_base::app);
+    stream << "foo";
+    ASSERT_FALSE(stream.fail());
+  }
+
+  EXPECT_EQ(ReadFileContent(overlay_ + "/d/a"), "a-foo");
+
+  // New file should be created in the upper dir.
+  EXPECT_EQ(ReadDir(upper_), (std::vector{DirEntry::Dir("d")}));
+  EXPECT_EQ(ReadFileContent(upper_ + "/d/a"), "a-foo");
+
+  // Lower FS should not change.
+  EXPECT_EQ(ReadFileContent(lower_ + "/d/a"), "a-");
+}
+
+TEST_F(OverlayFsTest, Link) {
+  ASSERT_THAT(mkdir((lower_ + "/d").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_THAT(link((overlay_ + "/d/a").c_str(), (overlay_ + "/d/b").c_str()), SyscallSucceeds());
+
+  // New file should be created in the upper dir.
+  auto list = ReadDir(upper_ + "/d");
+  EXPECT_EQ(list, (std::vector{DirEntry::File("a"), DirEntry::File("b")}));
+  EXPECT_EQ(list[0].inode_num, list[1].inode_num);
+
+  // Write new content. Both files should be updated.
+  ASSERT_TRUE(files::WriteFile(overlay_ + "/d/a", "new"));
+  EXPECT_EQ(ReadFileContent(upper_ + "/d/a"), "new");
+  EXPECT_EQ(ReadFileContent(upper_ + "/d/b"), "new");
+
+  // Lower FS should not change.
+  EXPECT_EQ(ReadDir(lower_ + "/d"), (std::vector{DirEntry::File("a")}));
+  EXPECT_EQ(ReadFileContent(lower_ + "/d/a"), "a");
+}
+
+TEST_F(OverlayFsTest, UpdateAfterOpen) {
+  ASSERT_TRUE(files::WriteFile(lower_ + "/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  std::ifstream file(overlay_ + "/a", std::ios::in);
+
+  ASSERT_TRUE(files::WriteFile(overlay_ + "/a", "updated"));
+
+  // Start reading from `file`. We should get new content, written after the file was open.
+  std::string data;
+  file >> data;
+  EXPECT_EQ(data, "updated");
+}
+
+TEST_F(OverlayFsTest, RenameFile) {
+  ASSERT_THAT(mkdir((lower_ + "/d1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d1/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_THAT(mkdir((overlay_ + "/d2").c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(rename((overlay_ + "/d1/a").c_str(), (overlay_ + "/d2/b").c_str()),
+              SyscallSucceeds());
+
+  EXPECT_EQ(ReadDir(overlay_), (std::vector{DirEntry::Dir("d1"), DirEntry::Dir("d2")}));
+  EXPECT_EQ(ReadFileContent(overlay_ + "/d2/b"), "a");
+
+  // New file should be created in the upper FS.
+  EXPECT_EQ(ReadFileContent(upper_ + "/d2/b"), "a");
+
+  // Lower FS should not change.
+  EXPECT_EQ(ReadDir(lower_), (std::vector{DirEntry::Dir("d1")}));
+  EXPECT_EQ(ReadFileContent(lower_ + "/d1/a"), "a");
+}
+
+TEST_F(OverlayFsTest, RenameNonexistent) {
+  ASSERT_THAT(mkdir((lower_ + "/d1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d1/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_THAT(rename((overlay_ + "/d1/b").c_str(), (overlay_ + "/d1/c").c_str()),
+              SyscallFailsWithErrno(ENOENT));
+}
+
+TEST_F(OverlayFsTest, RenameDir) {
+  ASSERT_THAT(mkdir((lower_ + "/d1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(lower_ + "/d1/a", "a"));
+  ASSERT_THAT(mkdir((upper_ + "/d1").c_str(), 0700), SyscallSucceeds());
+  ASSERT_TRUE(files::WriteFile(upper_ + "/d1/a", "a"));
+
+  ASSERT_NO_FATAL_FAILURE(Mount());
+
+  ASSERT_THAT(rename((overlay_ + "/d1").c_str(), (overlay_ + "/d2").c_str()),
+              SyscallFailsWithErrno(EXDEV));
+
+  // Lower FS should not change.
+  EXPECT_EQ(ReadDir(lower_), (std::vector{DirEntry::Dir("d1")}));
+  EXPECT_EQ(ReadFileContent(lower_ + "/d1/a"), "a");
 }
 
 }  // namespace

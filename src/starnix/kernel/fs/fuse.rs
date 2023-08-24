@@ -740,6 +740,7 @@ impl FsNodeOps for Arc<FuseNode> {
     fn allocate(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _mode: FallocMode,
         _offset: u64,
         _length: u64,

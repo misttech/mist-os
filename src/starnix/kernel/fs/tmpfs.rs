@@ -50,9 +50,6 @@ impl FileSystemOps for Arc<TmpFs> {
         }
         if let Some(replaced) = replaced {
             if replaced.is_dir() {
-                if !renamed.is_dir() {
-                    return error!(EISDIR);
-                }
                 // Ensures that replaces is empty.
                 if *child_count(replaced) != 0 {
                     return error!(ENOTEMPTY);

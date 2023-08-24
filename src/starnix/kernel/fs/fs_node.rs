@@ -174,6 +174,10 @@ impl FsNodeInfo {
         self.mode &= !FileMode::ISUID;
         self.clear_sgid_bit();
     }
+
+    pub fn cred(&self) -> FsCred {
+        FsCred { uid: self.uid, gid: self.gid }
+    }
 }
 
 #[derive(Default)]
@@ -551,6 +555,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn allocate(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _mode: FallocMode,
         _offset: u64,
         _length: u64,
@@ -1209,8 +1214,14 @@ impl FsNode {
 
     /// Avoid calling this method directly. You probably want to call `FileObject::fallocate()`
     /// which will also perform additional verifications.
-    pub fn fallocate(&self, mode: FallocMode, offset: u64, length: u64) -> Result<(), Errno> {
-        self.ops().allocate(self, mode, offset, length)?;
+    pub fn fallocate(
+        &self,
+        current_task: &CurrentTask,
+        mode: FallocMode,
+        offset: u64,
+        length: u64,
+    ) -> Result<(), Errno> {
+        self.ops().allocate(self, current_task, mode, offset, length)?;
         self.update_ctime_mtime();
         Ok(())
     }
