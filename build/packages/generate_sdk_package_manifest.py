@@ -22,21 +22,21 @@ import sys
 
 # SDK directory of blobs across all package manifests,
 # each renamed to their merkle.
-BLOBS_DIR = "fuchsia_packages/blobs"
+BLOBS_DIR = "packages/blobs"
 
 # SDK directory of subpackage manifests, each renamed to their merkle.
-SUBPACKAGE_MANIFEST_DIR = "fuchsia_packages/subpackage_manifests"
+SUBPACKAGE_MANIFEST_DIR = "packages/subpackage_manifests"
 
 # sdk://
-# └── fuchsia_packages
-#     ├── blobs
+# └── packages/
+#     ├── blobs/
 #     │   └── CONTENT_HASH_1
-#     ├── PACKAGE_BAR
-#     │   ├── ARCH
-#     │   │   └── release
+#     ├── PACKAGE_BAR/
+#     │   ├── ARCH/
+#     │   │   └── release/
 #     │   │       └── package_manifest.json
 #     │   └── meta.json
-#     └── subpackage_manifests
+#     └── subpackage_manifests/
 #         └── META_FAR_MERKLE.package_manifest.json
 # SDK directory of blobs, relative to each SDK package.
 PACKAGE_DIR_TO_BLOBS_DIR = "../../../blobs"
@@ -146,7 +146,7 @@ def handle_package_manifest(
     else:
         manifest_file_name = "package_manifest.json"
 
-        sdk_output_manifest_path = f"fuchsia_packages/{distribution_name}/{arch}/release/{manifest_file_name}"
+        sdk_output_manifest_path = f"packages/{distribution_name}/{arch}/release/{manifest_file_name}"
 
         # Ensure metadata is aware of SDK manifest location.
         sdk_metadata['package_manifests'] = [
@@ -230,7 +230,7 @@ def main():
         is_subpackage=False)
 
     # Capture content checklist file in metadata and file list.
-    content_checklist_path = f"fuchsia_packages/{distribution_name}/{arch}/release/content_checklist_path"
+    content_checklist_path = f"packages/{distribution_name}/{arch}/release/content_checklist_path"
     sdk_file_map.add(
         f"{content_checklist_path}={args.sdk_package_content_checklist_path}")
     sdk_metadata['target_files'][arch].append(content_checklist_path)
@@ -238,7 +238,7 @@ def main():
     # Handle license file.
     sdk_package_license_build_path = os.path.join(
         args.output, "license_data", "results.spdx.json")
-    sdk_package_license_path = f"fuchsia_packages/{distribution_name}/{arch}/release/license.spdx.json"
+    sdk_package_license_path = f"packages/{distribution_name}/{arch}/release/license.spdx.json"
     sdk_file_map.add(
         f"{sdk_package_license_path}={sdk_package_license_build_path}")
     sdk_metadata['target_files'][arch].append(sdk_package_license_path)

@@ -259,12 +259,12 @@ template("sdk_fuchsia_package") {
     sdk_atom(target_name) {
       forward_variables_from(invoker, [ "testonly" ])
 
-      id = "sdk://fuchsia_packages/${_distribution_name}"
+      id = "sdk://packages/${_distribution_name}"
       category = invoker.category
 
       meta = {
         schema = "package"
-        dest = "fuchsia_packages/${_distribution_name}/meta.json"
+        dest = "packages/${_distribution_name}/meta.json"
         source = "${_sdk_package_metadata}"
       }
 
