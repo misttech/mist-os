@@ -84,7 +84,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("async-stream") {
-  public_deps = [ ":async-stream-v0_3_4" ]
+  public_deps = [ ":async-stream-v0_3_5" ]
 }
 
 group("async-trait") {
@@ -1618,14 +1618,14 @@ rust_library("async-net-v1_7_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("async-stream-v0_3_4") {
+rust_library("async-stream-v0_3_5") {
   crate_name = "async_stream"
-  crate_root = "//third_party/rust_crates/vendor/async-stream-0.3.4/src/lib.rs"
-  output_name = "async_stream-1e2c1872d90466df"
+  crate_root = "//third_party/rust_crates/vendor/async-stream-0.3.5/src/lib.rs"
+  output_name = "async_stream-f4f882ab5615681b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-stream-impl-v0_3_4($host_toolchain)" ]
+  deps += [ ":async-stream-impl-v0_3_5($host_toolchain)" ]
   deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":pin-project-lite-v0_2_9" ]
 
@@ -1634,32 +1634,32 @@ rust_library("async-stream-v0_3_4") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=1e2c1872d90466df",
-    "-Cextra-filename=-1e2c1872d90466df",
+    "-Cmetadata=f4f882ab5615681b",
+    "-Cextra-filename=-f4f882ab5615681b",
   ]
 
   visibility = [ ":*" ]
 }
 
-rust_proc_macro("async-stream-impl-v0_3_4") {
+rust_proc_macro("async-stream-impl-v0_3_5") {
   crate_name = "async_stream_impl"
   crate_root =
-      "//third_party/rust_crates/vendor/async-stream-impl-0.3.4/src/lib.rs"
-  output_name = "async_stream_impl-43f6bec800732f62"
+      "//third_party/rust_crates/vendor/async-stream-impl-0.3.5/src/lib.rs"
+  output_name = "async_stream_impl-bdf5c3df77d0ae6a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_23" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=43f6bec800732f62",
-    "-Cextra-filename=-43f6bec800732f62",
+    "-Cmetadata=bdf5c3df77d0ae6a",
+    "-Cextra-filename=-bdf5c3df77d0ae6a",
   ]
 
   visibility = [ ":*" ]
