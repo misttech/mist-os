@@ -12,7 +12,10 @@ driver_bind_rules("hid-buttons-bind") {
   bind_output = "hid-buttons.bindbc"
   tests = "bind-tests.json"
   disable_fragment_gen = true
-  deps = [ "//src/devices/bind/fuchsia.hardware.gpio" ]
+  deps = [
+    "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 fuchsia_driver("hid-buttons-driver") {

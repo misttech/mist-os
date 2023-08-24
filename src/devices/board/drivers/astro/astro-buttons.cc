@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -18,6 +20,8 @@
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
+#include "lib/fidl/cpp/wire_natural_conversions.h"
+#include "lib/fidl_driver/cpp/wire_messaging_declarations.h"
 #include "src/devices/board/drivers/astro/astro.h"
 
 namespace astro {
@@ -39,79 +43,105 @@ static const buttons_gpio_config_t gpios[] = {
 };
 // clang-format on
 
-static const device_metadata_t available_buttons_metadata[] = {
-    {
-        .type = DEVICE_METADATA_BUTTONS_BUTTONS,
-        .data = &buttons,
-        .length = sizeof(buttons),
-    },
-    {
-        .type = DEVICE_METADATA_BUTTONS_GPIOS,
-        .data = &gpios,
-        .length = sizeof(gpios),
-    }};
-
 zx_status_t Astro::ButtonsInit() {
-  const ddk::BindRule kVolUpRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+  fidl::Arena<> fidl_arena;
+  fdf::Arena buttons_arena('BTTN');
+
+  fpbus::Node dev = {{.name = "astro-buttons",
+                      .vid = PDEV_VID_GENERIC,
+                      .pid = PDEV_PID_GENERIC,
+                      .did = PDEV_DID_HID_BUTTONS,
+                      .metadata = std::vector<fpbus::Metadata>{
+                          {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
+                            .data = std::vector<uint8_t>(
+                                reinterpret_cast<const uint8_t*>(&buttons),
+                                reinterpret_cast<const uint8_t*>(&buttons) + sizeof(buttons))}},
+                          {{.type = DEVICE_METADATA_BUTTONS_GPIOS,
+                            .data = std::vector<uint8_t>(
+                                reinterpret_cast<const uint8_t*>(&gpios),
+                                reinterpret_cast<const uint8_t*>(&gpios) + sizeof(gpios))}}
+
+                      }}};
+
+  const std::vector<fuchsia_driver_framework::BindRule> kVolUpRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_5)};
-  const device_bind_prop_t kVolUpProps[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::NodeProperty> kVolUpProps = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_UP),
   };
 
-  const ddk::BindRule kVolDownRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::BindRule> kVolDownRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_6)};
-  const device_bind_prop_t kVolDownProps[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::NodeProperty> kVolDownProps = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_DOWN),
   };
 
-  const ddk::BindRule kVolBothRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::BindRule> kVolBothRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d2::GPIOAO_PIN_ID_PIN_10)};
-  const device_bind_prop_t kVolBothProps[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::NodeProperty> kVolBothProps = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_BOTH),
   };
 
-  const ddk::BindRule kMicPrivacyRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::BindRule> kMicPrivacyRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_2)};
-  const device_bind_prop_t kMicPrivacyProps[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+  const std::vector<fuchsia_driver_framework::NodeProperty> kMicPrivacyProps = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
                         bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
   };
 
-  const ddk::CompositeNodeSpec buttonComposite =
-      ddk::CompositeNodeSpec(kVolUpRules, kVolUpProps)
-          .AddParentSpec(kVolDownRules, kVolDownProps)
-          .AddParentSpec(kVolBothRules, kVolBothProps)
-          .AddParentSpec(kMicPrivacyRules, kMicPrivacyProps)
-          .set_metadata(available_buttons_metadata);
+  std::vector<fuchsia_driver_framework::ParentSpec> parents = {
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = std::move(kVolUpRules),
+          .properties = std::move(kVolUpProps),
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = std::move(kVolDownRules),
+          .properties = std::move(kVolDownProps),
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = std::move(kVolBothRules),
+          .properties = std::move(kVolBothProps),
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = std::move(kMicPrivacyRules),
+          .properties = std::move(kMicPrivacyProps),
+      }},
+  };
 
-  zx_status_t status = DdkAddCompositeNodeSpec("astro-buttons", buttonComposite);
+  fuchsia_driver_framework::CompositeNodeSpec buttonComposite = {
+      {.name = "astro-buttons", .parents = std::move(parents)}};
 
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec failed: %s", __func__, zx_status_get_string(status));
-    return status;
+  fdf::WireUnownedResult status =
+      pbus_.buffer(buttons_arena)
+          ->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev),
+                                 fidl::ToWire(fidl_arena, buttonComposite));
+
+  if (status->is_error() || status.value().is_error()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec failed: %s", __func__,
+           status.FormatDescription().c_str());
+    return ZX_ERR_INTERNAL;
   }
 
   return ZX_OK;
