@@ -1,4 +1,5 @@
 config("fmtlib_config") {
+  cflags = [ "-Wno-deprecated-literal-operator" ]
   include_dirs = [ "src/include" ]
 }
 
