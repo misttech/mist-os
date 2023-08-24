@@ -29,7 +29,7 @@ mod verifier_worker;
 
 use std::{
     collections::HashMap,
-    convert::TryFrom as _,
+    convert::{Infallible as Never, TryFrom as _},
     ffi::CStr,
     future::Future,
     num::NonZeroU16,
@@ -49,7 +49,7 @@ use fuchsia_zircon as zx;
 use futures::{lock::Mutex as AsyncMutex, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
@@ -1051,9 +1051,11 @@ impl NetstackSeed {
         let no_finish_tasks = no_finish_tasks.map(NamedTask::into_future);
         let no_finish_tasks = futures::stream::FuturesUnordered::from_iter(no_finish_tasks);
         let no_finish_tasks_fut = no_finish_tasks.into_future().map(
-            |(name, _): (_, futures::stream::FuturesUnordered<_>)| match name {
-                Some(name) => panic!("task {name} ended unexpectedly"),
-                None => panic!("unexpected end of infinite task stream"),
+            |(name, _): (_, futures::stream::FuturesUnordered<_>)| -> Never {
+                match name {
+                    Some(name) => panic!("task {name} ended unexpectedly"),
+                    None => panic!("unexpected end of infinite task stream"),
+                }
             },
         );
         // Code generation for this async fn is bugging out very far away (where
@@ -1065,7 +1067,7 @@ impl NetstackSeed {
         //     |
         // We can get around that by boxing this future and everything is okay
         // again. This only happens once, we can pay the allocation.
-        let no_finish_tasks_fut = no_finish_tasks_fut.boxed();
+        let mut no_finish_tasks_fut = no_finish_tasks_fut.boxed().fuse();
 
         let socket_ctx = netstack.ctx.clone();
         let _sockets = inspector.root().create_lazy_child("Sockets", move || {
@@ -1081,6 +1083,16 @@ impl NetstackSeed {
         });
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
+
+        // Insert a stream after services to get a helpful log line when it
+        // completes. The future we create from it will still wait for all the
+        // user-created resources to be joined on before returning.
+        let services =
+            services.chain(futures::stream::poll_fn(|_: &mut std::task::Context<'_>| {
+                info!("services stream ended");
+                std::task::Poll::Ready(None)
+            }));
+
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
         // `Future` returned by this function fails to implement `Send` with the
@@ -1178,7 +1190,15 @@ impl NetstackSeed {
                 .await
         };
 
-        let ((), ()) = futures::join!(services_fut, no_finish_tasks_fut);
-        debug!("Services stream finished");
+        let services_fut = services_fut.fuse();
+        futures::pin_mut!(services_fut);
+        let () = futures::select! {
+            () = services_fut => (),
+            never = no_finish_tasks_fut => match never {}
+        };
+        info!("all services terminated");
+
+        // TODO(https://fxbug.dev/132457): Signal the long running tasks and
+        // join them all here.
     }
 }

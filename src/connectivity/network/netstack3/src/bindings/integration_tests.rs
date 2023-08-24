@@ -11,7 +11,7 @@ use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
-use futures::{channel::mpsc, TryFutureExt as _};
+use futures::{channel::mpsc, StreamExt as _, TryFutureExt as _};
 use net_declare::{net_ip_v4, net_subnet_v4, net_subnet_v6};
 use net_types::{
     ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv6},
@@ -86,7 +86,7 @@ pub(crate) struct TestStack {
     // in tests.
     netstack: crate::bindings::Netstack,
     // The main task running the netstack.
-    _task: fasync::Task<()>,
+    task: fasync::Task<()>,
     // A channel sink standing in for ServiceFs when running tests.
     services_sink: mpsc::UnboundedSender<crate::bindings::Service>,
     // The inspector instance given to Netstack, can be used to probe available
@@ -250,7 +250,7 @@ impl TestStack {
 
         Self {
             netstack,
-            _task: task,
+            task,
             services_sink,
             _inspector: inspector,
             endpoint_ids: Default::default(),
@@ -268,6 +268,35 @@ impl TestStack {
     pub(crate) fn ctx(&self) -> Ctx {
         self.netstack.ctx.clone()
     }
+
+    /// Synchronously shutdown the running stack.
+    // TODO(https://fxbug.dev/132457): Enforce that shutdown is called on all
+    // created [`TestStack`]s.
+    pub(crate) async fn shutdown(self) {
+        let Self {
+            netstack: crate::bindings::Netstack { ctx, interfaces_event_sink },
+            task,
+            services_sink,
+            _inspector,
+            endpoint_ids: _,
+        } = self;
+        // Drop the interfaces event sink, we cloned it from the seed to be able
+        // to poke at it from tests.
+        std::mem::drop(interfaces_event_sink);
+
+        // Drop the services sink, which should cause netstack to start shutting
+        // down cleanly.
+        std::mem::drop(services_sink);
+        // Wait for the task to join. The main serve loop should have helpful
+        // logs around shutdown progress.
+        task.await;
+        // We can now drop the context.
+        //
+        // TODO(https://fxbug.dev/132457): We should be able to assert here
+        // we're the last thing holding on to the context once we really have
+        // full cleanup.
+        std::mem::drop(ctx);
+    }
 }
 
 /// A test setup that than contain multiple stack instances networked together.
@@ -277,7 +306,7 @@ pub(crate) struct TestSetup {
     sandbox: Option<netemul::TestSandbox>,
     // Keep around the handle to the virtual networks and endpoints we create to
     // ensure they're not cleaned up before test execution is complete.
-    _network: Option<net::SetupHandleProxy>,
+    network: Option<net::SetupHandleProxy>,
     stacks: Vec<TestStack>,
 }
 
@@ -315,7 +344,7 @@ impl TestSetup {
     /// Creates a new empty `TestSetup`.
     fn new() -> Self {
         set_logger_for_test();
-        Self { sandbox: None, _network: None, stacks: Vec::new() }
+        Self { sandbox: None, network: None, stacks: Vec::new() }
     }
 
     fn sandbox(&mut self) -> &netemul::TestSandbox {
@@ -335,11 +364,22 @@ impl TestSetup {
             .expect("create network")
             .into_proxy();
 
-        self._network = Some(handle);
+        self.network = Some(handle);
     }
 
     fn add_stack(&mut self, stack: TestStack) {
         self.stacks.push(stack)
+    }
+
+    /// Synchronously shut down all the contained stacks.
+    pub(crate) async fn shutdown(self) {
+        let Self { sandbox, network, stacks } = self;
+        // Destroy the sandbox and network, which will cause all devices in the
+        // stacks to be removed.
+        std::mem::drop(network);
+        std::mem::drop(sandbox);
+        // Shutdown all the stacks concurrently.
+        futures::stream::iter(stacks).for_each_concurrent(None, |stack| stack.shutdown()).await;
     }
 }
 
@@ -624,6 +664,9 @@ async fn test_add_device_routes() {
         stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
         fidl_net_stack::Error::NotFound
     );
+
+    std::mem::drop(stack);
+    t.shutdown().await;
 }
 
 #[fasync::run_singlethreaded(test)]
