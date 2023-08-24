@@ -22,7 +22,7 @@ const (
 	// Ethernet MTU, less the TFTP, UDP and IP header lengths (RFC 2348).
 	defaultBlockSize = 1428 // default block size
 	// Arbitrary.
-	timeout = 1 * time.Second // default udp client timeout
+	timeout = 5 * time.Second // default udp client timeout
 	// Arbitrary.
 	retries = 8 // default number of timeout retries
 	// Point at where window size gains begin to tail off (RFC 7440)
