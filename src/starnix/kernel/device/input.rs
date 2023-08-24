@@ -278,6 +278,11 @@ impl InputFile {
             .name("kthread-touch-relay".to_string())
             .spawn(move || {
                 fasync::LocalExecutor::new().run_singlethreaded(async {
+                    slf.inner
+                        .lock()
+                        .inspect_status
+                        .as_mut()
+                        .map(|status| status.health_node.set_ok());
                     let mut previous_event_disposition = vec![];
                     // TODO(https://fxbug.dev/123718): Remove `close_fut`.
                     let mut close_fut = touch_source_proxy.on_closed();
@@ -354,6 +359,10 @@ impl InputFile {
                             }
                         };
                     }
+                    // If we exit the loop this indicates relay is no longer active.
+                    slf.inner.lock().inspect_status.as_mut().map(|status| {
+                        status.health_node.set_unhealthy("Touch relay terminated unexpectedly")
+                    });
                 })
             })
             .expect("able to create threads")
@@ -1439,7 +1448,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn touch_input_file_inspect_counts_events() {
+    async fn touch_relay_updates_touch_inspect_status() {
         let inspector = fuchsia_inspect::Inspector::default();
         let input_file =
             InputFile::new_touch(720, 1200, inspector.root().create_child("touch_input_file"));
@@ -1493,7 +1502,7 @@ mod test {
                 uapi_events_generated_count: 19u64,
                 uapi_events_read_count: 19u64,
                 "fuchsia.inspect.Health": {
-                    status: "STARTING_UP",
+                    status: "OK",
                     // Timestamp value is unpredictable and not relevant in this context,
                     // so we only assert that the property is present.
                     start_timestamp_nanos: fuchsia_inspect::AnyProperty
@@ -1504,5 +1513,23 @@ mod test {
         // Cleanly tear down the client.
         std::mem::drop(touch_source_stream); // Close Zircon channel.
         relay_thread.join().expect("client thread failed"); // Wait for client thread to finish.
+
+        // Inspect should reflect InputFile is in UNHEALTHY state after touch stream connection is
+        // closed and touch relay terminates.
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            touch_input_file: {
+                fidl_events_received_count: 7u64,
+                fidl_events_converted_count: 5u64,
+                uapi_events_generated_count: 19u64,
+                uapi_events_read_count: 19u64,
+                "fuchsia.inspect.Health": {
+                    status: "UNHEALTHY",
+                    message: "Touch relay terminated unexpectedly",
+                    // Timestamp value is unpredictable and not relevant in this context,
+                    // so we only assert that the property is present.
+                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                },
+            }
+        });
     }
 }
