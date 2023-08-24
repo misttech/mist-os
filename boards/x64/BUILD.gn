@@ -5,8 +5,6 @@
 import("//build/assembly/board_configuration.gni")
 
 board_configuration("x64") {
-  verify_against = "board_information.json5"
-
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::wlan_softmac",

@@ -5,8 +5,6 @@
 import("//build/assembly/board_configuration.gni")
 
 board_configuration("arm64") {
-  verify_against = "board_information.json5"
-
   provided_features = []
 
   filesystems = {
