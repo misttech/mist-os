@@ -10,7 +10,6 @@ _tools = [
   "profiler",
   "starnix",
   "target-package",
-  "log_ng",
 ]
 
 group("tools") {
