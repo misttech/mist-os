@@ -35,6 +35,7 @@ rustc_binary("test_list_tool") {
     "src/error.rs",
     "src/main.rs",
     "src/opts.rs",
+    "src/test_config.rs",
   ]
 
   testonly = true

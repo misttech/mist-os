@@ -861,16 +861,20 @@ compiled_action("test-list") {
   testonly = true
   tool = "//tools/test_list_tool"
   tool_output_name = "test_list_tool"
-
+  test_list_file = "$root_build_dir/test-list.json"
+  test_config_file = "$root_build_dir/test-config.json"
   inputs = [
     "$root_build_dir/tests.json",
     "$root_build_dir/test_components.json",
   ]
-  outputs = [ "$root_build_dir/test-list.json" ]
+  outputs = [
+    test_list_file,
+    test_config_file,
+  ]
   depfile = "$root_build_dir/test-list.json.d"
 
   metadata = {
-    test_list = [ rebase_path(outputs[0], root_out_dir) ]
+    test_list = [ rebase_path(outputs[0], root_build_dir) ]
   }
 
   deps = [
@@ -886,7 +890,9 @@ compiled_action("test-list") {
     "--test-components",
     "test_components.json",
     "--output",
-    "test-list.json",
+    rebase_path(test_list_file, root_build_dir),
+    "--experimental-test-config",
+    rebase_path(test_config_file, root_build_dir),
     "--depfile",
     "test-list.json.d",
   ]

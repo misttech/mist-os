@@ -27,6 +27,11 @@ pub struct Opt {
     #[structopt(short = "d", long = "depfile")]
     // Path to output a depfile.
     pub depfile: Option<Utf8PathBuf>,
+
+    #[structopt(long = "experimental-test-config")]
+    /// This is experimental as we are just prototyping
+    /// TODO(b/294567466): Eventually this will replace test-list.json.
+    pub test_config_output: Option<Utf8PathBuf>,
 }
 
 impl Opt {
