@@ -4,9 +4,7 @@
 
 import("//build/dart/toolchain.gni")
 import("//build/python/python_binary.gni")
-import("//build/python/python_host_test.gni")
 import("//build/toolchain/basic_toolchain.gni")
-import("//build/toolchain/concurrent_jobs.gni")
 
 group("dart_allowlist") {
   #  ________  _________  ________  ________
@@ -162,11 +160,6 @@ group("dart_allowlist") {
 
 python_binary("gen_dart_package_config") {
   main_source = "gen_dart_package_config.py"
-  deps = [ "//third_party/pyyaml:yaml" ]
-}
-
-python_binary("run_analysis") {
-  main_source = "run_analysis.py"
   deps = [ "//third_party/pyyaml:yaml" ]
 }
 

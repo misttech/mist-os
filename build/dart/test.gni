@@ -76,11 +76,6 @@ template("dart_test") {
     package_root = rebase_path(_source_dir, ".")
     source_dir = "."
 
-    # We include the pubspec and analysis options files which are at the
-    # original package root since we are effectively changing the package_root
-    # for this library.
-    pubspec = "pubspec.yaml"
-
     infer_package_name = true
     testonly = true
 

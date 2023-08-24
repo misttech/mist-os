@@ -72,7 +72,7 @@ be used.
 
 ## Build Integration
 An alternative for linter checks that provide zero false-positive rates is to include them in the
-build. Currently, the Fuchsia build runs the dartanalyzer in this capacity as a type checker.
+build.
 Adding additional checks to this category is not encouraged unless it is certain that they do not
 fire on false positives.
 
@@ -214,36 +214,6 @@ prebuilt/third_party/go/$HOST_PLATFORM/bin/gofmt -s -w $FILES
 ```
 
 TODO(fxbug.dev/27310): Document go vet once implementation details are finalized.
-
-## Dart
-
-Dart uses [`dart format`](https://github.com/dart-lang/dart_style) and
-[`dartanalyzer`](https://github.com/dart-lang/sdk/tree/HEAD/pkg/analyzer_cli).
-These are distributed as prebuilts from the Dart toolchain. The `dartanalyzer`
-is run as part of the build rather than as a check, as it performs
-type-checking and other assertive checks.
-
-`dart format` runs on source files as follows:
-
-```sh
-prebuilt/third_party/dart/${HOST_PLATFORM}/bin/dart format $FILES
-```
-
-The `dartanalyzer` is run as part of the build, triggered when the [`dart_library`](/build/dart/dart_library.gni) GN template is
-invoked. The [invocation](/build/dart/run_analysis.py) is:
-
-```sh
-prebuilt/third_party/dart/${HOST_PLATFORM}/bin/dartanalyzer \
-  --packages=$DOT_PACKAGES_FILE \
-  --dart-sdk=prebuilt/third_party/dart/${HOST_PLATFORM} \
-  --options=$PACKAGE_ROOT/analysis_options \
-  --fatal-warnings \
-  --fatal-hints \
-  --fatal-lints \
-  --enable-experiment \
-  non-nullable \
-  $FILES
-```
 
 ## FIDL
 
