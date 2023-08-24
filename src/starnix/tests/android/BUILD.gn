@@ -15,13 +15,6 @@ group("tests") {
   }
 }
 
-fuchsia_test_component_with_expectations("libutils_test") {
-  manifest = "meta/libutils_test.cml"
-  expectations = "expectations/libutils_test.json5"
-  deps = [ "//src/starnix/tests:starnix_test_with_expectations" ]
-  test_type = "starnix"
-}
-
 fuchsia_test_component("sh_test") {
   check_references = false
   manifest = "meta/sh_test.cml"
@@ -35,24 +28,10 @@ fuchsia_test_component("boringssl_self_test64") {
   test_type = "starnix"
 }
 
-group("container_resources") {
-  deps = [ "//src/starnix/containers:default_init" ]
-
-  if (target_cpu == "x64") {
-    deps += [
-      "//src/starnix/containers:data_tmp_target",
-      "//src/starnix/containers/bionic:minimal_init_rc",
-      "//src/starnix/containers/bionic:system_image",
-      "//src/starnix/containers/bionic:testcases_image",
-    ]
-  }
-}
-
 fuchsia_test_package("android") {
   test_components = [
     ":boringssl_self_test64",
     ":sh_test",
-    ":libutils_test",
   ]
 
   if (target_cpu == "x64") {

@@ -59,7 +59,6 @@ fuchsia_test_package("starnix_reboot_integration_tests") {
     ":realm",
     ":reboot_no_args",
     ":reboot_ota_update",
-    "//src/starnix/tests/android:container_resources",
   ]
 
   subpackages = starnix_test_subpackages +

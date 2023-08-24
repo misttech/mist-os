@@ -11,13 +11,6 @@ ext4_to_pkg("system_image") {
   prefix = "data/system"
 }
 
-# The filesystem image containing tests built in the Android tree but not included in the system
-# image.
-ext4_to_pkg("testcases_image") {
-  input = "//prebuilt/starnix/android-image-amd64/starnix_testcases.img"
-  prefix = "data/testcases"
-}
-
 resource("minimal_init_rc") {
   sources = [ "init.rc" ]
   outputs = [ "data/init.rc" ]
@@ -30,7 +23,6 @@ group("container_resources") {
     deps += [
       ":minimal_init_rc",
       ":system_image",
-      ":testcases_image",
       "//src/starnix/containers:data_tmp_target",
     ]
   }

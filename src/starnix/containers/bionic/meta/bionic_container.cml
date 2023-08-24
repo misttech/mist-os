@@ -14,7 +14,6 @@
         kernel_cmdline: "androidboot.hardware=starnix androidboot.init_rc=/container/init.rc",
         mounts: [
             "/:remote_bundle:data/system",
-            "/oem:remote_bundle:data/testcases",
             "/data:remotefs:data",
             "/dev:devtmpfs",
             "/dev/shm:tmpfs",

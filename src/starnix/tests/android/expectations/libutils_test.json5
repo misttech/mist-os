@@ -12,32 +12,8 @@
         {
             type: "expect_failure",
             matchers: [
-                "FileMap.*",
                 "SingletonTest.*",
                 "LooperTest.PollOnce_WhenCallbackAddedTwice_OnlySecondCallbackShouldBeInvoked",
-            ],
-        },
-        {
-            type: "skip",
-            matchers: [
-                "errors.unwrap_or_fatal",
-                "SharedBufferTest.alloc_death",
-                "SharedBufferTest.editResize_death",
-                "StrongPointer/0.AssertStrongRefExists",
-                "StrongPointer/1.AssertStrongRefExists",
-
-                // TODO(fxbug.dev/127475)
-                "LooperTest.MultiThreaded_NoUnexpectedFdRemoval",
-                "RefBase.AssertWeakRefExistsDeath",
-                "RefBase.DoubleOwnershipDeath",
-                "SystemClock.SystemClock",
-                "Timers.systemTime_invalid",
-                "UnicodeTest.InvalidUtf8OverreadDetected",
-                "VectorTest._grow_OverflowBufferAlloc",
-                "VectorTest._grow_OverflowCapacityDoubling",
-                "VectorTest._grow_OverflowSize",
-                "VectorTest.removeItemsAt_overflow",
-                "VectorTest.SetCapacity_Overflow",
             ],
         },
     ],
