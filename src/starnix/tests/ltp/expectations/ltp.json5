@@ -345,9 +345,6 @@
                 // TODO(fxbug.dev/128437) Re-enable once flake is resolved.
                 "pth_str01",
 
-                // TODO(fxbug.dev/128404) Re-enable once flake is resolved.
-                "kill03",
-
                 // TODO(fxbug.dev/127693) Re-enable once flake is resolved.
                 "waitid07",
 

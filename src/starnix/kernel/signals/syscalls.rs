@@ -338,7 +338,7 @@ pub fn sys_kill(
             // process group whose ID is -pid."
             let process_group_id = match pid {
                 0 => current_task.thread_group.read().process_group.leader,
-                _ => -pid,
+                _ => negate_pid(pid)?,
             };
 
             let thread_groups = {
@@ -698,7 +698,7 @@ pub fn sys_wait4(
     } else if pid > 0 {
         ProcessSelector::Pid(pid)
     } else if pid < -1 {
-        ProcessSelector::Pgid(-pid)
+        ProcessSelector::Pgid(negate_pid(pid)?)
     } else {
         not_implemented!("unimplemented wait4 pid selector {}", pid);
         return error!(ENOSYS);
@@ -726,6 +726,11 @@ pub fn sys_wait4(
     } else {
         Ok(0)
     }
+}
+
+// Negates the `pid` safely or fails with `ESRCH` (negation operation panics for `i32::MIN`).
+fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
+    pid.checked_neg().ok_or_else(|| errno!(ESRCH))
 }
 
 #[cfg(test)]
