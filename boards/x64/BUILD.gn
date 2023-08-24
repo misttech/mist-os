@@ -8,6 +8,7 @@ board_configuration("x64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::wlan_softmac",
+    "fuchsia::paravirtualization",
   ]
 
   filesystems = {

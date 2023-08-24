@@ -18,6 +18,7 @@ pub mod identity_config;
 pub mod input_config;
 pub mod intl_config;
 pub mod media_config;
+pub mod paravirtualization_config;
 pub mod session_manager_config;
 pub mod setui_config;
 pub mod starnix_config;
@@ -94,6 +95,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the media area.
     #[serde(default)]
     pub media: media_config::PlatformMediaConfig,
+
+    /// Platform configuration options for paravirtualization.
+    #[serde(default)]
+    pub paravirtualization: paravirtualization_config::PlatformParavirtualizationConfig,
 
     /// Platform configuration options for the session manager.
     #[serde(default)]

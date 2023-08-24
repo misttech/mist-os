@@ -1727,6 +1727,16 @@ assembly_input_bundle("virtualization_support") {
   ]
 }
 
+# AIB to enable running Fuchsia as a virtualized guest.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("paravirtualization_support") {
+  base_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+}
+
 # AIB to include Netstack2 as the netstack for use by base networking.
 #
 # feature_set_levels: minimal

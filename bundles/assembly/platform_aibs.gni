@@ -31,6 +31,7 @@ bootstrap_user_platform_aib_names = [
 
   # Emulator Support
   "emulator_support",
+  "paravirtualization_support",
 
   # Storage
   "fshost_common",

@@ -23,6 +23,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "fshost_fvm_minfs",
     "fshost_fvm_minfs_migration",
     "fshost_storage",
+    "paravirtualization_support",
     "kernel_args_user",
     "live_usb",
     "virtcon",
