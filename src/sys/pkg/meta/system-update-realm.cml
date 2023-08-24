@@ -45,5 +45,13 @@
             protocol: [ "fuchsia.update.CommitStatusProvider" ],
             from: "#system-update-committer",
         },
+        {
+            protocol: [
+                "fuchsia.update.config.OptOut",
+                "fuchsia.update.config.OptOutAdmin",
+            ],
+            from: "#system-update-configurator",
+            source_availability: "unknown",
+        },
     ],
 }

@@ -190,15 +190,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.update.config.OptOut",
-                "fuchsia.update.config.OptOutAdmin",
-            ],
-            from: "#system-update-configurator",
-            to: "#session-manager",
-            source_availability: "unknown",
-        },
-        {
             directory: "tzdata-icu-44-le",
             from: "#tzdata-provider",
             to: "#session-manager",
@@ -281,16 +272,15 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.update.installer.Installer",
+            protocol: [
+                "fuchsia.update.CommitStatusProvider",
+                "fuchsia.update.config.OptOut",
+                "fuchsia.update.config.OptOutAdmin",
+                "fuchsia.update.installer.Installer",
+            ],
             from: "#system-update",
             to: "#session-manager",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.update.CommitStatusProvider",
-            from: "#system-update",
-            to: "#session-manager",
-            source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.wlan.wlanix.Wlanix",

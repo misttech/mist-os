@@ -26,13 +26,4 @@
             to: [ "#system-update-configurator" ],
         },
     ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.update.config.OptOut",
-                "fuchsia.update.config.OptOutAdmin",
-            ],
-            from: "#system-update-configurator",
-        },
-    ],
 }
