@@ -29,6 +29,8 @@
         // TODO(fxbug.dev/91934): Drive down this list via fakes and similar.
         {
             protocol: [
+                "fuchsia.accessibility.semantics.SemanticsManager",
+
                 // "fuchsia.buildinfo.Provider" is faked.
                 "fuchsia.device.NameProvider",
                 "fuchsia.feedback.ComponentDataRegister",
@@ -37,12 +39,14 @@
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
 
                 // "fuchsia.intl.PropertyProvider" is faked.
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.media.ProfileProvider",
+                "fuchsia.media.SessionAudioConsumerFactory",
                 "fuchsia.mediacodec.CodecFactory",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.net.http.Loader",
@@ -51,6 +55,7 @@
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.settings.Display",
+                "fuchsia.stash.SecureStore",
 
                 // Tests of the media system change their behavior based on
                 // board.
@@ -58,6 +63,10 @@
                 // are ready.
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.web.ContextProvider",
             ],
@@ -66,15 +75,8 @@
         },
         {
             protocol: [
-                "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.element.GraphicalPresenter",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.media.drm.Widevine",
-                "fuchsia.stash.SecureStore",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
             to: "#chromium-tests",
@@ -87,15 +89,7 @@
             ],
             from: "parent",
             to: "#chromium-tests",
-        },
-
-        // TODO(fxbug.dev/296305908): Remove once Bluetooth streaming E2E tests
-        // no longer use this capability.
-        {
-            protocol: "fuchsia.media.SessionAudioConsumerFactory",
-            from: "parent",
-            to: "#chromium-system-tests",
-            availability: "same_as_target",
+            source_availability: "unknown",
         },
 
         // Test realms may offer subdirectories of config-data to test

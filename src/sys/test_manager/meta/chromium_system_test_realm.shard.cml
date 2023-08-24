@@ -28,6 +28,7 @@
         // These system capabilities are offered for use by the chromium tests.
         {
             protocol: [
+                "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.feedback.ComponentDataRegister",
@@ -36,11 +37,13 @@
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.media.ProfileProvider",
+                "fuchsia.media.SessionAudioConsumerFactory",
                 "fuchsia.mediacodec.CodecFactory",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.net.http.Loader",
@@ -49,11 +52,15 @@
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.settings.Display",
+                "fuchsia.stash.SecureStore",
 
                 // Tests of the media system change their behavior based on
                 // board.
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input3.Keyboard",
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.web.ContextProvider",
             ],
@@ -61,28 +68,25 @@
             to: "#chromium-system-tests",
         },
         {
-            protocol: [
-                "fuchsia.accessibility.semantics.SemanticsManager",
-                "fuchsia.element.GraphicalPresenter",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
-                "fuchsia.media.drm.Widevine",
-                "fuchsia.stash.SecureStore",
-                "fuchsia.tracing.perfetto.ProducerConnector",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
-            ],
+            protocol: [ "fuchsia.ui.scenic.Scenic" ],
             from: "parent",
             to: "#chromium-system-tests",
             availability: "same_as_target",
         },
-
-        // TODO(fxbug.dev/296305908): Remove once Bluetooth streaming E2E tests
-        // no longer use this capability.
         {
-            protocol: "fuchsia.media.SessionAudioConsumerFactory",
+            protocol: [
+                "fuchsia.element.GraphicalPresenter",
+                "fuchsia.media.drm.Widevine",
+            ],
+            from: "parent",
+            to: "#chromium-system-tests",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.tracing.perfetto.ProducerConnector",
+                "fuchsia.tracing.provider.Registry",
+            ],
             from: "parent",
             to: "#chromium-system-tests",
             availability: "same_as_target",

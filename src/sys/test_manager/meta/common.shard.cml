@@ -284,6 +284,10 @@
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.ProfileProvider",
 
+                // Needed for Bluetooth streaming E2E tests.
+                // TODO(fxbug.dev/90434): Consider removing when mediaplayer is v2.
+                "fuchsia.media.SessionAudioConsumerFactory",
+
                 // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
                 // TODO(fxbug.dev/83038): Remove once e2e is better supported.
                 "fuchsia.net.http.Loader",
@@ -419,6 +423,11 @@
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
             ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            protocol: [ "fuchsia.factory.WeaveFactoryStoreProvider" ],
             from: "parent",
             to: [ "#system-tests" ],
         },
@@ -622,9 +631,16 @@
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.memorypressure.Provider",
+                "fuchsia.ui.composition.Flatland",
             ],
             from: "parent",
             to: [ "#system-tests" ],
+        },
+        {
+            protocol: [ "fuchsia.ui.scenic.Scenic" ],
+            from: "parent",
+            to: [ "#system-tests" ],
+            availability: "same_as_target",
         },
 
         // `tz_version_parrot` tests use the system tzdata.
@@ -633,27 +649,6 @@
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
-        },
-
-        // Only available on some products.
-        {
-            protocol: [
-                "fuchsia.factory.WeaveFactoryStoreProvider",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
-            ],
-            from: "parent",
-            to: [ "#system-tests" ],
-            availability: "same_as_target",
-        },
-
-        // TODO(fxbug.dev/296305908): Remove once Bluetooth streaming E2E tests
-        // no longer use this capability.
-        {
-            protocol: "fuchsia.media.SessionAudioConsumerFactory",
-            from: "parent",
-            to: [ "#system-tests" ],
-            availability: "same_as_target",
         },
     ],
     expose: [
