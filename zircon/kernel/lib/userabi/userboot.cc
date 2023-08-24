@@ -234,14 +234,24 @@ void bootstrap_vmos(Handle** handles) {
   size_t rsize = ROUNDUP_PAGE_SIZE(zbi.size_bytes());
   dprintf(INFO, "userboot: ramdisk %#15zx @ %p\n", rsize, rbase);
 
+  // The instrumentation VMOs need to be created prior to the rootfs as the information for these
+  // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
+  zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
+  ASSERT(status == ZX_OK);
+
   // The ZBI.
   fbl::RefPtr<VmObjectPaged> rootfs_vmo;
-  zx_status_t status = VmObjectPaged::CreateFromWiredPages(
+  status = VmObjectPaged::CreateFromWiredPages(
       rbase, rsize, true, AttributionObject::GetKernelAttribution(), &rootfs_vmo);
   ASSERT(status == ZX_OK);
   rootfs_vmo->set_name(kZbiVmoName, sizeof(kZbiVmoName) - 1);
   status = get_vmo_handle(rootfs_vmo, false, rsize, nullptr, &handles[userboot::kZbi]);
   ASSERT(status == ZX_OK);
+  // The rootfs vmo was created with exclusive=true, which means that the VMO is sole owner of those
+  // pages. gPhysHandoff represents a pointer to the previous physmap location of the data, but the
+  // VMO is free to move and use different pages to represent the data, as such attempting to use
+  // this old reference is essentially a use-after-free.
+  gPhysHandoff = nullptr;
 
   // Crashlog.
   fbl::RefPtr<VmObject> crashlog_vmo;
@@ -293,9 +303,6 @@ void bootstrap_vmos(Handle** handles) {
   kcounters_vmo->set_name(counters::kArenaVmoName, sizeof(counters::kArenaVmoName) - 1);
   status = get_vmo_handle(ktl::move(kcounters_vmo), true, CounterArena().VmoContentSize(), nullptr,
                           &handles[userboot::kCounters]);
-  ASSERT(status == ZX_OK);
-
-  status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
   ASSERT(status == ZX_OK);
 }
 
