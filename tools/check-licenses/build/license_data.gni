@@ -25,6 +25,9 @@ import("//build/info/info.gni")
 #   run_analysis (optional)
 #     [bool] Whether to analyze license texts and run tests. Default == true.
 #
+#   always_run_gn_desc (optional)
+#     [bool] Whether to (re)generate build graph using 'fx gn desc'. Default == true.
+#
 #   produce_spdx (optional)
 #     [bool] Whether to also produce an SPDX output. Default == false.
 #
@@ -46,6 +49,11 @@ template("license_data") {
   run_analysis = true
   if (defined(invoker.run_analysis)) {
     run_analysis = invoker.run_analysis
+  }
+
+  always_run_gn_desc = true
+  if (defined(invoker.always_run_gn_desc)) {
+    always_run_gn_desc = invoker.always_run_gn_desc
   }
 
   # TODO(fxb/116788): Remove once SPDX generation is not flaky.
@@ -79,6 +87,12 @@ template("license_data") {
       "//tools/check-licenses/util/cmd/gn/generate_project_json"
   generate_project_json_output = "$root_build_dir/license/gen/project.json"
 
+  if (always_run_gn_desc) {
+    generate_project_json = "//tools/check-licenses/util/cmd/gn/generate_project_json:always_generate_project_json"
+    generate_project_json_output =
+        "$root_build_dir/license/always_gen/project.json"
+  }
+
   generate_intermediate_json = "${target_name}_generate_intermediate_json"
   generate_intermediate_json_output = "$license_outdir/${target_name}_all.json"
 
@@ -96,7 +110,9 @@ template("license_data") {
                              "visibility",
                            ])
     tool = "//tools/check-licenses/util/cmd/gn/generate_intermediate_json:generate_intermediate_json_cmd"
+
     deps = [ generate_project_json ]
+
     sources = [ generate_project_json_output ]
     outputs = [ generate_intermediate_json_output ]
 

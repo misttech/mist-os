@@ -7,6 +7,7 @@ import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/testing/host_test_data.gni")
+import("project_json.gni")
 
 go_library("generate_project_json_lib") {
   sources = [ "main.go" ]
@@ -26,31 +27,11 @@ install_host_tools("host") {
   outputs = [ "check-licenses-gen-project-json" ]
 }
 
-# Generate $root_out_dir/project.json by running 'fx gn gen'
-compiled_action("generate_project_json") {
-  tool = ":check-licenses-gen-project-json"
+project_json("always_generate_project_json") {
+  gen_output = "license/always_gen/project.json"
+  always_run_gn_desc = "true"
+}
 
-  # This command runs "fx gn gen", which potentially touches thousands of files
-  # across the repo. It cannot be hermetic.
-  # TODO(fxbug.dev/84924): Improve the way notice files are generated.
-  hermetic_deps = false
-
-  outputs = [
-    "$root_build_dir/license/gen/project.json.stamp",
-    "$root_build_dir/license/gen/project.json",
-  ]
-  args = [
-    "--gn_path",
-    rebase_path("//prebuilt/third_party/gn/${host_os}-${host_cpu}/gn",
-                root_build_dir),
-    "--build_dir",
-    rebase_path(root_out_dir, root_build_dir),
-    "--gen_output",
-    "license/gen/project.json",
-    "--stamp_output",
-    "license/gen/project.json.stamp",
-  ]
-
-  # "project.json" names the output dir
-  no_output_dir_leaks = false
+project_json("generate_project_json") {
+  gen_output = "license/gen/project.json"
 }

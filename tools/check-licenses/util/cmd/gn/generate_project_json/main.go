@@ -21,10 +21,11 @@ import (
 )
 
 var (
-	gnPath      = flag.String("gn_path", "", "Path to GN executable. Required when target is specified.")
-	buildDir    = flag.String("build_dir", os.Getenv("FUCHSIA_BUILD_DIR"), "Location of GN build directory.")
-	genOutput   = flag.String("gen_output", "", "Location to save intermediate GN gen output.")
-	stampOutput = flag.String("stamp_output", "", "Location to save stamp file.")
+	gnPath          = flag.String("gn_path", "", "Path to GN executable. Required when target is specified.")
+	buildDir        = flag.String("build_dir", os.Getenv("FUCHSIA_BUILD_DIR"), "Location of GN build directory.")
+	genOutput       = flag.String("gen_output", "", "Location to save intermediate GN gen output.")
+	stampOutput     = flag.String("stamp_output", "", "Location to save stamp file.")
+	alwaysRunGnDesc = flag.Bool("always_run_gn_desc", true, "Run 'fx gn desc' even if a project.json file already exists.")
 )
 
 func main() {
@@ -44,14 +45,21 @@ func main() {
 	}
 
 	projectJson := filepath.Join(*buildDir, "project.json")
+
+	_, err := os.Stat(projectJson)
+	projectJsonExists := err == nil
+
 	if shouldRegenerateProjectJson(projectJson) {
 
 		gn, err := util.NewGn(*gnPath, *buildDir)
 		if err != nil {
 			cmd.Exit(err)
 		}
-		if err := gn.GenerateProjectFile(context.Background()); err != nil {
-			cmd.Exit(err)
+
+		if *alwaysRunGnDesc || !projectJsonExists {
+			if err := gn.GenerateProjectFile(context.Background()); err != nil {
+				cmd.Exit(err)
+			}
 		}
 
 		if err := cmd.CopyFile(projectJson, *genOutput); err != nil {
