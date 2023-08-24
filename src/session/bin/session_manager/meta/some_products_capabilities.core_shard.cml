@@ -280,7 +280,7 @@
             ],
             from: "#system-update",
             to: "#session-manager",
-            availability: "optional",
+            availability: "same_as_target",
         },
         {
             protocol: "fuchsia.wlan.wlanix.Wlanix",
