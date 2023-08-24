@@ -18,12 +18,13 @@ use packet_formats::{
 use tracing::{debug, trace, warn};
 
 use crate::{
-    context::{CounterContext, SendFrameContext, TimerContext},
+    context::{CounterContext, SendFrameContext, TimerContext, TracingContext},
     device::{link::LinkDevice, DeviceIdContext, FrameDestination},
     ip::device::nud::{
         BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
         NudConfigContext, NudContext, NudHandler, NudState, NudTimerId,
     },
+    Instant,
 };
 
 // NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
@@ -103,11 +104,14 @@ pub(crate) trait BufferArpSenderContext<
 
 /// The non-synchronized execution context for the ARP protocol.
 pub(crate) trait ArpNonSyncCtx<D: ArpDevice, DeviceId>:
-    TimerContext<ArpTimerId<D, DeviceId>> + CounterContext
+    TimerContext<ArpTimerId<D, DeviceId>> + CounterContext + TracingContext
 {
 }
-impl<DeviceId, D: ArpDevice, C: TimerContext<ArpTimerId<D, DeviceId>> + CounterContext>
-    ArpNonSyncCtx<D, DeviceId> for C
+impl<
+        DeviceId,
+        D: ArpDevice,
+        C: TimerContext<ArpTimerId<D, DeviceId>> + CounterContext + TracingContext,
+    > ArpNonSyncCtx<D, DeviceId> for C
 {
 }
 
@@ -132,7 +136,10 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
 
     /// Calls the function with a mutable reference to ARP state and the ARP
     /// configuration context.
-    fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<D>, &mut Self::ConfigCtx<'_>) -> O>(
+    fn with_arp_state_mut<
+        O,
+        F: FnOnce(&mut ArpState<D, C::Instant>, &mut Self::ConfigCtx<'_>) -> O,
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -160,7 +167,7 @@ pub(crate) trait BufferArpContext<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D
     /// synchronized context.
     fn with_arp_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut ArpState<D>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+        F: FnOnce(&mut ArpState<D, C::Instant>, &mut Self::BufferArpSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -173,7 +180,10 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudC
 {
     type ConfigCtx<'a> = <SC as ArpContext<D, C>>::ConfigCtx<'a>;
 
-    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv4, D>, &mut Self::ConfigCtx<'_>) -> O>(
+    fn with_nud_state_mut<
+        O,
+        F: FnOnce(&mut NudState<Ipv4, D, C::Instant>, &mut Self::ConfigCtx<'_>) -> O,
+    >(
         &mut self,
         device_id: &SC::DeviceId,
         cb: F,
@@ -209,7 +219,7 @@ impl<
 
     fn with_nud_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut NudState<Ipv4, D>, &mut Self::BufferSenderCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<Ipv4, D, C::Instant>, &mut Self::BufferSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &SC::DeviceId,
@@ -517,11 +527,11 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
 ///
 /// Each device will contain an `ArpState` object for each of the network
 /// protocols that it supports.
-pub(crate) struct ArpState<D: ArpDevice> {
-    nud: NudState<Ipv4, D>,
+pub(crate) struct ArpState<D: ArpDevice, I: Instant> {
+    nud: NudState<Ipv4, D, I>,
 }
 
-impl<D: ArpDevice> Default for ArpState<D> {
+impl<D: ArpDevice, I: Instant> Default for ArpState<D, I> {
     fn default() -> Self {
         ArpState { nud: Default::default() }
     }
@@ -540,8 +550,8 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeCtx, FakeNetwork, FakeNonSyncCtx, FakeSyncCtx},
-            TimerHandler,
+            testutil::{FakeCtx, FakeInstant, FakeNetwork, FakeNonSyncCtx, FakeSyncCtx},
+            InstantContext as _, TimerHandler,
         },
         device::{
             ethernet::EthernetLinkDevice,
@@ -570,7 +580,7 @@ mod tests {
     struct FakeArpCtx {
         proto_addr: Option<Ipv4Addr>,
         hw_addr: UnicastAddr<Mac>,
-        arp_state: ArpState<EthernetLinkDevice>,
+        arp_state: ArpState<EthernetLinkDevice, FakeInstant>,
         inner: FakeArpInnerCtx,
         config: FakeArpConfigCtx,
     }
@@ -658,7 +668,7 @@ mod tests {
 
         fn with_arp_state_mut<
             O,
-            F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::ConfigCtx<'_>) -> O,
+            F: FnOnce(&mut ArpState<EthernetLinkDevice, FakeInstant>, &mut Self::ConfigCtx<'_>) -> O,
         >(
             &mut self,
             FakeLinkDeviceId: &FakeLinkDeviceId,
@@ -678,7 +688,10 @@ mod tests {
 
         fn with_arp_state_mut_and_buf_ctx<
             O,
-            F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+            F: FnOnce(
+                &mut ArpState<EthernetLinkDevice, FakeInstant>,
+                &mut Self::BufferArpSenderCtx<'_>,
+            ) -> O,
         >(
             &mut self,
             FakeLinkDeviceId: &FakeLinkDeviceId,
@@ -1160,7 +1173,10 @@ mod tests {
         // If the confirmation was interpreted as solicited, the entry should be
         // marked as REACHABLE; otherwise, it should have transitioned to STALE.
         let expected_state = if expect_solicited {
-            DynamicNeighborState::Reachable(Reachable { link_address: TEST_REMOTE_MAC })
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: TEST_REMOTE_MAC,
+                last_confirmed_at: non_sync_ctx.now(),
+            })
         } else {
             DynamicNeighborState::Stale(Stale { link_address: TEST_REMOTE_MAC })
         };

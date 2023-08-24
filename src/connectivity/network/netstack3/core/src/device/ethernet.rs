@@ -69,7 +69,7 @@ use crate::{
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
-    BufferNonSyncContext, NonSyncContext, SyncCtx,
+    BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
@@ -218,7 +218,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 
     fn with_nud_state_mut<
         O,
-        F: FnOnce(&mut NudState<Ipv6, EthernetLinkDevice>, &mut Self::ConfigCtx<'_>) -> O,
+        F: FnOnce(
+            &mut NudState<Ipv6, EthernetLinkDevice, NonSyncCtx::Instant>,
+            &mut Self::ConfigCtx<'_>,
+        ) -> O,
     >(
         &mut self,
         device_id: &EthernetDeviceId<NonSyncCtx>,
@@ -377,7 +380,10 @@ impl<
 
     fn with_nud_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut NudState<Ipv6, EthernetLinkDevice>, &mut Self::BufferSenderCtx<'_>) -> O,
+        F: FnOnce(
+            &mut NudState<Ipv6, EthernetLinkDevice, BufferNonSyncCtx::Instant>,
+            &mut Self::BufferSenderCtx<'_>,
+        ) -> O,
     >(
         &mut self,
         device_id: &EthernetDeviceId<BufferNonSyncCtx>,
@@ -491,7 +497,7 @@ impl EthernetDeviceStateBuilder {
     }
 
     /// Build the `EthernetDeviceState` from this builder.
-    pub(super) fn build(self) -> EthernetDeviceState {
+    pub(super) fn build<I: Instant>(self) -> EthernetDeviceState<I> {
         let Self { mac, max_frame_size, metric } = self;
 
         EthernetDeviceState {
@@ -535,12 +541,12 @@ pub(crate) struct StaticEthernetDeviceState {
 }
 
 /// The state associated with an Ethernet device.
-pub(crate) struct EthernetDeviceState {
+pub(crate) struct EthernetDeviceState<I: Instant> {
     /// IPv4 ARP state.
-    ipv4_arp: Mutex<ArpState<EthernetLinkDevice>>,
+    ipv4_arp: Mutex<ArpState<EthernetLinkDevice, I>>,
 
     /// IPv6 NUD state.
-    ipv6_nud: Mutex<NudState<Ipv6, EthernetLinkDevice>>,
+    ipv6_nud: Mutex<NudState<Ipv6, EthernetLinkDevice, I>>,
 
     static_state: StaticEthernetDeviceState,
 
@@ -550,7 +556,7 @@ pub(crate) struct EthernetDeviceState {
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
     type Data = StaticEthernetDeviceState;
     type Guard<'l> = &'l StaticEthernetDeviceState
@@ -562,7 +568,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStati
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
     type Data = DynamicEthernetDeviceState;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, DynamicEthernetDeviceState>
@@ -581,7 +587,7 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicSta
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
     type Data = HeldDeviceSockets<C>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
@@ -599,10 +605,10 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
-    type Data = NudState<Ipv6, EthernetLinkDevice>;
-    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, EthernetLinkDevice>>
+    type Data = NudState<Ipv6, EthernetLinkDevice, C::Instant>;
+    type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, EthernetLinkDevice, C::Instant>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -611,10 +617,10 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
-    type Data = ArpState<EthernetLinkDevice>;
-    type Guard<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice>>
+    type Data = ArpState<EthernetLinkDevice, C::Instant>;
+    type Guard<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice, C::Instant>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -623,7 +629,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
     type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
     type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
@@ -635,7 +641,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>
+    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
@@ -1166,7 +1172,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 
     fn with_arp_state_mut<
         O,
-        F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::ConfigCtx<'_>) -> O,
+        F: FnOnce(&mut ArpState<EthernetLinkDevice, C::Instant>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &EthernetDeviceId<C>,
@@ -1194,7 +1200,10 @@ impl<
 
     fn with_arp_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+        F: FnOnce(
+            &mut ArpState<EthernetLinkDevice, C::Instant>,
+            &mut Self::BufferArpSenderCtx<'_>,
+        ) -> O,
     >(
         &mut self,
         device_id: &EthernetDeviceId<C>,
@@ -1350,7 +1359,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::FakeFrameCtx,
+        context::testutil::{FakeFrameCtx, FakeInstant},
         device::{
             socket::Frame,
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
@@ -1396,7 +1405,7 @@ mod tests {
         crate::context::testutil::FakeNonSyncCtx<EthernetTimerId<FakeDeviceId>, (), ()>;
 
     type FakeCtx = crate::context::testutil::WrappedFakeSyncCtx<
-        ArpState<EthernetLinkDevice>,
+        ArpState<EthernetLinkDevice, FakeInstant>,
         FakeEthernetCtx,
         FakeDeviceId,
         FakeDeviceId,
@@ -1555,7 +1564,7 @@ mod tests {
 
         fn with_arp_state_mut<
             O,
-            F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::ConfigCtx<'_>) -> O,
+            F: FnOnce(&mut ArpState<EthernetLinkDevice, FakeInstant>, &mut Self::ConfigCtx<'_>) -> O,
         >(
             &mut self,
             _device_id: &Self::DeviceId,
@@ -1573,7 +1582,10 @@ mod tests {
 
         fn with_arp_state_mut_and_buf_ctx<
             O,
-            F: FnOnce(&mut ArpState<EthernetLinkDevice>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+            F: FnOnce(
+                &mut ArpState<EthernetLinkDevice, FakeInstant>,
+                &mut Self::BufferArpSenderCtx<'_>,
+            ) -> O,
         >(
             &mut self,
             device_id: &Self::DeviceId,

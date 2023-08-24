@@ -31,6 +31,7 @@ use crate::{
         link::{LinkAddress, LinkDevice},
         AnyDevice, DeviceIdContext, StrongId,
     },
+    Instant,
 };
 
 /// The maximum number of multicast solicitations as defined in [RFC 4861
@@ -95,8 +96,8 @@ pub(crate) enum DynamicNeighborUpdateSource {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum NeighborState<D: LinkDevice> {
-    Dynamic(DynamicNeighborState<D>),
+enum NeighborState<D: LinkDevice, I: Instant> {
+    Dynamic(DynamicNeighborState<D, I>),
     Static(D::Address),
 }
 
@@ -107,7 +108,7 @@ enum NeighborState<D: LinkDevice> {
 /// [RFC 4861 section 7.3.2]: https://tools.ietf.org/html/rfc4861#section-7.3.2
 /// [RFC 7048 section 3]: https://tools.ietf.org/html/rfc7048#section-3
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum DynamicNeighborState<D: LinkDevice> {
+pub(crate) enum DynamicNeighborState<D: LinkDevice, I: Instant> {
     /// Address resolution is being performed on the entry.
     ///
     /// Specifically, a probe has been sent to the solicited-node multicast
@@ -119,7 +120,7 @@ pub(crate) enum DynamicNeighborState<D: LinkDevice> {
     /// milliseconds that the forward path to the neighbor was functioning
     /// properly. While `Reachable`, no special action takes place as packets
     /// are sent.
-    Reachable(Reachable<D>),
+    Reachable(Reachable<D, I>),
 
     /// More than ReachableTime milliseconds have elapsed since the last
     /// positive confirmation was received that the forward path was functioning
@@ -324,8 +325,9 @@ impl Incomplete {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Reachable<D: LinkDevice> {
+pub(crate) struct Reachable<D: LinkDevice, I: Instant> {
     pub(crate) link_address: D::Address,
+    pub(crate) last_confirmed_at: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -610,7 +612,7 @@ impl<D: LinkDevice> Unreachable<D> {
     }
 }
 
-impl<D: LinkDevice> DynamicNeighborState<D> {
+impl<D: LinkDevice, Time: Instant> DynamicNeighborState<D, Time> {
     fn cancel_timer<I, C, DeviceId>(
         &mut self,
         ctx: &mut C,
@@ -637,7 +639,10 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
                     "incomplete entry for {neighbor} should have had a timer",
                 );
             }
-            DynamicNeighborState::Reachable(Reachable { link_address: _ }) => {
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: _,
+                last_confirmed_at: _,
+            }) => {
                 assert_ne!(
                     ctx.cancel_timer(NudTimerId {
                         device_id: device_id.clone(),
@@ -731,13 +736,35 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
         link_address: D::Address,
     ) where
         I: Ip,
-        C: NonSyncNudContext<I, D, SC::DeviceId>,
+        C: NonSyncNudContext<I, D, SC::DeviceId, Instant = Time>,
         SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
     {
         // TODO(https://fxbug.dev/35185): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
-        let previous =
-            core::mem::replace(self, DynamicNeighborState::Reachable(Reachable { link_address }));
+        let now = ctx.now();
+        match self {
+            // If this neighbor entry is already in REACHABLE, rather than proactively
+            // rescheduling the timer (which can be a relatively expensive operation
+            // especially in the hot path), simply update `last_confirmed_at` so that when
+            // the timer does eventually fire, we can reschedule it accordingly.
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: current,
+                last_confirmed_at,
+            }) if *current == link_address => {
+                *last_confirmed_at = now;
+                return;
+            }
+            DynamicNeighborState::Incomplete(_)
+            | DynamicNeighborState::Reachable(_)
+            | DynamicNeighborState::Stale(_)
+            | DynamicNeighborState::Delay(_)
+            | DynamicNeighborState::Probe(_)
+            | DynamicNeighborState::Unreachable(_) => {}
+        }
+        let previous = core::mem::replace(
+            self,
+            DynamicNeighborState::Reachable(Reachable { link_address, last_confirmed_at: now }),
+        );
         previous.cancel_timer_and_flush_pending_frames(
             sync_ctx,
             ctx,
@@ -745,7 +772,6 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
             neighbor,
             link_address,
         );
-
         assert_eq!(
             ctx.schedule_timer(
                 REACHABLE_TIME.get(),
@@ -835,7 +861,7 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
 
                 Ok(false)
             }
-            DynamicNeighborState::Reachable(Reachable { link_address })
+            DynamicNeighborState::Reachable(Reachable { link_address, last_confirmed_at: _ })
             | DynamicNeighborState::Delay(Delay { link_address })
             | DynamicNeighborState::Probe(Probe { link_address, transmit_counter: _ }) => {
                 sync_ctx.send_ip_packet_to_neighbor_link_addr(ctx, *link_address, body)?;
@@ -874,8 +900,11 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
         //
         // [RFC 4861 section 7.2.3]: https://tools.ietf.org/html/rfc4861#section-7.2.3
         let transition_to_stale = match self {
-            DynamicNeighborState::Incomplete { .. } => true,
-            DynamicNeighborState::Reachable(Reachable { link_address: current })
+            DynamicNeighborState::Incomplete(_) => true,
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: current,
+                last_confirmed_at: _,
+            })
             | DynamicNeighborState::Stale(Stale { link_address: current })
             | DynamicNeighborState::Delay(Delay { link_address: current })
             | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ })
@@ -898,7 +927,7 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
         flags: ConfirmationFlags,
     ) where
         I: Ip,
-        C: NonSyncNudContext<I, D, SC::DeviceId>,
+        C: NonSyncNudContext<I, D, SC::DeviceId, Instant = Time>,
         SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
     {
         let ConfirmationFlags { solicited_flag, override_flag } = flags;
@@ -925,7 +954,10 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
                     Some(NewState::Stale { link_address })
                 }
             }
-            DynamicNeighborState::Reachable(Reachable { link_address: current })
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: current,
+                last_confirmed_at: _,
+            })
             | DynamicNeighborState::Stale(Stale { link_address: current })
             | DynamicNeighborState::Delay(Delay { link_address: current })
             | DynamicNeighborState::Probe(Probe { link_address: current, transmit_counter: _ })
@@ -952,9 +984,10 @@ impl<D: LinkDevice> DynamicNeighborState<D> {
                     //       update the cache.
                     (_, true, false) => match self {
                         // NB: do not update the link address.
-                        DynamicNeighborState::Reachable(Reachable { link_address }) => {
-                            Some(NewState::Stale { link_address: *link_address })
-                        }
+                        DynamicNeighborState::Reachable(Reachable {
+                            link_address,
+                            last_confirmed_at: _,
+                        }) => Some(NewState::Stale { link_address: *link_address }),
                         // Ignore the advertisement and do not update the cache.
                         DynamicNeighborState::Stale(_)
                         | DynamicNeighborState::Delay(_)
@@ -1008,7 +1041,7 @@ pub(crate) mod testutil {
             assert_matches!(
                 neighbors.get(&neighbor),
                 Some(NeighborState::Dynamic(
-                    DynamicNeighborState::Reachable(Reachable{ link_address })
+                    DynamicNeighborState::Reachable(Reachable{ link_address, last_confirmed_at: _ })
                     | DynamicNeighborState::Stale(Stale{ link_address })
                 )) => {
                     assert_eq!(link_address, &expected_link_addr)
@@ -1026,7 +1059,7 @@ pub(crate) mod testutil {
         sync_ctx: &mut SC,
         device_id: SC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
-        expected_state: DynamicNeighborState<D>,
+        expected_state: DynamicNeighborState<D, C::Instant>,
     ) {
         sync_ctx.with_nud_state_mut(&device_id, |NudState { neighbors }, _config| {
             assert_matches!(
@@ -1072,9 +1105,9 @@ pub(crate) struct NudTimerId<I: Ip, D: LinkDevice, DeviceId> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(crate) struct NudState<I: Ip, D: LinkDevice> {
+pub(crate) struct NudState<I: Ip, D: LinkDevice, Time: Instant> {
     // TODO(https://fxbug.dev/126138): Key neighbors by `UnicastAddr`.
-    neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D>>,
+    neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, Time>>,
 }
 
 /// The non-synchronized context for NUD.
@@ -1096,7 +1129,10 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, C: NonSyncNudContext<I, D, Sel
 
     /// Calls the function with a mutable reference to the NUD state and NUD
     /// configuration for the device.
-    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<I, D>, &mut Self::ConfigCtx<'_>) -> O>(
+    fn with_nud_state_mut<
+        O,
+        F: FnOnce(&mut NudState<I, D, C::Instant>, &mut Self::ConfigCtx<'_>) -> O,
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -1141,7 +1177,7 @@ pub(crate) trait BufferNudContext<
     /// synchronized context.
     fn with_nud_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut NudState<I, D>, &mut Self::BufferSenderCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<I, D, C::Instant>, &mut Self::BufferSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -1303,7 +1339,7 @@ impl<I: Ip, D: LinkDevice, C: NonSyncNudContext<I, D, SC::DeviceId>, SC: NudCont
                         // TODO(http://fxbug.dev/132349): consider retaining this neighbor entry in
                         // a sentinel `Failed` state, equivalent to its having been discarded except
                         // for debugging/observability purposes.
-                        let _: NeighborState<D> = entry.remove();
+                        let _: NeighborState<_, _> = entry.remove();
                         None
                     }
                 }
@@ -1336,19 +1372,38 @@ impl<I: Ip, D: LinkDevice, C: NonSyncNudContext<I, D, SC::DeviceId>, SC: NudCont
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
                     link_address,
+                    last_confirmed_at,
                 })) => {
                     assert_eq!(event, NudEvent::ReachableTime);
                     let link_address = *link_address;
 
-                    // Per [RFC 4861 section 7.3.3]:
-                    //
-                    //   When ReachableTime milliseconds have passed since receipt of the last
-                    //   reachability confirmation for a neighbor, the Neighbor Cache entry's
-                    //   state changes from REACHABLE to STALE.
-                    //
-                    // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
-                    *entry.get_mut() =
-                        NeighborState::Dynamic(DynamicNeighborState::Stale(Stale { link_address }));
+                    let expiration = last_confirmed_at.add(REACHABLE_TIME.get());
+                    if expiration > ctx.now() {
+                        assert_eq!(
+                            ctx.schedule_timer_instant(
+                                expiration,
+                                NudTimerId {
+                                    device_id: device_id.clone(),
+                                    lookup_addr,
+                                    event: NudEvent::ReachableTime,
+                                    _marker: PhantomData
+                                },
+                            ),
+                            None
+                        );
+                    } else {
+                        // Per [RFC 4861 section 7.3.3]:
+                        //
+                        //   When ReachableTime milliseconds have passed since receipt of the last
+                        //   reachability confirmation for a neighbor, the Neighbor Cache entry's
+                        //   state changes from REACHABLE to STALE.
+                        //
+                        // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
+                        *entry.get_mut() =
+                            NeighborState::Dynamic(DynamicNeighborState::Stale(Stale {
+                                link_address,
+                            }));
+                    }
 
                     None
                 }
@@ -1411,7 +1466,7 @@ impl<
                         //   and set its reachability state to STALE as specified in Section 7.3.3.
                         //
                         // [RFC 4861 section 7.2.3]: https://tools.ietf.org/html/rfc4861#section-7.2.3
-                        let _: &mut NeighborState<_> =
+                        let _: &mut NeighborState<_, _> =
                             e.insert(NeighborState::Dynamic(DynamicNeighborState::Stale(Stale {
                                 link_address,
                             })));
@@ -1495,13 +1550,16 @@ impl<
         NudContext::with_nud_state_mut(
             self,
             device,
-            |NudState { neighbors }: &mut NudState<_, _>, _config| {
+            |NudState { neighbors }: &mut NudState<_, _, _>, _config| {
                 neighbors.get(dst).map_or(
                     NeighborLinkAddr::PendingNeighborResolution,
                     |neighbor_state| match neighbor_state {
                         NeighborState::Static(link_address)
                         | NeighborState::Dynamic(
-                            DynamicNeighborState::Reachable(Reachable { link_address })
+                            DynamicNeighborState::Reachable(Reachable {
+                                link_address,
+                                last_confirmed_at: _,
+                            })
                             | DynamicNeighborState::Stale(Stale { link_address })
                             | DynamicNeighborState::Delay(Delay { link_address })
                             | DynamicNeighborState::Probe(Probe {
@@ -1542,7 +1600,7 @@ impl<
             self.with_nud_state_mut_and_buf_ctx(device_id, |NudState { neighbors }, sync_ctx| {
                 match neighbors.entry(lookup_addr) {
                     Entry::Vacant(e) => {
-                        let _: &mut NeighborState<_> = e.insert(NeighborState::Dynamic(
+                        let _: &mut NeighborState<_, _> = e.insert(NeighborState::Dynamic(
                             DynamicNeighborState::Incomplete(Incomplete::new_with_pending_frame(
                                 sync_ctx,
                                 ctx,
@@ -1604,6 +1662,63 @@ impl<
     }
 }
 
+/// Confirm upper-layer forward reachability to the specified neighbor through
+/// the specified device.
+#[cfg(test)]
+fn confirm_reachable<I, D, SC, C>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+    neighbor: SpecifiedAddr<I::Addr>,
+) where
+    I: Ip,
+    D: LinkDevice,
+    C: NonSyncNudContext<I, D, SC::DeviceId>,
+    SC: BufferNudContext<Buf<Vec<u8>>, I, D, C>,
+{
+    sync_ctx.with_nud_state_mut_and_buf_ctx(device_id, |NudState { neighbors }, sync_ctx| {
+        match neighbors.entry(neighbor) {
+            Entry::Vacant(_) => {
+                tracing::error!(
+                    "got an upper-layer confirmation for non-existent neighbor entry {neighbor}"
+                );
+            }
+            Entry::Occupied(e) => match e.into_mut() {
+                NeighborState::Static(_) => {}
+                NeighborState::Dynamic(e) => {
+                    // Per [RFC 4861 section 7.3.3]:
+                    //
+                    //   When a reachability confirmation is received (either through upper-
+                    //   layer advice or a solicited Neighbor Advertisement), an entry's state
+                    //   changes to REACHABLE.  The one exception is that upper-layer advice has
+                    //   no effect on entries in the INCOMPLETE state (e.g., for which no link-
+                    //   layer address is cached).
+                    //
+                    // [RFC 4861 section 7.3.3]: https://tools.ietf.org/html/rfc4861#section-7.3.3
+                    let link_address = match e {
+                        DynamicNeighborState::Incomplete(_) => return,
+                        DynamicNeighborState::Reachable(Reachable {
+                            link_address,
+                            last_confirmed_at: _,
+                        })
+                        | DynamicNeighborState::Stale(Stale { link_address })
+                        | DynamicNeighborState::Delay(Delay { link_address })
+                        | DynamicNeighborState::Probe(Probe {
+                            link_address,
+                            transmit_counter: _,
+                        })
+                        | DynamicNeighborState::Unreachable(Unreachable {
+                            link_address,
+                            mode: _,
+                        }) => *link_address,
+                    };
+                    e.enter_reachable(sync_ctx, ctx, device_id, neighbor, link_address);
+                }
+            },
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
@@ -1635,8 +1750,8 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                handle_timer_helper_with_sc_ref_mut, FakeCtxWithSyncCtx, FakeNonSyncCtx,
-                FakeSyncCtx, FakeTimerCtxExt as _, WrappedFakeSyncCtx,
+                handle_timer_helper_with_sc_ref_mut, FakeCtxWithSyncCtx, FakeInstant,
+                FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _, WrappedFakeSyncCtx,
             },
             InstantContext, SendFrameContext as _,
         },
@@ -1664,7 +1779,7 @@ mod tests {
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
-        nud: NudState<I, D>,
+        nud: NudState<I, D, FakeInstant>,
     }
 
     struct FakeConfigContext {
@@ -1730,7 +1845,7 @@ mod tests {
 
         fn with_nud_state_mut<
             O,
-            F: FnOnce(&mut NudState<I, FakeLinkDevice>, &mut Self::ConfigCtx<'_>) -> O,
+            F: FnOnce(&mut NudState<I, FakeLinkDevice, FakeInstant>, &mut Self::ConfigCtx<'_>) -> O,
         >(
             &mut self,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
@@ -1769,7 +1884,10 @@ mod tests {
 
         fn with_nud_state_mut_and_buf_ctx<
             O,
-            F: FnOnce(&mut NudState<I, FakeLinkDevice>, &mut Self::BufferSenderCtx<'_>) -> O,
+            F: FnOnce(
+                &mut NudState<I, FakeLinkDevice, FakeInstant>,
+                &mut Self::BufferSenderCtx<'_>,
+            ) -> O,
         >(
             &mut self,
             _device_id: &Self::DeviceId,
@@ -1813,7 +1931,7 @@ mod tests {
             sync_ctx.outer.nud.neighbors.get(&lookup_addr),
             Some(entry @ (
                 NeighborState::Dynamic(
-                    DynamicNeighborState::Reachable (Reachable { link_address })
+                    DynamicNeighborState::Reachable (Reachable { link_address, last_confirmed_at: _ })
                     | DynamicNeighborState::Stale (Stale { link_address })
                     | DynamicNeighborState::Delay (Delay { link_address })
                     | DynamicNeighborState::Probe (Probe { link_address, transmit_counter: _ })
@@ -2014,7 +2132,10 @@ mod tests {
         );
         assert_neighbor_state(
             sync_ctx,
-            DynamicNeighborState::Reachable(Reachable { link_address }),
+            DynamicNeighborState::Reachable(Reachable {
+                link_address,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
         );
         assert_pending_frame_sent(sync_ctx, queued_frame, link_address);
     }
@@ -2118,7 +2239,7 @@ mod tests {
         sync_ctx: &mut FakeCtxImpl<I>,
         non_sync_ctx: &mut FakeNonSyncCtxImpl<I>,
         state: InitialState,
-    ) -> DynamicNeighborState<FakeLinkDevice> {
+    ) -> DynamicNeighborState<FakeLinkDevice, FakeInstant> {
         match state {
             InitialState::Incomplete => {
                 let _: VecDeque<Buf<Vec<u8>>> =
@@ -2148,7 +2269,7 @@ mod tests {
     #[track_caller]
     fn assert_neighbor_state<I: Ip + TestIpExt>(
         sync_ctx: &FakeCtxImpl<I>,
-        state: DynamicNeighborState<FakeLinkDevice>,
+        state: DynamicNeighborState<FakeLinkDevice, FakeInstant>,
     ) {
         let FakeNudContext { nud } = &sync_ctx.outer;
         assert_eq!(
@@ -2244,7 +2365,10 @@ mod tests {
         );
 
         let expected_state = if solicited_flag {
-            DynamicNeighborState::Reachable(Reachable { link_address: LINK_ADDR1 })
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now(),
+            })
         } else {
             DynamicNeighborState::Stale(Stale { link_address: LINK_ADDR1 })
         };
@@ -2360,7 +2484,10 @@ mod tests {
         // Neighbor should now be in REACHABLE, per RFC 4861 section 7.2.5.
         assert_neighbor_state(
             &sync_ctx,
-            DynamicNeighborState::Reachable(Reachable { link_address: LINK_ADDR1 }),
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
         );
     }
 
@@ -2473,7 +2600,10 @@ mod tests {
         // Neighbor should now be in REACHABLE, per RFC 4861 section 7.2.5.
         assert_neighbor_state(
             &sync_ctx,
-            DynamicNeighborState::Reachable(Reachable { link_address: LINK_ADDR2 }),
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR2,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
         );
     }
 
@@ -2498,7 +2628,10 @@ mod tests {
         // Neighbor should still be in REACHABLE with the same link address.
         assert_neighbor_state(
             &sync_ctx,
-            DynamicNeighborState::Reachable(Reachable { link_address: LINK_ADDR1 }),
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
         );
     }
 
@@ -3056,7 +3189,10 @@ mod tests {
 
         assert_neighbor_state(
             &sync_ctx,
-            DynamicNeighborState::Reachable(Reachable { link_address: LINK_ADDR1 }),
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
         );
         assert_eq!(
             sync_ctx.inner.take_frames(),
@@ -3251,7 +3387,7 @@ mod tests {
     >(
         sync_ctx: &'a SyncCtx<C>,
         device_id: &EthernetDeviceId<C>,
-        expected: HashMap<SpecifiedAddr<I::Addr>, NeighborState<EthernetLinkDevice>>,
+        expected: HashMap<SpecifiedAddr<I::Addr>, NeighborState<EthernetLinkDevice, C::Instant>>,
     ) where
         Locked<&'a SyncCtx<C>, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, C>
             + DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<C>>,
@@ -3294,6 +3430,121 @@ mod tests {
             NudHandler::resolve_link_addr(&mut sync_ctx, &FakeLinkDeviceId, &I::LOOKUP_ADDR1),
             expected_result
         );
+    }
+
+    #[ip_test]
+    #[test_case(InitialState::Incomplete, false; "incomplete neighbor")]
+    #[test_case(InitialState::Reachable, true; "reachable neighbor")]
+    #[test_case(InitialState::Stale, true; "stale neighbor")]
+    #[test_case(InitialState::Delay, true; "delay neighbor")]
+    #[test_case(InitialState::Probe, true; "probe neighbor")]
+    #[test_case(InitialState::Unreachable, true; "unreachable neighbor")]
+    fn upper_layer_confirmation<I: Ip + TestIpExt>(
+        initial_state: InitialState,
+        should_transition_to_reachable: bool,
+    ) {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+
+        let initial = init_neighbor_in_state(&mut sync_ctx, &mut non_sync_ctx, initial_state);
+
+        confirm_reachable(&mut sync_ctx, &mut non_sync_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1);
+
+        if !should_transition_to_reachable {
+            assert_neighbor_state(&sync_ctx, initial);
+            return;
+        }
+
+        // Neighbor should have transitioned to REACHABLE and scheduled a timer.
+        assert_neighbor_state(
+            &sync_ctx,
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
+        );
+        non_sync_ctx.timer_ctx().assert_timers_installed([(
+            NudTimerId {
+                device_id: FakeLinkDeviceId,
+                lookup_addr: I::LOOKUP_ADDR1,
+                event: NudEvent::ReachableTime,
+                _marker: PhantomData,
+            },
+            non_sync_ctx.now() + REACHABLE_TIME.get(),
+        )]);
+
+        // Advance the clock by less than REACHABLE_TIME and confirm reachability again.
+        // The existing timer should not have been rescheduled; only the entry's
+        // `last_confirmed_at` timestamp should have been updated.
+        non_sync_ctx.timer_ctx_mut().instant.sleep(REACHABLE_TIME.get() / 2);
+        confirm_reachable(&mut sync_ctx, &mut non_sync_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1);
+        assert_neighbor_state(
+            &sync_ctx,
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now(),
+            }),
+        );
+        non_sync_ctx.timer_ctx().assert_timers_installed([(
+            NudTimerId {
+                device_id: FakeLinkDeviceId,
+                lookup_addr: I::LOOKUP_ADDR1,
+                event: NudEvent::ReachableTime,
+                _marker: PhantomData,
+            },
+            non_sync_ctx.now() + REACHABLE_TIME.get() / 2,
+        )]);
+
+        // When the original timer eventually does expire, a new timer should be
+        // scheduled based on when the entry was last confirmed.
+        assert_eq!(
+            non_sync_ctx.trigger_timers_for(
+                REACHABLE_TIME.get() / 2,
+                handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+            ),
+            [NudTimerId {
+                device_id: FakeLinkDeviceId,
+                lookup_addr: I::LOOKUP_ADDR1,
+                event: NudEvent::ReachableTime,
+                _marker: PhantomData,
+            }]
+        );
+        assert_neighbor_state(
+            &sync_ctx,
+            DynamicNeighborState::Reachable(Reachable {
+                link_address: LINK_ADDR1,
+                last_confirmed_at: non_sync_ctx.now() - REACHABLE_TIME.get() / 2,
+            }),
+        );
+        non_sync_ctx.timer_ctx().assert_timers_installed([(
+            NudTimerId {
+                device_id: FakeLinkDeviceId,
+                lookup_addr: I::LOOKUP_ADDR1,
+                event: NudEvent::ReachableTime,
+                _marker: PhantomData,
+            },
+            non_sync_ctx.now() + REACHABLE_TIME.get() / 2,
+        )]);
+
+        // When *that* timer fires, if the entry has not been confirmed since it was
+        // scheduled, it should move into STALE.
+        assert_eq!(
+            non_sync_ctx.trigger_timers_for(
+                REACHABLE_TIME.get() / 2,
+                handle_timer_helper_with_sc_ref_mut(&mut sync_ctx, TimerHandler::handle_timer),
+            ),
+            [NudTimerId {
+                device_id: FakeLinkDeviceId,
+                lookup_addr: I::LOOKUP_ADDR1,
+                event: NudEvent::ReachableTime,
+                _marker: PhantomData,
+            }]
+        );
+        assert_neighbor_state(
+            &sync_ctx,
+            DynamicNeighborState::Stale(Stale { link_address: LINK_ADDR1 }),
+        );
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     #[test]
@@ -3646,6 +3897,7 @@ mod tests {
                 neighbor_ip.into_specified(),
                 NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
                     link_address: remote_mac.get(),
+                    last_confirmed_at: non_sync_ctx.now(),
                 })),
             )]),
         );

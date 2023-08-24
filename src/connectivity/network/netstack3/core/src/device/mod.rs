@@ -204,7 +204,11 @@ fn with_ethernet_state_and_sync_ctx<
     O,
     F: FnOnce(
         Locked<
-            &IpLinkDeviceState<NonSyncCtx, NonSyncCtx::EthernetDeviceState, EthernetDeviceState>,
+            &IpLinkDeviceState<
+                NonSyncCtx,
+                NonSyncCtx::EthernetDeviceState,
+                EthernetDeviceState<NonSyncCtx::Instant>,
+            >,
             L,
         >,
         &mut Locked<&SyncCtx<NonSyncCtx>, L>,
@@ -232,7 +236,11 @@ fn with_ethernet_state<
     O,
     F: FnOnce(
         Locked<
-            &IpLinkDeviceState<NonSyncCtx, NonSyncCtx::EthernetDeviceState, EthernetDeviceState>,
+            &IpLinkDeviceState<
+                NonSyncCtx,
+                NonSyncCtx::EthernetDeviceState,
+                EthernetDeviceState<NonSyncCtx::Instant>,
+            >,
             L,
         >,
     ) -> O,
@@ -414,7 +422,7 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx>
 pub(crate) struct DevicesIter<'s, C: NonSyncContext> {
     ethernet: id_map::Iter<
         's,
-        PrimaryRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>>,
+        PrimaryRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
     >,
     loopback: core::option::Iter<
         's,
@@ -1223,7 +1231,7 @@ impl<
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub struct EthernetWeakDeviceId<C: DeviceLayerTypes>(
     usize,
-    WeakRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>>,
+    WeakRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
 );
 
 impl<C: DeviceLayerTypes> PartialEq for EthernetWeakDeviceId<C> {
@@ -1286,7 +1294,7 @@ impl<C: DeviceLayerTypes> EthernetWeakDeviceId<C> {
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
 pub struct EthernetDeviceId<C: DeviceLayerTypes>(
     usize,
-    StrongRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>>,
+    StrongRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
 );
 
 impl<C: DeviceLayerTypes> PartialEq for EthernetDeviceId<C> {
@@ -1720,7 +1728,9 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct Devices<C: DeviceLayerTypes> {
-    ethernet: IdMap<PrimaryRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState>>>,
+    ethernet: IdMap<
+        PrimaryRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
+    >,
     loopback: Option<PrimaryRc<IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>>>,
 }
 

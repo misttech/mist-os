@@ -464,7 +464,7 @@ pub mod testutil {
 
     /// A fake [`TimerContext`] which stores time as a [`FakeInstantCtx`].
     pub(crate) struct FakeTimerCtx<Id> {
-        instant: FakeInstantCtx,
+        pub(crate) instant: FakeInstantCtx,
         timers: BinaryHeap<InstantAndData<Id>>,
     }
 
@@ -1145,6 +1145,11 @@ pub mod testutil {
         #[cfg(test)]
         pub(crate) fn timer_ctx(&self) -> &FakeTimerCtx<TimerId> {
             &self.timers
+        }
+
+        #[cfg(test)]
+        pub(crate) fn timer_ctx_mut(&mut self) -> &mut FakeTimerCtx<TimerId> {
+            &mut self.timers
         }
 
         #[cfg(test)]
