@@ -10,7 +10,7 @@ use errors::ffx_bail;
 use ffx_config::Sdk;
 use ffx_emulator_common::get_file_hash;
 use ffx_emulator_config::EmulatorEngine;
-use ffx_emulator_engines::EngineBuilder;
+use ffx_emulator_engines::{process_flag_template, EngineBuilder};
 use ffx_emulator_start_args::StartCommand;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter, TryFromEnv};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
@@ -240,11 +240,29 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 Self::save_disk_hashes(config)?;
             }
         } else {
-            engine = if !emulator_configuration.runtime.config_override && existing_engine.is_some()
-            {
-                existing_engine.expect("existing engine instance")
-            } else {
-                if self.cmd.reuse {
+            if self.cmd.reuse && !emulator_configuration.runtime.config_override {
+                if let Some(existing_instance) = existing_engine {
+                    engine = existing_instance;
+                    // Reset the runtime config before reusing
+                    // Reset the host port map.
+                    if engine.emu_config().host.networking == NetworkingMode::User {
+                        engine.emu_config_mut().host.port_map =
+                            emulator_configuration.host.port_map.clone();
+                    }
+                    // Set the log file
+                    let config = engine.emu_config_mut();
+                    config.host.log = emulator_configuration.host.log.clone();
+                    config.runtime.startup_timeout =
+                        emulator_configuration.runtime.startup_timeout.clone();
+                    config.runtime.log_level = emulator_configuration.runtime.log_level.clone();
+
+                    // And regenerate the flags
+                    config.flags = process_flag_template(config)
+                        .context("Failed to process the flags template file.")?;
+
+                    engine.save_to_disk().await?;
+                    println!("Reusing existing instance.");
+                } else {
                     let message = format!(
                         "Instance '{name}' not found with --reuse flag. \
                         Creating a new emulator named '{name}'.",
@@ -253,11 +271,23 @@ impl<T: EngineOperations> EmuStartTool<T> {
                     tracing::debug!("{message}");
                     println!("{message}");
                     self.cmd.reuse = false;
+                    engine = self
+                        .engine_operations
+                        .new_engine(&emulator_configuration, engine_type)
+                        .await
+                        .user_message("Error creating new engine")?
                 }
-                self.engine_operations
-                    .new_engine(&emulator_configuration, engine_type)
-                    .await
-                    .user_message("Error creating new engine")?
+            } else {
+                engine = if !emulator_configuration.runtime.config_override
+                    && existing_engine.is_some()
+                {
+                    existing_engine.expect("existing engine instance")
+                } else {
+                    self.engine_operations
+                        .new_engine(&emulator_configuration, engine_type)
+                        .await
+                        .user_message("Error creating new engine")?
+                }
             }
         }
         Ok(engine)
@@ -366,11 +396,23 @@ impl<T: EngineOperations> EmuStartTool<T> {
         let zbi_hash = &config.guest.zbi_hash;
         let disk_hash = &config.guest.disk_hash;
 
+        // If the hashes match, reuse the instance. Reset the config properties that are
+        // dynamic and should be set from the command line.
         if &new_zbi == zbi_hash && &new_disk == disk_hash {
             // Reset the host port map.
             if engine.emu_config().host.networking == NetworkingMode::User {
                 engine.emu_config_mut().host.port_map = new_config.host.port_map.clone();
             }
+            // Set the log file
+            let config = engine.emu_config_mut();
+            config.host.log = new_config.host.log.clone();
+            config.runtime.startup_timeout = new_config.runtime.startup_timeout.clone();
+            config.runtime.log_level = new_config.runtime.log_level.clone();
+
+            // And regenerate the flags
+            config.flags = process_flag_template(config)
+                .context("Failed to process the flags template file.")?;
+
             engine.save_to_disk().await?;
             return Ok((true, engine));
         } else {
@@ -409,7 +451,7 @@ mod tests {
     use assembly_manifest::Image;
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8PathBuf;
-    use emulator_instance::{GuestConfig, RuntimeConfig};
+    use emulator_instance::{LogLevel, RuntimeConfig};
     use ffx_config::{BuildOverride, ConfigLevel, SdkRoot, TestEnv};
     use ffx_emulator_config::EmulatorEngine;
     use pbms::ProductBundle;
@@ -767,25 +809,28 @@ mod tests {
         let env = ffx_config::test_init().await.unwrap();
         let sdk = make_intree_sdk(&env).await?;
 
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
         let cmd = StartCommand { reuse: true, net: Some("user".into()), ..Default::default() };
 
         let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
+        let reused_config =
+            make_configs(&tool.cmd, Some(pb.clone())).await.expect("reused_config config");
+
         tool.engine_operations.expect_new_engine().times(0);
         tool.engine_operations
             .expect_get_engine_by_name()
-            .returning(|_| {
+            .returning(move |_| {
                 Ok(Some(Box::new(TestEngine {
                     do_stage: false,
                     do_start: true,
-                    config: EmulatorConfiguration::default(),
+                    config: reused_config.clone(),
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>))
             })
             .times(1);
-
-        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
-        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
 
         tool.engine_operations
             .expect_load_product_bundle()
@@ -847,24 +892,27 @@ mod tests {
 
         let cmd = StartCommand { name: None, reuse: true, config: None, ..Default::default() };
 
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
         let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        let reused_config =
+            make_configs(&tool.cmd, Some(pb.clone())).await.expect("reused_config config");
 
         tool.engine_operations.expect_new_engine().times(0);
         tool.engine_operations
             .expect_get_engine_by_name()
-            .returning(|name| {
+            .returning(move |name| {
                 assert_eq!(name, &Some(DEFAULT_NAME.to_string()));
                 Ok(Some(Box::new(TestEngine {
                     do_stage: false,
                     do_start: true,
-                    config: EmulatorConfiguration::default(),
+                    config: reused_config.clone(),
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>))
             })
             .times(1);
-
-        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
-        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
 
         tool.engine_operations
             .expect_load_product_bundle()
@@ -996,25 +1044,28 @@ mod tests {
         let env = ffx_config::test_init().await.unwrap();
         let sdk = make_intree_sdk(&env).await?;
 
+        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
         let cmd = StartCommand { reuse: true, net: Some("user".into()), ..Default::default() };
 
         let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
+        let reused_config =
+            make_configs(&tool.cmd, Some(pb.clone())).await.expect("reused_config config");
+
         tool.engine_operations
             .expect_get_engine_by_name()
-            .returning(|_| {
+            .returning(move |_| {
                 Ok(Some(Box::new(TestEngine {
                     do_stage: false,
                     do_start: true,
-                    config: EmulatorConfiguration::default(),
+                    config: reused_config.clone(),
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>))
             })
             .times(1);
         tool.engine_operations.expect_new_engine().times(0);
-
-        let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
-        let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
 
         tool.engine_operations
             .expect_load_product_bundle()
@@ -1222,6 +1273,11 @@ mod tests {
 
         let mut tool = make_test_emu_start_tool(cmd, sdk).await;
 
+        let mut matching_config =
+            make_configs(&tool.cmd, Some(pb.clone())).await.expect("matching config");
+        matching_config.guest.zbi_hash = "d53f0b8a19b29d74".into();
+        matching_config.guest.disk_hash = "d547336219b6b160".into();
+
         // Only load the product bundle once.
         tool.engine_operations
             .expect_load_product_bundle()
@@ -1231,21 +1287,12 @@ mod tests {
         // Only look for the existing engine once, and find it.
         tool.engine_operations
             .expect_get_engine_by_name()
-            .returning(|_| {
-                let config = EmulatorConfiguration {
-                    guest: GuestConfig {
-                        // These match the hashes of the test files.
-                        zbi_hash: "d53f0b8a19b29d74".into(),
-                        disk_hash: "d547336219b6b160".into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                };
+            .returning(move |_| {
                 Ok(Some(Box::new(TestEngine {
                     // no staging should happen since we're reusing an instance.
                     do_stage: false,
                     do_start: true,
-                    config: config.clone(),
+                    config: matching_config.clone(),
                     ..Default::default()
                 }) as Box<dyn EmulatorEngine>))
             })
@@ -1255,6 +1302,76 @@ mod tests {
         tool.engine_operations.expect_new_engine().times(0);
 
         tool.main(SimpleWriter::new()).await.expect("main with stage");
+    }
+
+    // Checks that the command line options are applied to the existing instance when it is reused.
+    #[fuchsia::test]
+    async fn test_check_if_reusable_applies_args() {
+        // Setup the test environment and SDK. This is boilerplate for
+        // any test running ffx.
+        let env = ffx_config::test_init().await.unwrap();
+        let sdk = make_intree_sdk(&env).await.expect("test sdk");
+
+        // Create a test product bundle. This is boilerplate for
+        // any test that needs to use a product bundle. See the
+        // make_test_product_bundle function to get the specific contents
+        // that are staged in the product bundle.
+        let pb = ProductBundle::V2(
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle"),
+        );
+
+        // Create the command line arguments for this test.
+        let cmd = StartCommand {
+            name: Some("reuse-test".into()),
+            reuse_with_check: true,
+            net: Some("user".into()),
+            verbose: true,
+            log: Some(env.isolate_root.path().join("emu.log")),
+            ..Default::default()
+        };
+
+        // Create a configuration based on the product bundle, adding the
+        // disk hashes so it appears that the product bundle has not changed since
+        // when the instance was created.
+        let mut default_config =
+            make_configs(&StartCommand::default(), Some(pb.clone())).await.expect("default config");
+        default_config.guest.zbi_hash = "d53f0b8a19b29d74".into();
+        default_config.guest.disk_hash = "d547336219b6b160".into();
+
+        // Create the fake test engine instance. In this case since we are only testing if the engine
+        // is reusable, set do_stage and do_start to false.
+        let existing_engine = Box::new(TestEngine {
+            // no staging should happen since we're reusing an instance.
+            do_stage: false,
+            do_start: false,
+            config: default_config.clone(),
+            ..Default::default()
+        });
+
+        // Make the test instance of the tool, this uses mocks for the engine_operations
+        // object.
+        let mut tool = make_test_emu_start_tool(cmd, sdk).await;
+
+        // Create the configuration that is based on the command line and the product bundle.
+        let mut emulator_configuration =
+            make_configs(&tool.cmd, Some(pb.clone())).await.expect("cmd configs");
+        emulator_configuration.guest.zbi_hash = "d53f0b8a19b29d74".into();
+        emulator_configuration.guest.disk_hash = "d547336219b6b160".into();
+
+        // Set the mock expectation new_engine(). New engine should not be called.
+        tool.engine_operations.expect_new_engine().times(0);
+
+        // Call the function under test.
+        let (reused, engine) = tool
+            .check_if_reusable(&emulator_configuration, existing_engine)
+            .await
+            .expect("check_if_reusable");
+
+        // assert that it was reused and the log path and verbose flag
+        // were set to match the command line.
+        assert!(reused, "Expected engine to be reused");
+        assert_eq!(engine.emu_config().host.log, env.isolate_root.path().join("emu.log"));
+        assert_eq!(engine.emu_config().runtime.log_level, LogLevel::Verbose);
     }
 
     #[fuchsia::test]

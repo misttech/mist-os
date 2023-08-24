@@ -11,7 +11,7 @@ pub mod serialization;
 mod show_output;
 
 use anyhow::{bail, Context, Result};
-use arg_templates::process_flag_template;
+pub use arg_templates::process_flag_template;
 use emulator_instance::{
     get_instance_dir, read_from_disk, DeviceConfig, EmulatorConfiguration, EmulatorInstanceData,
     EmulatorInstanceInfo, EngineOption, EngineState, EngineType, FlagData, GuestConfig, HostConfig,

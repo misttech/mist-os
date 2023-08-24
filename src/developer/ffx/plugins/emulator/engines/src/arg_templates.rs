@@ -195,7 +195,7 @@ impl HelperDef for EnvironmentHelper {
     }
 }
 
-pub(crate) fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagData> {
+pub fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagData> {
     let template_text = std::fs::read_to_string(&emu_config.runtime.template).context(format!(
         "couldn't locate template file from path {:?}",
         &emu_config.runtime.template
