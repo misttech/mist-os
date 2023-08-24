@@ -11,32 +11,32 @@ Breakpoint 1 now matching 1 addrs for $main
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 
 # Make sure the return value is captured.
-[zxdb] p rust_functions::return_global_plus_one()
+[zxdb] p return_global_plus_one()
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 1
 
 # Return values can be used in expressions.
-[zxdb] p rust_functions::return_global_plus_one() - 1
+[zxdb] p return_global_plus_one() - 1
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 0
 
 # TODO(https://fxbug.dev/129958): this should also work as
 #        rust_functions::return_global_plus_one() - 1 == SOME_GLOBAL
-[zxdb] p SOME_GLOBAL == rust_functions::return_global_plus_one() - 1
+[zxdb] p SOME_GLOBAL == return_global_plus_one() - 1
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 true
 
 # Other built-in types should also work
-[zxdb] p rust_functions::return_i32_box()
+[zxdb] p return_i32_box()
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 (*)0x?? ➔ 0
 
 # Expressions should be able to dereference pointer return types.
-[zxdb] p *rust_functions::return_i32_box() + 1
+[zxdb] p *return_i32_box() + 1
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 1
 
-[zxdb] p rust_functions::return_float()
+[zxdb] p return_float()
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 3.14159
 

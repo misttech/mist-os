@@ -70,4 +70,28 @@ ParsedIdentifier FoundName::GetName() const {
   return ParsedIdentifier();
 }
 
+// static.
+const char* FoundName::KindToString(Kind kind) {
+  switch (kind) {
+    case FoundName::kNone:
+      return "<none>";
+    case FoundName::kVariable:
+      return "variable";
+    case FoundName::kMemberVariable:
+      return "member variable";
+    case FoundName::kNamespace:
+      return "namespace";
+    case FoundName::kTemplate:
+      return "template";
+    case FoundName::kType:
+      return "type";
+    case FoundName::kFunction:
+      return "function";
+    case FoundName::kOtherSymbol:
+      return "other";
+  }
+  FX_NOTREACHED();
+  return "";
+}
+
 }  // namespace zxdb

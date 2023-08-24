@@ -56,6 +56,7 @@ class FoundName {
   ~FoundName();
 
   Kind kind() const { return kind_; }
+  static const char* KindToString(Kind kind);
 
   // Implicit conversion to bool to test for a found value.
   bool is_found() const { return kind_ != kNone; }

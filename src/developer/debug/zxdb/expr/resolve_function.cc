@@ -4,17 +4,21 @@
 
 #include "src/developer/debug/zxdb/expr/resolve_function.h"
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/err_or.h"
 #include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/expr/cast.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
+#include "src/developer/debug/zxdb/expr/find_name.h"
+#include "src/developer/debug/zxdb/expr/found_name.h"
 #include "src/developer/debug/zxdb/symbols/base_type.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/function_call_info.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
+#include "src/developer/debug/zxdb/symbols/target_symbols.h"
 #include "src/developer/debug/zxdb/symbols/type.h"
 #include "src/developer/debug/zxdb/symbols/variable.h"
 #include "src/lib/fxl/memory/ref_ptr.h"
@@ -140,33 +144,49 @@ void CollectArguments(const fxl::RefPtr<EvalContext>& eval_context, std::string_
 void ResolveFunction(const fxl::RefPtr<EvalContext>& eval_context, const ParsedIdentifier& fn_name,
                      const std::vector<ExprValue>& params,
                      fit::callback<void(ErrOr<FunctionCallInfo>)> cb) {
-  std::vector<Location> locs =
-      eval_context->GetProcessSymbols()->ResolveInputLocation(InputLocation(ToIdentifier(fn_name)));
+  // FindName should be able to find the identifier in any context, regardless of where the current
+  // execution is. This includes any namespaces that the function might live in.
+  std::vector<FoundName> found_names;
 
-  if (locs.empty()) {
-    return cb(Err("Could not find function: " + fn_name.GetDebugName()));
-  } else if (locs.size() > 1) {
+  FindNameOptions opts(FindNameOptions::kNoKinds);
+  opts.find_functions = true;
+
+  eval_context->FindName(opts, fn_name, &found_names);
+  if (found_names.size() > 1) {
     // TODO(https://fxbug.dev/5457): Handle overloads.
-    return cb(Err("Function resolved to multiple locations."));
+    return cb(Err(fn_name.GetFullName() +
+                  " resolved to multiple locations. Overloaded functions are not supported yet."));
   }
 
-  // Resolve the symbol.
-  const Function* fn = locs[0].symbol().Get()->As<Function>();
+  auto found = found_names[0];
+
+  if (!found.function()) {
+    // Print a more helpful error message if something was found but it wasn't a
+    // function.
+    if (found.is_found()) {
+      return cb(Err(std::string("Identifier was not function: ") + found.GetName().GetFullName() +
+                    " " + FoundName::KindToString(found.kind())));
+    }
+
+    return cb(Err(fn_name.GetFullName() + " was not found in this context."));
+  }
+
+  auto fn_ref = found.function();
 
   // None of the locations actually resolved to the function or the function was inlined, return an
   // error.
-  if (!fn) {
+  if (!fn_ref) {
     return cb(Err("Error casting symbol " + fn_name.GetDebugName() + " to function."));
-  } else if (fn->is_inline()) {
+  } else if (fn_ref->is_inline()) {
     return cb(
-        Err(fn->GetFullName() + " has been inlined, and cannot be called from the debugger."));
+        Err(fn_ref->GetFullName() + " has been inlined, and cannot be called from the debugger."));
   }
 
   FunctionCallInfo call_info;
-  call_info.fn = RefPtrTo(fn);
+  call_info.fn = fn_ref;
 
   CollectArguments(
-      eval_context, fn->GetAssignedName(), fn->parameters(), params,
+      eval_context, fn_ref->GetAssignedName(), fn_ref->parameters(), params,
       [call_info, cb = std::move(cb)](ErrOr<std::vector<ExprValue>> err_or_args) mutable {
         if (err_or_args.has_error()) {
           return cb(err_or_args.err());

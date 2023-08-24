@@ -12,7 +12,7 @@ Breakpoint 1 now matching 1 addrs for $main
 
 # Rust functions need to be prepended with the module name. This will re-hit the
 # user installed breakpoint.
-[zxdb] p rust_functions::print_hello()
+[zxdb] p print_hello()
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 void
 
@@ -20,7 +20,7 @@ void
 🛑 rust_functions::main() • rust_functions.rs:??
 
 # Now it should stop at a generic breakpoint.
-[zxdb] p rust_functions::nested_no_args()
+[zxdb] p nested_no_args()
 🛑 rust_functions::main() • rust_functions.rs:??
 void
 
@@ -32,7 +32,7 @@ void
 [zxdb] f
 ▶ 0 rust_functions::main() • rust_functions.rs:??
 
-[zxdb] p rust_functions::add_two_ints(1, 3)
+[zxdb] p add_two_ints(1, 3)
 🛑 rust_functions::main() • rust_functions.rs:??
 4
 
