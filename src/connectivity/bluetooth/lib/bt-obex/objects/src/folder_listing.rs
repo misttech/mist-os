@@ -86,8 +86,8 @@ impl FormattedDateTimeObj {
     /// The format is YYYYMMDDTHHMMSS where "T" delimits the date from the time. It is assumed that
     /// the time is the local time, but per OBEX 2.2.5, a suffix of "Z" can be included to indicate
     /// UTC time.
-    const ISO_8601_UTC_TIME_FORMAT: &str = "%Y%m%dT%H%M%SZ";
-    const ISO_8601_TIME_FORMAT: &str = "%Y%m%dT%H%M%S";
+    const ISO_8601_UTC_TIME_FORMAT: &'static str = "%Y%m%dT%H%M%SZ";
+    const ISO_8601_TIME_FORMAT: &'static str = "%Y%m%dT%H%M%S";
 
     fn new(dt: NaiveDateTime) -> Self {
         Self(dt, Self::ISO_8601_TIME_FORMAT.to_string())
@@ -342,7 +342,7 @@ pub struct FolderListing {
 }
 
 impl FolderListing {
-    const DEFAULT_VERSION: &str = "1.0";
+    const DEFAULT_VERSION: &'static str = "1.0";
 
     fn new_empty() -> Self {
         Self { parent_folder: false, files: Vec::new(), folders: Vec::new() }

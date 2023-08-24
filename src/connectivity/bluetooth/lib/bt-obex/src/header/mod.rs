@@ -404,7 +404,7 @@ impl Header {
     /// The format is YYYYMMDDTHHMMSS where "T" delimits the date from the time. It is assumed that
     /// the time is the local time, but per OBEX 2.2.5, a suffix of "Z" can be included to indicate
     /// UTC time.
-    const ISO_8601_TIME_FORMAT: &str = "%Y%m%dT%H%M%S";
+    const ISO_8601_TIME_FORMAT: &'static str = "%Y%m%dT%H%M%S";
 
     /// The ISO 8601 time format used in the Time Header Packet.
     /// The format is YYYYMMDDTHHMMSSZ, where the "Z" denotes UTC time. The format is sent as a UTF-

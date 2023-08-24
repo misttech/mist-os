@@ -645,7 +645,7 @@ impl MediaAttributeEntries {
     const VALUE_LENGTH_LEN: usize = 2;
     const ATTRIBUTE_HEADER_LEN: usize =
         ATTRIBUTE_ID_LEN + Self::CHARSET_ID_LEN + Self::VALUE_LENGTH_LEN;
-    const UNKNOWN_VALUE_PLACEHOLDER: &str = "Unknown Value";
+    const UNKNOWN_VALUE_PLACEHOLDER: &'static str = "Unknown Value";
 
     fn all_fields(&self) -> Vec<(MediaAttributeId, &Option<String>)> {
         vec![

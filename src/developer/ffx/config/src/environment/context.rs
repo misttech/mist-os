@@ -323,7 +323,8 @@ impl EnvironmentContext {
     }
 
     /// The environment variable we search for
-    pub const FFX_BIN_ENV: &str = "FFX_BIN";
+    pub const FFX_BIN_ENV: &'static str = "FFX_BIN";
+
     /// Gets the path to the top level binary for use when re-running ffx.
     ///
     /// - This will first check the environment variable in [`Self::FFX_BIN_ENV`],
