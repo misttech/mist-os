@@ -19,6 +19,8 @@ use {
 
 /// Concurrency limit when checking which cache packages are resident on boot.
 const CACHE_PACKAGE_LOADING_CONCURRENCY: usize = 1000;
+/// Warn if loading cache packages takes longer than this.
+const CACHE_PACKAGE_LOADING_WARN_DURATION: zx::Duration = zx::Duration::from_millis(500);
 
 #[derive(Debug, Default)]
 pub struct DynamicIndex {
@@ -283,6 +285,19 @@ impl DynamicIndex {
 /// For any package referenced by the cache packages manifest that has all of its blobs present in
 /// blobfs, imports those packages into the provided dynamic index.
 pub async fn load_cache_packages(
+    index: &mut DynamicIndex,
+    cache_packages: &CachePackages,
+    blobfs: &blobfs::Client,
+) {
+    let start = zx::Time::get_monotonic();
+    let () = load_cache_packages_impl(index, cache_packages, blobfs).await;
+    let duration = zx::Time::get_monotonic() - start;
+    if duration > CACHE_PACKAGE_LOADING_WARN_DURATION {
+        warn!("loading cache packages is slow: {} ms", duration.into_millis())
+    }
+}
+
+async fn load_cache_packages_impl(
     index: &mut DynamicIndex,
     cache_packages: &CachePackages,
     blobfs: &blobfs::Client,
