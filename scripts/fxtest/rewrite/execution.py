@@ -74,6 +74,10 @@ class TestExecution:
                 extra_args += ["--max-severity-logs", execution.max_severity_logs]
             if execution.min_severity_logs:
                 extra_args += ["--min-severity-logs", execution.min_severity_logs]
+
+            if self._test.build.test.parallel is not None:
+                extra_args += ["--parallel", str(self._test.build.test.parallel)]
+
             return ["fx", "ffx", "test", "run"] + extra_args + [execution.component_url]
         elif self._test.build.test.path:
             return [os.path.join(self._exec_env.out_dir, self._test.build.test.path)]

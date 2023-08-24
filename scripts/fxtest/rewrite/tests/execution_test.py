@@ -101,6 +101,55 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
+    async def test_test_execution_component_parallel(self):
+        """Test the usage of the TestExecution wrapper on a component test with a parallel override"""
+
+        exec_env = environment.ExecutionEnvironment(
+            "/fuchsia", "/out/fuchsia", None, "", ""
+        )
+
+        test = execution.TestExecution(
+            test_list_file.Test(
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection("foo", "//foo", parallel=1)
+                ),
+                test_list_file.TestListEntry(
+                    "foo",
+                    [],
+                    test_list_file.TestListExecutionEntry(
+                        "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
+                        realm="foo_tests",
+                        max_severity_logs="INFO",
+                        min_severity_logs="TRACE",
+                    ),
+                ),
+            ),
+            exec_env,
+        )
+
+        self.assertListEqual(
+            test.command_line(),
+            [
+                "fx",
+                "ffx",
+                "test",
+                "run",
+                "--realm",
+                "foo_tests",
+                "--max-severity-logs",
+                "INFO",
+                "--min-severity-logs",
+                "TRACE",
+                "--parallel",
+                "1",
+                "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
+            ],
+        )
+
+        self.assertFalse(test.is_hermetic())
+        self.assertIsNone(test.environment())
+        self.assertTrue(test.should_symbolize())
+
     async def test_test_execution_host(self):
         """Test the usage of the TestExecution wrapper on a host test, and actually run it"""
 

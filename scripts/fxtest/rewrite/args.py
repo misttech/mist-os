@@ -26,6 +26,7 @@ class Flags:
     device: bool
     selection: typing.List[str]
 
+    parallel: int
     random: bool
     limit: int | None
     fail: bool
@@ -144,6 +145,12 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     selection.add_argument("selection", action=arg_option.SelectionAction, nargs="*")
 
     execution = parser.add_argument_group("Execution Options")
+    execution.add_argument(
+        "--parallel",
+        type=int,
+        help="Maximum number of test suites to run in parallel. Does not affect per-suite parallelism.",
+        default=4,
+    )
     execution.add_argument(
         "-r",
         "--random",

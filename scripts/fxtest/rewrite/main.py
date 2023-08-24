@@ -551,7 +551,7 @@ async def run_all_tests(
     Returns:
         bool: True only if all tests ran successfully, False otherwise.
     """
-    max_parallel = 4  # TODO(b/295340779): Get from flags
+    max_parallel = flags.parallel
     if tests.has_device_test() and not await has_device_connected(recorder):
         recorder.emit_warning_message("\nCould not find a running package server.")
         recorder.emit_instruction_message(

@@ -43,6 +43,10 @@ class TestSection:
     # If the test runs on the host, this is the path of the binary to execute.
     path: str | None = None
 
+    # If the test is a device tests, this is the argument to pass to
+    # ffx test run --parallel
+    parallel: int | None = None
+
 
 class TestFileError(Exception):
     """There was an error processing the contents of the tests.json file."""
