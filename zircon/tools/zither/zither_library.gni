@@ -511,6 +511,7 @@ if (support_rust) {
       not_needed([ "source_names" ])
     } else {
       foreach(name, source_names) {
+        name = string_replace(name, "-", "_")
         generated_files +=
             [ "${_output_dir}/${output_namespace}/src/${name}.rs" ]
       }

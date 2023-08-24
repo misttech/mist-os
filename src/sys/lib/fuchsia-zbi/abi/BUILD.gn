@@ -19,6 +19,7 @@ rustc_library("abi") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/zbi:zbi_zither.rust",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:zerocopy",
@@ -30,6 +31,16 @@ rustc_library("abi") {
   ]
 
   sources = [ "src/lib.rs" ]
+
+  # TODO(fxbug.dev/132599): //sdk/fidl/zbi:zbi_zither.rust is unused right now,
+  # but is depended upon for compilation exercise. Future changes will begin
+  # to replace the abi crate with the generated one, at which point this can be
+  # removed.
+  configs += [ ":unused" ]
+}
+
+config("unused") {
+  rustflags = [ "-Aunused-crate-dependencies" ]
 }
 
 fuchsia_unittest_package("fuchsia-zbi-abi-tests") {

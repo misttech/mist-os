@@ -6,7 +6,9 @@ The Zither Rust backend is gives Rust data layout bindings.
 
 Given a FIDL library by the name of `id1.id2.....idn`, one crate with name
 `fidl-data-id1-id2-...-idn` is generated: it contains a `${filename}.rs` for
-each original FIDL source file and a crate root `lib.rs`.
+each original FIDL source file and a crate root `lib.rs`, where each
+`${filename}.rs` has its hyphens replaced by underscores (as hyphens there are
+illegal).
 
 ## GN integration
 

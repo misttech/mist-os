@@ -175,8 +175,10 @@ func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) 
 
 	var outputs []string
 	for _, summary := range summary.Files {
-		rootData.Modules = append(rootData.Modules, summary.Name())
-		output := filepath.Join(outputDir, summary.Name()+".rs")
+		// Hyphens are illegal in module names.
+		moduleName := strings.ReplaceAll(summary.Name(), "-", "_")
+		rootData.Modules = append(rootData.Modules, moduleName)
+		output := filepath.Join(outputDir, moduleName+".rs")
 		if err := gen.GenerateFile(output, "GenerateRustFile", summary); err != nil {
 			return nil, err
 		}
