@@ -24,6 +24,7 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -35,6 +36,7 @@
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-frame.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bits.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcm_hw_ids.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_d11.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fweh.h"
@@ -44,6 +46,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
 #include "third_party/bcmdhd/crossdriver/include/proto/802.11.h"
 #include "wifi/wifi-config.h"
+#include "wlan/drivers/log.h"
 #include "zircon/errors.h"
 #include "zircon/types.h"
 
@@ -136,6 +139,7 @@ zx_status_t SimFirmware::SetupIovarTable() {
       {"snr", sizeof(int32_t), nullptr, &SimFirmware::IovarSnrGet},
       {"ssid", sizeof(brcmf_ssid_le), &SimFirmware::IovarSsidSet, nullptr},
       {"stbc_tx", sizeof(int32_t), &SimFirmware::IovarStbcTxSet, &SimFirmware::IovarStbcTxGet},
+      {"target_bss_info", std::nullopt, nullptr, &SimFirmware::IovarTargetBssInfoGet},
       {"tlv", sizeof(sim_iface_entry_t::tlv), &SimFirmware::IovarIfaceVarSet,
        &SimFirmware::IovarIfaceVarGet, offsetof(sim_iface_entry_t, tlv)},
       {"txstreams", sizeof(txstreams_), &SimFirmware::IovarTxstreamsSet, &SimFirmware::IovarGet,
@@ -472,7 +476,8 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
       BRCMF_DBG(SIM, "Ignoring firmware message %d", dcmd->cmd);
       break;
     case BRCMF_C_DISASSOC: {
-      if ((status = SIM_FW_CHK_CMD_LEN(dcmd->len, sizeof(brcmf_scb_val_le))) == ZX_OK) {
+      status = SIM_FW_CHK_CMD_LEN(dcmd->len, sizeof(brcmf_scb_val_le));
+      if (status == ZX_OK) {
         if (iface_tbl_[kClientIfidx].allocated && kClientIfidx == ifidx) {
           // Initiate Disassoc from AP
           auto scb_val = reinterpret_cast<brcmf_scb_val_le*>(data);
@@ -490,6 +495,7 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
         }
       } else {
         // Triggered by link down event in driver (no data)
+        BRCMF_DBG(SIM, "BRCMF_C_DISASSOC triggered by link down event in driver (no data)");
         if (assoc_state_.state == AssocState::ASSOCIATED) {
           SetAssocState(AssocState::NOT_ASSOCIATED);
         }
@@ -1289,12 +1295,18 @@ void SimFirmware::HandleAuthReq(std::shared_ptr<const simulation::SimAuthFrame> 
 void SimFirmware::HandleAuthResp(std::shared_ptr<const simulation::SimAuthFrame> frame) {
   // If we are not expecting auth resp packets, ignore it,
   if (auth_state_.state == AuthState::NOT_AUTHENTICATED ||
-      auth_state_.state == AuthState::AUTHENTICATED) {
+      auth_state_.state == AuthState::AUTHENTICATED ||
+      assoc_state_.state == AssocState::REASSOCIATING) {
     return;
   }
   // Ignore if this is not intended for us
   common::MacAddr mac_addr(GetMacAddr(kClientIfidx));
   if (frame->dst_addr_ != mac_addr) {
+    return;
+  }
+  // If client is roaming, ignore if the auth frame is not from the target BSS.
+  if (assoc_state_.state == AssocState::REASSOCIATING &&
+      frame->src_addr_ != assoc_state_.reassoc_opts->bssid) {
     return;
   }
   // Ignore if this is not from the bssid with which we were trying to authenticate
@@ -1732,6 +1744,10 @@ zx_status_t SimFirmware::ReassocToCurrentAp(
 
 zx_status_t SimFirmware::ReassocToDifferentAp(
     std::shared_ptr<const simulation::SimReassocRespFrame> frame) {
+  if (assoc_state_.state != AssocState::REASSOCIATING) {
+    BRCMF_DBG(SIM, "Ignoring ReassocToDifferentAp call, STA is not reassociating");
+    return ZX_ERR_CONNECTION_ABORTED;
+  }
   BRCMF_INFO("Reassociation to different AP");
   bss_type_t bss_type;
   if (GetBssType(frame, &bss_type) != ZX_OK) {
@@ -1742,17 +1758,12 @@ zx_status_t SimFirmware::ReassocToDifferentAp(
     return ZX_ERR_CONNECTION_REFUSED;
   }
 
-  BRCMF_DBG(SIM, "Reassoc kSuccess, send events with a delay");
+  BRCMF_DBG(SIM, "AP reported reassoc success, send events with a delay");
   const auto old_bssid = assoc_state_.opts->bssid.ToString();
   const auto new_bssid = assoc_state_.reassoc_opts->bssid.ToString();
   BRCMF_INFO("Associated to BSSID %s, will reassoc to BSSID %s", old_bssid.c_str(),
              new_bssid.c_str());
-  assoc_state_.opts->bssid = assoc_state_.reassoc_opts->bssid;
-  assoc_state_.opts->bss_type = bss_type;
-  assoc_state_.reassoc_opts.reset();
 
-  // Reassoc success implies auth success, and real firmware sends the AUTH event here.
-  SendEventToDriver(0, nullptr, BRCMF_E_AUTH, BRCMF_E_STATUS_SUCCESS, kClientIfidx);
   // Send the REASSOC event with a delay.
   SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
                     0, assoc_state_.opts->bssid, kReassocEventDelay);
@@ -1763,7 +1774,16 @@ zx_status_t SimFirmware::ReassocToDifferentAp(
   SendEventToDriver(0, nullptr, BRCMF_E_ROAM, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, 0,
                     assoc_state_.opts->bssid, kRoamEventDelay);
   // Set the Assoc state only after REASSOC event is sent to the driver.
-  hw_.RequestCallback([this] { SetAssocState(AssocState::ASSOCIATED); }, kReassocEventDelay);
+  hw_.RequestCallback(
+      [this, bss_type] {
+        if (assoc_state_.reassoc_opts) {
+          assoc_state_.opts->bssid = assoc_state_.reassoc_opts->bssid;
+          assoc_state_.opts->bss_type = bss_type;
+          assoc_state_.reassoc_opts.reset();
+          SetAssocState(AssocState::ASSOCIATED);
+        }
+      },
+      kReassocEventDelay);
   if (softap_ifidx_ != std::nullopt) {
     // Send the AP_STARTED event to the SoftAp IF after a delay. This event is sent to the
     // SoftAP IF in case its channel changed (to sync up to the client's channel).
@@ -1802,7 +1822,7 @@ void SimFirmware::RxReassocResp(std::shared_ptr<const simulation::SimReassocResp
     reassoc_status = ReassocToDifferentAp(frame);
   }
   if (reassoc_status != ZX_OK) {
-    BRCMF_DBG(SIM, "Reassoc refused, handle failure");
+    hw_.CancelCallback(assoc_state_.reassoc_timer_id);
     ReassocHandleFailure(frame->status_);
   }
 }
@@ -1850,6 +1870,9 @@ void SimFirmware::RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame
     BRCMF_DBG(SIM, "Ignoring BTM request frame due to firmware configuration");
     return;
   }
+  if (assoc_state_.state != AssocState::ASSOCIATED) {
+    BRCMF_DBG(SIM, "Ignoring BTM request frame because firmware is not associated");
+  }
   auto candidate_list = btm_req_frame->CandidateList();
   if (candidate_list.empty()) {
     BRCMF_DBG(SIM, "No candidates in incoming BTM request frame");
@@ -1861,8 +1884,11 @@ void SimFirmware::RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame
   wlan_common::WlanChannel chan{.primary = candidate_list[0].channel_number,
                                 .cbw = wlan_common::ChannelBandwidth::kCbw20};
   reassoc_opts->bssid = candidate_list[0].bssid;
+  // Must remember which channel original BSS was on, for future communication with it.
+  wlan_common::WlanChannel orig_bss_channel;
+  chanspec_to_channel(&d11_inf_, iface_tbl_[kClientIfidx].chanspec, &orig_bss_channel);
+  reassoc_opts->orig_bss_channel = orig_bss_channel;
   ReassocInit(std::move(reassoc_opts), chan);
-  ReassocStart();
 }
 
 void SimFirmware::SetAssocState(AssocState::AssocStateName state) {
@@ -1874,12 +1900,21 @@ void SimFirmware::SetAssocState(AssocState::AssocStateName state) {
 
 // Disassociate the Local Client (request coming in from the driver)
 void SimFirmware::DisassocLocalClient(wlan_ieee80211::ReasonCode reason) {
-  if (assoc_state_.state == AssocState::ASSOCIATED) {
+  BRCMF_DBG(SIM, "Driver initiated firmware disassoc.");
+  if (assoc_state_.state == AssocState::ASSOCIATED ||
+      assoc_state_.state == AssocState::REASSOCIATING) {
     common::MacAddr srcAddr(GetMacAddr(kClientIfidx));
     common::MacAddr bssid(assoc_state_.opts->bssid);
     // Transmit the disassoc req and since there is no response for it, indicate disassoc done to
     // driver now
     simulation::SimDisassocReqFrame disassoc_req_frame(srcAddr, bssid, reason);
+
+    // Restore the operating channel, in case reassociation attempt changed it.
+    if (assoc_state_.state == AssocState::REASSOCIATING && assoc_state_.reassoc_opts) {
+      BRCMF_DBG(SIM, "Changing channel before sending disassoc req frame");
+      hw_.SetChannel(assoc_state_.reassoc_opts->orig_bss_channel);
+    }
+
     hw_.Tx(disassoc_req_frame);
     SetStateToDisassociated(reason, true);
   } else if (auth_state_.state == AuthState::AUTHENTICATED) {
@@ -1941,20 +1976,66 @@ void SimFirmware::SetStateToDisassociated(wlan_ieee80211::ReasonCode reason,
                     static_cast<uint32_t>(reason), assoc_state_.opts->bssid, kLinkEventDelay);
 }
 
+void SimFirmware::SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf) {
+  ZX_ASSERT(assoc_state_.reassoc_opts);
+
+  // Note: we must set ie_offset to mimic real firmware, which sets this offset
+  // to somewhere after the BSS info struct ends. When returning target BSS info
+  // data, Sim firmware will write IE bytes at this offset. Check that the
+  // provided offset makes sense.
+  ZX_ASSERT(bss_info.ie_offset >= sizeof(brcmf_bss_info_le));
+
+  memcpy(&assoc_state_.reassoc_opts->target_bss_info, &bss_info, sizeof(brcmf_bss_info_le));
+  // Sim firmware stores IEs in a dedicated buffer, not at the target_bss_info ie_offset. This
+  // allows Sim firmware to use a strong type for target_bss_info (rather than a typecasted buffer).
+  memcpy(&assoc_state_.reassoc_opts->target_bss_info_ies, ie_buf.data(), ie_buf.size());
+}
+
 void SimFirmware::ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts,
                               wlan_common::WlanChannel& channel) {
   if (assoc_state_.state != AssocState::ASSOCIATED) {
     BRCMF_WARN("Cannot reassociate because STA is not associated");
     return;
   }
-  SetAssocState(AssocState::REASSOCIATING);
+
   assoc_state_.reassoc_opts = std::move(reassoc_opts);
+
+  // BSS info struct and IE buffer construction.
+  // At a minimum, SSID IE must be present.
+  cpp20::span<uint8_t> ssid_span{assoc_state_.opts->ssid.data.data(), assoc_state_.opts->ssid.len};
+  auto target_bss_ssid_ie = sim_utils::CreateSsidIe(ssid_span);
+  cpp20::span<uint8_t> target_bss_ie_span{target_bss_ssid_ie.begin(), target_bss_ssid_ie.end()};
+  // We only set BSS info fields that we know will be used by the driver.
+  // These are based on values seen in real firmware, for an open network.
+  brcmf_bss_info_le target_bss_info{
+      .version = 0x6d,
+      .length = 0x110,
+      .beacon_period = 0x64,
+      .capability = 0x21,
+      .chanspec = 0xe02a,
+      .RSSI = 0xffe0,
+      .ie_offset = 0xa3,
+      .ie_length = static_cast<uint32_t>(target_bss_ie_span.size()),
+      .SNR = 0x3b,
+  };
+  memcpy(target_bss_info.BSSID, &assoc_state_.reassoc_opts->bssid, ETH_ALEN);
+  SetTargetBssInfo(target_bss_info, target_bss_ie_span);
+
+  SetAssocState(AssocState::REASSOCIATING);
 
   const uint16_t chanspec = channel_to_chanspec(&d11_inf_, &channel);
   SetIFChanspec(kClientIfidx, chanspec);
   hw_.SetChannel(channel);
-  SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, BRCMF_E_STATUS_ATTEMPT, kClientIfidx);
-  SendEventToDriver(0, nullptr, BRCMF_E_ROAM_PREP, BRCMF_E_STATUS_SUCCESS, kClientIfidx);
+  const auto kRoamPrepEventDelay = zx::msec(15);
+  SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, BRCMF_E_STATUS_ATTEMPT, kClientIfidx, nullptr, 0,
+                    0, assoc_state_.reassoc_opts->bssid, kReassocEventDelay);
+  SendEventToDriver(0, nullptr, BRCMF_E_ROAM_PREP, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
+                    0, assoc_state_.reassoc_opts->bssid, kRoamPrepEventDelay);
+  // Send the AUTH event with a delay.
+  constexpr zx::duration auth_delay = zx::msec(40);
+  SendEventToDriver(0, nullptr, BRCMF_E_AUTH, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, 0,
+                    assoc_state_.reassoc_opts->bssid, auth_delay);
+  hw_.RequestCallback([this] { ReassocStart(); }, auth_delay + zx::msec(1));
 }
 
 void SimFirmware::ReassocStart() {
@@ -1977,17 +2058,17 @@ void SimFirmware::ReassocStart() {
   // handling if a response is sent.
   const common::MacAddr bssid(assoc_state_.reassoc_opts->bssid);
   const simulation::SimReassocReqFrame reassoc_req_frame(srcAddr, bssid);
-  BRCMF_DBG(SIM, "Sending reassoc req");
   hw_.Tx(reassoc_req_frame);
 }
 
 void SimFirmware::ReassocHandleFailure(wlan_ieee80211::StatusCode status) {
   // Reassociation state may have already been cleared (e.g. by driver roam timeout).
-  if (!assoc_state_.reassoc_opts) {
+  if (assoc_state_.reassoc_opts == nullptr) {
     BRCMF_DBG(SIM, "Reassoc failed, and reassoc state already cleared");
     return;
   }
   const auto bssid = assoc_state_.reassoc_opts->bssid;
+  hw_.SetChannel(assoc_state_.reassoc_opts->orig_bss_channel);
   assoc_state_.reassoc_opts.reset();
   if (assoc_state_.state == AssocState::NOT_ASSOCIATED) {
     BRCMF_DBG(SIM, "Reassoc failed, STA is not associated");
@@ -2345,6 +2426,22 @@ zx_status_t SimFirmware::IovarStbcTxSet(SimIovarSetReq* req) {
 zx_status_t SimFirmware::IovarStbcTxGet(SimIovarGetReq* req) {
   BRCMF_DBG(SIM, "get stbc_tx value: %u", stbc_tx_);
   memcpy(req->value, &stbc_tx_, sizeof(stbc_tx_));
+  return ZX_OK;
+}
+
+zx_status_t SimFirmware::IovarTargetBssInfoGet(SimIovarGetReq* req) {
+  if (assoc_state_.reassoc_opts == nullptr) {
+    return ZX_ERR_BAD_STATE;
+  }
+  const auto& opts = assoc_state_.reassoc_opts;
+  if (req->value_len < opts->target_bss_info.ie_offset + opts->target_bss_info.ie_length) {
+    BRCMF_ERR("Buffer length is too small for the target BSS info.");
+    return ZX_ERR_IO_REFUSED;
+  }
+  memcpy(req->value, &opts->target_bss_info, sizeof(brcmf_bss_info_le));
+  auto ies_out = static_cast<uint8_t*>(req->value) + opts->target_bss_info.ie_offset;
+  BRCMF_INFO("IoVarTargetBssInfoGet ie_length %d", opts->target_bss_info.ie_length);
+  memcpy(ies_out, opts->target_bss_info_ies, opts->target_bss_info.ie_length);
   return ZX_OK;
 }
 

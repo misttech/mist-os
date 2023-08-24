@@ -189,8 +189,9 @@ class FakeAp final : public StationIfc {
   zx::duration csa_beacon_interval_ = zx::msec(150);
   // Delay between an association request and an association response
   zx::duration assoc_resp_interval_ = zx::msec(1);
-  // Delay between a reassociation request and a reassociation response
-  zx::duration reassoc_resp_interval_ = zx::msec(1);
+  // Delay between a reassociation request and a reassociation response.
+  // Value based on actual timing seen during real reassociation.
+  zx::duration reassoc_resp_interval_ = zx::msec(65);
   // Delay between an Disassociation request and an Disassociation response
   zx::duration disassoc_resp_interval_ = zx::msec(1);
   // Delay between an probe request and an probe response

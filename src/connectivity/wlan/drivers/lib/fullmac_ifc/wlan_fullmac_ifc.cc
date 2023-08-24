@@ -209,12 +209,15 @@ void WlanFullmacIfc::RoamConf(const wlan_fullmac_roam_confirm_t* conf) {
 
   // Invalid StatusCode will be caught by FIDL transport.
   fidl_conf.result_code = static_cast<fuchsia_wlan_ieee80211::wire::StatusCode>(conf->result_code);
-  ConvertBssDescription(conf->selected_bss, &fidl_conf.selected_bss, *arena);
+
+  if (fidl_conf.result_code == fuchsia_wlan_ieee80211::wire::StatusCode::kSuccess) {
+    ConvertBssDescription(conf->selected_bss, &fidl_conf.selected_bss, *arena);
+  }
 
   auto result = ifc_client_.buffer(*arena)->RoamConf(fidl_conf);
   if (!result.ok()) {
     lerror(
-        "Failed to WlanFullmacAuthInd up in WlanFullmacIfc::RoamConf(). "
+        "Failed to WlanFullmacRoamConf up in WlanFullmacIfc::RoamConf(). "
         "result.status: %s\n",
         result.status_string());
   }

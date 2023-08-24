@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <zircon/assert.h>
 
+#include <algorithm>
+
 namespace wlan::brcmfmac::sim_utils {
 
 zx_status_t WriteEthernetFrame(cpp20::span<uint8_t> out, common::MacAddr dst, common::MacAddr src,
@@ -38,6 +40,17 @@ int8_t SnrDbFromSignalStrength(double signal_strength, double noise_level) {
     return INT8_MIN;
   }
   return static_cast<int8_t>(snr);
+}
+
+std::vector<uint8_t> CreateSsidIe(cpp20::span<const uint8_t> ssid) {
+  // SSID IE format described in IEEE 802.11-2020 9.4.2.2.
+  const uint8_t kSsidIeElementId = 0;
+  const size_t kMaxSsidLength = 32;
+  const uint8_t ssid_length = std::min(kMaxSsidLength, ssid.size());
+  std::vector<uint8_t> ssid_ie;
+  ssid_ie.insert(ssid_ie.end(), {kSsidIeElementId, ssid_length});
+  ssid_ie.insert(ssid_ie.end(), ssid.begin(), std::next(ssid.begin(), ssid_length));
+  return ssid_ie;
 }
 
 }  // namespace wlan::brcmfmac::sim_utils

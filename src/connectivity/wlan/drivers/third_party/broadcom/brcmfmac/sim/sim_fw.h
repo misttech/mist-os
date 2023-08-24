@@ -77,6 +77,8 @@ constexpr zx::duration kAbortScanDelay = zx::msec(10);
 constexpr zx::duration kApStartedEventDelay = zx::msec(1);
 // Size allocated to hold association frame IEs in SIM FW
 #define ASSOC_IES_MAX_LEN 1000
+// Size allocated to hold BSS info IEs in SIM FW
+#define BSS_INFO_IES_MAX_LEN 1000
 
 class SimFirmware {
   class BcdcResponse {
@@ -145,6 +147,14 @@ class SimFirmware {
   // During a reassociation attempt, this is where reassoc params are stored.
   struct ReassocOpts {
     common::MacAddr bssid;
+
+    // Real firmware returns target BSS info in a buffer that contains a
+    // struct, an offset, then an arbitrary length of IE bytes. Sim firmware
+    // stores this internally as a BSS info struct and a separate byte array.
+    brcmf_bss_info_le target_bss_info;
+    uint8_t target_bss_info_ies[BSS_INFO_IES_MAX_LEN];
+    // If we need to send disassoc during roam, we need to know the original BSS channel.
+    wlan_common::WlanChannel orig_bss_channel;
   };
 
  public:
@@ -295,6 +305,7 @@ class SimFirmware {
   zx_status_t IovarSsidSet(SimIovarSetReq* req);
   zx_status_t IovarStbcTxSet(SimIovarSetReq* req);
   zx_status_t IovarStbcTxGet(SimIovarGetReq* req);
+  zx_status_t IovarTargetBssInfoGet(SimIovarGetReq* req);
   zx_status_t IovarTxstreamsSet(SimIovarSetReq* req);
   zx_status_t IovarTxstreamsGet(SimIovarGetReq* req);
   zx_status_t IovarVerGet(SimIovarGetReq* req);
@@ -423,6 +434,8 @@ class SimFirmware {
   void DisassocStart(brcmf_scb_val_le* scb_val);
   void DisassocLocalClient(wlan_ieee80211::ReasonCode reason);
   void SetStateToDisassociated(wlan_ieee80211::ReasonCode reason, bool locally_initiated);
+  // Get the Sim firmware ready for a target_bss_info iovar request.
+  void SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf);
   void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts, wlan_common::WlanChannel& channel);
   void ReassocStart();
   void ReassocHandleFailure(wlan_ieee80211::StatusCode status);

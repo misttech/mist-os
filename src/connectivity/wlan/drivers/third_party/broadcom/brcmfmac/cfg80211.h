@@ -436,6 +436,8 @@ enum brcmf_disconnect_mode {
  * @roam_timer: timer for firmware response of roam.
  * @roam_timeout_work: associated work structure for roam timer.
  * @capability: BSS description capability field.
+ * @target_bss_info_buf: BSS description for target BSS during a roam attempt.
+ * @target_bssid: BSSID that firmware is attempting to roam to.
  */
 struct brcmf_cfg80211_info {
   struct brcmf_cfg80211_conf* conf;
@@ -479,6 +481,8 @@ struct brcmf_cfg80211_info {
   Timer* roam_timer;
   WorkItem roam_timeout_work;
   uint16_t capability;
+  uint8_t* target_bss_info_buf;
+  uint8_t target_bssid[ETH_ALEN];
 };
 
 /**

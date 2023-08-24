@@ -66,6 +66,7 @@
 #include "third_party/bcmdhd/crossdriver/include/proto/802.11.h"
 #include "third_party/bcmdhd/crossdriver/wlioctl.h"
 #include "wlan/drivers/log.h"
+#include "zircon/types.h"
 
 #define BRCMF_SCAN_JOIN_ACTIVE_DWELL_TIME_MS 320
 #define BRCMF_SCAN_JOIN_PASSIVE_DWELL_TIME_MS 400
@@ -1788,7 +1789,6 @@ void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_cod
   ndev->if_proto->ConnectConf(&conf);
 }
 
-// Stops roam timer, cleans up roam request, and returns roam result.
 void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bssid,
                               status_code_t result_code) {
   const std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
@@ -1796,8 +1796,6 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_cfg80211_profile prof = ifp->vif->profile;
 
-  cfg->roam_timer->Stop();
-  brcmf_clear_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state);
   if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping roam result callback");
     return;
@@ -5368,8 +5366,9 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
         break;
       }
       default: {
-        BRCMF_WARN("Unsuccessful roam: connect_status %s, reassoc_result %d",
+        BRCMF_WARN("Reassociation failed with connect_status %s, reassoc_result %d",
                    brcmf_get_connect_status_str(connect_status), static_cast<int>(reassoc_result));
+        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
         const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
         if (err != ZX_OK) {
           BRCMF_ERR("Failed to clear firmware connection state.");
@@ -5377,6 +5376,7 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
         break;
       }
     }
+    brcmf_return_roam_result(ndev, cfg->target_bssid, reassoc_result);
   }
 
   BRCMF_DBG(TRACE, "Exit");
@@ -5524,16 +5524,8 @@ static void brcmf_roam_timeout_worker(WorkItem* work) {
   struct brcmf_cfg80211_info* cfg =
       containerof(work, struct brcmf_cfg80211_info, roam_timeout_work);
   struct brcmf_if* ifp = cfg_to_if(cfg);
-  struct net_device* ndev = ifp->ndev;
-  struct wireless_dev* wdev = ndev_to_wdev(ndev);
-  struct brcmf_cfg80211_vif* vif = containerof(wdev, struct brcmf_cfg80211_vif, wdev);
 
-  brcmf_clear_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
-  BRCMF_WARN("Roam timeout, disassociating for firmware state cleanup");
-  const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
-  if (err != ZX_OK) {
-    BRCMF_ERR("Failed to clear firmware connection state.");
-  }
+  BRCMF_WARN("Roam timeout");
   brcmf_bss_roam_done(ifp, brcmf_connect_status_t::CONNECTING_TIMEOUT,
                       STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
 }
@@ -5566,15 +5558,13 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
   if (!check_vif_up(vif)) {
     return ZX_ERR_IO;
   }
+
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
   if (brcmf_is_apmode(ifp->vif)) {
     BRCMF_ERR("Unexpected REASSOC event received for AP interface");
     return ZX_ERR_INTERNAL;
   }
   ZX_DEBUG_ASSERT(!brcmf_is_apmode(ifp->vif));
-
-  // Must set ROAMING bit here, in case the in-progress roam is firmware-initiated.
-  brcmf_set_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
 
   // TODO(fxbug.dev/117517) REASSOC fails if scan overlaps.
   // Note: canceling in-progress scan here does not prevent the REASSOC event
@@ -5590,7 +5580,9 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
 
   if (e->status == BRCMF_E_STATUS_ATTEMPT) {
     BRCMF_DBG(CONN, "REASSOC event: attempt");
+    memcpy(cfg->target_bssid, e->addr, ETH_ALEN);
     cfg->roam_timer->Start(BRCMF_ROAM_TIMER_DUR);
+    brcmf_set_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
   } else if (e->status == BRCMF_E_STATUS_SUCCESS) {
     BRCMF_DBG(CONN, "REASSOC event: success");
   } else {
@@ -5598,7 +5590,6 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
     // Reassociation failed, so roam will not succeed, and we may not see further roam-related
     // events. For this event, e->reason is in the StatusCode enum space.
     const status_code_t reason_code = e->reason;
-    brcmf_return_roam_result(ndev, e->addr, reason_code);
     return brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, reason_code);
   }
   return ZX_OK;
@@ -5895,31 +5886,88 @@ static zx_status_t brcmf_process_set_ssid_event(struct brcmf_if* ifp,
   return ZX_OK;
 }
 
+// Check whether a BSS info (brcmf_bss_info_le) has a well-formed IE buffer.
+// This check is not meant to be exhaustive; it is intended to catch
+// obviously invalid IE buffers (occasionally seen in data retrieved from
+// firmware). Higher WLAN layers must perform their own IE validation.
+static bool brcmf_bss_info_le_ie_buffer_well_formed(brcmf_bss_info_le* bi) {
+  const auto& ies = reinterpret_cast<uint8_t*>(bi) + bi->ie_offset;
+  const auto& ies_len = bi->ie_length;
+
+  const auto ssid = brcmf_find_ssid_in_ies(ies, ies_len);
+  if (ssid.empty()) {
+    BRCMF_WARN("BSS description IE buffer does not contain SSID IE");
+    return false;
+  }
+
+  size_t offset = 0;
+  while (offset + TLV_HDR_LEN <= ies_len) {
+    const auto elem_len = ies[offset + TLV_LEN_OFF];
+    offset += TLV_HDR_LEN;
+    if (offset + elem_len > ies_len) {
+      break;
+    }
+    offset += elem_len;
+  }
+  if (offset != ies_len) {
+    BRCMF_WARN("BSS description IE buffer sum of bytes (%ld) does not match IE buffer length %ld",
+               offset, ies_len);
+    return false;
+  }
+  return true;
+}
+
+// Retrieve target BSS info from the firmware, storing it in the driver for later use.
+static zx_status_t brcmf_get_target_bss_info(struct brcmf_if* ifp) {
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  bcme_status_t fw_err = BCME_OK;
+
+  auto target_bss_info_status = brcmf_fil_iovar_data_get(
+      ifp, "target_bss_info", cfg->target_bss_info_buf, WL_EXTRA_BUF_MAX, &fw_err);
+  if (target_bss_info_status != ZX_OK) {
+    BRCMF_ERR("Could not get target BSS info from firmware: %s, fw err %s",
+              zx_status_get_string(target_bss_info_status), brcmf_fil_get_errstr(fw_err));
+    return target_bss_info_status;
+  }
+  const auto& target_bss_info = reinterpret_cast<brcmf_bss_info_le*>(cfg->target_bss_info_buf);
+
+  if (!brcmf_bss_info_le_ie_buffer_well_formed(target_bss_info)) {
+    BRCMF_ERR(
+        "target_bss_info firmware retrieval reported success, but IE buffer is not well-formed");
+    target_bss_info_status = ZX_ERR_INTERNAL;
+  }
+  return target_bss_info_status;
+}
+
 static zx_status_t brcmf_notify_roam_prep_status(struct brcmf_if* ifp,
                                                  const struct brcmf_event_msg* e, void* data) {
   const uint32_t event = e->event_code;
-  const brcmf_fweh_event_status_t status = e->status;
-  struct net_device* ndev = ifp->ndev;
+  const brcmf_fweh_event_status_t event_status = e->status;
+  zx_status_t status = ZX_OK;
 
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
   if (event != BRCMF_E_ROAM_PREP) {
     BRCMF_DBG(CONN, "Skipping event, not a ROAM_PREP event");
-    return ZX_OK;
+    return status;
   }
-  if (status == BRCMF_E_STATUS_SUCCESS) {
+  if (event_status == BRCMF_E_STATUS_SUCCESS) {
     BRCMF_DBG(CONN, "ROAM_PREP event: success");
-  } else if (status == BRCMF_E_STATUS_ATTEMPT) {
+    // Target BSS info must be available here. If not, roam cannot proceed.
+    status = brcmf_get_target_bss_info(ifp);
+  } else if (event_status == BRCMF_E_STATUS_ATTEMPT) {
     BRCMF_DBG(CONN, "ROAM_PREP event: attempt");
   } else {
     BRCMF_DBG(CONN, "ROAM_PREP event: failed");
+    status = ZX_ERR_INTERNAL;
+  }
+  if (status != ZX_OK) {
     BRCMF_WARN("Roam attempt failed");
-    const status_code_t status = STATUS_CODE_REFUSED_REASON_UNSPECIFIED;
-    brcmf_return_roam_result(ndev, e->addr, status);
-    return brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, status);
+    status = brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED,
+                                 STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
   }
 
-  return ZX_OK;
+  return status;
 }
 
 zx_status_t brcmf_update_bss_info(struct brcmf_if* ifp) {
@@ -5961,6 +6009,11 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
     return ZX_OK;
   }
 
+  if (!brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    BRCMF_DBG(CONN, "Skipping ROAM event, driver is not in ROAMING state");
+    return ZX_OK;
+  }
+
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
@@ -5973,7 +6026,6 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
       const auto sync_channel_status = sync_driver_channel_to_firmware_channel(ifp);
       const auto update_bss_info_status = brcmf_update_bss_info(ifp);
       if (sync_channel_status == ZX_OK && update_bss_info_status == ZX_OK) {
-        brcmf_return_roam_result(ifp->ndev, e->addr, STATUS_CODE_SUCCESS);
         brcmf_bss_roam_done(ifp, brcmf_connect_status_t::CONNECTED, STATUS_CODE_SUCCESS);
         return ZX_OK;
       }
@@ -5985,7 +6037,6 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
 
   BRCMF_WARN("Roam attempt failed");
   const status_code_t result_code = STATUS_CODE_REFUSED_REASON_UNSPECIFIED;
-  brcmf_return_roam_result(ifp->ndev, e->addr, result_code);
   brcmf_bss_roam_done(ifp, brcmf_connect_status_t::REASSOC_REQ_FAILED, result_code);
   return ZX_OK;
 }
@@ -6118,6 +6169,8 @@ static void brcmf_deinit_cfg_mem(struct brcmf_cfg80211_info* cfg) {
   cfg->wowl.nd = nullptr;
   free(cfg->wowl.nd_info);
   cfg->wowl.nd_info = nullptr;
+  free(cfg->target_bss_info_buf);
+  cfg->target_bss_info_buf = nullptr;
 }
 
 static zx_status_t brcmf_init_cfg_mem(struct brcmf_cfg80211_info* cfg) {
@@ -6137,6 +6190,11 @@ static zx_status_t brcmf_init_cfg_mem(struct brcmf_cfg80211_info* cfg) {
   cfg->wowl.nd_info = static_cast<decltype(cfg->wowl.nd_info)>(
       calloc(1, sizeof(*cfg->wowl.nd_info) + sizeof(struct cfg80211_wowlan_nd_match*)));
   if (!cfg->wowl.nd_info) {
+    goto init_priv_mem_out;
+  }
+  cfg->target_bss_info_buf =
+      static_cast<decltype(cfg->target_bss_info_buf)>(calloc(1, WL_EXTRA_BUF_MAX));
+  if (!cfg->target_bss_info_buf) {
     goto init_priv_mem_out;
   }
   return ZX_OK;

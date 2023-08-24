@@ -82,7 +82,7 @@ void WnmTest::Init() {
 // This function schedules a BTM req frame sent from the first AP.
 void WnmTest::ScheduleBtmReq(const simulation::SimBtmReqFrame& btm_req, zx::duration when) {
   BRCMF_INFO("Scheduling BTM");
-  ZX_ASSERT_MSG(!aps_.empty(), "Cannot sent BTM req because there is no AP\n");
+  ZX_ASSERT_MSG(!aps_.empty(), "Cannot send BTM req because there is no AP\n");
   env_->ScheduleNotification([this, btm_req] { aps_.front()->SendBtmReq(btm_req); }, when);
 }
 
@@ -209,10 +209,99 @@ TEST_F(WnmTest, RoamOnBtmReqButTargetApIgnoresReassoc) {
   ScheduleBtmReq(btm_req, zx::sec(1));
   env_->Run(kTestDuration);
 
-  EXPECT_EQ(SimInterface::AssocContext::kAssociated, client_ifc_.assoc_ctx_.state);
+  // Roam failure will incur disconnect from original AP.
+  EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
   EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
   EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(1U, ap_0.GetNumAssociatedClient());
+  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
+  // STA should not have associated with the target AP.
+  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
+  EXPECT_EQ(1U, btm_req_frame_count_);
+}
+
+// DUT is configured to roam when AP sends a BTM request, but the firmware
+// fails to obtain the target BSS info (e.g. due to lack of firmware support, or
+// some other firmware error).
+TEST_F(WnmTest, DisconnectOnBtmReqWhenTargetBssInfoUnsupported) {
+  setup_btm_firmware_support_ = true;
+  PreInit();
+  Init();
+
+  // Inject firmware error to "target_bss_info" iovar.
+  brcmf_simdev* sim = device_->GetSim();
+  sim->sim_fw->err_inj_.AddErrInjIovar("target_bss_info", ZX_ERR_NOT_SUPPORTED, BCME_UNSUPPORTED,
+                                       client_ifc_.iface_id_);
+
+  simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
+  simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);
+  ap_0.EnableBeacon(zx::msec(60));
+  ap_1.EnableBeacon(zx::msec(60));
+  aps_.push_back(&ap_0);
+  aps_.push_back(&ap_1);
+
+  client_ifc_.AssociateWith(ap_0, zx::msec(10));
+
+  common::MacAddr client_mac;
+  client_ifc_.GetMacAddr(&client_mac);
+  const simulation::SimBtmReqMode req_mode{.preferred_candidate_list_included = true};
+  const simulation::SimNeighborReportElement neighbor{
+      .bssid = kAp1Bssid,
+      .operating_class = kAp1OperatingClass,
+      .channel_number = kAp1Channel.primary,
+  };
+  const std::vector<simulation::SimNeighborReportElement> candidates({neighbor});
+  const simulation::SimBtmReqFrame btm_req(kAp0Bssid, client_mac, req_mode, candidates);
+  ScheduleBtmReq(btm_req, zx::sec(1));
+  env_->Run(kTestDuration);
+
+  EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
+  EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
+  EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
+  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
+  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
+  EXPECT_EQ(1U, btm_req_frame_count_);
+}
+
+// DUT is configured to roam when AP sends a BTM request, but the firmware
+// returns target BSS info with a malformed IE buffer.
+TEST_F(WnmTest, DisconnectOnBtmReqWhenTargetBssInfoIeBufferMalformed) {
+  setup_btm_firmware_support_ = true;
+  PreInit();
+  Init();
+
+  // Inject firmware error to "target_bss_info" iovar.
+  brcmf_simdev* sim = device_->GetSim();
+  // IE buffer that is all zero values, and is too short.
+  const std::vector<uint8_t> malformed_ie_buf{0, 0, 0, 0};
+  sim->sim_fw->err_inj_.AddErrInjIovar("target_bss_info", ZX_OK, BCME_OK, client_ifc_.iface_id_,
+                                       &malformed_ie_buf);
+
+  simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
+  simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);
+  ap_0.EnableBeacon(zx::msec(60));
+  ap_1.EnableBeacon(zx::msec(60));
+  aps_.push_back(&ap_0);
+  aps_.push_back(&ap_1);
+
+  client_ifc_.AssociateWith(ap_0, zx::msec(10));
+
+  common::MacAddr client_mac;
+  client_ifc_.GetMacAddr(&client_mac);
+  const simulation::SimBtmReqMode req_mode{.preferred_candidate_list_included = true};
+  const simulation::SimNeighborReportElement neighbor{
+      .bssid = kAp1Bssid,
+      .operating_class = kAp1OperatingClass,
+      .channel_number = kAp1Channel.primary,
+  };
+  const std::vector<simulation::SimNeighborReportElement> candidates({neighbor});
+  const simulation::SimBtmReqFrame btm_req(kAp0Bssid, client_mac, req_mode, candidates);
+  ScheduleBtmReq(btm_req, zx::sec(1));
+  env_->Run(kTestDuration);
+
+  EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
+  EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
+  EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
+  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
 }
