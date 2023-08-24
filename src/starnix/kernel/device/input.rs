@@ -102,7 +102,7 @@ pub struct InspectStatus {
     uapi_events_generated_count: fuchsia_inspect::UintProperty,
 
     /// The number of uapi::input_events read from this touch file by external process.
-    _uapi_events_read_count: fuchsia_inspect::UintProperty,
+    uapi_events_read_count: fuchsia_inspect::UintProperty,
 
     // Health status of this InputFile. UNHEALTHY if InputFile loses connection to TouchSource protocol
     pub health_node: fuchsia_inspect::health::Node,
@@ -121,7 +121,7 @@ impl InspectStatus {
             fidl_events_received_count,
             fidl_events_converted_count,
             uapi_events_generated_count,
-            _uapi_events_read_count: uapi_events_read_count,
+            uapi_events_read_count,
             health_node,
         }
     }
@@ -136,6 +136,10 @@ impl InspectStatus {
 
     fn count_generated_events(&self, count: u64) {
         self.uapi_events_generated_count.add(count);
+    }
+
+    fn count_read_events(&self, count: u64) {
+        self.uapi_events_read_count.add(count);
     }
 }
 
@@ -482,9 +486,12 @@ impl FileOps for Arc<InputFile> {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        let event = self.inner.lock().events.pop_front();
+        let mut inner = self.inner.lock();
+        let event = inner.events.pop_front();
         match event {
             Some(event) => {
+                inner.inspect_status.as_ref().map(|status| status.count_read_events(1));
+                drop(inner);
                 // TODO(https://fxbug.dev/124600): Consider sending as many events as will fit
                 // in `data`, instead of sending them one at a time.
                 data.write_all(event.as_bytes())
@@ -1440,6 +1447,7 @@ mod test {
             fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
         let relay_thread = input_file.start_touch_relay(touch_source_proxy);
+        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Send 2 TouchEvents to proxy that should be counted as `received` by InputFile
         // A TouchEvent::default() has no pointer sample so these events should be discarded.
@@ -1476,12 +1484,14 @@ mod test {
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
 
+        let _events = read_uapi_events(input_file, &file_object, &current_task);
+
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             touch_input_file: {
                 fidl_events_received_count: 7u64,
                 fidl_events_converted_count: 5u64,
                 uapi_events_generated_count: 19u64,
-                uapi_events_read_count: 0u64,
+                uapi_events_read_count: 19u64,
                 "fuchsia.inspect.Health": {
                     status: "STARTING_UP",
                     // Timestamp value is unpredictable and not relevant in this context,
