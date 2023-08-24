@@ -68,6 +68,7 @@
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
+                "fuchsia.wlan.wlanix.Wlanix",
             ],
             from: "parent",
             availability: "optional",

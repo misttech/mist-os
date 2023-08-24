@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::logging::{log_error, log_info, log_warn};
-use futures::{channel::mpsc, future::Future, stream::StreamExt};
-use netlink::{messaging::Sender, NETLINK_LOG_TAG};
+use async_trait::async_trait;
+use futures::{
+    channel::mpsc,
+    future::{join, Future},
+    stream::{FuturesUnordered, StreamExt},
+};
+use netlink::{messaging::Sender, multicast_groups::ModernGroup, NETLINK_LOG_TAG};
 use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_generic::{
     constants::GENL_ID_CTRL,
@@ -14,7 +18,17 @@ use netlink_packet_generic::{
     },
     GenlMessage,
 };
-use std::{collections::HashMap, sync::Mutex};
+use parking_lot::Mutex;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::DerefMut,
+    sync::Arc,
+};
+
+use crate::{
+    logging::{log_error, log_info, log_warn},
+    types::{errno, Errno},
+};
 
 mod messages;
 mod nl80211;
@@ -23,7 +37,8 @@ pub use messages::GenericMessage;
 
 const MIN_FAMILY_ID: u16 = GENL_ID_CTRL + 1;
 
-trait GenericNetlinkProtocolServer<S>: Send {
+#[async_trait]
+trait GenericNetlinkFamily<S>: Send + Sync {
     /// Return the unique name for this generic netlink protocol.
     ///
     /// This name is used by the ctrl server to identify this server for clients.
@@ -36,12 +51,24 @@ trait GenericNetlinkProtocolServer<S>: Send {
         vec![]
     }
 
+    /// Returns a future that pipes messages for the given multicast group into
+    /// the given sink. The parent of this server is responsible for managing
+    /// multicast group memberships and routing these messages appropriately.
+    /// The assigned family id of this multicast group is passed in to be used
+    /// appropriately when constructing messages.
+    async fn stream_multicast_messages(
+        &self,
+        group: String,
+        assigned_family_id: u16,
+        message_sink: mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
+    );
+
     /// Handle a netlink message targeted to this server.
     ///
     /// The given payload contains the generic netlink header and all subsequent data.
     /// Protocol servers should implement their own generic netlink families and
     /// deserialize messages using `GenlMessage::<_>::deserialize`.
-    fn handle_message(&self, netlink_header: NetlinkHeader, payload: Vec<u8>, sender: &mut S);
+    async fn handle_message(&self, netlink_header: NetlinkHeader, payload: Vec<u8>, sender: &mut S);
 }
 
 fn extract_family_names(genl_ctrl: GenlCtrl) -> Vec<String> {
@@ -60,62 +87,71 @@ fn extract_family_names(genl_ctrl: GenlCtrl) -> Vec<String> {
         .collect()
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+struct ClientId(u64);
+
 /// All state required to the generic netlink server. This struct assumes
 /// synchronous access, and should be kept inside of a GenericNetlinkServer.
 struct GenericNetlinkServerState<S> {
     /// Mapping from generic family server name to its assigned ID value.
-    server_ids: HashMap<String, u16>,
+    family_ids: HashMap<String, u16>,
     /// Servers for specific generic netlink families. Servers are stored in this
     /// list by order of ID, such that protocol N is in servers[N - MIN_FAMILY_ID].
-    servers: Vec<Box<dyn GenericNetlinkProtocolServer<S>>>,
+    families: Vec<Arc<dyn GenericNetlinkFamily<S>>>,
     /// Multicast groups, identified by (family name, group name). Multicast
     /// group IDs are assigned uniquely across all generic families.
-    multicast_groups: HashMap<(String, String), u32>,
+    multicast_groups: HashMap<(String, String), ModernGroup>,
     /// Counter used to generate unique ID values for all multicast groups.
-    multicast_group_id_counter: u32,
+    multicast_group_id_counter: ModernGroup,
+    /// Unique internal IDs used to track clients.
+    client_id_counter: ClientId,
+    /// Senders for passing multicast traffic to clients.
+    client_senders: HashMap<ClientId, S>,
+    /// Mapping from multicast group -> list of subscribed client IDs.
+    multicast_group_memberships: HashMap<ModernGroup, HashSet<ClientId>>,
 }
 
 impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
     fn new() -> Self {
-        let mut state = Self {
-            server_ids: HashMap::new(),
-            servers: vec![],
+        Self {
+            family_ids: HashMap::new(),
+            families: vec![],
             multicast_groups: HashMap::new(),
-            multicast_group_id_counter: 0,
-        };
-        // TODO(fxbug.dev/128857): Add dynamic family support. Right now this is only
-        // structured to support static family additions.
-        state.add_server(Box::new(nl80211::Nl80211ProtocolServer {}));
-        state
+            multicast_group_id_counter: ModernGroup(0),
+            client_id_counter: ClientId(0),
+            client_senders: HashMap::new(),
+            multicast_group_memberships: HashMap::new(),
+        }
     }
 
-    fn add_server(&mut self, server: Box<dyn GenericNetlinkProtocolServer<S>>) {
-        match (self.servers.len() as u16).checked_add(MIN_FAMILY_ID) {
+    fn add_family(&mut self, family: Arc<dyn GenericNetlinkFamily<S>>) {
+        match (self.families.len() as u16).checked_add(MIN_FAMILY_ID) {
             Some(new_family_id) => {
-                self.server_ids.insert(server.name(), new_family_id);
-                self.servers.push(server);
+                self.family_ids.insert(family.name(), new_family_id);
+                self.families.push(family);
             }
             None => {
                 log_error!(
                     tag = NETLINK_LOG_TAG,
-                    "Failed to add generic netlink server: too many servers"
+                    "Failed to add generic netlink family: too many families"
                 );
             }
         }
     }
 
-    fn get_server(&self, family_id: u16) -> Option<&dyn GenericNetlinkProtocolServer<S>> {
-        if family_id >= MIN_FAMILY_ID && ((family_id - MIN_FAMILY_ID) as usize) < self.servers.len()
+    fn get_family(&self, family_id: u16) -> Option<Arc<dyn GenericNetlinkFamily<S>>> {
+        if family_id >= MIN_FAMILY_ID
+            && ((family_id - MIN_FAMILY_ID) as usize) < self.families.len()
         {
-            Some(&*self.servers[(family_id - MIN_FAMILY_ID) as usize])
+            Some(Arc::clone(&self.families[(family_id - MIN_FAMILY_ID) as usize]))
         } else {
             None
         }
     }
 
-    fn get_multicast_group_id(&mut self, family: String, group: String) -> u32 {
+    fn get_multicast_group_id(&mut self, family: String, group: String) -> ModernGroup {
         *self.multicast_groups.entry((family, group)).or_insert_with(|| {
-            self.multicast_group_id_counter += 1;
+            self.multicast_group_id_counter.0 += 1;
             self.multicast_group_id_counter
         })
     }
@@ -133,7 +169,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                 log_info!(tag = NETLINK_LOG_TAG, "Netlink GetFamily request: {:?}", family_names);
 
                 for family in &family_names {
-                    if let Some(id) = self.server_ids.get(family) {
+                    if let Some(id) = self.family_ids.get(family) {
                         log_info!(
                             tag = NETLINK_LOG_TAG,
                             "Serving requested netlink family {}",
@@ -145,17 +181,20 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                                 GenlCtrlAttrs::FamilyId(*id),
                                 GenlCtrlAttrs::FamilyName(family.to_string()),
                                 GenlCtrlAttrs::McastGroups(
-                                    self.get_server(*id)
-                                        .expect("Known server ID should always exist")
+                                    self.get_family(*id)
+                                        .expect("Known family ID should always exist")
                                         .multicast_groups()
                                         .into_iter()
                                         .map(|name| {
                                             vec![
                                                 McastGrpAttrs::Name(name.clone()),
-                                                McastGrpAttrs::Id(self.get_multicast_group_id(
-                                                    family.to_string(),
-                                                    name,
-                                                )),
+                                                McastGrpAttrs::Id(
+                                                    self.get_multicast_group_id(
+                                                        family.to_string(),
+                                                        name,
+                                                    )
+                                                    .0,
+                                                ),
                                             ]
                                         })
                                         .collect(),
@@ -183,8 +222,24 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
             other => log_error!(tag = NETLINK_LOG_TAG, "Unsupported GenlCtrlCmd: {:?}", other),
         }
     }
+}
 
-    fn handle_generic_message(&mut self, message: NetlinkMessage<GenericMessage>, sender: &mut S) {
+/// Coordinates all generic netlink clients and families.
+#[derive(Clone)]
+struct GenericNetlinkServer<S> {
+    state: Arc<Mutex<GenericNetlinkServerState<S>>>,
+}
+
+impl<S: Sender<GenericMessage> + Send> GenericNetlinkServer<S> {
+    fn new() -> Self {
+        Self { state: Arc::new(Mutex::new(GenericNetlinkServerState::new())) }
+    }
+
+    async fn handle_generic_message(
+        &self,
+        message: NetlinkMessage<GenericMessage>,
+        sender: &mut S,
+    ) {
         let (netlink_header, payload) = message.into_parts();
         let req = match payload {
             NetlinkPayload::InnerMessage(p) => p,
@@ -195,70 +250,155 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
         };
         match req {
             GenericMessage::Ctrl(ctrl_message) => {
-                self.handle_ctrl_message(netlink_header, ctrl_message, sender)
+                self.state.lock().handle_ctrl_message(netlink_header, ctrl_message, sender)
             }
-            GenericMessage::Other { family, payload } => match self.get_server(family) {
-                Some(server) => server.handle_message(netlink_header, payload, sender),
-                None => log_info!(
-                    tag = NETLINK_LOG_TAG,
-                    "Ignoring generic netlink message with unsupported family {}",
-                    family
-                ),
-            },
+            GenericMessage::Other { family: family_id, payload } => {
+                let family = self.state.lock().get_family(family_id);
+                match family {
+                    Some(family) => {
+                        family.handle_message(netlink_header, payload, sender).await;
+                    }
+                    None => log_info!(
+                        tag = NETLINK_LOG_TAG,
+                        "Ignoring generic netlink message with unsupported family {}",
+                        family_id,
+                    ),
+                }
+            }
         }
     }
-}
 
-/// Coordinates all generic netlink clients and servers.
-struct GenericNetlinkServer<S> {
-    state: Mutex<GenericNetlinkServerState<S>>,
-    _data: std::marker::PhantomData<S>,
-}
-
-impl<S: Sender<GenericMessage> + Send> GenericNetlinkServer<S> {
-    fn new() -> Self {
-        Self { state: Mutex::new(GenericNetlinkServerState::new()), _data: Default::default() }
-    }
-
-    async fn run_generic_netlink_client(&self, mut client: GenericNetlinkClient<S>) {
+    async fn run_generic_netlink_client(self, mut client: GenericNetlinkClient<S>) {
         log_info!(tag = NETLINK_LOG_TAG, "Registered new generic netlink client");
         loop {
             match client.receiver.next().await {
-                Some(message) => {
-                    self.state.lock().unwrap().handle_generic_message(message, &mut client.sender)
-                }
+                Some(message) => self.handle_generic_message(message, &mut client.sender).await,
                 None => {
                     log_info!(tag = NETLINK_LOG_TAG, "Generic netlink client exited");
+                    let mut state = self.state.lock();
+                    for memberships in state.multicast_group_memberships.values_mut() {
+                        memberships.remove(&client.client_id);
+                    }
+                    state.client_senders.remove(&client.client_id);
                     return;
                 }
             }
         }
     }
+
+    async fn pipe_single_multicast_group(
+        &self,
+        mcast_group_id: ModernGroup,
+        mcast_stream: mpsc::UnboundedReceiver<NetlinkMessage<GenericMessage>>,
+    ) {
+        if self
+            .state
+            .lock()
+            .multicast_group_memberships
+            .insert(mcast_group_id, HashSet::new())
+            .is_some()
+        {
+            log_error!(
+                tag = NETLINK_LOG_TAG,
+                "pipe_single_multicast_group called on group {} but group is already served",
+                mcast_group_id.0
+            );
+            return;
+        }
+        let fut = mcast_stream.for_each(|mcast_message| {
+            let mut state_lock = self.state.lock();
+            let state = state_lock.deref_mut();
+            for client_id in state
+                .multicast_group_memberships
+                .get(&mcast_group_id)
+                .expect("Group memberships should always be present")
+            {
+                if let Some(sender) = state.client_senders.get_mut(client_id) {
+                    sender.send(mcast_message.clone(), Some(mcast_group_id));
+                }
+            }
+            async {}
+        });
+        fut.await;
+    }
+
+    async fn pipe_multicast_traffic(self) {
+        // Clone the list of families to avoid holding a lock across an await.
+        // We need to revisit this if we want to add dynamic family support.
+        let mut families = self.state.lock().families.clone();
+
+        let unordered = FuturesUnordered::new();
+        for family in &mut families {
+            let family_name = family.name().to_string();
+            let family_id =
+                *self.state.lock().family_ids.get(&family_name).expect("Failed to get family id");
+            for mcast_group in family.multicast_groups() {
+                let mcast_group_id = self
+                    .state
+                    .lock()
+                    .get_multicast_group_id(family_name.clone(), mcast_group.clone());
+                let (sink, receiver) = mpsc::unbounded();
+                unordered.push(family.stream_multicast_messages(mcast_group, family_id, sink));
+                unordered
+                    .push(Box::pin(self.pipe_single_multicast_group(mcast_group_id, receiver)));
+            }
+        }
+
+        unordered.collect::<Vec<()>>().await;
+    }
 }
 
 pub(crate) struct GenericNetlinkClient<S> {
+    client_id: ClientId,
     sender: S,
     receiver: mpsc::UnboundedReceiver<NetlinkMessage<GenericMessage>>,
 }
 
 pub(crate) struct GenericNetlink<S> {
+    server: GenericNetlinkServer<S>,
     new_client_sender: mpsc::UnboundedSender<GenericNetlinkClient<S>>,
 }
 
 async fn run_generic_netlink<S: Sender<GenericMessage> + Send>(
+    server: GenericNetlinkServer<S>,
     new_client_receiver: mpsc::UnboundedReceiver<GenericNetlinkClient<S>>,
 ) {
-    let server = GenericNetlinkServer::new();
-    new_client_receiver
-        .for_each_concurrent(None, |client| server.run_generic_netlink_client(client))
-        .await;
+    let multicast_fut = server.clone().pipe_multicast_traffic();
+    let new_client_fut = new_client_receiver
+        .for_each_concurrent(None, |client| server.clone().run_generic_netlink_client(client));
+
+    join(new_client_fut, multicast_fut).await;
 }
 
 impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
     pub fn new() -> (Self, impl Future<Output = ()> + Send) {
+        // TODO(fxbug.dev/128857): Add dynamic family support. Right now this is only
+        // structured to support static family additions.
+        let (generic_netlink, netlink_fut) = Self::new_internal();
+        let server = generic_netlink.server.clone();
+        let fut_with_server = async move {
+            // Initialize the nl80211 family inside this async block so that
+            // it shares an executor with the main netlink future.
+            match nl80211::Nl80211Family::new() {
+                Ok(nl80211_family) => server.state.lock().add_family(Arc::new(nl80211_family) as _),
+                Err(e) => {
+                    log_error!(
+                        tag = NETLINK_LOG_TAG,
+                        "Failed to connect to Nl80211 netlink family: {}",
+                        e
+                    );
+                }
+            };
+            netlink_fut.await;
+        };
+        (generic_netlink, fut_with_server)
+    }
+
+    fn new_internal() -> (Self, impl Future<Output = ()> + Send) {
         let (new_client_sender, new_client_receiver) = mpsc::unbounded();
-        let generic_netlink = Self { new_client_sender };
-        let netlink_fut = run_generic_netlink(new_client_receiver);
+        let server = GenericNetlinkServer::new();
+        let netlink_fut = run_generic_netlink(server.clone(), new_client_receiver);
+        let generic_netlink = Self { server, new_client_sender };
         (generic_netlink, netlink_fut)
     }
 
@@ -266,35 +406,65 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
         &self,
         sender: S,
         receiver: mpsc::UnboundedReceiver<NetlinkMessage<GenericMessage>>,
-    ) -> Result<(), anyhow::Error> {
-        let new_client = GenericNetlinkClient { sender, receiver };
-        self.new_client_sender.unbounded_send(new_client).map_err(|e| e.into())
+    ) -> Result<GenericNetlinkClientHandle<S>, anyhow::Error> {
+        let mut state = self.server.state.lock();
+        let client_id = state.client_id_counter;
+        state.client_id_counter.0 += 1;
+        state.client_senders.insert(client_id, sender.clone());
+        let handle = GenericNetlinkClientHandle { client_id, server: self.server.clone() };
+        let new_client = GenericNetlinkClient { client_id, sender, receiver };
+        self.new_client_sender.unbounded_send(new_client)?;
+        Ok(handle)
+    }
+}
+
+pub(crate) struct GenericNetlinkClientHandle<S> {
+    client_id: ClientId,
+    server: GenericNetlinkServer<S>,
+}
+
+impl<S> GenericNetlinkClientHandle<S> {
+    pub(crate) fn add_membership(&self, group_id: ModernGroup) -> Result<(), Errno> {
+        let mut state = self.server.state.lock();
+        if let Some(memberships) = state.multicast_group_memberships.get_mut(&group_id) {
+            memberships.insert(self.client_id);
+            Ok(())
+        } else {
+            errno::error!(EINVAL)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_utils {
+    use {
+        super::*, netlink::multicast_groups::ModernGroup, netlink_packet_core::NetlinkSerializable,
+    };
+
+    #[derive(Clone)]
+    pub(crate) struct TestSender<M> {
+        pub messages: Arc<Mutex<Vec<NetlinkMessage<M>>>>,
+    }
+
+    impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M> for TestSender<M> {
+        fn send(&mut self, message: NetlinkMessage<M>, _group: Option<ModernGroup>) {
+            self.messages.lock().push(message);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
+        super::{test_utils::*, *},
         assert_matches::assert_matches,
         fuchsia_async::TestExecutor,
-        netlink::multicast_groups::ModernGroup,
-        netlink_packet_core::{NetlinkPayload, NetlinkSerializable},
+        futures::pin_mut,
+        netlink_packet_core::NetlinkPayload,
         netlink_packet_generic::GenlHeader,
         std::sync::Arc,
         std::task::Poll,
     };
-
-    #[derive(Clone)]
-    struct TestSender<M> {
-        messages: Arc<Mutex<Vec<NetlinkMessage<M>>>>,
-    }
-
-    impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M> for TestSender<M> {
-        fn send(&mut self, message: NetlinkMessage<M>, _group: Option<ModernGroup>) {
-            self.messages.lock().unwrap().push(message);
-        }
-    }
 
     const TEST_FAMILY: &str = "test_family";
     const MCAST_GROUP_1: &str = "m1";
@@ -316,11 +486,15 @@ mod tests {
         netlink_message
     }
 
+    #[derive(Default)]
     struct TestFamily {
-        messages_to_server: Arc<Mutex<Vec<Vec<u8>>>>,
+        messages_to_server: Mutex<Vec<Vec<u8>>>,
+        multicast_message_sinks:
+            Mutex<HashMap<String, mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>>>,
     }
 
-    impl<S> GenericNetlinkProtocolServer<S> for TestFamily {
+    #[async_trait]
+    impl<S> GenericNetlinkFamily<S> for TestFamily {
         fn name(&self) -> String {
             TEST_FAMILY.into()
         }
@@ -329,52 +503,78 @@ mod tests {
             vec![MCAST_GROUP_1.to_string(), MCAST_GROUP_2.to_string()]
         }
 
-        fn handle_message(
+        async fn stream_multicast_messages(
+            &self,
+            group: String,
+            _assigned_family_id: u16,
+            message_sink: mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
+        ) {
+            self.multicast_message_sinks.lock().insert(group, message_sink);
+        }
+
+        async fn handle_message(
             &self,
             _netlink_header: NetlinkHeader,
             payload: Vec<u8>,
             _sender: &mut S,
         ) {
-            self.messages_to_server.lock().unwrap().push(payload);
+            self.messages_to_server.lock().push(payload);
         }
+    }
+
+    fn netlink_with_test_family() -> (
+        GenericNetlink<TestSender<GenericMessage>>,
+        Arc<TestFamily>,
+        impl Future<Output = ()> + Send,
+    ) {
+        let test_family = Arc::new(TestFamily::default());
+        let (netlink, fut) = GenericNetlink::new_internal();
+        netlink.server.state.lock().add_family(Arc::clone(&test_family) as _);
+        (netlink, test_family, fut)
+    }
+
+    fn new_client(
+        netlink: &GenericNetlink<TestSender<GenericMessage>>,
+    ) -> (
+        Arc<Mutex<Vec<NetlinkMessage<GenericMessage>>>>,
+        mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
+        GenericNetlinkClientHandle<TestSender<GenericMessage>>,
+    ) {
+        let messages_to_client = Arc::new(Mutex::new(vec![]));
+        let (netlink_sender, receiver) = mpsc::unbounded();
+        let sender = TestSender { messages: messages_to_client.clone() };
+        let client_handle =
+            netlink.new_generic_client(sender, receiver).expect("Failed to add new generic client");
+        (messages_to_client, netlink_sender, client_handle)
     }
 
     #[test]
     fn test_ctrl_getfamily_missing() {
         let mut exec = TestExecutor::new();
-        let server = GenericNetlinkServer::<TestSender<GenericMessage>>::new();
-        let messages = Arc::new(Mutex::new(vec![]));
-        let (sender, receiver) = mpsc::unbounded();
-        let client =
-            GenericNetlinkClient { sender: TestSender { messages: messages.clone() }, receiver };
-        let mut client_fut = Box::pin(server.run_generic_netlink_client(client));
+        let (netlink, fut) = GenericNetlink::new_internal();
+        pin_mut!(fut);
+        let (messages_to_client, sender, _client_handle) = new_client(&netlink);
+
         sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
-        assert!(exec.run_until_stalled(&mut client_fut) == Poll::Pending);
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
 
         // The family doesn't exist, so no response should be sent.
-        assert!(messages.lock().unwrap().is_empty());
+        assert!(messages_to_client.lock().is_empty());
     }
 
     #[test]
     fn test_ctrl_getfamily() {
         let mut exec = TestExecutor::new();
-        let server = GenericNetlinkServer::<TestSender<GenericMessage>>::new();
-        let messages_to_server = Arc::new(Mutex::new(vec![]));
-        server.state.lock().unwrap().add_server(Box::new(TestFamily { messages_to_server }));
-        let messages_to_client = Arc::new(Mutex::new(vec![]));
-        let (sender, receiver) = mpsc::unbounded();
-        let client = GenericNetlinkClient {
-            sender: TestSender { messages: messages_to_client.clone() },
-            receiver,
-        };
-        let mut client_fut = Box::pin(server.run_generic_netlink_client(client));
+        let (netlink, _test_family, fut) = netlink_with_test_family();
+        pin_mut!(fut);
+        let (messages_to_client, sender, _client_handle) = new_client(&netlink);
+
         sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
-        assert!(exec.run_until_stalled(&mut client_fut) == Poll::Pending);
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
 
         // Verify that we got all expected information in the response.
-        assert!(messages_to_client.lock().unwrap().len() == 1);
-        let (_netlink_header, payload) =
-            messages_to_client.lock().unwrap().pop().unwrap().into_parts();
+        assert!(messages_to_client.lock().len() == 1);
+        let (_netlink_header, payload) = messages_to_client.lock().pop().unwrap().into_parts();
         let (_genl_header, ctrl_payload) = assert_matches!(
             payload,
             NetlinkPayload::InnerMessage(GenericMessage::Ctrl(m)) => m.into_parts());
@@ -406,26 +606,15 @@ mod tests {
     #[test]
     fn test_send_family_message() {
         let mut exec = TestExecutor::new();
-        let server = GenericNetlinkServer::<TestSender<GenericMessage>>::new();
-        let messages_to_server = Arc::new(Mutex::new(vec![]));
-        server
-            .state
-            .lock()
-            .unwrap()
-            .add_server(Box::new(TestFamily { messages_to_server: messages_to_server.clone() }));
-        let messages_to_client = Arc::new(Mutex::new(vec![]));
-        let (sender, receiver) = mpsc::unbounded();
-        let client = GenericNetlinkClient {
-            sender: TestSender { messages: messages_to_client.clone() },
-            receiver,
-        };
-        let mut client_fut = Box::pin(server.run_generic_netlink_client(client));
-        sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
-        assert!(exec.run_until_stalled(&mut client_fut) == Poll::Pending);
+        let (netlink, test_family, fut) = netlink_with_test_family();
+        pin_mut!(fut);
+        let (messages_to_client, sender, _client_handle) = new_client(&netlink);
 
-        assert!(messages_to_client.lock().unwrap().len() == 1);
-        let (_netlink_header, payload) =
-            messages_to_client.lock().unwrap().pop().unwrap().into_parts();
+        sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+
+        assert!(messages_to_client.lock().len() == 1);
+        let (_netlink_header, payload) = messages_to_client.lock().pop().unwrap().into_parts();
         let (_genl_header, ctrl_payload) = assert_matches!(
             payload,
             NetlinkPayload::InnerMessage(GenericMessage::Ctrl(m)) => m.into_parts());
@@ -446,27 +635,16 @@ mod tests {
         netlink_message.finalize();
         sender.unbounded_send(netlink_message).expect("Failed to send test family message");
 
-        assert!(exec.run_until_stalled(&mut client_fut) == Poll::Pending);
-        assert_eq!(messages_to_server.lock().unwrap().len(), 1);
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+        assert_eq!(test_family.messages_to_server.lock().len(), 1);
     }
 
     #[test]
     fn test_send_invalid_family_message() {
         let mut exec = TestExecutor::new();
-        let server = GenericNetlinkServer::<TestSender<GenericMessage>>::new();
-        let messages_to_server = Arc::new(Mutex::new(vec![]));
-        server
-            .state
-            .lock()
-            .unwrap()
-            .add_server(Box::new(TestFamily { messages_to_server: messages_to_server.clone() }));
-        let messages_to_client = Arc::new(Mutex::new(vec![]));
-        let (sender, receiver) = mpsc::unbounded();
-        let client = GenericNetlinkClient {
-            sender: TestSender { messages: messages_to_client.clone() },
-            receiver,
-        };
-        let mut client_fut = Box::pin(server.run_generic_netlink_client(client));
+        let (netlink, test_family, fut) = netlink_with_test_family();
+        pin_mut!(fut);
+        let (messages_to_client, sender, _client_handle) = new_client(&netlink);
 
         let mut netlink_message = NetlinkMessage::new(
             Default::default(),
@@ -477,8 +655,71 @@ mod tests {
         );
         netlink_message.finalize();
         sender.unbounded_send(netlink_message).expect("Failed to send test family message");
-        assert!(exec.run_until_stalled(&mut client_fut) == Poll::Pending);
-        assert!(messages_to_server.lock().unwrap().is_empty());
-        assert!(messages_to_client.lock().unwrap().is_empty());
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+        assert!(test_family.messages_to_server.lock().is_empty());
+        assert!(messages_to_client.lock().is_empty());
+    }
+
+    #[test]
+    fn test_server_gets_multicast_messages() {
+        let mut exec = TestExecutor::new();
+        let (_netlink, test_family, fut) = netlink_with_test_family();
+        pin_mut!(fut);
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+        assert_eq!(test_family.multicast_message_sinks.lock().len(), 2);
+        assert!(test_family.multicast_message_sinks.lock().contains_key(MCAST_GROUP_1));
+        assert!(test_family.multicast_message_sinks.lock().contains_key(MCAST_GROUP_2));
+    }
+
+    #[test]
+    fn test_bad_multicast_subscription_fails() {
+        let mut exec = TestExecutor::new();
+        let (netlink, fut) = GenericNetlink::new_internal();
+        pin_mut!(fut);
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+
+        let (_messages_to_client, _sender, client_handle) = new_client(&netlink);
+        client_handle
+            .add_membership(ModernGroup(1337))
+            .expect_err("Should not be able to add invalid multicast membership");
+    }
+
+    #[test]
+    fn test_multicast_subscriptions() {
+        let mut exec = TestExecutor::new();
+        let (netlink, test_family, fut) = netlink_with_test_family();
+        pin_mut!(fut);
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+        let (messages_to_client_1, _sender_1, client_handle_1) = new_client(&netlink);
+        let (messages_to_client_2, _sender_2, client_handle_2) = new_client(&netlink);
+        let (messages_to_client_3, _sender_3, _client_handle_3) = new_client(&netlink);
+
+        let mcast_group_1_id = netlink
+            .server
+            .state
+            .lock()
+            .get_multicast_group_id(TEST_FAMILY.to_string(), MCAST_GROUP_1.to_string());
+        client_handle_1.add_membership(mcast_group_1_id).expect("add_membership failed");
+        client_handle_2.add_membership(mcast_group_1_id).expect("add_membership failed");
+
+        assert!(messages_to_client_1.lock().is_empty());
+        assert!(messages_to_client_2.lock().is_empty());
+        assert!(messages_to_client_3.lock().is_empty());
+
+        let message_sink = test_family
+            .multicast_message_sinks
+            .lock()
+            .get(MCAST_GROUP_1)
+            .expect("Failed to find multicast message sender")
+            .clone();
+        let netlink_message = NetlinkMessage::new(NetlinkHeader::default(), NetlinkPayload::Noop);
+        message_sink.unbounded_send(netlink_message).expect("Failed to send message");
+        assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
+
+        // All subscribed clients receive the message.
+        assert_eq!(messages_to_client_1.lock().len(), 1);
+        assert_eq!(messages_to_client_2.lock().len(), 1);
+        // Client 3 did not subscribe and should not receive the message.
+        assert!(messages_to_client_3.lock().is_empty());
     }
 }

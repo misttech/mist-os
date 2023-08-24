@@ -82,6 +82,7 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netlink",
+    "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/debug/rust",
     "//src/lib/diagnostics/inspect/contrib/rust",

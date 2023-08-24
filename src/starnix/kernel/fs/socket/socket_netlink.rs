@@ -979,6 +979,7 @@ impl SocketOps for RouteNetlinkSocket {
 /// Socket implementation for the NETLINK_GENERIC family of netlink sockets.
 struct GenericNetlinkSocket {
     inner: Arc<Mutex<NetlinkSocketInner>>,
+    client: GenericNetlinkClientHandle<NetlinkToClientSender<GenericMessage>>,
     message_sender: mpsc::UnboundedSender<NetlinkMessage<GenericMessage>>,
 }
 
@@ -997,7 +998,7 @@ impl GenericNetlinkSocket {
             .generic_netlink()
             .new_generic_client(NetlinkToClientSender::new(inner.clone()), message_receiver)
         {
-            Ok(()) => Ok(Self { inner, message_sender }),
+            Ok(client) => Ok(Self { inner, client, message_sender }),
             Err(e) => {
                 log_warn!(
                     tag = NETLINK_LOG_TAG,
@@ -1134,16 +1135,13 @@ impl SocketOps for GenericNetlinkSocket {
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
         match level {
-            SOL_NETLINK => {
-                match optname {
-                    // We currently send all multicast messages to all generic
-                    // netlink clients. We'll likely need to support actual
-                    // correct multicast behavior at some point.
-                    // TODO(fxbug.dev/128857): Actually handle memberships.
-                    NETLINK_ADD_MEMBERSHIP => Ok(()),
-                    _ => self.lock().setsockopt(task, level, optname, user_opt),
+            SOL_NETLINK => match optname {
+                NETLINK_ADD_MEMBERSHIP => {
+                    let group_id: u32 = task.mm.read_object(user_opt.try_into()?)?;
+                    self.client.add_membership(ModernGroup(group_id))
                 }
-            }
+                _ => self.lock().setsockopt(task, level, optname, user_opt),
+            },
             _ => self.lock().setsockopt(task, level, optname, user_opt),
         }
     }
