@@ -10,18 +10,57 @@ use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use futures::{future::FutureExt, join};
+use nix::unistd::dup;
+use std::os::unix::io::FromRawFd;
 use termion::raw::IntoRawMode;
 
 use crate::common::*;
 
-async fn forward_console(console_in: fidl::Socket, console_out: fidl::Socket) -> Result<()> {
-    let rx = fidl::AsyncSocket::from_socket(console_out)?;
+fn forward_stdin(console_in: fidl::Socket) -> Result<()> {
     let mut tx = fidl::AsyncSocket::from_socket(console_in)?;
-    fasync::Task::spawn(async move {
-        let _ = futures::io::copy(Unblock::new(std::io::stdin()), &mut tx).await;
+
+    // We spin off a separate thread to copy data from stdin into this console.
+    //
+    // We never wait for this thread to complete because we're happy to copy data from stdin into
+    // this socket until the process exits.
+    let _ = std::thread::spawn(|| {
+        let mut executor = fasync::LocalExecutor::new();
+        executor.run_singlethreaded(async move {
+            let _ = futures::io::copy(Unblock::new(std::io::stdin()), &mut tx).await;
+        });
     });
-    futures::io::copy(rx, &mut Unblock::new(std::io::stdout())).await?;
+
     Ok(())
+}
+
+async fn forward_stdout(console_out: fidl::Socket) -> Result<()> {
+    let rx = fidl::AsyncSocket::from_socket(console_out)?;
+
+    // We spin off a separate thread to copy data from this console to stdout.
+    //
+    // We wait for this thread to complete using fasync::unblock.
+    fasync::unblock(|| {
+        let mut executor = fasync::LocalExecutor::new();
+        executor.run_singlethreaded(async move {
+            // We make a duplicate of stdout so that fs::File can take ownership of the FD.
+            const STDOUT_FILENO: std::os::fd::RawFd = 1;
+            let duplicate_stdout = dup(STDOUT_FILENO).expect("failed to duplicate stdout");
+            // SAFETY: We have just created a new file descriptor, which means its safe to give
+            // ownership of the file descriptor to this fs::File;
+            let sink = unsafe { std::fs::File::from_raw_fd(duplicate_stdout) };
+
+            // Actually copy the data.
+            let _ = futures::io::copy(rx, &mut Unblock::new(sink)).await;
+        });
+    })
+    .await;
+
+    Ok(())
+}
+
+async fn forward_console(console_in: fidl::Socket, console_out: fidl::Socket) -> Result<()> {
+    forward_stdin(console_in)?;
+    forward_stdout(console_out).await
 }
 
 fn get_environ() -> Vec<String> {

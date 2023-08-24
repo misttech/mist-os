@@ -198,6 +198,9 @@ fn forward_to_pty(
                     let mut buffer = vec![0u8; BUFFER_CAPACITY];
                     loop {
                         let bytes = rx.read(&mut buffer[..]).await?;
+                        if bytes == 0 {
+                            return Ok(());
+                        }
                         pty_sink.write(&read_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
                     }
                 })
@@ -214,7 +217,10 @@ fn forward_to_pty(
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();
-                        pty_source.read(&write_task, &mut buffer)?;
+                        let bytes = pty_source.read(&write_task, &mut buffer)?;
+                        if bytes == 0 {
+                            return Ok(());
+                        }
                         tx.write_all(buffer.data()).await?;
                     }
                 })
