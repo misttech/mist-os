@@ -2971,6 +2971,7 @@ TEST(Pager, EvictionHintsVmar) {
   const uint64_t kVmarSize = 15 * zx_system_get_page_size();
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmarSize, &vmar, &base_addr));
+  auto destroy = fit::defer([&vmar]() { vmar.destroy(); });
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -3057,6 +3058,7 @@ TEST(Pager, EvictionHintsNestedVmar) {
   const uint64_t kVmarSize = 10 * zx_system_get_page_size();
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmarSize, &vmar, &base_addr));
+  auto destroy = fit::defer([&vmar]() { vmar.destroy(); });
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -3144,6 +3146,7 @@ TEST(Pager, EvictionHintsCloneVmar) {
   const uint64_t kVmarSize = 5 * zx_system_get_page_size();
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmarSize, &vmar, &base_addr));
+  auto destroy = fit::defer([&vmar]() { vmar.destroy(); });
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -3244,6 +3247,7 @@ TEST(Pager, OpCommitVmar) {
   const uint64_t kVmarSize = 15 * zx_system_get_page_size();
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmarSize, &vmar, &base_addr));
+  auto destroy = fit::defer([&vmar]() { vmar.destroy(); });
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -3307,6 +3311,7 @@ TEST(Pager, OpCommitCloneVmar) {
   const uint64_t kVmarSize = 5 * zx_system_get_page_size();
   ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
                                 0, kVmarSize, &vmar, &base_addr));
+  auto destroy = fit::defer([&vmar]() { vmar.destroy(); });
 
   UserPager pager;
   ASSERT_TRUE(pager.Init());
