@@ -5,7 +5,7 @@
 use {
     crate::model::{component::ComponentInstance, error::CapabilityProviderError},
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
+    cm_util::TaskGroup,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::path::PathBuf,
 };
@@ -26,7 +26,7 @@ pub trait CapabilityProvider: Send + Sync {
     /// the appropriate directory.
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,

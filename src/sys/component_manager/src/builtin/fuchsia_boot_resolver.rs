@@ -13,8 +13,8 @@ use {
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio,
@@ -297,7 +297,7 @@ impl ComponentResolverCapabilityProvider {
 impl CapabilityProvider for ComponentResolverCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -306,8 +306,8 @@ impl CapabilityProvider for ComponentResolverCapabilityProvider {
         let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
         let stream: fresolution::ResolverRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 let result = self.component_resolver.serve(stream).await;
                 if let Err(error) = result {
                     tracing::warn!(%error, "FuchsiaBootResolver::serve failed: {:?}", error);
@@ -593,10 +593,10 @@ mod tests {
         let resolver_provider =
             Box::new(ComponentResolverCapabilityProvider::new(resolver.clone()));
         let (client_channel, server_channel) = create_endpoints::<fresolution::ResolverMarker>();
-        let task_scope = TaskScope::new();
+        let task_group = TaskGroup::new();
         resolver_provider
             .open(
-                task_scope.clone(),
+                task_group.clone(),
                 fio::OpenFlags::empty(),
                 PathBuf::new(),
                 &mut server_channel.into_channel(),

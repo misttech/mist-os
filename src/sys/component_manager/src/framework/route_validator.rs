@@ -15,9 +15,9 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{ExposeDecl, SourceName, UseDecl},
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon as zx,
@@ -394,7 +394,7 @@ impl RouteValidatorCapabilityProvider {
 impl CapabilityProvider for RouteValidatorCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -418,8 +418,8 @@ impl CapabilityProvider for RouteValidatorCapabilityProvider {
         let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
         let stream: fsys::RouteValidatorRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 self.query.serve(self.scope_moniker, stream).await;
             })
             .await;

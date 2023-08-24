@@ -16,8 +16,8 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::lock::Mutex,
@@ -43,7 +43,7 @@ impl PkgDirectoryProvider {
 impl CapabilityProvider for PkgDirectoryProvider {
     async fn open(
         self: Box<Self>,
-        _task_scope: TaskScope,
+        _task_group: TaskGroup,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,

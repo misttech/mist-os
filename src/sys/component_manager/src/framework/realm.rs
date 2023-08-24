@@ -17,9 +17,9 @@ use {
     async_trait::async_trait,
     cm_fidl_validator,
     cm_rust::FidlIntoNative,
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
@@ -59,7 +59,7 @@ impl RealmCapabilityProvider {
 impl CapabilityProvider for RealmCapabilityProvider {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -69,8 +69,8 @@ impl CapabilityProvider for RealmCapabilityProvider {
         let server_end = ServerEnd::<fcomponent::RealmMarker>::new(server_end);
         let stream: fcomponent::RealmRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 // We only need to look up the component matching this scope.
                 // These operations should all work, even if the component is not running.
                 if let Some(model) = host.model.upgrade() {

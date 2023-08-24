@@ -4,3 +4,6 @@
 
 pub mod channel;
 pub mod io;
+pub mod task_group;
+
+pub use task_group::TaskGroup;

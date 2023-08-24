@@ -51,9 +51,9 @@ use {
         self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
         OfferDeclCommon, UseDecl,
     },
-    cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
+    cm_util::TaskGroup,
     config_encoder::ConfigFields,
     fidl::endpoints::{self, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -212,7 +212,7 @@ pub struct ComponentManagerInstance {
     pub builtin_capabilities: BuiltinCapabilities,
 
     /// Tasks owned by component manager's instance.
-    task_scope: TaskScope,
+    task_group: TaskGroup,
 
     /// Mutable state for component manager's instance.
     state: Mutex<ComponentManagerInstanceState>,
@@ -236,13 +236,13 @@ impl ComponentManagerInstance {
             namespace_capabilities,
             builtin_capabilities,
             state: Mutex::new(ComponentManagerInstanceState::new()),
-            task_scope: TaskScope::new(),
+            task_group: TaskGroup::new(),
         }
     }
 
-    /// Returns a scope for this instance where tasks can be run
-    pub fn task_scope(&self) -> TaskScope {
-        self.task_scope.clone()
+    /// Returns a group where tasks can be run scoped to this instance
+    pub fn task_group(&self) -> TaskGroup {
+        self.task_group.clone()
     }
 
     #[cfg(test)]
@@ -366,10 +366,10 @@ pub struct ComponentInstance {
     actions: Mutex<ActionSet>,
     /// Tasks owned by this component instance that will be cancelled if the component is
     /// destroyed.
-    nonblocking_task_scope: TaskScope,
+    nonblocking_task_group: TaskGroup,
     /// Tasks owned by this component instance that will block destruction if the component is
     /// destroyed.
-    blocking_task_scope: TaskScope,
+    blocking_task_group: TaskGroup,
 }
 
 impl ComponentInstance {
@@ -423,8 +423,8 @@ impl ComponentInstance {
             execution: Mutex::new(ExecutionState::new()),
             actions: Mutex::new(ActionSet::new()),
             hooks,
-            nonblocking_task_scope: TaskScope::new(),
-            blocking_task_scope: TaskScope::new(),
+            nonblocking_task_group: TaskGroup::new(),
+            blocking_task_group: TaskGroup::new(),
             persistent_storage,
         })
     }
@@ -444,16 +444,16 @@ impl ComponentInstance {
         self.actions.lock().await
     }
 
-    /// Returns a scope for this instance where tasks can be run. Tasks run in this scope will
-    /// be cancelled if the component is destroyed.
-    pub fn nonblocking_task_scope(&self) -> TaskScope {
-        self.nonblocking_task_scope.clone()
+    /// Returns a group for this instance where tasks can be run scoped to this instance. Tasks run
+    /// in this group will be cancelled when the component is destroyed.
+    pub fn nonblocking_task_group(&self) -> TaskGroup {
+        self.nonblocking_task_group.clone()
     }
 
-    /// Returns a scope for this instance where tasks can be run. Tasks run in this scope will
-    /// block destruction if the component is destroyed.
-    pub fn blocking_task_scope(&self) -> TaskScope {
-        self.blocking_task_scope.clone()
+    /// Returns a group for this instance where tasks can be run scoped to this instance. Tasks run
+    /// in this group will block destruction if the component is destroyed.
+    pub fn blocking_task_group(&self) -> TaskGroup {
+        self.blocking_task_group.clone()
     }
 
     /// Locks and returns a lazily resolved and populated `ResolvedInstanceState`. Does not
@@ -1569,11 +1569,8 @@ impl ResolvedInstanceState {
         if let Some(controller) = controller {
             if let Ok(stream) = controller.into_stream() {
                 child
-                    .nonblocking_task_scope()
-                    .add_task(controller::run_controller(
-                        WeakComponentInstance::new(&child),
-                        stream,
-                    ))
+                    .nonblocking_task_group()
+                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream))
                     .await;
             }
         }
@@ -1807,8 +1804,8 @@ impl Runtime {
                 let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
                 drop(actions);
                 component
-                    .nonblocking_task_scope()
-                    .add_task(fasync::Task::spawn(async move {
+                    .nonblocking_task_group()
+                    .spawn(fasync::Task::spawn(async move {
                         let _ = stop_nf.await.map_err(
                             |err| warn!(%err, "Watching for program termination: Stop failed"),
                         );

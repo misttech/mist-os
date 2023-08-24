@@ -130,12 +130,12 @@ impl<'a> OpenRequest<'a> {
 
         let source_instance =
             source.source_instance().upgrade().map_err(|_| OpenError::SourceInstanceNotFound)?;
-        let task_scope = match source_instance {
-            ExtendedInstance::AboveRoot(top) => top.task_scope(),
-            ExtendedInstance::Component(component) => component.nonblocking_task_scope(),
+        let task_group = match source_instance {
+            ExtendedInstance::AboveRoot(top) => top.task_group(),
+            ExtendedInstance::Component(component) => component.nonblocking_task_group(),
         };
         capability_provider
-            .open(task_scope, flags, PathBuf::from(relative_path), &mut server_chan)
+            .open(task_group, flags, PathBuf::from(relative_path), &mut server_chan)
             .await?;
         Ok(())
     }

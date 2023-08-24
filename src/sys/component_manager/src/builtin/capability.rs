@@ -12,8 +12,8 @@ use {
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::{ProtocolMarker, ServerEnd},
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, ResourceInfo},
@@ -139,7 +139,7 @@ impl<B: 'static + BuiltinCapability + Sync + Send> CapabilityProvider
 {
     async fn open(
         self: Box<Self>,
-        task_scope: TaskScope,
+        task_group: TaskGroup,
         _flags: fio::OpenFlags,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
@@ -148,8 +148,8 @@ impl<B: 'static + BuiltinCapability + Sync + Send> CapabilityProvider
         let server_end = ServerEnd::<B::Marker>::new(server_end);
         let stream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_scope
-            .add_task(async move {
+        task_group
+            .spawn(async move {
                 if let Some(capability) = self.capability.upgrade() {
                     if let Err(error) = capability.serve(stream).await {
                         warn!(protocol=%B::NAME, %error, "open failed");

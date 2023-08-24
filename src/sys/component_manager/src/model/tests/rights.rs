@@ -16,8 +16,8 @@ use {
     async_trait::async_trait,
     cm_rust::*,
     cm_rust_testing::*,
-    cm_task_scope::TaskScope,
     cm_util::channel,
+    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{
@@ -74,7 +74,7 @@ struct MockFrameworkDirectoryHost {
 impl CapabilityProvider for MockFrameworkDirectoryProvider {
     async fn open(
         self: Box<Self>,
-        _task_scope: TaskScope,
+        _task_group: TaskGroup,
         flags: fio::OpenFlags,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
