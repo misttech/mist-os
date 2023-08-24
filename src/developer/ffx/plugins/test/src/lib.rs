@@ -109,6 +109,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
     let experiments = Experiments::from_env().await;
 
     let min_log_severity = cmd.min_severity_logs.clone();
+    let hermetic_test = cmd.realm.is_none();
 
     let output_directory = match (cmd.disable_output_directory, &cmd.output_directory) {
         (true, maybe_dir) => {
@@ -177,15 +178,25 @@ async fn run_test<W: 'static + Write + Send + Sync>(
     });
 
     let start_time = std::time::Instant::now();
-    let result = match run_test_suite_lib::run_tests_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         RunConnector::new(remote_control, SUITE_BATCH_SIZE),
         test_definitions,
         run_params,
         reporter,
         cancel_receiver.map(|_| ()),
     )
-    .await
-    {
+    .await;
+    let show_realm_warning = outcome == run_test_suite_lib::Outcome::Timedout
+        || outcome == run_test_suite_lib::Outcome::Failed
+        || outcome == run_test_suite_lib::Outcome::DidNotFinish;
+    tracing::info!("ffx test duration: {:?}", start_time.elapsed().as_secs_f32());
+    if hermetic_test && show_realm_warning {
+        println!(
+            "The test was executed in the hermetic realm. If your test depends on system \
+capabilities, pass in correct realm. See https://fuchsia.dev/go/components/non-hermetic-tests"
+        );
+    }
+    match outcome {
         run_test_suite_lib::Outcome::Passed => Ok(()),
         run_test_suite_lib::Outcome::Timedout => {
             ffx_bail_with_code!(*TIMED_OUT_CODE, "Tests timed out.",)
@@ -231,9 +242,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
             }
             other => ffx_bail!("There was an error running tests: {:?}", other),
         },
-    };
-    tracing::info!("run test suite duration: {:?}", start_time.elapsed().as_secs_f32());
-    result
+    }
 }
 
 /// Generate TestParams from |cmd|.

@@ -610,7 +610,7 @@ To use a system capability, a test must explicitly mark itself to run in
 non-hermetic realm as shown below.
 
 ```gn
-# BUILD.gn
+# BUILD.gn (in-tree build rule)
 
 fuchsia_test_component("my_test_component") {
   component_name = "my_test"
@@ -621,6 +621,21 @@ fuchsia_test_component("my_test_component") {
   test_type = "system"
 }
 ```
+
+After integrating with the build rule, the test can be executed as
+
+```
+fx test <my_test>
+```
+
+Or for out-of-tree developers
+
+```
+ffx test run --realm <realm_moniker> <test_url>
+```
+
+where `realm_moniker` should be replaced with `/core/testing:system-tests` for
+above example.
 
 Possible values of `test_type`:
 

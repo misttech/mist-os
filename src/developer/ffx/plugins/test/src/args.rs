@@ -36,6 +36,9 @@ pub enum TestSubCommand {
 Run a test suite:
     $ ffx test run fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm
 
+Run a test suite in system realm:
+    $ ffx test run --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm
+
 Run a test suite and pass arguments to the suite:
     $ ffx test run fuchsia-pkg://fuchsia.com/my_test#meta/my_test.cm -- arg1 arg2
 
@@ -95,7 +98,7 @@ pub struct RunCommand {
     pub test_filter: Vec<String>,
 
     /// the realm to run the test in. This field is optional and takes the form:
-    /// /path/to/realm:test_collection.
+    /// /path/to/realm:test_collection. See https://fuchsia.dev/go/components/non-hermetic-tests
     #[argh(option)]
     pub realm: Option<String>,
 

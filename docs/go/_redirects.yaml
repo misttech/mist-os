@@ -35,6 +35,8 @@ redirects:
   to: /docs/development/testing/components/test_runner_framework.md#troubleshooting
 - from: /docs/go/components/test-runners
   to: /docs/development/testing/components/test_runner_framework.md#test-runners
+- from: /docs/go/components/non-hermetic-tests
+  to: /docs/development/testing/components/test_runner_framework.md##non-hermetic_tests
 - from: /docs/go/components/url
   to: /docs/reference/components/url
 - from: /docs/go/components/structured-config
