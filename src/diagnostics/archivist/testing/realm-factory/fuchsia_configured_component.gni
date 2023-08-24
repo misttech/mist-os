@@ -1,0 +1,54 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+# Same as fuchsia_component but accepts structured config values and
+# and doesn't require separate fuchsia_component_manifest target.
+#
+# Parameters
+#
+#    config_values
+#      Structured configuration values.
+#
+# Other parameters are the same as fuchsia_component.
+template("fuchsia_configured_component") {
+  component_manifest_target = "${target_name}_manifest"
+  fuchsia_component_manifest(component_manifest_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "component_name",
+                             "manifest",
+                           ])
+  }
+
+  component_target = "${target_name}_component"
+  fuchsia_component(component_target) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "values",
+                             "config_values",
+                             "cm_label",
+                             "manifest",
+                           ])
+    cm_label = ":$component_manifest_target"
+  }
+
+  component_config_target = "${target_name}_config"
+  fuchsia_structured_config_values(component_config_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    cm_label = ":$component_manifest_target"
+    values = invoker.config_values
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
+    deps = [
+      ":$component_config_target",
+      ":$component_target",
+    ]
+  }
+}

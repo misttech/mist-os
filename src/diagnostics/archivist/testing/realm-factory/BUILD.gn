@@ -1,0 +1,69 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/diagnostics/archivist/tests/integration/configs.gni")
+import("fuchsia_configured_component.gni")
+
+rustc_binary("bin") {
+  testonly = true
+  edition = "2021"
+  name = "archivist_realm_factory"
+  sources = [
+    "src/main.rs",
+    "src/realm_factory.rs",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
+    "//src/diagnostics/archivist/testing/fidl:fuchsia.archivist.test_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/testing/realm_proxy",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_component("archivist-realm-factory-component") {
+  testonly = true
+  component_name = "archivist-realm-factory"
+  manifest = "meta/realm-factory.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_configured_component("archivist-component") {
+  testonly = true
+  component_name = "archivist"
+  manifest = "meta/archivist.cml"
+  config_values = archivist_for_integration_config
+  deps = [ "//src/diagnostics/archivist:bin" ]
+}
+
+fuchsia_configured_component("archivist-with-kernel-log-component") {
+  testonly = true
+  component_name = "archivist-with-kernel-log"
+  manifest = "meta/archivist-with-kernel-log.cml"
+  config_values = with_klog_config
+  deps = [ "//src/diagnostics/archivist:bin" ]
+}
+
+fuchsia_package("realm-factory") {
+  package_name = "archivist-realm-factory"
+  testonly = true
+  deps = [
+    ":archivist-component",
+    ":archivist-realm-factory-component",
+    ":archivist-with-kernel-log-component",
+    "//src/diagnostics/archivist/testing/puppet:puppet-component",
+  ]
+}

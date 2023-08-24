@@ -19,7 +19,9 @@ rustc_test("integration_tests_bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//src/diagnostics/archivist:lib",
+    "//src/diagnostics/archivist/testing/fidl:fuchsia.archivist.test_rust",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/log/message/rust",
@@ -38,6 +40,7 @@ rustc_test("integration_tests_bin") {
     "//src/sys/lib/cm_types",
     "//src/sys/lib/component-events",
     "//src/sys/lib/component_debug",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:futures",
@@ -81,17 +84,6 @@ rustc_test("integration_tests_bin") {
     "test_data/pipeline_reader_single_value_golden.json",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
-fuchsia_component_manifest("with-klog-manifest") {
-  manifest = "meta/archivist_with_klog.cml"
-  component_name = "archivist_with_klog"
-}
-
-fuchsia_component("archivist-with-klog") {
-  cm_label = ":with-klog-manifest"
-  testonly = true
-  deps = [ "//src/diagnostics/archivist:bin" ]
 }
 
 fuchsia_component_manifest("for-integration-manifest") {
@@ -176,11 +168,6 @@ fuchsia_structured_config_values("archivist-with-small-caches-config") {
   values = small_caches_config
 }
 
-fuchsia_structured_config_values("archivist-with-klog-config") {
-  cm_label = ":with-klog-manifest"
-  values = with_klog_config
-}
-
 fuchsia_structured_config_values("archivist-with-feedback-filtering-config") {
   cm_label = ":with-feedback-filtering-manifest"
   values = with_feedback_filtering
@@ -235,8 +222,6 @@ fuchsia_test_package("archivist-integration-tests") {
     ":archivist-with-feedback-filtering-config",
     ":archivist-with-feedback-filtering-disabled",
     ":archivist-with-feedback-filtering-disabled-config",
-    ":archivist-with-klog",
-    ":archivist-with-klog-config",
     ":archivist-with-legacy-metrics-filtering",
     ":archivist-with-legacy-metrics-filtering-config",
     ":archivist-with-lowpan-filtering",
@@ -250,6 +235,7 @@ fuchsia_test_package("archivist-integration-tests") {
     "components",
     "//src/diagnostics/iquery/test/test_component",
   ]
+  subpackages = [ "//src/diagnostics/archivist/testing/realm-factory" ]
 }
 
 group("tests") {

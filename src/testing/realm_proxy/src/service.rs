@@ -8,7 +8,7 @@ use {
     fuchsia_component_test::RealmInstance,
     fuchsia_zircon as zx,
     futures::StreamExt,
-    tracing::{error, info},
+    tracing::error,
 };
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
@@ -75,7 +75,6 @@ pub async fn serve_with_proxy<P: RealmProxy>(
     mut stream: RealmProxy_RequestStream,
 ) -> Result<(), Error> {
     while let Some(Ok(request)) = stream.next().await {
-        info!("received {:?}", request);
         match request {
             RealmProxy_Request::ConnectToNamedProtocol {
                 protocol, server_end, responder, ..

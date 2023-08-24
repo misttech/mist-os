@@ -1,0 +1,53 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.archivist.test;
+
+using fuchsia.testing.harness;
+using fuchsia.component;
+
+type ArchivistConfig = enum {
+    DEFAULT = 0;
+    WITH_KERNEL_LOG = 1;
+};
+
+type PuppetDecl = struct {
+    /// The child name this puppet should have in the test realm.
+    name fuchsia.component.child_name;
+};
+
+/// RealmOptions tells the RealmFactory protocol how to create the test realm.
+type RealmOptions = resource table {
+    /// Optional name to give to the realm component.
+    /// This will become part of the realm's component selector.
+    1: realm_name fuchsia.component.name;
+
+    /// A set of puppets to add to the realm.
+    ///
+    /// When RealmFactory/CreateRealm is called, a puppet component will be added
+    /// to the test realm for each name specified here, but will not be started
+    /// until a client connects to its exposed Puppet protocol.
+    2: puppets vector<PuppetDecl>:MAX;
+
+    /// Selector for which configuration of archivist to use.
+    3: archivist_config ArchivistConfig;
+};
+
+/// The test realm factory protocol for archivist integration tests.
+///
+/// This protocol allows clients to build an archivist component in a hermetic
+/// test realm that also includes several "puppet" components.
+///
+/// For full documentation see //src/diagnostics/testing/realm-factory/README.md.
+@discoverable
+open protocol RealmFactory {
+    compose fuchsia.testing.harness.RealmFactory;
+
+    /// Specifies the options to use when creating the realm.
+    ///
+    /// Returns OperationError.INVALID if called more than once.
+    flexible SetRealmOptions(resource struct {
+        options RealmOptions;
+    }) -> () error fuchsia.testing.harness.OperationError;
+};

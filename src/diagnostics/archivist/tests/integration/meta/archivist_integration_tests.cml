@@ -11,7 +11,20 @@
     program: {
         binary: "bin/archivist_integration_tests",
     },
+    children: [
+        // TODO(289370551): Move this to a test-root.cml and make this test a sibling.
+        // These tests are being incrementally refactored to use this realm
+        // factory instead of RealmBuilder.
+        {
+            name: "realm_factory",
+            url: "archivist-realm-factory#meta/archivist-realm-factory.cm",
+        },
+    ],
     use: [
+        {
+            protocol: "fuchsia.archivist.test.RealmFactory",
+            from: "#realm_factory",
+        },
         {
             protocol: "fuchsia.sys2.RealmQuery",
             from: "framework",
@@ -31,13 +44,27 @@
         {
             protocol: [ "fuchsia.boot.ReadOnlyLog" ],
             from: "parent",
-            to: "#realm_builder",
+            to: [
+                "#realm_builder",
+                "#realm_factory",
+            ],
         },
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
-            to: "#realm_builder",
+            to: [
+                "#realm_builder",
+                "#realm_factory",
+            ],
             availability: "optional",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "directory_ready",
+            ],
+            from: "parent",
+            to: "#realm_factory",
         },
     ],
 }

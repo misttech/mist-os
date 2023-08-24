@@ -9,6 +9,7 @@ use diagnostics_reader::{
     assert_data_tree, assert_json_diff, AnyProperty, ArchiveReader, DiagnosticsHierarchy, Inspect,
 };
 use difference::assert_diff;
+use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
 use fuchsia_component_test::RealmInstance;
 use fuchsia_component_test::{Capability, ChildOptions, Ref, Route};
@@ -43,17 +44,19 @@ lazy_static! {
 
 #[fuchsia::test]
 async fn read_components_inspect() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "child", STUB_INSPECT_COMPONENT_URL)
-        .await
-        .expect("add child");
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+        puppets: Some(vec![ftest::PuppetDecl { name: "child".to_string() }]),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
 
-    let instance = builder.build().await.expect("create instance");
+    let child_puppet = test_topology::connect_to_puppet(&realm_proxy, "child").await.unwrap();
 
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    child_puppet.set_health_ok().await.unwrap();
+
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child:root")

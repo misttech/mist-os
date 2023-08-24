@@ -3,11 +3,18 @@
 // found in the LICENSE file.
 
 use crate::constants;
+
+use anyhow::{Context, Error, Result};
+use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker, ProtocolMarker};
+use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_component_decl as fdecl;
+use fidl_fuchsia_testing_harness as fharness;
+use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component_test::{
-    error::Error, Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, Ref, Route,
+    Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, Ref, Route,
     SubRealmBuilder,
 };
+use realm_proxy::client::RealmProxyClient;
 
 /// Options for creating a test topology.
 pub struct Options {
@@ -20,6 +27,29 @@ impl Default for Options {
     fn default() -> Self {
         Self { archivist_url: constants::INTEGRATION_ARCHIVIST_URL, realm_name: None }
     }
+}
+
+/// Creates a new test realm with an archivist inside.
+/// `options_fn` is called with a default RealmOptions struct and can modify any options
+/// before the realm is created.
+pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
+    let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
+    realm_factory.set_realm_options(options).await?.map_err(realm_proxy::Error::OperationError)?;
+    let (client, server) = create_endpoints::<fharness::RealmProxy_Marker>();
+    realm_factory.create_realm(server).await?.map_err(realm_proxy::Error::OperationError)?;
+    Ok(RealmProxyClient::from(client))
+}
+
+/// Connects to the puppet in the test realm with the given name.
+pub async fn connect_to_puppet(
+    realm_proxy: &RealmProxyClient,
+    puppet_name: &str,
+) -> Result<<ftest::PuppetMarker as ProtocolMarker>::Proxy> {
+    let puppet_protocol_alias = format!("{}.{puppet_name}", ftest::PuppetMarker::PROTOCOL_NAME);
+    realm_proxy
+        .connect_to_named_protocol::<ftest::PuppetMarker>(&puppet_protocol_alias)
+        .await
+        .with_context(|| format!("failed to connect to {puppet_name}"))
 }
 
 /// Creates a new topology for tests with an archivist inside.

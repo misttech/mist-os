@@ -1,0 +1,35 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.archivist.test;
+
+alias LogMessage = string:MAX;
+
+/// Puppet is testing component that interacts with Archivist.
+///
+/// For full documentation see //src/diagnostics/testing/realm-factory/README.md.
+@discoverable
+open protocol Puppet {
+    compose InspectPuppet;
+    compose LogPuppet;
+};
+
+/// LoggerPuppet emits log messages when requested.
+open protocol LogPuppet {
+    /// Prints a message to stdout and appends a newline.
+    flexible Println(resource struct {
+        message LogMessage;
+    });
+
+    /// Prints a message stderr and appends a newline.
+    flexible Eprintln(resource struct {
+        message LogMessage;
+    });
+};
+
+/// InspectPuppet emits inspect data when requested.
+open protocol InspectPuppet {
+    /// Emits a health inspect node with OK status.
+    flexible SetHealthOk() -> ();
+};
