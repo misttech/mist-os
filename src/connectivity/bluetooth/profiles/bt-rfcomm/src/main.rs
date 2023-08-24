@@ -27,12 +27,12 @@ pub async fn main() -> Result<(), Error> {
 
     let (service_sender, service_receiver) = mpsc::channel(1);
 
-    let mut fs = ServiceFs::new();
+    let fs = ServiceFs::new();
 
     let inspect = fuchsia_inspect::Inspector::default();
-    if let Err(e) = inspect_runtime::serve(&inspect, &mut fs) {
-        warn!("Could not serve inspect: {}", e);
-    }
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspect, inspect_runtime::PublishOptions::default());
+
     let services = run_services(fs, service_sender)?;
     pin_mut!(services);
 

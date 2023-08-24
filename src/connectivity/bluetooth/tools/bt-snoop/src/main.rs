@@ -395,9 +395,8 @@ async fn main() {
     let mut fs = ServiceFs::new();
 
     let inspector = inspect::Inspector::default();
-    inspect_runtime::serve(&inspector, &mut fs).unwrap_or_else(|e| {
-        error!("Failed to serve the inspect tree: {:?}", e);
-    });
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let config_inspect = inspector.root().create_child("configuration");
     let runtime_inspect = inspector.root().create_child("runtime_metrics");

@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use fuchsia_async::pin_mut;
-use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
+use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::future;
 use tracing::{debug, error, warn};
@@ -24,9 +24,9 @@ mod service_definition;
 async fn main() -> Result<(), Error> {
     debug!("Starting HFP Hands Free");
 
-    let mut fs = ServiceFs::new();
+    let fs = ServiceFs::new();
 
-    start_inspect(&mut fs);
+    let _inspect_server_task = start_inspect();
 
     let feature_support = HandsFreeFeatureSupport::load()?;
     let (profile_client, profile_proxy) = profile::register_hands_free(feature_support)?;
@@ -59,9 +59,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn start_inspect<S: ServiceObjTrait>(fs: &mut ServiceFs<S>) {
+fn start_inspect() -> Option<fuchsia_async::Task<()>> {
     let inspector = fuchsia_inspect::Inspector::default();
-    if let Err(e) = inspect_runtime::serve(&inspector, fs) {
-        warn!("Couldn't serve inspect: {}", e);
-    }
+    inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default())
 }

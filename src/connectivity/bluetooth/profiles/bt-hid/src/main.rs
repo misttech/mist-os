@@ -5,7 +5,7 @@
 use {
     anyhow::{Context as _, Error},
     fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_component::server::{ServiceFs, ServiceObj},
+    fuchsia_component::server::ServiceObj,
     profile_client::ProfileClient,
     tracing::{debug, error},
 };
@@ -24,12 +24,10 @@ async fn main() -> Result<(), Error> {
     debug!("Started HID component.");
 
     let (profile_proxy, profile_client) = register_profile()?;
-    let mut fs: ServiceFs<ServiceObj<'_, ()>> = ServiceFs::new();
 
     let inspector = fuchsia_inspect::Inspector::default();
-    if let Err(e) = inspect_runtime::serve(&inspector, &mut fs) {
-        error!("Could not serve inspect: {}", e);
-    }
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let mut peers = Peers::new(profile_client, profile_proxy);
     peers.run().await;

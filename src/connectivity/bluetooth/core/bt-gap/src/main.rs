@@ -222,7 +222,8 @@ async fn serve_fidl(hd: HostDispatcher, inspect: fuchsia_inspect::Inspector) -> 
     let mut fs = ServiceFs::new();
 
     // serve bt-gap inspect VMO
-    inspect_runtime::serve(&inspect, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspect, inspect_runtime::PublishOptions::default());
 
     let _ = fs
         .dir("svc")

@@ -28,11 +28,10 @@ async fn main() -> Result<(), Error> {
     let provider_config = Config::load()?;
     debug!("Starting Fast Pair Provider: {:?}", provider_config);
 
-    let mut fs = ServiceFs::new();
+    let fs = ServiceFs::new();
     let inspector = fuchsia_inspect::Inspector::default();
-    if let Err(e) = inspect_runtime::serve(&inspector, &mut fs) {
-        warn!("Couldn't serve inspect: {}", e);
-    }
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     // Set up the metrics logger.
     let metrics_logger = bt_metrics::MetricsLogger::new();

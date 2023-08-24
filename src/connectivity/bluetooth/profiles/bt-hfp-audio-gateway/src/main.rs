@@ -42,12 +42,11 @@ async fn setup_audio(
 
 #[fuchsia::main(logging_tags = ["hfp-ag"])]
 async fn main() -> Result<(), Error> {
-    let mut fs = ServiceFs::new();
+    let fs = ServiceFs::new();
 
     let inspector = fuchsia_inspect::Inspector::default();
-    if let Err(e) = inspect_runtime::serve(&inspector, &mut fs) {
-        warn!("Couldn't serve inspect: {}", e);
-    }
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let config = hfp_profile_config::Config::take_from_startup_handle();
     let in_band_sco = config.in_band_sco;
