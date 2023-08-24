@@ -3,7 +3,6 @@
     "outputLicenseFile": {OUTPUT_LICENSE_FILE},
     "checkURLs": {CHECK_URLS},
     "runAnalysis": {RUN_ANALYSIS},
-    "overwriteReadmeFiles": {OVERWRITE_README_FILES},
     "fuchsiaDir": "{FUCHSIA_DIR}",
     "rootOutDir": "{ROOT_OUT_DIR}",
     "outDir": "{OUT_DIR}",

@@ -11,10 +11,6 @@ import (
 	"strings"
 )
 
-const (
-	dartPkgCustomReadme = "tools/check-licenses/assets/readmes/"
-)
-
 // Create an in-memory representation of a new README.fuchsia file
 // by inferring info about a Dart package given it's location in the repo.
 func NewDartPkgReadme(path string) (*Readme, error) {
@@ -51,6 +47,5 @@ func NewDartPkgReadme(path string) (*Readme, error) {
 		licenseUrl := fmt.Sprintf("%s/license", url)
 		b.addLicense(item.Name(), licenseUrl, singleLicenseFile)
 	}
-	customReadmePath := filepath.Join(dartPkgCustomReadme, path)
-	return NewReadme(strings.NewReader(b.build()), path, customReadmePath)
+	return NewReadme(strings.NewReader(b.build()), path)
 }

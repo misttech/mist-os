@@ -62,12 +62,6 @@ func SaveResults(cmdConfig interface{}, cmdMetrics MetricsInterface) (string, er
 	}
 	b.WriteString(s)
 
-	s, err = saveReadmeFuchsiaFiles()
-	if err != nil {
-		return "", err
-	}
-	b.WriteString(s)
-
 	if Config.RunAnalysis {
 		err = RunChecks()
 		if err != nil {
@@ -158,36 +152,6 @@ func savePackageInfo(pkgName string, c interface{}, m MetricsInterface) (string,
 			return "", err
 		}
 	}
-	return b.String(), nil
-}
-
-// This retrieves all the relevant metrics information for a given package.
-// e.g. the //tools/check-licenses/directory package.
-func saveReadmeFuchsiaFiles() (string, error) {
-	var b strings.Builder
-
-	if Config.OverwriteReadmeFiles {
-		for _, p := range project.FilteredProjects {
-
-			// Create project directory if it doesn't exist.
-			dir := filepath.Dir(p.ReadmeFile.ReadmePath)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return "", fmt.Errorf("Failed to make README.fuchsia file directory %s: %w", dir, err)
-			}
-
-			f, err := os.Create(p.ReadmeFile.ReadmePath)
-			if err != nil {
-				// TODO: Throw an error when you fail to overwrite
-				// the README.fuchsia file.
-				continue
-			}
-			defer f.Close()
-
-			// Write the contents of the string to the file
-			fmt.Fprintln(f, p.ReadmeFile)
-		}
-	}
-
 	return b.String(), nil
 }
 

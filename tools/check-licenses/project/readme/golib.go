@@ -17,8 +17,6 @@ const (
 	golibCloudInternalRoot        = "third_party/golibs/vendor/cloud.google.com/go/internal"
 	golibCloudInternalLicenseFile = "../LICENSE"
 	golibCloudInternalLicenseURL  = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/golibs/vendor/cloud.google.com/go/LICENSE"
-
-	golibCustomReadme = "tools/check-licenses/assets/readmes/"
 )
 
 type golibReadmeBuilder struct {
@@ -77,8 +75,7 @@ func NewGolibReadme(path string) (*Readme, error) {
 		b.addLicense(golibCloudInternalLicenseFile, golibCloudInternalLicenseURL, singleLicenseFile)
 	}
 
-	customReadmePath := filepath.Join(golibCustomReadme, path)
-	return NewReadme(strings.NewReader(b.build()), path, customReadmePath)
+	return NewReadme(strings.NewReader(b.build()), path)
 }
 
 func getGolibLicenseURL(b *builder, remainder, path string) (string, error) {

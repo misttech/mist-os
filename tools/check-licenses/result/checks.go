@@ -42,9 +42,7 @@ func RunChecks() error {
 		return err
 	}
 	if err := AllReadmeFuchsiaFilesMustBeFormattedCorrectly(); err != nil {
-		// TODO: Make this blocking error after README.fuchsia format changes land.
-		// return err
-		fmt.Printf("*** Warning *** This will become an error in the future.\n\n%v\n", err)
+		return err
 	}
 	return nil
 }

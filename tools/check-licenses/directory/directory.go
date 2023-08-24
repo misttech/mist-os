@@ -137,6 +137,17 @@ func newDirectoryWithConfig(root string, parent *Directory, config *DirectoryCon
 			d.Files = append(d.Files, f)
 			d.Project.AddFile(f)
 		}
+
+		if fileType != file.RegularFile && f.URL() == "" {
+			r = d.Project.ReadmeFile
+			if r != nil {
+				url, err := r.GetLicenseURLForPath(path)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get URL for file %s: %w\n", path, err)
+				}
+				f.SetURL(url)
+			}
+		}
 	}
 
 	sort.Sort(Order(d.Children))

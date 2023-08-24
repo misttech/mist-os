@@ -5,19 +5,18 @@
 package result
 
 type ResultConfig struct {
-	FuchsiaDir           string      `json:"fuchsiaDir"`
-	Target               string      `json:"target"`
-	SPDXDocName          string      `json:"spdxDocName"`
-	OutDir               string      `json:"outDir"`
-	RootOutDir           string      `json:"rootOutDir"`
-	LicenseOutDir        string      `json:"licenseOutDir"`
-	Outputs              []string    `json:"outputs"`
-	Templates            []*Template `json:"templates"`
-	Zip                  bool        `json:"zip"`
-	GnGenOutputFile      string      `json:"gnGenOutputFile"`
-	OutputLicenseFile    bool        `json:"outputLicenseFile"`
-	RunAnalysis          bool        `json:"runAnalysis"`
-	OverwriteReadmeFiles bool        `json:"overwriteReadmeFiles"`
+	FuchsiaDir        string      `json:"fuchsiaDir"`
+	Target            string      `json:"target"`
+	SPDXDocName       string      `json:"spdxDocName"`
+	OutDir            string      `json:"outDir"`
+	RootOutDir        string      `json:"rootOutDir"`
+	LicenseOutDir     string      `json:"licenseOutDir"`
+	Outputs           []string    `json:"outputs"`
+	Templates         []*Template `json:"templates"`
+	Zip               bool        `json:"zip"`
+	GnGenOutputFile   string      `json:"gnGenOutputFile"`
+	OutputLicenseFile bool        `json:"outputLicenseFile"`
+	RunAnalysis       bool        `json:"runAnalysis"`
 
 	Checks    []*Check `json:"checks"`
 	CheckURLs bool
@@ -84,7 +83,6 @@ func (c *ResultConfig) Merge(other *ResultConfig) {
 	}
 	c.Checks = append(c.Checks, other.Checks...)
 	c.CheckURLs = c.CheckURLs || other.CheckURLs
-	c.OverwriteReadmeFiles = c.OverwriteReadmeFiles || other.OverwriteReadmeFiles
 
 	c.AllowLists = append(c.AllowLists, other.AllowLists...)
 }

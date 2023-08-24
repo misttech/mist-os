@@ -78,22 +78,20 @@ func NewProject(r *readme.Readme, projectRootPath string) (*Project, error) {
 	}
 
 	for _, l := range r.Licenses {
-		if l.LicenseFile == "" {
-			fmt.Printf("Found readme with empty license file: %s %v\n", r.ReadmePath, r)
+		if l.LicenseFilePath == "" {
 			continue
 		}
 		if l.LicenseFileFormat == "" {
 			l.LicenseFileFormat = "Single License File"
 		}
 
-		path := filepath.Join(p.Root, l.LicenseFile)
+		path := filepath.Join(p.Root, l.LicenseFilePath)
 		f, err := file.LoadFile(path, file.FileType(l.LicenseFileFormat), r.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load license file %s: %w\n", path, err)
 		}
 		f.SetURL(l.LicenseFileURL)
 		p.LicenseFiles = append(p.LicenseFiles, f)
-		l.LicenseFileRef = f
 	}
 
 	AllProjects[p.Root] = p
@@ -113,10 +111,6 @@ func (p *Project) AddFile(f *file.File) error {
 		}
 
 		p.LicenseFiles = append(p.LicenseFiles, f)
-
-		relPath, _ := filepath.Rel(p.Root, f.RelPath())
-		p.ReadmeFile.AddLicense(relPath, f)
-
 		return nil
 	}
 

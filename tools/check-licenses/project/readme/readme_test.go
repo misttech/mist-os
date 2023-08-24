@@ -23,6 +23,7 @@ func TestLoadReadmeFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v: expected no error, got %v.", t.Name(), err)
 	}
+	got.GetLicenseURLForPath = nil
 	got.ReadmePath = ""
 
 	wantPath := filepath.Join(*testDataDir, "readme", "want.json")
@@ -37,7 +38,6 @@ func TestLoadReadmeFile(t *testing.T) {
 	if err := decoder.Decode(want); err != nil {
 		t.Fatalf("%v: failed to decode want struct: %v.", t.Name(), err)
 	}
-	want.ProjectRoot = got.ProjectRoot
 
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("%s: compare readmes mismatch: (-want +got):\n%s", t.Name(), diff)
@@ -45,6 +45,7 @@ func TestLoadReadmeFile(t *testing.T) {
 }
 
 func runReadmeDiffTest(t *testing.T, wantPath string, got *Readme) {
+	got.GetLicenseURLForPath = nil
 	got.ReadmePath = ""
 
 	wantJson, err := os.ReadFile(wantPath)
@@ -58,7 +59,6 @@ func runReadmeDiffTest(t *testing.T, wantPath string, got *Readme) {
 	if err := decoder.Decode(want); err != nil {
 		t.Fatalf("%v: failed to decode want struct: %v.", t.Name(), err)
 	}
-	want.ProjectRoot = got.ProjectRoot
 
 	want.Sort()
 	got.Sort()

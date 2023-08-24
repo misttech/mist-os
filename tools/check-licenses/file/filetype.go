@@ -47,7 +47,3 @@ func init() {
 		"multi_license_google":   MultiLicenseGoogle,
 	}
 }
-
-func (ft FileType) String() string {
-	return string(ft)
-}

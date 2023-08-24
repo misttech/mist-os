@@ -4,12 +4,12 @@
   "malformedLines": [],
   "licenseInfo": [
     {
-      "licenseFile": "LICENSE.txt",
+      "licenseFilePath": "LICENSE.txt",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "https://pub.dev/packages/foo/license"
     },
     {
-      "licenseFile": "COPYING",
+      "licenseFilePath": "COPYING",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "https://pub.dev/packages/foo/license"
     }

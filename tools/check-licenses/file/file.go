@@ -9,7 +9,6 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -76,8 +75,6 @@ func LoadFile(path string, ft FileType, projectName string) (*File, error) {
 		plusVal(NumPotentialLicenseFiles, path)
 	}
 
-	// TODO: Instead of skipping empty files here, mark them as
-	// "Empty" in the README.fuchsia file.
 	// Check if the file is empty
 	fileInfo, err := os.Stat(absPath)
 	if err != nil {
@@ -145,35 +142,6 @@ func (f *File) Text() ([]byte, error) {
 		return nil, err
 	}
 	return f.text, nil
-}
-
-// Generate a string representing all of the license types that were detected
-// in the given file.
-func (f *File) LicenseType() string {
-	// Use a map to remove duplicate license types.
-	licenseTypesMap := map[string]bool{}
-	for _, d := range f.data {
-		for _, m := range d.searchResults.Matches {
-			licenseTypesMap[m.Name] = true
-		}
-	}
-
-	// Sort the list to ensure deterministic output.
-	licenseTypes := []string{}
-	for k := range licenseTypesMap {
-		licenseTypes = append(licenseTypes, k)
-	}
-	sort.Strings(licenseTypes)
-
-	licenseTypeString := ""
-	for i, l := range licenseTypes {
-		licenseTypeString = fmt.Sprintf("%s%s", licenseTypeString, l)
-		if i < len(licenseTypes)-1 {
-			licenseTypeString = fmt.Sprintf("%s, ", licenseTypeString)
-		}
-	}
-
-	return licenseTypeString
 }
 
 func (f *File) LoadContent() error {
