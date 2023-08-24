@@ -423,30 +423,6 @@ template("bazel_product_bundle") {
             }
           },
           {
-            name = "blob"
-            type = "blk"
-            cpu = current_cpu
-            label = _full_label
-            path = "${_system_a_root}/blob.blk"
-          },
-          {
-            name = "storage-full"
-            cpu = current_cpu
-            type = "blk"
-            label = _full_label
-            path = "${_system_a_root}/fvm.blk"
-            archive = add_qemu_to_build_archives
-          },
-          {
-            name = "storage-sparse"
-            cpu = current_cpu
-            type = "blk"
-            label = _full_label
-            path = "${_system_a_root}/fvm.sparse.blk"
-            archive = true
-            bootserver_pave = [ "--fvm" ]
-          },
-          {
             name = "zircon-r"
             cpu = current_cpu
             type = "zbi"
@@ -465,19 +441,67 @@ template("bazel_product_bundle") {
           },
         ]
 
-        if (supports_fastboot_fvm) {
+        if (fxfs_blob) {
           images += [
             {
-              name = "fvm.fastboot"
+              name = "storage-full"
+              type = "fxfs-blk"
               cpu = current_cpu
-              type = "blk"
               label = _full_label
-              path = "${_system_a_root}/fvm.fastboot.blk"
-
+              path = "${_system_a_root}/fxfs.blk"
+              archive = add_qemu_to_build_archives
+            },
+            {
+              name = "fuchsia.fxfs_sparse"
+              type = "blk"
+              cpu = current_cpu
+              label = _full_label
+              path = "${_system_a_root}/fxfs.sparse.blk"
               archive = true
-              fastboot_flash = [ fvm_partition ]
+              bootserver_pave = [ "--fxfs" ]
             },
           ]
+        } else {
+          images += [
+            {
+              name = "blob"
+              type = "blk"
+              cpu = current_cpu
+              label = _full_label
+              path = "${_system_a_root}/blob.blk"
+            },
+            {
+              name = "storage-full"
+              type = "blk"
+              cpu = current_cpu
+              label = _full_label
+              path = "${_system_a_root}/fvm.blk"
+              archive = add_qemu_to_build_archives
+            },
+            {
+              name = "storage-sparse"
+              type = "blk"
+              cpu = current_cpu
+              label = _full_label
+              path = "${_system_a_root}/fvm.sparse.blk"
+              archive = true
+              bootserver_pave = [ "--fvm" ]
+            },
+          ]
+          if (supports_fastboot_fvm) {
+            images += [
+              {
+                name = "fvm.fastboot"
+                cpu = current_cpu
+                type = "blk"
+                label = _full_label
+                path = "${_system_a_root}/fvm.fastboot.blk"
+
+                archive = true
+                fastboot_flash = [ fvm_partition ]
+              },
+            ]
+          }
         }
 
         if (use_vbmeta) {
