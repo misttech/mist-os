@@ -1637,10 +1637,7 @@ impl FsNode {
         }
 
         if !matches!((atime, mtime), (TimeUpdateType::Omit, TimeUpdateType::Omit)) {
-            // This function is called by `utimes(..)` which will update the access and
-            // modification time. We need to call `update_attributes()` to update the mtime of
-            // filesystems that manages file timestamps.
-            self.update_attributes(|info| {
+            self.update_info(|info| {
                 let now = utc::utc_now();
                 info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
@@ -1654,8 +1651,7 @@ impl FsNode {
                 if let Some(time) = get_time(mtime) {
                     info.time_modify = time;
                 }
-                Ok(())
-            })?;
+            });
         }
         Ok(())
     }
