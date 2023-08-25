@@ -40,7 +40,10 @@ impl WlanTestRealmFactory {
     }
 }
 
-async fn setup_archivist(builder: &RealmBuilder, wlan_components: &ChildRef) -> Result<(), Error> {
+async fn setup_archivist(
+    builder: &RealmBuilder,
+    wlan_components: &ChildRef,
+) -> Result<ChildRef, Error> {
     let archivist = builder
         .add_child("archivist", "#meta/archivist-for-embedding.cm", ChildOptions::new())
         .await?;
@@ -49,6 +52,7 @@ async fn setup_archivist(builder: &RealmBuilder, wlan_components: &ChildRef) -> 
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .capability(Capability::protocol_by_name("fuchsia.logger.Log"))
                 .from(&archivist)
                 .to(Ref::parent())
@@ -67,12 +71,13 @@ async fn setup_archivist(builder: &RealmBuilder, wlan_components: &ChildRef) -> 
         )
         .await?;
 
-    Ok(())
+    Ok(archivist)
 }
 
 async fn setup_wlandevicemonitor(
     builder: &RealmBuilder,
     wlan_components: &ChildRef,
+    archivist: &ChildRef,
     use_legacy_privacy: bool,
 ) -> Result<(), Error> {
     let wlandevicemonitor = builder
@@ -121,6 +126,15 @@ async fn setup_wlandevicemonitor(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .from(Ref::parent())
+                .to(&wlandevicemonitor),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
+                .from(archivist)
                 .to(&wlandevicemonitor),
         )
         .await?;
@@ -179,11 +193,12 @@ async fn build_realm(mut options: fidl_realm::RealmOptions) -> Result<RealmInsta
         .add_child("wlan-hw-sim", "#meta/wlan-hw-sim.cm", ChildOptions::new().eager())
         .await?;
 
-    setup_archivist(&builder, &wlan_components).await?;
+    let archivist = setup_archivist(&builder, &wlan_components).await?;
 
     setup_wlandevicemonitor(
         &builder,
         &wlan_components,
+        &archivist,
         wlan_config.use_legacy_privacy.unwrap_or(false),
     )
     .await?;

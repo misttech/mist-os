@@ -29,6 +29,11 @@
             ],
         },
         {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: "#wlancfg",
+        },
+        {
             protocol: "fuchsia.stash.SecureStore",
             from: "#stash",
             to: "#wlancfg",

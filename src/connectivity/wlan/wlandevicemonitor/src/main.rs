@@ -81,10 +81,11 @@ async fn main() -> Result<(), Error> {
     let (watcher_service, watcher_fut) =
         watcher_service::serve_watchers(phys.clone(), ifaces.clone(), phy_events, iface_events);
 
-    let mut fs = ServiceFs::new_local();
+    let fs = ServiceFs::new_local();
 
     let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
-    inspect_runtime::serve(&inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
     let cfg = wlandevicemonitor_config::Config::take_from_startup_handle();
     inspector.root().record_child("config", |config_node| cfg.record_inspect(config_node));
     let ifaces_node = inspector.root().create_child("ifaces");

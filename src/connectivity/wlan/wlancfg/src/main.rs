@@ -93,7 +93,10 @@ async fn serve_fidl(
 
     let mut fs = ServiceFs::new();
 
-    inspect_runtime::serve(component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
 
     let client_sender1 = client_sender.clone();
     let client_sender2 = client_sender.clone();
