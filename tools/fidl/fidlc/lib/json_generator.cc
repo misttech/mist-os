@@ -1028,6 +1028,20 @@ std::ostringstream JSONGenerator::Produce() {
         });
     GenerateObjectMember("experiments", active_experiments);
 
+    if (compilation_->version_selection_) {
+      GenerateObjectPunctuation(Position::kSubsequent);
+      EmitObjectKey("available");
+      GenerateObject([&]() {
+        Position p = Position::kFirst;
+        compilation_->version_selection_->ForEach([&](const Platform& platform, Version version) {
+          GenerateObjectMember(platform.name(), version.ToString(), p);
+          if (p == Position::kFirst) {
+            p = Position::kSubsequent;
+          }
+        });
+      });
+    }
+
     GenerateObjectPunctuation(Position::kSubsequent);
     EmitObjectKey("library_dependencies");
     GenerateArray(compilation_->direct_and_composed_dependencies);

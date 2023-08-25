@@ -205,6 +205,9 @@ struct Compilation {
   // dependencies that come from protocol composition, i.e. what would need to
   // be imported if the composed methods were copied and pasted.
   std::vector<Dependency> direct_and_composed_dependencies;
+
+  // Versions that were selected for this compilation.
+  const VersionSelection* version_selection_;
 };
 
 }  // namespace fidl::flat

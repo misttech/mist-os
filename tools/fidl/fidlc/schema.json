@@ -2111,6 +2111,15 @@
         "^experimental_": {}
     },
     "properties": {
+        "available": {
+            "description": "Platforms and versions that were available when compiling the library.",
+            "type": "object",
+            "patternProperties": {
+                ".*": {
+                    "type": "string"
+                }
+            }
+        },
         "bits_declarations": {
             "description": "List of bits declarations, sorted by fully qualified name",
             "items": {

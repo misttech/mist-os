@@ -481,6 +481,7 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
     dep.library = dep_library;
     filter_declarations(&dep.declarations, dep_library->declarations);
   }
+  compilation->version_selection_ = version_selection;
 
   return compilation;
 }

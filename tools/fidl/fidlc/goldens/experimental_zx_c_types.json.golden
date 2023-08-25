@@ -7,6 +7,9 @@
     "unknown_interactions_mandate",
     "zx_c_types"
   ],
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "library_dependencies": [],
   "bits_declarations": [],
   "const_declarations": [

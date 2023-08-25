@@ -6,6 +6,9 @@
     "unknown_interactions",
     "unknown_interactions_mandate"
   ],
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "library_dependencies": [
     {
       "name": "test.protocollayouts.imported",

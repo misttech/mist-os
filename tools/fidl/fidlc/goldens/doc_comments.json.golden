@@ -39,6 +39,9 @@
     "unknown_interactions",
     "unknown_interactions_mandate"
   ],
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "library_dependencies": [],
   "bits_declarations": [
     {
