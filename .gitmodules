@@ -613,8 +613,3 @@
 	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/chre
 	name = third_party/chre
 	ignore = all
-[submodule "third_party/dart-pkg/git/flutter"]
-	path = third_party/dart-pkg/git/flutter
-	url = https://chromium.googlesource.com/external/github.com/flutter/flutter
-	name = external/github.com/flutter/flutter
-	ignore = all
