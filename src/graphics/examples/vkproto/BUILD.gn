@@ -4,6 +4,7 @@
 
 import("//src/graphics/examples/vkproto/common/common.gni")
 import("//src/lib/vulkan/build/config.gni")
+import("//src/lib/vulkan/build/vulkan_targets.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
 resource("override") {
@@ -44,7 +45,7 @@ config("vulkan_sdk_linux_config") {
   libs = [ "vulkan" ]
 }
 
-executable("bin") {
+vulkan_executable("bin") {
   output_name = "vkproto"
   sources = common_sources
   sources += [ "example/main.cc" ]
@@ -103,11 +104,13 @@ copy("spirv_copy") {
     "common/shaders/vert.spv",
   ]
 
-  outputs = [ "$target_out_dir/{{source_file_part}}" ]
+  outputs = [ "$root_out_dir/{{source_file_part}}" ]
 }
 
 group("vkproto-glfw") {
-  deps = [ ":bin($host_toolchain)" ]
+  if (is_host) {
+    deps = [ ":bin($host_toolchain)" ]
+  }
 }
 
 group("vkproto") {

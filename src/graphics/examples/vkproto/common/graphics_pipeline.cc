@@ -36,25 +36,31 @@ bool GraphicsPipeline::Init() {
   std::vector<char> vert_shader_buffer;
   std::vector<char> frag_shader_buffer;
 
+  bool is_host = false;
 #ifdef __Fuchsia__
   const char *vert_shader = "/pkg/data/shaders/vert.spv";
   const char *frag_shader = "/pkg/data/shaders/frag.spv";
 #else
   char cwd[PATH_MAX];
+  is_host = true;
   if (getcwd(cwd, sizeof(cwd)) == NULL) {
     RTN_MSG(false, "Can't get current working directory.\n");
   }
   char vert_shader[PATH_MAX];
-  snprintf(vert_shader, PATH_MAX, "%s/host_x64/obj/src/graphics/examples/vkproto/vert.spv", cwd);
+  snprintf(vert_shader, PATH_MAX, "%s/vert.spv", cwd);
   char frag_shader[PATH_MAX];
-  snprintf(frag_shader, PATH_MAX, "%s/host_x64/obj/src/graphics/examples/vkproto/frag.spv", cwd);
+  snprintf(frag_shader, PATH_MAX, "%s/frag.spv", cwd);
 #endif
 
   if (!Shader::ReadFile(vert_shader, &vert_shader_buffer)) {
-    RTN_MSG(false, "Can't read vertex spv file.\n");
+    fprintf(stderr, "Can't read vertex spv file at %s.\n", vert_shader);
+    if (is_host) {
+      fprintf(stderr,
+              "For host builds, run from executable directory e.g. out/Default/host_x64.\n");
+    }
   }
   if (!Shader::ReadFile(frag_shader, &frag_shader_buffer)) {
-    RTN_MSG(false, "Can't read fragment spv file.\n");
+    RTN_MSG(false, "Can't read fragment spv file at %s.\n", frag_shader);
   }
 
   auto [r_vshader_module, vshader_module] =
