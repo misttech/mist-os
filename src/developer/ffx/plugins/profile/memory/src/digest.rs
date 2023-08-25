@@ -279,7 +279,7 @@ pub mod processed {
     pub fn rename(name: &str) -> &str {
         lazy_static::lazy_static! {
         /// Default, global regex match.
-        static ref RULES: [(regex::Regex, &'static str); 10] = [
+        static ref RULES: [(regex::Regex, &'static str); 11] = [
             (regex::Regex::new("ld\\.so\\.1-internal-heap|(^stack: msg of.*)").unwrap(), "[process-bootstrap]"),
             (regex::Regex::new("^blob-[0-9a-f]+$").unwrap(), "[blobs]"),
             (regex::Regex::new("^inactive-blob-[0-9a-f]+$").unwrap(), "[inactive blobs]"),
@@ -290,6 +290,7 @@ pub mod processed {
             (regex::Regex::new("^$").unwrap(), "[unnamed]"),
             (regex::Regex::new("^scudo:.*$").unwrap(), "[scudo]"),
             (regex::Regex::new("^.*\\.so.*$").unwrap(), "[bootfs-libraries]"),
+            (regex::Regex::new("^stack_and_tls:.*$").unwrap(), "[bionic-stack]"),
         ];
         }
         RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| rule.1)
@@ -911,5 +912,6 @@ mod tests {
         pretty_assertions::assert_eq!(rename("scudo:primary"), "[scudo]");
         pretty_assertions::assert_eq!(rename("libfoo.so.1"), "[bootfs-libraries]");
         pretty_assertions::assert_eq!(rename("foobar"), "foobar");
+        pretty_assertions::assert_eq!(rename("stack_and_tls:2331"), "[bionic-stack]");
     }
 }
