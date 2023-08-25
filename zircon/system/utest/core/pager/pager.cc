@@ -401,14 +401,24 @@ TEST(Pager, VmarUnmapTest) {
   Vmo* vmo;
   ASSERT_TRUE(pager.CreateVmo(1, &vmo));
 
-  TestThread t([vmo]() -> bool { return check_buffer(vmo, 0, 1, true); });
+  zx_vaddr_t addr;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo->vmo(), 0, zx_system_get_page_size(),
+                                       &addr));
+
+  TestThread t([addr]() -> bool {
+    auto buf = reinterpret_cast<uint8_t*>(addr);
+    uint8_t data = *buf;
+    // This comparison is not relevant. Just use the data so that the dereference is not optimized
+    // out. The thread is expected to crash before this point anyway.
+    return data > 0;
+  });
   ASSERT_TRUE(t.Start());
   ASSERT_TRUE(t.WaitForBlocked());
 
-  ASSERT_TRUE(pager.UnmapVmo(vmo));
+  ASSERT_OK(zx::vmar::root_self()->unmap(addr, zx_system_get_page_size()));
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
 
-  ASSERT_TRUE(t.WaitForCrash(vmo->base_addr(), ZX_ERR_NOT_FOUND));
+  ASSERT_TRUE(t.WaitForCrash(addr, ZX_ERR_NOT_FOUND));
 }
 
 // Tests that replacing a vmar mapping while threads are blocked on a

@@ -171,7 +171,6 @@ UserPager::~UserPager() {
   }
   while (!vmos_.is_empty()) {
     auto vmo = vmos_.pop_front();
-    zx::vmar::root_self()->unmap(vmo->base_addr(), vmo->size());
   }
 }
 
@@ -207,29 +206,17 @@ bool UserPager::CreateVmoWithOptions(uint64_t size, uint32_t options, Vmo** vmo_
     return false;
   }
 
-  zx_vaddr_t addr;
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size, &addr);
-  if (status != ZX_OK) {
-    fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
+  auto paged_vmo = Vmo::Create(std::move(vmo), size, next_key_);
+  if (paged_vmo == nullptr) {
+    fprintf(stderr, "could not create Vmo instance\n");
     return false;
   }
-
-  auto paged_vmo = Vmo::Create(std::move(vmo), size, addr, next_key_);
 
   next_key_ += (size / sizeof(uint64_t));
 
   *vmo_out = paged_vmo.get();
   vmos_.push_back(std::move(paged_vmo));
 
-  return true;
-}
-
-bool UserPager::UnmapVmo(Vmo* vmo) {
-  zx_status_t status = zx::vmar::root_self()->unmap(vmo->base_addr(), vmo->size());
-  if (status != ZX_OK) {
-    fprintf(stderr, "vmar unmap failed with %s\n", zx_status_get_string(status));
-    return false;
-  }
   return true;
 }
 
@@ -250,7 +237,6 @@ void UserPager::ReleaseVmo(Vmo* vmo) {
     return;
   }
 
-  zx::vmar::root_self()->unmap(vmo->base_addr(), vmo->size());
   vmos_.erase(*vmo);
 }
 
