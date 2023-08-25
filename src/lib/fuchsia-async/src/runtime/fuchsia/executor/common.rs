@@ -179,9 +179,8 @@ impl Inner {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = Task::new(next_id, future, self.clone());
         self.collector.task_created(next_id, task.source);
-        let waker = task.waker();
-        self.active_tasks.lock().insert(next_id, task);
-        ArcWake::wake_by_ref(&waker);
+        self.active_tasks.lock().insert(next_id, task.clone());
+        task.wake();
     }
 
     #[cfg_attr(trace_level_logging, track_caller)]
@@ -205,9 +204,11 @@ impl Inner {
     pub fn spawn_main(self: &Arc<Self>, future: FutureObj<'static, ()>) {
         let task = Task::new(MAIN_TASK_ID, future, self.clone());
         self.collector.task_created(MAIN_TASK_ID, task.source);
-        let waker = task.waker();
-        assert!(self.active_tasks.lock().insert(0, task).is_none(), "Existing main task");
-        ArcWake::wake_by_ref(&waker);
+        assert!(
+            self.active_tasks.lock().insert(MAIN_TASK_ID, task.clone()).is_none(),
+            "Existing main task"
+        );
+        task.wake();
     }
 
     pub fn notify_task_ready(&self) {
@@ -641,6 +642,13 @@ impl Task {
         Arc::new(TaskWaker { task: Arc::downgrade(self) })
     }
 
+    fn wake(self: &Arc<Self>) {
+        if self.notifier.prepare_notify() {
+            self.executor.ready_tasks.push(self.clone());
+            self.executor.notify_task_ready();
+        }
+    }
+
     fn try_poll(self: &Arc<Self>) -> bool {
         let task_waker = self.waker();
         let w = waker_ref(&task_waker);
@@ -656,10 +664,7 @@ struct TaskWaker {
 impl ArcWake for TaskWaker {
     fn wake_by_ref(arc_self: &Arc<Self>) {
         if let Some(task) = Weak::upgrade(&arc_self.task) {
-            if task.notifier.prepare_notify() {
-                task.executor.ready_tasks.push(task.clone());
-                task.executor.notify_task_ready();
-            }
+            task.wake();
         }
     }
 }
