@@ -125,7 +125,7 @@ _fx_config_lines = [
   "FUCHSIA_BUILD_DIR='${_relative_build_dir}'",
   "FUCHSIA_ARCH='${target_cpu}'",
   "FUCHSIA_BOARD_NAME=${board_name}",
-  "FUCHSIA_ZBI_COMPRESSION=$zbi_compression",
+  "FUCHSIA_ZBI_COMPRESSION=zstd",
   "HOST_OUT_DIR='${_host_out_dir}'",
   "USE_GOMA=$use_goma",
 ]

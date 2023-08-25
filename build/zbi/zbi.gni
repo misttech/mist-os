@@ -5,13 +5,6 @@
 import("//build/zircon/tools.gni")
 import("zbi_input.gni")
 
-declare_args() {
-  # Compression setting for ZBI "storage" items.
-  # This can be "zstd", optionally followed by ".LEVEL"
-  # where `LEVEL` can be an integer or "max".
-  zbi_compression = "zstd"
-}
-
 # Assembles a Zircon Boot Image file from various inputs.
 #
 # Parameters
@@ -34,7 +27,7 @@ declare_args() {
 #     items in the output.  See the `--compressed` switch in `zbi --help`.
 #     If this is a string rather than a bool, it's the argument for the
 #     `--compressed` switch to `zbi`.  A value of `true` is replaced with
-#     $zbi_compression.
+#     "zstd".
 #     Type: bool or string
 #     Default: true
 #
@@ -166,7 +159,7 @@ template("zbi") {
     # "-c" or "-u" from metadata.zbi_input_args meant to affect
     # a particular input (e.g. for "--type=ramdisk").
     if (!defined(compress) || compress == true) {
-      compress = zbi_compression
+      compress = "zstd"
     }
     if (compress == false) {
       args += [ "--uncompressed" ]
