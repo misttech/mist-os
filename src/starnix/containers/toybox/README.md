@@ -45,10 +45,5 @@ There is nothing special about running `toybox` in this `playground` collection.
 Once the container is running, you can use the `console` command to get an interactive console:
 
 ```posix-terminal
-ffx starnix console --moniker /core/starnix_runner/playground:toybox /bin/ls
+ffx starnix console --moniker /core/starnix_runner/playground:toybox /bin/sh
 ```
-
-Note: There is currently a bug with interactive consoles, which is why this command runs `ls`
-rather than `sh`.
-
-TODO(b/295595983): Update these docs to run `sh` once that works.
