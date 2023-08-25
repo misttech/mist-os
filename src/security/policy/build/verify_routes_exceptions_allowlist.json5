@@ -30,26 +30,6 @@
         capability_type: "protocol",
         results: {
             errors: [
-                // TODO(https://fxbug.dev/107231): Fix when optional exposes are supported. Right
-                // now fshost only exposes fuchsia.fxfs.BlobCreator when fxblob is enabled.
-                {
-                    using_node: "/bootstrap/pkg-cache",
-                    capability: "fuchsia.fxfs.BlobCreator",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    offer_from_child_expose_not_found: {
-                                        child_moniker: "fshost",
-                                        moniker: "/bootstrap",
-                                        capability_id: "fuchsia.fxfs.BlobCreator",
-                                    },
-                                },
-                            },
-                        },
-                        message: "`fuchsia.fxfs.BlobCreator` was not exposed to `/bootstrap` from child `#fshost`.",
-                    },
-                },
                 {
                     using_node: "/core/battery_manager",
                     capability: "fuchsia.hardware.powersource.Source",
