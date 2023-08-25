@@ -5721,7 +5721,6 @@ rust_library("log-v0_4_20") {
     "-Cmetadata=3237885152c97e3d",
     "-Cextra-filename=-3237885152c97e3d",
     "--cfg=feature=\"std\"",
-    "--cfg=atomic_cas",
   ]
 
   visibility = [ ":*" ]
