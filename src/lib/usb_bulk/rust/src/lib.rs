@@ -201,8 +201,12 @@ impl Open<AsyncInterface> for AsyncInterface {
             }
             false
         };
-        Interface::open(&mut cb).and_then(|iface| match serial {
+        Interface::open(&mut cb).and_then(|mut iface| match serial {
             Some(s) => {
+                // Clears out anything that was in the usb buffer waiting.
+                let mut buffer = Vec::new();
+                let _read_res = iface.read_to_end(&mut buffer);
+
                 let mut write_guard = IFACE_REGISTRY
                     .write()
                     .expect("could not acquire write lock on interface registry");
