@@ -5,6 +5,7 @@
 use {
     anyhow::{bail, ensure, Context, Error},
     argh::FromArgs,
+    assembly_partitions_config::{Partition, PartitionsConfig, Slot},
     byteorder::{BigEndian, WriteBytesExt},
     camino::{Utf8Path, Utf8PathBuf},
     crc::crc32,
@@ -15,11 +16,12 @@ use {
     },
     rand::{RngCore, SeedableRng},
     rand_xorshift::XorShiftRng,
+    sdk_metadata::{LoadedProductBundle, ProductBundle},
     serde::Deserialize,
     std::{
         collections::{BTreeMap, HashMap},
         fs::{File, OpenOptions},
-        io::{Read, Seek, SeekFrom, Write},
+        io::{BufReader, Read, Seek, SeekFrom, Write},
         ops::Range,
         os::unix::fs::FileExt,
         process::Command,
@@ -57,6 +59,12 @@ struct TopLevel {
     /// fuchsia build dir
     #[argh(option)]
     fuchsia_build_dir: Option<Utf8PathBuf>,
+
+    /// use named product information from Product Bundle Metadata (PBM). If no
+    /// product bundle is specified and there is an obvious choice, that will be
+    /// used (e.g. if there is only one PBM available).
+    #[argh(option)]
+    product_bundle: Option<Utf8PathBuf>,
 
     /// the architecture of the target CPU (x64|arm64)
     #[argh(option, default = "Arch::X64")]
@@ -235,12 +243,91 @@ impl<T: Seek> Seek for Shift<T> {
     }
 }
 
+fn get_product_bundle_partitions(path: &Utf8Path) -> Result<PartitionsConfig, Error> {
+    let product_bundle = LoadedProductBundle::try_load_from(path)?;
+
+    match product_bundle.into() {
+        ProductBundle::V1(_) => bail!("does not support product bundle v1"),
+        ProductBundle::V2(pb) => Ok(pb.partitions),
+    }
+}
+
+fn get_bootloader_partition_name(partitions: &Option<PartitionsConfig>) -> Result<&str, Error> {
+    if let Some(partitions) = &partitions {
+        match &partitions.bootloader_partitions[..] {
+            [bootloader_partition] => {
+                if let Some(name) = &bootloader_partition.name {
+                    return Ok(name);
+                } else {
+                    bail!("product bundle bootloader partition doesn't have a name");
+                }
+            }
+            [] => bail!("product bundle doesn't have any bootloader partitions"),
+            _ => bail!("product bundles with multiple bootloader partitions is not supported"),
+        }
+    }
+
+    Ok("fuchsia-esp")
+}
+
+fn get_zbi_partition_name(
+    partitions: &Option<PartitionsConfig>,
+    partition_slot: Slot,
+) -> Result<&str, Error> {
+    let Some(partitions) = partitions else {
+        return Ok(match partition_slot {
+            Slot::A => "zircon-a",
+            Slot::B => "zircon-b",
+            Slot::R => "zircon-r",
+        });
+    };
+
+    for partition in &partitions.partitions {
+        if let Partition::ZBI { name, slot } = &partition {
+            if slot == &partition_slot {
+                return Ok(name);
+            }
+        }
+    }
+
+    bail!("could not find ZBI partition name for slot {partition_slot:?}")
+}
+
+fn get_vbmeta_partition_name(
+    partitions: &Option<PartitionsConfig>,
+    partition_slot: Slot,
+) -> Result<&str, Error> {
+    let Some(partitions) = partitions else {
+        return Ok(match partition_slot {
+            Slot::A => "vbmeta_a",
+            Slot::B => "vbmeta_b",
+            Slot::R => "vbmeta_r",
+        });
+    };
+
+    for partition in &partitions.partitions {
+        if let Partition::VBMeta { name, slot } = &partition {
+            if slot == &partition_slot {
+                return Ok(name);
+            }
+        }
+    }
+
+    bail!("could not find ZBI partition name for slot {partition_slot:?}")
+}
+
 fn main() -> Result<(), Error> {
     run(argh::from_env::<TopLevel>())
 }
 
 fn run(mut args: TopLevel) -> Result<(), Error> {
     check_args(&mut args)?;
+
+    let product_bundle_partitions = if let Some(pbms_path) = &args.product_bundle {
+        Some(get_product_bundle_partitions(pbms_path)?)
+    } else {
+        None
+    };
 
     let mut disk = OpenOptions::new()
         .read(true)
@@ -264,8 +351,9 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
     let mut gpt_disk = config.create_from_device(Box::new(&mut disk), None)?;
     gpt_disk.update_partitions(BTreeMap::new())?;
 
+    let efi_partition_name = get_bootloader_partition_name(&product_bundle_partitions)?;
     let efi_part =
-        add_partition(&mut gpt_disk, "efi-system", args.efi_size, gpt::partition_types::EFI)?;
+        add_partition(&mut gpt_disk, efi_partition_name, args.efi_size, gpt::partition_types::EFI)?;
 
     struct Partitions {
         zircon_a: Range<u64>,
@@ -279,12 +367,42 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
 
     let abr_partitions = if !args.no_abr {
         Some(Partitions {
-            zircon_a: add_partition(&mut gpt_disk, "zircon_a", args.abr_size, ZIRCON_A_GUID)?,
-            vbmeta_a: add_partition(&mut gpt_disk, "vbmeta_a", args.vbmeta_size, VBMETA_A_GUID)?,
-            zircon_b: add_partition(&mut gpt_disk, "zircon_b", args.abr_size, ZIRCON_B_GUID)?,
-            vbmeta_b: add_partition(&mut gpt_disk, "vbmeta_b", args.vbmeta_size, VBMETA_B_GUID)?,
-            zircon_r: add_partition(&mut gpt_disk, "zircon_r", args.abr_size, ZIRCON_R_GUID)?,
-            vbmeta_r: add_partition(&mut gpt_disk, "vbmeta_r", args.vbmeta_size, VBMETA_R_GUID)?,
+            zircon_a: add_partition(
+                &mut gpt_disk,
+                get_zbi_partition_name(&product_bundle_partitions, Slot::A)?,
+                args.abr_size,
+                ZIRCON_A_GUID,
+            )?,
+            vbmeta_a: add_partition(
+                &mut gpt_disk,
+                get_vbmeta_partition_name(&product_bundle_partitions, Slot::A)?,
+                args.vbmeta_size,
+                VBMETA_A_GUID,
+            )?,
+            zircon_b: add_partition(
+                &mut gpt_disk,
+                get_zbi_partition_name(&product_bundle_partitions, Slot::B)?,
+                args.abr_size,
+                ZIRCON_B_GUID,
+            )?,
+            vbmeta_b: add_partition(
+                &mut gpt_disk,
+                get_vbmeta_partition_name(&product_bundle_partitions, Slot::B)?,
+                args.vbmeta_size,
+                VBMETA_B_GUID,
+            )?,
+            zircon_r: add_partition(
+                &mut gpt_disk,
+                get_zbi_partition_name(&product_bundle_partitions, Slot::R)?,
+                args.abr_size,
+                ZIRCON_R_GUID,
+            )?,
+            vbmeta_r: add_partition(
+                &mut gpt_disk,
+                get_vbmeta_partition_name(&product_bundle_partitions, Slot::R)?,
+                args.vbmeta_size,
+                VBMETA_R_GUID,
+            )?,
             misc: add_partition(&mut gpt_disk, "misc", args.vbmeta_size, MISC_GUID)?,
         })
     } else {
@@ -475,6 +593,22 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
         }
     }
 
+    let mut dependencies = vec![];
+
+    if args.product_bundle.is_none() {
+        args.product_bundle = get_build_product_bundle_path(args, &mut dependencies)?;
+    };
+
+    let product_bundle_path = if let Some(product_bundle_path) = &args.product_bundle {
+        Some(product_bundle_path.join("product_bundle.json"))
+    } else {
+        None
+    };
+
+    if let Some(product_bundle_path) = &product_bundle_path {
+        dependencies.push(product_bundle_path.as_path());
+    }
+
     if args.bootloader.is_none() {
         if let Some(build_dir) = &args.fuchsia_build_dir {
             let bootloader_dir = match args.arch {
@@ -487,7 +621,7 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
         }
     }
 
-    let mut dependencies: Vec<&Utf8Path> = vec![args.bootloader.as_ref().unwrap()];
+    dependencies.push(args.bootloader.as_ref().unwrap());
 
     let images = if let Some(build_dir) = &args.fuchsia_build_dir {
         dependencies.push("images.json".into());
@@ -615,6 +749,44 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn get_build_product_bundle_path(
+    args: &TopLevel,
+    dependencies: &mut Vec<&Utf8Path>,
+) -> Result<Option<Utf8PathBuf>, Error> {
+    let Some(build_dir) = &args.fuchsia_build_dir else { return Ok(None); };
+
+    let product_bundles_path = Utf8Path::new("product_bundles.json");
+    dependencies.push(product_bundles_path);
+
+    let f = match File::open(&build_dir.join(product_bundles_path)) {
+        Ok(f) => f,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(None);
+        }
+        Err(err) => {
+            return Err(err.into());
+        }
+    };
+
+    #[derive(Deserialize)]
+    struct ProductBundlePath {
+        path: Utf8PathBuf,
+    }
+
+    let mut product_bundle_paths: Vec<ProductBundlePath> =
+        serde_json::from_reader(BufReader::new(f))?;
+
+    let Some(product_bundle_path) = product_bundle_paths.pop() else {
+        bail!("{product_bundles_path} does not contain any entries");
+    };
+
+    if !product_bundle_paths.is_empty() {
+        bail!("{product_bundles_path} should only contain a single entry");
+    }
+
+    Ok(Some(build_dir.join(product_bundle_path.path)))
 }
 
 fn read_file(path: impl AsRef<std::path::Path>) -> Result<Vec<u8>, Error> {
@@ -786,8 +958,43 @@ mod tests {
         camino::{Utf8Path, Utf8PathBuf},
     };
 
+    fn compare_golden(test_data_dir: &Utf8Path, image_path: &Utf8Path) {
+        let image = std::fs::read(&image_path).expect("Unable to read image");
+        let file =
+            std::fs::File::open(test_data_dir.join("golden")).expect("Unable to read golden");
+        let golden = zstd::decode_all(file).expect("Unable to decompress");
+
+        // If this fails, here are some tips for debugging:
+        //
+        // Create a loopback device:
+        //
+        //   sudo losetup -fP /tmp/image
+        //
+        // Inspect the partition map:
+        //
+        //   fdisk /tmp/image
+        //
+        // Verify the ESP partition:
+        //
+        //   sudo fsck sudo fsck /dev/loop0p1
+        //
+        // Mount the ESP partition:
+        //
+        //   mkdir /tmp/esp
+        //   sudo mount -t vfat -o loop /dev/loop0p1 /tmp/esp
+        //
+        // To overwrite the golden image:
+        //
+        //   zstd /tmp/image -o golden
+        //
+        // View the contents of one of the partitions e.g. the misc partition:
+        //
+        //   sudo dd if=/dev/loop0p8 | hexdump -C
+        assert!(image == golden);
+    }
+
     #[test]
-    fn test_compare_golden() {
+    fn test_with_fuchsia_dir() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
@@ -846,41 +1053,71 @@ mod tests {
         .unwrap())
         .expect("run failed");
 
+        compare_golden(&test_data_dir, &image_path);
+    }
+
+    #[test]
+    fn test_with_product_bundle() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
         for i in 0..11 {
-            std::fs::remove_file(dir.join(format!("placeholder.{}", i))).unwrap();
+            std::fs::write(dir.join(format!("placeholder.{}", i)), vec![i; 8192]).unwrap();
         }
 
-        let image = std::fs::read(&image_path).expect("Unable to read image");
-        let file =
-            std::fs::File::open(test_data_dir.join("golden")).expect("Unable to read golden");
-        let golden = zstd::decode_all(file).expect("Unable to decompress");
+        let current_exe = std::env::current_exe().unwrap();
 
-        // If this fails, here are some tips for debugging:
-        //
-        // Create a loopback device:
-        //
-        //   sudo losetup -fP /tmp/image
-        //
-        // Inspect the partition map:
-        //
-        //   fdisk /tmp/image
-        //
-        // Verify the ESP partition:
-        //
-        //   sudo fsck sudo fsck /dev/loop0p1
-        //
-        // Mount the ESP partition:
-        //
-        //   mkdir /tmp/esp
-        //   sudo mount -t vfat -o loop /dev/loop0p1 /tmp/esp
-        //
-        // To overwrite the golden image:
-        //
-        //   zstd /tmp/image -o golden
-        //
-        // View the contents of one of the partitions e.g. the misc partition:
-        //
-        //   sudo dd if=/dev/loop0p8 | hexdump -C
-        assert!(image == golden);
+        let test_data_dir = Utf8PathBuf::from_path_buf(
+            current_exe.parent().unwrap().join("make-fuchsia-vol_test_data"),
+        )
+        .unwrap();
+
+        const IMAGE_SIZE: usize = 67108864;
+
+        let image_path = dir.join("image");
+        run(TopLevel::from_args(
+            &["make-fuchsia-vol"],
+            &[
+                image_path.as_str(),
+                "--abr-size",
+                "8192",
+                "--resize",
+                &format!("{}", IMAGE_SIZE),
+                "--seed",
+                "test_compare_golden",
+                "--efi-size",
+                "40000000",
+                "--bootloader",
+                dir.join("placeholder.0").as_str(),
+                "--zbi",
+                dir.join("placeholder.1").as_str(),
+                "--zedboot",
+                dir.join("placeholder.2").as_str(),
+                "--cmdline",
+                dir.join("placeholder.3").as_str(),
+                "--sparse-fvm",
+                dir.join("placeholder.4").as_str(),
+                "--zircon-a",
+                dir.join("placeholder.5").as_str(),
+                "--vbmeta-a",
+                dir.join("placeholder.6").as_str(),
+                "--zircon-b",
+                dir.join("placeholder.7").as_str(),
+                "--vbmeta-b",
+                dir.join("placeholder.8").as_str(),
+                "--zircon-r",
+                dir.join("placeholder.9").as_str(),
+                "--vbmeta-r",
+                dir.join("placeholder.10").as_str(),
+                "--fuchsia-build-dir",
+                test_data_dir.as_str(),
+                "--product-bundle",
+                test_data_dir.as_str(),
+            ],
+        )
+        .unwrap())
+        .expect("run failed");
+
+        compare_golden(&test_data_dir, &image_path);
     }
 }

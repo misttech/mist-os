@@ -14,6 +14,8 @@ if (is_host) {
       "//zircon/third_party/uapp/mkfs-msdosfs",
     ]
     deps = [
+      "//build/sdk/meta:rust",
+      "//src/lib/assembly/partitions_config",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:byteorder",
@@ -43,6 +45,7 @@ if (is_host) {
     sources = [
       "test_data/golden",
       "test_data/images.json",
+      "test_data/product_bundle.json",
     ]
     outputs =
         [ "$root_out_dir/make-fuchsia-vol_test_data/{{source_file_part}}" ]
