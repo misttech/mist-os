@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/zircon/zx_library.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 group("tests") {
   testonly = true
@@ -66,8 +65,6 @@ source_set("paver-core") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-
-  defines = [ "PRODUCT_FVM_SLICE_SIZE=${fvm_slice_size}" ]
 }
 
 # Helper libraries to aid board specific implementations.

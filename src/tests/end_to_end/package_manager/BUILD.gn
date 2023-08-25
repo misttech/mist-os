@@ -6,7 +6,6 @@ import("//build/dart/test.gni")
 import("//build/host.gni")
 import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 # TODO(omerlevran): Find a cleaner way to this by properly structuring the deps
 # between the rules. Please try to avoid using this pattern.

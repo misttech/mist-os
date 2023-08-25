@@ -8,7 +8,6 @@ import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/paths.gni")
 import("//build/product.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 
 #########

@@ -4,15 +4,11 @@
 
 import("//build/images/args.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 rustc_library("platform") {
   edition = "2021"
   with_unit_tests = true
   name = "fxfs-platform"
-  assert(!fxfs_blob || delivery_blob_type != false,
-         "Fxblob only supports delivery blobs.")
-
   deps = []
   sources = [ "src/lib.rs" ]
   test_deps = []

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//src/storage/fshost/fshost.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 import("access_ota_blob_as_executable/access_ota_blob_as_executable.gni")
 import("bad_signature_update/bad_signature_update.gni")
 

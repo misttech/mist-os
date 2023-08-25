@@ -18,7 +18,7 @@ pub struct ProductFilesystemConfig {
     #[serde(default)]
     pub watch_for_nand: bool,
 
-    /// If format_minfs_on_corruption is true (the default), fshost formats
+    /// If format_data_on_corruption is true (the default), fshost formats
     /// minfs partition on finding it corrupted.  Set to false to keep the
     /// devices in a corrupted state which might be of help to debug issues.
     #[serde(default)]
