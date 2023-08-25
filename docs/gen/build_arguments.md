@@ -384,26 +384,6 @@ TODO(fxbug.dev/100321): delete bless_goldens, to give users time to switch to ne
 
 From //build/testing/config.gni:11
 
-### blob_layout_format
-
-The format blobfs should store blobs in.
-Set by boards.
-
-**Current value (from the default):** `"compact"`
-
-From //src/storage/fshost/generated_fshost_config.gni:23
-
-### blobfs_board_minimum_inodes
-
-minimum_inodes is the number of inodes to reserve for the fs
-A value of false does not reserve any additional space than minimum
-required for the filesystem.
-Set by boards.
-
-**Current value (from the default):** `false`
-
-From //src/storage/fshost/generated_fshost_config.gni:52
-
 ### blobfs_capacity
 
 Maximum allowable contents for the /blob in a release mode build for
@@ -434,19 +414,6 @@ tree users don't set this anymore.
 **Current value (from the default):** `true`
 
 From //src/storage/blobfs/BUILD.gn:12
-
-### blobfs_maximum_runtime_bytes
-
-blobfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
-can grow as needed if there are extra slices available in FVM. This limit prevents the blobfs
-partition from taking too much space away from other uses.
-
-Pass the empty string for no limit.
-Set by boards.
-
-**Current value (from the default):** `""`
-
-From //src/storage/fshost/generated_fshost_config.gni:60
 
 ### blobfs_num_pager_threads
 
@@ -1466,11 +1433,10 @@ From //build/toolchain/rbe.gni:151
 Set to one of "minfs", "fxfs", "f2fs" (unstable).
 If set to anything other than "minfs", any existing minfs partition will be
 migrated in-place to the specified format when fshost mounts it.
-Set by products
 
 **Current value (from the default):** `"fxfs"`
 
-From //src/storage/fshost/generated_fshost_config.gni:19
+From //src/storage/fshost/generated_fshost_config.gni:12
 
 ### debian_guest_earlycon
 
@@ -3196,31 +3162,11 @@ Directory into which all fonts are checked out from CIPD
 
 From //src/fonts/build/font_args.gni:12
 
-### format_minfs_on_corruption
-
-If format_minfs_on_corruption is true (the default), fshost formats minfs partition on finding
-it corrupted.  Set to false to keep the devices in a corrupted state which might be of help to
-debug issues.
-Set by products
-
-**Current value (from the default):** `true`
-
-From //src/storage/fshost/generated_fshost_config.gni:13
-
 ### freeze_api_level
 
 **Current value (from the default):** `false`
 
 From //build/config/fuchsia/platform_version.gni:13
-
-### fshost_watch_for_nand
-
-Make fshost watch for NAND devices.
-Set by boards.
-
-**Current value (from the default):** `false`
-
-From //src/storage/fshost/generated_fshost_config.gni:72
 
 ### fuchsia_async_trace_level_logging
 
@@ -3400,30 +3346,15 @@ From //zircon/kernel/params.gni:60
 
 From //build/images/args.gni:116
 
-### fvm_slice_size
-
-The size of the FVM partition images "slice size". The FVM slice size is a
-minimum size of a particular chunk of a partition that is stored within
-FVM. A very small slice size may lead to decreased throughput. A very large
-slice size may lead to wasted space. The selected default size of 8mb is
-selected for conservation of space, rather than performance.
-LINT.IfChange
-Set by boards.
-
-**Current value (from the default):** `8388608`
-
-From //src/storage/fshost/generated_fshost_config.gni:32
-
 ### fxfs_blob
 
 Use Fxfs's blob implementation
 Changes the flashing logic because the outputs changed.
 Toggles a bunch of tests to use fxfs.
-Set by boards.
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:78
+From //src/storage/fshost/generated_fshost_config.gni:17
 
 ### fxfs_partition
 
@@ -4516,19 +4447,6 @@ users of persistent RAM.  Must be a multiple of 128 bytes.
 **Current value (from the default):** `2048`
 
 From //zircon/kernel/lib/crashlog/params.gni:14
-
-### minfs_maximum_runtime_bytes
-
-minfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
-can grow as needed if there are extra slices available in FVM. This limit prevents the minfs
-partition from taking too much space away from other uses.
-
-Pass the empty string for no limit.
-Set by boards.
-
-**Current value (from the default):** `""`
-
-From //src/storage/fshost/generated_fshost_config.gni:68
 
 ### mini_chromium_is_chromeos_ash
 
@@ -6181,7 +6099,7 @@ kConstantCase. Set this variable to temporarily enable legacy SNAKE_CASE
 support while you migrate your codebase to kConstantCase.
 b/266298474
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:28
 
@@ -8191,18 +8109,6 @@ direct.
 **Current value (from the default):** `false`
 
 From //src/lib/ui/carnelian/BUILD.gn:30
-
-### use_disk_migration
-
-If true, will enable content-detection for partition format, supporting both
-minfs and fxfs filesystems. A special "fs_switch" file can be written to the root directory
-containing the string "minfs", "fxfs" or "toggle" to trigger a migration from the current
-format to the specified format. (The "toggle" option will migrate back and forth at each boot.)
-Set by developers in fx set.
-
-**Current value (from the default):** `false`
-
-From //src/storage/fshost/generated_fshost_config.gni:85
 
 ### use_driver_framework_v2_default
 
