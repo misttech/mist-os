@@ -21,7 +21,8 @@ bool Delta::operator==(const Delta& other) const {
 glm::vec2 ToVec2(::fuchsia::math::PointF point) { return glm::vec2(point.x, point.y); }
 
 Delta GetDelta(const a11y::gesture_util_v2::GestureContext& current,
-               const a11y::gesture_util_v2::GestureContext& previous) {
+               const a11y::gesture_util_v2::GestureContext& previous,
+               float scale_min_finger_radius) {
   Delta delta;
 
   // We only ever compute deltas after a gesture has been recognized and before
@@ -55,11 +56,17 @@ Delta GetDelta(const a11y::gesture_util_v2::GestureContext& current,
       return Delta();
     }
 
-    auto current_point = ToVec2(entry.second.ndc_point);
     auto previous_point = ToVec2(previous.current_pointer_locations.at(pointer_id).ndc_point);
-
-    auto current_distance = glm::length(current_point - current_centroid);
     auto previous_distance = glm::length(previous_point - previous_centroid);
+
+    if (previous_distance < scale_min_finger_radius) {
+      // Fingers are close together. Treat as pan only. This avoids accidental zoom on small
+      // screens.
+      return delta;
+    }
+
+    auto current_point = ToVec2(entry.second.ndc_point);
+    auto current_distance = glm::length(current_point - current_centroid);
 
     scale_sum += current_distance / previous_distance;
   }

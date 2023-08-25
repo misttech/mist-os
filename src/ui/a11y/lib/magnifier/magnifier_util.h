@@ -30,11 +30,23 @@ struct Delta {
 glm::vec2 ToVec2(::fuchsia::math::PointF point);
 
 // Returns the Delta for two GestureContexts.
-// This method expects that |current| and |previous| have the same set of
-// pointers. If not, it will return the "NOOP" Delta with a translation of (0,
-// 0) and a scale of 1.
+//
+// * This method expects that |current| and |previous| have the same set of
+//   pointers. If not, it will return the "NOOP" Delta with a translation of (0,
+//   0) and a scale of 1.
+//
+// * This method checks if the |previous| distance between each finger and the
+//   centroid is less than or equal to |scale_min_finger_distance|. If so, the
+//   returned delta will have scale of 1.0.
+//
+//   This enables callers to filter out accidental scale adjustments that might
+//   happen when the user moves fingers while intending to pan. (With a small
+//   distance between fingers, even a small absolute change in the distance can
+//   cause a large scale adjustment, since the scale is multiplied by
+//   |new_distance/old_distance|.)
 Delta GetDelta(const a11y::gesture_util_v2::GestureContext& current,
-               const a11y::gesture_util_v2::GestureContext& previous);
+               const a11y::gesture_util_v2::GestureContext& previous,
+               float scale_min_finger_radius);
 
 }  // namespace a11y
 

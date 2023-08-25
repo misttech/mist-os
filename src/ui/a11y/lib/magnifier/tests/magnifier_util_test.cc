@@ -49,7 +49,7 @@ TEST(MagnifierUnitTest, GetDeltaFromGestureContexts) {
   previous.current_pointer_locations[1].ndc_point.x = -3;
   previous.current_pointer_locations[1].ndc_point.y = -3;
 
-  auto delta = GetDelta(current, previous);
+  auto delta = GetDelta(current, previous, 0.0);
 
   EXPECT_EQ(delta.translation.x, 0);
   EXPECT_EQ(delta.translation.y, -1);
@@ -63,7 +63,7 @@ TEST(MagnifierUnitTest, GetDeltaFromGestureContextsDifferentNumPointers) {
 
   a11y::gesture_util_v2::GestureContext previous;
 
-  auto delta = GetDelta(current, previous);
+  auto delta = GetDelta(current, previous, 0.0f);
 
   EXPECT_EQ(delta.translation.x, 0);
   EXPECT_EQ(delta.translation.y, 0);
@@ -79,11 +79,30 @@ TEST(MagnifierUnitTest, GetDeltaFromGestureContextsDifferentPointerIds) {
   previous.current_pointer_locations[1].ndc_point.x = -3;
   previous.current_pointer_locations[1].ndc_point.y = -3;
 
-  auto delta = GetDelta(current, previous);
+  auto delta = GetDelta(current, previous, 0.0f);
 
   EXPECT_EQ(delta.translation.x, 0);
   EXPECT_EQ(delta.translation.y, 0);
   EXPECT_EQ(delta.scale, 1);
+}
+
+TEST(MagnifierUnitTest, GetDeltaHonorsScaleMinFingerRadius) {
+  a11y::gesture_util_v2::GestureContext previous;
+  previous.current_pointer_locations[0].ndc_point.x = 0;
+  previous.current_pointer_locations[0].ndc_point.y = 0;
+  previous.current_pointer_locations[1].ndc_point.x = 0.1;
+  previous.current_pointer_locations[1].ndc_point.y = 0.1;
+
+  a11y::gesture_util_v2::GestureContext current;
+  current.current_pointer_locations[0].ndc_point.x = 0;
+  current.current_pointer_locations[0].ndc_point.y = 0;
+  current.current_pointer_locations[1].ndc_point.x = 1.0;
+  current.current_pointer_locations[1].ndc_point.y = 1.0;
+
+  // Because the initial distance between the fingers was too small,
+  // the scale should be unchanged.
+  auto delta = GetDelta(current, previous, 0.3);
+  EXPECT_EQ(delta.scale, 1.0f);
 }
 
 }  // namespace

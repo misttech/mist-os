@@ -215,7 +215,8 @@ void Magnifier2::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
         if (state_.mode != Mode::TEMPORARY) {
           return;
         }
-        auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */);
+        auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */,
+                              0 /* scale_min_finger_radius */);
         state_.gesture_context = context;
         HandleTemporaryDrag(delta);
       }, /* on update */
@@ -242,7 +243,8 @@ void Magnifier2::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
         if (state_.mode != Mode::TEMPORARY) {
           return;
         }
-        auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */);
+        auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */,
+                              0 /* scale_min_finger_radius */);
         state_.gesture_context = context;
         HandleTemporaryDrag(delta);
       }, /* on update */
@@ -271,7 +273,8 @@ void Magnifier2::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
         if (state_.mode != Mode::PERSISTENT) {
           return;
         }
-        auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */);
+        auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */,
+                              kZoomMinFingerDistance);
 
         HandlePersistentDrag(delta);
 
@@ -280,7 +283,9 @@ void Magnifier2::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
         // to use the old gesture_context.
         state_.gesture_context = context;
       }, /* on update */
-      [](a11y::gesture_util_v2::GestureContext context) { /* NOOP */ } /* on complete */);
+      [](a11y::gesture_util_v2::GestureContext context) {
+        /* NOOP */
+      } /* on complete */);
   FX_DCHECK(gesture_bind_status);
 }
 
