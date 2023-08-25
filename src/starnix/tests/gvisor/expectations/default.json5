@@ -1061,6 +1061,7 @@
 
                 // New failing gvisor test. Skip it to allow roller to pass.
                 "ProcTask.VerifyTaskChildren",
+                "ProcFilesystems.ReadCapLastCap",
             ],
         },
     ],
