@@ -87,6 +87,7 @@ board_package_labels += [
   "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan",
   "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config",
   "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt",
+  "//src/factory/factory_store_providers/config/qemu",
 ]
 
 # userspace PCI migration flags
@@ -95,3 +96,36 @@ platform_enable_user_pci = true
 
 # This will enable suspend only if the enable_suspend flag is set to true
 board_bootfs_labels += [ "//boards/kernel_cmdline:enable-suspend-from-board" ]
+partitions_config_label = "//boards/partitions:x64"
+partitions_config_contents += [ "$root_build_dir/fuchsia.esp.blk" ]
+
+use_vbmeta = true
+avb_key =
+    "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
+avb_atx_metadata =
+    "//third_party/android/platform/external/avb/test/data/atx_metadata.bin"
+
+blobfs_capacity = 10485760000  # 10000 MiB
+max_blob_contents_size =
+    5216665600  # 4975 MiB. Leaves 50 MiB for the update package.
+
+build_uefi_disk = true
+use_gigaboot = true
+assembly_generate_fvm_fastboot = true
+
+# Some users leave a USB key (containing zedboot) plugged into their
+# device at all times. To avoid unintentionally breaking remote workflows,
+# we permit multiple GPT devices.
+board_fshost_config.gpt_all = true
+board_zedboot_fshost_config.gpt_all = true
+
+zircon_a_partition = "zircon-a"
+zircon_b_partition = "zircon-b"
+zircon_r_partition = "zircon-r"
+vbmeta_a_partition = "vbmeta_a"
+vbmeta_b_partition = "vbmeta_b"
+vbmeta_r_partition = "vbmeta_r"
+fvm_partition = "fvm"
+fxfs_partition = "fvm"
+active_partition = "a"
+fastboot_product = "gigaboot"

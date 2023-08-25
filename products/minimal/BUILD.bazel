@@ -115,7 +115,7 @@ fuchsia_elf_sizes(
 fuchsia_product_bundle(
     name = "product_bundle.qemu-x64",
     board_name = "qemu-x64",
-    partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_image = ":image.qemu-x64",
     product_name = "fuchsia",
     recovery = "//products/zedboot:qemu-x64",

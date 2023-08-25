@@ -115,9 +115,9 @@ fuchsia_partitions_configuration(
     ],
 )
 
-fuchsia_partitions_configuration(
+alias(
     name = "qemu-x64",
-    hardware_revision = "qemu-x64",
+    actual = ":x64",
 )
 
 fuchsia_bootloader_partition(
