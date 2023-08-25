@@ -15,7 +15,7 @@
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/ams/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <ddk/metadata/lights.h>
@@ -97,15 +97,13 @@ zx_status_t Nelson::LightInit() {
 
   const auto kGpioLightInterruptRules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_5),
   };
   const auto kGpioLightInterruptProperties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                        bind_fuchsia_hardware_gpio::FUNCTION_LIGHT_INTERRUPT),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LIGHT_INTERRUPT),
   };
 
   auto kTcs3400LightParents = std::vector{
@@ -154,16 +152,14 @@ zx_status_t Nelson::LightInit() {
 
   auto amber_led_gpio_bind_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_11),
   };
 
   auto amber_led_gpio_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                        bind_fuchsia_hardware_gpio::FUNCTION_GPIO_AMBER_LED),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_AMBER_LED),
   };
 
   auto amber_led_pwm_bind_rules = std::vector{

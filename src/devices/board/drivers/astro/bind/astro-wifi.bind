@@ -5,7 +5,7 @@
 composite wifi;
 
 using fuchsia.amlogic.platform.s905d2;
-using fuchsia.hardware.gpio;
+using fuchsia.gpio;
 using fuchsia.sdmmc;
 using fuchsia.broadcom.platform;
 using fuchsia.platform;
@@ -29,7 +29,7 @@ node "sdio-function-2" {
 }
 
 node "gpio-oob" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d2.GPIOX_PIN_ID.PIN_7; // S905D2_WIFI_SDIO_WAKE_HOST
 }
 

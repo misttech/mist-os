@@ -53,7 +53,7 @@ impl Library {
             Library::Bluetooth => "//src/devices/bind/fuchsia.bluetooth",
             Library::Clock => "//src/devices/bind/fuchsia.hardware.clock",
             Library::Dsi => "//src/devices/bind/fuchsia.hardware.dsi",
-            Library::Gpio => "//src/devices/bind/fuchsia.hardware.gpio",
+            Library::Gpio => "//src/devices/bind/fuchsia.gpio",
             Library::I2c => "//src/devices/bind/fuchsia.i2c",
             Library::Pci => "//src/devices/bind/fuchsia.pci",
             Library::Platform => "//src/devices/bind/fuchsia.platform",
@@ -86,11 +86,11 @@ pub fn rename_and_add<'a>(libraries: &mut HashSet<Library>, original: &'a str) -
         }
         "ZX_PROTOCOL_GPIO" => {
             libraries.insert(Library::Gpio);
-            "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE"
+            "fuchsia.gpio.BIND_PROTOCOL.DEVICE"
         }
         "ZX_PROTOCOL_GPIO_IMPL" => {
             libraries.insert(Library::Gpio);
-            "fuchsia.hardware.gpio.BIND_PROTOCOL.IMPL"
+            "fuchsia.gpio.BIND_PROTOCOL.IMPL"
         }
         "ZX_PROTOCOL_USB_FUNCTION" => {
             libraries.insert(Library::Usb);

@@ -6,16 +6,16 @@
                 "name": "MatchMicPrivacy",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.MIC_MUTE"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.MIC_MUTE"
                 }
             },
             {
                 "name": "MicWrongGpioFunction",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
                 }
             }
         ]
@@ -27,16 +27,16 @@
                 "name": "MatchVolUp",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.VOLUME_UP"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.VOLUME_UP"
                 }
             },
             {
                 "name": "VolUpWrongGpioFunction",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
                 }
             }
         ]
@@ -48,16 +48,16 @@
                 "name": "MatchVolDown",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.VOLUME_DOWN"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.VOLUME_DOWN"
                 }
             },
             {
                 "name": "VolDownWrongGpioFunction",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
                 }
             }
         ]
@@ -69,16 +69,16 @@
                 "name": "MatchVolBoth",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.VOLUME_BOTH"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.VOLUME_BOTH"
                 }
             },
             {
                 "name": "VolBothWrongGpioFunction",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE",
-                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.NOT_A_KNOWN_FUNCTION"
                 }
             }
         ]

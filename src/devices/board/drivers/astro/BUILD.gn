@@ -50,7 +50,7 @@ driver_bind_rules("astro-pwm-bind") {
   tests = "bind-tests/astro-pwm-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
@@ -159,7 +159,7 @@ driver_bind_rules("astro-aml-sdio-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -173,7 +173,7 @@ driver_bind_rules("astro-wifi-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
     "//src/devices/bind/fuchsia.broadcom.platform",
-    "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sdmmc",
   ]
@@ -250,8 +250,8 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_cpp",
     "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
+    "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
-    "//src/devices/bind/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",

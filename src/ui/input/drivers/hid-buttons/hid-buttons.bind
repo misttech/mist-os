@@ -4,12 +4,12 @@
 
 composite hid_buttons;
 
-using fuchsia.hardware.gpio;
+using fuchsia.gpio;
 using fuchsia.platform;
 
 primary node "mic-privacy" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
-    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.MIC_MUTE;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+    fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.MIC_MUTE;
 }
 
 node "platform-device" {
@@ -18,16 +18,16 @@ node "platform-device" {
 }
 
 optional node "volume-up" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
-    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VOLUME_UP;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+    fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VOLUME_UP;
 }
 
 optional node "volume-down" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
-    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VOLUME_DOWN;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+    fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VOLUME_DOWN;
 }
 
 optional node "volume-both" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.gpio.BIND_FIDL_PROTOCOL.SERVICE;
-    fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VOLUME_BOTH;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+    fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VOLUME_BOTH;
 }

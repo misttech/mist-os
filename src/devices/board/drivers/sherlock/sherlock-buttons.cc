@@ -14,7 +14,7 @@
 
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
 #include <ddktl/device.h>
 #include <soc/aml-t931/t931-gpio.h>
@@ -63,50 +63,42 @@ zx_status_t Sherlock::ButtonsInit() {
 
   const std::vector<fuchsia_driver_framework::BindRule> kVolUpRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_4)};
   const std::vector<fuchsia_driver_framework::NodeProperty> kVolUpProps = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_UP),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_VOLUME_UP),
   };
 
   const std::vector<fuchsia_driver_framework::BindRule> kVolDownRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_5)};
   const std::vector<fuchsia_driver_framework::NodeProperty> kVolDownProps = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_DOWN),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_VOLUME_DOWN),
   };
 
   const std::vector<fuchsia_driver_framework::BindRule> kVolBothRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_13)};
   const std::vector<fuchsia_driver_framework::NodeProperty> kVolBothProps = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                        bind_fuchsia_hardware_gpio::FUNCTION_VOLUME_BOTH),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_VOLUME_BOTH),
   };
 
   const std::vector<fuchsia_driver_framework::BindRule> kMicPrivacyRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_3)};
   const std::vector<fuchsia_driver_framework::NodeProperty> kMicPrivacyProps = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                        bind_fuchsia_hardware_gpio::FUNCTION_MIC_MUTE),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_MIC_MUTE),
   };
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {

@@ -18,7 +18,7 @@ driver_bind_rules("focaltech_touch_bind") {
   disable_fragment_gen = true
   deps = [
     "//src/devices/bind/fuchsia.focaltech.platform",
-    "//src/devices/bind/fuchsia.hardware.gpio",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
   ]
 }

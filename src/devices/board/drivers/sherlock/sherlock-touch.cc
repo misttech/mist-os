@@ -14,7 +14,7 @@
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/focaltech/platform/cpp/bind.h>
-#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -44,29 +44,25 @@ const device_bind_prop_t kI2cProperties[] = {
 
 const ddk::BindRule kInterruptRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_1),
 };
 
 const device_bind_prop_t kInterruptProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                      bind_fuchsia_hardware_gpio::FUNCTION_TOUCH_INTERRUPT)};
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
 const ddk::BindRule kResetRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_9),
 };
 
 const device_bind_prop_t kResetProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_hardware_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
-                      bind_fuchsia_hardware_gpio::FUNCTION_TOUCH_RESET),
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
 zx_status_t Sherlock::TouchInit() {
