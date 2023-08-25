@@ -69,11 +69,14 @@ impl PackageIndex {
         &mut self,
         package_hash: Hash,
         package_path: PackagePath,
+        content_blobs: HashSet<Hash>,
     ) -> Result<(), FulfillMetaFarError> {
-        let is_retained = self.retained.contains_package(&package_hash);
-        // Transition the dynamic index state if it is interested in this package.  Report an error
-        // if the package is not tracked by any index.
-        let () = match self.dynamic.fulfill_meta_far(package_hash, package_path) {
+        // Notify the retained index if it is interested in this package.
+        let is_retained = self.retained.add_blobs(&package_hash, &content_blobs);
+
+        // Transition the dynamic index state if it is interested in this package.  Report an error if
+        // the package is not tracked by any index.
+        let () = match self.dynamic.fulfill_meta_far(package_hash, package_path, content_blobs) {
             Err(crate::index::dynamic::FulfillNotNeededBlobError { .. }) if is_retained => Ok(()),
             Err(e @ crate::index::dynamic::FulfillNotNeededBlobError { .. }) => Err(e),
             Ok(()) => Ok(()),
@@ -167,7 +170,11 @@ pub async fn fulfill_meta_far_blob(
     meta_hash: Hash,
 ) -> Result<package_directory::RootDir<blobfs::Client>, FulfillMetaFarError> {
     let root_dir = package_directory::RootDir::new(blobfs.clone(), meta_hash).await?;
-    let () = index.write().await.fulfill_meta_far(meta_hash, root_dir.path().await?)?;
+    let () = index.write().await.fulfill_meta_far(
+        meta_hash,
+        root_dir.path().await?,
+        root_dir.external_file_hashes().copied().collect::<HashSet<_>>(),
+    )?;
     Ok(root_dir)
 }
 
@@ -215,8 +222,7 @@ mod tests {
             hash(0) => None,
         }));
 
-        index.fulfill_meta_far(hash(0), path("pending")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(1)])).unwrap();
+        index.fulfill_meta_far(hash(0), path("pending"), hashset! {hash(1)}).unwrap();
         assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
 
         assert_eq!(
@@ -236,7 +242,7 @@ mod tests {
             hashmap! {
                 hash(0) => Package::Active {
                     path: path("pending"),
-                    required_blobs: HashSet::from([hash(1)]),
+                    required_blobs: hashset!{hash(1)},
                 },
             }
         );
@@ -249,10 +255,8 @@ mod tests {
         index.start_install(hash(0));
         index.start_install(hash(1));
 
-        index.fulfill_meta_far(hash(0), path("withmetafar1")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(10)])).unwrap();
-        index.fulfill_meta_far(hash(1), path("withmetafar2")).unwrap();
-        index.add_blobs(hash(1), HashSet::from([hash(11)])).unwrap();
+        index.fulfill_meta_far(hash(0), path("withmetafar1"), hashset! {hash(10)}).unwrap();
+        index.fulfill_meta_far(hash(1), path("withmetafar2"), hashset! {hash(11)}).unwrap();
 
         // Constructing a new RetainedIndex may race with a package install to the dynamic index.
         // Ensure index.set_retained_index handles both cases.
@@ -283,11 +287,11 @@ mod tests {
             hashmap! {
                 hash(0) => Package::Active {
                     path: path("withmetafar1"),
-                    required_blobs: HashSet::from([hash(10)]),
+                    required_blobs: hashset!{hash(10)},
                 },
                 hash(1) => Package::Active {
                     path: path("withmetafar2"),
-                    required_blobs: HashSet::from([hash(11)]),
+                    required_blobs: hashset!{hash(11)},
                 },
             }
         );
@@ -297,8 +301,7 @@ mod tests {
     fn set_retained_index_hashes_are_extended_with_dynamic_index_hashes() {
         let mut index = PackageIndex::new_test();
         index.start_install(hash(0));
-        index.fulfill_meta_far(hash(0), path("withmetafar1")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(1), hash(2)])).unwrap();
+        index.fulfill_meta_far(hash(0), path("withmetafar1"), hashset! {hash(1), hash(2)}).unwrap();
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(0) => Some(HashSet::from_iter([hash(1)])),
@@ -321,8 +324,7 @@ mod tests {
         }));
 
         index.start_install(hash(0));
-        index.fulfill_meta_far(hash(0), path("retaiendonly")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(123)])).unwrap();
+        index.fulfill_meta_far(hash(0), path("retaiendonly"), hashset! {hash(123)}).unwrap();
         assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Other);
 
         assert_eq!(
@@ -346,8 +348,7 @@ mod tests {
 
         // install a package not tracked by the retained index
         index.start_install(hash(2));
-        index.fulfill_meta_far(hash(2), path("dynamic-only")).unwrap();
-        index.add_blobs(hash(2), HashSet::from([hash(10)])).unwrap();
+        index.fulfill_meta_far(hash(2), path("dynamic-only"), hashset! {hash(10)}).unwrap();
         assert_eq!(index.complete_install(hash(2)).unwrap(), PackageStatus::Active);
 
         assert_eq!(
@@ -368,7 +369,7 @@ mod tests {
             hashmap! {
                 hash(2) => Package::Active {
                     path: path("dynamic-only"),
-                    required_blobs: HashSet::from([hash(10)]),
+                    required_blobs: hashset!{hash(10)},
                 },
             }
         );
@@ -380,8 +381,7 @@ mod tests {
 
         index.start_install(hash(2));
         index.start_install(hash(3));
-        index.fulfill_meta_far(hash(3), path("before")).unwrap();
-        index.add_blobs(hash(3), HashSet::from([hash(10)])).unwrap();
+        index.fulfill_meta_far(hash(3), path("before"), hashset! {hash(10)}).unwrap();
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(0) => Some(HashSet::from_iter([hash(11)])),
@@ -394,8 +394,7 @@ mod tests {
 
         index.start_install(hash(4));
         index.start_install(hash(5));
-        index.fulfill_meta_far(hash(5), path("after")).unwrap();
-        index.add_blobs(hash(5), HashSet::from([hash(12)])).unwrap();
+        index.fulfill_meta_far(hash(5), path("after"), hashset! {hash(12)}).unwrap();
 
         let retained_index = index.retained.clone();
 
@@ -408,18 +407,17 @@ mod tests {
         let mut index = PackageIndex::new_test();
 
         index.start_install(hash(2));
-        index.fulfill_meta_far(hash(2), path("some-path")).unwrap();
-        index.add_blobs(hash(2), HashSet::from([hash(10)])).unwrap();
+        index.fulfill_meta_far(hash(2), path("some-path"), hashset! {hash(10)}).unwrap();
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(2) => Some(HashSet::from_iter([hash(10)])),
         }));
 
-        index.add_blobs(hash(2), HashSet::from([hash(11)])).unwrap();
+        index.add_blobs(hash(2), hashset! {hash(11)}).unwrap();
 
         assert_eq!(
             index.retained.packages(),
             hashmap! {
-                hash(2) => Some(HashSet::from([hash(10), hash(11)]))
+                hash(2) => Some(hashset! {hash(10), hash(11)})
             }
         );
         assert_eq!(
@@ -427,7 +425,7 @@ mod tests {
             hashmap! {
                 hash(2) => Package::WithMetaFar {
                     path: path("some-path"),
-                    required_blobs: HashSet::from([hash(10), hash(11)]),
+                    required_blobs: hashset! { hash(10), hash(11) },
                 }
             }
         );
@@ -441,14 +439,14 @@ mod tests {
             hash(2) => Some(HashSet::from_iter([hash(10)])),
         }));
         index.start_install(hash(2));
-        index.fulfill_meta_far(hash(2), path("some-path")).unwrap();
+        index.fulfill_meta_far(hash(2), path("some-path"), hashset! {hash(10)}).unwrap();
 
-        index.add_blobs(hash(2), HashSet::from([hash(11)])).unwrap();
+        index.add_blobs(hash(2), hashset! {hash(11)}).unwrap();
 
         assert_eq!(
             index.retained.packages(),
             hashmap! {
-                hash(2) => Some(HashSet::from([hash(10), hash(11)]))
+                hash(2) => Some(hashset! {hash(10), hash(11)})
             }
         );
         assert_eq!(index.dynamic.packages(), hashmap! {});
@@ -477,10 +475,8 @@ mod tests {
         index.start_install(hash(0));
         index.start_install(hash(1));
 
-        index.fulfill_meta_far(hash(0), path("a")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(10)])).unwrap();
-        index.fulfill_meta_far(hash(1), path("b")).unwrap();
-        index.add_blobs(hash(1), HashSet::from([hash(11)])).unwrap();
+        index.fulfill_meta_far(hash(0), path("a"), hashset! {hash(10)}).unwrap();
+        index.fulfill_meta_far(hash(1), path("b"), hashset! {hash(11)}).unwrap();
 
         index.cancel_install(&hash(0));
         index.cancel_install(&hash(1));
@@ -509,10 +505,8 @@ mod tests {
 
         index.start_install(hash(1));
 
-        index.fulfill_meta_far(hash(0), path("pkg1")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(10)])).unwrap();
-        index.fulfill_meta_far(hash(1), path("pkg2")).unwrap();
-        index.add_blobs(hash(1), HashSet::from([hash(11), hash(61)])).unwrap();
+        index.fulfill_meta_far(hash(0), path("pkg1"), hashset! {hash(10)}).unwrap();
+        index.fulfill_meta_far(hash(1), path("pkg2"), hashset! {hash(11), hash(61)}).unwrap();
 
         assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
         assert_eq!(index.complete_install(hash(1)).unwrap(), PackageStatus::Active);
@@ -540,7 +534,6 @@ mod tests {
         add_meta_far_to_blobfs(&blobfs_fake, hash(2), "fake-package", [hash(3)], []);
 
         fulfill_meta_far_blob(&index, &blobfs, hash(2)).await.unwrap();
-        index.write().await.add_blobs(hash(2), HashSet::from([hash(3)])).unwrap();
 
         let index = index.read().await;
         assert_eq!(
@@ -548,7 +541,7 @@ mod tests {
             hashmap! {
                 hash(2) => Package::WithMetaFar {
                     path,
-                    required_blobs: HashSet::from([hash(3)]),
+                    required_blobs: hashset! { hash(3) },
                 }
             }
         );

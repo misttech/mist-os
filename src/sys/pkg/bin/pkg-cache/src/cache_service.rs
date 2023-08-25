@@ -359,6 +359,8 @@ async fn serve_needed_blobs(
             handle_open_meta_blob(&mut stream, meta_far_info, blobfs, package_index, &state)
                 .await?;
 
+        // TODO(fxbug.dev/112579) Move the fulfill_meta_far_blob call out of handle_open_meta_blob
+        // to avoid setting the content blobs twice in the package index.
         let (missing_blobs, missing_blobs_recv) = missing_blobs::MissingBlobs::new(
             blobfs.clone(),
             &root_dir,
