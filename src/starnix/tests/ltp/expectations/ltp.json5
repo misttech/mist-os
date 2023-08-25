@@ -338,32 +338,12 @@
         {
             type: "skip",
             matchers: [
-                // TODO(fxbug.dev/127724) Re-enable once flake is resolved.
-                "epoll_wait04",
-
-                // TODO(fxbug.dev/128437) Re-enable once flake is resolved.
-                "pth_str01",
-
-                // TODO(fxbug.dev/127693) Re-enable once flake is resolved.
-                "waitid07",
-
-                // TODO(fxbug.dev/127726) Re-enable once flake is resolved.
-                "waitid08",
-
-                // TODO(fxbug.dev/128184) Re-enable once flake is resolved.
-                "linkat01",
-
-                // TODO(fxbug.dev/130549) Re-enable once flake is resolved.
-                "prctl09",
-
-                // TODO(fxbug.dev/128583) Re-enable once flake is resolved.
-                "sigwait01",
-
                 // Flaky test.
                 "cve-2017-17052",
                 "io_pgetevents01",
                 "rename14",
                 "select03",
+                "sigwait01",
 
                 // Causes an OOM when /dev/loop-control is available.
                 "fallocate05",
@@ -380,9 +360,12 @@
 
                 // Timing-dependent tests that flake in QEMU and with ASan.
                 // TODO(b/297390005): Skip only in QEMU and with ASan.
+                "epoll_wait04",
                 "futex_wait_bitset01",
                 "timerfd01",
-                "pipe13"
+                "pipe13",
+                "prctl09",
+                "pth_str01",
             ],
         },
     ],
