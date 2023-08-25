@@ -34,12 +34,12 @@ pub struct PlatformNetworkConfig {
 
 /// Network stack version to use.
 #[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-// TODO(https://fxbug.dev/131101): Introduce migration version option.
+#[serde(rename_all = "snake_case")]
 pub enum NetstackVersion {
     #[default]
     Netstack2,
     Netstack3,
+    NetstackMigration,
 }
 
 /// Which networking type to use (standard or basic).

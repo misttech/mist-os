@@ -109,7 +109,9 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     # USER_PLATFORM_AIB_NAMES_RISCV64.
 
     # The Go toolchain used for netstack2 does not support RISC-V.
+    # netstack-migration contains netstack2, so equally no support on RISC-V.
     "netstack2",
+    "netstack-migration",
 
     # TODO(fxbug.dev/128554): Move to the list above once build errors are resolved.
     "starnix_support",

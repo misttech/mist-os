@@ -141,6 +141,15 @@
             source_availability: "unknown",
         },
         {
+            protocol: [
+                "fuchsia.net.stackmigrationdeprecated.Control",
+                "fuchsia.net.stackmigrationdeprecated.State",
+            ],
+            from: "#network",
+            to: "#session-manager",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.opencl.loader.Loader",
             from: "#opencl_loader",
             to: "#session-manager",

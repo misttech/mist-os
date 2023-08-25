@@ -113,6 +113,8 @@
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
+                "fuchsia.net.stackmigrationdeprecated.Control",
+                "fuchsia.net.stackmigrationdeprecated.State",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.button.Monitor",

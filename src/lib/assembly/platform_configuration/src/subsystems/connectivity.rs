@@ -98,6 +98,9 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     builder.platform_bundle("netstack3")
                 }
                 (false, NetstackVersion::Netstack2) => builder.platform_bundle("netstack2"),
+                (false, NetstackVersion::NetstackMigration) => {
+                    builder.platform_bundle("netstack-migration")
+                }
             }
 
             // Add the networking test collection on all eng builds. The test

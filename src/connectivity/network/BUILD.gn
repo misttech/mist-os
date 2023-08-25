@@ -63,6 +63,17 @@ fuchsia_package("netstack3") {
   ]
 }
 
+fuchsia_package("netstack-migration") {
+  deps = [
+    "netstack-proxy:component",
+    "stack-migration:component",
+  ]
+  visibility = [
+    ":*",
+    "//bundles/assembly:*",
+  ]
+}
+
 # TODO(fxbug.dev/122864) Remove transitional labels
 group("virtualization-core-shard") {
 }

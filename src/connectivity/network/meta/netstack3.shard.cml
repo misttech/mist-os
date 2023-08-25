@@ -9,4 +9,14 @@
             on_terminate: "reboot",
         },
     ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.net.stackmigrationdeprecated.Control",
+                "fuchsia.net.stackmigrationdeprecated.State",
+            ],
+            from: "void",
+            availability: "optional",
+        },
+    ],
 }

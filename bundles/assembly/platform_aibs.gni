@@ -177,7 +177,9 @@ user_platform_aib_names =
 if (current_cpu != "riscv64") {
   user_platform_aib_names += [
     # The Go toolchain used for netstack2 does not support RISC-V.
+    # netstack-migration contains netstack2, so equally no support on RISC-V.
     "netstack2",
+    "netstack-migration",
 
     # TODO(fxbug.dev/128554):: Move to the list above once build errors are resolved.
     "starnix_support",
