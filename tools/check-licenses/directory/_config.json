@@ -55,7 +55,7 @@
             },
             {
                 "paths": [
-                    "third_party/dart_pkg/git/flutter"
+                    "third_party/dart-pkg/git/flutter"
                 ],
                 "notes": [
                     "Temporary skip to support uprev & directory changes"
