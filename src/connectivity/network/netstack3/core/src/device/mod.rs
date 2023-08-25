@@ -1982,7 +1982,102 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     )
 }
 
-/// Removes an ethernet device from the device layer.
+/// A helper trait to provide a common implementation for all device type
+/// removals.
+///
+/// This trait exists to support [`remove_device`] which performs delicate
+/// common tasks on all device removals.
+trait RemovableDeviceId<C: NonSyncContext>: Into<DeviceId<C>> + Clone {
+    /// The external state for this device. Pulled from [`DeviceLayerTypes`]
+    /// impl on `C`.
+    type ExternalState;
+    /// The state held inside the [`PrimaryRc`] for this device.
+    type ReferenceState;
+
+    /// Removes the primary device reference from `sync_ctx`, returning its
+    /// [`PrimaryRc`] and what must be the last [`StrongRc`] reference.
+    fn remove(
+        self,
+        sync_ctx: &SyncCtx<C>,
+    ) -> (PrimaryRc<Self::ReferenceState>, StrongRc<Self::ReferenceState>);
+
+    /// Takes the external state from the unwrapped reference state in the
+    /// device's [`PrimaryRc`].
+    fn take_external_state(reference_state: Self::ReferenceState) -> Self::ExternalState;
+}
+
+impl<C: NonSyncContext> RemovableDeviceId<C> for EthernetDeviceId<C> {
+    type ExternalState = C::EthernetDeviceState;
+    type ReferenceState =
+        IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>;
+
+    fn remove(
+        self,
+        sync_ctx: &SyncCtx<C>,
+    ) -> (PrimaryRc<Self::ReferenceState>, StrongRc<Self::ReferenceState>) {
+        let mut devices = sync_ctx.state.device.devices.write();
+        let EthernetDeviceId(id, rc) = self;
+        let removed = devices
+            .ethernet
+            .remove(id)
+            .unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
+        debug!("removing Ethernet device with ID {}", id);
+        (removed, rc)
+    }
+
+    fn take_external_state(reference_state: Self::ReferenceState) -> Self::ExternalState {
+        reference_state.external_state
+    }
+}
+
+impl<C: NonSyncContext> RemovableDeviceId<C> for LoopbackDeviceId<C> {
+    type ExternalState = C::LoopbackDeviceState;
+    type ReferenceState = IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>;
+
+    fn remove(
+        self,
+        sync_ctx: &SyncCtx<C>,
+    ) -> (PrimaryRc<Self::ReferenceState>, StrongRc<Self::ReferenceState>) {
+        let mut devices = sync_ctx.state.device.devices.write();
+        let LoopbackDeviceId(rc) = self;
+        let removed = devices.loopback.take().expect("loopback device not installed");
+        debug!("removing Loopback device");
+        (removed, rc)
+    }
+
+    fn take_external_state(reference_state: Self::ReferenceState) -> Self::ExternalState {
+        reference_state.external_state
+    }
+}
+
+fn remove_device<NonSyncCtx: NonSyncContext, D: RemovableDeviceId<NonSyncCtx>>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: D,
+) -> D::ExternalState {
+    // Start cleaning up the device by disabling IP state. This removes timers
+    // for the device that would otherwise hold references to defunct device
+    // state.
+    {
+        let mut sync_ctx = Locked::new(sync_ctx);
+
+        let device = device.clone().into();
+
+        crate::ip::device::clear_ipv4_device_state(&mut sync_ctx, ctx, &device);
+        crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, ctx, &device);
+
+        // Uninstall all routes associated with the device.
+        crate::ip::forwarding::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, &device);
+        crate::ip::forwarding::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, &device);
+    }
+    let (primary, strong) = device.remove(sync_ctx);
+    assert!(PrimaryRc::ptr_eq(&primary, &strong));
+    core::mem::drop(strong);
+    let reference_state = PrimaryRc::unwrap(primary);
+    D::take_external_state(reference_state)
+}
+
+/// Removes an Ethernet device from the device layer.
 ///
 /// # Panics
 ///
@@ -1992,29 +2087,20 @@ pub fn remove_ethernet_device<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     device: EthernetDeviceId<NonSyncCtx>,
 ) -> NonSyncCtx::EthernetDeviceState {
-    // Start cleaning up the device by disabling IP state. This removes timers
-    // for the device that would otherwise hold references to defunct device
-    // state.
-    {
-        let mut sync_ctx = Locked::new(sync_ctx);
+    remove_device(sync_ctx, ctx, device)
+}
 
-        let device = device.clone().into();
-        crate::ip::device::clear_ipv4_device_state(&mut sync_ctx, ctx, &device);
-        crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, ctx, &device);
-
-        // Uninstall all routes associated with the device.
-        crate::ip::forwarding::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, &device);
-        crate::ip::forwarding::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, &device);
-    }
-
-    let EthernetDeviceId(id, rc) = device;
-    let mut devices = sync_ctx.state.device.devices.write();
-    let removed =
-        devices.ethernet.remove(id).unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
-    assert!(PrimaryRc::ptr_eq(&removed, &rc));
-    core::mem::drop(rc);
-    debug!("removing Ethernet device with ID {}", id);
-    PrimaryRc::unwrap(removed).external_state
+/// Removes the Loopback device from the device layer.
+///
+/// # Panics
+///
+/// Panics if the caller holds strong device IDs for `device`.
+pub fn remove_loopback_device<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: LoopbackDeviceId<NonSyncCtx>,
+) -> NonSyncCtx::LoopbackDeviceState {
+    remove_device(sync_ctx, ctx, device)
 }
 
 /// Adds a new Ethernet device to the stack.

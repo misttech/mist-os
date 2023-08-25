@@ -43,10 +43,9 @@ use std::{
 use either::{self, Either};
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_stack as fidl_net_stack;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{lock::Mutex as AsyncMutex, FutureExt as _, StreamExt as _};
+use futures::{FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use tracing::{error, info};
@@ -634,73 +633,6 @@ impl BindingsNonSyncCtxImpl {
     }
 }
 
-fn set_interface_enabled(
-    ctx: &mut Ctx,
-    id: BindingId,
-    should_enable: bool,
-) -> Result<(), fidl_net_stack::Error> {
-    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-    let core_id = non_sync_ctx.devices.get_core_id(id).ok_or(fidl_net_stack::Error::NotFound)?;
-
-    let dev_enabled = match core_id.external_state() {
-        DeviceSpecificInfo::Netdevice(i) => i.with_dynamic_info(
-            |DynamicNetdeviceInfo {
-                 phy_up,
-                 common_info:
-                     DynamicCommonInfo {
-                         admin_enabled,
-                         mtu: _,
-                         events: _,
-                         control_hook: _,
-                         addresses: _,
-                     },
-             }| *phy_up && *admin_enabled,
-        ),
-        DeviceSpecificInfo::Loopback(i) => i.with_dynamic_info(
-            |DynamicCommonInfo {
-                 admin_enabled,
-                 mtu: _,
-                 events: _,
-                 control_hook: _,
-                 addresses: _,
-             }| { *admin_enabled },
-        ),
-    };
-
-    if should_enable {
-        // We want to enable the interface, but its device is considered
-        // disabled so we do nothing further.
-        //
-        // This can happen when the interface was set to be administratively up
-        // but the phy is down.
-        if !dev_enabled {
-            return Ok(());
-        }
-    } else {
-        assert!(!dev_enabled, "caller attemped to disable an interface that is considered enabled");
-    }
-
-    let ip_config =
-        Some(IpDeviceConfigurationUpdate { ip_enabled: Some(should_enable), ..Default::default() });
-
-    let _: Ipv4DeviceConfigurationUpdate = netstack3_core::device::update_ipv4_configuration(
-        sync_ctx,
-        non_sync_ctx,
-        &core_id,
-        Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
-    )
-    .expect("changing ip_enabled should never fail");
-    let _: Ipv6DeviceConfigurationUpdate = netstack3_core::device::update_ipv6_configuration(
-        sync_ctx,
-        non_sync_ctx,
-        &core_id,
-        Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
-    )
-    .expect("changing ip_enabled should never fail");
-
-    Ok(())
-}
-
 fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
@@ -808,28 +740,6 @@ impl Netstack {
         properties: InterfaceProperties,
     ) -> InterfaceEventProducer {
         create_interface_event_producer(&self.interfaces_event_sink, id, properties)
-    }
-
-    fn spawn_interface_control(
-        &self,
-        id: BindingId,
-        stop_receiver: futures::channel::oneshot::Receiver<
-            fnet_interfaces_admin::InterfaceRemovedReason,
-        >,
-        control_receiver: futures::channel::mpsc::Receiver<interfaces_admin::OwnedControlHandle>,
-        removable: bool,
-    ) -> fuchsia_async::Task<()> {
-        fuchsia_async::Task::spawn(
-            interfaces_admin::run_interface_control(
-                self.ctx.clone(),
-                id,
-                stop_receiver,
-                control_receiver,
-                removable,
-                AsyncMutex::new(()),
-            )
-            .map(|f| f.map(|f| f()).unwrap_or(())),
-        )
     }
 
     fn add_loopback(
@@ -941,8 +851,17 @@ impl Netstack {
 
         // Loopback interface can't be removed.
         let removable = false;
-        let control_task =
-            self.spawn_interface_control(binding_id, stop_receiver, control_receiver, removable);
+        // Loopback doesn't have a defined state stream, provide a stream that
+        // never yields anything.
+        let state_stream = futures::stream::pending();
+        let control_task = fuchsia_async::Task::spawn(interfaces_admin::run_interface_control(
+            self.ctx.clone(),
+            binding_id,
+            stop_receiver,
+            control_receiver,
+            removable,
+            state_stream,
+        ));
         (
             stop_sender,
             binding_id,
