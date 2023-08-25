@@ -622,6 +622,10 @@ config("default_warnings") {
       # Moreover, most folks don't build with gcc. We just disable this
       # warning on gcc to make it easier to see actual errors.
       "-Wno-deprecated-declarations",
+
+      # TODO(fxbug.dev/126220): -Wstringop-overread has false positives in GCC
+      # 13.  Needs to be pursued upstream.
+      "-Wno-stringop-overread",
     ]
   }
 }
