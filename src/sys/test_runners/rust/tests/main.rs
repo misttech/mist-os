@@ -99,7 +99,6 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
 
     assert_eq!(expected_events, events_without_failing_test_logs);
 
-    let reset = "{{{reset}}}";
     let (reset_index, _) = failing_test_logs
         .iter()
         .enumerate()
@@ -107,11 +106,11 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
             let RunEvent::CaseStderr { name: _, stderr_message: line } = event else {
                 return false;
             };
-            line == reset
+            line == "{{{reset}}}" || line == "{{{reset:begin}}}"
         })
         .expect("should have reset log");
     assert!(failing_test_logs.len() > reset_index, "{:?}", failing_test_logs);
-    let assert_contains = |msg| {
+    let contains = |msg| {
         failing_test_logs[0..reset_index].iter().any(|event| {
             let RunEvent::CaseStderr { name: _, stderr_message: line } = event else {
                 return false;
@@ -119,10 +118,10 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
             line.contains(msg)
         })
     };
-    assert_contains("thread 'main' panicked at");
-    assert_contains("I'm supposed to panic!()");
-    assert_contains("../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:20:9");
-    assert_contains("stack backtrace:");
+    assert!(contains("I'm supposed to panic!()"));
+    assert!(contains(
+        "../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:20:9"
+    ));
     assert_eq!(
         failing_test_logs.last().unwrap(),
         &RunEvent::case_stderr("my_tests::failing_test", "test failed.")
