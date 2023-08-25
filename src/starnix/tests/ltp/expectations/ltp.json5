@@ -326,7 +326,6 @@
                 "vmsplice02",
                 "vmsplice03",
                 "vmsplice04",
-                "wait403",
                 "waitid10",
                 "writetest01",
 
@@ -375,24 +374,6 @@
 
                 // Makes all following tests to fail.
                 "kill10",
-
-                // TODO(fxbug.dev/129388) Removing these skip tests leads to the entire ltp_tests_bundle_w
-                // to fail on core.x64-vg-debug. No failure was observed on vg-release.
-                "wait402",
-                "wait403",
-                "waitid10",
-                "wqueue01",
-                "wqueue02",
-                "wqueue03",
-                "wqueue04",
-                "wqueue05",
-                "wqueue06",
-                "wqueue07",
-                "wqueue08",
-                "wqueue09",
-                "writetest",
-                "writev01",
-                "writev03",
 
                 // Times out.
                 "cve-2017-10661",
