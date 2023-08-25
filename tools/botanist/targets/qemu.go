@@ -255,7 +255,14 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	if t.imageOverrides.QEMUKernel != "" {
 		qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
 	} else if t.imageOverrides.EFIDisk == "" {
-		qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
+		if pbPath == "" || !t.UseFFXExperimental(1) {
+			qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
+		} else {
+			qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel")
+			if err != nil {
+				return fmt.Errorf("could not find qemu kernel from Product Bundle: %q: %w", pbPath, err)
+			}
+		}
 	}
 
 	// If a ZBI override is specified, use that; else if no overrides were
@@ -264,7 +271,14 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	if t.imageOverrides.ZBI != "" {
 		zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
 	} else if t.imageOverrides.IsEmpty() {
-		zbi = getImageByName(images, "zbi_zircon-a")
+		if pbPath == "" || !t.UseFFXExperimental(1) {
+			zbi = getImageByName(images, "zbi_zircon-a")
+		} else {
+			zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi")
+			if err != nil {
+				return fmt.Errorf("could not find zbi from Product Bundle: %q: %w", pbPath, err)
+			}
+		}
 	}
 
 	var efiDisk *bootserver.Image
@@ -288,8 +302,22 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	var fvmImage *bootserver.Image
 	var fxfsImage *bootserver.Image
 	if t.imageOverrides.IsEmpty() {
-		fvmImage = getImageByName(images, "blk_storage-full")
-		fxfsImage = getImageByName(images, "fxfs-blk_storage-full")
+		if pbPath == "" || !t.UseFFXExperimental(1) {
+			fvmImage = getImageByName(images, "blk_storage-full")
+		} else {
+			fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm")
+			if err != nil {
+				return fmt.Errorf("could not find fvm from Product Bundle: %q: %w", pbPath, err)
+			}
+		}
+		if pbPath == "" || !t.UseFFXExperimental(1) {
+			fxfsImage = getImageByName(images, "fxfs-blk_storage-full")
+		} else {
+			fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs")
+			if err != nil {
+				return fmt.Errorf("could not find fxfs from Product Bundle: %q: %w", pbPath, err)
+			}
+		}
 	} else if t.imageOverrides.FVM != "" {
 		// TODO(ihuh): Figure out proper way to identify fvm instead of
 		// hardcoding the name extension.

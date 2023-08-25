@@ -6,6 +6,7 @@
 package ffxutil
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
@@ -308,4 +310,41 @@ func (f *FFXInstance) Snapshot(ctx context.Context, outDir string, snapshotFilen
 // GetConfig shows the ffx config.
 func (f *FFXInstance) GetConfig(ctx context.Context) error {
 	return f.Run(ctx, "config", "get")
+}
+
+// GetImageFromPB returns an image from a product bundle.
+func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string) (*bootserver.Image, error) {
+	oldStdout := f.stdout
+
+	var buf []byte
+	stdout := bytes.NewBuffer(buf)
+
+	// Set to new stdout before execution
+	f.stdout = io.MultiWriter(stdout, oldStdout)
+
+	err := f.Run(ctx, "product", "get-image-path", pbPath, "-r", "--slot", slot, "--image-type", imageType)
+	f.stdout = oldStdout
+
+	if err != nil {
+		return nil, err
+	}
+	imagePath := filepath.Join(pbPath, stdout.String())
+	buildImg := build.Image{Path: imagePath}
+
+	reader, err := os.Open(imagePath)
+	if err != nil {
+		return nil, err
+	}
+
+	fi, err := reader.Stat()
+	if err != nil {
+		return nil, err
+	}
+	image := bootserver.Image{
+		Image:  buildImg,
+		Reader: reader,
+		Size:   fi.Size(),
+	}
+
+	return &image, nil
 }
