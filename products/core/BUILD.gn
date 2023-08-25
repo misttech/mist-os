@@ -80,6 +80,23 @@ _storage_default = {
   }
 }
 
+_storage_f2fs = {
+  storage = {
+    configure_fshost = true
+    filesystems = {
+      volume = {
+        fvm = {
+          data = {
+            data_filesystem_format = "f2fs"
+          }
+          blob = {
+          }
+        }
+      }
+    }
+  }
+}
+
 _storage_minfs = {
   storage = {
     configure_fshost = true
@@ -111,6 +128,18 @@ product_assembly_configuration("core") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_default, "*")
+  }
+  product = {
+  }
+
+  base_driver_packages = _base_driver_packages
+}
+
+product_assembly_configuration("core_with_f2fs") {
+  testonly = true
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_storage_f2fs, "*")
   }
   product = {
   }

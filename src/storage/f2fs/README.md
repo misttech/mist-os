@@ -7,20 +7,20 @@ For more information see: https://www.usenix.org/conference/fast15/technical-ses
 
 Limitations
 =============
-* Features under development: mmap(shared), xattr, fallocate
+* Features under development: xattr, fallocate
 
 How to test
 =============
 Fuchsia filesystem tests
 -------------
 * Build configuration for fs-tests
-(femu runs with f2fs data partition if you add --args='data_filesystem_format="f2fs"')
-> $ fx set core.x64 --with-base //src/storage/f2fs:tests
+(Set the product as "core_with_f2fs.x64" if you want to format /data to f2fs)
+> $ fx set core.x64 --with //src/storage/f2fs:tests
 
-* Run Fuchsia filesystem test suite with f2fs (slow-fs-tests can take more than 5 minutes.)
+* Run Fuchsia filesystem test suite with f2fs
 > $ fx test f2fs-fs-tests f2fs-slow-fs-tests
 
-* Only run f2fs unit tests
+* Run only unit tests
 > $ fx test f2fs-unittest
 
 Debian guest based Linux compatibility tests
