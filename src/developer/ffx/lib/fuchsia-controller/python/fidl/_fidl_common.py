@@ -50,7 +50,8 @@ def make_default_obj_from_ident(ident):
     library = "fidl." + split[0].replace(".", "_")
     ty = split[1]
     mod = sys.modules[library]
-    return make_default_obj(getattr(mod, ty))
+    obj_ty = getattr(mod, ty)
+    return make_default_obj(obj_ty)
 
 
 def construct_response_object(response_ident: str, response_obj):
@@ -107,26 +108,16 @@ def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
     if unwrapped_module.startswith("fidl."):
         obj = get_type_from_import(
             f"{unwrapped_module}.{unwrapped_ty.__name__}")
-        is_union = False
-        try:
-            is_union = obj.__fidl_kind__ == "union"
-        except AttributeError:
-            pass
-
-        def handle_union(parsed_obj):
-            if not is_union:
-                sub_obj = make_default_obj(obj)
-                construct_result(sub_obj, parsed_obj)
-            else:
-                sub_obj = construct_from_union(obj, parsed_obj)
-            return sub_obj
-
         if isinstance(sub_parsed_obj, dict):
-            setattr(constructed_obj, name, handle_union(sub_parsed_obj))
+            sub_obj = make_default_obj(obj)
+            construct_result(sub_obj, sub_parsed_obj)
+            setattr(constructed_obj, name, sub_obj)
         elif isinstance(sub_parsed_obj, list):
             results = []
             for item in sub_parsed_obj:
-                results.append(handle_union(item))
+                sub_obj = make_default_obj(obj)
+                construct_result(sub_obj, item)
+                results.append(sub_obj)
             setattr(constructed_obj, name, results)
         else:
             setattr(constructed_obj, name, sub_parsed_obj)
@@ -134,34 +125,18 @@ def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
         setattr(constructed_obj, name, sub_parsed_obj)
 
 
-def construct_from_union(obj_type, parsed_obj):
-    assert obj_type.__fidl_kind__ == "union"
-    assert len(parsed_obj.keys()) == 1
-    key = next(iter(parsed_obj.keys()))
-    sub_parsed_obj = parsed_obj[key]
-    obj_type = getattr(obj_type, f"{key}_type")
-    union_type = unwrap_type(obj_type)
-    if union_type.__module__.startswith("fidl."):
-        obj = get_type_from_import(
-            f"{union_type.__module__}.{union_type.__name__}")
-        sub_obj = make_default_obj(obj)
-    else:
-        sub_obj = make_default_obj(union_type)
-    construct_result(sub_obj, sub_parsed_obj)
-    return sub_obj
-
-
 def construct_result(constructed_obj, parsed_obj):
-    try:
-        elements = type(constructed_obj).__annotations__
-    except AttributeError as exc:
-        if constructed_obj.__fidl_kind__ == "union":
-            construct_from_union(constructed_obj, parsed_obj)
-            return
-        else:
-            raise TypeError(
-                f"Unexpected FIDL kind: {constructed_obj.__fidl_kind__}"
-            ) from exc
+    if constructed_obj.__fidl_kind__ == "union":
+        key = next(iter(parsed_obj.keys()))
+        sub_obj_type = getattr(constructed_obj, f"{key}_type")
+        sub_parsed_obj = parsed_obj[key]
+        setattr(constructed_obj, key, None)
+        construct_from_name_and_type(
+            constructed_obj, sub_parsed_obj, key, sub_obj_type)
+        # Since there is only one item for the union, no need to continue with iterating
+        # elements.
+        return
+    elements = type(constructed_obj).__annotations__
     for name, ty in elements.items():
         if parsed_obj.get(name) is None:
             setattr(constructed_obj, name, None)

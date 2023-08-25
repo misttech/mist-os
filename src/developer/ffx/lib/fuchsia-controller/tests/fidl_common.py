@@ -87,8 +87,10 @@ class FidlCommon(unittest.TestCase):
                     }
                 ]
         }
-        ip = fnet.Ipv4Address(addr=[192, 168, 1, 1])
-        addrinfo = ffx.TargetIp(ip=ip, scope_id=3)
+        ip = fnet.IpAddress()
+        ip.ipv4 = fnet.Ipv4Address(addr=[192, 168, 1, 1])
+        addrinfo = ffx.TargetAddrInfo()
+        addrinfo.ip = ffx.TargetIp(ip=ip, scope_id=3)
         expected = ffx.TargetInfo(nodename="foobar", addresses=[addrinfo])
         got = construct_response_object(
             "fuchsia.developer.ffx/TargetInfo", raw_object)

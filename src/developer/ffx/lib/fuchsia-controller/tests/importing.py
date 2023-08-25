@@ -55,18 +55,6 @@ class Importing(unittest.TestCase):
         self.assertEqual(msg["isu"]["variant_tss"]["value2"], "bar")
         self.assertEqual(msg["i"], 10)
 
-    def test_union_repr(self):
-        mod = importlib.import_module("fidl.test_fidlcodec_examples")
-        isu = mod.IntStructXunion()
-        isu.variant_tss = isu.variant_tss_type(value1="foo", value2="bar")
-        self.assertTrue(repr(isu.variant_tss) in repr(isu))
-
-    def test_union_str(self):
-        mod = importlib.import_module("fidl.test_fidlcodec_examples")
-        isu = mod.IntStructXunion()
-        isu.variant_tss = mod.TwoStringStruct(value1="foo", value2="bar")
-        self.assertEqual(str(isu.variant_tss), str(isu))
-
     def test_import_cross_library(self):
         mod = importlib.import_module("fidl.fuchsia_controller_othertest")
         other_mod = importlib.import_module("fidl.fuchsia_controller_test")

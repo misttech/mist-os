@@ -50,3 +50,16 @@ closed protocol Noop {
 
     strict DoNoop() -> ();
 };
+
+@discoverable
+closed protocol Testing {
+    strict ReturnUnion() -> (flexible union {
+        1: x uint8;
+        2: y string:255;
+    });
+
+    strict ReturnUnionWithTable() -> (flexible union {
+        1: x NoopUnion;
+        2: y NoopTable;
+    });
+};

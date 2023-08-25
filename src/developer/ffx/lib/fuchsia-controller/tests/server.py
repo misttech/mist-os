@@ -4,6 +4,8 @@
 import unittest
 import asyncio
 import fidl.fuchsia_developer_ffx as ffx
+import fidl.fuchsia_io as f_io
+import fidl.fuchsia_controller_test as fc_test
 import os
 import sys
 import tempfile
@@ -52,6 +54,27 @@ class TargetCollectionImpl(ffx.TargetCollection.Server):
             ffx.TargetInfo(nodename="baz"),
         ])
         await reader.next(entry=[])
+
+
+class StubFileServer(f_io.File.Server):
+
+    def read(self, request: f_io.ReadableReadRequest):
+        res = f_io.Readable_Read_Result()
+        res.response = f_io.Readable_Read_Response(data=[1, 2, 3, 4])
+        return res
+
+
+class TestingServer(fc_test.Testing.Server):
+
+    def return_union(self):
+        res = fc_test.TestingReturnUnionResponse()
+        res.y = "foobar"
+        return res
+
+    def return_union_with_table(self):
+        res = fc_test.TestingReturnUnionWithTableResponse()
+        res.y = fc_test.NoopTable(str="bazzz", integer=2)
+        return res
 
 
 class ServerTests(unittest.IsolatedAsyncioTestCase):
@@ -115,3 +138,24 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(bar_targets), 1)
         baz_targets = [x for x in target_list if x.nodename == "baz"]
         self.assertEqual(len(baz_targets), 1)
+
+    async def test_file_server(self):
+        # This handles the kind of case where a method has a signature of `-> (data) error Error;`
+        client, server = Channel.create()
+        file_proxy = f_io.File.Client(client)
+        file_server = StubFileServer(server)
+        server_task = asyncio.get_running_loop().create_task(
+            file_server.serve())
+        res = await file_proxy.read(count=4)
+        self.assertEqual(res.response.data, [1, 2, 3, 4])
+
+    async def test_testing_server(self):
+        client, server = Channel.create()
+        t_client = fc_test.Testing.Client(client)
+        t_server = TestingServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        res = await t_client.return_union()
+        self.assertEqual(res.y, "foobar")
+        res = await t_client.return_union_with_table()
+        self.assertEqual(res.y.str, "bazzz")
+        self.assertEqual(res.y.integer, 2)

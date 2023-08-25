@@ -389,23 +389,47 @@ def _union_get_value(self):
         if m[0].endswith('_type')
     ]
     got = None
+    item = None
     for i in items:
         got = getattr(self, i)
+        item = i
         if got is not None:
             break
-    return got
+    return item, got
 
 
 def union_repr(self) -> str:
     """Returns the union repr in the format <'foo.bar.baz/FooUnion' object({value})>
 
     If {value} is not set, will write None."""
-    return f"<'{self.__fidl_type__}' object({_union_get_value(self)})>"
+    key, value = _union_get_value(self)
+    string = f"{key}={repr(value)}"
+    if key is None and value is None:
+        string = "None"
+    return f"<'{self.__fidl_type__}' object({string})>"
 
 
 def union_str(self) -> str:
     """Returns the union string representation, e.g. whatever the union type has been set to."""
-    return str(_union_get_value(self))
+    key, value = _union_get_value(self)
+    string = f"{key}={str(value)}"
+    if key is None and value is None:
+        string = "None"
+    return f"{type(self).__name__}({string})"
+
+
+def union_eq(self, other) -> bool:
+    if not isinstance(other, type(self)):
+        return False
+    items = [
+        m[0].replace("_type", "")
+        for m in inspect.getmembers(self)
+        if m[0].endswith("_type")
+    ]
+    for item in items:
+        if getattr(self, item) == getattr(other, item):
+            return True
+    return False
 
 
 def union_type(ir, root_ir, recurse_guard=None) -> type:
@@ -419,6 +443,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
             "__fidl_kind__": "union",
             "__repr__": union_repr,
             "__str__": union_str,
+            "__eq__": union_eq,
             "__fidl_type__": ir.name(),
         },
     )
