@@ -33,7 +33,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut service_fs = ServiceFs::new_local();
 
     // Initialize inspect.
-    inspect_runtime::serve(component::inspector(), &mut service_fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
     component::health().set_starting_up();
 
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Calculator);
