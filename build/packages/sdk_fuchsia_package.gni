@@ -4,7 +4,6 @@
 
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/sdk_atom.gni")
-import("//tools/check-licenses/build/license_data.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 # Defines an in-tree package for distribution in the SDK, landing
@@ -193,21 +192,6 @@ template("sdk_fuchsia_package") {
       }
     }
 
-    _license_target = "${target_name}.license"
-    _license_output = "${_sdk_package_dir}/license_data"
-    _license_output_spdx_file = "${_license_output}/results.spdx.json"
-    _license_target_spdx = "${_license_target}_spdx_copy"
-
-    # Collects the license data for all GN inputs and makes it available for the SDK
-    license_data(_license_target) {
-      target = _full_package_label
-      out_dir = _license_output
-
-      produce_spdx = true
-      emit_metadata = false
-      run_analysis = false
-    }
-
     _sdk_package_file_list = "${_sdk_package_dir}/file_list.fini"
     _sdk_package_metadata = "${_sdk_package_dir}/metadata"
     _sdk_manifest_target = "${target_name}.sdk_manifest"
@@ -225,7 +209,6 @@ template("sdk_fuchsia_package") {
       inputs = [
         package_manifest_file,
         computed_content_checklist_file,
-        _license_output_spdx_file,
       ]
       outputs = [
         _sdk_package_file_list,
@@ -233,7 +216,6 @@ template("sdk_fuchsia_package") {
       ]
       deps = [
         ":${_content_checklist_target}",
-        ":${_license_target_spdx}",
         _full_package_label,
       ]
       depfile = _sdk_package_depfile

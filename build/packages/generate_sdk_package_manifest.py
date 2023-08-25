@@ -235,14 +235,6 @@ def main():
         f"{content_checklist_path}={args.sdk_package_content_checklist_path}")
     sdk_metadata['target_files'][arch].append(content_checklist_path)
 
-    # Handle license file.
-    sdk_package_license_build_path = os.path.join(
-        args.output, "license_data", "results.spdx.json")
-    sdk_package_license_path = f"packages/{distribution_name}/{arch}/release/license.spdx.json"
-    sdk_file_map.add(
-        f"{sdk_package_license_path}={sdk_package_license_build_path}")
-    sdk_metadata['target_files'][arch].append(sdk_package_license_path)
-
     # Write out sorted file list.
     sdk_file_list = sorted(list(sdk_file_map))
     sdk_file_list_path = os.path.join(args.output, "file_list.fini")
