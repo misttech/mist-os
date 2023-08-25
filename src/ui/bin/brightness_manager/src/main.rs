@@ -161,7 +161,8 @@ async fn main() -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
 
     let inspector = inspector();
-    inspect_runtime::serve(inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     let backlight = if config.manage_display_power {
         Backlight::with_display_power(config.power_off_delay_millis, config.power_on_delay_millis)
@@ -197,6 +198,7 @@ async fn main() -> Result<(), Error> {
         Box::pin(run_brightness_server(stream, control))
     })
     .await?;
+
     Ok(())
 }
 

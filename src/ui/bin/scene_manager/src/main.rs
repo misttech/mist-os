@@ -94,7 +94,8 @@ async fn inner_main() -> Result<(), Error> {
     // * Use a slightly larger value here to allow some headroom. E.g. perhaps
     //   some events have a third finger.
     let inspector = inspect::component::init_inspector_with_size(300 * 1024);
-    inspect_runtime::serve(inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     // Report data on the size of the inspect VMO, and the number of allocation
     // failures encountered. (Allocation failures can lead to missing data.)

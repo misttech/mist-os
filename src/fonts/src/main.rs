@@ -90,8 +90,8 @@ async fn main() -> Result<()> {
     fs.take_and_serve_directory_handle()
         .context("could not serve directory handle, this is a fatal error")?;
 
-    inspect_runtime::serve(inspector(), &mut fs)
-        .context("could not serve inspect, this is a fatal error")?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector(), inspect_runtime::PublishOptions::default());
 
     let fs = fs;
     service.run(fs).await;
