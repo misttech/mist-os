@@ -350,14 +350,15 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
 void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
   zx::result client = this->incoming()->Connect<fuchsia_device_manager::SystemStateTransition>();
   if (client.is_error()) {
-    FDF_SLOG(ERROR, "failed to connect to fuchsia.device.manager/SystemStateTransition",
-             KV("status", client.status_value()));
+    FDF_LOGL(ERROR, *logger_,
+             "failed to connect to fuchsia.device.manager/SystemStateTransition: %s",
+             client.status_string());
     completer(client.take_error());
     return;
   }
   fidl::WireResult result = fidl::WireCall(client.value())->GetTerminationSystemState();
   if (!result.ok()) {
-    FDF_SLOG(ERROR, "failed to get termination state", KV("status", client.status_value()));
+    FDF_LOGL(ERROR, *logger_, "failed to get termination state: %s", client.status_string());
     completer(zx::error(result.error().status()));
     return;
   }
