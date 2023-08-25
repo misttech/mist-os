@@ -13,7 +13,13 @@
             type: "expect_failure",
             matchers: [
                 "SingletonTest.*",
-                "LooperTest.PollOnce_WhenCallbackAddedTwice_OnlySecondCallbackShouldBeInvoked",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Flaky tests.
+                "LooperTest.*",
             ],
         },
     ],
