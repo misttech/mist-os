@@ -84,6 +84,35 @@ declare_args() {
   # product_system_image_deps = []  (defined in product.gni)
   legacy_product_system_image_deps = []
 
+  # These are arguments used by Infra (and 'fx set') to add tests to a build
+  # configuration without necessarily adding them to the assembled product, and
+  # validating that they only contain tests of the type in their name.
+
+  # Fully hermetic tests (both by packaging and at runtime)
+  hermetic_test_package_labels = []
+
+  # Non-hermetic tests (at runtime).  Non-test packages found in this group will
+  # be flagged as an error by the build.
+  test_package_labels = []
+
+  # Used by Infra (or developers) to put test packages into the base package set
+  # instead of adding the '//bundles/buildbot/<product>:<test group>' to the
+  # 'base_package_labels' GN argument.
+  tests_in_base = false
+
+  # Host-driven, "end-to-end" tests that run on a Fuchsia image (either real
+  # hardware or emulated).
+  e2e_test_labels = []
+
+  # Host-only tests.  These cannot have any dependency on an assembled platform
+  # image, or the compiled OS itself, not even for their host_test_data().
+  host_test_labels = []
+
+  # A developer-only argument that is used to add tests to the build without
+  # going through the test-type validate that the above sets of tests are.
+  # These are always a dependency of the main product assembly.
+  developer_test_labels = []
+
   # If you add labels to this variable, these will be included in the 'host'
   # artifact set, which represents an additional set of host-only software that
   # is produced by the build.
@@ -785,17 +814,33 @@ build_api_module("tests") {
   data_keys = [ "tests" ]
   walk_keys = [ "tests_barrier" ]
   deps = [
-    # Pull in tests from host_labels.
+    # Pull in tests from host_labels.  This is deprecated, and tests should be
+    # in //:host_tests instead.
     "//:host",
 
-    # Pull in tests present in the assembled product image.
+    # Pull in tests present in the assembled product image.  This is deprecated,
+    # and tests should be in the various type-specific test groups below.
     "//build/images:main_assembly",
+
+    # Pull in tests from the various type-specific on-device test groups
+    "//:e2e_tests",
+    "//:hermetic_test_packages",
+
+    # Pull in tests from the non-device type-specific test groups.
+    "//:host_tests",
+    "//:test_packages",
+
+    # Pull in tests from the developer
+    "//:developer_specified_tests",
 
     # While these should be redundant with the above, they way in which they are
     # redundant (included via the main assembly) is quite opaque, and so they
     # are listed here for developers to be able to see (and to ensure that all
     # developer-chosen tests are in the build api, catching any failures to
     # include those tests in the assembly.
+    #
+    # This is deprecated, and the above type-specific groups should be used
+    # instead.
     ":developer_base_packages",
     ":developer_cache_packages",
     ":developer_universe_packages",
@@ -822,14 +867,25 @@ build_api_module("test_components") {
   data_keys = [ "test_components" ]
   walk_keys = [ "test_components_barrier" ]
   deps = [
-    # Pull in tests present in the assembled product image.
+    # Pull in tests present in the assembled product image.  This is deprecated,
+    # and tests should be in the various type-specific test groups below.
     "//build/images:main_assembly",
+
+    # Pull in tests from the various type-specific on-device test groups
+    "//:hermetic_test_packages",
+    "//:test_packages",
+
+    # Pull in tests from the developer
+    "//:developer_specified_tests",
 
     # While these should be redundant with the above, they way in which they are
     # redundant (included via the main assembly) is quite opaque, and so they
     # are listed here for developers to be able to see (and to ensure that all
     # developer-chosen tests are in the build api, catching any failures to
     # include those tests in the assembly.
+    #
+    # This is deprecated, and the above type-specific groups should be used
+    # instead.
     ":developer_base_packages",
     ":developer_cache_packages",
     ":developer_universe_packages",
@@ -1458,6 +1514,11 @@ group("developer_base_packages") {
 
   public_deps = base_package_labels
 
+  # The tests group can only be added if base packages are testonly
+  if (testonly) {
+    public_deps += [ ":base_tests" ]
+  }
+
   # the buildbot host tests should only be added via `--with-host`, to the
   # `host_labels` GN arg.
   assert_no_deps = [ "//bundles/buildbot/host/*" ]
@@ -1533,13 +1594,112 @@ group("legacy_universe_packages") {
   public_deps = legacy_universe_package_labels
 }
 
+###
+# GN-Argument configured groups for adding tests to a build.
+#
+
+# Fully hermetic tests (both by packaging and at runtime)
+group("hermetic_test_packages") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = hermetic_test_package_labels
+  assert(
+      hermetic_test_package_labels == [],
+      "hermetic_test_package_labels cannot be used before adding validation of test hermeticity.")
+}
+
+# Non-hermetic tests (at runtime).  Non-test packages found in this group will
+# be flagged as an error by the build.
+group("test_packages") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = test_package_labels
+  assert(
+      test_package_labels == [],
+      "test_package_labels cannot be used before adding validation of test type.")
+}
+
+# These are all tests that are to be published in the 'discoverable' package
+# set.  Whether the on-device tests are here or in `:base_tests` is controlled
+# by the 'tests_in_base' GN build argument.
+group("discoverable_tests") {
+  testonly = true
+  visibility = [
+    ":*",
+    "//build/images/*",
+  ]
+  if (!tests_in_base) {
+    public_deps = [
+      "//:developer_specified_tests",
+      "//:hermetic_test_packages",
+      "//:test_packages",
+    ]
+  }
+}
+
+# These are all tests that are to be published as part of the product's 'base'
+# package set.  Whether the on-device tests are here or in `:discoverable_tests`
+# is controlled by the 'tests_in_base' GN build argument.
+group("base_tests") {
+  testonly = true
+  visibility = [
+    ":*",
+    "//build/images/*",
+  ]
+  if (tests_in_base) {
+    public_deps = [
+      "//:developer_specified_tests",
+      "//:hermetic_test_packages",
+      "//:test_packages",
+    ]
+  }
+}
+
+# Host-driven, "end-to-end" tests that run on a Fuchsia image (either real
+# hardware or emulated).
+group("e2e_tests") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = e2e_test_labels
+  assert(
+      e2e_test_labels == [],
+      "e2e_test_labels cannot be used before adding validation of test type.")
+}
+
+# Host-only tests.  These cannot have any dependency on an assembled platform
+# image, or the compiled OS itself, not even for their host_test_data().
+group("host_tests") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = host_test_labels
+  assert(
+      host_test_labels == [],
+      "host_test_labels cannot be used before adding validation of test type.")
+}
+
+# Can be any test-type. This is for local-developer use only.  It is not for use
+# by infra or products.
+group("developer_specified_tests") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = developer_test_labels
+}
+
+###
+# GN-Argument configured groups other package sets
+#
+
 # Packages that are compiled and published, but unable to contribute to the
 # product in any way.
 group("discoverable_packages") {
   testonly = true
   visibility = [ "//build/images/updates:universe_packages" ]
-  public_deps = discoverable_package_labels
+  public_deps = discoverable_package_labels + [ ":discoverable_tests" ]
 }
+
+###
+# GN-Argument configured groups for host binaries and tools
+#
 
 group("host") {
   # TODO(fxbug.dev/80548) investigate removing testonly here
