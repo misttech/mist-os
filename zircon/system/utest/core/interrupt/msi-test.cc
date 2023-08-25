@@ -20,28 +20,44 @@ using MsiTest = RootResourceFixture;
 
 namespace {
 
-zx::result<std::pair<zx::vmo, void*>> GetMsiTestVmo() {
-  const size_t vmo_size = zx_system_get_page_size();
-  auto result = vmo_test::GetTestPhysVmo(vmo_size);
-  if (result.is_error()) {
-    return result.take_error();
+class MsiTestVmo {
+ public:
+  static zx::result<std::unique_ptr<MsiTestVmo>> Create() {
+    const size_t vmo_size = zx_system_get_page_size();
+    auto result = vmo_test::GetTestPhysVmo(vmo_size);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    zx::vmo vmo = std::move(result.value().vmo);
+    zx_status_t status = vmo.set_cache_policy(ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    zx_vaddr_t mapped_addr = 0;
+    status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, vmo_size,
+                                        &mapped_addr);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    std::unique_ptr<MsiTestVmo> res(new MsiTestVmo(std::move(vmo), mapped_addr, vmo_size));
+    return zx::ok(std::move(res));
   }
 
-  zx::vmo vmo = std::move(result.value().vmo);
-  zx_status_t status = vmo.set_cache_policy(ZX_CACHE_POLICY_UNCACHED_DEVICE);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
+  const zx::vmo& vmo() const { return vmo_; }
+  zx_vaddr_t addr() const { return addr_; }
 
-  zx_vaddr_t mapped_addr = 0;
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, vmo_size,
-                                      &mapped_addr);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
+  ~MsiTestVmo() { zx::vmar::root_self()->unmap(addr_, size_); }
 
-  return zx::ok(std::make_pair(std::move(vmo), reinterpret_cast<void*>(mapped_addr)));
-}
+ private:
+  MsiTestVmo(zx::vmo vmo, zx_vaddr_t addr, size_t size)
+      : vmo_(std::move(vmo)), addr_(addr), size_(size) {}
+  const zx::vmo vmo_;
+  const zx_vaddr_t addr_;
+  const size_t size_;
+};
 
 // Differentiate the two test categories while still allowing the use of the helper
 // functions in this file.
@@ -117,14 +133,15 @@ uint32_t kVectorControlMasked = (1u << 0);
 }  // namespace FakeMsi
 
 TEST_F(MsiTest, CreateSyscallArgs) {
-  auto result = GetMsiTestVmo();
+  auto result = MsiTestVmo::Create();
   if (!MsiTestsSupported() || result.is_error()) {
     return;
   }
 
   zx::msi msi;
   constexpr uint32_t msi_cnt = 8;
-  auto [vmo, ptr] = std::move(result.value());
+  auto msi_test_vmo = std::move(result.value());
+  auto& vmo = msi_test_vmo->vmo();
   ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
   zx_info_msi_t msi_info;
   ASSERT_OK(msi.get_info(ZX_INFO_MSI, &msi_info, sizeof(msi_info), nullptr, nullptr));
@@ -166,7 +183,7 @@ TEST_F(MsiTest, CreateSyscallArgs) {
 }
 
 TEST_F(MsiTest, Msi) {
-  auto result = GetMsiTestVmo();
+  auto result = MsiTestVmo::Create();
   if (!MsiTestsSupported() || result.is_error()) {
     return;
   }
@@ -176,7 +193,9 @@ TEST_F(MsiTest, Msi) {
   ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
   zx::interrupt interrupt, interrupt_dup;
 
-  auto [vmo, ptr] = std::move(result.value());
+  auto msi_test_vmo = std::move(result.value());
+  auto& vmo = msi_test_vmo->vmo();
+  auto ptr = msi_test_vmo->addr();
   auto cap = reinterpret_cast<volatile FakeMsi::Capability*>(ptr);
 
   // With no options the syscall should check if the Capability's ID matches MSI's.
@@ -210,7 +229,7 @@ constexpr uint32_t SizeNeededForMsi(size_t vmo_size, uint32_t msi_id) {
 }
 
 TEST_F(MsiTest, Msix) {
-  auto result = GetMsiTestVmo();
+  auto result = MsiTestVmo::Create();
   if (!MsiTestsSupported() || result.is_error()) {
     return;
   }
@@ -219,7 +238,9 @@ TEST_F(MsiTest, Msix) {
   zx::msi msi = {};
   ASSERT_OK(zx::msi::allocate(*root_resource(), msi_cnt, &msi));
 
-  auto [vmo, ptr] = std::move(result.value());
+  auto msi_test_vmo = std::move(result.value());
+  auto& vmo = msi_test_vmo->vmo();
+  auto ptr = msi_test_vmo->addr();
   zx_info_vmo_t vmo_info = {};
   zx_info_msi_t msi_info = {};
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &vmo_info, sizeof(vmo_info), nullptr, nullptr));
