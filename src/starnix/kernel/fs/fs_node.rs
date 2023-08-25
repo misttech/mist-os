@@ -1308,16 +1308,15 @@ impl FsNode {
         let mut new_info = info.clone();
         mutator(&mut new_info)?;
         let mut has = zxio_node_attr_has_t { ..Default::default() };
-        has.modification_time = info.time_modify != new_info.time_modify;
+        has.modification_time = info.time_status_change != new_info.time_status_change;
         has.mode = info.mode != new_info.mode;
         has.uid = info.uid != new_info.uid;
         has.gid = info.gid != new_info.gid;
         has.rdev = info.rdev != new_info.rdev;
-        // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time || has.mode || has.uid || has.gid || has.rdev {
             self.ops().update_attributes(&new_info, has)?;
+            *info = new_info;
         }
-        *info = new_info;
         Ok(())
     }
 
