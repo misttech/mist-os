@@ -129,7 +129,7 @@ def find_bootserver(build_dir):
 EPILOG = """
 In order to use this tool, please ensure that your boot test (usually defined
 by one of zbi_test(), qemu_kernel_test(), or efi_test()) is in your GN graph. A
-way to do this is to add //bundles:boot_tests to your `fx set` invocation.
+way to do this is to add //bundles/boot_tests to your `fx set` invocation.
 """
 
 
@@ -196,7 +196,7 @@ def main():
 
     if not boot_tests:
         warning(
-            "no boot tests found. Is //bundles:boot_tests in your GN graph?")
+            "no boot tests found. Is //bundles/boot_tests in your GN graph?")
         return 0
 
     if not args.name:

@@ -1404,7 +1404,7 @@ group("default") {
     "//build/images:default-images",
     "//build/images/updates:packages",
     "//build/input:build_only",
-    "//bundles:boot_tests",
+    "//bundles/boot_tests",
     "//sdk",
   ]
 

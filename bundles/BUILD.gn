@@ -11,14 +11,6 @@ group("bootstrap") {
 group("debugging") {
 }
 
-# WARNING: Known to infrastructure
-#
-# This provides metadata in the //:boot_tests schema.
-group("boot_tests") {
-  testonly = true
-  deps = [ "//bundles/bringup:boot_tests" ]
-}
-
 # A collection of all stress tests available in-tree. The tests in this group will be built
 # and run on the core.qemu-x64-stress builder.
 group("stress-tests") {
