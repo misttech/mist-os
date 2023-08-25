@@ -5,4 +5,15 @@
 // This manifest is intentionally empty. The toolbox component exists to parent
 // other components. Software assembly is used to composite the toolbox
 // manifest based on children of the toolbox realm.
-{}
+{
+    use: [
+        {
+            protocol: [
+                "fuchsia.buildinfo.Provider",
+                "fuchsia.process.explorer.ProcessExplorer",
+                "fuchsia.process.explorer.Query",
+            ],
+            availability: "optional",
+        },
+    ],
+}

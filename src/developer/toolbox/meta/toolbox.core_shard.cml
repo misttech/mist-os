@@ -12,4 +12,23 @@
             url: "fuchsia-pkg://fuchsia.com/toolbox#meta/toolbox.cm",
         },
     ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.process.explorer.ProcessExplorer",
+                "fuchsia.process.explorer.Query",
+            ],
+            from: "#process_explorer",
+            to: "#toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.buildinfo.Provider" ],
+            from: "#build-info",
+            to: "#toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+    ],
 }
