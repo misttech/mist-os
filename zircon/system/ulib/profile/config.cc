@@ -264,7 +264,122 @@ fit::result<std::string, unsigned int> GetUint(const char* name, const rapidjson
   return fit::ok(result->get().GetUint());
 }
 
+std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
+                                                    const char* profile_name,
+                                                    const rapidjson::Value::Member& profile) {
+  const bool has_priority = profile.value.HasMember("priority");
+  const bool has_capacity = profile.value.HasMember("capacity");
+  const bool has_deadline = profile.value.HasMember("deadline");
+  const bool has_period = profile.value.HasMember("period");
+  const bool has_affinity = profile.value.HasMember("affinity");
+
+  const bool has_complete_deadline = has_capacity && has_deadline && has_period;
+  const bool has_some_deadline = has_capacity || has_deadline || has_period;
+
+  zx_profile_info_t info{};
+  if (has_priority && !has_some_deadline) {
+    auto result = GetInt("priority", profile.value, "Profile ", profile_name);
+    if (result.is_ok()) {
+      info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
+      info.priority = std::clamp<int32_t>(result.value(), ZX_PRIORITY_LOWEST, ZX_PRIORITY_HIGHEST);
+    } else {
+      FX_SLOG(WARNING, result.error_value().c_str(), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
+      return std::nullopt;
+    }
+  } else if (!has_priority && has_complete_deadline) {
+    auto capacity_result = ParseDuration(profile.value["capacity"]);
+    if (capacity_result.is_error()) {
+      FX_SLOG(WARNING, capacity_result.error_value().c_str(), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
+      return std::nullopt;
+    }
+    auto deadline_result = ParseDuration(profile.value["deadline"]);
+    if (deadline_result.is_error()) {
+      FX_SLOG(WARNING, deadline_result.error_value().c_str(), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
+      return std::nullopt;
+    }
+    auto period_result = ParseDuration(profile.value["period"]);
+    if (period_result.is_error()) {
+      FX_SLOG(WARNING, period_result.error_value().c_str(), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
+      return std::nullopt;
+    }
+    info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
+    info.deadline_params = zx_sched_deadline_params_t{.capacity = capacity_result->get(),
+                                                      .relative_deadline = deadline_result->get(),
+                                                      .period = period_result->get()};
+  } else if (has_priority && has_some_deadline) {
+    FX_SLOG(WARNING, "Priority and deadline parameters are mutually exclusive!",
+            KV("filename", filename), KV("profile_name", profile_name),
+            KV("tag", "ProfileProvider"));
+    return std::nullopt;
+  } else if (!has_priority && !has_complete_deadline && has_some_deadline) {
+    FX_SLOG(WARNING, "Deadline profiles must specify \"capacity\", \"deadline\", and \"period\"!",
+            KV("filename", filename), KV("profile_name", profile_name),
+            KV("tag", "ProfileProvider"));
+    return std::nullopt;
+  }
+
+  if (has_affinity) {
+    const auto& affinity_member = profile.value["affinity"];
+    const bool is_uint = affinity_member.IsUint64();
+    const bool is_array = affinity_member.IsArray();
+
+    info.flags |= ZX_PROFILE_INFO_FLAG_CPU_MASK;
+
+    if (is_uint) {
+      static_assert(std::numeric_limits<uint64_t>::digits <= ZX_CPU_SET_BITS_PER_WORD);
+      info.cpu_affinity_mask.mask[0] = affinity_member.GetUint64();
+    } else if (is_array) {
+      size_t element_count = 0;
+      bool failed = false;
+
+      for (const auto& value : IterateValues(affinity_member)) {
+        if (!value.IsUint()) {
+          FX_SLOG(WARNING,
+                  "Array element of profile member \"affinity\" must be an "
+                  "unsigned integer!",
+                  KV("element_count", element_count), KV("filename", filename),
+                  KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
+          failed = true;
+          break;
+        }
+
+        element_count++;
+        const size_t cpu_number = value.GetUint();
+
+        if (cpu_number >= ZX_CPU_SET_MAX_CPUS) {
+          FX_SLOG(WARNING, "Profile member \"affinity\" must be an integer < ZX_CPU_SET_MAX_CPUS",
+                  KV("filename", filename), KV("profile_name", profile_name),
+                  KV("ZX_CPU_SET_MAX_CPUS", ZX_CPU_SET_MAX_CPUS), KV("tag", "ProfileProvider"));
+          failed = true;
+          break;
+        }
+
+        info.cpu_affinity_mask.mask[cpu_number / ZX_CPU_SET_BITS_PER_WORD] |=
+            uint64_t{1} << (cpu_number % ZX_CPU_SET_BITS_PER_WORD);
+      }
+      if (failed) {
+        return std::nullopt;
+      }
+    } else {
+      FX_SLOG(WARNING, "Profile member \"affinity\" must be a uint64 or an array of CPU indices!",
+              KV("filename", filename), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
+      return std::nullopt;
+    }
+  }  // if (has_affinity)
+
+  return info;
+}
+
+using SingleProfileParser = std::optional<zx_profile_info_t>(
+    const std::string& filename, const char* profile_name, const rapidjson::Value::Member& profile);
+
 void ParseProfiles(const std::string& filename, const rapidjson::Document& document,
+                   const char* type_name, SingleProfileParser parser,
                    zircon_profile::ProfileMap* profiles) {
   if (!document.IsObject()) {
     FX_SLOG(WARNING, "The profile config document must be a JSON object!", KV("filename", filename),
@@ -272,10 +387,10 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
     return;
   }
 
-  if (!document.HasMember("profiles")) {
+  if (!document.HasMember(type_name)) {
     return;
   }
-  const rapidjson::Value& profile_member = document["profiles"];
+  const rapidjson::Value& profile_member = document[type_name];
 
   ProfileScope scope = ProfileScope::None;
   if (document.HasMember("scope")) {
@@ -300,118 +415,19 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
     const char* profile_name = profile.name.GetString();
     if (!profile.value.IsObject()) {
       FX_SLOG(WARNING, "Profile value must be a JSON object!", KV("filename", filename),
-              KV("profile", profile_name), KV("tag", "ProfileProvider"));
+              KV("type", type_name), KV("profile", profile_name), KV("tag", "ProfileProvider"));
       continue;
     }
 
-    const bool has_priority = profile.value.HasMember("priority");
-    const bool has_capacity = profile.value.HasMember("capacity");
-    const bool has_deadline = profile.value.HasMember("deadline");
-    const bool has_period = profile.value.HasMember("period");
-    const bool has_affinity = profile.value.HasMember("affinity");
-
-    const bool has_complete_deadline = has_capacity && has_deadline && has_period;
-    const bool has_some_deadline = has_capacity || has_deadline || has_period;
-
-    zx_profile_info_t info{};
-    if (has_priority && !has_some_deadline) {
-      auto result = GetInt("priority", profile.value, "Profile ", profile_name);
-      if (result.is_ok()) {
-        info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
-        info.priority =
-            std::clamp<int32_t>(result.value(), ZX_PRIORITY_LOWEST, ZX_PRIORITY_HIGHEST);
-      } else {
-        FX_SLOG(WARNING, result.error_value().c_str(), KV("profile_name", profile_name),
-                KV("tag", "ProfileProvider"));
-        continue;
-      }
-    } else if (!has_priority && has_complete_deadline) {
-      auto capacity_result = ParseDuration(profile.value["capacity"]);
-      if (capacity_result.is_error()) {
-        FX_SLOG(WARNING, capacity_result.error_value().c_str(), KV("profile_name", profile_name),
-                KV("tag", "ProfileProvider"));
-        continue;
-      }
-      auto deadline_result = ParseDuration(profile.value["deadline"]);
-      if (deadline_result.is_error()) {
-        FX_SLOG(WARNING, deadline_result.error_value().c_str(), KV("profile_name", profile_name),
-                KV("tag", "ProfileProvider"));
-        continue;
-      }
-      auto period_result = ParseDuration(profile.value["period"]);
-      if (period_result.is_error()) {
-        FX_SLOG(WARNING, period_result.error_value().c_str(), KV("profile_name", profile_name),
-                KV("tag", "ProfileProvider"));
-        continue;
-      }
-      info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
-      info.deadline_params = zx_sched_deadline_params_t{.capacity = capacity_result->get(),
-                                                        .relative_deadline = deadline_result->get(),
-                                                        .period = period_result->get()};
-    } else if (has_priority && has_some_deadline) {
-      FX_SLOG(WARNING, "Priority and deadline parameters are mutually exclusive!",
-              KV("filename", filename), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
-      continue;
-    } else if (!has_priority && !has_complete_deadline && has_some_deadline) {
-      FX_SLOG(WARNING, "Deadline profiles must specify \"capacity\", \"deadline\", and \"period\"!",
-              KV("filename", filename), KV("profile_name", profile_name),
-              KV("tag", "ProfileProvider"));
+    auto result = parser(filename, profile_name, profile);
+    if (!result.has_value()) {
       continue;
     }
 
-    if (has_affinity) {
-      const auto& affinity_member = profile.value["affinity"];
-      const bool is_uint = affinity_member.IsUint64();
-      const bool is_array = affinity_member.IsArray();
-
-      info.flags |= ZX_PROFILE_INFO_FLAG_CPU_MASK;
-
-      if (is_uint) {
-        static_assert(std::numeric_limits<uint64_t>::digits <= ZX_CPU_SET_BITS_PER_WORD);
-        info.cpu_affinity_mask.mask[0] = affinity_member.GetUint64();
-      } else if (is_array) {
-        size_t element_count = 0;
-        bool failed = false;
-
-        for (const auto& value : IterateValues(affinity_member)) {
-          if (!value.IsUint()) {
-            FX_SLOG(WARNING,
-                    "Array element of profile member \"affinity\" must be an "
-                    "unsigned integer!",
-                    KV("element_count", element_count), KV("filename", filename),
-                    KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
-            failed = true;
-            break;
-          }
-
-          element_count++;
-          const size_t cpu_number = value.GetUint();
-
-          if (cpu_number >= ZX_CPU_SET_MAX_CPUS) {
-            FX_SLOG(WARNING, "Profile member \"affinity\" must be an integer < ZX_CPU_SET_MAX_CPUS",
-                    KV("filename", filename), KV("profile_name", profile_name),
-                    KV("ZX_CPU_SET_MAX_CPUS", ZX_CPU_SET_MAX_CPUS), KV("tag", "ProfileProvider"));
-            failed = true;
-            break;
-          }
-
-          info.cpu_affinity_mask.mask[cpu_number / ZX_CPU_SET_BITS_PER_WORD] |=
-              uint64_t{1} << (cpu_number % ZX_CPU_SET_BITS_PER_WORD);
-        }
-        if (failed) {
-          continue;
-        }
-      } else {
-        FX_SLOG(WARNING, "Profile member \"affinity\" must be a uint64 or an array of CPU indices!",
-                KV("filename", filename), KV("profile_name", profile_name),
-                KV("tag", "ProfileProvider"));
-        continue;
-      }
-    }  // if (has_affinity)
+    zx_profile_info_t& info = *result;
 
     if (info.flags == 0) {
-      FX_SLOG(WARNING, "Ignoring empty profile.", KV("filename", filename),
+      FX_SLOG(WARNING, "Ignoring empty profile.", KV("filename", filename), KV("type", type_name),
               KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
       continue;
     }
@@ -422,10 +438,14 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       if (existing_scope >= scope) {
         FX_SLOG(WARNING, "Profile already exists at scope.", KV("filename", filename),
                 KV("profile_name", profile_name), KV("existing_scope", ToString(existing_scope)),
+                KV("type", type_name), KV("profile_name", profile_name),
                 KV("scope", ToString(scope)), KV("tag", "ProfileProvider"));
-      } else if (iter->second.scope < scope) {
+        continue;
+      }
+      if (iter->second.scope < scope) {
         FX_SLOG(INFO, "Profile overridden at scope.", KV("filename", filename),
-                KV("profile_name", profile_name), KV("scope", ToString(scope)),
+                KV("type", type_name), KV("profile_name", profile_name),
+                KV("scope", ToString(scope)), KV("profile_name", profile_name),
                 KV("tag", "ProfileProvider"));
         iter->second = Profile{scope, info};
       }
@@ -491,13 +511,13 @@ fit::result<fit::failed, MediaRole> MaybeMediaRole(const Role& role) {
   return fit::ok(MediaRole{.capacity = capacity, .deadline = deadline});
 }
 
-fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path) {
+fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& config_path) {
   fbl::unique_fd dir_fd(openat(AT_FDCWD, config_path.c_str(), O_RDONLY | O_DIRECTORY));
   if (!dir_fd.is_valid()) {
     // A non-existent directory is not an error.
     FX_SLOG(WARNING, "Failed to open config dir.", KV("config_path", config_path),
             KV("error", strerror(errno)), KV("tag", "ProfileProvider"));
-    return fit::ok(ProfileMap{});
+    return fit::ok(ConfiguredProfiles{});
   }
 
   std::vector<std::string> dir_entries;
@@ -511,14 +531,15 @@ fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path)
     return pos != std::string::npos && pos == (filename.size() - std::strlen(kConfigFileExtension));
   };
 
-  ProfileMap profiles;
+  ConfiguredProfiles profiles;
 
   // Define fuchsia.default at builtin scope to prevent overrides from config files.
   {
     zx_profile_info_t info{};
     info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
     info.priority = ZX_PRIORITY_DEFAULT;
-    auto [iter, added] = profiles.emplace("fuchsia.default", Profile{ProfileScope::Builtin, info});
+    auto [iter, added] =
+        profiles.thread.emplace("fuchsia.default", Profile{ProfileScope::Builtin, info});
     ZX_DEBUG_ASSERT(added);
   }
 
@@ -547,14 +568,17 @@ fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path)
       continue;
     }
 
-    ParseProfiles(entry, document, &profiles);
+    ParseProfiles(entry, document, "profiles", ParseThreadProfile, &profiles.thread);
   }
 
-  FX_SLOG(INFO, "Loaded profiles.");
-  for (const auto& [key, value] : profiles) {
-    FX_SLOG(INFO, "Loaded profile.", KV("key", key), KV("scope", ToString(value.scope)),
-            KV("info", ToString(value.info)), KV("tag", "ProfileProvider"));
-  }
+  auto log_profiles = [](ProfileMap& profiles) {
+    for (const auto& [key, value] : profiles) {
+      FX_SLOG(INFO, "Loaded profile.", KV("key", key), KV("scope", ToString(value.scope)),
+              KV("info", ToString(value.info)), KV("tag", "ProfileProvider"));
+    }
+  };
+  FX_SLOG(INFO, "Loaded thread profiles:");
+  log_profiles(profiles.thread);
 
   return fit::ok(std::move(profiles));
 }

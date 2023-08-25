@@ -19,16 +19,16 @@ TEST(ProfileConfig, Parse) {
   ASSERT_TRUE(result.is_ok());
 
   {
-    const auto iter = result->find("fuchsia.default");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("fuchsia.default");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Builtin);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 16);
   }
 
   {
-    const auto iter = result->find("test.bringup.a:affinity");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.bringup.a:affinity");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Bringup);
     EXPECT_EQ(iter->second.info.flags,
               ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_PRIORITY);
@@ -37,8 +37,8 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->find("test.bringup.b:affinity");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.bringup.b:affinity");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags,
               ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_PRIORITY);
@@ -47,8 +47,8 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->find("test.core.a");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.core.a");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_DEADLINE);
     EXPECT_EQ(iter->second.info.deadline_params.capacity, 5'000'000);
@@ -57,24 +57,24 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->find("test.bringup.a");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.bringup.a");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 10);
   }
 
   {
-    const auto iter = result->find("test.product.a");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.product.a");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Product);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 25);
   }
 
   {
-    const auto iter = result->find("test.core.a:affinity");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.core.a:affinity");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Product);
     EXPECT_EQ(iter->second.info.flags,
               ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_DEADLINE);
@@ -85,8 +85,8 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->find("test.bringup.b");
-    ASSERT_TRUE(iter != result->end());
+    const auto iter = result->thread.find("test.bringup.b");
+    ASSERT_TRUE(iter != result->thread.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Product);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 20);
@@ -98,7 +98,7 @@ TEST(ProfileConfig, Parse) {
       "test.bringup.a", "fuchsia.default",
   };
 
-  for (const auto& [key, value] : *result) {
+  for (const auto& [key, value] : result->thread) {
     EXPECT_NE(expected_profiles.end(), expected_profiles.find(key));
   }
 }

@@ -29,9 +29,9 @@ namespace {
 
 constexpr char kConfigPath[] = "/config/profiles";
 
+using zircon_profile::ConfiguredProfiles;
 using zircon_profile::MaybeMediaRole;
 using zircon_profile::ParseRoleSelector;
-using zircon_profile::ProfileMap;
 
 class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvider> {
  public:
@@ -43,7 +43,7 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
   }
 
  private:
-  ProfileProvider(const zx::job& root_job, ProfileMap profiles)
+  ProfileProvider(const zx::job& root_job, ConfiguredProfiles profiles)
       : root_job_(root_job), profiles_(std::move(profiles)) {}
 
   void GetProfile(GetProfileRequestView request, GetProfileCompleter::Sync& completer) override;
@@ -59,7 +59,7 @@ class ProfileProvider : public fidl::WireServer<fuchsia_scheduler::ProfileProvid
 
   fidl::ServerBindingGroup<fuchsia_scheduler::ProfileProvider> bindings_;
   zx::unowned_job root_job_;
-  ProfileMap profiles_;
+  ConfiguredProfiles profiles_;
 };
 
 void ProfileProvider::GetProfile(GetProfileRequestView request,
@@ -152,7 +152,8 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     completer.Reply(ZX_ERR_NOT_FOUND);
   } else if (role_result->name == "fuchsia.test-role" && role_result->has("ok")) {
     completer.Reply(ZX_OK);
-  } else if (auto search = profiles_.find(role_result->name); search != profiles_.cend()) {
+  } else if (auto search = profiles_.thread.find(role_result->name);
+             search != profiles_.thread.cend()) {
     status = zx_object_set_profile(request->handle.get(), search->second.profile.get(), 0);
     completer.Reply(status);
   } else if (const auto media_role = MaybeMediaRole(*role_result); media_role.is_ok()) {
@@ -209,23 +210,27 @@ zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  // Create profiles for each configured role. If creating the profile fails, remove the role entry.
-  for (auto iter = result->begin(); iter != result->end();) {
-    const zx_status_t status =
-        zx::profile::create(root_job, 0, &iter->second.info, &iter->second.profile);
-    if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
-              KV("role", iter->first), KV("status", zx_status_get_string(status)));
-      iter = result->erase(iter);
-    } else {
-      ++iter;
+  auto create = [&root_job](zircon_profile::ProfileMap& profiles) {
+    // Create profiles for each configured role. If creating the profile fails, remove the role
+    // entry.
+    for (auto iter = profiles.begin(); iter != profiles.end();) {
+      const zx_status_t status =
+          zx::profile::create(root_job, 0, &iter->second.info, &iter->second.profile);
+      if (status != ZX_OK) {
+        FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
+                KV("role", iter->first), KV("status", zx_status_get_string(status)));
+        iter = profiles.erase(iter);
+      } else {
+        ++iter;
+      }
     }
-  }
+  };
+  create(result->thread);
 
   // Apply the dispatch role if defined.
   const std::string dispatch_role = "fuchsia.system.profile-provider.dispatch";
-  const auto search = result->find(dispatch_role);
-  if (search != result->end()) {
+  const auto search = result->thread.find(dispatch_role);
+  if (search != result->thread.end()) {
     const zx_status_t status = zx::thread::self()->set_profile(search->second.profile, 0);
     if (status != ZX_OK) {
       FX_SLOG(ERROR, "Failed to set profile", KV("error", zx_status_get_string(status)),

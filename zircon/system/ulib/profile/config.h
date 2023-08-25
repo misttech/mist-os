@@ -47,7 +47,11 @@ struct StringHash {
 
 using ProfileMap = std::unordered_map<std::string, Profile, StringHash, std::equal_to<>>;
 
-fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path);
+struct ConfiguredProfiles {
+  ProfileMap thread;
+};
+
+fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& config_path);
 
 struct Role {
   std::string name;
