@@ -29,7 +29,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut service_fs = ServiceFs::new_local();
 
     // Initialize inspect.
-    inspect_runtime::serve(component::inspector(), &mut service_fs)?;
     component::health().set_starting_up();
 
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Launcher);
@@ -39,6 +38,10 @@ async fn main() -> Result<(), anyhow::Error> {
     component::health().set_ok();
     debug!("Initialized.");
 
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
     service_fs
         .for_each_concurrent(None, |IncomingRequest::Launcher(mut stream)| async move {
             while let Some(Ok(request)) = stream.next().await {

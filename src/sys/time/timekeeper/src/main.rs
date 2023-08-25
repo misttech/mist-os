@@ -176,8 +176,6 @@ async fn main() -> Result<(), Error> {
         InspectDiagnostics::new(diagnostics::INSPECTOR.root(), &primary_track, &monitor_track),
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
-    let mut fs = ServiceFs::new();
-    inspect_runtime::serve(&diagnostics::INSPECTOR, &mut fs)?;
 
     info!("connecting to real time clock");
     let optional_rtc = match RtcImpl::only_device() {
@@ -197,7 +195,14 @@ async fn main() -> Result<(), Error> {
     })
     .detach();
 
+    let _inspect_server_task = inspect_runtime::publish(
+        &diagnostics::INSPECTOR,
+        inspect_runtime::PublishOptions::default(),
+    );
+
+    let mut fs = ServiceFs::new();
     fs.take_and_serve_directory_handle()?;
+
     Ok(fs.collect().await)
 }
 

@@ -21,7 +21,10 @@ async fn main() -> Result<(), Error> {
     info!("Started diagnostics publisher");
     debug!("I'm a debug log from the publisher!");
     let mut fs = ServiceFs::new();
-    inspect_runtime::serve(component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
     component::health().set_ok();
     fs.take_and_serve_directory_handle()?;
     fasync::Task::spawn(fs.collect::<()>()).detach();

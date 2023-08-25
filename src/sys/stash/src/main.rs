@@ -95,9 +95,13 @@ async fn main() -> Result<(), Error> {
             };
             inspect::component::inspector().root().record_bool("secure_mode", opts.secure_mode);
 
-            let mut fs = ServiceFs::new();
             inspect::component::health().set_starting_up();
-            inspect_runtime::serve(inspect::component::inspector(), &mut fs)?;
+            let _inspect_server_task = inspect_runtime::publish(
+                inspect::component::inspector(),
+                inspect_runtime::PublishOptions::default(),
+            );
+
+            let mut fs = ServiceFs::new();
             fs.dir("svc").add_fidl_service_at(name, |stream| {
                 stash_server(store_manager.clone(), !opts.secure_mode, stream)
             });

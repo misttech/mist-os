@@ -227,9 +227,13 @@ where
     D: Diagnostics,
     N: Future<Output = Result<(), Error>> + Send,
 {
+    let _inspect_server_task = inspect_runtime::publish(
+        fuchsia_inspect::component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
+
     if config.use_pull_api {
         let mut fs = ServiceFs::new();
-        inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
         fs.take_and_serve_directory_handle()?;
 
@@ -238,7 +242,6 @@ where
         result
     } else {
         let mut fs = ServiceFs::new();
-        inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
         fs.take_and_serve_directory_handle()?;
 

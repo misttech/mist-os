@@ -52,7 +52,10 @@ async fn main() -> Result<(), Error> {
     std::fs::create_dir_all(constants::DEBUG_DATA_FOR_SCP)?;
     std::fs::create_dir_all(constants::ISOLATED_TMP)?;
 
-    inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        fuchsia_inspect::component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
 
     info!("Reading capabilities from {}", args.manifest_name());
     let routing_info = Arc::new(AboveRootCapabilitiesForTest::new(args.manifest_name()).await?);
