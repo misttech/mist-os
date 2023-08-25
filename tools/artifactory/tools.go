@@ -24,6 +24,7 @@ var (
 		"bootserver_new": "bootserver",
 		"ffx":            "ffx",
 		"device-finder":  "device-finder",
+		"pbtool":         "pbtool",
 		"symbolize":      "symbolize",
 		// Undercoat is used by fuzzing infrastructure.
 		"undercoat": "undercoat",
