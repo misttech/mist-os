@@ -2,39 +2,46 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("pci") {
+import("//build/drivers/check_included_drivers.gni")
+import("//build/drivers/create_all_drivers_doc.gni")
+
+# Group including all drivers in the fuchsia repo except for templates.
+group("drivers-not-templates") {
+  testonly = true
   deps = [
+    "//examples/drivers",
+    "//sdk/lib/driver/devicetree/examples/example-board",
+    "//sdk/lib/driver_test_realm/fake_driver:component",
+    "//src/camera:drivers",
+    "//src/connectivity/bundles:drivers",
     "//src/connectivity/ethernet/drivers/third_party/igc",
-    "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:fuchsia_driver",
-    "//src/devices/block/drivers/ahci:ahci",
-    "//src/devices/block/drivers/nvme:nvme",
-    "//src/devices/block/drivers/pci-sdhci:pci-sdhci",
-    "//src/devices/block/drivers/ufs:ufs",
-    "//src/devices/block/drivers/virtio:virtio_block",
-    "//src/devices/i2c/drivers/intel-i2c:intel-i2c",
-    "//src/devices/misc/drivers/virtio-rng:virtio_rng",
-    "//src/devices/misc/drivers/virtio-socket:virtio_socket",
-    "//src/devices/serial/drivers/virtio-console:virtio_console",
-    "//src/devices/usb/drivers/xhci:xhci",
-    "//src/graphics/display/drivers/intel-i915:intel-i915",
-    "//src/graphics/display/drivers/simple:simple.amd-kaveri",
-    "//src/graphics/display/drivers/simple:simple.bochs",
-    "//src/graphics/display/drivers/simple:simple.gga",
-    "//src/graphics/display/drivers/simple:simple.intel",
-    "//src/graphics/display/drivers/simple:simple.nv",
-    "//src/graphics/display/drivers/simple:simple.vmware",
-    "//src/graphics/display/drivers/virtio-guest:virtio_gpu",
-    "//src/graphics/drivers/misc/goldfish_address_space:address_space_driver",
-    "//src/media/audio/drivers/intel-hda/controller:intel-hda",
-    "//src/ui/input/drivers/virtio:virtio_input",
+    "//src/connectivity/overnet/usb:overnet-usb",
+    "//src/developer/adb:drivers",
+    "//src/devices/bundles:drivers",
+    "//src/diagnostics/validator/logs/ddk/log-test-driver",
+    "//src/graphics/bundles:drivers",
+    "//src/media/bundles:drivers",
+    "//src/power:drivers",
+    "//src/storage/fvm/driver:driver",
+    "//src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_component",
+    "//src/ui/bundles:drivers",
     "//zircon/third_party/dev/ethernet/e1000:e1000",
   ]
+}
 
-  if (target_cpu == "x64") {
-    deps += [
-      "//src/connectivity/ethernet/drivers/realtek-8111:realtek-8111",
-      "//src/graphics/drivers/msd-intel-gen",
-    ]
-  }
+# Group including all drivers in the fuchsia repo. Useful for ensuring
+# all driver continue to build without needing to build every board.
+check_included_drivers("drivers-build-only") {
+  testonly = true
+  contains_all_drivers = true
+  deps = [
+    ":drivers-not-templates",
+    "//tools/create/goldens/my-driver-cpp:component",
+  ]
+}
+
+# Group including all drivers to extract documentation from.
+create_all_drivers_doc("create_all_drivers_doc") {
+  testonly = true
+  deps = [ ":drivers-not-templates" ]
 }

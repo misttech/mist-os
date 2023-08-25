@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_action.gni")
+
 # Creates JSON with documentation from all drivers.
 # Every driver can optionally provide a ${target_name}-driver-info.json in its folder.
 # Documentation from this JSON file is aggregated into a global documentation file.
@@ -15,6 +17,7 @@
 #   testonly
 #   visibility
 template("create_all_drivers_doc") {
+  main_target = target_name
   all_doc_target = "${target_name}_all_doc"
   all_doc_output = "${target_gen_dir}/${target_name}_all_doc"
   generated_file(all_doc_target) {
@@ -23,10 +26,7 @@ template("create_all_drivers_doc") {
                              "testonly",
                              "visibility",
                            ])
-    visibility = [
-      ":$target_name",
-      "//bundles:create_all_drivers_doc",
-    ]
+    visibility = [ ":$main_target" ]
     outputs = [ all_doc_output ]
     deps = invoker.deps
     rebase = root_out_dir
@@ -36,32 +36,15 @@ template("create_all_drivers_doc") {
     walk_keys = [ "driver_component_barrier" ]
   }
 
-  action(target_name) {
+  python_action(main_target) {
     forward_variables_from(invoker, [ "testonly" ])
-    deps = [
-      ":${all_doc_target}",
-      "//build/drivers:gen_create_all_drivers_doc",
-    ]
-    script =
-        get_label_info("//build/drivers:gen_create_all_drivers_doc",
-                       "target_out_dir") + "/gen_create_all_drivers_doc.pyz"
+    deps = [ ":${all_doc_target}" ]
+    binary_label = "//build/drivers:gen_create_all_drivers_doc"
     areas_file = "//build/drivers/areas.txt"
     inputs = [
       all_doc_output,
       areas_file,
     ]
-    metadata = {
-      # Record metadata for the //tools/docsgen build API.
-      generated_docset = [
-        {
-          name = "driversdoc"
-          origin_files =
-              [ rebase_path("$root_gen_dir/bundles/all_drivers_doc.yaml",
-                            root_build_dir) ]
-          dest_folder = "sdk/drivers"
-        },
-      ]
-    }
     outputs = [ "${target_gen_dir}/all_drivers_doc.yaml" ]
     depfile = "${target_gen_dir}/${target_name}.d"
     args = [
@@ -74,5 +57,15 @@ template("create_all_drivers_doc") {
       "--dep_file",
       rebase_path(depfile, root_build_dir),
     ]
+    metadata = {
+      # Record metadata for the //tools/docsgen build API.
+      generated_docset = [
+        {
+          name = "driversdoc"
+          origin_files = [ rebase_path(outputs[0], root_build_dir) ]
+          dest_folder = "sdk/drivers"
+        },
+      ]
+    }
   }
 }

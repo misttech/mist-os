@@ -2,9 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/drivers/check_included_drivers.gni")
-import("//build/drivers/create_all_drivers_doc.gni")
-
 # A collection of all stress tests available in-tree. The tests in this group will be built
 # and run on the core.qemu-x64-stress builder.
 group("stress-tests") {
@@ -34,43 +31,13 @@ group("amlogic_hw_dependent_tests") {
   ]
 }
 
-# Group including all drivers in the fuchsia repo except for templates.
-group("drivers-not-templates") {
+group("drivers-build-only") {
   testonly = true
-  deps = [
-    "//examples/drivers",
-    "//sdk/lib/driver/devicetree/examples/example-board",
-    "//sdk/lib/driver_test_realm/fake_driver:component",
-    "//src/camera:drivers",
-    "//src/connectivity/bundles:drivers",
-    "//src/connectivity/ethernet/drivers/third_party/igc",
-    "//src/connectivity/overnet/usb:overnet-usb",
-    "//src/developer/adb:drivers",
-    "//src/devices/bundles:drivers",
-    "//src/diagnostics/validator/logs/ddk/log-test-driver",
-    "//src/graphics/bundles:drivers",
-    "//src/media/bundles:drivers",
-    "//src/power:drivers",
-    "//src/storage/fvm/driver:driver",
-    "//src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_component",
-    "//src/ui/bundles:drivers",
-    "//zircon/third_party/dev/ethernet/e1000:e1000",
-  ]
-}
-
-# Group including all drivers in the fuchsia repo. Useful for ensuring
-# all driver continue to build without needing to build every board.
-check_included_drivers("drivers-build-only") {
-  testonly = true
-  contains_all_drivers = true
-  deps = [
-    ":drivers-not-templates",
-    "//tools/create/goldens/my-driver-cpp:component",
-  ]
+  deps = [ "//bundles/drivers:drivers-build-only" ]
 }
 
 # Group including all drivers to extract documentation from.
-create_all_drivers_doc("create_all_drivers_doc") {
+group("create_all_drivers_doc") {
   testonly = true
-  deps = [ ":drivers-not-templates" ]
+  deps = [ "//bundles/drivers:create_all_drivers_doc" ]
 }

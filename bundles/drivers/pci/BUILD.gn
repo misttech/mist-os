@@ -1,0 +1,40 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+group("pci") {
+  deps = [
+    "//src/connectivity/ethernet/drivers/third_party/igc",
+    "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
+    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:fuchsia_driver",
+    "//src/devices/block/drivers/ahci:ahci",
+    "//src/devices/block/drivers/nvme:nvme",
+    "//src/devices/block/drivers/pci-sdhci:pci-sdhci",
+    "//src/devices/block/drivers/ufs:ufs",
+    "//src/devices/block/drivers/virtio:virtio_block",
+    "//src/devices/i2c/drivers/intel-i2c:intel-i2c",
+    "//src/devices/misc/drivers/virtio-rng:virtio_rng",
+    "//src/devices/misc/drivers/virtio-socket:virtio_socket",
+    "//src/devices/serial/drivers/virtio-console:virtio_console",
+    "//src/devices/usb/drivers/xhci:xhci",
+    "//src/graphics/display/drivers/intel-i915:intel-i915",
+    "//src/graphics/display/drivers/simple:simple.amd-kaveri",
+    "//src/graphics/display/drivers/simple:simple.bochs",
+    "//src/graphics/display/drivers/simple:simple.gga",
+    "//src/graphics/display/drivers/simple:simple.intel",
+    "//src/graphics/display/drivers/simple:simple.nv",
+    "//src/graphics/display/drivers/simple:simple.vmware",
+    "//src/graphics/display/drivers/virtio-guest:virtio_gpu",
+    "//src/graphics/drivers/misc/goldfish_address_space:address_space_driver",
+    "//src/media/audio/drivers/intel-hda/controller:intel-hda",
+    "//src/ui/input/drivers/virtio:virtio_input",
+    "//zircon/third_party/dev/ethernet/e1000:e1000",
+  ]
+
+  if (target_cpu == "x64") {
+    deps += [
+      "//src/connectivity/ethernet/drivers/realtek-8111:realtek-8111",
+      "//src/graphics/drivers/msd-intel-gen",
+    ]
+  }
+}

@@ -239,7 +239,7 @@ fuchsia_driver_component("fuchsia_driver") {
   manifest = "meta/brcmfmac_sdio.cml"
   deps = [ ":fuchsia_driver-driver" ]
   visibility += [
-    "//bundles/drivers:pci",
+    "//bundles/drivers/pci",
     "//src/connectivity/wlan:drivers",
   ]
   info = "fuchsia_driver-info.json"
