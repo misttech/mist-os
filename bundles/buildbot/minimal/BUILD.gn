@@ -4,6 +4,43 @@
 
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
+# For use with the 'hermetic_test_package_labels' GN build argument.
+group("hermetic_tests") {
+  testonly = true
+  deps = []
+
+  # TODO(fxbug.dev/131001): Define the set of tests that should run on minimal.
+  assert(
+      deps == [],
+      "'hermetic_tests' cannot be used before adding validation of test type.")
+}
+
+# For use with the 'test_package_labels' GN build argument.
+group("non-hermetic_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the non-hermetic tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The minimal product does not support the running of non-hermetic tests in infra.")
+}
+
+# For use with the 'e2e_test_labels' GN build argument.
+group("e2e_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the e2e_tests tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The minimal product does not support the running of end-to-end tests in infra.")
+}
+
 # WARNING: Known to infrastructure
 group("minimal") {
   testonly = true
@@ -13,6 +50,12 @@ group("minimal") {
   assert_no_deps = [ "//bundles/platform/*" ]
 
   deps = [
+    # All tests from the standardized test groups:
+    ":e2e_tests",
+    ":hermetic_tests",
+    ":non-hermetic_tests",
+
+    # Additional non-test things to build:
     ":additional_build_targets",
 
     # TODO(fxbug.dev/131001): Define the set of tests that should run on minimal.
