@@ -23,6 +23,7 @@ group("drivers") {
   testonly = true
   deps = [
     ":component",
+    "composite-replacement:component",
     "target-1-replacement:component",
     "target-2-replacement:component",
     "//src/devices/tests/v2/reload-driver:drivers",
@@ -62,6 +63,7 @@ fuchsia_unittest_package("replacedriver_test") {
   deps = [
     ":bin",
     ":component",  # target 1 with colocate = false
+    "composite-replacement:component",
     "target-1-replacement:component",
     "target-2-replacement:component",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",

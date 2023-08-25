@@ -6,6 +6,8 @@ following changes:
 - target 1 is not colocated with its parent
 - target 1 replacement driver will create a child called 'Z' (instead of 'I')
 - target 2 replacement driver will create a child called 'Y' (instead of 'K')
+- The composite replacement will create a child called 'J_replaced' (instead of 'J')
+- The composite replacement will have E as the primary node (instead of 'D').
 
 See `//src/devices/tests/v2/reload-driver/README.md`.
 
@@ -19,3 +21,8 @@ the main one has been disabled.
 
 This driver will be registered after the initial driver is disabled and its node goes to the
 available nodes. Once registered, it should get bound to the replacement.
+
+# Composite replacement
+
+This driver is a composite driver and will ensure that fully replacing a composite driver with
+different primary nodes and node names works.

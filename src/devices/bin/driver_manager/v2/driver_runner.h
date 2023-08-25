@@ -129,6 +129,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                  std::shared_ptr<BindResultTracker> result_tracker) override;
   void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) override;
   zx::result<DriverHost*> CreateDriverHost() override;
+  bool IsDriverHostValid(DriverHost* driver_host) const override;
 
   // BindManagerBridge interface.
   zx::result<std::string> StartDriver(

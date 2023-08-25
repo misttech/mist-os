@@ -204,6 +204,40 @@ impl CompositeNodeSpecManager {
         Ok(())
     }
 
+    pub fn rebind_composites_with_driver(
+        &mut self,
+        driver: String,
+        composite_drivers: Vec<&ResolvedDriver>,
+    ) -> Result<(), zx_status_t> {
+        let specs_to_rebind = self
+            .spec_list
+            .iter()
+            .filter_map(|(spec_name, spec_info)| {
+                let driver_info =
+                    spec_info.matched.as_ref().map(|matched| &matched.info.driver_info);
+                if let Some(info) = driver_info {
+                    if let Some(info) = info {
+                        let expected_url = Some(driver.clone());
+                        if info.url == expected_url || info.driver_url == expected_url {
+                            return Some(spec_name.to_string());
+                        }
+                    }
+                }
+                None
+            })
+            .collect::<Vec<_>>();
+
+        for spec_name in specs_to_rebind {
+            let spec = self.spec_list.get(&spec_name).ok_or(Status::NOT_FOUND.into_raw())?;
+            let new_match = self.find_composite_driver_match(&spec.nodes, &composite_drivers)?;
+            self.spec_list.entry(spec_name).and_modify(|spec| {
+                spec.matched = new_match;
+            });
+        }
+
+        Ok(())
+    }
+
     pub fn get_specs(&self, name_filter: Option<String>) -> Vec<fdd::CompositeNodeSpecInfo> {
         if let Some(name) = name_filter {
             match self.spec_list.get(&name) {
@@ -541,6 +575,10 @@ fn node_matches_composite_driver(
 
 fn get_driver_url(composite: &MatchedComposite) -> String {
     if let Some(driver_info) = &composite.info.driver_info {
+        if let Some(url) = &driver_info.url {
+            return url.to_string();
+        }
+
         if let Some(url) = &driver_info.driver_url {
             return url.to_string();
         }

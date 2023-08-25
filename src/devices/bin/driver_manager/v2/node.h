@@ -59,6 +59,13 @@ class NodeManager {
 
   virtual zx::result<DriverHost*> CreateDriverHost() = 0;
 
+  // DriverHost lifetimes are managed through a linked list, and they will delete themselves
+  // when the FIDL connection is closed. Currently in the Node class we store a raw pointer to the
+  // DriverHost object, and do not have a way to remove it from the class when the underlying
+  // DriverHost object is deallocated. This function will return true if the underlying DriverHost
+  // object is still alive and in the linked list. Otherwise returns false.
+  virtual bool IsDriverHostValid(DriverHost* driver_host) const { return true; }
+
   // Destroys the dynamic child component that runs the driver associated with
   // `node`.
   virtual void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) = 0;
@@ -219,7 +226,13 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   NodeType type() const { return type_; }
 
-  const DriverHost* driver_host() const { return *driver_host_; }
+  const DriverHost* driver_host() const {
+    if (node_manager_.has_value() && node_manager_.value()->IsDriverHostValid(*driver_host_)) {
+      return *driver_host_;
+    }
+
+    return nullptr;
+  }
 
   const std::string& driver_url() const;
 

@@ -429,6 +429,12 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
   return zx::ok(driver_host_ptr);
 }
 
+bool DriverRunner::IsDriverHostValid(DriverHost* driver_host) const {
+  return driver_hosts_.find_if([driver_host](const DriverHostComponent& host) {
+    return &host == driver_host;
+  }) != driver_hosts_.end();
+}
+
 zx::result<std::string> DriverRunner::StartDriver(
     Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) {
   if (!driver_info.has_url()) {
@@ -537,11 +543,6 @@ zx::result<> DriverRunner::CreateDriverHostComponent(
 
 zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
     std::string_view url, fdd::RematchFlags rematch_flags) {
-  if (rematch_flags & fdd::RematchFlags::kCompositeSpec) {
-    LOGF(WARNING, "Rematching composite spec is not supported currently.");
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
   auto driver_hosts = DriverHostsWithDriverUrl(url);
 
   // Perform a BFS over the node topology, if the current node's host is one of the driver_hosts
@@ -553,13 +554,20 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
   // on this node we will always create a new driver host. The old driver host will go away
   // on its own asynchronously since it is drained from all of its drivers.
   PerformBFS(root_node_,
-             [&driver_hosts, rematch_flags, url](const std::shared_ptr<dfv2::Node>& current) {
+             [this, &driver_hosts, rematch_flags, url](const std::shared_ptr<dfv2::Node>& current) {
                if (driver_hosts.find(current->driver_host()) == driver_hosts.end()) {
                  // Not colocated with one of the restarting hosts. Continue to visit the children.
                  return true;
                }
 
                if (current->EvaluateRematchFlags(rematch_flags, url)) {
+                 if (current->type() == dfv2::NodeType::kComposite) {
+                   // Composites need to go through a different flow that will fully remove the
+                   // node and empty out the composite spec management layer.
+                   RebindComposite(current->name(), std::nullopt, [](zx::result<>) {});
+                   return false;
+                 }
+
                  // Legacy composites and plain nodes both use the restart with rematch flow.
                  current->RestartNodeWithRematch();
                  return false;

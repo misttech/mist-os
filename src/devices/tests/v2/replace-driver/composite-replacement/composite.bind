@@ -1,0 +1,22 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+composite H_replaced;
+
+using fuchsia.reloaddriverbind.test;
+
+node "D_replaced" {
+  fuchsia.reloaddriverbind.test.TEST_BIND_PROPERTY ==
+    fuchsia.reloaddriverbind.test.TEST_BIND_PROPERTY.COMPOSITE_PARENT_D;
+}
+
+primary node "E_replaced" {
+  fuchsia.reloaddriverbind.test.TEST_BIND_PROPERTY ==
+    fuchsia.reloaddriverbind.test.TEST_BIND_PROPERTY.COMPOSITE_PARENT_E;
+}
+
+node "F_replaced" {
+  fuchsia.reloaddriverbind.test.TEST_BIND_PROPERTY ==
+    fuchsia.reloaddriverbind.test.TEST_BIND_PROPERTY.COMPOSITE_PARENT_F;
+}

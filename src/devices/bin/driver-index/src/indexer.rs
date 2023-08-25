@@ -77,7 +77,18 @@ impl Indexer {
             }
     }
 
-    // Create a list of all drivers in the following priority:
+    // Checks if the given driver is in the disabled list.
+    fn is_disabled(&self, driver: &ResolvedDriver) -> bool {
+        if self.disabled_driver_urls.borrow().contains(&fidl_fuchsia_pkg::PackageUrl {
+            url: driver.component_url.as_str().to_string(),
+        }) {
+            return true;
+        }
+
+        false
+    }
+
+    // Create a list of all drivers (except for disabled drivers) in the following priority:
     // 1. Non-fallback boot drivers
     // 2. Non-fallback base drivers
     // 3. Fallback boot drivers
@@ -105,6 +116,7 @@ impl Indexer {
             .chain(ephemeral.values())
             .chain(fallback_boot_drivers)
             .chain(fallback_base_drivers)
+            .filter(|&driver| !self.is_disabled(driver))
             .map(|driver| driver.clone())
             .collect::<Vec<_>>()
     }
@@ -152,14 +164,7 @@ impl Indexer {
                             return None;
                         }
                     }
-                    if self
-                        .disabled_driver_urls
-                        .borrow()
-                        .iter()
-                        .any(|disabled| disabled.url.as_str() == driver.component_url.as_str())
-                    {
-                        return None;
-                    }
+
                     Some((driver.fallback, matched))
                 } else {
                     None
@@ -216,6 +221,17 @@ impl Indexer {
             })
             .collect::<Vec<_>>();
         self.composite_node_spec_manager.borrow_mut().rebind(spec_name, composite_drivers)
+    }
+
+    pub fn rebind_composites_with_driver(&self, driver: String) -> Result<(), i32> {
+        let driver_list = self.list_drivers();
+        let composite_drivers = driver_list
+            .iter()
+            .filter(|&driver| matches!(driver.bind_rules, DecodedRules::Composite(_)))
+            .collect::<Vec<_>>();
+        self.composite_node_spec_manager
+            .borrow_mut()
+            .rebind_composites_with_driver(driver, composite_drivers)
     }
 
     pub fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdd::DriverInfo> {
@@ -306,7 +322,14 @@ impl Indexer {
     }
 
     pub fn disable_driver(&self, driver_url: fidl_fuchsia_pkg::PackageUrl) {
-        self.disabled_driver_urls.borrow_mut().insert(driver_url);
+        self.disabled_driver_urls.borrow_mut().insert(driver_url.clone());
+        let rebind_result = self.rebind_composites_with_driver(driver_url.url);
+        if let Err(e) = rebind_result {
+            tracing::error!(
+                "Failed to rebind composites with the driver being disabled: {}.",
+                Status::from_raw(e)
+            );
+        }
     }
 
     pub fn re_enable_driver(&self, driver_url: fidl_fuchsia_pkg::PackageUrl) -> Result<(), i32> {
