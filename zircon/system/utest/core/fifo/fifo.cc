@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -294,6 +295,7 @@ TEST(FifoTest, ReadBadBuffer) {
 
   // Note, no options means the buffer is not readable.
   ASSERT_OK(zx::vmar::root_self()->map(0, 0, vmo, 0, kVmoSize, &addr));
+  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, kVmoSize); });
 
   void* buffer = reinterpret_cast<void*>(addr);
 
@@ -318,6 +320,7 @@ TEST(FifoTest, WriteBadBuffer) {
 
   // Note, no options means the buffer is not readable.
   ASSERT_OK(zx::vmar::root_self()->map(0, 0, vmo, 0, kVmoSize, &addr));
+  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, kVmoSize); });
 
   void* buffer = reinterpret_cast<void*>(addr);
 
@@ -340,6 +343,7 @@ TEST(FifoTest, ReadPartialBadBuffer) {
 
   ASSERT_OK(
       zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
+  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, kVmoSize); });
 
   // Calculate buffer such that 1 element will fit, and the next will be out of bounds.
   void* buffer = reinterpret_cast<void*>(addr + kVmoSize - sizeof(ElementType));
@@ -365,6 +369,7 @@ TEST(FifoTest, WritePartialBadBuffer) {
 
   ASSERT_OK(
       zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
+  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, kVmoSize); });
 
   // Calculate buffer such that 1 element will fit, and the next will be out of bounds.
   void* buffer = reinterpret_cast<void*>(addr + kVmoSize - sizeof(ElementType));
