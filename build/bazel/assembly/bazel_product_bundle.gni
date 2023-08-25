@@ -284,6 +284,10 @@ template("bazel_product_bundle") {
       bazel_targets = [ invoker.bazel_size_checker_target + "_aggregator" ]
       bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
 
+      # Size checker prints out size information when limits are exceeded on
+      # INFO level, so it is necessary to include Bazel INFO logs here.
+      filter_bazel_info_logs = false
+
       _size_report_path = "${_size_report_target}/size_report.json"
       copy_outputs = [
         {

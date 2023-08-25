@@ -124,6 +124,13 @@ declare_args() {
 #     A list extra command line arguments to pass to Bazel.
 #     Type: list of string.
 #
+#   filter_bazel_info_logs: (optional)
+#     When true (the default value), INFO level logs are filtered from Bazel.
+#     INFO level logs from Bazel are usually not interesting during Ninja
+#     invocations.
+#     Type: boolean
+#     Default: true
+#
 #   deps:
 #   metadata:
 #   no_output_dir_leaks:
@@ -375,13 +382,22 @@ template("bazel_action") {
           [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]
     }
 
+    _filter_bazel_info_logs = true
+    if (defined(invoker.filter_bazel_info_logs)) {
+      _filter_bazel_info_logs = invoker.filter_bazel_info_logs
+    }
+
     if (bazel_quiet) {
       args += [ "--config=quiet" ]
+      not_needed([ "_filter_bazel_info_logs" ])
     } else {
-      # Disable INFO lines and printing results, this makes Bazel output much
-      # less chatty when invoked from Ninja. https://fxbug.dev/126548
+      if (_filter_bazel_info_logs) {
+        # Disable INFO lines and printing results, this makes Bazel output much
+        # less chatty when invoked from Ninja. https://fxbug.dev/126548
+        args += [ "--ui_event_filters=-info" ]
+      }
+
       # Note that --show_result=0 is not supported by `bazel query`.
-      args += [ "--ui_event_filters=-info" ]
       if (invoker.command != "query") {
         args += [ "--show_result=0" ]
       }
