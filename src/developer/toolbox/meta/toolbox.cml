@@ -1,0 +1,8 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This manifest is intentionally empty. The toolbox component exists to parent
+// other components. Software assembly is used to composite the toolbox
+// manifest based on children of the toolbox realm.
+{}

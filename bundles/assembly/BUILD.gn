@@ -785,8 +785,19 @@ assembly_input_bundle("core_realm_development_access") {
                     "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
                     "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
                     "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
+                    "//src/developer/toolbox/meta/toolbox.core_shard.cml",
                   ],
                   root_build_dir)
+        },
+      ]
+    },
+    {
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = rebase_path("//src/developer/toolbox/meta/toolbox.cml",
+                               root_build_dir)
         },
       ]
     },
