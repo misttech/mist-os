@@ -11,7 +11,7 @@ use {
     fxfs_crypto::{Crypt, UnwrappedKeys, WrappedKeys, XtsCipherSet},
     std::{
         cell::UnsafeCell,
-        collections::{hash_map::Entry, HashMap},
+        collections::{btree_map::Entry, BTreeMap},
         future::Future,
         pin::pin,
         sync::{Arc, Mutex},
@@ -28,14 +28,14 @@ const PURGE_TIMEOUT: Duration = Duration::from_secs(37);
 /// A simple cache that purges entries periodically when `purge` is called.  The API is similar to
 /// HashMap's.
 struct Cache<V> {
-    hash: HashMap<u64, V>,
-    pending_purge: HashMap<u64, V>,
-    permanent: HashMap<u64, V>,
+    hash: BTreeMap<u64, V>,
+    pending_purge: BTreeMap<u64, V>,
+    permanent: BTreeMap<u64, V>,
 }
 
 impl<V> Cache<V> {
     fn new() -> Self {
-        Self { hash: HashMap::new(), pending_purge: HashMap::new(), permanent: HashMap::new() }
+        Self { hash: BTreeMap::new(), pending_purge: BTreeMap::new(), permanent: BTreeMap::new() }
     }
 
     fn get(&mut self, key: u64) -> Option<&V> {
@@ -61,8 +61,11 @@ impl<V> Cache<V> {
     }
 
     /// This purges entries that haven't been accessed since the last call to purge.
-    fn purge(&mut self) {
+    ///
+    /// Returns true if the cache no longer has any purgeable entries.
+    fn purge(&mut self) -> bool {
         self.pending_purge = std::mem::take(&mut self.hash);
+        self.pending_purge.is_empty()
     }
 
     fn clear(&mut self) {
@@ -80,12 +83,30 @@ impl<V> Cache<V> {
 
 pub struct KeyManager {
     inner: Arc<Mutex<Inner>>,
-    _purge_task: fasync::Task<()>,
 }
 
 struct Inner {
     keys: Cache<Arc<XtsCipherSet>>,
-    unwrapping: HashMap<u64, Arc<UnwrapResult>>,
+    unwrapping: BTreeMap<u64, Arc<UnwrapResult>>,
+    purge_task: Option<fasync::Task<()>>,
+}
+
+impl Inner {
+    fn start_purge_task(&mut self, inner: &Arc<Mutex<Inner>>) {
+        self.purge_task.get_or_insert_with(move || {
+            let inner = inner.clone();
+            fasync::Task::spawn(async move {
+                loop {
+                    fasync::Timer::new(PURGE_TIMEOUT).await;
+                    let mut inner = inner.lock().unwrap();
+                    if inner.keys.purge() {
+                        inner.purge_task = None;
+                        break;
+                    }
+                }
+            })
+        });
+    }
 }
 
 struct UnwrapResult {
@@ -100,7 +121,7 @@ impl UnwrapResult {
 
     fn set(
         &self,
-        inner: &Mutex<Inner>,
+        inner: &Arc<Mutex<Inner>>,
         object_id: u64,
         permanent: bool,
         result: Result<Option<Arc<XtsCipherSet>>, Error>,
@@ -112,12 +133,13 @@ impl UnwrapResult {
             }
             error!(?error, oid = object_id, "Failed to unwrap keys");
         }
-        let mut inner = inner.lock().unwrap();
-        if let Entry::Occupied(o) = inner.unwrapping.entry(object_id) {
+        let mut guard = inner.lock().unwrap();
+        if let Entry::Occupied(o) = guard.unwrapping.entry(object_id) {
             if std::ptr::eq(Arc::as_ptr(o.get()), self) {
                 o.remove();
                 if let Ok(Some(keys)) = &result {
-                    inner.keys.insert(object_id, keys.clone(), permanent);
+                    guard.keys.insert(object_id, keys.clone(), permanent);
+                    guard.start_purge_task(inner);
                 }
             }
         }
@@ -130,19 +152,13 @@ unsafe impl Sync for UnwrapResult {}
 
 impl KeyManager {
     pub fn new() -> Self {
-        let inner = Arc::new(Mutex::new(Inner { keys: Cache::new(), unwrapping: HashMap::new() }));
+        let inner = Arc::new(Mutex::new(Inner {
+            keys: Cache::new(),
+            unwrapping: BTreeMap::new(),
+            purge_task: None,
+        }));
 
-        let purge_task = {
-            let inner = inner.clone();
-            fasync::Task::spawn(async move {
-                loop {
-                    fasync::Timer::new(PURGE_TIMEOUT).await;
-                    inner.lock().unwrap().keys.purge();
-                }
-            })
-        };
-
-        Self { inner, _purge_task: purge_task }
+        Self { inner }
     }
 
     /// Retrieves a key from the cache but won't initiate unwrapping if no key is present.  If the
@@ -242,7 +258,9 @@ impl KeyManager {
     /// This inserts the keys into the cache.  Any existing keys will be overwritten.  It's
     /// unspecified what happens if keys for the object are currently being unwrapped.
     pub fn insert(&self, object_id: u64, keys: impl ToCipherSet, permanent: bool) {
-        self.inner.lock().unwrap().keys.insert(object_id, keys.to_cipher_set(), permanent);
+        let mut inner = self.inner.lock().unwrap();
+        inner.keys.insert(object_id, keys.to_cipher_set(), permanent);
+        inner.start_purge_task(&self.inner);
     }
 
     pub fn remove(&self, object_id: u64) {
