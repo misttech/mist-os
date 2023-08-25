@@ -19,6 +19,7 @@ use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_routes_ext as froutes_ext;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
+use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use fuchsia_zircon_status as zx;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ipv4, Ipv6};
@@ -70,6 +71,8 @@ pub trait NetCliDepsConnector:
     + ServiceConnector<froutes::StateV4Marker>
     + ServiceConnector<froutes::StateV6Marker>
     + ServiceConnector<fname::LookupMarker>
+    + ServiceConnector<fnet_migration::ControlMarker>
+    + ServiceConnector<fnet_migration::StateMarker>
 {
 }
 
@@ -86,6 +89,8 @@ impl<O> NetCliDepsConnector for O where
         + ServiceConnector<froutes::StateV4Marker>
         + ServiceConnector<froutes::StateV6Marker>
         + ServiceConnector<fname::LookupMarker>
+        + ServiceConnector<fnet_migration::ControlMarker>
+        + ServiceConnector<fnet_migration::StateMarker>
 {
 }
 
@@ -118,6 +123,11 @@ pub async fn do_root<C: NetCliDepsConnector>(
         }
         CommandEnum::Dns(opts::dns::Dns { dns_cmd: cmd }) => {
             do_dns(out, cmd, connector).await.context("failed during dns command")
+        }
+        CommandEnum::NetstackMigration(opts::NetstackMigration { cmd }) => {
+            do_netstack_migration(out, cmd, connector)
+                .await
+                .context("failed during migration command")
         }
     }
 }
@@ -1432,6 +1442,37 @@ async fn do_dns<W: std::io::Write, C: NetCliDepsConnector>(
     Ok(())
 }
 
+async fn do_netstack_migration<W: std::io::Write, C: NetCliDepsConnector>(
+    mut out: W,
+    cmd: opts::NetstackMigrationEnum,
+    connector: &C,
+) -> Result<(), Error> {
+    match cmd {
+        opts::NetstackMigrationEnum::Set(opts::NetstackMigrationSet { version }) => {
+            let control =
+                connect_with_context::<fnet_migration::ControlMarker, _>(connector).await?;
+            control
+                .set_user_netstack_version(Some(&fnet_migration::VersionSetting { version }))
+                .await
+                .context("failed to set stack version")
+        }
+        opts::NetstackMigrationEnum::Clear(opts::NetstackMigrationClear {}) => {
+            let control =
+                connect_with_context::<fnet_migration::ControlMarker, _>(connector).await?;
+            control.set_user_netstack_version(None).await.context("failed to set stack version")
+        }
+        opts::NetstackMigrationEnum::Get(opts::NetstackMigrationGet {}) => {
+            let state = connect_with_context::<fnet_migration::StateMarker, _>(connector).await?;
+            let fnet_migration::InEffectVersion { current_boot, user, automated, .. } =
+                state.get_netstack_version().await.context("failed to get stack version")?;
+            writeln!(out, "current_boot = {current_boot:?}")?;
+            writeln!(out, "user = {user:?}")?;
+            writeln!(out, "automated = {automated:?}")?;
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1579,6 +1620,24 @@ mod tests {
                 .as_ref()
                 .cloned()
                 .ok_or(anyhow::anyhow!("connector has no name lookup instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<fnet_migration::ControlMarker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<fnet_migration::ControlMarker as ProtocolMarker>::Proxy, Error> {
+            unimplemented!("stack migration not supported");
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<fnet_migration::StateMarker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<fnet_migration::StateMarker as ProtocolMarker>::Proxy, Error> {
+            unimplemented!("stack migration not supported");
         }
     }
 

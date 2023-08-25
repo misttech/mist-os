@@ -14,6 +14,7 @@ use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_root as froot;
 use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
+use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol_at_path;
@@ -87,6 +88,7 @@ const REALM_QUERY_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";
 const NETSTACK_MONIKER: &str = "./core/network/netstack";
 const DHCPD_MONIKER: &str = "./core/network/dhcpd";
 const DNS_RESOLVER_MONIKER: &str = "./core/network/dns-resolver";
+const MIGRATION_CONTROLLER_MONIKER: &str = "./core/network/network-features";
 
 #[async_trait::async_trait]
 impl net_cli::ServiceConnector<fdebug::InterfacesMarker> for Connector {
@@ -171,6 +173,30 @@ impl net_cli::ServiceConnector<froutes::StateV6Marker> for Connector {
 impl net_cli::ServiceConnector<fname::LookupMarker> for Connector {
     async fn connect(&self) -> Result<<fname::LookupMarker as ProtocolMarker>::Proxy, Error> {
         self.connect_to_exposed_protocol::<fname::LookupMarker>(DNS_RESOLVER_MONIKER).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<fnet_migration::ControlMarker> for Connector {
+    async fn connect(
+        &self,
+    ) -> Result<<fnet_migration::ControlMarker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<fnet_migration::ControlMarker>(
+            MIGRATION_CONTROLLER_MONIKER,
+        )
+        .await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<fnet_migration::StateMarker> for Connector {
+    async fn connect(
+        &self,
+    ) -> Result<<fnet_migration::StateMarker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<fnet_migration::StateMarker>(
+            MIGRATION_CONTROLLER_MONIKER,
+        )
+        .await
     }
 }
 

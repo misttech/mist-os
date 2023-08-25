@@ -10,6 +10,7 @@ use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use std::{
     collections::HashMap,
     convert::{TryFrom as _, TryInto as _},
@@ -59,6 +60,7 @@ pub enum CommandEnum {
     Dhcp(Dhcp),
     Dhcpd(dhcpd::Dhcpd),
     Dns(dns::Dns),
+    NetstackMigration(NetstackMigration),
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]
@@ -753,6 +755,51 @@ pub struct DhcpStop {
     #[argh(positional, arg_name = "nicid or name:ifname")]
     pub interface: InterfaceIdentifier,
 }
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "migration")]
+/// controls netstack selection for migration from netstack2 to netstack3
+pub struct NetstackMigration {
+    #[argh(subcommand)]
+    pub cmd: NetstackMigrationEnum,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum NetstackMigrationEnum {
+    Set(NetstackMigrationSet),
+    Get(NetstackMigrationGet),
+    Clear(NetstackMigrationClear),
+}
+
+fn parse_netstack_version(s: &str) -> Result<fnet_migration::NetstackVersion, String> {
+    match s {
+        "ns2" => Ok(fnet_migration::NetstackVersion::Netstack2),
+        "ns3" => Ok(fnet_migration::NetstackVersion::Netstack3),
+        // NB: argh already prints the bad value to the user, no need to repeat
+        // it.
+        _ => Err(format!("valid values are ns2 or ns3")),
+    }
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "set")]
+/// sets the netstack version at next boot to |ns2| or |ns3|.
+pub struct NetstackMigrationSet {
+    #[argh(positional, from_str_fn(parse_netstack_version))]
+    /// ns2 or ns3
+    pub version: fnet_migration::NetstackVersion,
+}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "get")]
+/// prints the currently configured netstack version for migration.
+pub struct NetstackMigrationGet {}
+
+#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "clear")]
+/// clears netstack version for migration configuration.
+pub struct NetstackMigrationClear {}
 
 #[cfg(test)]
 mod tests {

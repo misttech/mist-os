@@ -20,11 +20,13 @@ use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_root as froot;
 use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
+use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 
 const NETSTACK_MONIKER_SUFFIX: &str = "/netstack";
 const DHCPD_MONIKER_SUFFIX: &str = "/dhcpd";
 const DNS_MONIKER_SUFFIX: &str = "/dns-resolver";
 const NETWORK_REALM: &str = "/core/network";
+const MIGRATION_CONTROLLER_SUFFIX: &str = "/netstack-migration";
 
 struct FfxConnector<'a> {
     remote_control: fremotecontrol::RemoteControlProxy,
@@ -164,6 +166,25 @@ impl net_cli::ServiceConnector<fname::LookupMarker> for FfxConnector<'_> {
         &self,
     ) -> Result<<fname::LookupMarker as ProtocolMarker>::Proxy, anyhow::Error> {
         self.remotecontrol_connect::<fname::LookupMarker>(DNS_MONIKER_SUFFIX).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<fnet_migration::ControlMarker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<fnet_migration::ControlMarker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<fnet_migration::ControlMarker>(MIGRATION_CONTROLLER_SUFFIX)
+            .await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<fnet_migration::StateMarker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<fnet_migration::StateMarker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<fnet_migration::StateMarker>(MIGRATION_CONTROLLER_SUFFIX).await
     }
 }
 
