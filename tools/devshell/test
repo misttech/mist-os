@@ -67,7 +67,9 @@ else
 
   FUCHSIA_SSH_KEY="$(get-ssh-privkey)" || exit $?
   export FUCHSIA_SSH_KEY
-  export FUCHSIA_TEST_OUTDIR="${FUCHSIA_OUT_DIR}/test_out/$(date +'%F-%H:%M:%S')"
+
+  # Only set this environment variable if it's empty.
+  [ -z "$FUCHSIA_TEST_OUTDIR" ] && export FUCHSIA_TEST_OUTDIR="${FUCHSIA_OUT_DIR}/test_out/$(date +'%F-%H:%M:%S')"
 fi
 
 args=()
