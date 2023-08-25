@@ -45,7 +45,6 @@ type Modules struct {
 	testSpecs                []TestSpec
 	testDurations            []TestDuration
 	tools                    Tools
-	bootTests                []BootTest
 }
 
 // NewModules returns a Modules associated with a given build directory.
@@ -74,7 +73,6 @@ func NewModules(buildDir string) (*Modules, error) {
 		"test_durations.json":              &m.testDurations,
 		"test_list_location.json":          &m.testListLocation,
 		"tool_paths.json":                  &m.tools,
-		"boot_tests.json":                  &m.bootTests,
 	}
 	// Ensure we read the manifests in order, so that if multiple manifests are
 	// missing we always get the same error.
@@ -185,8 +183,4 @@ func (m Modules) TestSpecs() []TestSpec {
 
 func (m Modules) Tools() Tools {
 	return m.tools
-}
-
-func (m Modules) BootTests() []BootTest {
-	return m.bootTests
 }
