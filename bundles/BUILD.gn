@@ -5,12 +5,6 @@
 import("//build/drivers/check_included_drivers.gni")
 import("//build/drivers/create_all_drivers_doc.gni")
 
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("bootstrap") {
-}
-group("debugging") {
-}
-
 # A collection of all stress tests available in-tree. The tests in this group will be built
 # and run on the core.qemu-x64-stress builder.
 group("stress-tests") {
