@@ -16,33 +16,33 @@ group("ffx") {
 
   public_deps = [
     ":ffx-defaults.json($host_toolchain)",
-    ":ffx_tool",
+    ":ffx_tool($host_toolchain)",
     ":tests",
     "lib($host_toolchain)",
   ]
 }
 
-group("ffx_tool") {
-  deps = [
-    ":host",
-    "frontends/ffx:ffx_bin($host_toolchain)",
-    "tools($host_toolchain)",
-  ]
-}
-
-install_host_tools("host") {
-  deps = [ "frontends/ffx:ffx_bin" ]
-  outputs = [ "ffx" ]
-}
-
-group("runtime") {
-  deps = [
-    # The tool
-    ":host",
-  ]
-}
-
 if (is_host) {
+  group("ffx_tool") {
+    deps = [
+      ":host",
+      "frontends/ffx:ffx_bin($host_toolchain)",
+      "tools($host_toolchain)",
+    ]
+  }
+
+  install_host_tools("host") {
+    deps = [ "frontends/ffx:ffx_bin" ]
+    outputs = [ "ffx" ]
+  }
+
+  group("runtime") {
+    deps = [
+      # The tool
+      ":host",
+    ]
+  }
+
   group("ffx_bin") {
     public_deps = [ "frontends/ffx:ffx_bin" ]
 

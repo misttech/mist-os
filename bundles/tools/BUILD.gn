@@ -18,7 +18,6 @@ group("tools") {
     "//src/connectivity/bluetooth/tools/bt-snoop",
     "//src/developer/debug/zxdb:zxdb_host",
     "//src/developer/fastboot",
-    "//src/developer/ffx:ffx_tool",
     "//src/devices/bundles:tools",
     "//src/devices/lib/bind",
     "//src/graphics/display:tools",
