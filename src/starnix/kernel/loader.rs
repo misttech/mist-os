@@ -249,7 +249,7 @@ pub struct ResolvedInterpElf {
 
 // The magic bytes of a script file.
 const HASH_BANG: &[u8; 2] = b"#!";
-const MAX_RECURSION_DEPTH: usize = 4;
+const MAX_RECURSION_DEPTH: usize = 5;
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth. `argv` may change due to script interpreter logic.
@@ -273,7 +273,7 @@ fn resolve_executable_impl(
     environ: Vec<CString>,
     recursion_depth: usize,
 ) -> Result<ResolvedElf, Errno> {
-    if recursion_depth >= MAX_RECURSION_DEPTH {
+    if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
     }
     let vmo = file.get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;

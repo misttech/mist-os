@@ -141,7 +141,6 @@
                 // These tests try to use `/tmp` and that doesn't exist in
                 // the Android system image (it's actually under `/data/tmp`).
                 "InterpreterScriptTest.Whitespace",
-                "InterpreterScriptTest.MaxRecursion",
 
                 // exit_test
                 "ExitTest.SigkillZombieGroup",
@@ -1062,6 +1061,9 @@
                 // New failing gvisor test. Skip it to allow roller to pass.
                 "ProcTask.VerifyTaskChildren",
                 "ProcFilesystems.ReadCapLastCap",
+
+                // Panic on elf load
+                "InterpreterScriptTest.MaxRecursion",
             ],
         },
     ],
