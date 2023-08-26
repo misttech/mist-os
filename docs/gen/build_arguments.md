@@ -421,7 +421,7 @@ The number of pager threads to spawn for blobfs.
 
 **Current value (from the default):** `2`
 
-From //src/storage/bin/blobfs/BUILD.gn:23
+From //src/storage/bin/blobfs/BUILD.gn:22
 
 ### blobfs_page_in_metrics_recording
 
@@ -1215,9 +1215,9 @@ From //build/toolchain/rbe.gni:180
 
 Enable compression of debug sections.
 
-**Current value (from the default):** `"zstd"`
+**Current value (from the default):** `"none"`
 
-From //build/config/compiler.gni:90
+From //build/config/compiler.gni:85
 
 ### config_example_cpp_greeting
 
