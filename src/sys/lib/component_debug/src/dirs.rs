@@ -76,6 +76,19 @@ impl Into<fsys::OpenDirType> for OpenDirType {
     }
 }
 
+impl From<fsys::OpenDirType> for OpenDirType {
+    fn from(fidl_type: fsys::OpenDirType) -> Self {
+        match fidl_type {
+            fsys::OpenDirType::OutgoingDir => Self::Outgoing,
+            fsys::OpenDirType::RuntimeDir => Self::Runtime,
+            fsys::OpenDirType::PackageDir => Self::Package,
+            fsys::OpenDirType::ExposedDir => Self::Exposed,
+            fsys::OpenDirType::NamespaceDir => Self::Namespace,
+            fsys::OpenDirTypeUnknown!() => panic!("This should not be constructed"),
+        }
+    }
+}
+
 /// Opens a protocol in a component instance directory, assuming it is located at the root.
 pub async fn connect_to_instance_protocol_at_dir_root<P: ProtocolMarker>(
     moniker: &Moniker,

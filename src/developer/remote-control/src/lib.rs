@@ -136,7 +136,34 @@ impl RemoteControlService {
             } => {
                 responder.send(
                     self.clone()
-                        .connect_capability(moniker, capability_name, flags, server_chan)
+                        .connect_capability(
+                            moniker,
+                            fsys::OpenDirType::ExposedDir,
+                            capability_name,
+                            flags,
+                            server_chan,
+                        )
+                        .await,
+                )?;
+                Ok(())
+            }
+            rcs::RemoteControlRequest::OpenCapability {
+                moniker,
+                capability_set,
+                capability_name,
+                server_channel,
+                flags,
+                responder,
+            } => {
+                responder.send(
+                    self.clone()
+                        .connect_capability(
+                            moniker,
+                            capability_set,
+                            capability_name,
+                            flags,
+                            server_channel,
+                        )
                         .await,
                 )?;
                 Ok(())
@@ -400,10 +427,12 @@ impl RemoteControlService {
         Ok(())
     }
 
-    /// Connects to an exposed capability identified by the given moniker and capability name.
+    /// Connects to a capability identified by the given moniker in the specified set of
+    /// capabilities at the given capability name.
     async fn connect_capability(
         self: &Rc<Self>,
         moniker: String,
+        capability_set: fsys::OpenDirType,
         capability_name: String,
         flags: io::OpenFlags,
         server_end: zx::Channel,
@@ -429,13 +458,24 @@ impl RemoteControlService {
 
         let moniker = Moniker::try_from(moniker.as_str())
             .map_err(|_| rcs::ConnectCapabilityError::InvalidMoniker)?;
-        connect_to_exposed_capability(moniker, capability_name, server_end, flags, lifecycle, query)
-            .await
+        connect_to_capability_at_moniker(
+            moniker,
+            capability_set,
+            capability_name,
+            server_end,
+            flags,
+            lifecycle,
+            query,
+        )
+        .await
     }
 }
 
-async fn connect_to_exposed_capability(
+/// Connect to the capability at the provided moniker in the specified set of capabilities under
+/// the provided capability name.
+async fn connect_to_capability_at_moniker(
     moniker: Moniker,
+    capability_set: fsys::OpenDirType,
     capability_name: String,
     server_end: zx::Channel,
     flags: io::OpenFlags,
@@ -455,25 +495,25 @@ async fn connect_to_exposed_capability(
         })
         .await?;
 
-    let exposed_dir = open_instance_dir_root_readable(&moniker, OpenDirType::Exposed, &query)
+    let exposed_dir = open_instance_dir_root_readable(&moniker, capability_set.into(), &query)
         .map_err(|err| {
             error!(?err, "error opening exposed dir");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })
         .await?;
 
-    connect_to_capability_in_exposed_dir(&exposed_dir, &capability_name, server_end, flags).await?;
+    connect_to_capability_in_dir(&exposed_dir, &capability_name, server_end, flags).await?;
     Ok(())
 }
 
-async fn connect_to_capability_in_exposed_dir(
-    exposed_dir: &io::DirectoryProxy,
+async fn connect_to_capability_in_dir(
+    dir: &io::DirectoryProxy,
     capability_name: &str,
     server_end: zx::Channel,
     flags: io::OpenFlags,
 ) -> Result<(), rcs::ConnectCapabilityError> {
     // Check if capability exists in exposed dir.
-    let entries = fuchsia_fs::directory::readdir(exposed_dir)
+    let entries = fuchsia_fs::directory::readdir(dir)
         .await
         .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;
     let is_capability_exposed = entries.iter().any(|e| &e.name == &capability_name);
@@ -482,12 +522,12 @@ async fn connect_to_capability_in_exposed_dir(
     }
 
     // Connect to the capability
-    exposed_dir
-        .open(flags, io::ModeType::empty(), capability_name, ServerEnd::new(server_end))
-        .map_err(|err| {
+    dir.open(flags, io::ModeType::empty(), capability_name, ServerEnd::new(server_end)).map_err(
+        |err| {
             error!(%err, "error opening capability from exposed dir");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
-        })
+        },
+    )
 }
 
 #[derive(Debug)]
@@ -808,7 +848,11 @@ mod tests {
         fasync::Task::spawn(fs.collect::<()>()).detach();
     }
 
-    fn setup_fake_realm_query() -> fsys::RealmQueryProxy {
+    /// Set up a fake realm query which asserts a requests coming in have the
+    /// right options set, including which of a component's capability sets
+    /// (ie. incoming namespace, outgoing directory, etc) the capability is
+    /// expected to be requested from.
+    fn setup_fake_realm_query(capability_set: fsys::OpenDirType) -> fsys::RealmQueryProxy {
         fidl::endpoints::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
             match request {
                 fsys::RealmQueryRequest::Open {
@@ -821,7 +865,7 @@ mod tests {
                     responder,
                 } => {
                     assert_eq!(moniker, "core/my_component");
-                    assert_eq!(dir_type, fsys::OpenDirType::ExposedDir);
+                    assert_eq!(dir_type, capability_set);
                     assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
                     assert_eq!(mode, fio::ModeType::empty());
                     assert_eq!(path, ".");
@@ -837,39 +881,53 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_connect_to_exposed_capability() -> Result<()> {
-        let (_client, server) = zx::Channel::create();
-        let lifecycle = setup_fake_lifecycle_controller();
-        let query = setup_fake_realm_query();
-        connect_to_exposed_capability(
-            Moniker::try_from("./core/my_component").unwrap(),
-            "fuchsia.hwinfo.Board".to_string(),
-            server,
-            io::OpenFlags::RIGHT_READABLE,
-            lifecycle,
-            query,
-        )
-        .await
-        .unwrap();
+    async fn test_connect_to_component_capability() -> Result<()> {
+        for dir_type in vec![
+            fsys::OpenDirType::ExposedDir,
+            fsys::OpenDirType::NamespaceDir,
+            fsys::OpenDirType::OutgoingDir,
+        ] {
+            let (_client, server) = zx::Channel::create();
+            let lifecycle = setup_fake_lifecycle_controller();
+            let query = setup_fake_realm_query(dir_type);
+            connect_to_capability_at_moniker(
+                Moniker::try_from("./core/my_component").unwrap(),
+                dir_type,
+                "fuchsia.hwinfo.Board".to_string(),
+                server,
+                io::OpenFlags::RIGHT_READABLE,
+                lifecycle,
+                query,
+            )
+            .await
+            .unwrap();
+        }
         Ok(())
     }
 
     #[fuchsia::test]
-    async fn test_connect_to_capability_not_exposed() -> Result<()> {
-        let (_client, server) = zx::Channel::create();
-        let lifecycle = setup_fake_lifecycle_controller();
-        let query = setup_fake_realm_query();
-        let error = connect_to_exposed_capability(
-            Moniker::try_from("./core/my_component").unwrap(),
-            "fuchsia.not.exposed".to_string(),
-            server,
-            io::OpenFlags::RIGHT_READABLE,
-            lifecycle,
-            query,
-        )
-        .await
-        .unwrap_err();
-        assert_eq!(error, rcs::ConnectCapabilityError::NoMatchingCapabilities);
+    async fn test_connect_to_capability_not_available() -> Result<()> {
+        for dir_type in vec![
+            fsys::OpenDirType::ExposedDir,
+            fsys::OpenDirType::NamespaceDir,
+            fsys::OpenDirType::OutgoingDir,
+        ] {
+            let (_client, server) = zx::Channel::create();
+            let lifecycle = setup_fake_lifecycle_controller();
+            let query = setup_fake_realm_query(dir_type);
+            let error = connect_to_capability_at_moniker(
+                Moniker::try_from("./core/my_component").unwrap(),
+                dir_type,
+                "fuchsia.not.exposed".to_string(),
+                server,
+                io::OpenFlags::RIGHT_READABLE,
+                lifecycle,
+                query,
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(error, rcs::ConnectCapabilityError::NoMatchingCapabilities);
+        }
         Ok(())
     }
 

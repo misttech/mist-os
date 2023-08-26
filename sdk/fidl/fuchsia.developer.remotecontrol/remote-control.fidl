@@ -77,10 +77,22 @@ closed protocol RemoteControl {
     // Connects a channel to a service, given a moniker and a channel iff the
     // component identified by the given moniker exposes a capability of the
     // requested name.
+    @deprecated("Please use `OpenCapability` with `OpenDirType::Exposed`")
     strict ConnectCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;
         capability_name component.name;
         server_chan zx.Handle:CHANNEL;
+        flags io.OpenFlags;
+    }) -> () error ConnectCapabilityError;
+
+    // Connects a channel to a service, given a moniker and a channel iff the
+    // component identified by the given moniker exposes a capability of the
+    // requested name.
+    strict OpenCapability(resource struct {
+        moniker string:component.MAX_MONIKER_LENGTH;
+        capability_set sys2.OpenDirType;
+        capability_name component.name;
+        server_channel zx.Handle:CHANNEL;
         flags io.OpenFlags;
     }) -> () error ConnectCapabilityError;
 
