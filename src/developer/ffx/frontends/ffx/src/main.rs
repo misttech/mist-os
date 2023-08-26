@@ -110,6 +110,7 @@ async fn run_legacy_subcommand(
         .and_then(|_| tempfile::tempdir_in(&cache_path))
         .user_message("Unable to create hoist cache directory")?;
     let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
+    tracing::debug!("initializing overnet");
     let injector = Injection::initialize_overnet(
         context,
         hoist_cache_dir.path(),

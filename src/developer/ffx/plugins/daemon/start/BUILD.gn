@@ -14,6 +14,7 @@ ffx_plugin("ffx_daemon_start") {
     "//src/developer/ffx/daemon/server:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:tracing",
   ]
 
   args_sources = [ "src/args.rs" ]

@@ -356,6 +356,7 @@ impl Daemon {
     }
 
     pub async fn start(&mut self, hoist: &Hoist) -> Result<()> {
+        tracing::debug!("starting daemon");
         let context =
             ffx_config::global_env_context().context("Discovering ffx environment context")?;
 

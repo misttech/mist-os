@@ -21,6 +21,7 @@ impl FfxMain for DaemonStartTool {
     type Writer = fho::SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        tracing::debug!("in daemon start main");
         // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
         // instead.
         let hoist = hoist::hoist();
@@ -34,12 +35,14 @@ impl FfxMain for DaemonStartTool {
         };
         let parent_dir =
             ascendd_path.parent().ok_or_else(|| user_error!("Daemon socket path had no parent"))?;
+        tracing::debug!("creating daemon socket dir");
         std::fs::create_dir_all(parent_dir).with_user_message(|| {
             format!(
                 "Could not create directory for the daemon socket ({path})",
                 path = parent_dir.display()
             )
         })?;
+        tracing::debug!("creating daemon");
         let mut daemon = ffx_daemon_server::Daemon::new(ascendd_path);
         daemon.start(hoist).await.bug()
     }

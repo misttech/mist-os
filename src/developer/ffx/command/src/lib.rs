@@ -73,8 +73,10 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
 
     let metrics = MetricsSession::start(&context).await?;
+    tracing::debug!("metrics session started");
 
     let stamp = stamp_file(&app.stamp)?;
+    tracing::debug!("stamp file created, running tool");
     let res = match tool {
         Some(tool) => tool.run(metrics).await,
         // since we didn't run a subtool, do the metrics ourselves

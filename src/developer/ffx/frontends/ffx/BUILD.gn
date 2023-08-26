@@ -53,6 +53,7 @@ ffx("ffx") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:tracing",
   ]
 
   args_sources = [ "src/args.rs" ]
