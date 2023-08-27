@@ -201,20 +201,21 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_info_job_t, exited, 8, 1);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_job_t, kill_on_oom, 9, 1);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_job_t, debugger_attached, 10, 1);
 
-VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_maps_mapping_t, 32, 8);
+VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_maps_mapping_t, 40, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_mapping_t, mmu_flags, 0, 4);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_mapping_t, vmo_koid, 8, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_mapping_t, vmo_offset, 16, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_mapping_t, committed_pages, 24, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_mapping_t, populated_pages, 32, 8);
 
-VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_maps_t, 96, 8);
+VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_maps_t, 104, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, name, 0, 32);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, base, 32, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, size, 40, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, depth, 48, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, type, 56, 4);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, u, 64, 32);
-VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, u.mapping, 64, 32);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, u, 64, 40);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_maps_t, u.mapping, 64, 40);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_process_t, 24, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_process_t, return_code, 0, 8);
@@ -248,7 +249,7 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_info_timer_t, options, 0, 4);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_timer_t, deadline, 8, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_timer_t, slack, 16, 8);
 
-VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_vmo_t, 120, 8);
+VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_vmo_t, 128, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, koid, 0, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, name, 8, 32);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, size_bytes, 40, 8);
@@ -262,6 +263,7 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, handle_rights, 96, 4);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, cache_policy, 100, 4);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, metadata_bytes, 104, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, committed_change_events, 112, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_t, populated_bytes, 120, 8);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_info_vmo_v1_t, 104, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_info_vmo_v1_t, koid, 0, 8);

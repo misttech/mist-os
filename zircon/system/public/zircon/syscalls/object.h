@@ -29,9 +29,11 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_THREAD_EXCEPTION_REPORT_V1  __ZX_INFO_TOPIC(11u, 0) // zx_exception_report_t[1]
 #define ZX_INFO_THREAD_EXCEPTION_REPORT     __ZX_INFO_TOPIC(11u, 1) // zx_exception_report_t[1]
 #define ZX_INFO_TASK_STATS                  ((zx_object_info_topic_t) 12u) // zx_info_task_stats_t[1]
-#define ZX_INFO_PROCESS_MAPS                ((zx_object_info_topic_t) 13u) // zx_info_maps_t[n]
+#define ZX_INFO_PROCESS_MAPS_V1             __ZX_INFO_TOPIC(13u, 0)        // zx_info_maps_t[n]
+#define ZX_INFO_PROCESS_MAPS                __ZX_INFO_TOPIC(13u, 1)        // zx_info_maps_t[n]
 #define ZX_INFO_PROCESS_VMOS_V1             __ZX_INFO_TOPIC(14u, 0)        // zx_info_vmo_t[n]
-#define ZX_INFO_PROCESS_VMOS                __ZX_INFO_TOPIC(14u, 1)        // zx_info_vmo_t[n]
+#define ZX_INFO_PROCESS_VMOS_V2             __ZX_INFO_TOPIC(14u, 1)        // zx_info_vmo_t[n]
+#define ZX_INFO_PROCESS_VMOS                __ZX_INFO_TOPIC(14u, 2)        // zx_info_vmo_t[n]
 #define ZX_INFO_THREAD_STATS                ((zx_object_info_topic_t) 15u) // zx_info_thread_stats_t[1]
 #define ZX_INFO_CPU_STATS                   ((zx_object_info_topic_t) 16u) // zx_info_cpu_stats_t[n]
 #define ZX_INFO_KMEM_STATS                  ((zx_object_info_topic_t) 17u) // zx_info_kmem_stats_t[1]
@@ -41,7 +43,8 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_PROCESS_HANDLE_STATS        ((zx_object_info_topic_t) 21u) // zx_info_process_handle_stats_t[1]
 #define ZX_INFO_SOCKET                      ((zx_object_info_topic_t) 22u) // zx_info_socket_t[1]
 #define ZX_INFO_VMO_V1                      __ZX_INFO_TOPIC(23u, 0)        // zx_info_vmo_t[1]
-#define ZX_INFO_VMO                         __ZX_INFO_TOPIC(23u, 1)        // zx_info_vmo_t[1]
+#define ZX_INFO_VMO_V2                      __ZX_INFO_TOPIC(23u, 1)        // zx_info_vmo_t[1]
+#define ZX_INFO_VMO                         __ZX_INFO_TOPIC(23u, 2)        // zx_info_vmo_t[1]
 #define ZX_INFO_JOB                         ((zx_object_info_topic_t) 24u) // zx_info_job_t[1]
 #define ZX_INFO_TIMER                       ((zx_object_info_topic_t) 25u) // zx_info_timer_t[1]
 #define ZX_INFO_STREAM                      ((zx_object_info_topic_t) 26u) // zx_info_stream_t[1]
@@ -365,7 +368,20 @@ typedef struct zx_info_maps_mapping {
     // The number of PAGE_SIZE pages in the mapped region of the VMO
     // that are backed by physical memory.
     size_t committed_pages;
+    // The number of PAGE_SIZE pages of content that have been populated and are
+    // being tracked in the mapped region of the VMO. This can be greater than
+    // |committed_pages| where pages might be compressed or otherwise tracked in
+    // a way that does not correlate directly to being committed.
+    size_t populated_pages;
 } zx_info_maps_mapping_t;
+
+typedef struct zx_info_maps_mapping_v1 {
+    zx_vm_option_t mmu_flags;
+    uint8_t padding1[4];
+    zx_koid_t vmo_koid;
+    uint64_t vmo_offset;
+    size_t committed_pages;
+} zx_info_maps_mapping_v1_t;
 
 // Types of entries represented by zx_info_maps_t.
 // Can't use zx_obj_type_t because not all of these are
@@ -397,6 +413,18 @@ typedef struct zx_info_maps {
         // No additional fields for other types.
     } u;
 } zx_info_maps_t;
+
+typedef struct zx_info_maps_v1 {
+    char name[ZX_MAX_NAME_LEN];
+    zx_vaddr_t base;
+    size_t size;
+    size_t depth;
+    zx_info_maps_type_t type;
+    uint8_t padding1[4];
+    union {
+        zx_info_maps_mapping_v1_t mapping;
+    } u;
+} zx_info_maps_v1_t;
 
 
 // Values and types used by ZX_INFO_PROCESS_VMOS.
@@ -500,7 +528,31 @@ typedef struct zx_info_vmo {
     // performed actions on this VMO that would have caused |committed_bytes| to
     // report a different value.
     uint64_t committed_change_events;
+
+    // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    // content that has been populated and is being tracked by this vmo. This
+    // can be greater than |committed_bytes| where content might be compressed
+    // or otherwise tracked in a way that does not correlate directly to being
+    // committed.
+    uint64_t populated_bytes;
 } zx_info_vmo_t;
+
+typedef struct zx_info_vmo_v2 {
+    zx_koid_t koid;
+    char name[ZX_MAX_NAME_LEN];
+    uint64_t size_bytes;
+    zx_koid_t parent_koid;
+    size_t num_children;
+    size_t num_mappings;
+    size_t share_count;
+    uint32_t flags;
+    uint8_t padding1[4];
+    uint64_t committed_bytes;
+    zx_rights_t handle_rights;
+    uint32_t cache_policy;
+    uint64_t metadata_bytes;
+    uint64_t committed_change_events;
+} zx_info_vmo_v2_t;
 
 typedef struct zx_info_vmo_v1 {
     zx_koid_t koid;

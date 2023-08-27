@@ -926,7 +926,7 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
  public:
   // NOTE: Code outside of the syscall layer should not typically know about
   // user_ptrs; do not use this pattern as an example.
-  VmMapBuilder(user_out_ptr<zx_info_maps_t> maps, size_t max)
+  VmMapBuilder(ProcessMapsInfoWriter& maps, size_t max)
       : RestartableVmEnumerator(max), entries_(maps) {}
 
   static void MakeVmarEntry(const VmAddressRegion* vmar, uint depth, zx_info_maps_t* entry) {
@@ -954,27 +954,26 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
     u->mmu_flags = arch_mmu_flags_to_vm_flags(region_mmu_flags), u->vmo_koid = vmo->user_id();
     const VmObject::AttributionCounts page_counts =
         vmo->AttributedPagesInRange(region_object_offset, region_size);
-    // TODO(fxb/60238): Handle compressed page counting.
-    DEBUG_ASSERT(page_counts.compressed == 0);
     u->committed_pages = page_counts.uncompressed;
+    u->populated_pages = page_counts.uncompressed + page_counts.compressed;
     u->vmo_offset = region_object_offset;
   }
 
  protected:
   zx_status_t WriteEntry(const zx_info_maps_t& entry, size_t offset) {
-    return entries_.element_offset(offset).copy_to_user(entry);
+    return entries_.Write(entry, offset);
   }
   UserCopyCaptureFaultsResult WriteEntryCaptureFaults(const zx_info_maps_t& entry, size_t offset) {
-    return entries_.element_offset(offset).copy_to_user_capture_faults(entry);
+    return entries_.WriteCaptureFaults(entry, offset);
   }
-  const user_out_ptr<zx_info_maps_t> entries_;
+  ProcessMapsInfoWriter& entries_;
 };
 
 }  // namespace
 
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
-zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, user_out_ptr<zx_info_maps_t> maps,
+zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, ProcessMapsInfoWriter& maps,
                             size_t max, size_t* actual, size_t* available) {
   DEBUG_ASSERT(target_aspace != nullptr);
   *actual = 0;
@@ -989,7 +988,7 @@ zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, user_out_ptr<zx
     entry.size = target_aspace->size();
     entry.depth = 0;
     entry.type = ZX_INFO_MAPS_TYPE_ASPACE;
-    if (maps.copy_array_to_user(&entry, 1, 0) != ZX_OK) {
+    if (maps.Write(entry, 0) != ZX_OK) {
       return ZX_ERR_INVALID_ARGS;
     }
   }

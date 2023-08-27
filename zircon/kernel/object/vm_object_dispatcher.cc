@@ -203,8 +203,8 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, bool is_handle, zx_rights_t ha
                 (vmo->is_user_pager_backed() ? ZX_INFO_VMO_PAGER_BACKED : 0) |
                 (vmo->is_contiguous() ? ZX_INFO_VMO_CONTIGUOUS : 0);
   VmObject::AttributionCounts page_counts = vmo->AttributedPages();
-  // TODO(fxb/60238): Handle compressed page counting.
   entry.committed_bytes = page_counts.uncompressed * PAGE_SIZE;
+  entry.populated_bytes = (page_counts.compressed + page_counts.uncompressed) * PAGE_SIZE;
   entry.cache_policy = vmo->GetMappingCachePolicy();
   if (is_handle) {
     entry.flags |= ZX_INFO_VMO_VIA_HANDLE;

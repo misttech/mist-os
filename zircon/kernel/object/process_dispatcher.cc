@@ -723,7 +723,7 @@ zx_status_t ProcessDispatcher::AccumulateRuntimeTo(zx_info_task_runtime_t* info)
   return ZX_OK;
 }
 
-zx_status_t ProcessDispatcher::GetAspaceMaps(user_out_ptr<zx_info_maps_t> maps, size_t max,
+zx_status_t ProcessDispatcher::GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t max,
                                              size_t* actual_out, size_t* available_out) const {
   *actual_out = 0;
   *available_out = 0;
@@ -739,9 +739,7 @@ zx_status_t ProcessDispatcher::GetAspaceMaps(user_out_ptr<zx_info_maps_t> maps, 
     }
     DEBUG_ASSERT(max >= actual_r);
     max -= actual_r;
-    if (maps) {
-      maps = maps.element_offset(actual_r);
-    }
+    maps.AddOffset(actual_r);
   }
 
   // Do not check the state_ since we need to call GetVmAspaceMaps without the dispatcher lock held,

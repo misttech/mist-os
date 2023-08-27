@@ -36,6 +36,7 @@
 #include <vm/vm_aspace.h>
 
 class JobDispatcher;
+class ProcessMapsInfoWriter;
 class VmoInfoWriter;
 
 // To allow this function to be friended by ProcessDispatcher.
@@ -207,9 +208,7 @@ class ProcessDispatcher final
   // process.
   zx_status_t AccumulateRuntimeTo(zx_info_task_runtime_t* info) const;
 
-  // NOTE: Code outside of the syscall layer should not typically know about
-  // user_ptrs; do not use this pattern as an example.
-  zx_status_t GetAspaceMaps(user_out_ptr<zx_info_maps_t> maps, size_t max, size_t* actual,
+  zx_status_t GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t max, size_t* actual,
                             size_t* available) const;
   zx_status_t GetVmos(VmoInfoWriter& vmos, size_t max, size_t* actual, size_t* available);
   zx_status_t GetThreads(fbl::Array<zx_koid_t>* threads) const;

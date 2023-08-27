@@ -36,6 +36,21 @@ class VmoInfoWriter {
   virtual void AddOffset(size_t offset) = 0;
 };
 
+// Similar to VmoInfoWriter, but for zx_info_maps_t
+class ProcessMapsInfoWriter {
+ public:
+  ProcessMapsInfoWriter() = default;
+  virtual ~ProcessMapsInfoWriter() {}
+  // Writes a single zx_info_maps_t at the given element offset. Return values are same as
+  // user_ptr::copy_to_user
+  virtual zx_status_t Write(const zx_info_maps_t& vmo, size_t offset) = 0;
+  // Same as Write, except is the no faulting variant and returns the complete capture result type.
+  virtual UserCopyCaptureFaultsResult WriteCaptureFaults(const zx_info_maps_t& vmo,
+                                                         size_t offset) = 0;
+  // Increases the base offset such that Writes to offset 0 write to this offset.
+  virtual void AddOffset(size_t offset) = 0;
+};
+
 // Walks the VmAspace and writes entries that describe it into |maps|, which
 // must point to enough memory for |max| entries. The number of entries
 // written is returned via |actual|, and the number entries that could have
@@ -43,7 +58,7 @@ class VmoInfoWriter {
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
 // |target_aspace| is the aspace that is to be enumerated.
-zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, user_out_ptr<zx_info_maps_t> maps,
+zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, ProcessMapsInfoWriter& maps,
                             size_t max, size_t* actual, size_t* available);
 
 // Walks the VmAspace and writes entries that describe its mapped VMOs into
