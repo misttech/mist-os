@@ -375,6 +375,26 @@ std::optional<zx_profile_info_t> ParseThreadProfile(const std::string& filename,
   return info;
 }
 
+std::optional<zx_profile_info_t> ParseMemoryProfile(const std::string& filename,
+                                                    const char* profile_name,
+                                                    const rapidjson::Value::Member& profile) {
+  const bool has_priority = profile.value.HasMember("priority");
+
+  zx_profile_info_t info{};
+  if (has_priority) {
+    auto result = GetInt("priority", profile.value, "Profile ", profile_name);
+    if (result.is_ok()) {
+      info.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY;
+      info.priority = std::clamp<int32_t>(result.value(), ZX_PRIORITY_LOWEST, ZX_PRIORITY_HIGHEST);
+    } else {
+      FX_SLOG(WARNING, result.error_value().c_str(), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
+      return std::nullopt;
+    }
+  }
+  return info;
+}
+
 using SingleProfileParser = std::optional<zx_profile_info_t>(
     const std::string& filename, const char* profile_name, const rapidjson::Value::Member& profile);
 
@@ -569,6 +589,7 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
     }
 
     ParseProfiles(entry, document, "profiles", ParseThreadProfile, &profiles.thread);
+    ParseProfiles(entry, document, "memory", ParseMemoryProfile, &profiles.memory);
   }
 
   auto log_profiles = [](ProfileMap& profiles) {
@@ -579,6 +600,8 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
   };
   FX_SLOG(INFO, "Loaded thread profiles:");
   log_profiles(profiles.thread);
+  FX_SLOG(INFO, "Defined memory profiles:");
+  log_profiles(profiles.memory);
 
   return fit::ok(std::move(profiles));
 }

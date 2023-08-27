@@ -92,14 +92,57 @@ TEST(ProfileConfig, Parse) {
     EXPECT_EQ(iter->second.info.priority, 20);
   }
 
-  const std::unordered_set<std::string> expected_profiles{
+  {
+    const auto iter = result->memory.find("test.bringup.a");
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 20);
+  }
+
+  {
+    const auto iter = result->memory.find("test.bringup.b");
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Bringup);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 24);
+  }
+
+  {
+    const auto iter = result->memory.find("test.core.a");
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 24);
+  }
+
+  {
+    const auto iter = result->memory.find("test.core.mem");
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 20);
+  }
+
+  const std::unordered_set<std::string> expected_thread_profiles{
       "test.product.a", "test.core.a:affinity",    "test.bringup.a:affinity",
       "test.bringup.b", "test.bringup.b:affinity", "test.core.a",
       "test.bringup.a", "fuchsia.default",
   };
 
   for (const auto& [key, value] : result->thread) {
-    EXPECT_NE(expected_profiles.end(), expected_profiles.find(key));
+    EXPECT_NE(expected_thread_profiles.end(), expected_thread_profiles.find(key));
+  }
+
+  const std::unordered_set<std::string> expected_memory_profiles{
+      "test.bringup.a",
+      "test.bringup.b",
+      "test.core.a",
+      "test.core.mem",
+  };
+
+  for (const auto& [key, value] : result->memory) {
+    EXPECT_NE(expected_memory_profiles.end(), expected_memory_profiles.find(key));
   }
 }
 

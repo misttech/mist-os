@@ -15,4 +15,12 @@
     "error-test.exclusive": { "priority": 10, "capacity": "5ms", "deadline": "10ms", "period": "10ms" },
     "error-test.partial": { "capacity": "5000000", "period": "10ms" },
   },
+  "memory": {
+    "error-test.priority:units": { "priority": "20x" },
+    "error-test.priority:float": { "priority": 1.2 },
+    "error-test.priority:array": { "priority": [] },
+    "error-test.priority:string": { "priority": "abcde" },
+    "error-test.priority:object": { "priority": {} },
+    "error-test.empty": {},
+  },
 }

@@ -132,7 +132,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     handle_info.koid = ZX_KOID_INVALID;
     handle_info.related_koid = ZX_KOID_INVALID;
   }
-  if (handle_info.type != ZX_OBJ_TYPE_THREAD) {
+  if (handle_info.type != ZX_OBJ_TYPE_THREAD && handle_info.type != ZX_OBJ_TYPE_VMAR) {
     completer.Reply(ZX_ERR_WRONG_TYPE);
     return;
   }
@@ -147,16 +147,23 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     return;
   }
 
+  const auto& profile_map =
+      handle_info.type == ZX_OBJ_TYPE_THREAD ? profiles_.thread : profiles_.memory;
+
   // Select the profile parameters based on the role selector.
   if (role_result->name == "fuchsia.test-role" && role_result->has("not-found")) {
     completer.Reply(ZX_ERR_NOT_FOUND);
   } else if (role_result->name == "fuchsia.test-role" && role_result->has("ok")) {
     completer.Reply(ZX_OK);
-  } else if (auto search = profiles_.thread.find(role_result->name);
-             search != profiles_.thread.cend()) {
+  } else if (auto search = profile_map.find(role_result->name); search != profile_map.cend()) {
     status = zx_object_set_profile(request->handle.get(), search->second.profile.get(), 0);
     completer.Reply(status);
   } else if (const auto media_role = MaybeMediaRole(*role_result); media_role.is_ok()) {
+    // Media role only applicable to threads.
+    if (handle_info.type != ZX_OBJ_TYPE_THREAD) {
+      completer.Reply(ZX_ERR_INVALID_ARGS);
+      return;
+    }
     // TODO(fxbug.dev/40858): If a media profile is not found in the system config, use the
     // forwarded parameters. This can be removed once clients are migrated to use defined roles.
     // Skip media roles with invalid deadline parameters.
@@ -226,6 +233,7 @@ zx::result<ProfileProvider*> ProfileProvider::Create(const zx::job& root_job) {
     }
   };
   create(result->thread);
+  create(result->memory);
 
   // Apply the dispatch role if defined.
   const std::string dispatch_role = "fuchsia.system.profile-provider.dispatch";

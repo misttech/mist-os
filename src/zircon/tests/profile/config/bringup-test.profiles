@@ -7,4 +7,8 @@
     "test.bringup.b": { "priority": 1 },
     "test.bringup.b:affinity": { "priority": 1, "affinity": 2 },
   },
+  "memory": {
+    "test.bringup.a": { "priority": 24 },
+    "test.bringup.b": { "priority": 24 },
+  },
 }

@@ -49,6 +49,7 @@ using ProfileMap = std::unordered_map<std::string, Profile, StringHash, std::equ
 
 struct ConfiguredProfiles {
   ProfileMap thread;
+  ProfileMap memory;
 };
 
 fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& config_path);

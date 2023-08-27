@@ -7,4 +7,9 @@
     "test.core.a": { "capacity": "5ms", "deadline": "10ms", "period": "10ms" },
     "test.core.a:affinity": { "capacity": "5ms", "deadline": "10ms", "period": "10ms", "affinity": [ 0, 1, 2 ] },
   },
+  "memory": {
+    "test.bringup.a": { "priority": 20 },
+    "test.core.a": { "priority": 24},
+    "test.core.mem": { "priority": 20 },
+  },
 }
