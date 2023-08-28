@@ -408,6 +408,11 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
         percpu->monitor->PrepareForWait();
         if (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
           auto start = current_time();
+          // AMD-SB-1045: Clear the RAS before a thread enters MWAIT to prevent paired hyperthreads
+          // from consuming this thread's RAS entries.
+          if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
+            x86_ras_fill();
+          }
           x86_enable_ints_and_mwait(next_state->MwaitHint());
           auto duration = zx_time_sub_time(current_time(), start);
           percpu->idle_states->RecordDuration(duration);
@@ -465,6 +470,11 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
           percpu->halt_interlock.compare_exchange_strong(halt_interlock_spinning, 2);
       if (no_fast_wakeup && !preemption_state.preempts_pending()) {
         arch_disable_ints();
+        // AMD-SB-1045: Clear the RAS before a thread enters HLT to prevent paired hyperthreads
+        // from consuming this thread's RAS entries.
+        if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
+          x86_ras_fill();
+        }
         if (!preemption_state.preempts_pending()) {
           x86_enable_ints_and_hlt();
         } else {

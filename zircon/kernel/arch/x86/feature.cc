@@ -68,6 +68,7 @@ bool g_has_ibpb;
 bool g_should_ibpb_on_ctxt_switch;
 bool g_ras_fill_on_ctxt_switch;
 bool g_cpu_vulnerable_to_rsb_underflow;
+bool g_cpu_vulnerable_to_rsb_cross_thread;
 bool g_has_enhanced_ibrs;
 bool g_has_retbleed;
 bool g_stibp_enabled;
@@ -288,6 +289,16 @@ void x86_cpu_feature_late_init_percpu(void) {
         break;
     }
   }
+  // AMD-SB-1045: On certain processors (Zen, Zen2), when a thread halts, it's Return Stack Buffer
+  // entries become available to the other hyperthread; the contents of the entries aren't
+  // cleared, however. On these processors, clear the return stack buffer before entering MWAIT or
+  // halt to prevent the hyperbuddy from consuming our (stale) RSB entries.
+  if (!gBootOptions->x86_disable_spec_mitigations) {
+    if (x86_vendor == X86_VENDOR_AMD && model_info.display_family == 0x17 && !ht_disabled) {
+      g_cpu_vulnerable_to_rsb_cross_thread = true;
+    }
+  }
+
   // RETbleed mitigations
   // Some RETbleed mitigations may overlap with Spectre V2 mitigations.
   if (!gBootOptions->x86_disable_spec_mitigations && g_has_retbleed) {
@@ -481,6 +492,7 @@ void x86_feature_debug(void) {
 #ifdef ZERO_CALL_USED_REGS
   print_property("zero_call_used_regs");
 #endif
+  print_property("cpu_vulnerable_to_rsb_cross_thread", g_cpu_vulnerable_to_rsb_cross_thread);
   if (arch::BootCpuidSupports<arch::CpuidPerformanceMonitoringA>()) {
     const arch::CpuidPerformanceMonitoringA eax = io.Read<arch::CpuidPerformanceMonitoringA>();
     const arch::CpuidPerformanceMonitoringD edx = io.Read<arch::CpuidPerformanceMonitoringD>();

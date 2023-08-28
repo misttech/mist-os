@@ -309,6 +309,7 @@ extern const x86_microarch_config_t* x86_microarch_config;
 extern bool g_has_ibpb;
 extern bool g_ras_fill_on_ctxt_switch;
 extern bool g_cpu_vulnerable_to_rsb_underflow;
+extern bool g_cpu_vulnerable_to_rsb_cross_thread;
 extern bool g_should_ibpb_on_ctxt_switch;
 extern bool g_ssb_mitigated;
 extern bool g_l1d_flush_on_vmentry;
@@ -323,6 +324,10 @@ static inline const x86_microarch_config_t* x86_get_microarch_config() {
 static inline bool x86_cpu_has_ibpb() { return g_has_ibpb; }
 
 static inline bool x86_cpu_should_ras_fill_on_ctxt_switch() { return g_ras_fill_on_ctxt_switch; }
+
+static inline bool x86_cpu_vulnerable_to_rsb_cross_thread() {
+  return g_cpu_vulnerable_to_rsb_cross_thread;
+}
 
 static inline bool x86_cpu_vulnerable_to_rsb_underflow() {
   return g_cpu_vulnerable_to_rsb_underflow;
