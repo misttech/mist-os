@@ -136,6 +136,10 @@ TEST(GwpAsanTest, HandleGwpAsanException) {
   uint64_t faulting_addr = exception_report.context.arch.u.x86_64.cr2;
 #elif defined(__aarch64__)
   uint64_t faulting_addr = exception_report.context.arch.u.arm_64.far;
+#elif defined(__riscv)
+  uint64_t faulting_addr = exception_report.context.arch.u.riscv_64.tval;
+#else
+#error "what machine?"
 #endif
 
   // Now we should be able to obtain the full report of the crash.
