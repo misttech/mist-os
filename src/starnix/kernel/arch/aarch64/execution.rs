@@ -59,9 +59,24 @@ macro_rules! generate_cfi_directives {
                 // ".cfi_offset tpidr_el0, 0x108",
                 // ".cfi_offset cpsr, 0x110",
 
-                // x27 could technically get clobbered between here and `execute_syscall`. We should
-                // use a method for computing `.cfi_def_cfa` that can't fail (e.g., sp offset).
+                // x27 could technically get clobbered between here and `execute_syscall`.
+                // TODO(https://fxbug.dev/297897817): Use a more robust approach to unwind.
                 in("x27") state_addr,
+
+                // It appears that on nelson-release, if we only put x27 here, the register will be
+                // immediately used for other purposes. e.g.
+                //
+                //      279                 generate_cfi_directives!(state);
+                //    0x8000c0dfeed4  add   x27, sp, #0x170   <-- correct
+                //    0x8000c0dfeed8  add   x27, sp, #0x5a4   <-- but immediately clobbered
+                //
+                // Adding x28 below will redirect the compiler to use x28 and leave x27 unchanged.
+                //
+                //     279                 generate_cfi_directives!(state);
+                //    0x8000573efed4  add   x27, sp, #0x170   <-- correct
+                //    0x8000573efed8  add   x28, sp, #0x170
+                //    0x8000573efedc  add   x28, sp, #0x5a4   <-- now x28 is clobbered
+                in("x28") state_addr,
                 options(nomem, preserves_flags, nostack),
             );
         }

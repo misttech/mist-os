@@ -44,8 +44,8 @@ macro_rules! generate_cfi_directives {
                 // ".cfi_offset fs.base, 0x90",
                 // ".cfi_offset gs.base, 0x98",
 
-                // r14 could technically get clobbered between here and `execute_syscall`. We should
-                // use a method for computing `.cfi_def_cfa` that can't fail (e.g., rsp offset).
+                // r14 could technically get clobbered between here and `execute_syscall`.
+                // TODO(https://fxbug.dev/297897817): Use a more robust approach to unwind.
                 in("r14") state_addr,
                 options(nomem, preserves_flags, nostack),
             );

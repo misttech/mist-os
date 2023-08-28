@@ -56,8 +56,8 @@ macro_rules! generate_cfi_directives {
                 ".cfi_offset t5, 0xF0",
                 ".cfi_offset t6, 0xF8",
 
-                // t6 could technically get clobbered between here and `execute_syscall`. We should
-                // use a method for computing `.cfi_def_cfa` that can't fail (e.g., sp offset).
+                // t6 could technically get clobbered between here and `execute_syscall`.
+                // TODO(https://fxbug.dev/297897817): Use a more robust approach to unwind.
                 in("t6") state_addr,
                 options(nomem, preserves_flags, nostack),
             );
