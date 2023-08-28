@@ -99,6 +99,11 @@ config("common.config") {
   defines = [
     "GWP_ASAN_HOOKS=1",
     "SCUDO_DEBUG=$scudo_debug",
+    "SCUDO_ENABLE_HOOKS=1",
+
+    # TODO(fxbug.dev/132760): Scudo, which lives in the C library, cannot
+    # see the hooks defined by the wrapper-tests in the test executable.
+    "SCUDO_ENABLE_HOOKS_TESTS=0",
   ]
 }
 
