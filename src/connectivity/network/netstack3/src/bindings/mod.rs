@@ -117,6 +117,12 @@ mod ctx {
         sync_ctx: Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
     }
 
+    #[derive(Debug)]
+    pub(crate) enum DestructionError {
+        NonSyncCtxStillCloned(usize),
+        SyncCtxStillCloned(usize),
+    }
+
     impl Ctx {
         pub(crate) fn sync_ctx(&self) -> &Arc<SyncCtx<BindingsNonSyncCtxImpl>> {
             &self.sync_ctx
@@ -142,6 +148,23 @@ mod ctx {
         ) -> (&Arc<SyncCtx<BindingsNonSyncCtxImpl>>, &mut BindingsNonSyncCtxImpl) {
             let Ctx { non_sync_ctx, sync_ctx } = self;
             (sync_ctx, non_sync_ctx)
+        }
+
+        /// Destroys the last standing clone of [`Ctx`].
+        pub(crate) fn try_destroy_last(self) -> Result<(), DestructionError> {
+            let Self { non_sync_ctx: BindingsNonSyncCtxImpl(non_sync_ctx), sync_ctx } = self;
+
+            fn unwrap_and_drop_or_get_count<T>(arc: Arc<T>) -> Result<(), usize> {
+                match Arc::try_unwrap(arc) {
+                    Ok(t) => Ok(std::mem::drop(t)),
+                    Err(arc) => Err(Arc::strong_count(&arc)),
+                }
+            }
+
+            // Always destroy NonSyncCtx first.
+            unwrap_and_drop_or_get_count(non_sync_ctx)
+                .map_err(DestructionError::NonSyncCtxStillCloned)?;
+            unwrap_and_drop_or_get_count(sync_ctx).map_err(DestructionError::SyncCtxStillCloned)
         }
     }
 
@@ -955,51 +978,60 @@ impl NetstackSeed {
         let timers_task =
             NamedTask::new("timers", netstack.ctx.non_sync_ctx().timers.spawn(netstack.clone()));
 
-        // The Sender is unused because Loopback should never be canceled.
-        let (_sender, _, loopback_tasks): (futures::channel::oneshot::Sender<_>, BindingId, _) =
-            netstack.add_loopback();
+        let (loopback_stopper, _, loopback_tasks): (
+            futures::channel::oneshot::Sender<_>,
+            BindingId,
+            _,
+        ) = netstack.add_loopback();
 
         let interfaces_worker_task = NamedTask::spawn("interfaces worker", async move {
             let result = interfaces_worker.run().await;
-            let _: futures::stream::FuturesUnordered<_> =
-                result.expect("interfaces worker ended with an error");
+            let watchers = result.expect("interfaces worker ended with an error");
+            info!("interfaces worker shutting down, waiting for watchers to end");
+            watchers
+                .map(|res| match res {
+                    Ok(()) => (),
+                    Err(e) => {
+                        if !e.is_closed() {
+                            tracing::error!("error {e:?} collecting watchers");
+                        }
+                    }
+                })
+                .collect::<()>()
+                .await;
+            info!("all interface watchers closed, interfaces worker shutdown is complete");
         });
 
         let no_finish_tasks =
             loopback_tasks.into_iter().chain([interfaces_worker_task, timers_task]);
         let no_finish_tasks = no_finish_tasks.map(NamedTask::into_future);
-        let no_finish_tasks = futures::stream::FuturesUnordered::from_iter(no_finish_tasks);
-        let no_finish_tasks_fut = no_finish_tasks.into_future().map(
-            |(name, _): (_, futures::stream::FuturesUnordered<_>)| -> Never {
+        let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(no_finish_tasks);
+        let mut no_finish_tasks_fut = no_finish_tasks
+            .by_ref()
+            .into_future()
+            .map(|(name, _): (_, &mut futures::stream::FuturesUnordered<_>)| -> Never {
                 match name {
                     Some(name) => panic!("task {name} ended unexpectedly"),
                     None => panic!("unexpected end of infinite task stream"),
                 }
-            },
-        );
-        // Code generation for this async fn is bugging out very far away (where
-        // `NetstackSeed::serve` is called). Looks like:
-        // error: higher-ranked lifetime error
-        // --> ...
-        //     |
-        //     |  fasync::Task::spawn(async move { seed.serve(services, &inspector_cloned).await });
-        //     |
-        // We can get around that by boxing this future and everything is okay
-        // again. This only happens once, we can pay the allocation.
-        let mut no_finish_tasks_fut = no_finish_tasks_fut.boxed().fuse();
+            })
+            .fuse();
 
-        let socket_ctx = netstack.ctx.clone();
-        let _sockets = inspector.root().create_lazy_child("Sockets", move || {
-            futures::future::ok(inspect::sockets(&mut socket_ctx.clone())).boxed()
-        });
-        let routes_ctx = netstack.ctx.clone();
-        let _routes = inspector.root().create_lazy_child("Routes", move || {
-            futures::future::ok(inspect::routes(&mut routes_ctx.clone())).boxed()
-        });
-        let devices_ctx = netstack.ctx.clone();
-        let _devices = inspector.root().create_lazy_child("Devices", move || {
-            futures::future::ok(inspect::devices(&devices_ctx)).boxed()
-        });
+        let inspect_nodes = {
+            let socket_ctx = netstack.ctx.clone();
+            let sockets = inspector.root().create_lazy_child("Sockets", move || {
+                futures::future::ok(inspect::sockets(&mut socket_ctx.clone())).boxed()
+            });
+            let routes_ctx = netstack.ctx.clone();
+            let routes = inspector.root().create_lazy_child("Routes", move || {
+                futures::future::ok(inspect::routes(&mut routes_ctx.clone())).boxed()
+            });
+            let devices_ctx = netstack.ctx.clone();
+            let devices = inspector.root().create_lazy_child("Devices", move || {
+                futures::future::ok(inspect::devices(&devices_ctx)).boxed()
+            });
+            (sockets, routes, devices)
+        };
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
 
@@ -1015,6 +1047,9 @@ impl NetstackSeed {
         // Keep a clone of Ctx around for teardown before moving it to the
         // services future.
         let teardown_ctx = netstack.ctx.clone();
+
+        // Use a reference to the watcher sink in the services loop.
+        let interfaces_watcher_sink_ref = &interfaces_watcher_sink;
 
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
@@ -1073,7 +1108,10 @@ impl NetstackSeed {
                         Service::Interfaces(interfaces) => {
                             interfaces
                                 .serve_with(|rs| {
-                                    interfaces_watcher::serve(rs, interfaces_watcher_sink.clone())
+                                    interfaces_watcher::serve(
+                                        rs,
+                                        interfaces_watcher_sink_ref.clone(),
+                                    )
                                 })
                                 .await
                         }
@@ -1113,17 +1151,36 @@ impl NetstackSeed {
                 .await
         };
 
-        let services_fut = services_fut.fuse();
-        futures::pin_mut!(services_fut);
-        let () = futures::select! {
-            () = services_fut => (),
-            never = no_finish_tasks_fut => match never {}
-        };
-        info!("all services terminated");
+        {
+            let services_fut = services_fut.fuse();
+            // Pin services_fut to this block scope so it's dropped after the
+            // select.
+            futures::pin_mut!(services_fut);
+            let () = futures::select! {
+                () = services_fut => (),
+                never = no_finish_tasks_fut => match never {}
+            };
+        }
 
-        // TODO(https://fxbug.dev/132457): Signal the long running tasks and
-        // join them all here.
+        info!("all services terminated, starting shutdown");
         let ctx = teardown_ctx;
+        // Stop the loopback interface.
+        loopback_stopper
+            .send(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
+            .expect("loopback task must still be running");
+        // Stop the timer dispatcher.
         ctx.non_sync_ctx().timers.stop();
+        // Stop the interfaces watcher worker.
+        std::mem::drop(interfaces_watcher_sink);
+
+        // We've signalled all long running tasks, now we can collect them.
+        no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;
+
+        // Drop all inspector data, it holds ctx clones.
+        std::mem::drop(inspect_nodes);
+        inspector.root().clear_recorded();
+
+        // Last thing to happen is dropping the context.
+        ctx.try_destroy_last().expect("all Ctx references must have been dropped")
     }
 }

@@ -273,29 +273,19 @@ impl TestStack {
     // TODO(https://fxbug.dev/132457): Enforce that shutdown is called on all
     // created [`TestStack`]s.
     pub(crate) async fn shutdown(self) {
-        let Self {
-            netstack: crate::bindings::Netstack { ctx, interfaces_event_sink },
-            task,
-            services_sink,
-            _inspector,
-            endpoint_ids: _,
-        } = self;
-        // Drop the interfaces event sink, we cloned it from the seed to be able
-        // to poke at it from tests.
-        std::mem::drop(interfaces_event_sink);
+        let Self { netstack, task, services_sink, _inspector, endpoint_ids: _ } = self;
+
+        // Drop the netstack clone we created to have direct access to Ctx. The
+        // main loop will assert that no more references exist before exiting.
+        std::mem::drop(netstack);
 
         // Drop the services sink, which should cause netstack to start shutting
         // down cleanly.
         std::mem::drop(services_sink);
         // Wait for the task to join. The main serve loop should have helpful
-        // logs around shutdown progress.
+        // logs around shutdown progress. And it asserts that no Ctx clones
+        // exist before finishing.
         task.await;
-        // We can now drop the context.
-        //
-        // TODO(https://fxbug.dev/132457): We should be able to assert here
-        // we're the last thing holding on to the context once we really have
-        // full cleanup.
-        std::mem::drop(ctx);
     }
 }
 
