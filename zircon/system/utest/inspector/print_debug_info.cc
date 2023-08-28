@@ -110,16 +110,23 @@ __asm__(
     ".cfi_startproc\n"
     "nop\n"
 #if defined(__aarch64__)
-    ".cfi_return_column 29\n"
+    ".cfi_return_column 30\n"
     // This has the effect of the default same_value rule, but via
     // a val_expression rule to test the unwinder's val_expression support.
-    // DW_CFA_val_expression, regno 29, BLOCK(DW_OP_breg29 0)
-    ".cfi_escape 0x16, 29, 2, 0x8d, 0\n"
+    // DW_CFA_val_expression, regno 30, BLOCK(DW_OP_breg30 0)
+    ".cfi_escape 0x16, 30, 2, 0x8e, 0\n"
     "brk 0\n"
+#elif defined(__riscv)
+    ".cfi_return_column 1\n"
+    // This has the effect of the default same_value rule, but via
+    // a val_expression rule to test the unwinder's val_expression support.
+    // DW_CFA_val_expression, regno 1, BLOCK(DW_OP_breg1 0)
+    ".cfi_escape 0x16, 1, 2, 0x71, 0\n"
+    "ebreak\n"
 #elif defined(__x86_64__)
     ".cfi_return_column 16\n"
     // DW_CFA_val_expression, regno 16, BLOCK(DW_OP_breg16 0)
-    ".cfi_escape 0x16, 29, 2, 0x80, 0\n"
+    ".cfi_escape 0x16, 16, 2, 0x80, 0\n"
     "int3\n"
 #else
 #error Not supported on this platform.
