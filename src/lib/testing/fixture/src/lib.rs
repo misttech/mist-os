@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! This crate provides an attribute macro to help instrument test functions
-//! with setup logic.
+//! with setup and teardown logic.
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -122,6 +122,103 @@ pub fn fixture(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let wrapper_fn = syn::parse_macro_input!(attrs as syn::Path);
     let input = syn::parse_macro_input!(input as syn::ItemFn);
     match fixture_inner(wrapper_fn, input) {
+        Ok(token_stream) => token_stream,
+        Err(token_stream) => token_stream,
+    }
+}
+
+mod kw {
+    syn::custom_keyword!(noasync);
+}
+
+struct TeardownArgs {
+    teardown_fn: syn::Path,
+    noasync: bool,
+}
+
+impl syn::parse::Parse for TeardownArgs {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::parse::Result<Self> {
+        let teardown_fn = input.parse::<syn::Path>()?;
+        let comma = input.parse::<Option<syn::token::Comma>>()?;
+        let noasync = comma
+            .and_then(|_| input.parse::<Option<kw::noasync>>().transpose())
+            .transpose()?
+            .is_some();
+        Ok(Self { teardown_fn, noasync })
+    }
+}
+
+fn teardown_inner(args: TeardownArgs, input: syn::ItemFn) -> Result<TokenStream, TokenStream> {
+    let TeardownArgs { teardown_fn, noasync } = args;
+    let syn::ItemFn { attrs, sig, block, vis } = input;
+
+    // Use function asyncness for teardown or force sync through option.
+    let add_await = sig.asyncness.is_some() && !noasync;
+
+    let await_tokens = add_await.then(|| quote! {.await});
+
+    let result = quote! {
+        #(#attrs)*
+        #vis #sig {
+            let teardown_arg = #block;
+            #teardown_fn (teardown_arg) #await_tokens
+        }
+    };
+    Ok(result.into())
+}
+
+/// Runs a teardown function after a target function execution, giving the
+/// teardown function the target function's return value.
+///
+/// Especially useful to perform teardown in asynchronous test functions.
+///
+///  Example:
+///
+/// ```
+/// struct Foo{}
+/// async fn teardown(foo: Foo) {
+///     futures::future::ready(foo).await;
+/// }
+///
+/// #[fixture::teardown(teardown)]
+/// async fn foo_checker() {
+///     Foo {}
+/// }
+/// ```
+///
+/// Expands to
+///
+/// ```
+/// # struct Foo{}
+/// async fn teardown(foo: Foo) {
+/// #   futures::future::ready(foo).await;
+/// }
+///
+/// async fn foo_checker() {
+///     let teardown_result = {
+///         Foo{}
+///     };
+///     teardown(teardown_result).await
+/// }
+/// ```
+///
+/// If the target function is `async`, the teardown function is assumed to be
+/// async as well and thus a `.await` is added. This behavior can be overridden
+/// by adding `, noasync` to the macro invocation.
+///
+/// Example:
+///
+/// ```
+/// fn teardown(){}
+/// #[fixture::teardown(teardown, noasync)]
+/// async fn foo_checker() {
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn teardown(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let args = syn::parse_macro_input!(attrs as TeardownArgs);
+    let input = syn::parse_macro_input!(input as syn::ItemFn);
+    match teardown_inner(args, input) {
         Ok(token_stream) => token_stream,
         Err(token_stream) => token_stream,
     }

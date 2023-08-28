@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod tests {
-    use fixture::fixture;
+    use fixture::{fixture, teardown};
     use futures::{SinkExt as _, StreamExt as _};
 
     fn non_async_setup(test_name: &str, test: impl FnOnce(&str)) {
@@ -80,5 +80,47 @@ mod tests {
     fn uninferred_generic_test(name: &str, value: usize) {
         assert_eq!(name, "u8");
         assert_eq!(value, 3)
+    }
+
+    struct RequiresTeardown {
+        ok_to_drop: bool,
+    }
+
+    impl Drop for RequiresTeardown {
+        fn drop(&mut self) {
+            let Self { ok_to_drop } = self;
+            if !*ok_to_drop {
+                panic!("shouldn't drop me");
+            }
+        }
+    }
+
+    impl RequiresTeardown {
+        fn teardown(mut self) {
+            self.ok_to_drop = true;
+        }
+
+        async fn async_teardown(self) {
+            futures::future::ready(()).await;
+            self.teardown()
+        }
+    }
+
+    #[teardown(RequiresTeardown::teardown)]
+    #[test]
+    fn teardown() {
+        RequiresTeardown { ok_to_drop: false }
+    }
+
+    #[teardown(RequiresTeardown::async_teardown)]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn async_teardown() {
+        RequiresTeardown { ok_to_drop: false }
+    }
+
+    #[teardown(RequiresTeardown::teardown, noasync)]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn force_noasync_teardown() {
+        RequiresTeardown { ok_to_drop: false }
     }
 }
