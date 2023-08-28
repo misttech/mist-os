@@ -410,6 +410,10 @@ impl ResponsePacket {
         Self::new(ResponseCode::Ok, vec![], headers)
     }
 
+    pub fn new_setpath(code: ResponseCode, headers: HeaderSet) -> Self {
+        Self::new(code, vec![], headers)
+    }
+
     pub fn expect_code(self, request: OpCode, expected: ResponseCode) -> Result<Self, Error> {
         if *self.code() == expected {
             return Ok(self);

@@ -11,7 +11,7 @@ use tracing::{info, trace, warn};
 
 use crate::error::{Error, PacketError};
 use crate::header::HeaderSet;
-use crate::operation::{OpCode, RequestPacket, ResponseCode, ResponsePacket};
+use crate::operation::{OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags};
 use crate::transport::max_packet_size_from_transport;
 pub use crate::transport::TransportType;
 
@@ -51,6 +51,11 @@ impl ObexServer {
     pub fn new(channel: Channel, handler: Box<dyn ObexServerHandler>) -> Self {
         let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
         Self { connected: ConnectionStatus::Initialized, max_packet_size, channel, handler }
+    }
+
+    /// Returns `true` if the OBEX connection is current connected (e.g. CONNECT operation done).
+    fn is_connected(&self) -> bool {
+        matches!(self.connected, ConnectionStatus::Connected)
     }
 
     fn set_connected(&mut self, status: ConnectionStatus) {
@@ -114,6 +119,34 @@ impl ObexServer {
         Ok(response_packet)
     }
 
+    /// Handles a SetPath request made by the remote OBEX client.
+    /// Returns a response packet to be sent on success, Error if the request couldn't be handled.
+    async fn setpath_request(&mut self, request: RequestPacket) -> Result<ResponsePacket, Error> {
+        if !self.is_connected() {
+            return Err(Error::operation(OpCode::SetPath, "CONNECT not completed"));
+        }
+        // Parse the additional data first - the data length is already validated during decoding.
+        // Only the `flags` field is used in OBEX 1.5. `constants` is RFA.
+        let data = request.data();
+        let flags = SetPathFlags::from_bits_truncate(data[0]);
+        let backup = flags.contains(SetPathFlags::BACKUP);
+        let create = !flags.contains(SetPathFlags::DONT_CREATE);
+
+        let headers = HeaderSet::from(request);
+        let (code, response_headers) = match self.handler.set_path(headers, backup, create).await {
+            Ok(headers) => {
+                trace!("Application accepted SETPATH request");
+                (ResponseCode::Ok, headers)
+            }
+            Err(reject_parameters) => {
+                trace!("Application rejected SETPATH request");
+                reject_parameters
+            }
+        };
+        let response_packet = ResponsePacket::new_setpath(code, response_headers);
+        Ok(response_packet)
+    }
+
     /// Processes a raw data `packet` received from the remote peer acting as an OBEX client.
     /// Returns a `ResponsePacket` on success, Error if the request couldn't be handled.
     async fn receive_packet(&mut self, packet: Vec<u8>) -> Result<ResponsePacket, Error> {
@@ -122,6 +155,7 @@ impl ObexServer {
         match decoded.code() {
             OpCode::Connect => self.connect_request(decoded).await,
             OpCode::Disconnect => self.disconnect_request(decoded).await,
+            OpCode::SetPath => self.setpath_request(decoded).await,
             _code => todo!("Support other OBEX requests"),
         }
     }
@@ -282,5 +316,77 @@ mod tests {
             assert!(headers.contains_header(&HeaderIdentifier::Description));
         };
         expect_response(&mut exec, &mut remote, expectation, OpCode::Disconnect);
+    }
+
+    #[fuchsia::test]
+    fn setpath_request_accepted_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut obex_server, test_app, mut remote) = new_obex_server();
+        // Set to the Connected state to bypass CONNECT operation.
+        obex_server.set_connected(ConnectionStatus::Connected);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let headers = HeaderSet::from_header(Header::name("folder1")).unwrap();
+        let setpath_request =
+            RequestPacket::new_set_path(SetPathFlags::all(), headers).expect("valid request");
+        send_packet(&mut remote, setpath_request);
+
+        // The ObexServer should receive the request and hand it to the profile - profile accepts.
+        test_app.set_response(Ok(HeaderSet::new()));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        // Expect the remote peer to receive our SETPATH response.
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Ok);
+            let headers = HeaderSet::from(response);
+            assert!(headers.is_empty());
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::SetPath);
+    }
+
+    #[fuchsia::test]
+    fn setpath_request_rejected_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut obex_server, test_app, mut remote) = new_obex_server();
+        // Set to the Connected state to bypass CONNECT operation.
+        obex_server.set_connected(ConnectionStatus::Connected);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let setpath_request = RequestPacket::new_set_path(SetPathFlags::BACKUP, HeaderSet::new())
+            .expect("valid request");
+        send_packet(&mut remote, setpath_request);
+
+        // The ObexServer should receive the request and hand it to the profile - profile rejects.
+        test_app.set_response(Err((ResponseCode::Forbidden, HeaderSet::new())));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        // Expect the remote peer to receive our negative SETPATH response.
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Forbidden);
+            let headers = HeaderSet::from(response);
+            assert!(headers.is_empty());
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::SetPath);
+    }
+
+    #[fuchsia::test]
+    fn setpath_request_before_connect_is_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (obex_server, _test_app, mut remote) = new_obex_server();
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let setpath_request = RequestPacket::new_set_path(SetPathFlags::BACKUP, HeaderSet::new())
+            .expect("valid request");
+        send_packet(&mut remote, setpath_request);
+        let result = exec
+            .run_until_stalled(&mut server_fut)
+            .expect("server terminated from invalid setpath");
+        assert_matches!(result, Err(Error::OperationError { operation: OpCode::SetPath, .. }));
     }
 }
