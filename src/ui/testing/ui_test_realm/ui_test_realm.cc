@@ -363,12 +363,10 @@ void UITestRealm::RouteConfigData() {
 }
 
 void UITestRealm::ConfigureScenic() {
-  // Load default config for Scenic, and override its "i_can_haz_flatland" flag.
+  // Load default config for Scenic.
   realm_builder_.InitMutableConfigFromPackage(kScenicName);
   realm_builder_.SetConfigValue(kScenicName, "flatland_enable_display_composition",
                                 ConfigValue::Bool(false));
-  realm_builder_.SetConfigValue(kScenicName, "i_can_haz_flatland",
-                                ConfigValue::Bool(config_.use_flatland));
 }
 
 void UITestRealm::ConfigureSceneOwner() {

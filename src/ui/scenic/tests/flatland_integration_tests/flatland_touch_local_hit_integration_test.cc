@@ -83,7 +83,7 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public Logging
     // Build the realm topology and route the protocols required by this test fixture from the
     // scenic subrealm.
     realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder({.use_flatland = false})
+        ScenicRealmBuilder()
             .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
             .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
             .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)

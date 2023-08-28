@@ -22,7 +22,6 @@ struct ViewProviderConfig {
 };
 
 struct RealmBuilderArgs {
-  bool use_flatland = true;
   std::optional<ViewProviderConfig> view_provider_config;
 };
 

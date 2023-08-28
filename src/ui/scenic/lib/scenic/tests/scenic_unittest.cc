@@ -47,9 +47,8 @@ namespace test {
 class ScenicUnitTest : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
-    scenic_ = std::make_unique<Scenic>(
-        provider_.context(), inspect_node_, frame_scheduler_, [this] { QuitLoop(); },
-        use_flatland_);
+    scenic_ = std::make_unique<Scenic>(provider_.context(), inspect_node_, frame_scheduler_,
+                                       [this] { QuitLoop(); });
   }
 
   std::unique_ptr<scenic::Session> CreateSession() {
@@ -61,7 +60,6 @@ class ScenicUnitTest : public gtest::TestLoopFixture {
     return std::make_unique<::scenic::Session>(std::move(session_ptr), std::move(listener_request));
   }
 
-  bool use_flatland_ = false;
   sys::testing::ComponentContextProvider provider_;
   scheduling::test::MockFrameScheduler frame_scheduler_;
   inspect::Node inspect_node_;
@@ -248,24 +246,12 @@ TEST_F(ScenicUnitTest, ScenicApiAfterDelegate) {
   EXPECT_TRUE(display_ownership);
 }
 
-// Tests that Scenic returns the flatland signal it is initialized with.
-class ParameterizedScenicUsesFlatlandTest : public ScenicUnitTest,
-                                            public ::testing::WithParamInterface<bool> {
- protected:
-  void SetUp() override {
-    use_flatland_ = GetParam();
-    ScenicUnitTest::SetUp();
-  }
-};
-
-TEST_P(ParameterizedScenicUsesFlatlandTest, UsesFlatlandCallbackIsRun) {
+TEST_F(ScenicUnitTest, UsesFlatlandCallbackIsRun) {
   std::optional<bool> uses_flatland;
   scenic_->UsesFlatland([&uses_flatland](bool enabled) { uses_flatland = enabled; });
   EXPECT_TRUE(uses_flatland.has_value());
-  EXPECT_EQ(*uses_flatland, GetParam());
+  EXPECT_TRUE(*uses_flatland);
 }
-
-INSTANTIATE_TEST_SUITE_P(UseFlatland, ParameterizedScenicUsesFlatlandTest, ::testing::Bool());
 
 }  // namespace test
 }  // namespace scenic_impl

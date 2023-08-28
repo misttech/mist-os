@@ -15,9 +15,8 @@ void ScenicTest::SetUp() {
   context_ = provider.TakeContext();
   frame_scheduler_ = std::make_unique<scheduling::DefaultFrameScheduler>(
       std::make_unique<scheduling::ConstantFramePredictor>(/* static_vsync_offset */ zx::msec(5)));
-  scenic_ = std::make_shared<Scenic>(
-      context_.get(), inspect_node_, *frame_scheduler_, [this] { QuitLoop(); },
-      /*use_flatland=*/false);
+  scenic_ = std::make_shared<Scenic>(context_.get(), inspect_node_, *frame_scheduler_,
+                                     [this] { QuitLoop(); });
   InitializeScenic(scenic_);
 }
 

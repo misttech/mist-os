@@ -15,7 +15,6 @@ executable("unittests") {
 
   sources = [
     "flatland_screenshot_unittest.cc",
-    "gfx_screenshot_unittest.cc",
     "util_unittest.cc",
   ]
 

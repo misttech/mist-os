@@ -41,8 +41,7 @@ class Scenic final : public fuchsia::ui::scenic::Scenic {
   };
 
   Scenic(sys::ComponentContext* app_context, inspect::Node& inspect_node,
-         scheduling::FrameScheduler& frame_scheduler, fit::closure quit_callback,
-         bool use_flatland);
+         scheduling::FrameScheduler& frame_scheduler, fit::closure quit_callback);
   ~Scenic();
 
   // |fuchsia::ui::scenic::Scenic|
@@ -138,8 +137,6 @@ class Scenic final : public fuchsia::ui::scenic::Scenic {
   fit::closure quit_callback_;
   inspect::Node& inspect_node_;
   scheduling::FrameScheduler& frame_scheduler_;
-
-  const bool use_flatland_;
 
   // Registered systems, mapped to their TypeId.
   std::unordered_map<System::TypeId, std::shared_ptr<System>> systems_;

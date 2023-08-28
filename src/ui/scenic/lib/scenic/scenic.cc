@@ -15,13 +15,11 @@ namespace scenic_impl {
 using fuchsia::ui::scenic::SessionEndpoints;
 
 Scenic::Scenic(sys::ComponentContext* app_context, inspect::Node& inspect_node,
-               scheduling::FrameScheduler& frame_scheduler, fit::closure quit_callback,
-               bool use_flatland)
+               scheduling::FrameScheduler& frame_scheduler, fit::closure quit_callback)
     : app_context_(app_context),
       quit_callback_(std::move(quit_callback)),
       inspect_node_(inspect_node),
-      frame_scheduler_(frame_scheduler),
-      use_flatland_(use_flatland) {
+      frame_scheduler_(frame_scheduler) {
   FX_DCHECK(app_context_);
 
   app_context->outgoing()->AddPublicService(scenic_bindings_.GetHandler(this));
@@ -247,7 +245,7 @@ void Scenic::GetDisplayOwnershipEvent(
 }
 
 void Scenic::UsesFlatland(fuchsia::ui::scenic::Scenic::UsesFlatlandCallback callback) {
-  callback(use_flatland_);
+  callback(true);
 }
 
 void Scenic::InitializeSnapshotService(

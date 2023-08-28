@@ -6,8 +6,6 @@ source_set("screenshot") {
   sources = [
     "flatland_screenshot.cc",
     "flatland_screenshot.h",
-    "gfx_screenshot.cc",
-    "gfx_screenshot.h",
     "screenshot_manager.cc",
     "screenshot_manager.h",
     "util.cc",

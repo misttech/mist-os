@@ -23,7 +23,6 @@
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
 #include "src/ui/scenic/lib/gfx/api/internal_snapshot_impl.h"
 #include "src/ui/scenic/lib/gfx/gfx_system.h"
-#include "src/ui/scenic/lib/gfx/screenshotter.h"
 #include "src/ui/scenic/lib/scheduling/frame_metrics_registry.cb.h"
 #include "src/ui/scenic/lib/scheduling/windowed_frame_predictor.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
@@ -69,7 +68,6 @@ scenic_structured_config::Config GetConfig() {
 
   FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
                 << values.frame_scheduler_min_predicted_frame_duration_in_us();
-  FX_LOGS(INFO) << "i_can_haz_flatland: " << values.i_can_haz_flatland();
   FX_LOGS(INFO) << "enable_allocator_for_flatland: " << values.enable_allocator_for_flatland();
   FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
   FX_LOGS(INFO) << "flatland_enable_display_composition: "
@@ -190,58 +188,30 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
               scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
           inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
       image_pipe_updater_(std::make_shared<gfx::ImagePipeUpdater>(frame_scheduler_)),
-      scenic_(
-          app_context_.get(), inspect_node_, frame_scheduler_,
-          [weak = std::weak_ptr<ShutdownManager>(shutdown_manager_)] {
-            if (auto strong = weak.lock()) {
-              strong->Shutdown(kShutdownTimeout);
-            }
-          },
-          config_values_.i_can_haz_flatland()),
+      scenic_(app_context_.get(), inspect_node_, frame_scheduler_,
+              [weak = std::weak_ptr<ShutdownManager>(shutdown_manager_)] {
+                if (auto strong = weak.lock()) {
+                  strong->Shutdown(kShutdownTimeout);
+                }
+              }),
       uber_struct_system_(std::make_shared<flatland::UberStructSystem>()),
       link_system_(
           std::make_shared<flatland::LinkSystem>(uber_struct_system_->GetNextInstanceId())),
       flatland_presenter_(std::make_shared<flatland::FlatlandPresenterImpl>(
           async_get_default_dispatcher(), frame_scheduler_)),
-      color_converter_(app_context_.get(),
-                       /*set_color_conversion_values*/
-                       config_values_.i_can_haz_flatland()
-                           ? display::SetColorConversionFunc([this](const auto& coefficients,
-                                                                    const auto& preoffsets,
-                                                                    const auto& postoffsets) {
-                               FX_DCHECK(flatland_compositor_);
-                               flatland_compositor_->SetColorConversionValues(
-                                   coefficients, preoffsets, postoffsets);
-                             })
-                           : display::SetColorConversionFunc([this](const auto& coefficients,
-                                                                    const auto& preoffsets,
-                                                                    const auto& postoffsets) {
-                               FX_DCHECK(engine_);
-                               for (auto compositor : engine_->scene_graph()->compositors()) {
-                                 if (auto swapchain = compositor->swapchain()) {
-                                   const bool success = swapchain->SetDisplayColorConversion(
-                                       {.preoffsets = preoffsets,
-                                        .matrix = coefficients,
-                                        .postoffsets = postoffsets});
-                                   FX_DCHECK(success);
-                                 }
-                               }
-                             }),
-                       /*set_minimum_rgb*/
-                       config_values_.i_can_haz_flatland()
-                           ? display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
-                               FX_DCHECK(flatland_compositor_);
-                               flatland_compositor_->SetMinimumRgb(minimum_rgb);
-                             })
-                           : display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
-                               FX_DCHECK(engine_);
-                               for (auto compositor : engine_->scene_graph()->compositors()) {
-                                 if (auto swapchain = compositor->swapchain()) {
-                                   const bool success = swapchain->SetMinimumRgb(minimum_rgb);
-                                   FX_DCHECK(success);
-                                 }
-                               }
-                             })),
+      color_converter_(
+          app_context_.get(),
+          /*set_color_conversion_values*/
+          display::SetColorConversionFunc([this](const auto& coefficients, const auto& preoffsets,
+                                                 const auto& postoffsets) {
+            FX_DCHECK(flatland_compositor_);
+            flatland_compositor_->SetColorConversionValues(coefficients, preoffsets, postoffsets);
+          }),
+          /*set_minimum_rgb*/
+          display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
+            FX_DCHECK(flatland_compositor_);
+            flatland_compositor_->SetMinimumRgb(minimum_rgb);
+          })),
       focus_manager_(inspect_node_.CreateChild("FocusManager"),
                      /*legacy_focus_listener*/
                      [this](zx_koid_t old_focus, zx_koid_t new_focus) {
@@ -443,15 +413,12 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
   // will be too early to do it here, since we're not yet aware of any displays nor the formats they
   // support.  It will probably be OK to warm the cache when a new display is plugged in, because
   // users don't expect plugging in a display to be completely jank-free.
-  if (config_values_.i_can_haz_flatland()) {
-    // Warming the pipeline cache causes some non-Flatland tests to time out, so don't warm unless
-    // |i_can_haz_flatland| is true.
-    flatland_renderer->WarmPipelineCache();
 
-    // TODO(fxb/122155) Support camera image in shader pre-warmup.
-    // Disabling this line allows any shaders that weren't warmed up to be lazily created later.
-    // flatland_renderer->set_disable_lazy_pipeline_creation(true);
-  }
+  flatland_renderer->WarmPipelineCache();
+
+  // TODO(fxb/122155) Support camera image in shader pre-warmup.
+  // Disabling this line allows any shaders that weren't warmed up to be lazily created later.
+  // flatland_renderer->set_disable_lazy_pipeline_creation(true);
 
   // Flatland compositor must be made first; it is needed by the manager and the engine.
   {
@@ -519,8 +486,6 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     screen_capture_importers.push_back(screen_capture_buffer_collection_importer);
 
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> default_importers;
-    if (!config_values_.i_can_haz_flatland())
-      default_importers.push_back(gfx_buffer_collection_importer);
     if (config_values_.enable_allocator_for_flatland() && flatland_compositor_)
       default_importers.push_back(flatland_compositor_);
 
@@ -591,14 +556,10 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
     // Capture flatland_manager since the primary display may not have been initialized yet.
     screenshot_manager_.emplace(
-        config_values_.i_can_haz_flatland(), allocator_, flatland_renderer,
+        allocator_, flatland_renderer,
         [this]() {
           auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
           return flatland_engine_->GetRenderables(*display);
-        },
-        [this](fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) {
-          gfx::Screenshotter::TakeScreenshot(&engine_.value(), std::move(callback),
-                                             escher_cleanup_);
         },
         std::move(screen_capture_importers), display_info_delegate_->GetDisplayDimensions(),
         GetDisplayRotation());
@@ -660,14 +621,6 @@ void App::InitializeHeartbeat(display::Display& display) {
         return view_tree::SubtreeSnapshot{};  // Empty snapshot.
       }
     });
-    // The i_can_haz_flatland flag is about eager-forcing of Flatland.
-    // If true, then we KNOW that GFX should *not* run. Workstation is true.
-    // if false, then either system could legitimately run. This flag is false for tests and
-    // GFX-based products.
-    if (!config_values_.i_can_haz_flatland()) {
-      subtrees_generator_callbacks.emplace_back(
-          [this] { return engine_->scene_graph()->view_tree().Snapshot(); });
-    }
 
     // All subscriber callbacks get called with the new snapshot every time one is generated (once
     // per frame).
@@ -713,14 +666,11 @@ void App::InitializeHeartbeat(display::Display& display) {
       /*update_sessions*/
       [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
         TRACE_DURATION("gfx", "App update_sessions");
-        if (config_values_.i_can_haz_flatland()) {
-          // Flatland doesn't pass release fences into the FrameScheduler. Instead, they are stored
-          // in the FlatlandPresenter and pulled out by the flatland::Engine during rendering.
-          FX_CHECK(fences_from_previous_presents.empty())
-              << "Flatland fences should not be handled by FrameScheduler.";
-        } else {
-          engine_->SignalFencesWhenPreviousRendersAreDone(std::move(fences_from_previous_presents));
-        }
+
+        // Flatland doesn't pass release fences into the FrameScheduler. Instead, they are stored
+        // in the FlatlandPresenter and pulled out by the flatland::Engine during rendering.
+        FX_CHECK(fences_from_previous_presents.empty())
+            << "Flatland fences should not be handled by FrameScheduler.";
 
         const scheduling::SessionsWithFailedUpdates failed_sessions =
             scenic_.UpdateSessions(sessions_to_update, trace_id);

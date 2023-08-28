@@ -13,14 +13,11 @@
 namespace screenshot {
 
 ScreenshotManager::ScreenshotManager(
-    bool use_flatland, std::shared_ptr<allocation::Allocator> allocator,
-    std::shared_ptr<flatland::Renderer> renderer, GetRenderables get_renderables,
-    TakeGfxScreenshot take_gfx_screenshot,
+    std::shared_ptr<allocation::Allocator> allocator, std::shared_ptr<flatland::Renderer> renderer,
+    GetRenderables get_renderables,
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> buffer_collection_importers,
     fuchsia::math::SizeU display_size, int display_rotation)
-    : use_flatland_(use_flatland),
-      take_gfx_screenshot_(std::move(take_gfx_screenshot)),
-      allocator_(std::move(allocator)),
+    : allocator_(std::move(allocator)),
       renderer_(renderer),
       get_renderables_(std::move(get_renderables)),
       buffer_collection_importers_(std::move(buffer_collection_importers)),
@@ -31,27 +28,15 @@ ScreenshotManager::ScreenshotManager(
 
 void ScreenshotManager::CreateBinding(
     fidl::InterfaceRequest<fuchsia::ui::composition::Screenshot> request) {
-  if (use_flatland_) {
-    std::unique_ptr<ScreenCapture> screen_capture = std::make_unique<ScreenCapture>(
-        buffer_collection_importers_, renderer_, [this]() { return get_renderables_(); });
+  std::unique_ptr<ScreenCapture> screen_capture = std::make_unique<ScreenCapture>(
+      buffer_collection_importers_, renderer_, [this]() { return get_renderables_(); });
 
-    bindings_.AddBinding(
-        std::make_unique<screenshot::FlatlandScreenshot>(
-            std::move(screen_capture), allocator_, display_size_, display_rotation_,
-            [this](screenshot::FlatlandScreenshot* sc) {
-              bindings_.CloseBinding(sc, ZX_ERR_SHOULD_WAIT);
-            }),
-        std::move(request));
-  } else {
-    bindings_.AddBinding(std::make_unique<screenshot::GfxScreenshot>(
-                             [this](fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) {
-                               take_gfx_screenshot_(std::move(callback));
-                             },
-                             [this](screenshot::GfxScreenshot* sc) {
-                               bindings_.CloseBinding(sc, ZX_ERR_SHOULD_WAIT);
-                             }),
-                         std::move(request));
-  }
+  bindings_.AddBinding(std::make_unique<screenshot::FlatlandScreenshot>(
+                           std::move(screen_capture), allocator_, display_size_, display_rotation_,
+                           [this](screenshot::FlatlandScreenshot* sc) {
+                             bindings_.CloseBinding(sc, ZX_ERR_SHOULD_WAIT);
+                           }),
+                       std::move(request));
 }
 
 }  // namespace screenshot

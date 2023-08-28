@@ -13,19 +13,15 @@
 #include "src/ui/scenic/lib/flatland/renderer/renderer.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 #include "src/ui/scenic/lib/screenshot/flatland_screenshot.h"
-#include "src/ui/scenic/lib/screenshot/gfx_screenshot.h"
 
 using GetRenderables = std::function<flatland::Renderables()>;
-using TakeGfxScreenshot =
-    std::function<void(fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback)>;
 
 namespace screenshot {
 
 class ScreenshotManager {
  public:
-  ScreenshotManager(bool use_flatland, std::shared_ptr<allocation::Allocator> allocator_,
+  ScreenshotManager(std::shared_ptr<allocation::Allocator> allocator_,
                     std::shared_ptr<flatland::Renderer> renderer, GetRenderables get_renderables,
-                    TakeGfxScreenshot take_gfx_screenshot,
                     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>
                         buffer_collection_importers,
                     fuchsia::math::SizeU display_size, int display_rotation);
@@ -34,10 +30,6 @@ class ScreenshotManager {
   void CreateBinding(fidl::InterfaceRequest<fuchsia::ui::composition::Screenshot> request);
 
  private:
-  const bool use_flatland_;
-
-  TakeGfxScreenshot take_gfx_screenshot_;
-
   // We need these for rendering the scene into the client supplied buffer.
   std::shared_ptr<allocation::Allocator> allocator_;
   std::shared_ptr<flatland::Renderer> renderer_;

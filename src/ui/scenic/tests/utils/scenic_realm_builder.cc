@@ -38,11 +38,6 @@ ScenicRealmBuilder::ScenicRealmBuilder(RealmBuilderArgs args)
 }
 
 ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
-  // Load default config for Scenic, and override its "i_can_haz_flatland" flag.
-  realm_builder_.InitMutableConfigFromPackage(kScenic);
-  realm_builder_.SetConfigValue(kScenic, "i_can_haz_flatland",
-                                ConfigValue::Bool(args.use_flatland));
-
   // Only fuchsia.media.ProfileProvider is not already included by scenic_only.cml.
   realm_builder_.AddRoute(Route{.capabilities =
                                     {
