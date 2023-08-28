@@ -132,7 +132,10 @@ async fn run_virtio_balloon(
 #[fuchsia::main(logging = true, threads = 1)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut fs = server::ServiceFs::new();
-    inspect_runtime::serve(inspect::component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        inspect::component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
     fs.dir("svc").add_fidl_service(|stream: VirtioBalloonRequestStream| stream);
     fs.take_and_serve_directory_handle().context("Error starting server")?;
     fs.for_each_concurrent(None, |stream| async {
@@ -141,5 +144,6 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     })
     .await;
+
     Ok(())
 }
