@@ -292,7 +292,7 @@ async fn create_container(
 
     let mut init_task = create_init_task(&kernel, config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
-    release_on_error!(init_task, &(), {
+    release_on_error!(init_task, (), {
         let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)
             .source_context("creating FsContext")?;
         init_task.set_fs(fs_context.clone());
@@ -420,7 +420,7 @@ fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<Curr
         CString::new(config.init[0].clone())?
     };
     let task = Task::create_process_without_parent(kernel, initial_name, None)?;
-    release_on_error!(task, &(), {
+    release_on_error!(task, (), {
         task.set_creds(credentials);
         set_rlimits(&task, &config.rlimits)?;
         Ok(())

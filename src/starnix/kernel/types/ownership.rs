@@ -41,10 +41,10 @@ use std::{
 /// The base trait for explicit ownership. Any `Releasable` object must call `release` before
 /// being dropped.
 pub trait Releasable {
-    type Context;
+    type Context<'a>;
 
     // TODO(https://fxbug.dev/131095): This method should take `self` instead of `&self`.
-    fn release(&self, c: &Self::Context);
+    fn release(&self, c: Self::Context<'_>);
 }
 
 /// A wrapper a round a Releasable object that will check, in test and when assertion are enabled,
@@ -59,9 +59,9 @@ pub struct ReleaseGuard<T: Releasable> {
 }
 
 impl<T: Releasable> Releasable for ReleaseGuard<T> {
-    type Context = T::Context;
+    type Context<'a> = T::Context<'a>;
 
-    fn release(&self, c: &Self::Context) {
+    fn release(&self, c: Self::Context<'_>) {
         self.drop_guard.disarm();
         self.value.release(c);
     }
@@ -189,7 +189,7 @@ impl<T: Releasable> OwnedRef<T> {
 
     /// Take the releasable from the `OwnedRef`. Returns None if the `OwnedRef` is not the last
     /// reference to the data.
-    pub fn take(this: &Self) -> Option<impl Releasable<Context = T::Context>> {
+    pub fn take(this: &Self) -> Option<impl for<'a> Releasable<Context<'a> = T::Context<'a>>> {
         this.drop_guard.disarm();
         let previous_count = this.inner.owned_refs_count.fetch_sub(1, Ordering::Release);
         if previous_count == 1 {
@@ -218,11 +218,11 @@ impl<T: Releasable> Clone for OwnedRef<T> {
 }
 
 impl<T: Releasable> Releasable for OwnedRef<T> {
-    type Context = T::Context;
+    type Context<'a> = T::Context<'a>;
 
     /// Release the `OwnedRef`. If this is the last instance, this method will block until all
     /// `TempRef` instances are dropped, and will release the underlying object.
-    fn release(&self, c: &Self::Context) {
+    fn release(&self, c: Self::Context<'_>) {
         if let Some(value) = OwnedRef::take(self) {
             value.release(c);
         }
@@ -441,8 +441,8 @@ struct RefInner<T: Releasable> {
 }
 
 impl<T: Releasable> Releasable for Arc<RefInner<T>> {
-    type Context = T::Context;
-    fn release(&self, c: &Self::Context) {
+    type Context<'a> = T::Context<'a>;
+    fn release(&self, c: Self::Context<'_>) {
         self.value.release(c);
     }
 }
@@ -622,8 +622,16 @@ mod test {
     struct Data;
 
     impl Releasable for Data {
-        type Context = ();
-        fn release(&self, _: &()) {}
+        type Context<'a> = ();
+        fn release(&self, _: ()) {}
+    }
+
+    #[derive(Default)]
+    struct DataWithMutableReleaseContext;
+
+    impl Releasable for DataWithMutableReleaseContext {
+        type Context<'a> = &'a mut ();
+        fn release(&self, _: &mut ()) {}
     }
 
     #[::fuchsia::test]
@@ -637,7 +645,7 @@ mod test {
         let value = OwnedRef::new(Data {});
         let reference = WeakRef::from(&value);
         reference.upgrade().expect("upgrade");
-        value.release(&());
+        value.release(());
         assert!(reference.upgrade().is_none());
     }
 
@@ -646,14 +654,14 @@ mod test {
         let value = OwnedRef::new(Data {});
         {
             let value2 = OwnedRef::clone(&value);
-            value2.release(&());
+            value2.release(());
         }
         #[allow(clippy::redundant_clone)]
         {
             let reference = WeakRef::from(&value);
             let _reference2 = reference.clone();
         }
-        value.release(&());
+        value.release(());
     }
 
     #[::fuchsia::test]
@@ -666,7 +674,7 @@ mod test {
     fn test_release_on_error() {
         fn release_on_error() -> Result<(), ()> {
             let value = OwnedRef::new(Data {});
-            release_on_error!(value, &(), {
+            release_on_error!(value, (), {
                 if true {
                     return Err(());
                 }
@@ -687,7 +695,7 @@ mod test {
         std::mem::drop(weak);
         // Drop static_ref
         std::mem::drop(static_ref);
-        value.release(&());
+        value.release(());
     }
 
     #[::fuchsia::test]
@@ -703,7 +711,7 @@ mod test {
         .expect("join");
         std::mem::drop(_temp_ref);
         debug_assert_no_local_temp_ref();
-        value.release(&());
+        value.release(());
         debug_assert_no_local_temp_ref();
     }
 
@@ -717,14 +725,14 @@ mod test {
         }
         // This code should not be reached, but ensures the test will fail is
         // `debug_assert_no_local_temp_ref` fails to panic.
-        value.release(&());
+        value.release(());
     }
 
     #[::fuchsia::test]
     #[should_panic]
     fn test_clone_released_owned_ref_abort_in_test() {
         let value = OwnedRef::new(Data {});
-        value.release(&());
+        value.release(());
         let _ = OwnedRef::clone(&value);
     }
 
@@ -738,12 +746,19 @@ mod test {
     #[should_panic]
     fn test_double_release_release_guard() {
         let value = ReleaseGuard::<Data>::default();
-        value.release(&());
-        value.release(&());
+        value.release(());
+        value.release(());
     }
 
     #[::fuchsia::test]
     fn test_released_release_guard() {
         let _value = ReleaseGuard::<Data>::default_released();
+    }
+
+    #[::fuchsia::test]
+    fn release_with_mutable_context() {
+        let value = OwnedRef::new(DataWithMutableReleaseContext {});
+        let mut context = ();
+        value.release(&mut context);
     }
 }

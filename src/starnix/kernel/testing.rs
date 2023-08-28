@@ -341,7 +341,7 @@ impl From<CurrentTask> for AutoReleasableTask {
 
 impl Drop for AutoReleasableTask {
     fn drop(&mut self) {
-        self.0.take().unwrap().release(&());
+        self.0.take().unwrap().release(());
     }
 }
 

@@ -164,7 +164,7 @@ fn create_task_with_pty(
     window_size: uapi::winsize,
 ) -> Result<(CurrentTask, FileHandle), Errno> {
     let mut current_task = Task::create_init_child_process(kernel, &binary_path)?;
-    let pty = release_on_error!(current_task, &(), {
+    let pty = release_on_error!(current_task, (), {
         let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
         current_task.exec(executable, binary_path, argv, environ)?;
         let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
@@ -194,7 +194,7 @@ fn forward_to_pty(
         let read_task = container.kernel.kthreads.new_system_thread()?;
         move || {
             let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
-                async_release_after!(read_task, &(), || -> Result<(), Error> {
+                async_release_after!(read_task, (), || -> Result<(), Error> {
                     let mut buffer = vec![0u8; BUFFER_CAPACITY];
                     loop {
                         let bytes = rx.read(&mut buffer[..]).await?;
@@ -213,7 +213,7 @@ fn forward_to_pty(
         let write_task = container.kernel.kthreads.new_system_thread()?;
         move || {
             let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
-                async_release_after!(write_task, &(), || -> Result<(), Error> {
+                async_release_after!(write_task, (), || -> Result<(), Error> {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();

@@ -33,7 +33,7 @@ pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, 
         UserRef::<pid_t>::new(UserAddress::from(args.parent_tid)),
         UserRef::<pid_t>::new(UserAddress::from(args.child_tid)),
     )?;
-    let (tid, task_ref) = release_on_error!(new_task, &(), {
+    let (tid, task_ref) = release_on_error!(new_task, (), {
         let tid = new_task.id;
 
         // Clone the registers, setting the result register to 0 for the return value from clone in the

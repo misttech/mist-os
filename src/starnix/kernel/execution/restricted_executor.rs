@@ -393,7 +393,7 @@ where
                 ok => ok,
             };
 
-            current_task.release(&());
+            current_task.release(());
             task_complete(run_result);
         })
         .expect("able to spawn threads");

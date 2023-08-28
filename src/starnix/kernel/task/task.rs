@@ -79,9 +79,9 @@ type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
 impl Releasable for CurrentTask {
-    type Context = ();
+    type Context<'a> = ();
 
-    fn release(&self, _: &()) {
+    fn release(&self, _: ()) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
         self.task.release(self);
@@ -820,7 +820,7 @@ impl Task {
             UserAddress::NULL.into(),
             default_timerslack,
         ));
-        release_on_error!(current_task, &(), {
+        release_on_error!(current_task, (), {
             let temp_task = current_task.temp_task();
             current_task.thread_group.add(&temp_task)?;
 
@@ -873,7 +873,7 @@ impl Task {
             UserAddress::NULL.into(),
             default_timerslack_ns,
         ));
-        release_on_error!(current_task, &(), {
+        release_on_error!(current_task, (), {
             let temp_task = current_task.temp_task();
             current_task.thread_group.add(&temp_task)?;
             pids.add_task(&temp_task);
@@ -1061,7 +1061,7 @@ impl Task {
             timerslack_ns,
         ));
 
-        release_on_error!(child, &(), {
+        release_on_error!(child, (), {
             let child_task = TempRef::from(&child.task);
             // Drop the pids lock as soon as possible after creating the child. Destroying the child
             // and removing it from the pids table itself requires the pids lock, so if an early exit
@@ -1308,7 +1308,7 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context = CurrentTask;
+    type Context<'a> = &'a CurrentTask;
 
     fn release(&self, current_task: &CurrentTask) {
         self.thread_group.remove(self);

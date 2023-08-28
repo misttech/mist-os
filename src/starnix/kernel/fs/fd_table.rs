@@ -147,7 +147,7 @@ impl FdTableInner {
 }
 
 impl Releasable for FdTableInner {
-    type Context = CurrentTask;
+    type Context<'a> = &'a CurrentTask;
 
     fn release(&self, _current_task: &CurrentTask) {
         *self.map_handle.lock() = FdMap::default();
@@ -363,7 +363,7 @@ impl FdTable {
 }
 
 impl Releasable for FdTable {
-    type Context = CurrentTask;
+    type Context<'a> = &'a CurrentTask;
     /// Drop the fd table, closing any files opened exclusively by this table.
     fn release(&self, current_task: &CurrentTask) {
         let table = OwnedRef::take(&self.table.lock());

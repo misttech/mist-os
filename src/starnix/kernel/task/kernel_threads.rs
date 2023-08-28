@@ -52,7 +52,7 @@ impl Default for KernelThreads {
 impl Drop for KernelThreads {
     fn drop(&mut self) {
         let system_task = self.system_task.take().unwrap();
-        system_task.release(&());
+        system_task.release(());
     }
 }
 

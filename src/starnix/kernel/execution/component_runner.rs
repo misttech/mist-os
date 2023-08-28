@@ -116,7 +116,7 @@ pub async fn start_component(
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
-    release_on_error!(current_task, &(), {
+    release_on_error!(current_task, (), {
         let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
         let cwd = current_task
             .lookup_path(
