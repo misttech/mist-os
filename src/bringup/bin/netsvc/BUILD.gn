@@ -197,6 +197,17 @@ fuchsia_test_package("netsvc-tests-package") {
     ":netsvc-stress-test-component",
     ":netsvc-test-component",
   ]
+  if (is_coverage) {
+    test_specs = {
+      log_settings = {
+        # We get a test flake only on coverage builders that is not reproducible
+        # locally, owed purely to an error log from driver test realm in an
+        # otherwise-passing test.
+        # See https://fxbug.dev/131630.
+        max_severity = "ERROR"
+      }
+    }
+  }
 }
 
 # NB: These sources were historically part of a zircon library called inet6.
