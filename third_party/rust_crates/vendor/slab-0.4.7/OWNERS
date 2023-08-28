@@ -5,13 +5,8 @@
 include /src/connectivity/bluetooth/OWNERS
 include /src/connectivity/lowpan/OWNERS
 include /src/lib/async-utils/OWNERS
-include /src/lib/cutex/OWNERS
 include /src/lib/fidl/rust/OWNERS
 include /src/lib/fuchsia-async/OWNERS
 include /src/lib/storage/OWNERS
-include /src/proc/OWNERS
 include /src/storage/OWNERS
-include /third_party/rust_crates/vendor/async-executor-1.4.1/OWNERS
-include /third_party/rust_crates/vendor/async-io-1.4.1/OWNERS
-include /third_party/rust_crates/vendor/deepsize-0.2.0/OWNERS
 include /third_party/rust_crates/vendor/futures-util-0.3.19/OWNERS
