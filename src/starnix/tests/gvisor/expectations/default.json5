@@ -343,6 +343,7 @@
                 "MountTest.MountInfo",
                 "MountTest.MountNoExec",
                 "MountTest.MountTmpfsMagicValIgnored",
+                "MountTest.MountWithStrictAtime",
                 "MountTest.OpenFileBusy",
                 "MountTest.PropagateUmountEvent",
                 "MountTest.ReuseGroupIDs",
