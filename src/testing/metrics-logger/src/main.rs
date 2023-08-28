@@ -534,7 +534,8 @@ async fn inner_main() -> Result<()> {
 
     // Required call to serve the inspect tree
     let inspector = inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     // Construct the server, and begin serving.
     let config: Option<json::Value> = std::fs::File::open(CONFIG_PATH)
