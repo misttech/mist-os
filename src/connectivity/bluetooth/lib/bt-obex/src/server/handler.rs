@@ -19,6 +19,11 @@ pub trait ObexServerHandler {
     /// Returns `Err` with a rejection code and headers if the CONNECT request is rejected.
     async fn connect(&mut self, headers: HeaderSet) -> ObexResult;
 
+    /// A request to disconnect the OBEX connection.
+    /// `headers` are the informational headers provided by the remote OBEX client.
+    /// Returns informational headers in response to the request.
+    async fn disconnect(&mut self, headers: HeaderSet) -> HeaderSet;
+
     // TODO(fxbug.dev/125307): Add other operation types.
 }
 
@@ -51,6 +56,15 @@ pub(crate) mod test_utils {
                 .lock()
                 .take()
                 .unwrap_or(Err((ResponseCode::MethodNotAllowed, HeaderSet::new())))
+        }
+
+        async fn disconnect(&mut self, _headers: HeaderSet) -> HeaderSet {
+            // Disconnect cannot be rejected so just take the response headers if they exist or
+            // default to returning an empty HeaderSet.
+            match self.response.lock().take() {
+                Some(Ok(headers)) => headers,
+                _ => HeaderSet::new(),
+            }
         }
     }
 }

@@ -20,12 +20,23 @@ pub use crate::transport::TransportType;
 mod handler;
 pub use handler::ObexServerHandler;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ConnectionStatus {
+    /// The transport is created but the CONNECT operation has not been completed.
+    Initialized,
+    /// The transport is connected and the CONNECT operation has been completed.
+    Connected,
+    /// The transport is connected but a DISCONNECT request has been received. The `ObexServer`
+    /// will no longer process requests from the remote peer.
+    DisconnectReceived,
+}
+
 /// Implements the Server role for the OBEX protocol.
 /// Provides an interface for receiving and responding to OBEX requests made by a remote OBEX client
 /// service. Supports the operations defined in OBEX 1.5.
 pub struct ObexServer {
-    /// Whether the CONNECT operation has completed.
-    connected: bool,
+    /// The current connection status of the server.
+    connected: ConnectionStatus,
     /// The maximum OBEX packet length for this OBEX session.
     max_packet_size: u16,
     /// The data channel that is used to read & write OBEX packets.
@@ -39,11 +50,11 @@ pub struct ObexServer {
 impl ObexServer {
     pub fn new(channel: Channel, handler: Box<dyn ObexServerHandler>) -> Self {
         let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
-        Self { connected: false, max_packet_size, channel, handler }
+        Self { connected: ConnectionStatus::Initialized, max_packet_size, channel, handler }
     }
 
-    fn set_connected(&mut self, connected: bool) {
-        self.connected = connected;
+    fn set_connected(&mut self, status: ConnectionStatus) {
+        self.connected = status;
     }
 
     fn set_max_packet_size(&mut self, peer_max_packet_size: u16) {
@@ -77,7 +88,7 @@ impl ObexServer {
         let (code, response_headers) = match self.handler.connect(headers).await {
             Ok(headers) => {
                 trace!("Application accepted CONNECT request");
-                self.set_connected(true);
+                self.set_connected(ConnectionStatus::Connected);
                 (ResponseCode::Ok, headers)
             }
             Err(reject_parameters) => {
@@ -90,6 +101,19 @@ impl ObexServer {
         Ok(response_packet)
     }
 
+    /// Handles a Disconnect request made by the remote OBEX client.
+    /// Returns a response packet to be sent on success, Error if the request couldn't be handled.
+    async fn disconnect_request(
+        &mut self,
+        request: RequestPacket,
+    ) -> Result<ResponsePacket, Error> {
+        let headers = HeaderSet::from(request);
+        let response_headers = self.handler.disconnect(headers).await;
+        let response_packet = ResponsePacket::new_disconnect(response_headers);
+        self.set_connected(ConnectionStatus::DisconnectReceived);
+        Ok(response_packet)
+    }
+
     /// Processes a raw data `packet` received from the remote peer acting as an OBEX client.
     /// Returns a `ResponsePacket` on success, Error if the request couldn't be handled.
     async fn receive_packet(&mut self, packet: Vec<u8>) -> Result<ResponsePacket, Error> {
@@ -97,6 +121,7 @@ impl ObexServer {
         trace!(packet = ?decoded, "Received request from OBEX client");
         match decoded.code() {
             OpCode::Connect => self.connect_request(decoded).await,
+            OpCode::Disconnect => self.disconnect_request(decoded).await,
             _code => todo!("Support other OBEX requests"),
         }
     }
@@ -108,6 +133,12 @@ impl ObexServer {
                     Ok(bytes) => {
                         let response = self.receive_packet(bytes).await?;
                         self.send(response)?;
+
+                        // The OBEX Client requested to close the OBEX connection.
+                        if self.connected == ConnectionStatus::DisconnectReceived {
+                            trace!("Disconnect request - closing transport");
+                            return Ok(());
+                        }
                     }
                     Err(e) => warn!("Error reading data from transport: {e:?}"),
                 }
@@ -221,5 +252,35 @@ mod tests {
 
         let result = exec.run_until_stalled(&mut server_fut).expect("terminate due to error");
         assert_matches!(result, Err(Error::Packet(_)));
+    }
+
+    #[fuchsia::test]
+    fn peer_disconnect_request_terminates_server() {
+        let mut exec = fasync::TestExecutor::new();
+        let (obex_server, test_app, mut remote) = new_obex_server();
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let headers = HeaderSet::from_header(Header::Description("done".into())).unwrap();
+        let disconnect_request = RequestPacket::new_disconnect(headers);
+        send_packet(&mut remote, disconnect_request);
+
+        // Expect the ObexServer to receive the request, parse it, get response headers from the
+        // application, and reply. Because this is a Disconnect request, the server run loop
+        // should finish.
+        let headers = HeaderSet::from_header(Header::Description("disconnecting".into())).unwrap();
+        test_app.set_response(Ok(headers));
+        let result =
+            exec.run_until_stalled(&mut server_fut).expect("server terminated from disconnect");
+        assert_matches!(result, Ok(_));
+
+        // Expect the remote peer to receive our DISCONNECT response.
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Ok);
+            let headers = HeaderSet::from(response);
+            assert!(headers.contains_header(&HeaderIdentifier::Description));
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::Disconnect);
     }
 }

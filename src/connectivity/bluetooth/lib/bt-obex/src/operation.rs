@@ -406,6 +406,10 @@ impl ResponsePacket {
         Self::new(code, data, headers)
     }
 
+    pub fn new_disconnect(headers: HeaderSet) -> Self {
+        Self::new(ResponseCode::Ok, vec![], headers)
+    }
+
     pub fn expect_code(self, request: OpCode, expected: ResponseCode) -> Result<Self, Error> {
         if *self.code() == expected {
             return Ok(self);
