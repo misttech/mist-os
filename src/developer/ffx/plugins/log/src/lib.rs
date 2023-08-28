@@ -753,40 +753,18 @@ mod tests {
         };
         let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:00")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:03")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world 2!")
-                .build(),
-            ],
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(
+                    parse_time("1980-01-01T00:00:03").unwrap().time.naive_utc().timestamp_nanos(),
+                ),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_message("Hello world 2!")
+            .build()],
             send_mode_event: true,
             ..Default::default()
         }));
@@ -850,40 +828,18 @@ mod tests {
         };
         let symbolizer = NoOpSymbolizer::new();
         let mut task_manager = TaskManager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:00")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:03")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world 2!")
-                .build(),
-            ],
+            messages: vec![LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".into(),
+                severity: Severity::Info,
+                timestamp_nanos: Timestamp::from(
+                    parse_time("1980-01-01T00:00:03").unwrap().time.naive_utc().timestamp_nanos(),
+                ),
+            })
+            .set_pid(1)
+            .set_tid(2)
+            .set_message("Hello world 2!")
+            .build()],
             send_mode_event: true,
             ..Default::default()
         }));

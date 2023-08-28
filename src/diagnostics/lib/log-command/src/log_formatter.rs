@@ -161,11 +161,13 @@ pub struct DeviceOrLocalTimestamp {
 impl DeviceOrLocalTimestamp {
     /// Creates a DeviceOrLocalTimestamp from a real-time date/time or
     /// a monotonic date/time. Returns None if both rtc and monotonic are None.
+    /// Returns None if the timestamp is "now".
     pub fn new(
         rtc: Option<&DetailedDateTime>,
         monotonic: Option<&Duration>,
     ) -> Option<DeviceOrLocalTimestamp> {
         rtc.as_ref()
+            .filter(|value| !value.is_now)
             .map(|value| DeviceOrLocalTimestamp {
                 timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
                 is_monotonic: false,
@@ -448,6 +450,7 @@ pub trait LogFormatter {
 
 #[cfg(test)]
 mod test {
+    use crate::parse_time;
     use assert_matches::assert_matches;
     use diagnostics_data::{LogsDataBuilder, Severity, Timezone};
     use ffx_writer::{Format, MachineWriter, TestBuffers};
@@ -973,6 +976,11 @@ mod test {
         .await
         .unwrap();
         assert_eq!(buffers.stdout.into_string(), "[00000.000000][1][2][ffx] INFO: Fuchsia\n");
+    }
+
+    #[test]
+    fn test_device_or_local_timestamp_returns_none_if_now_is_passed() {
+        assert_matches!(DeviceOrLocalTimestamp::new(Some(&parse_time("now").unwrap()), None), None);
     }
 
     #[fuchsia::test]
