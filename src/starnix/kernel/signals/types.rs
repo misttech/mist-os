@@ -8,7 +8,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     lock::RwLock,
-    task::{WaitQueue, WaiterRef},
+    task::{TimerId, WaitQueue, WaiterRef},
     types::*,
 };
 
@@ -285,6 +285,18 @@ impl SignalInfo {
                     _arch: arch as c_uint,
                 }
             ),
+            SignalDetail::Timer { timer_id: tid, overrun, sigval } => {
+                make_siginfo!(
+                    self,
+                    _timer,
+                    __sifields__bindgen_ty_2 {
+                        _tid: tid,
+                        _overrun: overrun,
+                        _sigval: sigval.into(),
+                        ..Default::default()
+                    }
+                )
+            }
             SignalDetail::Raw { data } => {
                 let header = SignalInfoHeader {
                     signo: self.signal.number(),
@@ -304,14 +316,122 @@ impl SignalInfo {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SignalDetail {
     None,
-    SigChld { pid: pid_t, uid: uid_t, status: i32 },
-    SigSys { call_addr: UserAddress, syscall: i32, arch: u32 },
-    Raw { data: [u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE] },
+    SigChld {
+        pid: pid_t,
+        uid: uid_t,
+        status: i32,
+    },
+    SigSys {
+        call_addr: UserAddress,
+        syscall: i32,
+        arch: u32,
+    },
+    /// POSIX timer
+    Timer {
+        timer_id: TimerId,
+        /// For the timer referred to by the `timer_id, the number of timer expirations that
+        /// occurred between the time when the signal was generated and when it was delivered or
+        /// accepted.
+        overrun: i32,
+        /// Data passed with notification from asynchronous routines.
+        sigval: SignalEventValue,
+    },
+    Raw {
+        data: [u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE],
+    },
 }
 
 impl Default for SignalDetail {
     fn default() -> Self {
         Self::None
+    }
+}
+
+#[derive(Debug)]
+pub struct SignalEvent {
+    pub value: Option<SignalEventValue>,
+    pub signo: Option<Signal>,
+    pub notify: SignalEventNotify,
+}
+
+impl SignalEvent {
+    pub fn new(value: SignalEventValue, signo: Signal, notify: SignalEventNotify) -> Self {
+        Self { value: Some(value), signo: Some(signo), notify }
+    }
+
+    pub fn none() -> Self {
+        Self { value: None, signo: None, notify: SignalEventNotify::None }
+    }
+}
+
+impl TryFrom<sigevent> for SignalEvent {
+    type Error = Errno;
+
+    fn try_from(value: sigevent) -> Result<Self, Self::Error> {
+        // SAFETY: _sigev_un was created with FromBytes so it's safe to access any variant
+        // because all variants must be valid with all bit patterns.
+        let notify = match value.sigev_notify as u32 {
+            SIGEV_SIGNAL => SignalEventNotify::Signal,
+            SIGEV_NONE => SignalEventNotify::None,
+            SIGEV_THREAD => unsafe {
+                SignalEventNotify::Thread {
+                    function: value._sigev_un._sigev_thread._function.into(),
+                    attribute: value._sigev_un._sigev_thread._attribute.into(),
+                }
+            },
+            SIGEV_THREAD_ID => SignalEventNotify::ThreadId(unsafe { value._sigev_un._tid }),
+            _ => return error!(EINVAL),
+        };
+
+        Ok(match notify {
+            SignalEventNotify::None => SignalEvent::none(),
+            _ => SignalEvent::new(
+                value.sigev_value.into(),
+                UncheckedSignal::new(value.sigev_signo as u64).try_into()?,
+                notify,
+            ),
+        })
+    }
+}
+
+#[derive(Debug)]
+/// Specifies how notification is to be performed.
+pub enum SignalEventNotify {
+    /// Notify the process by sending the signal specified in `SignalInfo::Signal`.
+    Signal,
+    /// Don't do anything when the event occurs.
+    None,
+    /// Notify the process by invoking the `function` as if it were the start function of
+    /// a new thread.
+    Thread { function: UserAddress, attribute: UserAddress },
+    /// Similar to `SignalNotify::Signal`, but the signal is targeted at the thread ID.
+    ThreadId(pid_t),
+}
+
+impl From<SignalEventNotify> for i32 {
+    fn from(value: SignalEventNotify) -> Self {
+        match value {
+            SignalEventNotify::Signal => SIGEV_SIGNAL as i32,
+            SignalEventNotify::None => SIGEV_NONE as i32,
+            SignalEventNotify::Thread { .. } => SIGEV_THREAD as i32,
+            SignalEventNotify::ThreadId(_) => SIGEV_THREAD_ID as i32,
+        }
+    }
+}
+
+/// Data passed with signal event notification.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct SignalEventValue(pub u64);
+
+impl From<sigval_t> for SignalEventValue {
+    fn from(value: sigval_t) -> Self {
+        SignalEventValue(unsafe { value._bindgen_opaque_blob })
+    }
+}
+
+impl From<SignalEventValue> for sigval_t {
+    fn from(value: SignalEventValue) -> Self {
+        Self { _bindgen_opaque_blob: value.0 }
     }
 }
 

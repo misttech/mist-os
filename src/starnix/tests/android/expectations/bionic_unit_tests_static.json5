@@ -51,8 +51,7 @@
                 "PtraceResumptionTest.*",
 
                 // Timers
-                "time.timer_create",
-                "time.timer_create_EINVAL",
+                // TODO(b/287121317): Following tests are relying on timer_settime.
                 "time.timer_create_NULL",
                 "time.timer_create_SIGEV_SIGNAL",
                 "time.timer_create_multiple",

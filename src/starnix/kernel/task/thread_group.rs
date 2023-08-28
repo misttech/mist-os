@@ -22,7 +22,7 @@ use crate::{
     mutable_state::*,
     selinux::SeLinuxThreadGroupState,
     signals::{syscalls::WaitingOptions, *},
-    task::{itimer::Itimer, *},
+    task::{interval_timer::IntervalTimerHandle, *},
     time::utc,
     types::*,
 };
@@ -70,10 +70,7 @@ pub struct ThreadGroupMutableState {
     pub process_group: Arc<ProcessGroup>,
 
     /// The timers for this thread group (from timer_create(), etc.).
-    pub timers: Arc<TimerTable>,
-
-    // Object for ITIMER_REAL.
-    itimer_real: Arc<Itimer>,
+    pub timers: TimerTable,
 
     pub did_exec: bool,
 
@@ -162,6 +159,9 @@ pub struct ThreadGroup {
     /// for the purposes of SECCOMP_FILTER_FLAG_TSYNC.  Inherited across clone because
     /// seccomp filters are also inherited across clone.
     pub next_seccomp_filter_id: AtomicU64,
+
+    // Timer id of ITIMER_REAL.
+    itimer_real_id: TimerId,
 }
 
 impl fmt::Debug for ThreadGroup {
@@ -242,11 +242,14 @@ impl ThreadGroup {
         process_group: Arc<ProcessGroup>,
         signal_actions: Arc<SignalActions>,
     ) -> Arc<ThreadGroup> {
+        let timers = TimerTable::new();
+        let itimer_real_id = timers.create(CLOCK_REALTIME as ClockId, None).unwrap();
         let thread_group = Arc::new(ThreadGroup {
             kernel,
             process,
             leader,
             signal_actions,
+            itimer_real_id,
             drop_notifier: Default::default(),
             // A child process created via fork(2) inherits its parent's
             // resource limits.  Resource limits are preserved across execve(2).
@@ -262,8 +265,7 @@ impl ThreadGroup {
                 child_status_waiters: WaitQueue::default(),
                 is_child_subreaper: false,
                 process_group: Arc::clone(&process_group),
-                timers: TimerTable::new(),
-                itimer_real: Arc::new(Itimer::default()),
+                timers,
                 did_exec: false,
                 stopped: false,
                 stopped_waiters: WaitQueue::default(),
@@ -518,6 +520,10 @@ impl ThreadGroup {
         Ok(())
     }
 
+    fn itimer_real(self: &Arc<Self>) -> IntervalTimerHandle {
+        self.write().timers.get_timer(self.itimer_real_id).expect("no ITIMER_REAL exists")
+    }
+
     pub fn set_itimer(self: &Arc<Self>, which: u32, value: itimerval) -> Result<itimerval, Errno> {
         if which == ITIMER_PROF || which == ITIMER_VIRTUAL {
             // We don't support setting these timers.
@@ -533,17 +539,17 @@ impl ThreadGroup {
         if which != ITIMER_REAL {
             return Err(errno!(EINVAL));
         }
-        let state = self.write();
-        let prev_remaining = state.itimer_real.time_remaining();
+        let itimer_real = self.itimer_real();
+        let prev_remaining = itimer_real.time_remaining();
         if value.it_value.tv_sec != 0 || value.it_value.tv_usec != 0 {
-            state.itimer_real.arm(
+            itimer_real.arm(
                 Arc::downgrade(self),
                 &self.kernel.kthreads.ehandle,
                 utc::utc_now() + duration_from_timeval(value.it_value)?,
                 duration_from_timeval(value.it_interval)?,
             );
         } else {
-            state.itimer_real.disarm();
+            itimer_real.disarm();
         }
         Ok(itimerval {
             it_value: timeval_from_duration(prev_remaining.remainder),
@@ -559,7 +565,7 @@ impl ThreadGroup {
         if which != ITIMER_REAL {
             return Err(errno!(EINVAL));
         }
-        let remaining = self.read().itimer_real.time_remaining();
+        let remaining = self.itimer_real().time_remaining();
         Ok(itimerval {
             it_value: timeval_from_duration(remaining.remainder),
             it_interval: timeval_from_duration(remaining.interval),

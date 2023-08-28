@@ -2,39 +2,89 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//use fuchsia_zircon as zx;
-use std::sync::Arc;
+use std::collections::HashMap;
 
-use crate::types::*;
+use fuchsia_sync::Mutex;
+
+use crate::{
+    signals::{SignalEvent, SignalEventNotify, SignalEventValue},
+    task::interval_timer::{IntervalTimer, IntervalTimerHandle},
+    types::*,
+};
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
 // timerfd's).
 //
 // This is currently unimplemented.
 #[derive(Debug, Default)]
-pub struct TimerTable {}
+pub struct TimerTable {
+    state: Mutex<TimerTableMutableState>,
+}
 
-pub type TimerId = usize;
+#[derive(Debug, Default)]
+struct TimerTableMutableState {
+    /// The `TimerId` at which allocation should begin searching for an unused ID.
+    next_timer_id: TimerId,
+    timers: HashMap<TimerId, IntervalTimerHandle>,
+}
+
+pub type TimerId = __kernel_timer_t;
+pub type ClockId = uapi::__kernel_clockid_t;
 
 impl TimerTable {
-    pub fn new() -> Arc<TimerTable> {
+    pub fn new() -> TimerTable {
         Default::default()
     }
 
     /// Creates a new per-process interval timer.
-    pub fn create(
-        &self,
-        _clockid: uapi::__kernel_clockid_t,
-        _event: &sigevent,
-    ) -> Result<TimerId, Errno> {
-        // TODO(fxbug.dev/123084): Really implement.
-        Ok(1)
+    ///
+    /// The new timer is initially disarmed.
+    pub fn create(&self, clock_id: ClockId, sigev: Option<sigevent>) -> Result<TimerId, Errno> {
+        let mut state = self.state.lock();
+
+        // Find a vacant timer id.
+        let end = state.next_timer_id;
+        let timer_id = loop {
+            let timer_id = state.next_timer_id;
+            state.next_timer_id += 1;
+
+            if state.next_timer_id == TimerId::MAX {
+                state.next_timer_id = 0;
+            } else if state.next_timer_id == end {
+                // After searching the entire timer map, there is no vacant timer id.
+                // Fails the call and implies the program could try it again later.
+                return error!(EAGAIN);
+            }
+
+            if !state.timers.contains_key(&timer_id) {
+                break timer_id;
+            }
+        };
+
+        let signal_event: SignalEvent = match sigev {
+            Some(sigev) => sigev.try_into()?,
+            None => SignalEvent::new(
+                SignalEventValue(timer_id as u64),
+                SIGALRM,
+                SignalEventNotify::Signal,
+            ),
+        };
+
+        state.timers.insert(timer_id, IntervalTimer::new(timer_id, clock_id, signal_event));
+
+        Ok(timer_id)
     }
 
     /// Disarms and deletes a timer.
-    pub fn delete(&self, _id: TimerId) -> Result<(), Errno> {
-        // TODO(fxbug.dev/123084): Really implement.
-        Ok(())
+    pub fn delete(&self, id: TimerId) -> Result<(), Errno> {
+        let mut state = self.state.lock();
+        match state.timers.remove_entry(&id) {
+            Some(entry) => {
+                entry.1.disarm();
+                Ok(())
+            }
+            None => error!(EINVAL),
+        }
     }
 
     /// Fetches the time remaining until the next expiration of a timer, along with the interval
@@ -60,5 +110,12 @@ impl TimerTable {
     ) -> Result<(), Errno> {
         // TODO(fxbug.dev/123084): Really implement.
         Ok(())
+    }
+
+    pub fn get_timer(&self, id: TimerId) -> Result<IntervalTimerHandle, Errno> {
+        match self.state.lock().timers.get(&id) {
+            Some(itimer) => Ok(itimer.clone()),
+            None => error!(EINVAL),
+        }
     }
 }

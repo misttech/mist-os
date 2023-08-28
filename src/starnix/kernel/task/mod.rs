@@ -4,8 +4,8 @@
 
 mod abstract_socket_namespace;
 mod interruptible_lock;
+mod interval_timer;
 mod iptables;
-mod itimer;
 mod kernel;
 mod kernel_threads;
 mod net;

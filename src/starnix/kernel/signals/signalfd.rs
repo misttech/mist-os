@@ -95,6 +95,12 @@ impl FileOps for SignalFd {
                         siginfo.ssi_utime = u64::from_ne_bytes(data[12..20].try_into().unwrap());
                         siginfo.ssi_stime = u64::from_ne_bytes(data[20..28].try_into().unwrap());
                     }
+                    SignalDetail::Timer { timer_id: tid, overrun, sigval } => {
+                        siginfo.ssi_tid = tid as u32;
+                        siginfo.ssi_overrun = overrun as u32;
+                        siginfo.ssi_int = sigval.0 as i32;
+                        siginfo.ssi_ptr = sigval.0;
+                    }
                 }
                 buf.extend_from_slice(siginfo.as_bytes());
             }

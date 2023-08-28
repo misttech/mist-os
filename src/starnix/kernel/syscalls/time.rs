@@ -80,7 +80,7 @@ pub fn sys_gettimeofday(
 
 pub fn sys_clock_nanosleep(
     current_task: &mut CurrentTask,
-    which_clock: uapi::__kernel_clockid_t,
+    which_clock: ClockId,
     flags: u32,
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
@@ -215,13 +215,7 @@ pub fn sys_nanosleep(
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
-    sys_clock_nanosleep(
-        current_task,
-        CLOCK_REALTIME as uapi::__kernel_clockid_t,
-        0,
-        user_request,
-        user_remaining,
-    )
+    sys_clock_nanosleep(current_task, CLOCK_REALTIME as ClockId, 0, user_request, user_remaining)
 }
 
 /// Returns the cpu time for the task with the given `pid`.
@@ -305,14 +299,17 @@ fn get_dynamic_clock(current_task: &CurrentTask, which_clock: i32) -> Result<i64
 
 pub fn sys_timer_create(
     current_task: &CurrentTask,
-    clockid: uapi::__kernel_clockid_t,
+    clock_id: ClockId,
     event: UserRef<sigevent>,
-    timerid: UserRef<uapi::__kernel_timer_t>,
+    timerid: UserRef<TimerId>,
 ) -> Result<(), Errno> {
-    not_implemented!("timer_create");
     let timers = &current_task.thread_group.read().timers;
-    let user_event = current_task.read_object(event)?;
-    let id = timers.create(clockid, &user_event)? as uapi::__kernel_timer_t;
+    if clock_id >= MAX_CLOCKS as TimerId {
+        return error!(EINVAL);
+    }
+    let user_event =
+        if event.addr().is_null() { None } else { Some(current_task.read_object(event)?) };
+    let id = timers.create(clock_id, user_event)?;
     current_task.write_object(timerid, &id)?;
     Ok(())
 }
@@ -321,9 +318,8 @@ pub fn sys_timer_delete(
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
 ) -> Result<(), Errno> {
-    not_implemented!("timer_delete");
     let timers = &current_task.thread_group.read().timers;
-    timers.delete(id as usize)
+    timers.delete(id)
 }
 
 pub fn sys_timer_gettime(
@@ -332,7 +328,7 @@ pub fn sys_timer_gettime(
     curr_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
-    current_task.write_object(curr_value, &timers.get_time(id as usize)?)?;
+    current_task.write_object(curr_value, &timers.get_time(id)?)?;
     Ok(())
 }
 
@@ -341,7 +337,7 @@ pub fn sys_timer_getoverrun(
     id: uapi::__kernel_timer_t,
 ) -> Result<i32, Errno> {
     let timers = &current_task.thread_group.read().timers;
-    timers.get_overrun(id as usize)
+    timers.get_overrun(id)
 }
 
 pub fn sys_timer_settime(
@@ -353,7 +349,7 @@ pub fn sys_timer_settime(
 ) -> Result<(), Errno> {
     not_implemented!("timer_settime");
     let timers = &current_task.thread_group.read().timers;
-    timers.set_time(id as usize, flags, new_value, old_value)
+    timers.set_time(id, flags, new_value, old_value)
 }
 
 pub fn sys_getitimer(
