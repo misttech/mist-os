@@ -27,6 +27,8 @@
 
 #define LOCAL_TRACE 0
 
+namespace {
+
 KCOUNTER(channel_msg_0_bytes, "channel.bytes.0")
 KCOUNTER(channel_msg_64_bytes, "channel.bytes.64")
 KCOUNTER(channel_msg_256_bytes, "channel.bytes.256")
@@ -36,7 +38,12 @@ KCOUNTER(channel_msg_16k_bytes, "channel.bytes.16k")
 KCOUNTER(channel_msg_64k_bytes, "channel.bytes.64k")
 KCOUNTER(channel_msg_received, "channel.messages")
 
-static void record_recv_msg_sz(uint32_t size) {
+inline void TraceMessage(const MessagePacketPtr& msg) {
+  KTRACE_INSTANT("kernel:ipc", "ChannelMessage",
+                 ("ordinal", msg ? msg->fidl_header().ordinal : 0u));
+}
+
+void record_recv_msg_sz(uint32_t size) {
   kcounter_add(channel_msg_received, 1);
 
   switch (size) {
@@ -63,6 +70,8 @@ static void record_recv_msg_sz(uint32_t size) {
       break;
   }
 }
+
+}  // anonymous namespace
 
 // zx_status_t zx_channel_create
 zx_status_t sys_channel_create(uint32_t options, zx_handle_t* out0, zx_handle_t* out1) {
@@ -174,6 +183,8 @@ static zx_status_t channel_read(zx_handle_t handle_value, uint32_t options,
   }
   if (result == ZX_ERR_BUFFER_TOO_SMALL)
     return result;
+
+  TraceMessage(msg);
 
   if (num_bytes > 0u) {
     if (msg->CopyDataTo(bytes.reinterpret<char>()) != ZX_OK)
@@ -345,6 +356,8 @@ static zx_status_t channel_write(zx_handle_t handle_value, uint32_t options,
 
   cleanup.cancel();
 
+  TraceMessage(msg);
+
   status = channel->Write(up->handle_table().get_koid(), ktl::move(msg));
   if (status != ZX_OK)
     return status;
@@ -412,7 +425,7 @@ zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options, zx_
       return status;
   }
 
-  // TODO(fxbug.dev/30917): ktrace channel calls; maybe two traces, maybe with txid.
+  TraceMessage(msg);
 
   // Write message and wait for reply, deadline, or cancellation
   MessagePacketPtr reply;

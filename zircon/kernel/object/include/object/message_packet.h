@@ -78,15 +78,28 @@ class MessagePacket final : public fbl::DoublyLinkedListable<MessagePacketPtr> {
       return 0;
     }
     // The first few bytes of the payload are a zx_txid_t.
-    void* payload_start = buffer_chain_->buffers()->front().data() + payload_offset_;
-    return *reinterpret_cast<zx_txid_t*>(payload_start);
+    return *static_cast<const zx_txid_t*>(payload());
   }
 
   void set_txid(zx_txid_t txid) {
     if (data_size_ >= sizeof(zx_txid_t)) {
-      void* payload_start = buffer_chain_->buffers()->front().data() + payload_offset_;
-      *(reinterpret_cast<zx_txid_t*>(payload_start)) = txid;
+      *(static_cast<zx_txid_t*>(payload())) = txid;
     }
+  }
+
+  struct FidlHeader {
+    zx_txid_t txid{};
+    uint8_t flags[3]{0, 0, 0};
+    uint8_t magic{0};
+    uint64_t ordinal{0};
+  };
+  static_assert(sizeof(FidlHeader) == 2 * sizeof(uint64_t));
+
+  FidlHeader fidl_header() const {
+    if (data_size_ >= sizeof(FidlHeader)) {
+      return *static_cast<const FidlHeader*>(payload());
+    }
+    return FidlHeader{};
   }
 
  private:
@@ -128,6 +141,9 @@ class MessagePacket final : public fbl::DoublyLinkedListable<MessagePacketPtr> {
   static zx_status_t CreateCommon(size_t data_size, size_t num_handles, MessagePacketPtr* msg);
 
   void set_data_size(uint32_t data_size) { data_size_ = data_size; }
+
+  const void* payload() const { return buffer_chain_->buffers()->front().data() + payload_offset_; }
+  void* payload() { return buffer_chain_->buffers()->front().data() + payload_offset_; }
 
   BufferChain* buffer_chain_;
   Handle** const handles_;
