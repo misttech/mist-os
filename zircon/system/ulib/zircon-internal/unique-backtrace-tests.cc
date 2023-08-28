@@ -148,6 +148,11 @@ TEST(ZirconInternalUniqueBacktraceTests, IndirectIcfPreventedDirectly) {
 constexpr auto kPcRegister = &zx_thread_state_general_regs_t::pc;
 constexpr zx_excp_type_t kTrapExceptionType = ZX_EXCP_SW_BREAKPOINT;
 
+#elif defined(__riscv)
+
+constexpr auto kPcRegister = &zx_thread_state_general_regs_t::pc;
+constexpr zx_excp_type_t kTrapExceptionType = ZX_EXCP_UNDEFINED_INSTRUCTION;
+
 #elif defined(__x86_64__)
 
 constexpr auto kPcRegister = &zx_thread_state_general_regs_t::rip;
