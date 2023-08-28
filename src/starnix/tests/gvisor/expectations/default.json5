@@ -136,6 +136,11 @@
                 // is a symlink that points to `toybox`, meaning that using NOFOLLOW will fail.
                 "ExecveatTest.SymlinkNoFollowWithNormalFile",
 
+                // This test call exec from a process with multiple threads.
+                // Starnix doesnt' support this yet: https://fxbug.dev/132623
+                "ExecTest.FromSiblingThread",
+                "ExecTest.WithSiblingThread",
+
                 // exec_binary_test
                 //
                 // These tests try to use `/tmp` and that doesn't exist in
@@ -1008,10 +1013,6 @@
                 "TimeTest.VsyscallTime_InvalidAddressSIGSEGV",
                 "TkillTest.ValidTIDAndRealSignal",
                 "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",
-
-                // This test call exec from a process with multiple threads.
-                // Starnix doesnt' support this yet: https://fxbug.dev/132623
-                "ExecTest.WithSiblingThread",
 
                 // Causes some other wait tests to fail.
                 "WaitTest.TraceeWALL",

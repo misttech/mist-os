@@ -1731,6 +1731,14 @@ impl CurrentTask {
         executable.node().check_access(self, Access::EXEC)?;
 
         let resolved_elf = resolve_executable(self, executable, path.clone(), argv, environ)?;
+
+        // TODO(https://fxbug.dev/132623): Starnix doesn't yet support running exec on a
+        // multi-thread process.
+        if self.thread_group.read().tasks_count() > 1 {
+            not_implemented!("exec on multithread process is not supported");
+            return error!(EINVAL);
+        }
+
         if let Err(err) = self.finish_exec(path, resolved_elf) {
             // TODO(tbodt): Replace this panic with a log and force a SIGSEGV.
             panic!("{self:?} unrecoverable error in exec: {err:?}");
