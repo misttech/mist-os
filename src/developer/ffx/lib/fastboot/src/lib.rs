@@ -4,6 +4,7 @@
 
 pub mod boot;
 pub mod common;
+pub mod file_resolver;
 pub mod info;
 pub mod lock;
 pub mod manifest;
@@ -12,7 +13,7 @@ pub mod unlock;
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 pub mod test {
-    use crate::common::file::FileResolver;
+    use crate::file_resolver::FileResolver;
     use anyhow::Result;
     use async_trait::async_trait;
     use fidl::endpoints::{create_proxy_and_stream, Proxy};

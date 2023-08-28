@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::{
-        cmd::{ManifestParams, OemFile},
-        file::FileResolver,
-    },
+    common::cmd::{ManifestParams, OemFile},
+    file_resolver::FileResolver,
     manifest::{
         v1::{FlashManifest as FlashManifestV1, Partition as PartitionV1, Product as ProductV1},
         v2::FlashManifest as FlashManifestV2,

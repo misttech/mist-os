@@ -4,10 +4,11 @@
 
 use crate::{
     common::{
-        cmd::ManifestParams, crypto::unlock_device, file::FileResolver, finish, flash_bootloader,
-        flash_product, is_locked, lock_device, verify_hardware, Boot, Flash, Unlock,
-        MISSING_CREDENTIALS, MISSING_PRODUCT,
+        cmd::ManifestParams, crypto::unlock_device, finish, flash_bootloader, flash_product,
+        is_locked, lock_device, verify_hardware, Boot, Flash, Unlock, MISSING_CREDENTIALS,
+        MISSING_PRODUCT,
     },
+    file_resolver::FileResolver,
     manifest::v1::FlashManifest as FlashManifestV1,
     unlock::unlock,
 };

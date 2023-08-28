@@ -5,9 +5,10 @@
 use crate::{
     common::{
         cmd::{BootParams, Command, ManifestParams},
-        file::{ArchiveResolver, FileResolver, Resolver, TarResolver},
         prepare, Boot, Flash, Unlock,
     },
+    file_resolver::resolvers::{ArchiveResolver, Resolver, TarResolver},
+    file_resolver::FileResolver,
     manifest::{
         sdk::SdkEntries, v1::FlashManifest as FlashManifestV1,
         v2::FlashManifest as FlashManifestV2, v3::FlashManifest as FlashManifestV3,

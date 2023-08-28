@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::{cmd::ManifestParams, file::FileResolver},
+    common::cmd::ManifestParams,
+    file_resolver::FileResolver,
     manifest::{
         v3::{
             Condition as ConditionV3, ExplicitOemFile as OemFileV3,

@@ -11,7 +11,8 @@ use ffx_bootloader_args::{
 };
 use ffx_fastboot::{
     boot::boot,
-    common::{file::EmptyResolver, from_manifest, prepare},
+    common::{from_manifest, prepare},
+    file_resolver::resolvers::EmptyResolver,
     info::info,
     lock::lock,
     unlock::unlock,

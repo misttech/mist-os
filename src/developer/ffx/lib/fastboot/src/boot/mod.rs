@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::{file::FileResolver, map_fidl_error, stage_file};
+use crate::common::{map_fidl_error, stage_file};
+use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
 use fidl_fuchsia_developer_ffx::FastbootProxy;

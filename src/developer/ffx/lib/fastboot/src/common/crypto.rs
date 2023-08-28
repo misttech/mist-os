@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::file_resolver::FileResolver;
 use crate::common::{
-    done_time, file::FileResolver, handle_upload_progress_for_staging, is_locked, map_fidl_error,
+    done_time,  handle_upload_progress_for_staging, is_locked,
+    map_fidl_error,
 };
 use anyhow::{anyhow, bail, Result};
 use async_fs::OpenOptions;

@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::{
-        cmd::{ManifestParams, OemFile},
-        file::*,
-    },
+    common::cmd::{ManifestParams, OemFile},
+    file_resolver::FileResolver,
     manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
 };
 use anyhow::{anyhow, bail, Context, Error, Result};
@@ -34,9 +32,7 @@ pub const MISSING_CREDENTIALS: &str =
 
 pub mod cmd;
 pub mod crypto;
-pub mod file;
 pub mod find;
-pub mod gcs;
 
 pub trait Partition {
     fn name(&self) -> &str;

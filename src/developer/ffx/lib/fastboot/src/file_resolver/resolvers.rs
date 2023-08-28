@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::file_resolver::FileResolver;
 use crate::common::done_time;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
@@ -18,11 +19,6 @@ use tempfile::{tempdir, TempDir};
 use walkdir::WalkDir;
 use zip::read::ZipArchive;
 
-#[async_trait(?Send)]
-pub trait FileResolver {
-    fn manifest(&self) -> &Path;
-    async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String>;
-}
 
 pub struct EmptyResolver {
     fake: PathBuf,

@@ -6,10 +6,10 @@ use crate::{
     boot::boot,
     common::{
         cmd::{ManifestParams, OemFile},
-        file::FileResolver,
         flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait,
         Product as ProductTrait, Unlock, MISSING_PRODUCT, UNLOCK_ERR,
     },
+    file_resolver::FileResolver,
 };
 use anyhow::Result;
 use async_trait::async_trait;
