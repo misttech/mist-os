@@ -155,22 +155,8 @@ zx_status_t arch_mp_cpu_hotplug(cpu_num_t cpu_id) {
     // Start failed, so free the stack.
     [[maybe_unused]] zx_status_t free_stack_status = arm64_free_secondary_stack(cpu_id);
     DEBUG_ASSERT(free_stack_status == ZX_OK);
-    return status;
   }
-
-  // Poll the CPU till it comes online, waiting up to 5 seconds for this to happen.
-  // TODO(https://fxbug.dev/130793): Don't hard code the deadline for mp_hotplug CPU startup.
-  const auto deadline = Deadline::after(ZX_SEC(5));
-  while (current_time() < deadline.when()) {
-    if (mp_is_cpu_online(cpu_id)) {
-      return ZX_OK;
-    }
-    Thread::Current::SleepRelative(ZX_MSEC(10));
-  }
-  printf("timed out waiting for cpu-%u to come online\n", cpu_id);
-
-  // If we got here, the CPU never came online.
-  return ZX_ERR_BAD_STATE;
+  return status;
 }
 
 // If there are any A73 cores in this system, then we need the clock read

@@ -45,6 +45,17 @@ static unsigned get_num_cpus_online() {
   return count;
 }
 
+static zx_status_t wait_for_cpu_active(cpu_num_t i, Deadline deadline) {
+  while (current_time() < deadline.when()) {
+    if (mp_is_cpu_active(i)) {
+      return ZX_OK;
+    }
+    Thread::Current::SleepRelative(ZX_MSEC(10));
+  }
+  printf("timed out waiting for cpu-%u to become active\n", i);
+  return ZX_ERR_TIMED_OUT;
+}
+
 // Unplug all cores (except for Boot core), then hotplug
 // the cores one by one and make sure that we can schedule
 // tasks on that core.
@@ -69,8 +80,11 @@ static unsigned get_num_cpus_online() {
     if (i == BOOT_CPU_ID) {
       continue;
     }
-    // hotplug this core.
+    // Hotplug this core.
     ASSERT_OK(hotplug_core(i), "hotplugging core failed");
+    // Wait until the core is active.
+    ASSERT_OK(wait_for_cpu_active(i, Deadline::after(ZX_SEC(5))),
+              "waiting for core to come online failed");
     // Create a thread, affine it to the core just hotplugged
     // and make sure the thread does get scheduled there.
     cpu_num_t running_core;
