@@ -11,6 +11,7 @@
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -49,6 +50,40 @@ def cmd_target_dump(args: argparse.Namespace) -> int:
       return proc1.returncode
     return proc2.returncode
 
+def cmd_actions(args: argparse.Namespace) -> int:
+    """Implement the 'actions' command."""
+    bazel_cmd = make_bazel_quiet_command(args.bazel, 'aquery') + args.extra_args[1:] + args.target_set
+    print('CMD %s' % bazel_cmd)
+    ret = subprocess.run(bazel_cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    if ret.returncode != 0:
+      print('%s\n' % ret.stdout, file=sys.stdout)
+      print('%s\n' % ret.stderr, file=sys.stderr)
+      return ret.returncode
+
+    def ignored_path(path):
+        if path.startswith(('external/prebuilt_clang/',
+                            'external/fuchsia_clang/',
+                            'prebuilt/third_party/sysroot/',)):
+            return True
+
+        if path.find('external/fuchsia_prebuilt_rust/') >= 0:
+            return True
+
+        return False
+
+    inputs_re = re.compile('^  Inputs: \[(.*)\]$')
+    for line in ret.stdout.splitlines():
+        m = inputs_re.match(line)
+        if m:
+            input_paths = []
+            for path in m.group(1).split(','):
+                path = path.strip()
+                if not ignored_path(path):
+                    input_paths.append(path)
+
+            line = '  Inputs: [%s]' % (', '.join(input_paths))
+        print(line)
+    return 0
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -81,6 +116,20 @@ Bazel graph, after all macros have been expanded. Note that:
 ''')
     parser_target_dump.add_argument('target_set', metavar='TARGET_SET', nargs = '+', help='Set of targets to dump.')
     parser_target_dump.set_defaults(func=cmd_target_dump)
+
+    # The target_commands command.
+    parser_actions = subparsers.add_parser(
+      'actions',
+      help='Dump action commands of Bazel targets.',
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      description=r'''
+Print the action commands of a target, or set of targets, omitting
+from the list of inputs sysroot and toolchain related headers, which
+can be _very_ long when using the Fuchsia C++ toolchain.
+''')
+    parser_actions.add_argument('target_set', metavar='TARGET_SET', nargs = '+', help='Set to targets to print actions for.')
+    parser_actions.add_argument('--', dest='extra_args', default=[], nargs=argparse.REMAINDER, help='extra Bazel aquery-compatible arguments.')
+    parser_actions.set_defaults(func=cmd_actions)
 
     args = parser.parse_args()
     if args.workspace:
