@@ -26,133 +26,31 @@ group("dart_allowlist") {
   # To add targets to this allowlist, please send a change to one of the OWNERS
   # of this file.
   #
-  # We will ignore variance in targets added/deleted from //third_part/dart-pkg, //sdk/fidl, and //src/tests/end_to_end/perf*.
-  # To regenerate:
-  # fx gn refs $(fx get-build-dir) :*(//build/dart:dartlang) | sed -e 's|\([^:]*\):.*|"\1:*",|' -e '/^["//]/!d' -e '/third_party\/dart-pkg*/d' -e '/src\/tests\/end_to_end\/perf*/d' | sort | uniq
-  visibility = [
-    "//build/dart/kernel/tests:*",
-    "//build/dart/sdk/detect_api_changes:*",
-    "//examples/components/routing/fidl:*",
-    "//examples/diagnostics/inspect/codelab/dart:*",
-    "//examples/diagnostics/inspect/codelab/dart/client:*",
-    "//examples/diagnostics/inspect/codelab/dart/fizzbuzz:*",
-    "//examples/diagnostics/inspect/codelab/dart/part_1:*",
-    "//examples/diagnostics/inspect/codelab/dart/part_2:*",
-    "//examples/diagnostics/inspect/codelab/dart/part_3:*",
-    "//examples/diagnostics/inspect/codelab/dart/part_4:*",
-    "//examples/diagnostics/inspect/codelab/dart/part_5:*",
-    "//examples/diagnostics/inspect/codelab/dart/testing:*",
-    "//examples/diagnostics/inspect/codelab/fidl:*",
+  # We will ignore variance in targets added/deleted from //third_part/dart-pkg and //src/tests/end_to_end/perf.
+  visibility = []
+
+  # Remaining host tools which still use Dart.
+  visibility += [
     "//scripts/fxtest:*",
     "//scripts/fxutils:*",
     "//scripts/status:*",
-    "//sdk/dart/fidl:*",
-    "//sdk/dart/fuchsia:*",
-    "//sdk/dart/fuchsia_vfs:*",
-    "//sdk/dart/zircon:*",
-    "//sdk/testing/fidl/protocols_tests:*",
+  ]
+
+  # SL4F dart client library and tests which use it.
+  visibility += [
+    "//sdk/testing/gcloud_lib:gcloud_lib",
     "//sdk/testing/sl4f/client:*",
-    "//src/diagnostics/lib/streams/dart:*",
-    "//src/diagnostics/validator/inspect/fidl:*",
-    "//src/diagnostics/validator/logs/encoding/fidl:*",
-    "//src/diagnostics/validator/logs/encoding/puppet/dart:*",
-    "//src/experiences/bin/ermine_testserver:*",
-    "//src/experiences/bin/feedback:*",
-    "//src/experiences/bin/settings/license:*",
-    "//src/experiences/bin/settings/shell:*",
-    "//src/experiences/examples/hello_experiences:*",
-    "//src/experiences/examples/localized_flutter/localized_flutter_app:*",
-    "//src/experiences/examples/localized_flutter/localized_flutter_localization:*",
-    "//src/experiences/lib/ermine_localhost:*",
-    "//src/experiences/lib/ermine_ui:*",
-    "//src/experiences/session_shells/ermine/fidl:*",
-    "//src/experiences/session_shells/ermine/internationalization:*",
-    "//src/experiences/session_shells/ermine/keyboard_shortcuts:*",
-    "//src/experiences/session_shells/ermine/login:*",
-    "//src/experiences/session_shells/ermine/session:*",
-    "//src/experiences/session_shells/ermine/shell:*",
-    "//src/experiences/session_shells/ermine/utils:*",
-    "//src/experiences/tests:*",
-    "//src/experiences/tests/chrome:*",
-    "//src/experiences/tests/e2e:*",
-    "//src/experiences/tests/performance:*",
-    "//src/lib/diagnostics/inspect/dart/bench:*",
-    "//src/lib/fidl/dart/gidl:*",
-    "//src/testing/fidl:*",
-    "//src/tests/benchmarks/fidl/benchmark_suite:*",
-    "//src/tests/benchmarks/fidl/dart:*",
-    "//src/tests/end_to_end/copy_files:*",
-    "//src/tests/end_to_end/diagnostics:*",
-    "//src/tests/end_to_end/fidlcat:*",
     "//src/tests/end_to_end/package_manager:*",
     "//src/tests/end_to_end/package_manager/util/net:*",
     "//src/tests/end_to_end/package_manager/util/pkg:*",
     "//src/tests/end_to_end/package_manager/util/pm:*",
-    "//src/tests/end_to_end/screen_is_not_black:*",
+    "//src/tests/end_to_end/perf:*",
     "//src/tests/end_to_end/sl4f:*",
-    "//src/tests/end_to_end/snapshot:*",
     "//src/tests/end_to_end/time_sync:*",
-    "//src/tests/fidl/client_suite/dart:*",
-    "//src/tests/fidl/client_suite/fidl:*",
-    "//src/tests/fidl/compatibility/dart:*",
-    "//src/tests/fidl/compatibility/fidl:*",
-    "//src/tests/fidl/conformance_suite:*",
-    "//src/tests/fidl/dangerous_identifiers:*",
-    "//src/tests/fidl/dart_bindings_test:*",
-    "//src/tests/fidl/dart_bindings_test/fidl:*",
-    "//src/tests/fidl/server_suite/dart:*",
-    "//src/tests/fidl/server_suite/fidl:*",
-    "//src/tests/fidl/source_compatibility/bits-flexible-strict:*",
-    "//src/tests/fidl/source_compatibility/bits-member-add:*",
-    "//src/tests/fidl/source_compatibility/bits-member-remove:*",
-    "//src/tests/fidl/source_compatibility/bits-strict-flexible:*",
-    "//src/tests/fidl/source_compatibility/enum-flexible-strict:*",
-    "//src/tests/fidl/source_compatibility/enum-member-add:*",
-    "//src/tests/fidl/source_compatibility/enum-member-remove:*",
-    "//src/tests/fidl/source_compatibility/enum-strict-flexible:*",
-    "//src/tests/fidl/source_compatibility/protocol-event-add:*",
-    "//src/tests/fidl/source_compatibility/protocol-event-remove:*",
-    "//src/tests/fidl/source_compatibility/protocol-method-add:*",
-    "//src/tests/fidl/source_compatibility/protocol-method-remove:*",
-    "//src/tests/fidl/source_compatibility/table-member-add:*",
-    "//src/tests/fidl/source_compatibility/table-member-remove:*",
-    "//src/tests/fidl/source_compatibility/union-flexible-strict:*",
-    "//src/tests/fidl/source_compatibility/union-member-add:*",
-    "//src/tests/fidl/source_compatibility/union-member-remove:*",
-    "//src/tests/fidl/source_compatibility/union-strict-flexible:*",
-    "//src/tests/intl/timestamp-server-dart:*",
-    "//tools/blobstats:*",
-    "//tools/dart-strict-deps:*",
-    "//tools/dart-strict-deps/library:*",
-    "//tools/doc_checker:*",
-    "//tools/protobuf/protoc_gen_dart:*",
-    "//tools/zedmon/client:*",
-    "//zircon/vdso/zx:*",
   ]
-
-  # TODO(fxb/108758): Figure out how to make this appear in list of regenerated targets using above command.
-  # Update guidance above as necessary.
-  visibility += [ "//sdk/testing/gcloud_lib:gcloud_lib" ]
-
-  # We will allow everything under //sdk/fidl for now so that we don't mess with the
-  # fidl team's workflow too much. When the time comes, we will get rid of the dart
-  # deps here all at once.
-  visibility += [
-    "//sdk/fidl/*",
-    "//src/tests/fidl/source_compatibility/*",
-    "//tools/fidl/fidlc/testdata/*",
-  ]
-
-  # In line with the incrementality design principle we will include a wild-card entry
-  # in the allowlist for performance testing; this wild-card entry will allow addition of
-  # new performance tests inside of "//src/tests/end_to_end/perf".
-  visibility += [ "//src/tests/end_to_end/perf:*" ]
 
   # Third_party dart programs/libraries must continue to be built as dart libraries.
-  visibility += [
-    "//third_party/dart-pkg/git/flutter/*",
-    "//third_party/dart-pkg/pub/*",
-  ]
+  visibility += [ "//third_party/dart-pkg/pub/*" ]
 
   # Catch-all for //vendor/google.
   visibility += [ "//vendor/google/*" ]
