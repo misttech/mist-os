@@ -10,8 +10,12 @@ board_configuration_label = "//boards/qemu-x64"
 
 board_name = "qemu-x64"
 
+board_package_labels += [ "//src/factory/factory_store_providers/config/qemu" ]
+
 # Supports only virtual devices.
 board_is_emu = true
 board_is_phys = false
+
+partitions_config_label = "//boards/partitions:qemu-x64"
 
 bazel_product_bundle_board = "qemu-x64"

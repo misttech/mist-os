@@ -68,6 +68,10 @@ generated_partitions_config("riscv64") {
   hw_revision = "riscv64"
 }
 
+generated_partitions_config("qemu-x64") {
+  hw_revision = "qemu-x64"
+}
+
 # NOTE: if you touch this target, please add this line to your commit
 # description so that the vim3 tests are run as we do not run vim3 tests in CQ
 # by default.
@@ -82,6 +86,7 @@ group("partitions") {
   testonly = true
   public_deps = [
     ":arm64",
+    ":qemu-x64",
     ":vim3",
     ":x64",
   ]
