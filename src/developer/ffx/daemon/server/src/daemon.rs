@@ -463,9 +463,6 @@ impl Daemon {
                 ..Default::default()
             },
             &hoist,
-            // TODO: this just prints serial output to stdout - ffx probably wants to take a more
-            // nuanced approach here.
-            blocking::Unblock::new(std::io::stdout()),
         )
         .await
         .map_err(|e| ffx_error!("Error trying to start daemon socket: {e}"))

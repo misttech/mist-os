@@ -5,7 +5,7 @@
 use argh::{FromArgs, SubCommands};
 use errors::ffx_error;
 use ffx_command::{
-    Error, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Result, ToolRunner, ToolSuite,
+    Error, FfxCommandLine, FfxToolInfo, MetricsSession, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::{environment::ExecutableKind, EnvironmentContext};
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
@@ -105,15 +105,10 @@ async fn run_legacy_subcommand(
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
     let router_interval = if is_daemon(&subcommand) { Some(CIRCUIT_REFRESH_RATE) } else { None };
-    let cache_path = context.get_cache_path()?;
-    let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
-        .and_then(|_| tempfile::tempdir_in(&cache_path))
-        .user_message("Unable to create hoist cache directory")?;
     let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
     tracing::debug!("initializing overnet");
     let injector = Injection::initialize_overnet(
         context,
-        hoist_cache_dir.path(),
         router_interval,
         daemon_version_string,
         app.global.machine,

@@ -15,7 +15,6 @@ rustc_library("hoist") {
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
-    "//src/connectivity/overnet/lib/stream_link",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
@@ -30,12 +29,6 @@ rustc_library("hoist") {
   sources = [
     "src/lib.rs",
     "src/not_fuchsia.rs",
-  ]
-
-  inputs = [
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt",
   ]
 
   test_deps = [

@@ -6,15 +6,13 @@ use super::{
     signals::Collector, IntoProxied, Message, Proxyable, ProxyableRW, ReadValue, RouterHolder,
     Serializer, IO,
 };
-use crate::coding;
-use crate::peer::{MessageStats, PeerConnRef};
+use crate::peer::PeerConnRef;
 use anyhow::Error;
 use fidl::{AsHandleRef, AsyncSocket, HandleBased, Peered, Signals};
 use fuchsia_zircon_status as zx_status;
 use futures::io::{AsyncRead, AsyncWrite};
 use futures::ready;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 pub(crate) struct Socket {
@@ -137,10 +135,8 @@ impl Serializer for SocketMessageSerializer {
         msg: &mut SocketMessage,
         bytes: &mut Vec<u8>,
         _: PeerConnRef<'_>,
-        _: &Arc<MessageStats>,
         _: &mut RouterHolder<'_>,
         _: &mut Context<'_>,
-        _: coding::Context,
     ) -> Poll<Result<(), Error>> {
         std::mem::swap(bytes, &mut msg.0);
         Poll::Ready(Ok(()))

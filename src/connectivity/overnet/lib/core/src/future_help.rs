@@ -71,7 +71,8 @@ impl<T: std::fmt::Debug> Observable<T> {
         changed
     }
 
-    pub async fn edit(&self, f: impl FnOnce(&mut T)) {
+    #[cfg(test)]
+    async fn edit(&self, f: impl FnOnce(&mut T)) {
         self.maybe_mutate(move |v| {
             f(v);
             true
@@ -79,6 +80,7 @@ impl<T: std::fmt::Debug> Observable<T> {
         .await;
     }
 
+    #[cfg(test)]
     pub async fn push(&self, new: T) {
         self.edit(|current| *current = new).await
     }

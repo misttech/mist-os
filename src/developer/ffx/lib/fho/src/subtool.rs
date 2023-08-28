@@ -84,7 +84,6 @@ struct FhoTool<M: FfxTool> {
     env: FhoEnvironment,
     redacted_args: Vec<String>,
     main: M,
-    _hoist_cache_dir: tempfile::TempDir,
 }
 
 struct MetadataRunner {
@@ -144,17 +143,9 @@ impl<T: FfxTool> FhoTool<T> {
         tool: T::Command,
     ) -> Result<Box<Self>> {
         let is_machine_output = ffx.global.machine.is_some();
-        let cache_path = context.get_cache_path()?;
-        let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
-            .and_then(|_| tempfile::tempdir_in(&cache_path))
-            .with_user_message(|| format!(
-                "Could not create hoist cache root in {}. Do you have permission to write to its parent?",
-                cache_path.display()
-            ))?;
         let build_info = context.build_info();
         let injector = Injection::initialize_overnet(
             context.clone(),
-            hoist_cache_dir.path(),
             None,
             DaemonVersionCheck::SameVersionInfo(build_info),
             ffx.global.machine,
@@ -171,7 +162,7 @@ impl<T: FfxTool> FhoTool<T> {
             )));
         }
 
-        let found = FhoTool { env, redacted_args, main, _hoist_cache_dir: hoist_cache_dir };
+        let found = FhoTool { env, redacted_args, main };
         Ok(Box::new(found))
     }
 }

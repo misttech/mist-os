@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use super::handle::{Message, Proxyable, ProxyableHandle, RouterHolder, Serializer};
-use crate::coding::{self, decode_fidl_with_context, encode_fidl_with_context};
+use crate::coding::{decode_fidl, encode_fidl};
 use crate::labels::{NodeId, TransferKey};
-use crate::peer::{
-    FrameType, FramedStreamReader, FramedStreamWriter, MessageStats, PeerConn, PeerConnRef,
-};
+use crate::peer::{FrameType, FramedStreamReader, FramedStreamWriter, PeerConn, PeerConnRef};
 use crate::router::Router;
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_overnet_protocol::{BeginTransfer, Empty, SignalUpdate, StreamControl};
@@ -18,13 +16,12 @@ use futures::{
     ready,
 };
 use std::pin::Pin;
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 use std::task::{Context, Poll};
 
 pub(crate) struct StreamWriter<Msg: Message> {
     stream: FramedStreamWriter,
     send_buffer: Vec<u8>,
-    stats: Arc<MessageStats>,
     router: Weak<Router>,
     closed: bool,
     _phantom_msg: std::marker::PhantomData<Msg>,
@@ -45,40 +42,34 @@ impl<Msg: Message> StreamWriter<Msg> {
         let send_buffer = &mut self.send_buffer;
         let conn = self.stream.conn();
         let mut rh = RouterHolder::Unused(&self.router);
-        let stats = &self.stats;
-        let coding_context = coding::DEFAULT_CONTEXT;
-        poll_fn(|fut_ctx| {
-            s.poll_ser(msg, send_buffer, conn, stats, &mut rh, fut_ctx, coding_context)
-        })
-        .await
-        .with_context(|| format_err!("Serializing message {:?}", msg))?;
+        poll_fn(|fut_ctx| s.poll_ser(msg, send_buffer, conn, &mut rh, fut_ctx))
+            .await
+            .with_context(|| format_err!("Serializing message {:?}", msg))?;
         self.stream
-            .send(FrameType::Data(coding_context), &self.send_buffer, false, &self.stats)
+            .send(FrameType::Data, &self.send_buffer)
             .await
             .with_context(|| format_err!("sending data {:?} ser={:?}", msg, self.send_buffer))
     }
 
     async fn send_control(&mut self, mut msg: StreamControl, fin: bool) -> Result<(), Error> {
         assert_ne!(self.closed, true);
-        let coding_context = coding::DEFAULT_CONTEXT;
-        let msg = encode_fidl_with_context(coding_context, &mut msg)
+        let msg = encode_fidl(&mut msg)
             .with_context(|| format_err!("encoding control message {:?}", msg))?;
         if fin {
             self.closed = true;
         }
         self.stream
-            .send(FrameType::Control(coding_context), msg.as_slice(), fin, &self.stats)
+            .send(FrameType::Control, msg.as_slice())
             .await
             .with_context(|| format_err!("sending control message {:?}", msg))
     }
 
     pub async fn send_signal(&mut self, mut msg: SignalUpdate) -> Result<(), Error> {
         assert_ne!(self.closed, true);
-        let coding_context = coding::DEFAULT_CONTEXT;
-        let msg = encode_fidl_with_context(coding_context, &mut msg)
+        let msg = encode_fidl(&mut msg)
             .with_context(|| format_err!("encoding control message {:?}", msg))?;
         self.stream
-            .send(FrameType::Signal(coding_context), msg.as_slice(), false, &self.stats)
+            .send(FrameType::Signal, msg.as_slice())
             .await
             .with_context(|| format_err!("sending control message {:?}", msg))
     }
@@ -108,10 +99,7 @@ impl<Msg: Message> StreamWriter<Msg> {
     }
 
     pub async fn send_hello(&mut self) -> Result<(), Error> {
-        self.stream
-            .send(FrameType::Hello, &[], false, &self.stats)
-            .await
-            .with_context(|| format_err!("sending hello"))
+        self.stream.send(FrameType::Hello, &[]).await.with_context(|| format_err!("sending hello"))
     }
 
     pub async fn send_shutdown(mut self, r: Result<(), zx_status::Status>) -> Result<(), Error> {
@@ -144,7 +132,6 @@ impl StreamWriterBinder for FramedStreamWriter {
         StreamWriter {
             stream: self,
             send_buffer: Vec::new(),
-            stats: hdl.stats().clone(),
             router: hdl.router().clone(),
             closed: false,
             _phantom_msg: std::marker::PhantomData,
@@ -168,7 +155,6 @@ pub(crate) struct StreamReader<Msg: Message> {
     stream: FramedStreamReader,
     incoming_message: Msg,
     router: Weak<Router>,
-    stats: Arc<MessageStats>,
     state: ReadNextState<Msg::Parser>,
 }
 
@@ -178,7 +164,6 @@ pub(crate) struct ReadNext<'a, Msg: Message> {
     state: &'a mut ReadNextState<Msg::Parser>,
     conn: PeerConn,
     incoming_message: Option<&'a mut Msg>,
-    stats: &'a Arc<MessageStats>,
     router_holder: RouterHolder<'a>,
 }
 
@@ -214,7 +199,7 @@ impl<'a> ReadNextFrameOrPeerConnRef<'a> {
 #[derive(Debug)]
 enum ReadNextState<Parser> {
     Reading,
-    DeserializingData(coding::Context, Vec<u8>, Parser),
+    DeserializingData(Vec<u8>, Parser),
 }
 
 impl<'a, Msg: Message> ReadNext<'a, Msg> {
@@ -237,44 +222,33 @@ impl<'a, Msg: Message> ReadNext<'a, Msg> {
                             }
                             Frame::Hello
                         }
-                        FrameType::Data(coding_context) => {
-                            *self.state = ReadNextState::DeserializingData(
-                                coding_context,
-                                bytes,
-                                Msg::Parser::new(),
-                            );
+                        FrameType::Data => {
+                            *self.state =
+                                ReadNextState::DeserializingData(bytes, Msg::Parser::new());
                             continue;
                         }
-                        FrameType::Signal(coding_context) => Frame::SignalUpdate(
-                            decode_fidl_with_context(coding_context, &mut bytes)?,
-                        ),
-                        FrameType::Control(coding_context) => {
-                            match decode_fidl_with_context(coding_context, &mut bytes)? {
-                                StreamControl::AckTransfer(Empty {}) => Frame::AckTransfer,
-                                StreamControl::EndTransfer(Empty {}) => Frame::EndTransfer,
-                                StreamControl::Shutdown(status_code) => {
-                                    Frame::Shutdown(zx_status::Status::ok(status_code))
-                                }
-
-                                StreamControl::BeginTransfer(BeginTransfer {
-                                    new_destination_node,
-                                    transfer_key,
-                                }) => {
-                                    Frame::BeginTransfer(new_destination_node.into(), transfer_key)
-                                }
+                        FrameType::Signal => Frame::SignalUpdate(decode_fidl(&mut bytes)?),
+                        FrameType::Control => match decode_fidl(&mut bytes)? {
+                            StreamControl::AckTransfer(Empty {}) => Frame::AckTransfer,
+                            StreamControl::EndTransfer(Empty {}) => Frame::EndTransfer,
+                            StreamControl::Shutdown(status_code) => {
+                                Frame::Shutdown(zx_status::Status::ok(status_code))
                             }
-                        }
+
+                            StreamControl::BeginTransfer(BeginTransfer {
+                                new_destination_node,
+                                transfer_key,
+                            }) => Frame::BeginTransfer(new_destination_node.into(), transfer_key),
+                        },
                     }
                 }
-                ReadNextState::DeserializingData(coding_context, ref mut bytes, ref mut parser) => {
+                ReadNextState::DeserializingData(ref mut bytes, ref mut parser) => {
                     ready!(parser.poll_ser(
                         self.incoming_message.as_mut().unwrap(),
                         bytes,
                         self.conn.as_ref(),
-                        self.stats,
                         &mut self.router_holder,
                         ctx,
-                        coding_context,
                     ))?;
                     *self.state = ReadNextState::Reading;
                     Frame::Data(self.incoming_message.take().unwrap())
@@ -307,14 +281,13 @@ impl<Msg: Message> StreamReader<Msg> {
                 ReadNextState::Reading => {
                     ReadNextFrameOrPeerConnRef::ReadNextFrame(self.stream.next().boxed())
                 }
-                ReadNextState::DeserializingData(_, _, _) => {
+                ReadNextState::DeserializingData(_, _) => {
                     ReadNextFrameOrPeerConnRef::PeerConnRef(self.stream.conn())
                 }
             },
             state: &mut self.state,
             conn,
             incoming_message: Some(&mut self.incoming_message),
-            stats: &self.stats,
             router_holder: RouterHolder::Unused(&self.router),
         }
     }
@@ -362,7 +335,6 @@ impl StreamReaderBinder for FramedStreamReader {
             stream: self,
             incoming_message: Default::default(),
             router: hdl.router().clone(),
-            stats: hdl.stats().clone(),
             state: ReadNextState::Reading,
         }
     }

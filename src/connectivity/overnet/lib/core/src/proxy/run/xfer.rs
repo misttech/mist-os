@@ -32,7 +32,6 @@ pub(crate) async fn follow<Hdl: 'static + for<'a> ProxyableRW<'a>>(
         stream_writer.send_ack_transfer().await?;
         let hdl = proxy.hdl.take().ok_or_else(|| format_err!("Handle already taken"))?;
         let router = Weak::upgrade(&hdl.router()).ok_or_else(|| format_err!("Router gone"))?;
-        let stats = hdl.stats().clone();
         let hdl = hdl.into_fidl_handle()?;
         drop(proxy);
         let r = router.open_transfer(new_destination_node.into(), transfer_key, hdl).await?;
@@ -44,7 +43,7 @@ pub(crate) async fn follow<Hdl: 'static + for<'a> ProxyableRW<'a>>(
             OpenedTransfer::Remote(new_writer, new_reader, handle) => {
                 let handle = Hdl::from_fidl_handle(handle)?;
                 make_boxed_main_loop(
-                    Proxy::new(handle, Arc::downgrade(&router), stats),
+                    Proxy::new(handle, Arc::downgrade(&router)),
                     initiate_transfer,
                     new_writer.into(),
                     None,
@@ -96,11 +95,7 @@ pub(crate) async fn initiate<Hdl: 'static + for<'a> ProxyableRW<'a>>(
 
     futures::future::try_join(
         drain_handle_to_stream(
-            ProxyableHandle::new(
-                Hdl::from_fidl_handle(pair)?,
-                proxy.hdl().router().clone(),
-                proxy.hdl().stats().clone(),
-            ),
+            ProxyableHandle::new(Hdl::from_fidl_handle(pair)?, proxy.hdl().router().clone()),
             drain_stream,
         ),
         async move {

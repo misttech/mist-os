@@ -109,11 +109,7 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     stream_reader: FramedStreamReader,
 ) -> Result<(), Error> {
     #[cfg(not(target_os = "fuchsia"))]
-    if stream_writer.is_circuit() {
-        proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Cso);
-    } else {
-        proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Legacy);
-    }
+    proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Cso);
 
     let (tx_join, rx_join) = new_task_joiner();
     let hdl = proxy.hdl();

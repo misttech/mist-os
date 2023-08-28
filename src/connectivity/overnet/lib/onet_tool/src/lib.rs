@@ -12,7 +12,6 @@ use {
 };
 
 mod generator;
-mod host_pipe;
 mod list_peers;
 mod probe_node;
 mod probe_reports;
@@ -29,7 +28,6 @@ pub struct Opts {
 pub enum Command {
     ListPeers(ListPeers),
     ListLinks(ListLinks),
-    HostPipe(host_pipe::HostPipe),
     FullMap(probe_reports::FullMapArgs),
 }
 
@@ -184,7 +182,6 @@ pub async fn run_onet(hoist: &hoist::Hoist, opts: Opts) -> Result<(), Error> {
     match opts.command {
         Command::ListPeers(_) => list_peers().await,
         Command::ListLinks(args) => list_links(args).await,
-        Command::HostPipe(_) => host_pipe::host_pipe().await,
         Command::FullMap(args) => {
             println!("{}", probe_reports::full_map(args).await?);
             Ok(())

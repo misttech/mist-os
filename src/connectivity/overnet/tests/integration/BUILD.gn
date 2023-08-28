@@ -25,20 +25,12 @@ rustc_test("integration") {
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
   ]
-  if (is_host) {
-    deps += [ "//src/connectivity/overnet/lib/core:test_certs" ]
-  }
 
   sources = [
     "src/drop.rs",
     "src/echo.rs",
     "src/lib.rs",
     "src/triangle.rs",
-  ]
-  inputs = [
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt",
   ]
 }
 
@@ -54,10 +46,7 @@ fidl("triangle") {
 }
 
 fuchsia_unittest_package("overnet-integration-tests") {
-  deps = [
-    ":integration",
-    "//src/connectivity/overnet:certificates",
-  ]
+  deps = [ ":integration" ]
 }
 
 group("tests") {
