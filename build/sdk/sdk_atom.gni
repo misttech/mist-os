@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/compiled_action.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/json/validate_json.gni")
 import("//build/sdk/plasa/config.gni")
 import("//build/testing/golden_files.gni")
@@ -231,7 +232,13 @@ template("sdk_atom") {
     rebase_path(meta_file, root_build_dir),
   ]
 
-  if (defined(invoker.api)) {
+  # api files are only valid for the HEAD API level. When
+  # override_target_api_level is set, some of them will fail to reflect
+  # the API of the atom being built. Disallow api verification when
+  # this is the case.
+  _verify_api = defined(invoker.api) && override_target_api_level == -1
+
+  if (_verify_api) {
     if (defined(invoker.api_contents)) {
       assert(invoker.api_contents != [], "api_contents cannot be empty")
 
@@ -281,6 +288,13 @@ template("sdk_atom") {
         deps = [ ":$generate_api_target_name" ]
       }
     }
+  } else {
+    not_needed(invoker,
+               [
+                 "api",
+                 "api_contents",
+                 "current_api",
+               ])
   }
 
   # Builds a manifest representing this element.
@@ -303,7 +317,7 @@ template("sdk_atom") {
     script = "//build/sdk/create_atom_manifest.py"
 
     public_deps = gn_deps + [ ":$meta_target_name" ]
-    if (defined(invoker.api)) {
+    if (_verify_api) {
       public_deps += [ ":$verify_api_target_name" ]
     }
 
