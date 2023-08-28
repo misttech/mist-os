@@ -376,7 +376,7 @@ async fn measure_peak_usage(
                 result.expect("should receive message when benchmark is complete");
                 break;
             },
-            () = fuchsia_async::Timer::new(zx::Duration::from_millis(100)).fuse() => {},
+            () = fuchsia_async::Timer::new(zx::Duration::from_millis(10)).fuse() => {},
         }
     }
     max
