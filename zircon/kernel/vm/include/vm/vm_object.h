@@ -557,7 +557,11 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  virtual uint32_t GetMappingCachePolicy() const = 0;
+  virtual uint32_t GetMappingCachePolicy() const {
+    Guard<CriticalMutex> guard{lock()};
+    return GetMappingCachePolicyLocked();
+  }
+  virtual uint32_t GetMappingCachePolicyLocked() const = 0;
   virtual zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) {
     return ZX_ERR_NOT_SUPPORTED;
   }

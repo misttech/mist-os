@@ -231,11 +231,7 @@ zx_status_t VmObjectPhysical::LookupContiguousLocked(uint64_t offset, uint64_t l
   return ZX_OK;
 }
 
-uint32_t VmObjectPhysical::GetMappingCachePolicy() const {
-  Guard<CriticalMutex> guard{lock()};
-
-  return mapping_cache_flags_;
-}
+uint32_t VmObjectPhysical::GetMappingCachePolicyLocked() const { return mapping_cache_flags_; }
 
 zx_status_t VmObjectPhysical::SetMappingCachePolicy(const uint32_t cache_policy) {
   // Is it a valid cache flag?

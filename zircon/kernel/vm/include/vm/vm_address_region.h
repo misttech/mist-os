@@ -848,6 +848,12 @@ class MappingProtectionRanges {
   // Flags for the first protection region.
   uint FirstRegionMmuFlags() const { return first_region_arch_mmu_flags_; }
 
+  // Returns whether there is only a single protection region, that being the first region.
+  bool IsSingleRegion() const { return protect_region_list_rest_.is_empty(); }
+
+  // Sets the flags for the first region
+  void SetFirstRegionMmuFlags(uint32_t new_flags) { first_region_arch_mmu_flags_ = new_flags; }
+
  private:
   // If a mapping is protected so that parts of it are different types then we need to track this
   // information. The ProtectNode represents the additional metadata that we need to allocate to

@@ -1130,6 +1130,32 @@ void VmMapping::ActivateLocked() {
 
   state_ = LifeCycleState::ALIVE;
   object_->AddMappingLocked(this);
+
+  // Now that we have added a mapping to the VMO it's cache policy becomes fixed, and we can read it
+  // and augment our arch_mmu_flags.
+  uint32_t cache_policy = object_->GetMappingCachePolicyLocked();
+  uint arch_mmu_flags = protection_ranges_.FirstRegionMmuFlags();
+  if ((arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) != cache_policy) {
+    // Warn in the event that we somehow receive a VMO that has a cache
+    // policy set while also holding cache policy flags within the arch
+    // flags. The only path that should be able to achieve this is if
+    // something in the kernel maps into their aspace incorrectly.
+    if ((arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) != 0) {
+      TRACEF(
+          "warning: mapping has conflicting cache policies: vmo %02x "
+          "arch_mmu_flags %02x.\n",
+          cache_policy, arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK);
+      // Clear the existing cache policy and use the new one.
+      arch_mmu_flags &= ~ARCH_MMU_FLAG_CACHE_MASK;
+    }
+    // If we are changing the cache policy then this can only happen if this is a new mapping region
+    // and not a new mapping occurring as a result of an unmap split. In the case of a new mapping
+    // region we know there cannot yet be any protection ranges.
+    DEBUG_ASSERT(protection_ranges_.IsSingleRegion());
+    arch_mmu_flags |= cache_policy;
+    protection_ranges_.SetFirstRegionMmuFlags(arch_mmu_flags);
+  }
+
   AssertHeld(parent_->lock_ref());
   parent_->subregions_.InsertRegion(fbl::RefPtr<VmAddressRegionOrMapping>(this));
 }

@@ -233,11 +233,7 @@ class VmObjectPaged final : public VmObject {
 
   zx_status_t CacheOp(uint64_t offset, uint64_t len, CacheOpType type) override;
 
-  uint32_t GetMappingCachePolicy() const override {
-    Guard<CriticalMutex> guard{lock()};
-    return GetMappingCachePolicyLocked();
-  }
-  uint32_t GetMappingCachePolicyLocked() const TA_REQ(lock()) { return cache_policy_; }
+  uint32_t GetMappingCachePolicyLocked() const override TA_REQ(lock()) { return cache_policy_; }
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;
 
   void DetachSource() override {
