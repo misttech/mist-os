@@ -7,10 +7,11 @@ use {
     async_trait::async_trait,
     errors::{ffx_bail, ffx_error},
     ffx_profile_heapdump_common::{
-        build_process_selector, check_collector_error, connect_to_collector, export_to_pprof,
+        build_process_selector, check_snapshot_error, connect_to_collector, export_to_pprof,
     },
     ffx_profile_heapdump_snapshot_args::SnapshotCommand,
     fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter},
+    fidl::endpoints::create_request_stream,
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
     std::io::Write,
@@ -39,17 +40,19 @@ impl FfxMain for SnapshotTool {
 async fn snapshot(remote_control: RemoteControlProxy, cmd: SnapshotCommand) -> Result<()> {
     let process_selector = build_process_selector(cmd.by_name, cmd.by_koid)?;
     let contents_dir = cmd.output_contents_dir.as_ref().map(std::path::Path::new);
+
+    let (receiver_client, receiver_stream) = create_request_stream()?;
     let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
         process_selector: Some(process_selector),
+        receiver: Some(receiver_client),
         with_contents: Some(contents_dir.is_some()),
         ..Default::default()
     };
 
     let collector = connect_to_collector(&remote_control, cmd.collector).await?;
-    let result = collector.take_live_snapshot(&request).await?;
-
-    let receiver_stream = check_collector_error(result)?.into_stream()?;
-    let snapshot = heapdump_snapshot::Snapshot::receive_from(receiver_stream).await?;
+    collector.take_live_snapshot(request)?;
+    let snapshot =
+        check_snapshot_error(heapdump_snapshot::Snapshot::receive_from(receiver_stream).await)?;
 
     // If the user has requested the blocks' contents, ensure that `contents_dir` is an empty
     // directory (creating it if necessary), then dump the contents of each allocated block to a

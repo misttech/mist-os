@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_memory_heapdump_client::{self as fheapdump_client, CollectorError};
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
+use fuchsia_async as fasync;
 use fuchsia_zircon::Koid;
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -59,10 +59,10 @@ impl Registry {
             match request {
                 fheapdump_client::StoredSnapshotIteratorRequest::GetNext { responder } => {
                     if let Some(elem) = snapshots.get(index) {
-                        responder.send(std::slice::from_ref(elem))?;
+                        responder.send(Ok(std::slice::from_ref(elem)))?;
                         index += 1;
                     } else {
-                        responder.send(&[])?;
+                        responder.send(Ok(&[]))?;
                     }
                 }
             }
@@ -77,8 +77,10 @@ impl Registry {
     ) -> Result<(), anyhow::Error> {
         while let Some(request) = stream.next().await.transpose()? {
             match request {
-                fheapdump_client::CollectorRequest::TakeLiveSnapshot { payload, responder } => {
+                fheapdump_client::CollectorRequest::TakeLiveSnapshot { payload, .. } => {
                     let process_selector = payload.process_selector;
+                    let receiver =
+                        payload.receiver.context("missing required receiver")?.into_proxy()?;
                     let with_contents = payload.with_contents.unwrap_or(false);
 
                     let process = match process_selector {
@@ -98,27 +100,28 @@ impl Registry {
                         }
                     };
 
-                    match process {
-                        Ok(process) => match process.take_live_snapshot(with_contents) {
-                            Ok(snapshot) => {
-                                let (proxy, stream) = create_proxy()
-                                    .expect("failed to create snapshot receiver channel");
-                                responder.send(Ok(stream))?;
-
-                                if let Err(error) = snapshot.write_to(proxy).await {
-                                    warn!(?error, "Error while streaming snapshot");
+                    start_detached_task(async move {
+                        let error = match process {
+                            Ok(process) => match process.take_live_snapshot(with_contents) {
+                                Ok(snapshot) => {
+                                    return snapshot
+                                        .write_to(receiver)
+                                        .await
+                                        .context("streaming snapshot")
                                 }
-                            }
-                            Err(error) => {
-                                warn!(?error, "Error while taking live snapshot");
-                                responder.send(Err(CollectorError::LiveSnapshotFailed))?;
-                            }
-                        },
-                        Err(e) => responder.send(Err(e))?,
-                    };
+                                Err(error) => {
+                                    warn!(?error, "Error while taking live snapshot");
+                                    CollectorError::LiveSnapshotFailed
+                                }
+                            },
+                            Err(error) => error,
+                        };
+                        receiver.report_error(error).await.context("reporting error")
+                    });
                 }
-                fheapdump_client::CollectorRequest::ListStoredSnapshots { payload, responder } => {
-                    let iterator = payload.iterator.context("missing required iterator")?;
+                fheapdump_client::CollectorRequest::ListStoredSnapshots { payload, .. } => {
+                    let mut iterator =
+                        payload.iterator.context("missing required iterator")?.into_stream()?;
                     let process_selector = payload.process_selector.as_ref();
 
                     let filter: Result<Box<dyn Fn(Koid, &str) -> bool>, _> = match process_selector
@@ -140,34 +143,49 @@ impl Registry {
                         Ok(filter) => {
                             let snapshots =
                                 self.snapshot_storage.lock().await.list_snapshots(filter);
-                            responder.send(Ok(()))?;
-
-                            if let Err(error) =
-                                Registry::send_stored_snapshots(iterator.into_stream()?, &snapshots)
+                            start_detached_task(async move {
+                                Registry::send_stored_snapshots(iterator, &snapshots)
                                     .await
-                            {
-                                warn!(?error, "Error while streaming list of stored snapshots");
-                            }
+                                    .context("streaming list of stored snapshots")
+                            });
                         }
-                        Err(error) => responder.send(Err(error))?,
+                        Err(error) => {
+                            start_detached_task(async move {
+                                if let Some(
+                                    fheapdump_client::StoredSnapshotIteratorRequest::GetNext {
+                                        responder,
+                                    },
+                                ) = iterator.next().await.transpose()?
+                                {
+                                    responder.send(Err(error)).context("sending error")
+                                } else {
+                                    warn!(
+                                        ?error,
+                                        "Could not report because the client never called GetNext"
+                                    );
+                                    Ok(())
+                                }
+                            });
+                        }
                     }
                 }
-                fheapdump_client::CollectorRequest::DownloadStoredSnapshot {
-                    snapshot_id,
-                    responder,
-                } => {
-                    let snapshot = self.snapshot_storage.lock().await.get_snapshot(snapshot_id);
-                    if let Some(snapshot) = snapshot {
-                        let (proxy, stream) =
-                            create_proxy().expect("failed to create snapshot receiver channel");
-                        responder.send(Ok(stream))?;
+                fheapdump_client::CollectorRequest::DownloadStoredSnapshot { payload, .. } => {
+                    let snapshot_id =
+                        payload.snapshot_id.context("missing required snapshot_id")?;
+                    let receiver =
+                        payload.receiver.context("missing required receiver")?.into_proxy()?;
 
-                        if let Err(error) = snapshot.write_to(proxy).await {
-                            warn!(?error, "Error while streaming snapshot");
+                    let snapshot = self.snapshot_storage.lock().await.get_snapshot(snapshot_id);
+                    start_detached_task(async move {
+                        if let Some(snapshot) = snapshot {
+                            snapshot.write_to(receiver).await.context("streaming snapshot")
+                        } else {
+                            receiver
+                                .report_error(CollectorError::StoredSnapshotNotFound)
+                                .await
+                                .context("reporting error")
                         }
-                    } else {
-                        responder.send(Err(CollectorError::StoredSnapshotNotFound))?;
-                    }
+                    });
                 }
             }
         }
@@ -246,13 +264,21 @@ impl Registry {
     }
 }
 
+fn start_detached_task(fut: impl futures::Future<Output = anyhow::Result<()>> + 'static) {
+    let worker_fn = async move {
+        if let Err(error) = fut.await {
+            warn!(?error, "Error in detached task");
+        }
+    };
+    fasync::Task::local(worker_fn).detach();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
-    use fidl::endpoints::create_proxy_and_stream;
-    use fuchsia_async as fasync;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
     use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
     use futures::{channel::oneshot, pin_mut};
     use itertools::{assert_equal, Itertools};
@@ -433,6 +459,17 @@ mod tests {
         }
     }
 
+    async fn receive_and_assert_error(
+        mut src: fheapdump_client::SnapshotReceiverRequestStream,
+        expected_error: fheapdump_client::CollectorError,
+    ) {
+        let received = src.next().await;
+        assert_matches!(
+            received,
+            Some(Ok(fheapdump_client::SnapshotReceiverRequest::ReportError{ error, .. })) if error == expected_error
+        );
+    }
+
     #[test_case(Ok(()) ; "exit ok")]
     #[test_case(Err(anyhow::anyhow!("Simulated error")) ; "exit error")]
     fn test_register_and_unregister(exit_result: Result<(), anyhow::Error>) {
@@ -525,32 +562,32 @@ mod tests {
         let (_registry, proxy) = create_registry_and_proxy([process1, process2, process3]);
 
         // Execute the request.
+        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
         let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
             process_selector,
+            receiver: Some(receiver_client),
             with_contents,
             ..Default::default()
         };
-        let result = proxy.take_live_snapshot(&request).await.expect("FIDL channel error");
+        proxy.take_live_snapshot(request).expect("FIDL channel error");
 
         // Verify that the result matches our expectation (either success or a specific error).
         if let Some(expect_error) = expect_error {
-            assert_eq!(result.expect_err("request should fail"), expect_error);
+            receive_and_assert_error(receiver_stream, expect_error).await;
         } else {
-            let result = result.expect("request should succeed");
             let expect_contents = with_contents == Some(true);
-            FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap(), expect_contents)
-                .await;
+            FakeSnapshot::receive_and_assert_match(receiver_stream, expect_contents).await;
         }
     }
 
     async fn receive_list_of_snapshots(
         iterator: fheapdump_client::StoredSnapshotIteratorProxy,
-    ) -> Vec<fheapdump_client::StoredSnapshot> {
+    ) -> Result<Vec<fheapdump_client::StoredSnapshot>, CollectorError> {
         let mut result = Vec::new();
         loop {
-            let batch = iterator.get_next().await.unwrap();
+            let batch = iterator.get_next().await.unwrap()?;
             if batch.is_empty() {
-                return result;
+                return Ok(result);
             } else {
                 result.extend(batch);
             }
@@ -597,10 +634,9 @@ mod tests {
                 iterator: Some(server_end),
                 ..Default::default()
             })
-            .await
-            .unwrap()
-            .unwrap();
-        let actual_snapshots = receive_list_of_snapshots(iterator).await;
+            .expect("FIDL channel error");
+        let actual_snapshots =
+            receive_list_of_snapshots(iterator).await.expect("request should succeed");
 
         // Verify the resulting list.
         assert_equal(
@@ -636,10 +672,9 @@ mod tests {
                 process_selector: Some(fheapdump_client::ProcessSelector::ByKoid(1234)),
                 ..Default::default()
             })
-            .await
-            .unwrap()
-            .unwrap();
-        let returned_snapshots = receive_list_of_snapshots(iterator).await;
+            .expect("FIDL channel error");
+        let returned_snapshots =
+            receive_list_of_snapshots(iterator).await.expect("request should succeed");
         assert_eq!(
             returned_snapshots.iter().at_most_one().unwrap().unwrap().snapshot_id,
             Some(snapshot_id_koid_1234)
@@ -655,10 +690,9 @@ mod tests {
                 )),
                 ..Default::default()
             })
-            .await
-            .unwrap()
-            .unwrap();
-        let returned_snapshots = receive_list_of_snapshots(iterator).await;
+            .expect("FIDL channel error");
+        let returned_snapshots =
+            receive_list_of_snapshots(iterator).await.expect("request should succeed");
         assert_eq!(
             returned_snapshots.iter().at_most_one().unwrap().unwrap().snapshot_id,
             Some(snapshot_id_name_foobar)
@@ -677,14 +711,23 @@ mod tests {
             "foobaz".to_string(),
             Box::new(FakeSnapshot { with_contents: false }),
         );
-        let result = proxy.download_stored_snapshot(snapshot_id).await.unwrap().unwrap();
-        FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap(), false).await;
+        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
+            snapshot_id: Some(snapshot_id),
+            receiver: Some(receiver_client),
+            ..Default::default()
+        };
+        proxy.download_stored_snapshot(request).expect("FIDL channel error");
+        FakeSnapshot::receive_and_assert_match(receiver_stream, false).await;
 
         // Attempt to request a non-existing snapshot and verify the returned error.
-        let bad_snapshot_id = snapshot_id + 1;
-        assert_eq!(
-            proxy.download_stored_snapshot(bad_snapshot_id).await.unwrap(),
-            Err(CollectorError::StoredSnapshotNotFound)
-        );
+        let (receiver_client, receiver_stream) = create_request_stream().unwrap();
+        let request = fheapdump_client::CollectorDownloadStoredSnapshotRequest {
+            snapshot_id: Some(snapshot_id + 1), // bad snapshot ID
+            receiver: Some(receiver_client),
+            ..Default::default()
+        };
+        proxy.download_stored_snapshot(request).expect("FIDL channel error");
+        receive_and_assert_error(receiver_stream, CollectorError::StoredSnapshotNotFound).await;
     }
 }

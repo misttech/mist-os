@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use errors::ffx_bail;
+use errors::{ffx_bail, ffx_error};
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 
 mod pprof;
@@ -26,31 +26,38 @@ pub fn build_process_selector(
 /// Converts a CollectorError into a user-friendly error.
 ///
 /// The returned error is meant to be returned by the ffx plugin's main function.
-pub fn check_collector_error<T>(
-    value: Result<T, fheapdump_client::CollectorError>,
-) -> anyhow::Result<T> {
+pub fn prettify_collector_error(error: fheapdump_client::CollectorError) -> anyhow::Error {
     // Match known errors and return an FfxError (which is simply printed as-is).
     // For unknown errors, return a regular anyhow Error so that the full context with a "BUG"
     // banner is printed instead.
-    match value {
-        Ok(inner) => Ok(inner),
-        Err(fheapdump_client::CollectorError::ProcessSelectorUnsupported) => {
-            ffx_bail!("Unsupported process filter")
+    match error {
+        fheapdump_client::CollectorError::ProcessSelectorUnsupported => {
+            ffx_error!("Unsupported process filter")
         }
-        Err(fheapdump_client::CollectorError::ProcessSelectorNoMatch) => {
-            ffx_bail!("No process matches the requested filter")
+        fheapdump_client::CollectorError::ProcessSelectorNoMatch => {
+            ffx_error!("No process matches the requested filter")
         }
-        Err(fheapdump_client::CollectorError::ProcessSelectorAmbiguous) => {
-            ffx_bail!("More than one process matches the requested filter")
+        fheapdump_client::CollectorError::ProcessSelectorAmbiguous => {
+            ffx_error!("More than one process matches the requested filter")
         }
-        Err(fheapdump_client::CollectorError::LiveSnapshotFailed) => {
-            ffx_bail!("Failed to take a snapshot of the current live allocations in the process")
+        fheapdump_client::CollectorError::LiveSnapshotFailed => {
+            ffx_error!("Failed to take a snapshot of the current live allocations in the process")
         }
-        Err(fheapdump_client::CollectorError::StoredSnapshotNotFound) => {
-            ffx_bail!("The requested snapshot ID does not exist")
+        fheapdump_client::CollectorError::StoredSnapshotNotFound => {
+            ffx_error!("The requested snapshot ID does not exist")
         }
-        Err(other) => {
-            anyhow::bail!("Unrecognized CollectorError: {:?}", other)
-        }
+        other => return anyhow::anyhow!("Unrecognized CollectorError: {:?}", other),
+    }
+    .into()
+}
+
+/// Converts a Result potentially containing heapdump_snapshot::Error into a user-friendly error.
+///
+/// The returned error is meant to be returned by the ffx plugin's main function.
+pub fn check_snapshot_error<T>(value: Result<T, heapdump_snapshot::Error>) -> anyhow::Result<T> {
+    if let Err(heapdump_snapshot::Error::CollectorError(error)) = value {
+        Err(prettify_collector_error(error))
+    } else {
+        Ok(value?)
     }
 }

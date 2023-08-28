@@ -102,12 +102,23 @@ impl Snapshot {
         let mut executable_regions: HashMap<u64, ExecutableRegion> = HashMap::new();
         let mut contents: HashMap<u64, Vec<u8>> = HashMap::new();
 
-        while let Some(fheapdump_client::SnapshotReceiverRequest::Batch {
-            batch, responder, ..
-        }) = stream.next().await.transpose()?
-        {
-            // Send acknowledgment.
-            responder.send()?;
+        loop {
+            // Wait for the next batch of elements.
+            let batch = match stream.next().await.transpose()? {
+                Some(fheapdump_client::SnapshotReceiverRequest::Batch { batch, responder }) => {
+                    // Send acknowledgment as quickly as possible, then keep processing the received batch.
+                    responder.send()?;
+                    batch
+                }
+                Some(fheapdump_client::SnapshotReceiverRequest::ReportError {
+                    error,
+                    responder,
+                }) => {
+                    let _ = responder.send(); // Ignore the result of the acknowledgment.
+                    return Err(Error::CollectorError(error));
+                }
+                None => return Err(Error::UnexpectedEndOfStream),
+            };
 
             // Process data. An empty batch signals the end of the stream.
             if !batch.is_empty() {
@@ -211,8 +222,6 @@ impl Snapshot {
                 return Ok(Snapshot { allocations: final_allocations, executable_regions });
             }
         }
-
-        Err(Error::UnexpectedEndOfStream)
     }
 }
 

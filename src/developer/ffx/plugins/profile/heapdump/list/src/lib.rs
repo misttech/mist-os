@@ -6,7 +6,7 @@ use {
     anyhow::{Context, Result},
     async_trait::async_trait,
     ffx_profile_heapdump_common::{
-        build_process_selector, check_collector_error, connect_to_collector,
+        build_process_selector, connect_to_collector, prettify_collector_error,
     },
     ffx_profile_heapdump_list_args::ListCommand,
     ffx_writer::ToolIO,
@@ -32,7 +32,7 @@ async fn receive_list_of_stored_snapshots(
 ) -> Result<Vec<StoredSnapshot>> {
     let mut result = Vec::new();
     loop {
-        let batch = iterator.get_next().await?;
+        let batch = iterator.get_next().await?.map_err(prettify_collector_error)?;
         if batch.is_empty() {
             break;
         }
@@ -77,7 +77,7 @@ async fn list(
     cmd: ListCommand,
     writer: &mut MachineWriter<Vec<StoredSnapshot>>,
 ) -> Result<()> {
-    let (iterator_proxy, iterator_server) = create_proxy().unwrap();
+    let (iterator_proxy, iterator_server) = create_proxy()?;
     let request = fheapdump_client::CollectorListStoredSnapshotsRequest {
         iterator: Some(iterator_server),
         process_selector: match (cmd.by_name, cmd.by_koid) {
@@ -88,7 +88,7 @@ async fn list(
     };
 
     let collector = connect_to_collector(&remote_control, cmd.collector).await?;
-    check_collector_error(collector.list_stored_snapshots(request).await?)?;
+    collector.list_stored_snapshots(request)?;
 
     let stored_snapshots = receive_list_of_stored_snapshots(iterator_proxy).await?;
     if writer.is_machine() {
