@@ -192,11 +192,11 @@ macro_rules! state_implementation {
         pub type [<$base_name StateMutRef>]<'ref_lifetime> = crate::mutable_state::StateMutRef<'ref_lifetime, $base_name, $mutable_name>;
 
         impl<'guard, G: 'guard + std::ops::Deref<Target=$mutable_name>> crate::mutable_state::Guard<'guard, $base_name, G> {
-            filter_methods!(RoMethod, $($tt)*);
+            filter_methods_macro::filter_methods!(RoMethod, $($tt)*);
         }
 
         impl<'guard, G: 'guard + std::ops::DerefMut<Target=$mutable_name>> crate::mutable_state::Guard<'guard, $base_name, G> {
-            filter_methods!(RwMethod, $($tt)*);
+            filter_methods_macro::filter_methods!(RwMethod, $($tt)*);
         }
         }
     };
@@ -239,41 +239,7 @@ impl<'a, B, S, G: DerefMut<Target = S>> DerefMut for Guard<'a, B, G> {
     }
 }
 
-/// This macro matches the methods inside a `state_implementation!` macro depending on their
-/// visibility and mutability so that the `state_implementation!` might dispatch these to the right
-/// implementation.
-macro_rules! filter_methods {
-    // No more token.
-    ($_:ident, ) => {};
-    // Match non mutable methods and output them.
-    (RoMethod, $(#[$meta:meta])* $vis:vis fn $fn:ident $(<$($template:tt),*>)? ( & $self_lifetime:lifetime $self_:tt $(, $name:ident : $type:ty)* $(,)? ) $(-> $ret:ty)? $body:block $($tail:tt)*) => {
-        $(#[$meta])* $vis fn $fn $(<$($template),*>)?( & $self_lifetime $self_ $(, $name : $type)* ) $(-> $ret)? $body
-        filter_methods!(RoMethod, $($tail)*);
-    };
-    (RoMethod, $(#[$meta:meta])* $vis:vis fn $fn:ident $(<$($template:tt),*>)? ( & $self_:tt $(, $name:ident : $type:ty)* $(,)? ) $(-> $ret:ty)? $body:block $($tail:tt)*) => {
-        $(#[$meta])* $vis fn $fn $(<$($template),*>)?( & $self_ $(, $name : $type)* ) $(-> $ret)? $body
-        filter_methods!(RoMethod, $($tail)*);
-    };
-    // Match mutable methods and output them.
-    (RwMethod, $(#[$meta:meta])* $vis:vis fn $fn:ident $(<$($template:tt),*>)? ( & $($self_lifetime:lifetime)? mut $self_:tt $(, $name:ident : $type:ty)* $(,)? ) $(-> $ret:ty)? $body:block $($tail:tt)*) => {
-        $(#[$meta])* $vis fn $fn $(<$($template),*>)?( & $($self_lifetime)? mut $self_ $(, $name : $type)* ) $(-> $ret)? $body
-        filter_methods!(RwMethod, $($tail)*);
-    };
-    // Next patterns match every type of method. They are used to remove the tokens associated with
-    // a method that has not been match by the previous patterns.
-    ($qualifier:ident, $(#[$meta:meta])* $(pub)? fn $fn:ident $(<$($template:tt),*>)? ( & $self_lifetime:lifetime $self_:tt $(, $name:ident : $type:ty)* $(,)? ) $(-> $ret:ty)? $body:block $($tail:tt)*) => {
-        filter_methods!($qualifier, $($tail)*);
-    };
-    ($qualifier:ident, $(#[$meta:meta])* $(pub)? fn $fn:ident $(<$($template:tt),*>)? ( & $self_:tt $(, $name:ident : $type:ty)* $(,)? ) $(-> $ret:ty)? $body:block $($tail:tt)*) => {
-        filter_methods!($qualifier, $($tail)*);
-    };
-    ($qualifier:ident, $(#[$meta:meta])* $(pub)? fn $fn:ident $(<$($template:tt),*>)? ( & $($self_lifetime:lifetime)? mut $self_:tt $(, $name:ident : $type:ty)* $(,)? ) $(-> $ret:ty)? $body:block $($tail:tt)*) => {
-        filter_methods!($qualifier, $($tail)*);
-    };
-}
-
 // Public re-export of macros allows them to be used like regular rust items.
-pub(crate) use filter_methods;
 pub(crate) use state_accessor;
 pub(crate) use state_implementation;
 
@@ -323,6 +289,20 @@ mod test {
         pub fn with_lifecycle<'a>(&self, _n: &'a u32) {}
         #[allow(dead_code)]
         pub fn with_type<T>(&self, _n: &T) {}
+        #[allow(dead_code)]
+        pub fn with_type_and_where<T>(&self, _n: &T)
+        where
+            T: Copy,
+        {
+        }
+        #[allow(dead_code)]
+        pub fn with_type_and_bound<T: Copy>(&self, _n: &T) {}
+        #[allow(dead_code)]
+        pub fn with_multiple_types_and_bound_and_where<T: Copy, U>(&self, _n: &T)
+        where
+            U: Copy,
+        {
+        }
         #[allow(dead_code, clippy::needless_lifetimes)]
         pub fn with_lifecycle_and_type<'a, T>(&self, _n: &'a T) {}
         #[allow(dead_code, clippy::needless_lifetimes)]
