@@ -386,7 +386,7 @@ pub mod processed {
                             // inconsistencies like this are expected.
                             eprintln!(
                               "[stderr] Process {:?} refers (directly or indirectly) to unknown VMO {}",
-                              process, vmo_koid
+                              process.koid, vmo_koid
                             );
                             break;
                         }
