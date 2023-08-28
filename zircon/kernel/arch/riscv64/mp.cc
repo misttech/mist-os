@@ -154,6 +154,11 @@ void riscv64_mp_early_init_percpu(uint32_t hart_id, cpu_num_t cpu_num) {
   wmb();
 }
 
+uint32_t arch_cpu_num_to_hart_id(cpu_num_t cpu_num) {
+  DEBUG_ASSERT(cpu_num < ktl::size(cpu_to_hart_map));
+  return cpu_to_hart_map[cpu_num];
+}
+
 void arch_mp_init_percpu() { interrupt_init_percpu(); }
 
 void arch_flush_state_and_halt(Event* flush_done) {

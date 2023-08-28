@@ -136,6 +136,9 @@ uint32_t riscv64_boot_hart_id();
 zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id);
 extern "C" void riscv64_secondary_entry_asm();
 
+// Translate a CPU number to the hart ID of the CPU.
+uint32_t arch_cpu_num_to_hart_id(cpu_num_t cpu_num);
+
 #endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_

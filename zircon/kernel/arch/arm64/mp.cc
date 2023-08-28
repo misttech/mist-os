@@ -70,6 +70,11 @@ cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr) {
   return INVALID_CPU;
 }
 
+uint64_t arch_cpu_num_to_mpidr(cpu_num_t cpu_num) {
+  DEBUG_ASSERT(cpu_num < ktl::size(arm64_cpu_list));
+  return arm64_cpu_list[cpu_num];
+}
+
 // do the 'slow' lookup by mpidr to cpu number
 static cpu_num_t arch_curr_cpu_num_slow() {
   uint64_t mpidr = __arm_rsr64("mpidr_el1");

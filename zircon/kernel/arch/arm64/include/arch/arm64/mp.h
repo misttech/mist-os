@@ -131,6 +131,9 @@ inline uint arch_cpu_num_to_cpu_id(cpu_num_t cpu) {
   return arm64_cpu_cpu_ids[cpu];
 }
 
+// Translate a CPU number back to the MPIDR of the CPU.
+uint64_t arch_cpu_num_to_mpidr(cpu_num_t cpu_num);
+
 // translate mpidr to cpu number
 cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr);
 
