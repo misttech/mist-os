@@ -458,6 +458,7 @@
                 "ProcPidFile.SubprocessZombie",
                 "ProcPidFile.SubprocessExited",
                 "ProcTask.TaskDirHasCorrectMetadata",
+                "ProcTask.VerifyTaskChildren",
                 "ProcTask.VerifyTaskDirNlinks",
                 "ProcSysKernelHostname.Exists",
                 "ProcSysKernelHostname.MatchesUname",
@@ -465,6 +466,7 @@
                 "ProcSysVmMmapMinAddr.HasNumericValue",
                 "ProcSysVmOvercommitMemory.HasNumericValue",
                 "ProcFilesystems.Bug65172365",
+                "ProcFilesystems.ReadCapLastCap",
                 "Proc.GetdentsEnoent",
                 "Proc.PidTidIOAccounting",
                 "ProcPidMem.DifferentUserAttached",
@@ -1058,10 +1060,6 @@
 
                 // TODO(fxbug.dev/128870): Investigate failure on arm.
                 "SigstopTest.RestartSyscall",
-
-                // New failing gvisor test. Skip it to allow roller to pass.
-                "ProcTask.VerifyTaskChildren",
-                "ProcFilesystems.ReadCapLastCap",
 
                 // Panic on elf load
                 "InterpreterScriptTest.MaxRecursion",
