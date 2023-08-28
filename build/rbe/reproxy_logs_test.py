@@ -77,6 +77,37 @@ class ReproxyLogTests(unittest.TestCase):
         diffs = list(log1.diff_by_outputs(log2, _digests_equal))
         self.assertEqual(diffs, [(output, record1, record2)])
 
+    def test_bandwidth_no_remote_metadata(self):
+        record = log_pb2.LogRecord()
+        # no remote metadata
+        log_dump = log_pb2.LogDump(records=[record])
+        log = reproxy_logs.ReproxyLog(log_dump)
+        download_bytes, upload_bytes = log.bandwidth_summary()
+        self.assertEqual(download_bytes, 0)
+        self.assertEqual(upload_bytes, 0)
+
+    def test_bandwidth_no_upload_download(self):
+        record = log_pb2.LogRecord()
+        record.remote_metadata.action_digest = 'ccddcdcdcdd/13'
+        log_dump = log_pb2.LogDump(records=[record])
+        log = reproxy_logs.ReproxyLog(log_dump)
+        download_bytes, upload_bytes = log.bandwidth_summary()
+        self.assertEqual(download_bytes, 0)
+        self.assertEqual(upload_bytes, 0)
+
+    def test_bandwidth_nonzero(self):
+        record1 = log_pb2.LogRecord()
+        record1.remote_metadata.real_bytes_downloaded = 100
+        record1.remote_metadata.real_bytes_uploaded = 10
+        record2 = log_pb2.LogRecord()
+        record2.remote_metadata.real_bytes_downloaded = 20
+        record2.remote_metadata.real_bytes_uploaded = 5
+        log_dump = log_pb2.LogDump(records=[record1, record2])
+        log = reproxy_logs.ReproxyLog(log_dump)
+        download_bytes, upload_bytes = log.bandwidth_summary()
+        self.assertEqual(download_bytes, 120)
+        self.assertEqual(upload_bytes, 15)
+
 
 class SetupLogdirForLogDumpTest(unittest.TestCase):
 
@@ -193,6 +224,28 @@ class MainTests(unittest.TestCase):
             status = reproxy_logs.main(
                 ['output_file_digest', '--log', 'log.rrpl', '--path', path1])
 
+        self.assertEqual(status, 0)
+        mock_multi_parse.assert_called_once()
+
+    def test_bandwidth(self):
+        up = 33
+        down = 999
+        record = log_pb2.LogRecord()
+        record.remote_metadata.real_bytes_uploaded = up
+        record.remote_metadata.real_bytes_downloaded = down
+
+        log_dump = log_pb2.LogDump(records=[record])
+        log = reproxy_logs.ReproxyLog(log_dump)
+
+        result = io.StringIO()
+        with mock.patch.object(reproxy_logs, 'parse_log',
+                               return_value=log) as mock_multi_parse:
+            with contextlib.redirect_stdout(result):
+                status = reproxy_logs.main(['bandwidth', 'log.rrpl'])
+
+        self.assertEqual(
+            result.getvalue(),
+            f'total_download_bytes = {down}\ntotal_upload_bytes   = {up}\n')
         self.assertEqual(status, 0)
         mock_multi_parse.assert_called_once()
 

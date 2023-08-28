@@ -55,6 +55,7 @@ More details can be found by running with `--help`.
 *   `reproxy_logs.sh`: subcommand utility
     *   `diff`: report meaningful difference between two reproxy logs
     *   `output_file_digest`: lookup the digest of a remote built artifact
+    *   `bandwidth`: report total download and upload bytes from reproxy log
 
 All tools have more detailed usage with `--help`.
 

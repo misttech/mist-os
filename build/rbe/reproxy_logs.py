@@ -108,6 +108,15 @@ class ReproxyLog(object):
             for p in common_outputs:
                 visited_outputs.add(p)
 
+    def bandwidth_summary(self) -> Tuple[int, int]:
+        total_upload_bytes = 0
+        total_download_bytes = 0
+        for record in self.proto.records:
+            if record.HasField('remote_metadata'):
+                total_upload_bytes += record.remote_metadata.real_bytes_uploaded
+                total_download_bytes += record.remote_metadata.real_bytes_downloaded
+        return total_download_bytes, total_upload_bytes
+
 
 def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
     """Automatically setup a log dir for logdump, if needed.
@@ -298,6 +307,18 @@ def lookup_output_file_digest_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def bandwidth_command(args: argparse.Namespace) -> int:
+    log = parse_log(
+        log_path=args.log,
+        reclient_bindir=fuchsia.RECLIENT_BINDIR,
+        verbose=False,
+    )
+    download_bytes, upload_bytes = log.bandwidth_summary()
+    print(f"total_download_bytes = {download_bytes}")
+    print(f"total_upload_bytes   = {upload_bytes}")
+    return 0
+
+
 def _main_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
@@ -341,6 +362,18 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         help="Path under the build output directory to lookup.",
         metavar="OUTPUT_PATH",
         required=True,
+    )
+
+    bandwidth_parser = subparsers.add_parser(
+        'bandwidth',
+        help="prints total download and upload",
+    )
+    bandwidth_parser.set_defaults(func=bandwidth_command)
+    bandwidth_parser.add_argument(
+        "log",
+        type=Path,
+        help="reproxy log",
+        metavar="PATH",
     )
 
     return parser
