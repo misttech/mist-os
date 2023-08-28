@@ -45,6 +45,18 @@ impl<T> Mutex<T> {
         let Self(mutex) = self;
         mutex.into_inner().expect("unexpectedly poisoned")
     }
+
+    /// Returns a mutable reference to the underlying data.
+    ///
+    /// Since this call borrows the [`Mutex`] mutably, no actual locking needs
+    /// to take place. See [`std::sync::Mutex::get_mut`] for more details.
+    #[inline]
+    // TODO(https://github.com/tokio-rs/loom/pull/322): remove the disable for
+    // loom once loom's lock type supports the method.
+    #[cfg(not(loom))]
+    pub fn get_mut(&mut self) -> &mut T {
+        self.0.get_mut().expect("unexpectedly poisoned")
+    }
 }
 
 /// A [`std::sync::RwLock`] assuming lock poisoning will never occur.

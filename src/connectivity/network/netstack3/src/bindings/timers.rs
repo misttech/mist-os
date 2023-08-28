@@ -625,6 +625,24 @@ where
         assert_eq!(info.id, id);
         Ok(external_id)
     }
+
+    /// Stops the timer dispatcher.
+    ///
+    /// The task created in [`TimerDispatcher::spawn`] can be joined after
+    /// calling `stop`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this `TimerDispatcher` hasn't been spawned or if `stop` was
+    /// already called on it.
+    pub(crate) fn stop(&self) {
+        let Self { inner } = self;
+        let mut inner = inner.write();
+        let TimerDispatcherInner { timer_ids: _, timers: _, next_id: _, futures_sender } =
+            inner.deref_mut();
+        let _: mpsc::UnboundedSender<_> =
+            futures_sender.take().expect("timer dispatcher not running");
+    }
 }
 
 #[cfg(test)]
@@ -633,39 +651,73 @@ mod tests {
     use crate::bindings::integration_tests::set_logger_for_test;
     use assert_matches::assert_matches;
     use futures::{channel::mpsc, Future, StreamExt};
+    use netstack3_core::sync::Mutex;
     use std::{sync::Arc, task::Poll};
     use test_case::test_case;
 
     type TestDispatcher = TimerDispatcher<usize>;
 
+    struct TestContextInner {
+        dispatcher: TestDispatcher,
+        fired: mpsc::UnboundedSender<usize>,
+        /// The task ends up with a clone of the context itself so we need to do
+        /// internal mutability here.
+        task: Mutex<Option<fasync::Task<()>>>,
+    }
+
+    impl Drop for TestContextInner {
+        fn drop(&mut self) {
+            let task = self.task.get_mut().take();
+            if task.is_some() {
+                panic!("dropped TestContext without joining task")
+            }
+        }
+    }
     #[derive(Clone)]
     struct TestContext {
-        dispatcher: Arc<TestDispatcher>,
-        fired: mpsc::UnboundedSender<usize>,
+        inner: Arc<TestContextInner>,
     }
 
     impl TimerHandler<usize> for TestContext {
         fn handle_expired_timer(&mut self, timer: usize) {
-            self.fired.unbounded_send(timer).expect("Can't fire timer")
+            self.inner.fired.unbounded_send(timer).expect("Can't fire timer")
         }
         fn get_timer_dispatcher(&mut self) -> &TimerDispatcher<usize> {
-            &self.dispatcher
+            &self.inner.dispatcher
         }
     }
 
     impl TestContext {
         fn new() -> (Self, mpsc::UnboundedReceiver<usize>) {
             let (fired, receiver) = mpsc::unbounded();
-            let this = TestContext { dispatcher: TestDispatcher::default().into(), fired };
-            let task = this.dispatcher.spawn(this.clone());
-            // TODO(https://fxbug.dev/132457): Don't detach this task once the
-            // timer task has a clean shutdown signal.
-            task.detach();
+            let this = TestContext {
+                inner: Arc::new(TestContextInner {
+                    dispatcher: TestDispatcher::default().into(),
+                    fired,
+                    task: Mutex::new(None),
+                }),
+            };
+            let task = this.inner.dispatcher.spawn(this.clone());
+            *this.inner.task.lock() = Some(task);
             (this, receiver)
         }
 
+        async fn shutdown(self) {
+            let task = self.inner.task.lock().take().unwrap();
+            self.inner.dispatcher.stop();
+            task.await;
+        }
+
+        fn dispatcher(&self) -> &TimerDispatcher<usize> {
+            &self.inner.dispatcher
+        }
+
+        fn shutdown_in_executor((this, mut executor): (Self, fasync::TestExecutor)) {
+            run_in_executor(&mut executor, this.shutdown())
+        }
+
         fn with_disp_sync<R, F: FnOnce(&TestDispatcher) -> R>(&self, f: F) -> R {
-            f(&self.dispatcher)
+            f(&self.inner.dispatcher)
         }
     }
 
@@ -736,6 +788,7 @@ mod tests {
         assert_eq!(super::calc_fire_instant(req_time), want_time);
     }
 
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test_case(fasync::Time::from_nanos(0); "zero")]
     #[test_case(fasync::Time::from_nanos(GRANULARITY.into_nanos()); "non-zero")]
     fn test_timers_fire(initial_time: fasync::Time) {
@@ -764,7 +817,7 @@ mod tests {
             let mut id = 1;
             for batch in batches {
                 for instant in batch {
-                    assert_eq!(d.dispatcher.schedule_timer(id, instant), None);
+                    assert_eq!(d.dispatcher().schedule_timer(id, instant), None);
                     id += 1;
                 }
             }
@@ -784,15 +837,18 @@ mod tests {
 
             first_id = next_first_id;
         }
+
+        (t, executor)
     }
 
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
     fn test_get_scheduled_instant() {
         set_logger_for_test();
-        let mut _executor = new_test_executor();
+        let executor = new_test_executor();
         let (t, _) = TestContext::new();
 
-        let d = &t.dispatcher;
+        let d = t.dispatcher();
 
         // Timer 1 is scheduled.
         let time1 = time_from_now(1);
@@ -814,8 +870,11 @@ mod tests {
 
         // Timer 2 should still be scheduled.
         assert_eq!(d.scheduled_time(&2).unwrap(), time2);
+
+        (t, executor)
     }
 
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
     fn test_cancel() {
         set_logger_for_test();
@@ -852,8 +911,11 @@ mod tests {
         executor.set_fake_time(time3.0);
         let r = run_in_executor(&mut executor, rcv.next()).unwrap();
         assert_eq!(r, 3);
+
+        (t, executor)
     }
 
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
     fn test_reschedule() {
         set_logger_for_test();
@@ -888,8 +950,11 @@ mod tests {
         executor.set_fake_time(resched2.0);
         assert_eq!(run_in_executor(&mut executor, rcv.next()).unwrap(), 1);
         assert_eq!(run_in_executor(&mut executor, rcv.next()).unwrap(), 2);
+
+        (t, executor)
     }
 
+    #[fixture::teardown(TestContext::shutdown_in_executor)]
     #[test]
     fn test_cancel_with() {
         set_logger_for_test();
@@ -913,5 +978,7 @@ mod tests {
         // get the timer and assert that it is the timer with id == 2.
         let r = run_in_executor(&mut executor, rcv.next()).unwrap();
         assert_eq!(r, 2);
+
+        (t, executor)
     }
 }

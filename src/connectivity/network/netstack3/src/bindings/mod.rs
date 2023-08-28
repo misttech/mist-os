@@ -1012,6 +1012,10 @@ impl NetstackSeed {
                 std::task::Poll::Ready(None)
             }));
 
+        // Keep a clone of Ctx around for teardown before moving it to the
+        // services future.
+        let teardown_ctx = netstack.ctx.clone();
+
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
         // `Future` returned by this function fails to implement `Send` with the
@@ -1119,5 +1123,7 @@ impl NetstackSeed {
 
         // TODO(https://fxbug.dev/132457): Signal the long running tasks and
         // join them all here.
+        let ctx = teardown_ctx;
+        ctx.non_sync_ctx().timers.stop();
     }
 }
