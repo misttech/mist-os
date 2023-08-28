@@ -64,6 +64,32 @@ bool sbi_extension_present(sbi_extension ext) {
 
 }  // anonymous namespace
 
+zx::result<power_cpu_state> sbi_get_cpu_state(uint64_t hart_id) {
+  arch::RiscvSbiRet ret = arch::RiscvSbi::HartGetStatus(static_cast<arch::HartId>(hart_id));
+  if (ret.error == arch::RiscvSbiError::kInvalidParam) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  switch (static_cast<arch::RiscvSbiHartState>(ret.value)) {
+    case arch::RiscvSbiHartState::kStarted:
+      return zx::success(power_cpu_state::STARTED);
+    case arch::RiscvSbiHartState::kStopped:
+      return zx::success(power_cpu_state::STOPPED);
+    case arch::RiscvSbiHartState::kStartPending:
+      return zx::success(power_cpu_state::START_PENDING);
+    case arch::RiscvSbiHartState::kStopPending:
+      return zx::success(power_cpu_state::STOP_PENDING);
+    case arch::RiscvSbiHartState::kSuspended:
+      return zx::success(power_cpu_state::SUSPENDED);
+    case arch::RiscvSbiHartState::kSuspendPending:
+      return zx::success(power_cpu_state::SUSPEND_PENDING);
+    case arch::RiscvSbiHartState::kResumePending:
+      return zx::success(power_cpu_state::RESUME_PENDING);
+    default:
+      // We should never reach here.
+      return zx::error(ZX_ERR_INTERNAL);
+  }
+}
+
 void riscv64_sbi_early_init() {
   // Probe to see what extensions are present
   auto probe_and_set_extension = [](sbi_extension extension_bit, const char *,
@@ -96,7 +122,9 @@ void riscv64_sbi_early_init() {
       // Null the cpu on/off with default hooks and use sbi directly for now.
       // Their api isn't expressive enough for the sbi arguments.
       .cpu_off = []() -> uint32_t { PANIC_UNIMPLEMENTED; },
-      .cpu_on = [](uint64_t mpid, paddr_t entry) -> uint32_t { PANIC_UNIMPLEMENTED; }};
+      .cpu_on = [](uint64_t mpid, paddr_t entry) -> uint32_t { PANIC_UNIMPLEMENTED; },
+      .get_cpu_state = sbi_get_cpu_state,
+  };
 
   pdev_register_power(&sbi_ops);
 }
