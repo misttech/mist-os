@@ -15,7 +15,7 @@ namespace fdf_testing {
 // It provides the server backing the driver's incoming namespace. This incoming namespace can
 // be customized by the user through the |incoming_directory| method. The |TestEnvironment|
 // uses a fdf::OutgoingDirectory which can support driver transport. Therefore it must be used
-// with an fdf_dispatcher, which can be gotten using |fdf::TestSynchronizedDispatcher|.
+// with an fdf_dispatcher.
 //
 // # Thread safety
 //
@@ -23,20 +23,11 @@ namespace fdf_testing {
 // See
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 //
-// If the dispatcher used for it is a default dispatcher, the TestEnvironment does not need to be
-// wrapped in a DispatcherBound. Example:
-// ```
-// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherDefault};
-// fdf_testing::TestEnvironment test_environment_;
-// ```
+// If the dispatcher used for it is the foreground dispatcher, the TestEnvironment does not need to
+// be wrapped in a DispatcherBound.
 //
-// If the dispatcher is not the default dispatcher of the main thread, the suggestion is to wrap
-// this inside of an |async_patterns::TestDispatcherBound|. Example:
-// ```
-// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
-// async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
-//      test_env_dispatcher_.dispatcher(), std::in_place};
-// ```
+// If the dispatcher is a background dispatcher, the suggestion is to wrap this inside of an
+// |async_patterns::TestDispatcherBound|.
 class TestEnvironment {
  public:
   explicit TestEnvironment(fdf_dispatcher_t* dispatcher = nullptr);

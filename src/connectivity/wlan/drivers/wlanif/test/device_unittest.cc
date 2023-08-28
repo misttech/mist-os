@@ -48,8 +48,8 @@ struct WlanifDeviceTest : public ::zxtest::Test,
 
     device_ = new wlanif::Device(parent_.get(), std::move(endpoints_fullmac_impl->client));
 
-    fdf::BindServer(server_dispatcher_.driver_dispatcher().get(),
-                    std::move(endpoints_fullmac_impl->server), this);
+    auto server_dispatcher = fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
+    fdf::BindServer(server_dispatcher->get(), std::move(endpoints_fullmac_impl->server), this);
   }
 
   void TearDown() override { mock_ddk::ReleaseFlaggedDevices(device_->zxdev()); }
@@ -127,8 +127,6 @@ struct WlanifDeviceTest : public ::zxtest::Test,
   }
 
   std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
-
-  fdf_internal::TestSynchronizedDispatcher server_dispatcher_{fdf_internal::kDispatcherManaged};
 
   // Client to fire WlanFullmacImplIfc FIDL requests to wlanif driver.
   fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> client_;

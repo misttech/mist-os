@@ -33,20 +33,11 @@ namespace fdf_testing {
 // See
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 //
-// If the dispatcher used for it is a default dispatcher, the TestNode does not need to be
-// wrapped in a DispatcherBound. Example:
-// ```
-// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherDefault};
-// fdf_testing::TestNode node_server_{"root"};
-// ```
+// If the dispatcher used for it is the foreground dispatcher, the TestNode does not need to be
+// wrapped in a DispatcherBound.
 //
-// If the dispatcher is not the default dispatcher of the main thread, the suggestion is to wrap
-// this inside of an |async_patterns::TestDispatcherBound|. Example:
-// ```
-// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
-// async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
-//      test_env_dispatcher_.dispatcher(), std::in_place, std::string("root")};
-// ```
+// If the dispatcher is a background dispatcher, the suggestion is to wrap this inside of an
+// |async_patterns::TestDispatcherBound|.
 class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                  public fidl::WireServer<fuchsia_driver_framework::Node> {
  public:

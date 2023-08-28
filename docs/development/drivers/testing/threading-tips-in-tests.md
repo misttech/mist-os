@@ -37,30 +37,29 @@ TEST(MyRegister, Read) {
 }
 ```
 
-Example involving `fdf::TestSynchronizedDispatcher` on the main thread:
+Example involving `fdf_testing::DriverRuntime`'s foreground dispatcher:
 
 ```cpp {:.devsite-disable-click-to-copy}
 TEST(MyRegister, Read) {
-  fdf::TestSynchronizedDispatcher test_driver_dispatcher_{
-      fdf::kDispatcherDefault};
+  // Creates a foreground driver dispatcher.
+  fdf_testing::DriverRuntime driver_runtime;
   // For illustration purposes, this is the thread-unsafe type being tested.
   MyRegister reg{dispatcher.dispatcher()};
   // Use the object on the current thread.
   reg.SetValue(123);
   // Run any async work scheduled by the object, also on the current thread.
-  ASSERT_OK(fdf_testing_run_until_idle());
+  driver_runtime.RunUntilIdle();
   // Read from the object on the current thread.
   EXPECT_EQ(obj.GetValue(), 123);
   ASSERT_OK(dispatcher.Stop());
 }
 ```
 
-Note that `fdf::TestSynchronizedDispatcher` may also be driven by driver runtime
-managed thread pool if a driver needs to make synchronous calls. Objects
-associated with driver dispatchers backed by the thread pool should not be
-accessed from the main thread. As a simple rule, if the associated dispatcher is
-not started with `kDispatcherDefault`, then it may not be running on the main
-thread.
+Note that `fdf_testing::DriverRuntime` can also create background driver
+dispatchers that are driven by the driver runtime's managed thread pool.
+This is done through the `StartBackgroundDispatcher` method.
+Thread-unsafe objects associated with these background driver dispatchers
+should not be accessed directly from the main thread.
 
 When using the async objects from a single thread, their contained
 `async::synchronization_checker` will not panic.
@@ -123,21 +122,20 @@ with `TestDispatcherBound` and have the test fixture class used on the main
 test thread. The `TestDispatcherBound` objects will become members of the test
 fixture class.
 
-Example involving `fdf::TestSynchronizedDispatcher`:
+Example involving `fdf_testing::DriverRuntime`:
 
 In drivers, often the blocking work itself happens inside a driver. For example,
 the blocking work may involve a synchronous FIDL call made by the driver, over a
 FIDL protocol that is faked out during testing. In the following example, the
 `BlockingIO` class represents the driver, and the `FakeRegister` class
 represents a fake implementation of some FIDL protocol used by `BlockingIO`.
-When `FakeRegister` does not speak FIDL over driver transports, an `async::Loop`
-is a good way to isolate it to separate thread such that we can make the
-blocking call from the main thread.
 
 ```cpp {:.devsite-disable-click-to-copy}
 // Here is the bare skeleton of a driver object that makes a synchronous call.
 class BlockingIO {
  public:
+  BlockingIO(): dispatcher_(fdf_dispatcher_get_current_dispatcher()) {}
+
   // Let's say this function blocks to update the value stored in a
   // |FakeRegister|.
   void SetValueInABlockingWay(int value);
@@ -146,30 +144,34 @@ class BlockingIO {
 };
 
 TEST(BlockingIO, Read) {
-  // Configure the loop to register itself as the dispatcher for the
-  // loop thread, such that the |FakeRegister| constructor may use
-  // `async_get_default_dispatcher()` to obtain the loop dispatcher.
-  async::Loop register_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  register_loop.StartThread();
+  // Creates a foreground driver dispatcher.
+  fdf_testing::DriverRuntime driver_runtime;
 
-  // Construct the |FakeRegister| on the loop thread.
+  // Create a background dispatcher for the |FakeRegister|.
+  // This way it is safe to call into it synchronously from the |BlockingIO|.
+  fdf::UnownedSynchronizedDispatcher register_dispatcher =
+      driver_runtime.StartBackgroundDispatcher();
+
+  // Construct the |FakeRegister| on the background dispatcher.
+  // The |FakeRegister| constructor may use
+  // `fdf_dispatcher_get_current_dispatcher()` to obtain the dispatcher.
   async_patterns::TestDispatcherBound<FakeRegister> reg{
-      register_loop.dispatcher(), std::in_place};
+      register_dispatcher.async_dispatcher(), std::in_place};
 
-  // Start a driver dispatcher for |BlockingIO| and register it as the
-  // dispatcher for the main thread.
-  fdf::TestSynchronizedDispatcher driver_dispatcher{fdf::kDispatcherDefault};
+  // Construct the |BlockingIO| on the foreground driver dispatcher.
+  BlockingIO io;
 
-  // Construct the |BlockingIO| on the main thread.
-  BlockingIO io{driver_dispatcher.dispatcher()};
-
-  // Call the blocking function. The |register_loop| will respond to it in the
+  // Call the blocking function. The |register_dispatcher| will respond to it in the
   // background.
   io.SetValueInABlockingWay(123);
 
   // Check the value from the fake.
-  // |GetValue| returns an |int|; |AsyncCall| will proxy that back.
-  EXPECT_EQ(fdf::WaitFor(reg.AsyncCall(&FakeRegister::GetValue).ToFuture()), 123);
+  // |GetValue| returns an |int|; |SyncCall| will proxy that back.
+  // |PerformBlockingWork| will ensure the foreground dispatcher is running while
+  // the blocking work runs in a new temporary background thread.
+  EXPECT_EQ(driver_runtime.PerformBlockingWork([&reg]() {
+    return reg.SyncCall(&FakeRegister::GetValue);
+  }), 123);
 }
 ```
 
@@ -178,21 +180,18 @@ no need to go through a `TestDispatcherBound`. We can safely use the
 `BlockingIO` driver object, including making the `SetValueInABlockingWay` call,
 from the main thread.
 
-When the `FakeRegister` fake object lives on the `register_loop` thread, we need
+When the `FakeRegister` fake object lives on the `register_dispatcher`, we need
 to use a `TestDispatcherBound` to safely interact with it from the main thread.
-Instead of `SyncCall` which blocks without doing anything else, here we find the
-`fdf::WaitFor(object.AsyncCall(&SomeMethod).ToFuture())` pattern. `fdf::WaitFor`
-can wait on a `std::future` while concurrently running driver dispatchers backed
-by the main thread. Running those dispatchers will be necessary if `SomeMethod`
-involves talking to an async object associated with one of those dispatchers. In
-some driver dispatcher configurations, all dispatchers will be backed by threads
-from a managed thread pool, in which case you can use `SyncCall` while the
-thread pool works in the background. The `AsyncCall` and `fdf::WaitFor`
-combination still works in those configurations, so you may default to that if
-in doubt.
 
-Blocking on the future directly, i.e.
-`object.AsyncCall(&SomeMethod).ToFuture().get()`, is equivalent to `SyncCall`.
+Note we have the `SyncCall` wrapped with a `driver_runtime.PerformBlockingWork`.
+What this does for us is run the foreground driver dispatcher on the main thread,
+while running the `SyncCall` on a new temporary thread in the background.
+Running the foreground dispatcher will be necessary if the method running on the
+dispatcher bound object, in this case `GetValue`, involves talking to an object
+associated with the foreground dispatcher, here that would be the `BlockingIO`.
+
+If certain that the method getting called does not need the foreground dispatcher
+running in order to return, then a direct `SyncCall` is ok to use.
 
 ### Granularity of DispatcherBound objects
 
