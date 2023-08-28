@@ -490,6 +490,12 @@
             to: "#session",
             availability: "same_as_target",
         },
+        {
+            directory: [ "dev-bt-hci" ],
+            from: "parent",
+            to: "#session",
+            availability: "same_as_target",
+        },
 
         // Allow components in the session to restart it (the session).
         {

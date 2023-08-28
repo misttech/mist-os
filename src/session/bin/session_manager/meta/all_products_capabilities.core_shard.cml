@@ -111,9 +111,7 @@
             to: "#session-manager",
         },
         {
-            protocol: [
-                "fuchsia.vsock.Connector"
-            ],
+            protocol: [ "fuchsia.vsock.Connector" ],
             from: "#vsock",
             to: "#session-manager",
         },

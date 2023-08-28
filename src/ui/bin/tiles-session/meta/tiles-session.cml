@@ -92,6 +92,12 @@
             to: "#elements",
             availability: "same_as_target",
         },
+        {
+            directory: "dev-bt-hci",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
 
         // Dependencies for element_manager
         {

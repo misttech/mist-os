@@ -50,6 +50,18 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
+
+        // Used by Bluetooth in Starnix.
+        // TODO(b/296933425): Ideally, we wouldn't need to route this directory to Starnix for BT.
+        // This route should eventually be removed when we can depend solely on Bluetooth FIDL APIs.
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-bt-hci",
+            to: "#session-manager",
+            subdir: "bt-hci",
+            source_availability: "unknown",
+        },
         {
             protocol: "fuchsia.bluetooth.a2dp.AudioMode",
             from: "#bt-a2dp",
