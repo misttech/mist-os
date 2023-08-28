@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        capability::{Capability, Remote},
-        sender::Sender,
-        AnyCapability, AnyCloneCapability, TryIntoOpen,
-    },
+    crate::{AnyCast, Capability, Remote, Sender},
     fidl::{
         endpoints::{create_proxy, ProtocolMarker, Proxy, RequestStream},
         AsyncChannel,
@@ -46,7 +42,8 @@ impl Message {
 }
 
 /// A capability that represents a Zircon handle.
-#[derive(Debug, Clone)]
+#[derive(Capability, Debug, Clone)]
+#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Receiver {
     inner: Arc<Mutex<Peekable<mpsc::UnboundedReceiver<Message>>>>,
     sender: mpsc::UnboundedSender<Message>,
@@ -59,7 +56,7 @@ impl Receiver {
     }
 
     pub fn new_sender(&self, moniker: Moniker) -> Sender {
-        Sender { inner: self.sender.clone(), moniker: moniker }
+        Sender { inner: self.sender.clone(), moniker }
     }
 
     pub async fn receive(&self) -> Message {
@@ -72,14 +69,11 @@ impl Receiver {
     }
 }
 
-impl Capability for Receiver {}
-
 impl Remote for Receiver {
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let (receiver_proxy, receiver_server) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
         let fut = async move {
-            let receiver = *self;
-            receiver.handle_receiver(receiver_proxy).await;
+            self.handle_receiver(receiver_proxy).await;
         };
         (receiver_server.into_handle(), Some(fut.boxed()))
     }
@@ -101,39 +95,5 @@ impl Receiver {
                 }
             }
         }
-    }
-}
-
-impl TryIntoOpen for Receiver {}
-
-impl<'a> TryFrom<&'a AnyCapability> for &'a Receiver {
-    type Error = ();
-
-    fn try_from(value: &AnyCapability) -> Result<&Receiver, ()> {
-        value.as_any().downcast_ref::<Receiver>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a mut AnyCapability> for &'a mut Receiver {
-    type Error = ();
-
-    fn try_from(value: &mut AnyCapability) -> Result<&mut Receiver, ()> {
-        value.as_any_mut().downcast_mut::<Receiver>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a AnyCloneCapability> for &'a Receiver {
-    type Error = ();
-
-    fn try_from(value: &AnyCloneCapability) -> Result<&Receiver, ()> {
-        value.as_any().downcast_ref::<Receiver>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a mut AnyCloneCapability> for &'a mut Receiver {
-    type Error = ();
-
-    fn try_from(value: &mut AnyCloneCapability) -> Result<&mut Receiver, ()> {
-        value.as_any_mut().downcast_mut::<Receiver>().ok_or(())
     }
 }

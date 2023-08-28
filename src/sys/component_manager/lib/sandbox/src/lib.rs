@@ -4,24 +4,25 @@
 
 //! Component sandbox traits and capability types.
 
-mod capability;
-pub mod data;
-pub mod dict;
-pub mod handle;
-pub mod open;
-pub mod receiver;
-pub mod sender;
+extern crate self as sandbox;
 
-pub use self::capability::{
-    AnyCapability, AnyCloneCapability, Capability, CloneCapability, Remote, TryIntoOpen,
-    TryIntoOpenError,
-};
-pub use self::data::AsData;
-pub use self::dict::SomeDict;
-pub use self::handle::{CloneHandle, Handle};
+#[doc(hidden)]
+pub use sandbox_macro::Capability;
+
+mod any;
+mod capability;
+mod data;
+mod dict;
+mod handle;
+mod open;
+mod receiver;
+mod sender;
+
+pub use self::any::{AnyCapability, AnyCast};
+pub use self::capability::{Capability, Convert, Remote, TryClone};
+pub use self::data::Data;
+pub use self::dict::{Dict, Key as DictKey};
+pub use self::handle::Handle;
 pub use self::open::Open;
 pub use receiver::{Message, Receiver};
 pub use sender::Sender;
-
-pub type CloneDict = dict::Dict<AnyCloneCapability>;
-pub type Dict = dict::Dict<AnyCapability>;

@@ -2,82 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        handle::{CloneHandle, Handle},
-        open::Open,
-    },
-    dyn_clone::{clone_trait_object, DynClone},
+    crate::{AnyCapability, AnyCast},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
     std::fmt::Debug,
-    thiserror::Error,
 };
 
 /// The capability trait, implemented by all capabilities.
-pub trait Capability: crate_local::AnyCast + Remote + TryIntoOpen + Debug + Send + Sync {}
-
-/// Trait object used to hold any kind of capability.
-pub type AnyCapability = Box<dyn Capability>;
-
-impl<T> From<T> for AnyCapability
-where
-    T: zx::HandleBased,
+pub trait Capability:
+    AnyCast + TryFrom<AnyCapability> + Convert + Remote + TryClone + Debug + Send + Sync
 {
-    fn from(value: T) -> Self {
-        Box::new(Handle::from(value.into_handle()))
-    }
-}
-
-/// A Capability that can be cloned.
-pub trait CloneCapability: Capability + DynClone {
-    // TODO: When upcasting is stable in Rust, we can remove this helper.
-    // https://github.com/rust-lang/rust/issues/65991.
-    fn into_any_capability(self: Box<Self>) -> AnyCapability;
-}
-
-clone_trait_object!(CloneCapability);
-
-impl<T: Capability + Clone> CloneCapability for T {
-    fn into_any_capability(self: Box<Self>) -> AnyCapability {
-        self
-    }
-}
-
-pub type AnyCloneCapability = Box<dyn CloneCapability>;
-
-impl TryFrom<zx::Handle> for AnyCloneCapability {
-    type Error = zx::Status;
-
-    fn try_from(value: zx::Handle) -> Result<Self, Self::Error> {
-        // TODO(fxbug.dev/122024): Convert Remote trait handles back to the original type
-        Ok(Box::new(CloneHandle::try_from(value)?))
-    }
-}
-
-pub(crate) mod crate_local {
-    use std::any::Any;
-
-    /// Types implementing the [AnyCast] trait will be convertible to `dyn Any`.
-    ///
-    /// This trait is only visible to the `cap` crate so that external users are
-    /// prevented from downcasting capabilities.
-    pub trait AnyCast: Any {
-        fn into_any(self: Box<Self>) -> Box<dyn Any>;
-        fn as_any(&self) -> &dyn Any;
-        fn as_any_mut(&mut self) -> &mut dyn Any;
-    }
-
-    impl<T: Any> AnyCast for T {
-        fn into_any(self: Box<Self>) -> Box<dyn Any> {
-            self
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-    }
 }
 
 /// Trait for capabilities that can be transferred as a Zircon handle.
@@ -92,54 +26,17 @@ pub trait Remote {
     /// - If the user drops the future, work backing the handle will be terminated. For example,
     ///   if the framework serves the peer handle to this handle, the peer will be closed.
     /// - If the user drops the handle, the future will complete.
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>);
+    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>);
 }
 
-/// This error is returned when a capability cannot be converted into an [Open] capability.
-#[derive(Error, Debug)]
-pub enum TryIntoOpenError {
-    /// Converting to [Open] involved a string name that is not a valid `fuchsia.io` node name.
-    #[error(
-        "converting to Open involved a string name that is not a valid `fuchsia.io` node name"
-    )]
-    ParseNameError(#[from] vfs::name::ParseNameError),
-
-    /// The capability does not support converting into an [Open] capability.
-    #[error("the capability does not support converting into an Open capability")]
-    DoesNotSupportOpen,
+/// Trait for capabilities that can be converted to another type of capability.
+pub trait Convert {
+    /// Attempt to convert `self` to a capability of type `type_id`.
+    fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()>;
 }
 
-/// This trait is introduced as an extra indirection behind [TryInto<Open>] because
-/// [TryInto] is not object-safe [1]. The type-erased `dyn Capability` will require all
-/// traits behind `Capability` to be object-safe.
-///
-/// [1]: https://doc.rust-lang.org/reference/items/traits.html#object-safety
-pub trait TryIntoOpen {
-    /// Attempt to transform the capability into an [Open] capability, which let us mount it
-    /// as a node inside a `fuchsia.io` directory and open it using `fuchsia.io/Directory.Open`.
-    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
-        Err(TryIntoOpenError::DoesNotSupportOpen)
-    }
-}
-
-impl<T: Into<Open>> TryIntoOpen for T {
-    fn try_into_open(self: Box<Self>) -> Result<Open, TryIntoOpenError> {
-        Ok((*self).into())
-    }
-}
-
-impl TryInto<Open> for AnyCapability {
-    type Error = TryIntoOpenError;
-
-    fn try_into(self: Self) -> Result<Open, Self::Error> {
-        self.try_into_open()
-    }
-}
-
-impl TryInto<Open> for AnyCloneCapability {
-    type Error = TryIntoOpenError;
-
-    fn try_into(self: Self) -> Result<Open, Self::Error> {
-        self.try_into_open()
-    }
+/// Trait for types that can be optionally cloned.
+pub trait TryClone: Sized {
+    /// Attempts to create a copy of the value.
+    fn try_clone(&self) -> Result<Self, ()>;
 }

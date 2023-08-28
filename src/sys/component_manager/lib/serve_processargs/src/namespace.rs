@@ -12,7 +12,7 @@ use {
         FutureExt, StreamExt,
     },
     process_builder::NamespaceEntry,
-    sandbox::{open::Open, AnyCapability, Dict, Remote, TryIntoOpenError},
+    sandbox::{AnyCapability, Dict, Open, Remote},
     std::collections::HashMap,
     std::ffi::CString,
     std::ffi::NulError,
@@ -50,11 +50,7 @@ pub enum NamespaceError {
         "while installing capabilities within the namespace entry `{path}`, \
         failed to convert the namespace entry to Open"
     )]
-    TryIntoOpenError {
-        path: String,
-        #[source]
-        err: TryIntoOpenError,
-    },
+    TryIntoOpenError { path: String },
 }
 
 impl Namespace {
@@ -77,7 +73,7 @@ impl Namespace {
         let c_str = self.namespace_checker.add_parent(path)?;
 
         // If these is no such entry, make an empty dictionary.
-        let dict = self.entries.entry(c_str).or_insert_with(|| {
+        let dict: &mut AnyCapability = self.entries.entry(c_str).or_insert_with(|| {
             let (dict, fut) = make_dict_with_not_found_logging(
                 path.dirname().clone().into(),
                 self.not_found.clone(),
@@ -128,9 +124,8 @@ impl Namespace {
         let mut futures = self.futures;
 
         for (path, cap) in self.entries {
-            let open: Open = cap.try_into().map_err(|e| NamespaceError::TryIntoOpenError {
+            let open: Open = cap.try_into().map_err(|_| NamespaceError::TryIntoOpenError {
                 path: path.to_string_lossy().into_owned(),
-                err: e,
             })?;
             let (client_end, fut) = Box::new(open).to_zx_handle();
 

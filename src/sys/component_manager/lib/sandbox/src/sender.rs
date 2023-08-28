@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        capability::{Capability, Remote},
-        receiver::Message,
-        AnyCapability, AnyCloneCapability, TryIntoOpen,
-    },
+    crate::{receiver::Message, AnyCast, Capability, Remote},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
@@ -17,7 +13,8 @@ use {
 };
 
 /// A capability that represents a Zircon handle.
-#[derive(Debug, Clone)]
+#[derive(Capability, Debug, Clone)]
+#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Sender {
     pub(crate) inner: mpsc::UnboundedSender<Message>,
     /// The moniker of the component this sender was given to
@@ -34,15 +31,12 @@ impl Sender {
     }
 }
 
-impl Capability for Sender {}
-
 impl Remote for Sender {
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+    fn to_zx_handle(mut self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let (sender_client_end, sender_stream) =
             create_request_stream::<fsandbox::SenderMarker>().unwrap();
         let fut = async move {
-            let mut sender = *self;
-            sender.serve_sender(sender_stream).await.expect("failed to serve Sender");
+            self.serve_sender(sender_stream).await.expect("failed to serve Sender");
         };
         (sender_client_end.into_handle(), Some(fut.boxed()))
     }
@@ -72,39 +66,5 @@ impl Sender {
             }
         }
         Ok(())
-    }
-}
-
-impl TryIntoOpen for Sender {}
-
-impl<'a> TryFrom<&'a AnyCapability> for &'a Sender {
-    type Error = ();
-
-    fn try_from(value: &AnyCapability) -> Result<&Sender, ()> {
-        value.as_any().downcast_ref::<Sender>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a mut AnyCapability> for &'a mut Sender {
-    type Error = ();
-
-    fn try_from(value: &mut AnyCapability) -> Result<&mut Sender, ()> {
-        value.as_any_mut().downcast_mut::<Sender>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a AnyCloneCapability> for &'a Sender {
-    type Error = ();
-
-    fn try_from(value: &AnyCloneCapability) -> Result<&Sender, ()> {
-        value.as_any().downcast_ref::<Sender>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a mut AnyCloneCapability> for &'a mut Sender {
-    type Error = ();
-
-    fn try_from(value: &mut AnyCloneCapability) -> Result<&mut Sender, ()> {
-        value.as_any_mut().downcast_mut::<Sender>().ok_or(())
     }
 }

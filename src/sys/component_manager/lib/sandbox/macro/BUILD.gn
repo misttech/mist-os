@@ -1,0 +1,47 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_macro.gni")
+import("//build/rust/rustc_test.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":sandbox-macro-tests" ]
+}
+
+rustc_macro("sandbox-macro") {
+  name = "sandbox_macro"
+  edition = "2021"
+
+  deps = [
+    "//third_party/rust_crates:darling",
+    "//third_party/rust_crates:quote",
+    "//third_party/rust_crates:syn",
+  ]
+
+  sources = [ "src/lib.rs" ]
+
+  visibility = [
+    "//src/sys/component_manager/*",
+    "//src/sys/lib/elf_runner/*",
+  ]
+}
+
+rustc_test("sandbox_macro_tests") {
+  edition = "2021"
+
+  deps = [
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/component_manager/lib/sandbox",
+    "//third_party/rust_crates:futures",
+  ]
+
+  source_root = "tests/test.rs"
+  sources = [ "tests/test.rs" ]
+}
+
+fuchsia_unittest_package("sandbox-macro-tests") {
+  deps = [ ":sandbox_macro_tests" ]
+}

@@ -9,7 +9,7 @@ use {
     namespace::Namespace,
     process_builder::StartupHandle,
     processargs::ProcessArgs,
-    sandbox::{dict::Key, AnyCapability, CloneDict, Dict, SomeDict},
+    sandbox::{AnyCapability, Dict, DictKey},
     std::collections::HashMap,
     std::iter::once,
     thiserror::Error,
@@ -68,7 +68,7 @@ pub enum DeliveryMapEntry {
 /// capability will be delivered to the process. If a [Dict] has a nested [Dict], then there
 /// will be a corresponding nested [DeliveryMapEntry::Dict] containing the [DeliveryMap] for the
 /// capabilities in the nested [Dict].
-pub type DeliveryMap = HashMap<Key, DeliveryMapEntry>;
+pub type DeliveryMap = HashMap<DictKey, DeliveryMapEntry>;
 
 /// Visits `dict` and installs its capabilities into appropriate locations in the
 /// `processargs`, as determined by a `delivery_map`.
@@ -91,18 +91,16 @@ pub fn add_to_processargs(
 
     // Iterate over the delivery map.
     // Take entries away from dict and install them accordingly.
-    visit_map(delivery_map, Box::new(dict), &mut |cap: AnyCapability, delivery: &Delivery| {
-        match delivery {
-            Delivery::NamespacedObject(path) => {
-                namespace.add_object(cap, path).map_err(DeliveryError::NamespaceError)
-            }
-            Delivery::NamespaceEntry(path) => {
-                namespace.add_entry(cap, path).map_err(DeliveryError::NamespaceError)
-            }
-            Delivery::Handle(info) => {
-                processargs.add_handles(once(translate_handle(cap, info, &mut futures)?));
-                Ok(())
-            }
+    visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| match delivery {
+        Delivery::NamespacedObject(path) => {
+            namespace.add_object(cap, path).map_err(DeliveryError::NamespaceError)
+        }
+        Delivery::NamespaceEntry(path) => {
+            namespace.add_entry(cap, path).map_err(DeliveryError::NamespaceError)
+        }
+        Delivery::Handle(info) => {
+            processargs.add_handles(once(translate_handle(cap, info, &mut futures)?));
+            Ok(())
         }
     })?;
 
@@ -120,13 +118,13 @@ pub fn add_to_processargs(
 #[derive(Error, Debug)]
 pub enum DeliveryError {
     #[error("the key `{0}` is not found in the dict")]
-    NotInDict(Key),
+    NotInDict(DictKey),
 
     #[error("wrong type: the delivery map expected `{0}` to be a nested Dict in the dict")]
-    NotADict(Key),
+    NotADict(DictKey),
 
-    #[error("unused capability in dict: `{0}`")]
-    UnusedCapability(Key),
+    #[error("unused capabilities in dict: `{0:?}`")]
+    UnusedCapabilities(Vec<DictKey>),
 
     #[error("handle type `{0:?}` is not allowed to be installed into processargs")]
     UnsupportedHandleType(HandleType),
@@ -152,15 +150,15 @@ fn translate_handle(
 
 fn visit_map(
     map: &DeliveryMap,
-    mut dict: Box<dyn SomeDict>,
+    mut dict: Dict,
     f: &mut impl FnMut(AnyCapability, &Delivery) -> Result<(), DeliveryError>,
 ) -> Result<(), DeliveryError> {
     for (key, entry) in map {
-        match dict.remove(key) {
+        match dict.entries.remove(key) {
             Some(value) => match entry {
                 DeliveryMapEntry::Delivery(delivery) => f(value, delivery)?,
                 DeliveryMapEntry::Dict(sub_map) => {
-                    let nested_dict: Box<dyn SomeDict> =
+                    let nested_dict: Dict =
                         value.try_into().map_err(|_| DeliveryError::NotADict(key.to_owned()))?;
                     visit_map(sub_map, nested_dict, f)?;
                 }
@@ -168,8 +166,9 @@ fn visit_map(
             None => return Err(DeliveryError::NotInDict(key.to_owned())),
         }
     }
-    if let Some(key) = dict.list().into_iter().next() {
-        return Err(DeliveryError::UnusedCapability(key.to_owned()));
+    if !dict.entries.is_empty() {
+        let keys = dict.entries.into_keys().collect();
+        return Err(DeliveryError::UnusedCapabilities(keys));
     }
     Ok(())
 }
@@ -337,14 +336,14 @@ mod tests {
         Ok(())
     }
 
-    /// Test accessing capabilities from a CloneDict inside a Dict.
+    /// Test accessing capabilities from a Dict inside a Dict.
     #[fuchsia::test]
     async fn test_nested_clone_dict() -> Result<()> {
         let (ep0, ep1) = zx::EventPair::create();
 
         let mut processargs = ProcessArgs::new();
 
-        let mut handles = CloneDict::new();
+        let mut handles = Dict::new();
         handles.entries.insert("stdin".to_string(), ep0.into_handle().try_into().unwrap());
         let mut dict = Dict::new();
         dict.entries.insert("handles".to_string(), Box::new(handles));
@@ -411,8 +410,8 @@ mod tests {
 
         assert_matches!(
             add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
-            DeliveryError::UnusedCapability(name)
-            if &name == "stdin"
+            DeliveryError::UnusedCapabilities(keys)
+            if keys == vec![DictKey::from("stdin")]
         );
     }
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{Capability, Remote},
+    crate::{AnyCast, Capability, Remote},
     core::fmt,
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
@@ -51,7 +51,8 @@ use {
 /// [Open] implements [Clone] because logically one agent opening two capabilities
 /// is equivalent to two agents each opening one capability through their respective
 /// clones of the open capability.
-#[derive(Clone)]
+#[derive(Capability, Clone)]
+#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Open {
     open: Arc<OpenFn>,
     entry_type: fio::DirentType,
@@ -70,8 +71,6 @@ impl fmt::Debug for Open {
             .finish()
     }
 }
-
-impl Capability for Open {}
 
 impl Open {
     /// Creates an [Open] capability.
@@ -123,7 +122,7 @@ impl Open {
 
 impl Remote for Open {
     /// Opens the capability with "." path when a request comes from the returned client endpoint.
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let open_flags = self.open_flags;
         let remote = self.into_remote();
         let scope = ExecutionScope::new();
@@ -232,7 +231,7 @@ mod tests {
         );
 
         assert_eq!(OPEN_COUNT.get(), 0);
-        let (client_end, fut) = Box::new(open).to_zx_handle();
+        let (client_end, fut) = open.to_zx_handle();
         zx::Channel::from(client_end)
             .write(&[1], &mut [])
             .expect("should be able to write to the client endpoint");
@@ -261,7 +260,7 @@ mod tests {
         );
 
         assert_eq!(OPEN_COUNT.get(), 0);
-        let (client_end, fut) = Box::new(open).to_zx_handle();
+        let (client_end, fut) = open.to_zx_handle();
         drop(client_end);
         fut.unwrap().await;
         assert_eq!(OPEN_COUNT.get(), 0);
