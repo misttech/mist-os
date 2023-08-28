@@ -1991,8 +1991,9 @@ mod tests {
         };
     }
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn connect_failure<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         // Pass a bad domain.
         let res = proxy
@@ -2020,6 +2021,8 @@ mod tests {
             .unwrap()
             .expect_err("connect fails");
         assert_eq!(res, fposix::Errno::Enetunreach);
+
+        t
     }
 
     declare_tests!(
@@ -2027,8 +2030,9 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn connect<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
         let () = proxy
             .connect(&A::create(A::REMOTE_ADDR, 200))
             .await
@@ -2041,6 +2045,8 @@ mod tests {
             .await
             .unwrap()
             .expect("connect suceeds");
+
+        t
     }
 
     declare_tests!(
@@ -2048,8 +2054,9 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn connect_loopback<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
         let () = proxy
             .connect(&A::create(
                 <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
@@ -2058,14 +2065,17 @@ mod tests {
             .await
             .unwrap()
             .expect("connect succeeds");
+
+        t
     }
 
     declare_tests!(connect_loopback);
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn connect_any<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         // Pass an unspecified remote address. This should be treated as the
         // loopback address.
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         const PORT: u16 = 1010;
         let () = proxy
@@ -2078,6 +2088,8 @@ mod tests {
             proxy.get_peer_name().await.unwrap().unwrap(),
             A::create(<A::AddrType as IpAddress>::Version::LOOPBACK_ADDRESS.get(), PORT)
         );
+
+        t
     }
 
     declare_tests!(
@@ -2085,6 +2097,7 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn bind<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (mut t, socket, _event) = prepare_test::<A>(proto).await;
         let stack = t.get(0);
@@ -2107,14 +2120,17 @@ mod tests {
             .await
             .unwrap()
             .expect("bind succeeds");
+
+        t
     }
 
     declare_tests!(bind,
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn bind_then_connect<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
-        let (_t, socket, _event) = prepare_test::<A>(proto).await;
+        let (t, socket, _event) = prepare_test::<A>(proto).await;
         // Can bind to local address.
         let () = socket.bind(&A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind suceeds");
 
@@ -2123,6 +2139,8 @@ mod tests {
             .await
             .unwrap()
             .expect("connect succeeds");
+
+        t
     }
 
     declare_tests!(
@@ -2130,10 +2148,11 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn connect_then_disconnect<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (_t, socket, _event) = prepare_test::<A>(proto).await;
+        let (t, socket, _event) = prepare_test::<A>(proto).await;
 
         let remote_addr = A::create(A::REMOTE_ADDR, 1010);
         let () = socket.connect(&remote_addr).await.unwrap().expect("connect succeeds");
@@ -2148,6 +2167,8 @@ mod tests {
             socket.get_peer_name().await.unwrap().expect_err("alice getpeername fails"),
             fposix::Errno::Enotconn
         );
+
+        t
     }
 
     declare_tests!(connect_then_disconnect,
@@ -2159,6 +2180,7 @@ mod tests {
     // TODO(https://fxbug.dev/47321): this test is incorrect for ICMP sockets. At the time of this
     // writing it crashes before reaching the wrong parts, but we will need to specialize the body
     // of this test for ICMP before calling the feature complete.
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn hello<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         // We create two stacks, Alice (server listening on LOCAL_ADDR:200), and
         // Bob (client, bound on REMOTE_ADDR:300). After setup, Bob connects to
@@ -2308,6 +2330,8 @@ mod tests {
         assert_eq!(source.port(), 300);
         assert_eq!(truncated, 0);
         assert_eq!(&data[..], body);
+
+        t
     }
 
     declare_tests!(
@@ -2315,6 +2339,7 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn socket_describe(
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
@@ -2338,6 +2363,7 @@ mod tests {
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event, .. } =
             socket.into_proxy().unwrap().describe().await.expect("Describe call succeeds");
         let _: zx::EventPair = event.expect("Describe call returns event");
+        t
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -2352,6 +2378,7 @@ mod tests {
             .await
     }
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn socket_get_info(
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
@@ -2374,6 +2401,8 @@ mod tests {
         };
         let info = socket.into_proxy().unwrap().get_info().await.expect("get_info call succeeds");
         assert_eq!(info, Ok((domain, proto)));
+
+        t
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -2399,6 +2428,7 @@ mod tests {
         client
     }
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn clone<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
@@ -2568,6 +2598,8 @@ mod tests {
                 )
             });
         }
+
+        t
     }
 
     declare_tests!(
@@ -2575,6 +2607,7 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn close_twice<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
@@ -2625,10 +2658,13 @@ mod tests {
                 },
             )
         });
+
+        t
     }
 
     declare_tests!(close_twice);
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn implicit_close<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
@@ -2660,10 +2696,13 @@ mod tests {
                 },
             )
         });
+
+        t
     }
 
     declare_tests!(implicit_close);
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn invalid_clone_args<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
@@ -2691,10 +2730,13 @@ mod tests {
                 },
             )
         });
+
+        t
     }
 
     declare_tests!(invalid_clone_args);
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn shutdown<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let mut t = TestSetupBuilder::new()
             .add_endpoint()
@@ -2800,6 +2842,8 @@ mod tests {
             .await
             .unwrap()
             .expect("failed to shutdown the socket twice");
+
+        t
     }
 
     declare_tests!(
@@ -2807,6 +2851,7 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn set_receive_buffer_after_delivery<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) where
@@ -2897,6 +2942,8 @@ mod tests {
         .count()
         .await;
         assert_eq!(rx_count, usize::from(SENT_PACKETS));
+
+        t
     }
 
     declare_tests!(
@@ -2904,10 +2951,11 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn send_recv_loopback_peek<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
         let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 100);
 
@@ -2960,6 +3008,8 @@ mod tests {
             .expect("recv should succeed");
         assert_eq!(truncated, 0);
         assert_eq!(data.as_slice(), DATA);
+
+        t
     }
 
     declare_tests!(
@@ -2969,6 +3019,7 @@ mod tests {
 
     // TODO(https://fxbug.dev/92678): add a syscall test to exercise this
     // behavior.
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn multicast_join_receive<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
@@ -3036,6 +3087,8 @@ mod tests {
             .expect("recv should succeed");
         assert_eq!(truncated, 0);
         assert_eq!(data.as_slice(), DATA);
+
+        t
     }
 
     declare_tests!(
@@ -3043,10 +3096,11 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn set_get_hop_limit_unicast<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         const HOP_LIMIT: u8 = 200;
         match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
@@ -3066,7 +3120,9 @@ mod tests {
             .unwrap()
             .expect("get hop limit should succeed"),
             HOP_LIMIT
-        )
+        );
+
+        t
     }
 
     declare_tests!(
@@ -3074,10 +3130,11 @@ mod tests {
         icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
     );
 
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn set_get_hop_limit_multicast<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         const HOP_LIMIT: u8 = 200;
         match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
@@ -3097,7 +3154,9 @@ mod tests {
             .unwrap()
             .expect("get hop limit should succeed"),
             HOP_LIMIT
-        )
+        );
+
+        t
     }
 
     declare_tests!(
@@ -3108,10 +3167,11 @@ mod tests {
     // TODO(https://fxbug.dev/21198): Change this when dual-stack socket support
     // is added since dual-stack sockets should allow setting options for both
     // IP versions.
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn set_hop_limit_wrong_type<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         const HOP_LIMIT: u8 = 200;
         assert_matches!(
@@ -3133,6 +3193,8 @@ mod tests {
             .unwrap(),
             Err(_)
         );
+
+        t
     }
 
     declare_tests!(set_hop_limit_wrong_type);
@@ -3140,10 +3202,11 @@ mod tests {
     // TODO(https://fxbug.dev/21198): Change this when dual-stack socket support
     // is added since dual-stack sockets should allow setting options for both
     // IP versions.
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn get_hop_limit_wrong_type<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (_t, proxy, _event) = prepare_test::<A>(proto).await;
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
         assert_matches!(
             match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
@@ -3164,6 +3227,8 @@ mod tests {
             .unwrap(),
             Err(_)
         );
+
+        t
     }
 
     declare_tests!(get_hop_limit_wrong_type);

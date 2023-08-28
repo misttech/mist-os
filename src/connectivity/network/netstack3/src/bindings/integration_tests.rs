@@ -86,7 +86,7 @@ pub(crate) struct TestStack {
     // in tests.
     netstack: crate::bindings::Netstack,
     // The main task running the netstack.
-    task: fasync::Task<()>,
+    task: Option<fasync::Task<()>>,
     // A channel sink standing in for ServiceFs when running tests.
     services_sink: mpsc::UnboundedSender<crate::bindings::Service>,
     // The inspector instance given to Netstack, can be used to probe available
@@ -94,6 +94,14 @@ pub(crate) struct TestStack {
     _inspector: Arc<fuchsia_inspect::Inspector>,
     // Keep track of installed endpoints.
     endpoint_ids: HashMap<String, BindingId>,
+}
+
+impl Drop for TestStack {
+    fn drop(&mut self) {
+        if self.task.is_some() {
+            panic!("dropped TestStack without calling shutdown")
+        }
+    }
 }
 
 pub(crate) trait NetstackServiceMarker: fidl::endpoints::DiscoverableProtocolMarker {
@@ -250,7 +258,7 @@ impl TestStack {
 
         Self {
             netstack,
-            task,
+            task: Some(task),
             services_sink,
             _inspector: inspector,
             endpoint_ids: Default::default(),
@@ -270,21 +278,13 @@ impl TestStack {
     }
 
     /// Synchronously shutdown the running stack.
-    // TODO(https://fxbug.dev/132457): Enforce that shutdown is called on all
-    // created [`TestStack`]s.
-    pub(crate) async fn shutdown(self) {
-        let Self { netstack, task, services_sink, _inspector, endpoint_ids: _ } = self;
+    pub(crate) async fn shutdown(mut self) {
+        let task = self.task.take().unwrap();
 
-        // Drop the netstack clone we created to have direct access to Ctx. The
-        // main loop will assert that no more references exist before exiting.
-        std::mem::drop(netstack);
+        // Drop all the TestStack, which will release our clone of Ctx and close
+        // the services sink, which triggers the main loop shutdown.
+        std::mem::drop(self);
 
-        // Drop the services sink, which should cause netstack to start shutting
-        // down cleanly.
-        std::mem::drop(services_sink);
-        // Wait for the task to join. The main serve loop should have helpful
-        // logs around shutdown progress. And it asserts that no Ctx clones
-        // exist before finishing.
         task.await;
     }
 }
@@ -567,6 +567,7 @@ impl StackSetupBuilder {
     }
 }
 
+#[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn test_add_device_routes() {
     // create a stack and add a single endpoint to it so we have the interface
@@ -655,10 +656,10 @@ async fn test_add_device_routes() {
         fidl_net_stack::Error::NotFound
     );
 
-    std::mem::drop(stack);
-    t.shutdown().await;
+    t
 }
 
+#[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn test_list_del_routes() {
     // create a stack and add a single endpoint to it so we have the interface
@@ -822,8 +823,11 @@ async fn test_list_del_routes() {
     let expected_routes =
         expected_routes.into_iter().filter(|route| route != &route1_fwd_entry).collect::<Vec<_>>();
     assert_eq!(routes, expected_routes);
+
+    t
 }
 
+#[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn test_add_remote_routes() {
     let mut t = TestSetupBuilder::new()
@@ -875,6 +879,8 @@ async fn test_add_remote_routes() {
         stack.add_forwarding_entry(&fwd_entry).await.unwrap(),
         Err(fidl_net_stack::Error::AlreadyExists)
     );
+
+    t
 }
 
 fn get_slaac_secret<'s>(
@@ -892,6 +898,7 @@ fn get_slaac_secret<'s>(
     })
 }
 
+#[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn test_ipv6_slaac_secret_stable() {
     const ENDPOINT: &'static str = "endpoint";
@@ -929,4 +936,6 @@ async fn test_ipv6_slaac_secret_stable() {
     assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
 
     assert_eq!(get_slaac_secret(test_stack, if_id), Some(enabled_secret));
+
+    t
 }
