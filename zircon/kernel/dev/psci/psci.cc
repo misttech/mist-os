@@ -50,8 +50,29 @@ uint32_t psci_cpu_on(uint64_t mpid, paddr_t entry) {
   return (uint32_t)do_psci_call(PSCI64_CPU_ON, mpid, entry, 0);
 }
 
-uint32_t psci_get_affinity_info(uint64_t cluster, uint64_t cpuid) {
-  return (uint32_t)do_psci_call(PSCI64_AFFINITY_INFO, ARM64_MPID(cluster, cpuid), 0, 0);
+int32_t psci_get_affinity_info(uint64_t mpid) {
+  return (uint32_t)do_psci_call(PSCI64_AFFINITY_INFO, mpid, 0, 0);
+}
+
+zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
+  int32_t aff_info = psci_get_affinity_info(mpid);
+  switch (aff_info) {
+    case PSCI_INVALID_PARAMETERS:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    case PSCI_DISABLED:
+      // PSCI_DISABLED means the core is offline due to some physical reason (such as being faulty).
+      return zx::error(ZX_ERR_BAD_STATE);
+    case 0:
+      return zx::success(power_cpu_state::ON);
+    case 1:
+      return zx::success(power_cpu_state::OFF);
+    case 2:
+      return zx::success(power_cpu_state::ON_PENDING);
+    default:
+      dprintf(INFO, "Tried to get affinity info for MPID %lu, got invalid return code %d\n", mpid,
+              aff_info);
+      return zx::error(ZX_ERR_INTERNAL);
+  }
 }
 
 uint32_t psci_get_feature(uint32_t psci_call) {
@@ -133,6 +154,7 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
       .shutdown = psci_system_off,
       .cpu_off = psci_cpu_off,
       .cpu_on = psci_cpu_on,
+      .get_cpu_state = psci_get_cpu_state,
   };
 
   pdev_register_power(&psci_ops);
@@ -166,8 +188,9 @@ static int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
     if (argc < 4) {
       goto notenoughargs;
     }
-    uint32_t ret = psci_get_affinity_info(argv[2].u, argv[3].u);
-    printf("affinity info returns %u\n", ret);
+
+    int32_t ret = psci_get_affinity_info(ARM64_MPID(argv[2].u, argv[3].u));
+    printf("affinity info returns %d\n", ret);
   } else {
     uint32_t function = static_cast<uint32_t>(argv[1].u);
     uint64_t arg0 = (argc >= 3) ? argv[2].u : 0;
