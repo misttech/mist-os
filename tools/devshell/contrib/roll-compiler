@@ -44,9 +44,10 @@ def GetSplitRustToolchainPaths(packages, host_platforms, target_platforms=None):
         "aarch64-unknown-linux-gnu",
         "fuchsia",
         "wasm32-unknown-unknown",
-        "x86_64-apple-darwin",
         "x86_64-unknown-linux-gnu",
-    ]
+    ] + ([
+        "x86_64-apple-darwin"
+    ] if any("mac-" in plat for plat in host_platforms) else [])
     rust_toolchain_packages = []
     if "rust" not in packages:
         return rust_toolchain_packages
@@ -116,7 +117,7 @@ before commands are run for any package.
         "--platforms",
         action="append",
         metavar="PLATFORM",
-        help="CIPD platforms with matching packages",
+        help="CIPD host platforms with matching packages",
     )
     parser.add_argument(
         "--dry-run",
@@ -195,7 +196,7 @@ before commands are run for any package.
         run([update_lockfiles])
     else:
         sys.stderr.write("Warning: update-lockfiles.sh not found, falling back to jiri\n")
-        run([JIRI, "resolve", "-local-manifest=true"])
+        run([JIRI, "resolve", "-local-manifest"])
 
     sys.stderr.write("\nRun this command to download the updated package:\n")
     sys.stderr.write("$ jiri fetch-packages -local-manifest\n")
