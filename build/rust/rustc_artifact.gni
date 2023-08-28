@@ -55,6 +55,9 @@ import("//build/toolchain/rbe.gni")
 #   deps
 #     List of GN targets on which this crate depends.
 #
+#   public_deps
+#     List of GN targets on which this crate depends publicly.
+#
 #   pass_through
 #     A scope of arguments to pass directly to the underlying wrapped target.
 #     Only the primary target generated will receive these arguments.
@@ -129,7 +132,10 @@ template("rustc_artifact") {
   assert(
       defined(invoker.edition),
       "Rust targets must set an edition. For new rust targets use: `edition = \"2021\"`")
-  _configs = invoker.configs
+  _configs = []
+  if (defined(invoker.configs)) {
+    _configs += invoker.configs
+  }
   _edition = invoker.edition
   _configs += [ "//build/config/rust:edition_${_edition}" ]
 
@@ -144,6 +150,7 @@ template("rustc_artifact") {
                              [
                                "testonly",
                                "rustenv",
+                               "public_deps",
                              ])
       clippy_crate_type = invoker.clippy_crate_type
       configs = _configs
@@ -240,7 +247,11 @@ template("rustc_artifact") {
 
     configs = []
     configs = _configs
-    deps = invoker.deps
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "public_deps",
+                           ])
     inputs = _local_inputs
 
     if (!defined(invoker.enforce_source_listing) ||
