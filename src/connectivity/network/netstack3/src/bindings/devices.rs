@@ -30,9 +30,9 @@ use crate::bindings::{
     interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
 };
 
-pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
+pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
-pub type BindingId = NonZeroU64;
+pub(crate) type BindingId = NonZeroU64;
 
 /// Keeps tabs on devices.
 ///
@@ -42,7 +42,7 @@ pub type BindingId = NonZeroU64;
 /// The type parameter `C` is for the extra information associated with the
 /// device. The type parameters are there to allow testing without dependencies
 /// on `core`.
-pub struct Devices<C> {
+pub(crate) struct Devices<C> {
     id_map: CoreRwLock<HashMap<BindingId, C>>,
     last_id: CoreMutex<BindingId>,
 }
@@ -59,7 +59,7 @@ where
 {
     /// Allocates a new [`BindingId`].
     #[must_use]
-    pub fn alloc_new_id(&self) -> BindingId {
+    pub(crate) fn alloc_new_id(&self) -> BindingId {
         let Self { id_map: _, last_id } = self;
         let mut last_id = last_id.lock();
         let id = *last_id;
@@ -73,7 +73,7 @@ where
     /// currently tracked by [`Devices`]). A new [`BindingId`] will be allocated
     /// and a [`DeviceInfo`] struct will be created with the provided `info` and
     /// IDs.
-    pub fn add_device(&self, id: BindingId, core_id: C) {
+    pub(crate) fn add_device(&self, id: BindingId, core_id: C) {
         let Self { id_map, last_id: _ } = self;
         assert_matches!(id_map.write().insert(id, core_id), None);
     }
@@ -82,18 +82,21 @@ where
     ///
     /// Removes a device from the internal [`Devices`] list and returns the
     /// associated [`DeviceInfo`] if `id` is found or `None` otherwise.
-    pub fn remove_device(&self, id: BindingId) -> Option<C> {
+    pub(crate) fn remove_device(&self, id: BindingId) -> Option<C> {
         let Self { id_map, last_id: _ } = self;
         id_map.write().remove(&id)
     }
 
     /// Retrieve associated `core_id` for [`BindingId`].
-    pub fn get_core_id(&self, id: BindingId) -> Option<C> {
+    pub(crate) fn get_core_id(&self, id: BindingId) -> Option<C> {
         self.id_map.read().get(&id).cloned()
     }
 
     /// Call the provided callback with an iterator over the devices.
-    pub fn with_devices<R>(&self, f: impl FnOnce(hash_map::Values<'_, BindingId, C>) -> R) -> R {
+    pub(crate) fn with_devices<R>(
+        &self,
+        f: impl FnOnce(hash_map::Values<'_, BindingId, C>) -> R,
+    ) -> R {
         let Self { id_map, last_id: _ } = self;
         f(id_map.read().values())
     }
@@ -101,7 +104,10 @@ where
 
 impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
     /// Retrieves the device with the given name.
-    pub fn get_device_by_name(&self, name: &str) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+    pub(crate) fn get_device_by_name(
+        &self,
+        name: &str,
+    ) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
         self.id_map
             .read()
             .iter()
@@ -114,20 +120,20 @@ impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
 
 /// Device specific iformation.
 #[derive(Debug)]
-pub enum DeviceSpecificInfo<'a> {
+pub(crate) enum DeviceSpecificInfo<'a> {
     Netdevice(&'a NetdeviceInfo),
     Loopback(&'a LoopbackInfo),
 }
 
 impl DeviceSpecificInfo<'_> {
-    pub fn static_common_info(&self) -> &StaticCommonInfo {
+    pub(crate) fn static_common_info(&self) -> &StaticCommonInfo {
         match self {
             Self::Netdevice(i) => &i.static_common_info,
             Self::Loopback(i) => &i.static_common_info,
         }
     }
 
-    pub fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+    pub(crate) fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         match self {
             Self::Netdevice(i) => {
                 i.with_dynamic_info(|DynamicNetdeviceInfo { phy_up: _, common_info }| {
@@ -138,7 +144,10 @@ impl DeviceSpecificInfo<'_> {
         }
     }
 
-    pub fn with_common_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+    pub(crate) fn with_common_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
         match self {
             Self::Netdevice(i) => {
                 i.with_dynamic_info_mut(|DynamicNetdeviceInfo { phy_up: _, common_info }| {
@@ -194,24 +203,24 @@ pub(crate) fn spawn_tx_task(
 
 /// Static information common to all devices.
 #[derive(Derivative, Debug)]
-pub struct StaticCommonInfo {
-    pub binding_id: BindingId,
-    pub name: String,
+pub(crate) struct StaticCommonInfo {
+    pub(crate) binding_id: BindingId,
+    pub(crate) name: String,
     #[derivative(Debug = "ignore")]
-    pub tx_notifier: NeedsDataNotifier,
+    pub(crate) tx_notifier: NeedsDataNotifier,
 }
 
 /// Information common to all devices.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct DynamicCommonInfo {
-    pub mtu: Mtu,
-    pub admin_enabled: bool,
-    pub events: super::InterfaceEventProducer,
+pub(crate) struct DynamicCommonInfo {
+    pub(crate) mtu: Mtu,
+    pub(crate) admin_enabled: bool,
+    pub(crate) events: super::InterfaceEventProducer,
     // An attach point to send `fuchsia.net.interfaces.admin/Control` handles to the Interfaces
     // Admin worker.
     #[derivative(Debug = "ignore")]
-    pub control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
+    pub(crate) control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
     pub(crate) addresses: HashMap<SpecifiedAddr<IpAddr>, AddressInfo>,
 }
 
@@ -231,19 +240,22 @@ pub(crate) struct AddressInfo {
 /// Loopback device information.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct LoopbackInfo {
-    pub static_common_info: StaticCommonInfo,
-    pub dynamic_common_info: std::sync::RwLock<DynamicCommonInfo>,
+pub(crate) struct LoopbackInfo {
+    pub(crate) static_common_info: StaticCommonInfo,
+    pub(crate) dynamic_common_info: std::sync::RwLock<DynamicCommonInfo>,
     #[derivative(Debug = "ignore")]
-    pub rx_notifier: NeedsDataNotifier,
+    pub(crate) rx_notifier: NeedsDataNotifier,
 }
 
 impl LoopbackInfo {
-    pub fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         cb(self.dynamic_common_info.read().unwrap().deref())
     }
 
-    pub fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
         cb(self.dynamic_common_info.write().unwrap().deref_mut())
     }
 }
@@ -253,35 +265,38 @@ impl LoopbackInfo {
 pub(crate) struct FidlWorkerInfo<R> {
     // The worker `Task`, wrapped in a `Shared` future so that it can be awaited
     // multiple times.
-    pub worker: futures::future::Shared<fuchsia_async::Task<()>>,
+    pub(crate) worker: futures::future::Shared<fuchsia_async::Task<()>>,
     // Mechanism to cancel the worker with reason `R`. If `Some`, the worker is
     // active (and holds the `Receiver`). Otherwise, the worker has been
     // canceled.
-    pub cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
+    pub(crate) cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
 }
 
 #[derive(Debug)]
-pub struct DynamicNetdeviceInfo {
-    pub phy_up: bool,
-    pub common_info: DynamicCommonInfo,
+pub(crate) struct DynamicNetdeviceInfo {
+    pub(crate) phy_up: bool,
+    pub(crate) common_info: DynamicCommonInfo,
 }
 
 /// Network device information.
 #[derive(Debug)]
-pub struct NetdeviceInfo {
-    pub handler: super::netdevice_worker::PortHandler,
-    pub mac: UnicastAddr<Mac>,
-    pub static_common_info: StaticCommonInfo,
-    pub dynamic: std::sync::RwLock<DynamicNetdeviceInfo>,
+pub(crate) struct NetdeviceInfo {
+    pub(crate) handler: super::netdevice_worker::PortHandler,
+    pub(crate) mac: UnicastAddr<Mac>,
+    pub(crate) static_common_info: StaticCommonInfo,
+    pub(crate) dynamic: std::sync::RwLock<DynamicNetdeviceInfo>,
 }
 
 impl NetdeviceInfo {
-    pub fn with_dynamic_info<O, F: FnOnce(&DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
         let dynamic = self.dynamic.read().unwrap();
         cb(dynamic.deref())
     }
 
-    pub fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicNetdeviceInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
         let mut dynamic = self.dynamic.write().unwrap();
         cb(dynamic.deref_mut())
     }

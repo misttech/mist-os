@@ -90,7 +90,7 @@ impl Drop for NeedsData {
 /// The notifier side of the underlying signal struct, it is meant to be held
 /// by the Core side and schedule signals to be received by the Bindings.
 #[derive(Default, Debug, Clone)]
-pub struct NeedsDataNotifier {
+pub(crate) struct NeedsDataNotifier {
     inner: Arc<NeedsData>,
 }
 
@@ -393,7 +393,7 @@ impl TryIntoFidl<fidl_net::MacAddress> for Mac {
 /// An error indicating that an address was a member of the wrong class (for
 /// example, a unicast address used where a multicast address is required).
 #[derive(Debug)]
-pub struct AddrClassError;
+pub(crate) struct AddrClassError;
 
 // TODO(joshlf): Introduce a separate variant to `fidl_net_stack::Error` for
 // `AddrClassError`?
@@ -717,10 +717,10 @@ impl<O> AsRef<Never> for UninstantiableFuture<O> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct DeviceNotFoundError;
+pub(crate) struct DeviceNotFoundError;
 
 #[derive(Debug, PartialEq)]
-pub enum SocketAddressError {
+pub(crate) enum SocketAddressError {
     Device(DeviceNotFoundError),
     UnexpectedZone,
 }
@@ -931,7 +931,7 @@ impl IntoErrno for DeviceNotFoundError {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum ForwardingConversionError {
+pub(crate) enum ForwardingConversionError {
     DeviceNotFound,
     TypeMismatch,
     Subnet(SubnetError),

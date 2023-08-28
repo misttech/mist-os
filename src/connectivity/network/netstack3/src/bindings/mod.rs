@@ -340,7 +340,7 @@ macro_rules! trace_duration {
 pub(crate) use trace_duration;
 
 #[derive(Default)]
-pub struct RngImpl(CoreMutex<OsRng>);
+pub(crate) struct RngImpl(CoreMutex<OsRng>);
 
 impl RngCore for &'_ RngImpl {
     fn next_u32(&mut self) -> u32 {
@@ -701,13 +701,13 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
 /// Provides the entry point for creating a netstack to be served as a
 /// component.
 #[derive(Clone)]
-pub struct Netstack {
+pub(crate) struct Netstack {
     ctx: Ctx,
     interfaces_event_sink: interfaces_watcher::WorkerInterfaceSink,
 }
 
 /// Contains the information needed to start serving a network stack over FIDL.
-pub struct NetstackSeed {
+pub(crate) struct NetstackSeed {
     netstack: Netstack,
     interfaces_worker: interfaces_watcher::Worker,
     interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
@@ -874,7 +874,7 @@ impl Netstack {
     }
 }
 
-pub enum Service {
+pub(crate) enum Service {
     DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     Filter(fidl_fuchsia_net_filter::FilterRequestStream),
@@ -942,7 +942,7 @@ impl NamedTask {
 impl NetstackSeed {
     /// Consumes the netstack and starts serving all the FIDL services it
     /// implements to the outgoing service directory.
-    pub async fn serve<S: futures::Stream<Item = Service>>(
+    pub(crate) async fn serve<S: futures::Stream<Item = Service>>(
         self,
         services: S,
         inspector: &fuchsia_inspect::Inspector,

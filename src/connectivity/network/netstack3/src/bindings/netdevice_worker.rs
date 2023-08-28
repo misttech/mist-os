@@ -81,7 +81,7 @@ const DEFAULT_BUFFER_LENGTH: usize = 2048;
 // TODO(https://fxbug.dev/101303): Decorate *all* logging with human-readable
 // device debug information to disambiguate.
 impl NetdeviceWorker {
-    pub async fn new(
+    pub(crate) async fn new(
         ctx: Ctx,
         device: fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>,
     ) -> Result<Self, Error> {
@@ -94,11 +94,11 @@ impl NetdeviceWorker {
         Ok(Self { ctx, inner: Inner { device, session, state: Default::default() }, task })
     }
 
-    pub fn new_handler(&self) -> DeviceHandler {
+    pub(crate) fn new_handler(&self) -> DeviceHandler {
         DeviceHandler { inner: self.inner.clone() }
     }
 
-    pub async fn run(self) -> Result<std::convert::Infallible, Error> {
+    pub(crate) async fn run(self) -> Result<std::convert::Infallible, Error> {
         let Self { mut ctx, inner: Inner { device: _, session, state }, task } = self;
         // Allow buffer shuttling to happen in other threads.
         let mut task = fuchsia_async::Task::spawn(task).fuse();
@@ -155,8 +155,8 @@ impl NetdeviceWorker {
 }
 
 pub(crate) struct InterfaceOptions {
-    pub name: Option<String>,
-    pub metric: Option<u32>,
+    pub(crate) name: Option<String>,
+    pub(crate) metric: Option<u32>,
 }
 
 pub(crate) struct DeviceHandler {
@@ -431,7 +431,7 @@ fn add_initial_routes<NonSyncCtx: NonSyncContext>(
     Ok(())
 }
 
-pub struct PortHandler {
+pub(crate) struct PortHandler {
     id: BindingId,
     port_id: netdevice_client::Port,
     inner: Inner,

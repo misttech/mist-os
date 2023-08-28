@@ -181,7 +181,7 @@ const INTERFACES_ADMIN_CHANNEL_SIZE: usize = 16;
 ///
 /// If `owns_interface` is true, this handle 'owns' the interfaces, and when the handle closes the
 /// interface should be removed.
-pub struct OwnedControlHandle {
+pub(crate) struct OwnedControlHandle {
     request_stream: fnet_interfaces_admin::ControlRequestStream,
     control_handle: fnet_interfaces_admin::ControlControlHandle,
     owns_interface: bool,

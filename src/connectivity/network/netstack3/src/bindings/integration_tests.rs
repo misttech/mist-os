@@ -549,7 +549,7 @@ impl TestSetupBuilder {
 
 /// Helper struct to create stack configuration for [`TestSetupBuilder`].
 #[derive(Debug)]
-pub struct StackSetupBuilder {
+pub(crate) struct StackSetupBuilder {
     endpoints: Vec<(String, Option<AddrSubnetEither>)>,
 }
 
