@@ -30,14 +30,3 @@ group("amlogic_hw_dependent_tests") {
     "//src/security/bin/tee_manager:optee_smoke_test",
   ]
 }
-
-group("drivers-build-only") {
-  testonly = true
-  deps = [ "//bundles/drivers:drivers-build-only" ]
-}
-
-# Group including all drivers to extract documentation from.
-group("create_all_drivers_doc") {
-  testonly = true
-  deps = [ "//bundles/drivers:create_all_drivers_doc" ]
-}

@@ -231,7 +231,7 @@ build_api_module("generated_docs") {
     ":invoke_cmldoc",
     ":invoke_fidldoc",
     ":invoke_helpdoc",
-    "//bundles:create_all_drivers_doc",
+    "//bundles/drivers:create_all_drivers_doc",
     "//sdk/lib/fdio:docs",
   ]
 }
