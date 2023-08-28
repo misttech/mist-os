@@ -1954,7 +1954,7 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
         type=cl_utils.bool_golang_flag,
         default=True,
         help=
-        "Set to false to avoid downloading outputs after remote execution succeeds."
+        "Set to false to avoid downloading outputs after remote execution succeeds.  Each toolchain (Rust, C++) may decide how to apply this to its set of outputs yb default.  For example, for Rust, this affects only the main -o output."
         "",
     )
     return parser

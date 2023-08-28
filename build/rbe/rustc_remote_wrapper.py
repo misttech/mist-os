@@ -365,6 +365,10 @@ class RustRemoteAction(object):
         return self._rust_action.depfile
 
     @property
+    def primary_output(self) -> Path:
+        return self._rust_action.output_file
+
+    @property
     def host_compiler(self) -> Path:
         return self._rust_action.compiler
 
@@ -592,7 +596,7 @@ class RustRemoteAction(object):
 
     def _remote_output_files(self) -> Iterable[Path]:
         """Remote output files are relative to current working dir."""
-        yield self.value_verbose('main output', self._rust_action.output_file)
+        yield self.value_verbose('main output', self.primary_output)
 
         depfile = self.depfile
         if depfile:
@@ -651,9 +655,12 @@ class RustRemoteAction(object):
         remote_output_files = list(self._remote_output_files())
         remote_output_dirs = list(self._remote_output_dirs())
 
-        downloads = []
-        if self.depfile:  # always download the depfile
-            downloads.append(self.depfile)
+        # Interpret --download_outputs=false as a request to avoid
+        # downloading only the primary rustc output (often the largest
+        # artifact).  In other words, always download *all* other outputs,
+        # including the depfile and emitted llvm-ir (if applicable).
+        # The depfile *must* be downloaded because it is consumed by ninja.
+        downloads = [f for f in remote_output_files if f != self.primary_output]
 
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
@@ -813,9 +820,8 @@ class RustRemoteAction(object):
             # Once re-client presents permission information in the
             # --action_log (reproxy remote_metadata), this workaround can
             # be replaced with a more generalized solution.
-            if remote_action.is_download_stub_file(
-                    self._rust_action.output_file):
-                self._rust_action.output_file.chmod(_EXEC_PERMS)
+            if remote_action.is_download_stub_file(self.primary_output):
+                self.primary_output.chmod(_EXEC_PERMS)
         return 0
 
     def _rewrite_remote_or_local_depfile(self):
