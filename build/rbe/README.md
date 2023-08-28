@@ -39,6 +39,25 @@ More details can be found by running with `--help`.
 *   `fuchsia-rewrapper.cfg`: rewrapper configuration
 *   `fuchsia-reproxy.cfg`: reproxy configuration
 
+# Troubleshooting tools
+
+*   `action_diff.sh`: recursively queries through two reproxy logs to
+    root-cause differences between output and intermediate artifacts.
+    This is useful for examining unexpected digest differences and
+    cache misses.
+*   `bb_fetch_rbe_cas.sh`: retrieve a remote-built artifact from the
+    RBE CAS using a buildbucket id and the path under the build output
+    directory.
+*   `detail-diff.sh`: attempts to compare human-readable representations
+    of files, including some binary files, by using tools like `objdump`.
+*   `remotetool.sh`: can lookup actions and artifacts in the RBE CAS.
+    From: https://github.com/bazelbuild/remote-apis-sdks
+*   `reproxy_logs.sh`: subcommand utility
+    *   `diff`: report meaningful difference between two reproxy logs
+    *   `output_file_digest`: lookup the digest of a remote built artifact
+
+All tools have more detailed usage with `--help`.
+
 # GN files
 
 *   `build/toolchain/rbe.gni`: global `args.gn` variables for RBE
