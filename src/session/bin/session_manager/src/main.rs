@@ -20,7 +20,8 @@ const DISABLE_AUTOLAUNCH_PATH: &str = "/data/session-manager/noautolaunch";
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
     let inspector = fuchsia_inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     let realm = connect_to_protocol::<fcomponent::RealmMarker>()?;
 
@@ -43,6 +44,7 @@ async fn main() -> Result<(), Error> {
         // TODO(fxbug.dev/67789): Using ? here causes errors to not be logged.
         session_manager.start_default_session().await.expect("failed to start session");
     }
+
     session_manager.serve(&mut fs).await.expect("failed to serve protocols");
 
     Ok(())
