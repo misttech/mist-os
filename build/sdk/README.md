@@ -27,39 +27,6 @@ Schemas for the various types of SDK elements are available under
 tools outside the Fuchsia build.
 
 
-## Building the Fuchsia Core IDK
-
-The simplest way to build the Fuchsia "Core" IDK, is to run the following
-command:
-
-```
-fx build final_fuchsia_idk
-```
-
-This generates the IDK, validates its content by running the Bazel SDK test
-suite locally, then creates a compressed archive that goes under
-`${BUILD_DIR}/sdk/archive/fuchsia_idk.tgz`.
-
-During local development, creation of the compressed archive can be skipped
-by using one of the following targets instead:
-
-```
-# Creates the IDK's export directory, under $BUILD_DIR/sdk/exported/fuchsia_idk
-# but does not validate its result.
-fx build final_fuchsia_idk.exported
-
-# Same, but also validates its result by running the Bazel SDK test suite.
-fx build final_fuchsia_idk.validation
-```
-
-## Building the Fuchsia Bazel SDK
-
-Due to technical limitations at the GN / Bazel boundary, the Fuchsia Bazel SDK
-is currently _not_ built from the Fuchsia "Core" IDK. For more details, see
-[//build/bazel_sdk/README.md](/build/bazel/sdk/README.md) and
-[//build/bazel/fuchsia_bazel_sdk.gni](/build/bazel/fuchsia_bazel_sdk.gni).
-
-
 ## Implementation
 
 Individual elements are declared using the [`sdk_atom`](sdk_atom.gni) template.
@@ -87,8 +54,8 @@ the standard IDK layout for all its elements, under
 `$OUTPUT_DIR/sdk/exported/<name>`.
 
 The [`generate_final_idk`][generate_final_idk] template is used to
-generate and validate the final IDK archive, by merging the content of one or
-more collections. It also ensures that all prebuilt binaries are provided
+generate the final IDK archive, by merging the content of one or more
+collections. It also ensures that all prebuilt binaries are provided
 for all supported target CPU architectures (achieved by performing
 specific sub-builds of the same collections), that are all stored in
 the same compressed archive output.
