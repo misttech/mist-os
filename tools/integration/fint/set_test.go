@@ -408,12 +408,14 @@ func TestGenArgs(t *testing.T) {
 				CachePackages:    []string{"//c"},
 				UniversePackages: []string{"//u1", "//u2"},
 				HostLabels:       []string{"//src:host-tests"},
+				BuildOnlyLabels:  []string{"//tools:build_only"},
 			},
 			expectedArgs: []string{
 				`base_package_labels=["//b"]`,
 				`cache_package_labels=["//c"]`,
 				`universe_package_labels=["//u1","//u2"]`,
 				`host_labels=["//src:host-tests"]`,
+				`build_only_labels=["//tools:build_only"]`,
 			},
 		},
 		{
@@ -424,13 +426,84 @@ func TestGenArgs(t *testing.T) {
 				CachePackages:    []string{"//c"},
 				UniversePackages: []string{"//u1", "//u2"},
 				HostLabels:       []string{"//src:host-tests"},
+				BuildOnlyLabels:  []string{"//tools:build_only"},
 			},
 			expectedArgs: []string{
-				`base_package_labels+=["//b"]`,
-				`cache_package_labels+=["//c"]`,
-				`universe_package_labels+=["//u1","//u2"]`,
+				`base_package_labels=["//b"]`,
+				`cache_package_labels=["//c"]`,
+				`universe_package_labels=["//u1","//u2"]`,
 				`host_labels=["//src:host-tests"]`,
+				`build_only_labels=["//tools:build_only"]`,
 			},
+		},
+		{
+			name: "empty test groups (part 1)",
+			staticSpec: &fintpb.Static{
+				Product: "products/core.gni",
+			},
+			orderMatters: true,
+			expectedArgs: []string{
+				`hermetic_test_package_labels=[]`,
+				`tests_in_base=false`,
+				`e2e_test_labels=[]`,
+				`host_test_labels=[]`,
+				`developer_test_labels=[]`,
+			},
+		},
+		{
+			name: "empty test groups (part 2)",
+			staticSpec: &fintpb.Static{
+				Product: "products/core.gni",
+			},
+			orderMatters: true,
+			expectedArgs: []string{
+				`test_package_labels=[]`,
+			},
+		},
+		{
+			name: "test groups (part 1) ",
+			staticSpec: &fintpb.Static{
+				Product:              "products/core.gni",
+				HermeticTestPackages: []string{"//a"},
+				TestPackages:         []string{"//b"},
+				TestsInBase:          true,
+				E2ETestLabels:        []string{"//c"},
+				HostTestLabels:       []string{"//d"},
+				DeveloperTestLabels:  []string{"//e"},
+			},
+			orderMatters: true,
+			expectedArgs: []string{
+				`hermetic_test_package_labels=["//a"]`,
+				`tests_in_base=true`,
+				`e2e_test_labels=["//c"]`,
+				`host_test_labels=["//d"]`,
+				`developer_test_labels=["//e"]`,
+			},
+		},
+		{
+			name: "test groups",
+			staticSpec: &fintpb.Static{
+				Product:              "products/core.gni",
+				HermeticTestPackages: []string{"//a"},
+				TestPackages:         []string{"//b"},
+				TestsInBase:          true,
+				E2ETestLabels:        []string{"//c"},
+				HostTestLabels:       []string{"//d"},
+				DeveloperTestLabels:  []string{"//e"},
+			},
+			orderMatters: true,
+			expectedArgs: []string{
+				`test_package_labels=["//b"]`,
+			},
+		},
+		{
+			name: "using developer tests errors when skip-local-args is true",
+			staticSpec: &fintpb.Static{
+				Product:             "products/core.gni",
+				DeveloperTestLabels: []string{"//a"},
+			},
+			skipLocalArgs: true,
+			expectErr:     true,
 		},
 		{
 			name: "variant",

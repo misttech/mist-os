@@ -223,11 +223,14 @@ func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
 func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context, skipLocalArgs bool) ([]string, error) {
 	// GN variables to set via args (mapping from variable name to value).
 	vars := make(map[string]interface{})
-	// GN list variables to which we want to append via args (mapping from
-	// variable name to list of values to append).
-	appends := make(map[string][]string)
+	// GN list variables that could historically be set by products, and should go
+	// in their own block in args.gn.  Append or assign is controlled when these
+	// are formatted as lines.
+	targetLists := make(map[string][]string)
 	// GN targets to import.
 	var imports []string
+	// GN vars for managing tests.
+	testVars := make(map[string]interface{})
 
 	if staticSpec.TargetArch == fintpb.Static_ARCH_UNSPECIFIED {
 		// Board files declare `target_cpu` so it's not necessary to set
@@ -323,19 +326,17 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		"cache_package_labels":    staticSpec.CachePackages,
 		"universe_package_labels": staticSpec.UniversePackages,
 	} {
-		// If product is set, append to the corresponding list variable instead
-		// of overwriting it to avoid overwriting any packages set in the
-		// imported product file.
-		if staticSpec.Product == "" {
-			vars[varName] = values
-		} else {
-			appends[varName] = values
-		}
+		targetLists[varName] = values
 	}
 
-	// host_labels are not initialized in product files, so should always be
-	// initialized here instead of appended to.
+	// These list variables are never initialized by a product, so they can be
+	// directly set.
 	vars["host_labels"] = staticSpec.HostLabels
+	testVars["hermetic_test_package_labels"] = staticSpec.HermeticTestPackages
+	testVars["test_package_labels"] = staticSpec.TestPackages
+	testVars["tests_in_base"] = staticSpec.TestsInBase
+	testVars["e2e_test_labels"] = staticSpec.E2ETestLabels
+	testVars["host_test_labels"] = staticSpec.HostTestLabels
 
 	if len(staticSpec.Variants) != 0 {
 		vars["select_variant"] = staticSpec.Variants
@@ -367,35 +368,53 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		vars["rust_incremental"] = filepath.Join(contextSpec.CacheDir, "rust_cache")
 	}
 
-	var importArgs, varArgs, appendArgs, localArgs []string
+	var importArgs, varArgs, targetListArgs, testArgs, localArgs []string
 
 	// Add comments to make args.gn more readable.
-	//
-	// TODO(olivernewman): target list are sometimes included in `varArgs`
-	// rather than `appendArgs`. Fix this logic to stop conflating appended vars
-	// with target lists.
 	varArgs = append(varArgs, "\n\n# Basic args:")
-	appendArgs = append(appendArgs, "\n\n# Target lists:")
+	targetListArgs = append(targetListArgs, "\n\n# Target lists:")
+	testArgs = append(testArgs, "\n\n# Tests to add to build: (these are validated by test-type)")
+
+	// vars are directly set in the "basic args" block
+	for k, v := range vars {
+		varArgs = append(varArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
+	}
 
 	for _, arg := range staticSpec.GnArgs {
 		if strings.HasPrefix(arg, "import(") {
 			importArgs = append(importArgs, arg)
 		} else if strings.Contains(arg, "+=") {
-			appendArgs = append(appendArgs, arg)
+			// any list-append operation is almost always trying to change the target
+			// lists set by a product or board, so add it to that block:
+			targetListArgs = append(targetListArgs, arg)
 		} else {
+			// any directly-assigned args are more likely general build arguments.
 			varArgs = append(varArgs, arg)
 		}
 	}
-
-	for k, v := range vars {
-		varArgs = append(varArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
-	}
 	sort.Strings(varArgs)
 
-	for k, v := range appends {
-		appendArgs = append(appendArgs, fmt.Sprintf("%s+=%s", k, toGNValue(v)))
+	for k, v := range targetLists {
+		// Products and Boards are now using their own namespace of GN args, and not
+		// using these target lists, which are used only by infra or developers.
+		targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
 	}
-	sort.Strings(appendArgs)
+	sort.Strings(targetListArgs)
+
+	// Add the "build_only_labels" to the end of appendArgs so that it stays in
+	// the "#Target lists:" block, which is semantically where it belongs.
+	targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", "build_only_labels", toGNValue(staticSpec.BuildOnlyLabels)))
+
+	// The test vars are kept in a particular order to match the BUILD.gn files.
+	for _, k := range []string{"hermetic_test_package_labels", "test_package_labels", "tests_in_base", "e2e_test_labels", "host_test_labels"} {
+		testArgs = append(testArgs, fmt.Sprintf("%s=%s", k, toGNValue(testVars[k])))
+	}
+
+	if len(staticSpec.DeveloperTestLabels) != 0 && skipLocalArgs {
+		return nil, fmt.Errorf("'developer_test_labels' cannot be provided when 'skipLocalArgs' is true")
+	}
+	testArgs = append(testArgs, "\n\n# Additional tests: (not validated by test-type)")
+	testArgs = append(testArgs, fmt.Sprintf("%s=%s", "developer_test_labels", toGNValue(staticSpec.DeveloperTestLabels)))
 
 	for _, p := range imports {
 		importArgs = append(importArgs, fmt.Sprintf(`import("//%s")`, p))
@@ -423,8 +442,10 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	var finalArgs []string
 	finalArgs = append(finalArgs, importArgs...)
 	finalArgs = append(finalArgs, varArgs...)
-	finalArgs = append(finalArgs, appendArgs...)
+	finalArgs = append(finalArgs, targetListArgs...)
+	finalArgs = append(finalArgs, testArgs...)
 	finalArgs = append(finalArgs, localArgs...)
+	finalArgs = append(finalArgs, "\n")
 	return finalArgs, nil
 }
 

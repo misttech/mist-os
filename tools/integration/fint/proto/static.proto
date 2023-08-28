@@ -165,4 +165,45 @@ message Static {
 
   // Extra args to pass to ninja.
   repeated string ninja_args = 35;
+
+  //
+  // The following fields are used to control the addition of test
+  // groups to a builder.  They correspond to GN arguments that are defined in
+  // '//BUILD.gn'.
+  //
+
+  // Hermetic tests to add to the build configuration.  Only hermetic tests that
+  // run on Fuchsia devices can be added here.  The build will validate that
+  // any labels added here only contain hermetic tests.
+  repeated string hermetic_test_packages = 36;
+
+  // Non-hermetic tests to add to the build configuration.  Only non-hermetic
+  // tests that run on Fuchsia devices can be added here.  The build will
+  // validate that any labels added here only contain non-hermetic tests.
+  repeated string test_packages = 37;
+
+  // Whether test packages will be added to the product's base package set or
+  // only available via the discoverable package set.  This causes the tests to
+  // become a dependency of assembly (when false they are not)
+  bool tests_in_base = 38;
+
+  // End-to-end tests to add to the build configuration.  The build will
+  // validate that any labels added here only contain e2e tests.
+  repeated string e2e_test_labels = 39;
+
+  // Host tests to add to the build configuration.  Host tests should _not_ be
+  // added via the 'host_labels' field.
+  // TODO(b/297926167): Enforce that no tests are found.
+  repeated string host_test_labels = 40;
+
+  // Any sort of test that is added by a developer.  These are not to be added
+  // by infra, but only by 'fx set'.  If 'Set()' is called with 'skipLocalArgs'
+  // true (it should be when called by infra), fint will assert that this is an
+  // empty list.
+  repeated string developer_test_labels = 41;
+
+  // Additional labels to add to the GN build graph, which are then built by the
+  // :default ninja target, but are not added to the product, or any published
+  // package sets.
+  repeated string build_only_labels = 42;
 }

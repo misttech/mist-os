@@ -3,6 +3,12 @@
 # found in the LICENSE file.
 import("//build/security.gni")
 
+declare_args() {
+  # These labels are added as dependencies of '//:default', but not as a
+  # dependency of anything else, and so are "build only".
+  build_only_labels = []
+}
+
 group("bootfs") {
   testonly = fuchsia_zbi_testonly
   deps = [
@@ -14,7 +20,7 @@ group("bootfs") {
 
 group("build_only") {
   testonly = true
-  deps = [ "dev:build_only_deps" ]
+  deps = build_only_labels + [ "dev:build_only_deps" ]
 }
 
 group("recovery_bootfs") {
