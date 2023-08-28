@@ -61,7 +61,10 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(IncomingService::Authenticator);
     fs.take_and_serve_directory_handle()?;
 
-    inspect_runtime::serve(component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
 
     // Add a device watcher to watch for usb ctap devices as they are connected, so that we don't
     // need to check for their capabilities once a request is made.
