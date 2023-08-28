@@ -210,7 +210,7 @@ impl InnerPacketBuilder for SendPayload<'_> {
 /// only while a shrink is in progress. Once the reserved segment is large
 /// enough it will be removed to complete the shrinking.
 #[derive(Debug)]
-#[cfg_attr(test, derive(Clone, PartialEq, Eq))]
+#[cfg_attr(any(test, feature = "testutils"), derive(Clone, PartialEq, Eq))]
 pub struct RingBuffer {
     storage: Vec<u8>,
     /// The index where the reader starts to read.
@@ -230,7 +230,7 @@ pub struct RingBuffer {
 }
 
 #[derive(Debug)]
-#[cfg_attr(test, derive(Copy, Clone, Eq, PartialEq))]
+#[cfg_attr(any(test, feature = "testutils"), derive(Copy, Clone, Eq, PartialEq))]
 struct PendingShrink {
     /// The target number of reserved bytes.
     target: NonZeroUsize,
@@ -647,6 +647,182 @@ impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for 
     }
 }
 
+#[cfg(any(test, feature = "testutils"))]
+pub(crate) mod testutil {
+    use super::*;
+
+    use alloc::{rc::Rc, vec::Vec};
+    use core::cell::RefCell;
+
+    use crate::transport::tcp::socket::ListenerNotifier;
+
+    impl RingBuffer {
+        /// Enqueues as much of `data` as possible to the end of the buffer.
+        ///
+        /// Returns the number of bytes actually queued.
+        pub(crate) fn enqueue_data(&mut self, data: &[u8]) -> usize {
+            let nwritten = self.write_at(0, &data);
+            self.make_readable(nwritten);
+            nwritten
+        }
+    }
+
+    impl Buffer for Rc<RefCell<RingBuffer>> {
+        fn limits(&self) -> BufferLimits {
+            self.borrow().limits()
+        }
+
+        fn target_capacity(&self) -> usize {
+            self.borrow().target_capacity()
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            self.borrow_mut().set_target_size(size)
+        }
+    }
+
+    impl ReceiveBuffer for Rc<RefCell<RingBuffer>> {
+        fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
+            self.borrow_mut().write_at(offset, data)
+        }
+
+        fn make_readable(&mut self, count: usize) {
+            self.borrow_mut().make_readable(count)
+        }
+    }
+
+    #[derive(Debug, Default)]
+    pub struct TestSendBuffer {
+        fake_stream: Rc<RefCell<Vec<u8>>>,
+        ring: RingBuffer,
+    }
+
+    impl TestSendBuffer {
+        pub fn new(fake_stream: Rc<RefCell<Vec<u8>>>, ring: RingBuffer) -> TestSendBuffer {
+            Self { fake_stream, ring }
+        }
+    }
+
+    impl Buffer for TestSendBuffer {
+        fn limits(&self) -> BufferLimits {
+            let Self { fake_stream, ring } = self;
+            let BufferLimits { capacity: ring_capacity, len: ring_len } = ring.limits();
+            let len = ring_len + fake_stream.borrow().len();
+            let capacity = ring_capacity + fake_stream.borrow().capacity();
+            BufferLimits { len, capacity }
+        }
+
+        fn target_capacity(&self) -> usize {
+            let Self { fake_stream: _, ring } = self;
+            ring.target_capacity()
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            let Self { fake_stream: _, ring } = self;
+            ring.set_target_size(size)
+        }
+    }
+
+    impl SendBuffer for TestSendBuffer {
+        fn mark_read(&mut self, count: usize) {
+            let Self { fake_stream: _, ring } = self;
+            ring.mark_read(count)
+        }
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(SendPayload<'a>) -> R,
+        {
+            let Self { fake_stream, ring } = self;
+            if !fake_stream.borrow().is_empty() {
+                // Pull from the fake stream into the ring if there is capacity.
+                let BufferLimits { capacity, len } = ring.limits();
+                let len = (capacity - len).min(fake_stream.borrow().len());
+                let rest = fake_stream.borrow_mut().split_off(len);
+                let first = fake_stream.replace(rest);
+                assert_eq!(ring.enqueue_data(&first[..]), len);
+            }
+            ring.peek_with(offset, f)
+        }
+    }
+
+    #[derive(Clone, Debug, Default, Eq, PartialEq)]
+    pub struct ClientBuffers {
+        pub receive: Rc<RefCell<RingBuffer>>,
+        pub send: Rc<RefCell<Vec<u8>>>,
+    }
+
+    impl ClientBuffers {
+        pub fn new(buffer_sizes: BufferSizes) -> Self {
+            let BufferSizes { send, receive } = buffer_sizes;
+            Self {
+                receive: Rc::new(RefCell::new(RingBuffer::new(receive))),
+                send: Rc::new(RefCell::new(Vec::with_capacity(send))),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum ProvidedBuffers {
+        Buffers(WriteBackClientBuffers),
+        NoBuffers,
+    }
+
+    impl Default for ProvidedBuffers {
+        fn default() -> Self {
+            Self::NoBuffers
+        }
+    }
+
+    impl From<WriteBackClientBuffers> for ProvidedBuffers {
+        fn from(buffers: WriteBackClientBuffers) -> Self {
+            ProvidedBuffers::Buffers(buffers)
+        }
+    }
+
+    impl From<ProvidedBuffers> for WriteBackClientBuffers {
+        fn from(extra: ProvidedBuffers) -> Self {
+            match extra {
+                ProvidedBuffers::Buffers(buffers) => buffers,
+                ProvidedBuffers::NoBuffers => Default::default(),
+            }
+        }
+    }
+
+    impl From<ProvidedBuffers> for () {
+        fn from(_: ProvidedBuffers) -> Self {
+            ()
+        }
+    }
+
+    impl From<()> for ProvidedBuffers {
+        fn from(_: ()) -> Self {
+            Default::default()
+        }
+    }
+
+    #[derive(Debug, Default, Clone, PartialEq, Eq)]
+    pub struct WriteBackClientBuffers(pub Rc<RefCell<Option<ClientBuffers>>>);
+
+    impl IntoBuffers<Rc<RefCell<RingBuffer>>, TestSendBuffer> for ProvidedBuffers {
+        fn into_buffers(
+            self,
+            buffer_sizes: BufferSizes,
+        ) -> (Rc<RefCell<RingBuffer>>, TestSendBuffer) {
+            let buffers = ClientBuffers::new(buffer_sizes);
+            if let ProvidedBuffers::Buffers(b) = self {
+                *b.0.as_ref().borrow_mut() = Some(buffers.clone());
+            }
+            let ClientBuffers { receive, send } = buffers;
+            (receive, TestSendBuffer::new(send, Default::default()))
+        }
+    }
+
+    impl ListenerNotifier for ProvidedBuffers {
+        fn new_incoming_connections(&mut self, _: usize) {}
+    }
+}
+
 #[cfg(test)]
 mod test {
     use assert_matches::assert_matches;
@@ -667,17 +843,6 @@ mod test {
     use crate::transport::tcp::seqnum::WindowSize;
 
     const TEST_BYTES: &'static [u8] = "Hello World!".as_bytes();
-
-    impl RingBuffer {
-        /// Enqueues as much of `data` as possible to the end of the buffer.
-        ///
-        /// Returns the number of bytes actually queued.
-        pub(crate) fn enqueue_data(&mut self, data: &[u8]) -> usize {
-            let nwritten = self.write_at(0, &data);
-            self.make_readable(nwritten);
-            nwritten
-        }
-    }
 
     proptest! {
         #![proptest_config(Config {

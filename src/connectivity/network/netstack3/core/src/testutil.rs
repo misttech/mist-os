@@ -6,10 +6,11 @@
 
 #[cfg(test)]
 use alloc::vec;
-use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, collections::HashMap, rc::Rc, sync::Arc, vec::Vec};
 #[cfg(test)]
 use core::time::Duration;
 use core::{
+    cell::RefCell,
     ffi::CStr,
     fmt::Debug,
     marker::PhantomData,
@@ -68,7 +69,10 @@ use crate::{
     sync::Mutex,
     transport::{
         tcp::{
-            buffer::RingBuffer,
+            buffer::{
+                testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
+                RingBuffer,
+            },
             socket::{ListenerNotifier, NonSyncContext},
             BufferSizes,
         },
@@ -424,19 +428,23 @@ impl ListenerNotifier for () {
 }
 
 impl NonSyncContext for FakeNonSyncCtx {
-    type ReceiveBuffer = RingBuffer;
+    type ReceiveBuffer = Rc<RefCell<RingBuffer>>;
 
-    type SendBuffer = RingBuffer;
+    type SendBuffer = TestSendBuffer;
 
-    type ReturnedBuffers = ();
+    type ReturnedBuffers = ClientBuffers;
 
-    type ListenerNotifierOrProvidedBuffers = ();
+    type ListenerNotifierOrProvidedBuffers = ProvidedBuffers;
 
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,
     ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers) {
-        let BufferSizes { send, receive } = buffer_sizes;
-        (RingBuffer::new(receive), RingBuffer::new(send), ())
+        let client = ClientBuffers::new(buffer_sizes);
+        (
+            Rc::clone(&client.receive),
+            TestSendBuffer::new(Rc::clone(&client.send), RingBuffer::default()),
+            client,
+        )
     }
 
     fn default_buffer_sizes() -> BufferSizes {
