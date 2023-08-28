@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Error},
+    anyhow::{anyhow, Error, Result},
     async_trait::async_trait,
     chrono::{prelude::*, LocalResult},
     fdio::service_connect,
@@ -49,9 +49,9 @@ pub enum RtcCreationError {
 #[async_trait]
 pub trait Rtc: Send + Sync {
     /// Returns the current time reported by the realtime clock.
-    async fn get(&self) -> Result<zx::Time, Error>;
+    async fn get(&self) -> Result<zx::Time>;
     /// Sets the time of the realtime clock to `value`.
-    async fn set(&self, value: zx::Time) -> Result<(), Error>;
+    async fn set(&self, value: zx::Time) -> Result<()>;
 }
 
 /// An implementation of the `Rtc` trait that connects to an RTC device in /dev/class/rtc.
@@ -94,7 +94,7 @@ impl RtcImpl {
     }
 }
 
-fn fidl_time_to_zx_time(fidl_time: frtc::Time) -> Result<zx::Time, Error> {
+fn fidl_time_to_zx_time(fidl_time: frtc::Time) -> Result<zx::Time> {
     let chrono = Utc
         .ymd_opt(fidl_time.year as i32, fidl_time.month as u32, fidl_time.day as u32)
         .and_hms_opt(fidl_time.hours as u32, fidl_time.minutes as u32, fidl_time.seconds as u32);
@@ -119,17 +119,17 @@ fn zx_time_to_fidl_time(zx_time: zx::Time) -> frtc::Time {
 
 #[async_trait]
 impl Rtc for RtcImpl {
-    async fn get(&self) -> Result<zx::Time, Error> {
+    async fn get(&self) -> Result<zx::Time> {
         self.proxy
             .get()
-            .map_err(|err| anyhow!("FIDL error: {}", err))
-            .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on get")))
+            .map_err(|err| anyhow!("FIDL error on Rtc::get: {}", err))
+            .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on Rtc::get")))
             .await?
-            .map_err(|err| anyhow!("Driver error: {}", err))
+            .map_err(|err| anyhow!("Driver error on Rtc::get: {}", err))
             .and_then(fidl_time_to_zx_time)
     }
 
-    async fn set(&self, value: zx::Time) -> Result<(), Error> {
+    async fn set(&self, value: zx::Time) -> Result<()> {
         let fractional_second = zx::Duration::from_nanos(value.into_nanos() % NANOS_PER_SECOND);
         // The RTC API only accepts integer seconds but we really need higher accuracy, particularly
         // for the kernel clock set by the RTC driver...
@@ -146,10 +146,10 @@ impl Rtc for RtcImpl {
         let status = self
             .proxy
             .set(&fidl_time)
-            .map_err(|err| anyhow!("FIDL error: {}", err))
-            .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on set")))
+            .map_err(|err| anyhow!("FIDL error on Rtc::set: {}", err))
+            .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on Rtc::set")))
             .await?;
-        zx::Status::ok(status).map_err(|stat| anyhow!("Bad status on set: {:?}", stat))
+        zx::Status::ok(status).map_err(|stat| anyhow!("Bad status on Rtc::set: {:?}", stat))
     }
 }
 
@@ -186,11 +186,11 @@ impl FakeRtc {
 #[cfg(test)]
 #[async_trait]
 impl Rtc for FakeRtc {
-    async fn get(&self) -> Result<zx::Time, Error> {
+    async fn get(&self) -> Result<zx::Time> {
         self.value.as_ref().map(|time| time.clone()).map_err(|msg| Error::msg(msg.clone()))
     }
 
-    async fn set(&self, value: zx::Time) -> Result<(), Error> {
+    async fn set(&self, value: zx::Time) -> Result<()> {
         let mut last_set = self.last_set.lock();
         last_set.replace(value);
         Ok(())
