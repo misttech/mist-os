@@ -259,16 +259,22 @@ fxl::RefPtr<AsyncOutputBuffer> FormatThen(const ExprValue& then, const FormatFut
 
 fxl::RefPtr<AsyncOutputBuffer> FormatMap(const ExprValue& map, const FormatFutureOptions& options,
                                          const fxl::RefPtr<EvalContext>& context, int indent) {
-  ErrOrValue val = ResolveNonstaticMember(context, map, {"inner"});
+  ErrOrValue val = ResolveSingleVariantValue(context, map);
   if (val.has_error())
     return FormatError("Invalid Map (1)", val.err());
-  val = ResolveSingleVariantValue(context, val.value());
-  if (val.has_error())
-    return FormatError("Invalid Map (2)", val.err());
   val = ResolveNonstaticMember(context, val.value(), {"future"});
   if (val.has_error())
-    return FormatError("Invalid Map (3)", val.err());
+    return FormatError("Invalid Map (2)", val.err());
   return FormatFuture(val.value(), options, context, indent);
+}
+
+fxl::RefPtr<AsyncOutputBuffer> FormatMapDebug(const ExprValue& map,
+                                              const FormatFutureOptions& options,
+                                              const fxl::RefPtr<EvalContext>& context, int indent) {
+  ErrOrValue val = ResolveNonstaticMember(context, map, {"inner"});
+  if (val.has_error())
+    return FormatError("Invalid Map (0)", val.err());
+  return FormatMap(val.value(), options, context, indent);
 }
 
 fxl::RefPtr<AsyncOutputBuffer> FormatMaybeDone(const ExprValue& maybe_done,
@@ -348,7 +354,9 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
     return FormatMaybeDone(future, options, context, indent);
   if (type == "futures_util::future::future::Then")
     return FormatThen(future, options, context, indent);
-  if (type == "futures_util::future::future::Map")
+  if (type == "futures_util::future::future::Map")  // only appears in debug mode.
+    return FormatMapDebug(future, options, context, indent);
+  if (type == "futures_util::future::future::map::Map")
     return FormatMap(future, options, context, indent);
   if (type == "futures_util::future::future::remote_handle::Remote")
     return FormatRemote(future, options, context, indent);
@@ -509,26 +517,6 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
   return out;
 }
 
-fxl::RefPtr<AsyncOutputBuffer> FormatSendExecutorMainThread(
-    const FormatFutureOptions& options, const fxl::RefPtr<EvalContext>& context) {
-  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  EvalExpression("self.inner->data.active_tasks.data.value", context, false,
-                 [out, options, context](const ErrOrValue& value) {
-                   out->Complete(FormatActiveTasksHashMap(value, options, context));
-                 });
-  return out;
-}
-
-fxl::RefPtr<AsyncOutputBuffer> FormatExecutorWorkerThread(const FormatFutureOptions& options,
-                                                          const fxl::RefPtr<EvalContext>& context) {
-  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  EvalExpression("self.ptr->data.active_tasks.data.value", context, false,
-                 [out, options, context](const ErrOrValue& value) {
-                   out->Complete(FormatActiveTasksHashMap(value, options, context));
-                 });
-  return out;
-}
-
 void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
                   const FormatFutureOptions& options) {
   // Step 2: locate main_future and the executor.
@@ -542,12 +530,15 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
     if (!stack[i]->GetLocation().has_symbols())
       continue;
     std::string func_name(StripTemplate(stack[i]->GetLocation().symbol().Get()->GetFullName()));
-    if (func_name == "fuchsia_async::runtime::fuchsia::executor::common::Inner::worker_lifecycle") {
-      cmd_context->Output(FormatExecutorWorkerThread(options, stack[i]->GetEvalContext()));
-      return;
-    }
-    if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
-      cmd_context->Output(FormatSendExecutorMainThread(options, stack[i]->GetEvalContext()));
+    if (func_name == "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run" ||
+        func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
+      auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+      auto context = stack[i]->GetEvalContext();
+      EvalExpression("self.inner->data.active_tasks.data.value", context, false,
+                     [out, options, context](const ErrOrValue& value) {
+                       out->Complete(FormatActiveTasksHashMap(value, options, context));
+                     });
+      cmd_context->Output(out);
       return;
     }
   }
