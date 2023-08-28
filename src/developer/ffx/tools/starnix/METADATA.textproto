@@ -4,13 +4,19 @@
 
 last_reviewed_date: {
   year: 2023
-  month: 4
-  day: 17
+  month: 8
+  day: 28
 }
 
 trackers: {
+  # TODO(fxbug.dev/132769): Migrate Flake fetcher to Buganizer. This component
+  # is for Flake fetcher use only. Use `Starnix` component for all other issues.
   monorail: {
     project: "fuchsia"
-    component: "Starnix"
+    component: "StarnixFlakes"
+  }
+  # Buganizer component_id for `starnix` public component.
+  issue_tracker: {
+    component_id: 1396624
   }
 }
