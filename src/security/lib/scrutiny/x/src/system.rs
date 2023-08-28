@@ -3,12 +3,24 @@
 // found in the LICENSE file.
 
 use super::api;
+use super::api::Package as _;
 use super::blob::BlobDirectoryError;
 use super::product_bundle::ProductBundle;
 use super::update_package::Error as UpdatePackageError;
 use super::update_package::UpdatePackage;
+use super::zbi::Error as ZbiError;
+use super::zbi::Zbi;
 use std::rc::Rc;
 use thiserror::Error;
+
+/// The path to the unsigned fuchsia ZBI image relative to the update package root.
+const FUCHSIA_ZBI_PATH: &str = "zbi";
+/// The path to the signed fuchsia ZBI image relative to the update package root.
+const FUCHSIA_ZBI_SIGNED_PATH: &str = "zbi.signed";
+/// The path to the unsigned recovery ZBI image relative to the update package root.
+const RECOVERY_ZBI_PATH: &str = "recovery";
+/// The path to the signed recovery ZBI image relative to the update package root.
+const RECOVERY_ZBI_SIGNED_PATH: &str = "recovery.signed";
 
 /// Errors that may occur when constructing a [`System`].
 #[derive(Debug, Error)]
@@ -17,6 +29,10 @@ pub enum Error {
     BlobDirectory(#[from] BlobDirectoryError),
     #[error("failed to construct update package: {0}")]
     UpdatePackage(#[from] UpdatePackageError),
+    #[error("failed to find zbi as content blob in update package at path \"{zbi_signed_path}\" or \"{zbi_path}\"")]
+    MissingZbiBlob { zbi_signed_path: Box<dyn api::Path>, zbi_path: Box<dyn api::Path> },
+    #[error("failed to load zbi from update package: {0}")]
+    Zbi(#[from] ZbiError),
 }
 
 #[derive(Clone)]
@@ -24,25 +40,48 @@ pub(crate) struct System(Rc<SystemData>);
 
 impl System {
     /// Constructs a [`System`] backed by `product_bundle`.
-    pub fn new(product_bundle: ProductBundle) -> Result<Self, Error> {
+    pub fn new(product_bundle: ProductBundle, variant: api::SystemVariant) -> Result<Self, Error> {
         let build_dir = product_bundle.directory().clone();
         let blob_set = product_bundle.blob_set()?;
-        let update_package: Box<dyn api::UpdatePackage> = Box::new(UpdatePackage::new(
+        let update_package = UpdatePackage::new(
             Some(product_bundle.data_source().clone()),
             product_bundle.update_package_hash().clone(),
             blob_set,
-        )?);
-        Ok(Self(Rc::new(SystemData { build_dir, update_package })))
+        )?;
+        let (zbi_path, zbi_signed_path): (Box<dyn api::Path>, Box<dyn api::Path>) = match variant {
+            api::SystemVariant::Recovery => {
+                (Box::new(RECOVERY_ZBI_PATH), Box::new(RECOVERY_ZBI_SIGNED_PATH))
+            }
+            api::SystemVariant::Main => {
+                (Box::new(FUCHSIA_ZBI_PATH), Box::new(FUCHSIA_ZBI_SIGNED_PATH))
+            }
+        };
+        let (actual_zbi_path, zbi_blob) = update_package
+            .content_blobs()
+            .find(|(path, _blob)| path == &zbi_signed_path)
+            .or_else(|| update_package.content_blobs().find(|(path, _blob)| path == &zbi_path))
+            .ok_or_else(|| Error::MissingZbiBlob { zbi_signed_path, zbi_path })?;
+        let zbi = Zbi::new(Some(update_package.data_source()), actual_zbi_path, zbi_blob)?;
+        Ok(Self(Rc::new(SystemData {
+            variant,
+            build_dir,
+            update_package: Box::new(update_package),
+            zbi: Box::new(zbi),
+        })))
     }
 }
 
 impl api::System for System {
+    fn variant(&self) -> api::SystemVariant {
+        self.0.variant.clone()
+    }
+
     fn build_dir(&self) -> Box<dyn api::Path> {
         self.0.build_dir.clone()
     }
 
     fn zbi(&self) -> Box<dyn api::Zbi> {
-        todo!()
+        self.0.zbi.clone()
     }
 
     fn update_package(&self) -> Box<dyn api::UpdatePackage> {
@@ -67,8 +106,10 @@ impl api::System for System {
 }
 
 struct SystemData {
+    variant: api::SystemVariant,
     build_dir: Box<dyn api::Path>,
     update_package: Box<dyn api::UpdatePackage>,
+    zbi: Box<dyn api::Zbi>,
 }
 
 #[cfg(test)]
@@ -123,7 +164,8 @@ mod tests {
         let product_bundle = ProductBundle::new(pb_path.clone()).expect("create product bundle");
 
         // Instantiate system.
-        let system = System::new(product_bundle).expect("create system instance");
+        let system =
+            System::new(product_bundle, api::SystemVariant::Main).expect("create system instance");
         assert_eq!(system.build_dir().to_string(), pb_path.to_string());
         let update_package = system.update_package();
         assert_eq!(update_package.hash().to_string(), update_package_hash.to_string());

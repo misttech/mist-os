@@ -202,7 +202,7 @@ impl Package {
             .collect::<Result<Vec<BlobData>, Error>>()?;
 
         Ok(Self(Rc::new(PackageData {
-            data_source: Box::new(package_data_source),
+            data_source: package_data_source,
             hash,
             meta_package: MetaPackage(meta_package),
             meta_contents: MetaContents(meta_contents),
@@ -211,6 +211,10 @@ impl Package {
             far_reader: Rc::new(RefCell::new(far_reader)),
             content_blob_set,
         })))
+    }
+
+    pub fn data_source(&self) -> ds::DataSource {
+        self.0.data_source.clone()
     }
 }
 
@@ -260,7 +264,7 @@ impl api::Package for Package {
 /// Internal state of a [`Package`] object.
 struct PackageData {
     /// The data source from which the package was loaded.
-    data_source: Box<dyn api::DataSource>,
+    data_source: ds::DataSource,
 
     /// The `Hash` of the package's meta.far file.
     hash: Box<dyn api::Hash>,

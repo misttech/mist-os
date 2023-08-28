@@ -14,11 +14,11 @@ use {
     tracing::trace,
 };
 
-const BOOTFS_MAGIC: u32 = 0xa56d3ff9;
+pub(crate) const BOOTFS_MAGIC: u32 = 0xa56d3ff9;
 
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
-struct BootfsHeader {
+pub(crate) struct BootfsHeader {
     magic: u32,
     dir_size: u32,
     reserved_0: u32,
@@ -132,15 +132,25 @@ impl BootfsReader {
     }
 }
 
+/// Test helpers for pre-computed bootfs images.
+pub mod test {
+    use super::*;
+
+    /// Returns raw bytes for a bootfs image that contains no file entries.
+    pub fn empty_bootfs_bytes() -> Vec<u8> {
+        let bootfs_header =
+            BootfsHeader { magic: BOOTFS_MAGIC, dir_size: 0, reserved_0: 0, reserved_1: 0 };
+        bincode::serialize(&bootfs_header).unwrap()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {super::test::*, super::*};
 
     #[test]
     fn test_bootfs_empty() {
-        let bootfs_header =
-            BootfsHeader { magic: BOOTFS_MAGIC, dir_size: 0, reserved_0: 0, reserved_1: 0 };
-        let bytes = bincode::serialize(&bootfs_header).unwrap();
+        let bytes = empty_bootfs_bytes();
         let mut reader = BootfsReader::new(bytes);
         let files = reader.parse().unwrap();
         assert_eq!(files.len(), 0);

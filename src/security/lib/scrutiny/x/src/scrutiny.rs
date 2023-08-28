@@ -28,10 +28,13 @@ pub(crate) struct Scrutiny(Rc<ScrutinyData>);
 impl Scrutiny {
     /// Constructs a [`Scrutiny`] instance backed by build artifacts referenced in a single product
     /// bundle.
-    pub fn new(product_bundle_path: Box<dyn api::Path>) -> Result<Self, Error> {
+    pub fn new(
+        product_bundle_path: Box<dyn api::Path>,
+        variant: api::SystemVariant,
+    ) -> Result<Self, Error> {
         let product_bundle = pb::ProductBundle::new(product_bundle_path)?;
         let product_bundle_blob_set = product_bundle.blob_set()?;
-        let system: Box<dyn api::System> = Box::new(System::new(product_bundle.clone())?);
+        let system: Box<dyn api::System> = Box::new(System::new(product_bundle.clone(), variant)?);
         Ok(Self(Rc::new(ScrutinyData { product_bundle, product_bundle_blob_set, system })))
     }
 }

@@ -117,6 +117,9 @@ pub enum ScrutinyPackagesError {
 
 /// High-level metadata about the system inspected by a [`Scrutiny`] instance.
 pub trait System {
+    /// The kind of Fuchsia system under inspection.
+    fn variant(&self) -> SystemVariant;
+
     /// The build directory associated with the system build.
     fn build_dir(&self) -> Box<dyn Path>;
 
@@ -139,16 +142,29 @@ pub trait System {
     fn component_manager_configuration(&self) -> Box<dyn ComponentManagerConfiguration>;
 }
 
+/// The kind of Fuchsia system that should be inspected by a [`Scrutiny`] instance. The variant determines a
+/// variety of strategies used to locate system artifacts. For example, the location of the Zircon Boot Image
+/// (ZBI) in the Update Package is different for `Main` and `Recovery` systems.
+#[derive(Clone)]
+pub enum SystemVariant {
+    /// The usual system layout that would be installed on the "A/B" device partitions.
+    Main,
+    /// The recovery system layout that would be installed on a "recovery" device partition.
+    Recovery,
+}
+
 // TODO(fxbug.dev/112121): This is over-fitted to the "inspect bootfs" use case, and should probably be in terms of
 // the various types of ZBI sections.
 
 /// Model of the system's Zircon Boot Image (ZBI) used for Zircon kernel to userspace bootstrapping
 /// (userboot). See https://fuchsia.dev/fuchsia-src/concepts/process/userboot for details.
-pub trait Zbi {
+pub trait Zbi: DynClone {
     /// Iterate over (path, contents) pairs of files in this ZBI's bootfs. See
     /// https://fuchsia.dev/fuchsia-src/concepts/process/userboot#bootfs for details.
     fn bootfs(&self) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>, ZbiError>;
 }
+
+clone_trait_object!(Zbi);
 
 #[derive(Debug, Error)]
 pub enum ZbiError {

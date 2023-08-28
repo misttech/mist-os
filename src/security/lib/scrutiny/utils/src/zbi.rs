@@ -258,12 +258,12 @@ impl VBootSeeker {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use {super::*, std::convert::TryInto};
+/// Test helpers for pre-computed zbi images.
+pub mod test {
+    use {super::*, crate::bootfs::test::*};
 
-    #[test]
-    fn test_zbi_empty_container() {
+    /// Returns raw bytes for a zbi container that has no sections.
+    pub fn empty_zbi_bytes() -> Vec<u8> {
         let container_header = ZbiHeader {
             zbi_type: ZBI_TYPE_CONTAINER,
             length: 0,
@@ -274,10 +274,66 @@ mod tests {
             magic: ZBI_ITEM_MAGIC,
             crc32: 0,
         };
-        let zbi_bytes = bincode::serialize(&container_header).unwrap();
+
+        bincode::serialize(&container_header).unwrap()
+    }
+
+    /// Returns raw bytes for a zbi container has exactly one section: a bootfs section containing no file entries.
+    pub fn zbi_with_empty_bootfs_bytes() -> Vec<u8> {
+        let section_data = empty_bootfs_bytes();
+
+        let section_header = ZbiHeader {
+            zbi_type: ZbiType::StorageBootfs as u32,
+            length: section_data.len() as u32,
+            extra: 0,
+            flags: 0,
+            reserved_0: 0,
+            reserved_1: 0,
+            magic: ZBI_ITEM_MAGIC,
+            crc32: 0,
+        };
+
+        let mut section_bytes: Vec<u8> = bincode::serialize(&section_header).unwrap();
+        section_bytes.extend(&section_data);
+
+        let container_header = ZbiHeader {
+            zbi_type: ZBI_TYPE_CONTAINER,
+            length: section_bytes.len() as u32,
+            extra: 0,
+            flags: 0,
+            reserved_0: 0,
+            reserved_1: 0,
+            magic: ZBI_ITEM_MAGIC,
+            crc32: 0,
+        };
+
+        let mut zbi_bytes: Vec<u8> = bincode::serialize(&container_header).unwrap();
+        zbi_bytes.extend(&section_bytes);
+
+        zbi_bytes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::test::*, super::*, crate::bootfs::test::*, std::convert::TryInto};
+
+    #[test]
+    fn test_zbi_empty_container() {
+        let zbi_bytes = empty_zbi_bytes();
         let mut reader = ZbiReader::new(zbi_bytes);
         let sections = reader.parse().unwrap();
         assert_eq!(sections.len(), 0);
+    }
+
+    #[test]
+    fn test_zbi_with_empty_bootfs() {
+        let zbi_bytes = zbi_with_empty_bootfs_bytes();
+        let mut reader = ZbiReader::new(zbi_bytes);
+        let sections = reader.parse().unwrap();
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].section_type, ZbiType::StorageBootfs);
+        assert_eq!(sections[0].buffer, empty_bootfs_bytes());
     }
 
     #[test]

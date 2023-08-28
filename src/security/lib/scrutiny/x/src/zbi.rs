@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO: Exercise all crate-local code in tests and/or other modules.
-#![allow(dead_code)]
-
 use super::api;
 use super::blob::UnverifiedMemoryBlob;
 use super::data_source as ds;
@@ -16,18 +13,19 @@ use scrutiny_utils::zbi::ZbiReader;
 use scrutiny_utils::zbi::ZbiType;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs;
 use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub(crate) enum Error {
-    #[error("failed to read zbi from {path:?}: {error}")]
-    Filesystem { path: Box<dyn api::Path>, error: std::io::Error },
-    #[error("failed parse zbi image from path {path:?}: {error}")]
-    ParseZbi { path: Box<dyn api::Path>, error: anyhow::Error },
-    #[error("expected to find exactly 1 bootfs section in zbi, but found {num_bootfs_sections} in zbi at path {path:?}")]
-    BootfsSections { path: Box<dyn api::Path>, num_bootfs_sections: usize },
+pub enum Error {
+    #[error("failed to open zbi blob: {0}")]
+    Open(#[from] api::BlobError),
+    #[error("failed to read zbi blob: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("failed parse zbi image: {0}")]
+    ParseZbi(#[from] anyhow::Error),
+    #[error("expected to find exactly 1 bootfs section in zbi, but found {0}")]
+    BootfsSections(usize),
 }
 
 #[derive(Clone, Debug)]
@@ -37,12 +35,13 @@ impl Zbi {
     pub fn new(
         mut parent_data_source: Option<ds::DataSource>,
         path: Box<dyn api::Path>,
+        blob: Box<dyn api::Blob>,
     ) -> Result<Self, Error> {
-        let buffer = fs::read(path.as_ref())
-            .map_err(|error| Error::Filesystem { path: path.clone(), error })?;
+        let mut buffer = vec![];
+        blob.reader_seeker()?.read_to_end(&mut buffer)?;
+        let buffer = buffer;
         let mut zbi_reader = ZbiReader::new(buffer);
-        let zbi_sections =
-            zbi_reader.parse().map_err(|error| Error::ParseZbi { path: path.clone(), error })?;
+        let zbi_sections = zbi_reader.parse()?;
         let bootfs_sections = zbi_sections
             .into_iter()
             .filter(|section| section.section_type == ZbiType::StorageBootfs)
@@ -50,10 +49,7 @@ impl Zbi {
         let bootfs_section = match bootfs_sections.as_slice() {
             [section] => section,
             sections => {
-                return Err(Error::BootfsSections {
-                    path: path.clone(),
-                    num_bootfs_sections: sections.len(),
-                });
+                return Err(Error::BootfsSections(sections.len()));
             }
         };
 

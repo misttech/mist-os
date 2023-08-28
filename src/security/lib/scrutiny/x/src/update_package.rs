@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/111242): Exercise production update package implementations to eliminate dead code
-// warnings.
-#![allow(dead_code)]
-
 use super::api;
 use super::api::Package as _;
 use super::blob::BlobOpenError;
 use super::blob::BlobSet;
+use super::data_source as ds;
 use super::data_source::DataSource;
 use super::package::Error as PackageError;
 use super::package::Package;
@@ -42,7 +39,7 @@ pub enum Error {
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/update_pkg for details.
 #[derive(Clone)]
 pub(crate) struct UpdatePackage {
-    package: Box<dyn api::Package>,
+    package: Package,
     packages_json: Vec<PinnedAbsolutePackageUrl>,
 }
 
@@ -78,9 +75,13 @@ impl UpdatePackage {
         let mut packages_json_contents = vec![];
         packages_json_reader.read_to_end(&mut packages_json_contents)?;
         Ok(Self {
-            package: Box::new(package),
+            package,
             packages_json: update_package::parse_packages_json(packages_json_contents.as_slice())?,
         })
+    }
+
+    pub fn data_source(&self) -> ds::DataSource {
+        self.package.data_source()
     }
 }
 
@@ -133,6 +134,7 @@ pub mod test {
     use fuchsia_merkle::Hash;
     use fuchsia_pkg::PackageManifest;
     use once_cell::sync::Lazy;
+    use scrutiny_utils::zbi::test::zbi_with_empty_bootfs_bytes;
     use std::io::Write as _;
     use tempfile::NamedTempFile;
 
@@ -164,7 +166,9 @@ pub mod test {
         let mut version_file = NamedTempFile::new().expect("create version file");
         writeln!(version_file, "1.2.3.4").expect("write version file");
 
-        let zbi_file = NamedTempFile::new().expect("create zbi file");
+        let mut zbi_file = NamedTempFile::new().expect("create zbi file");
+        zbi_file.write_all(zbi_with_empty_bootfs_bytes().as_slice()).expect("write zbi");
+        let zbi_file = zbi_file;
         let zbi_path = Utf8Path::from_path(zbi_file.path()).expect("get zbi path");
 
         let mut builder = UpdatePackageBuilder::new(

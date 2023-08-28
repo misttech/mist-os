@@ -61,7 +61,8 @@ fn run_smoke_test(args: Args) -> Result<()> {
     let Args { depfile, stamp, product_bundle, .. } = args;
 
     let product_bundle_path: Box<dyn scrutiny::Path> = Box::new(product_bundle.clone());
-    let scrutiny = scrutiny::scrutiny(product_bundle_path).map_err(|error| anyhow!("{}", error))?;
+    let scrutiny = scrutiny::scrutiny(product_bundle_path, scrutiny::SystemVariant::Main)
+        .map_err(|error| anyhow!("{}", error))?;
 
     output_data_sources(scrutiny.as_ref());
     output_blobs(scrutiny.as_ref());
