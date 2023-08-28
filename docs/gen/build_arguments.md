@@ -2982,6 +2982,19 @@ useful for including verification and other Bazel assembly specific targets.
 
 From //build/images/args.gni:214
 
+### extra_cipd_assembly_artifact_targets
+
+Extra targets to be traversed by //:cipd_assembly_artifacts for GN metadata
+only. These targets are expected to set "assembly_inputs" in metadata, which
+can include a JSON file describing artifacts to be uploaded to CPID.
+
+NOTE: These targets are for GN metadata walk only. If the artifacts need to
+be built, they should be included in the build graph through other means.
+
+**Current value (from the default):** `[]`
+
+From //build/product.gni:62
+
 ### extra_gn_labels_for_bazel_inputs
 
 A list of extra labels to bazel_input_xxx() targets that complement
