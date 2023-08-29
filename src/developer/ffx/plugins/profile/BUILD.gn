@@ -5,28 +5,42 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-ffx_plugin("ffx_profile") {
-  version = "0.1.0"
-  edition = "2021"
-  plugin_deps = [
-    "cpu:ffx_profile_cpu",
-    "gpu:ffx_profile_gpu",
-    "heapdump:ffx_profile_heapdump",
-    "memory:ffx_profile_memory",
-    "network:ffx_profile_network",
-    "power:ffx_profile_power",
-    "temperature:ffx_profile_temperature",
-  ]
+if (is_host) {
+  ffx_plugin("ffx_profile") {
+    version = "0.1.0"
+    edition = "2021"
+    plugin_deps = [
+      "cpu:ffx_profile_cpu",
+      "gpu:ffx_profile_gpu",
+      "heapdump:ffx_profile_heapdump",
+      "memory:ffx_profile_memory",
+      "network:ffx_profile_network",
+      "power:ffx_profile_power",
+      "temperature:ffx_profile_temperature",
+    ]
 
-  args_sources = [ "src/args.rs" ]
+    args_sources = [ "src/args.rs" ]
+  }
+
+  ffx_tool("ffx_profile_tool") {
+    edition = "2021"
+    output_name = "ffx-profile"
+    deps = [
+      ":ffx_profile_suite",
+      "//src/lib/fuchsia-async",
+    ]
+    sources = [ "src/main.rs" ]
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [ "heapdump:host_tests" ]
+  }
 }
 
-ffx_tool("ffx_profile_tool") {
-  edition = "2021"
-  output_name = "ffx-profile"
-  deps = [
-    ":ffx_profile_suite",
-    "//src/lib/fuchsia-async",
-  ]
-  sources = [ "src/main.rs" ]
+if (is_fuchsia) {
+  group("package_deps_for_host_tests") {
+    testonly = true
+    deps = [ "heapdump:package_deps_for_host_tests" ]
+  }
 }

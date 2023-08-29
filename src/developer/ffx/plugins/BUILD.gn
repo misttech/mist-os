@@ -7,6 +7,7 @@ if (is_host) {
     testonly = true
     deps = [
       "component:host_tests",
+      "profile:host_tests",
       "target:host_tests",
     ]
   }
@@ -15,6 +16,9 @@ if (is_host) {
 if (is_fuchsia) {
   group("package_deps_for_host_tests") {
     testonly = true
-    deps = [ "component:package_deps_for_host_tests" ]
+    deps = [
+      "component:package_deps_for_host_tests",
+      "profile:package_deps_for_host_tests",
+    ]
   }
 }

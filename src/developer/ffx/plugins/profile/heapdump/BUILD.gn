@@ -4,14 +4,57 @@
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
-ffx_plugin("ffx_profile_heapdump") {
-  version = "0.1.0"
-  edition = "2021"
-  plugin_deps = [
-    "download:ffx_profile_heapdump_download",
-    "list:ffx_profile_heapdump_list",
-    "snapshot:ffx_profile_heapdump_snapshot",
-  ]
-  args_sources = [ "src/args.rs" ]
-  test_deps = [ "common:ffx_profile_heapdump_common_test" ]
+if (is_host) {
+  ffx_plugin("ffx_profile_heapdump") {
+    version = "0.1.0"
+    edition = "2021"
+    plugin_deps = [
+      "download:ffx_profile_heapdump_download",
+      "list:ffx_profile_heapdump_list",
+      "snapshot:ffx_profile_heapdump_snapshot",
+    ]
+    args_sources = [ "src/args.rs" ]
+  }
+
+  rustc_test("verify_ffx_profile_heapdump") {
+    testonly = true
+
+    edition = "2021"
+    source_root = "src/tests.rs"
+    sources = [ source_root ]
+
+    deps = [
+      "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+      "//src/lib/fuchsia",
+      "//src/lib/fuchsia-async",
+      "//src/performance/memory/pprof",
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:prost",
+      "//third_party/rust_crates:serde",
+      "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tempfile",
+      "//third_party/rust_crates:tracing",
+    ]
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [ "common:ffx_profile_heapdump_common_test" ]
+
+    # TODO(fxbug.dev/122141): ASAN builds use a different allocator that
+    # heapdump's instrumentation does not support yet.
+    if (!is_asan) {
+      deps += [ ":verify_ffx_profile_heapdump" ]
+    }
+  }
+}
+
+if (is_fuchsia) {
+  group("package_deps_for_host_tests") {
+    testonly = true
+    deps = [
+      "//src/performance/memory/heapdump/collector",
+      "//src/performance/memory/heapdump/example",
+    ]
+  }
 }
