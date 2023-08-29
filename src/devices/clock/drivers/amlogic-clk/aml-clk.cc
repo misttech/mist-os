@@ -823,8 +823,9 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
       parent, std::move(*hiu_mmio), *std::move(dosbus_mmio), *std::move(msr_mmio),
       *std::move(cpuctrl_mmio), info.did);
 
-  status = clock_device->DdkAdd(
-      ddk::DeviceAddArgs("clocks").forward_metadata(parent, DEVICE_METADATA_CLOCK_IDS));
+  status = clock_device->DdkAdd(ddk::DeviceAddArgs("clocks")
+                                    .forward_metadata(parent, DEVICE_METADATA_CLOCK_IDS)
+                                    .forward_metadata(parent, DEVICE_METADATA_CLOCK_INIT));
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-clk: Could not create clock device: %d", status);
     return status;
