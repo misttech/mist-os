@@ -21,8 +21,15 @@ main() {
     fx-info "Start creating pb.zip..."
     (
         cd "${product_bundle_path}/.."
-        zip -r pb.zip product_bundle
-        mv pb.zip "${FUCHSIA_BUILD_DIR}"
+        local tmpfile_path="${FUCHSIA_BUILD_DIR}/tmp-pb-zip-$$"
+
+        fx-command-run ffx product get-artifacts product_bundle -r -g flash > "$tmpfile_path"
+        echo "product_bundle.json" >> "$tmpfile_path"
+        sed -i -e 's/^/product_bundle\//' "$tmpfile_path"
+
+        zip pb.zip -@ < "$tmpfile_path"
+        rm -rf "$tmpfile_path"
+        mv -f pb.zip "${FUCHSIA_BUILD_DIR}"
     )
 
     fx-info "Done! Output: ${FUCHSIA_BUILD_DIR}/pb.zip"
