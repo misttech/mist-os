@@ -26,13 +26,6 @@ workbench_platform_config = {
             "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:%s.json)" % ("delegated_network_provisioning" if delegated_network_provisioning else "default"),
         },
     },
-    "input": {
-        "supported_input_devices": [
-            "keyboard",
-            "mouse",
-            "touchscreen",
-        ],
-    },
     "icu": {
         "revision": "default",
     },
@@ -69,5 +62,10 @@ workbench_platform_config = {
     },
     "ui": {
         "enabled": True,
+        "supported_input_devices": [
+            "keyboard",
+            "mouse",
+            "touchscreen",
+        ],
     },
 }

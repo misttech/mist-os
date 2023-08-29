@@ -46,6 +46,18 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .field("i_can_haz_display_id", -1i64)?
             .field("i_can_haz_display_mode", -1i64)?;
 
+        let mut scene_manager_config =
+            builder.package("scene_manager").component("meta/scene_manager.cm")?;
+        // Configure the supported input devices. Default to an empty list.
+        scene_manager_config.field(
+            "supported_input_devices",
+            ui_config
+                .supported_input_devices
+                .iter()
+                .filter_map(|d| serde_json::to_value(d).ok())
+                .collect::<serde_json::Value>(),
+        )?;
+
         let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
             config_dir.entry(FileEntry {

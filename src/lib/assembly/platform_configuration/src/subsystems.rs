@@ -33,7 +33,6 @@ mod forensics;
 mod graphics;
 mod hwinfo;
 mod identity;
-mod input;
 mod intl;
 mod media;
 mod radar;
@@ -234,9 +233,6 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'identity' subsystem")?;
-
-    input::InputSubsystemConfig::define_configuration(context, &config.platform.input, builder)
-        .context("Configuring the 'input' subsystem")?;
 
     media::MediaSubsystem::define_configuration(context, &config.platform.media, builder)
         .context("Configuring the 'media' subsystem")?;

@@ -34,15 +34,15 @@ _PRODUCT_CONFIG_BASE_JSON = {
         "intl": {
             "config_type": "default",
         },
-        "input": {
+        "setui": {
+            "use_icu": "with_icu",
+            "with_camera": False,
+        },
+        "ui": {
             "supported_input_devices": [
                 INPUT_DEVICE_TYPE.BUTTON,
                 INPUT_DEVICE_TYPE.TOUCHSCREEN,
             ],
-        },
-        "setui": {
-            "use_icu": "with_icu",
-            "with_camera": False,
         },
         "storage": {
             "configure_fshost": True,

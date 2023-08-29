@@ -30,12 +30,6 @@ _base_driver_packages = [
 # This is the base platform configuration used by core
 _platform_configuration_base = {
   build_type = "eng"
-  input = {
-    supported_input_devices = [
-      "button",
-      "touchscreen",
-    ]
-  }
 
   fonts = {
     enabled = true
@@ -52,6 +46,13 @@ _platform_configuration_base = {
   setui = {
     use_icu = "with_icu"
     with_camera = false
+  }
+
+  ui = {
+    supported_input_devices = [
+      "button",
+      "touchscreen",
+    ]
   }
 
   # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path

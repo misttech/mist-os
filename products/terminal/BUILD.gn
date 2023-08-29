@@ -12,12 +12,6 @@ assert(
 product_assembly_configuration("terminal") {
   platform = {
     build_type = "eng"
-    input = {
-      supported_input_devices = [
-        "button",
-        "touchscreen",
-      ]
-    }
 
     storage = {
       configure_fshost = true
@@ -44,6 +38,10 @@ product_assembly_configuration("terminal") {
 
     ui = {
       enabled = true
+      supported_input_devices = [
+        "button",
+        "touchscreen",
+      ]
     }
 
     intl = {
