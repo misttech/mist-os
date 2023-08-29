@@ -19,6 +19,7 @@
                TEST_REG_B_LENGTH_WORD0 TEST_REG_B_LENGTH_WORD1
                TEST_REG_C_BASE_WORD0 TEST_REG_C_BASE_WORD1
                TEST_REG_C_LENGTH_WORD0 TEST_REG_C_LENGTH_WORD1>;
+        device_specific_prop = <DEVICE_SPECIFIC_PROP_VALUE>;
     };
 
     dummy_iommu:iommu {

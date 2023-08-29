@@ -50,6 +50,13 @@ void Node::AddBti(fuchsia_hardware_platform_bus::Bti bti) {
   pbus_node_.bti()->emplace_back(std::move(bti));
 }
 
+void Node::AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata) {
+  if (!pbus_node_.metadata()) {
+    pbus_node_.metadata() = std::vector<fuchsia_hardware_platform_bus::Metadata>();
+  }
+  pbus_node_.metadata()->emplace_back(std::move(metadata));
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr) {
   if (node_properties_.empty()) {

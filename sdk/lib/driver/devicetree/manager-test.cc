@@ -383,5 +383,46 @@ TEST_F(ManagerTest, DriverVisitorTest) {
   ASSERT_TRUE(visitor.visited);
 }
 
+TEST_F(ManagerTest, TestMetadata) {
+  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+
+  class MetadataVisitor : public DriverVisitor {
+   public:
+    MetadataVisitor() : DriverVisitor("fuchsia,sample-device") {}
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      auto prop = node.properties().find("device_specific_prop");
+      EXPECT_NE(node.properties().end(), prop) << "Property device_specific_prop was unexpected.";
+      device_specific_prop = prop->second.AsUint32().value_or(ZX_ERR_INVALID_ARGS);
+      EXPECT_EQ(device_specific_prop, (uint32_t)DEVICE_SPECIFIC_PROP_VALUE);
+      fuchsia_hardware_platform_bus::Metadata metadata = {
+          {.data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&device_specific_prop),
+                                        reinterpret_cast<const uint8_t*>(&device_specific_prop) +
+                                            sizeof(device_specific_prop))}};
+      node.AddMetadata(metadata);
+
+      return zx::ok();
+    }
+    uint32_t device_specific_prop = 0;
+  };
+
+  DefaultVisitors<MetadataVisitor> visitor;
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
+
+  DoPublish(manager);
+
+  ASSERT_EQ(3lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
+
+  // First node is devicetree root. Second one is the sample-device. Check
+  // metadata of sample-device.
+  auto metadata = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1).metadata();
+
+  // Test Metadata properties.
+  ASSERT_TRUE(metadata);
+  ASSERT_EQ(1lu, metadata->size());
+  ASSERT_EQ((uint32_t)DEVICE_SPECIFIC_PROP_VALUE,
+            *reinterpret_cast<uint32_t*>((*(*metadata)[0].data()).data()));
+}
+
 }  // namespace
 }  // namespace fdf_devicetree
