@@ -180,6 +180,21 @@ impl AdvertisingProxyInner {
         Ok(())
     }
 
+    /// Makes sure that the proxy host publisher is working.
+    pub fn verify_mdns_connection(&mut self) -> Result<(), anyhow::Error> {
+        if self.mdns_proxy_host_publisher.is_closed() {
+            warn!(
+                tag = "srp_advertising_proxy",
+                "self.mdns_proxy_host_publisher has closed unexpectedly."
+            );
+
+            self.mdns_proxy_host_publisher = connect_to_protocol::<ProxyHostPublisherMarker>()
+                .context("mdns_proxy_host_publisher")?;
+        }
+
+        Ok(())
+    }
+
     /// Updates the mDNS service with the host and services from the SrpServerHost.
     pub fn push_srp_host_changes<'a>(
         &mut self,
@@ -270,9 +285,9 @@ impl AdvertisingProxyInner {
                     .trim_end_matches(&self.srp_domain)
                     .trim_end_matches('.');
 
-                debug!(
+                info!(
                     tag = "srp_advertising_proxy",
-                    "Advertising host {:?} on {:?} as {:?}",
+                    "Advertising host [PII]({:?}) on {:?} as [PII]({:?})",
                     srp_host.full_name_cstr(),
                     LOCAL_DOMAIN,
                     local_name
@@ -280,6 +295,15 @@ impl AdvertisingProxyInner {
 
                 if local_name.len() > MAX_DNSSD_HOST_LEN {
                     bail!("Host {:?} is too long (max {} chars)", local_name, MAX_DNSSD_HOST_LEN);
+                }
+
+                // Make sure the hostname only contains legal characters.
+                if local_name.starts_with('-')
+                    || local_name.contains(|ch: char| {
+                        !(ch.is_ascii_alphanumeric() || ch == '-' || !ch.is_ascii())
+                    })
+                {
+                    bail!("Host {local_name:?} contains forbidden characters");
                 }
 
                 let (client, server) = create_endpoints::<ServiceInstancePublisherMarker>();
@@ -296,6 +320,9 @@ impl AdvertisingProxyInner {
                         })
                     })
                     .collect::<Vec<_>>();
+
+                // Make sure that the connection to the mDNS component is solid.
+                self.verify_mdns_connection()?;
 
                 let publish_proxy_host_future = self
                     .mdns_proxy_host_publisher
