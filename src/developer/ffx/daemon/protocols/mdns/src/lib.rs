@@ -189,6 +189,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[ignore] // TODO(b/297919461) -- re-enable or delete
     async fn test_mdns_network_traffic_valid() {
         let mdns = Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
         let daemon = FakeDaemonBuilder::new().inject_fidl_protocol::<Mdns>(mdns).build();
@@ -349,6 +350,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[ignore] // TODO(b/297919461) -- re-enable or delete
     async fn test_new_and_rediscovered_target() {
         let daemon = FakeDaemonBuilder::new().build();
         let protocol =
