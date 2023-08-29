@@ -147,7 +147,6 @@ group("tests") {
     ":test-runner-unit-tests",
     "elf:tests",
     "fuzz:tests",
-    "gotests:tests",
     "gtest:tests",
     "gunit:tests",
     "inspect:tests",
@@ -156,6 +155,11 @@ group("tests") {
     "starnix:tests",
     "stress_test:tests",
   ]
+
+  # The Go toolchain does not support RISC-V.
+  if (current_cpu != "riscv64") {
+    deps += [ "gotests:tests" ]
+  }
 }
 
 # Use this group to include fuchsia.process.Launcher in generated test manifests.

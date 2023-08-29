@@ -40,16 +40,30 @@ impl Expected {
 #[test_case("#meta/logs-default-cpp.cm", "logs_default_cpp", Expected::Both; "cpp logs to both implicitly by default")]
 #[test_case("#meta/logs-stdout-cpp.cm", "logs_stdout_cpp", Expected::Stdout; "cpp logs to stdout")]
 #[test_case("#meta/logs-stderr-cpp.cm", "logs_stderr_cpp", Expected::Stderr; "cpp logs to stderr")]
-#[test_case("#meta/logs-stdout-and-stderr-go.cm", "logs_stdout_and_stderr_go", Expected::Both; "go logs to both")]
-#[test_case("#meta/logs-default-go.cm", "logs_default_go", Expected::Both; "go logs to both implicitly by default")]
-#[test_case("#meta/logs-stdout-go.cm", "logs_stdout_go", Expected::Stdout; "go logs to stdout")]
-#[test_case("#meta/logs-stderr-go.cm", "logs_stderr_go", Expected::Stderr; "go logs to stderr")]
 #[test_case("#meta/logs-stdout-and-stderr-rust.cm", "logs_stdout_and_stderr_rust", Expected::Both; "rust logs to both")]
 #[test_case("#meta/logs-default-rust.cm", "logs_default_rust", Expected::Both; "rust logs to both implicitly by default")]
 #[test_case("#meta/logs-stdout-rust.cm", "logs_stdout_rust", Expected::Stdout; "rust logs to stdout")]
 #[test_case("#meta/logs-stderr-rust.cm", "logs_stderr_rust", Expected::Stderr; "rust logs to stderr")]
 #[fuchsia::test(add_test_attr = false)]
 fn launch_component_and_check_messages(url: &str, moniker: &str, expected_messages: Expected) {
+    // TODO(https://fxbug.dev/94784) inline `test_inner` once the fuchsia test macro supports it
+    TestExecutor::new().run_singlethreaded(test_inner(url, moniker, expected_messages));
+}
+
+// Same test as above but for Go.
+// It must be duplicated because of the conditional compilation.
+// The Go toolchain does not support RISC-V.
+#[cfg(not(target_arch = "riscv64"))]
+#[test_case("#meta/logs-stdout-and-stderr-go.cm", "logs_stdout_and_stderr_go", Expected::Both; "go logs to both")]
+#[test_case("#meta/logs-default-go.cm", "logs_default_go", Expected::Both; "go logs to both implicitly by default")]
+#[test_case("#meta/logs-stdout-go.cm", "logs_stdout_go", Expected::Stdout; "go logs to stdout")]
+#[test_case("#meta/logs-stderr-go.cm", "logs_stderr_go", Expected::Stderr; "go logs to stderr")]
+#[fuchsia::test(add_test_attr = false)]
+fn launch_component_and_check_messages_go_lang(
+    url: &str,
+    moniker: &str,
+    expected_messages: Expected,
+) {
     // TODO(https://fxbug.dev/94784) inline `test_inner` once the fuchsia test macro supports it
     TestExecutor::new().run_singlethreaded(test_inner(url, moniker, expected_messages));
 }
