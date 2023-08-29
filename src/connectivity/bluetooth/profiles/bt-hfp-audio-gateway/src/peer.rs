@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use self::task::PeerTask;
-use crate::{audio::AudioControl, config::AudioGatewayFeatureSupport, error::Error, hfp};
 use {
     async_trait::async_trait,
     async_utils::channel::TrySend,
@@ -22,6 +21,12 @@ use {
     profile_client::ProfileEvent,
     std::sync::Arc,
 };
+
+use crate::audio::AudioControl;
+use crate::config::AudioGatewayFeatureSupport;
+use crate::error::Error;
+use crate::hfp;
+use crate::sco_connector::ScoConnector;
 
 #[cfg(test)]
 use async_utils::event::{Event, EventWaitResult};
@@ -107,8 +112,7 @@ pub struct PeerImpl {
     /// A handle to the audio control interface.
     audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
     hfp_sender: mpsc::Sender<hfp::Event>,
-    /// TODO(fxbug.dev/122263): consider configuring in-band SCO per codec type.
-    in_band_sco: bool,
+    sco_connector: ScoConnector,
     /// The last call manager connected.  Used on re-connect to a peer
     last_call_manager: Option<hfp::ManagerConnectionId>,
     inspect_node: inspect::Node,
@@ -122,7 +126,7 @@ impl PeerImpl {
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: mpsc::Sender<hfp::Event>,
-        in_band_sco: bool,
+        sco_connector: ScoConnector,
         inspect_node: inspect::Node,
     ) -> Result<Self, Error> {
         let (task, queue) = PeerTask::spawn(
@@ -132,7 +136,7 @@ impl PeerImpl {
             local_config,
             connection_behavior,
             hfp_sender.clone(),
-            in_band_sco,
+            sco_connector.clone(),
             &inspect_node,
         )?;
         Ok(Self {
@@ -144,7 +148,7 @@ impl PeerImpl {
             queue,
             connection_behavior,
             hfp_sender,
-            in_band_sco,
+            sco_connector,
             last_call_manager: None,
             inspect_node,
         })
@@ -159,7 +163,7 @@ impl PeerImpl {
             self.local_config,
             self.connection_behavior,
             self.hfp_sender.clone(),
-            self.in_band_sco,
+            self.sco_connector.clone(),
             &self.inspect_node,
         )?;
 
@@ -328,6 +332,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::pin_mut;
     use futures::StreamExt;
+    use std::collections::HashSet;
 
     use crate::{audio::TestAudioControl, AudioGatewayFeatureSupport};
 
@@ -338,6 +343,7 @@ mod tests {
     fn make_peer(id: PeerId) -> (PeerImpl, mpsc::Receiver<hfp::Event>) {
         let proxy = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap().0;
         let (send, recv) = mpsc::channel(1);
+        let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
         let peer = PeerImpl::new(
             id,
             proxy,
@@ -345,7 +351,7 @@ mod tests {
             AudioGatewayFeatureSupport::default(),
             ConnectionBehavior::default(),
             send,
-            false,
+            sco_connector,
             Default::default(),
         )
         .expect("valid peer");

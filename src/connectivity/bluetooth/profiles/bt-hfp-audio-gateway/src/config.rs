@@ -107,7 +107,8 @@ mod tests {
             wide_band_speech: true,
             enhanced_voice_recognition: false,
             enhanced_voice_recognition_with_text: false,
-            in_band_sco: false,
+            controller_encoding_cvsd: true,
+            controller_encoding_msbc: true,
         });
         assert_eq!(
             config,

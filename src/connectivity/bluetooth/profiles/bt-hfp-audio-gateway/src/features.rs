@@ -78,7 +78,7 @@ impl From<&AudioGatewayFeatureSupport> for AgFeatures {
 }
 
 /// Codec IDs. See HFP 1.8, Section 10 / Appendix B.
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub struct CodecId(u8);
 
 impl CodecId {

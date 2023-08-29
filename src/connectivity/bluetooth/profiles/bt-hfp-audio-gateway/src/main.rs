@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 #![recursion_limit = "1024"]
 
-use anyhow::{format_err, Context, Error};
+use anyhow::{Context, Error};
 use battery_client::BatteryClient;
 use fidl_fuchsia_media as media;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::{channel::mpsc, future, pin_mut};
+use std::collections::HashSet;
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    audio::AudioControl, config::AudioGatewayFeatureSupport, fidl_service::run_services, hfp::Hfp,
-    profile::register_audio_gateway,
+    config::AudioGatewayFeatureSupport, features::CodecId, fidl_service::run_services, hfp::Hfp,
+    profile::register_audio_gateway, sco_connector::ScoConnector,
 };
 
 mod a2dp;
@@ -29,15 +30,15 @@ mod profile;
 mod sco_connector;
 mod service_definitions;
 
-async fn setup_audio(
-    in_band_sco: bool,
-    audio_proxy: media::AudioDeviceEnumeratorProxy,
-) -> Result<Box<dyn AudioControl>, audio::AudioError> {
-    if in_band_sco {
-        Ok(Box::from(audio::InbandAudioControl::create(audio_proxy)?))
-    } else {
-        Ok(Box::from(audio::DaiAudioControl::discover(audio_proxy).await?))
+fn controller_codecs(config: &hfp_profile_config::Config) -> HashSet<features::CodecId> {
+    let mut controller_codecs = HashSet::new();
+    if config.controller_encoding_cvsd {
+        let _ = controller_codecs.insert(CodecId::CVSD);
     }
+    if config.controller_encoding_msbc {
+        let _ = controller_codecs.insert(CodecId::MSBC);
+    }
+    controller_codecs
 }
 
 #[fuchsia::main(logging_tags = ["hfp-ag"])]
@@ -49,7 +50,7 @@ async fn main() -> Result<(), Error> {
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let config = hfp_profile_config::Config::take_from_startup_handle();
-    let in_band_sco = config.in_band_sco;
+    let controller_codecs = controller_codecs(&config);
     let feature_support = AudioGatewayFeatureSupport::load_from_config(config);
     debug!(?feature_support, "Starting HFP Audio Gateway");
     let (profile_client, profile_svc) = register_audio_gateway(feature_support)?;
@@ -70,13 +71,10 @@ async fn main() -> Result<(), Error> {
     let audio_proxy =
         fuchsia_component::client::connect_to_protocol::<media::AudioDeviceEnumeratorMarker>()
             .with_context(|| format!("Error connecting to audio_core"))?;
-    let audio = match setup_audio(in_band_sco, audio_proxy).await {
-        Err(e) => {
-            error!(?e, "Couldn't setup audio");
-            return Err(format_err!("Audio setup failed: {e:?}"));
-        }
-        Ok(audio) => audio,
-    };
+    let audio =
+        Box::new(audio::CodecAudioControl::setup(audio_proxy, controller_codecs.clone()).await?);
+    let sco_connector = ScoConnector::build(profile_svc.clone(), controller_codecs);
+
     let mut hfp = Hfp::new(
         profile_client,
         profile_svc,
@@ -84,7 +82,7 @@ async fn main() -> Result<(), Error> {
         audio,
         call_manager_receiver,
         feature_support,
-        in_band_sco,
+        sco_connector,
         test_request_receiver,
     );
     if let Err(e) = hfp.iattach(&inspector.root(), "hfp") {
@@ -115,19 +113,4 @@ async fn main() -> Result<(), Error> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[fuchsia::test]
-    async fn setup_audio_chooses_wisely() {
-        // This should not panic, inband audio doesn't need to connect to anything other than the
-        // proxy.
-        // Dai Audio does, and will panic this test.
-        let proxy =
-            fidl::endpoints::create_proxy::<media::AudioDeviceEnumeratorMarker>().unwrap().0;
-        let _ = setup_audio(true, proxy).await.unwrap();
-    }
 }

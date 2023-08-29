@@ -137,11 +137,10 @@ impl PeerTask {
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: Sender<hfp::Event>,
-        in_band_sco: bool,
+        sco_connector: ScoConnector,
         inspect: &inspect::Node,
     ) -> Result<(Task<()>, Sender<PeerRequest>), Error> {
         let (sender, receiver) = mpsc::channel(0);
-        let sco_connector = ScoConnector::build(profile_proxy.clone(), in_band_sco);
         let mut peer = Self::new(
             id,
             profile_proxy,
@@ -768,9 +767,9 @@ impl PeerTask {
                 // TODO(fxbug.dev/79784): this probably means we should just cancel out of HFP and
                 // this peer's connection entirely.
                 warn!(%peer_id, ?e, "Couldn't start Audio - dropping audio connection");
-                return Err(Error::system(format!("Couldn't start audio DAI"), e));
+                return Err(Error::system(format!("Couldn't start audio"), e));
             } else {
-                info!(%peer_id, "Successfully started Audio DAI");
+                info!(%peer_id, "Successfully started Audio");
             }
         }
         Vigil::watch(&vigil, {
@@ -907,6 +906,7 @@ mod tests {
             SinkExt,
         },
         proptest::prelude::*,
+        std::collections::HashSet,
         std::convert::TryFrom,
     };
 
@@ -959,7 +959,7 @@ mod tests {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
         let audio: Arc<Mutex<Box<dyn AudioControl>>> =
             Arc::new(Mutex::new(Box::new(TestAudioControl::default())));
-        let sco_connector = ScoConnector::build(proxy.clone(), false);
+        let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
         let mut task = PeerTask::new(
             PeerId(1),
             proxy,

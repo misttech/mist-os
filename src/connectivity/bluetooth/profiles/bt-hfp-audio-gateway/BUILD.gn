@@ -65,8 +65,8 @@ rustc_binary("bin") {
   sources = [
     "src/a2dp.rs",
     "src/audio.rs",
-    "src/audio/dai_audio_control.rs",
-    "src/audio/inband_audio_control.rs",
+    "src/audio/dai.rs",
+    "src/audio/inband.rs",
     "src/config.rs",
     "src/error.rs",
     "src/features.rs",
@@ -140,7 +140,8 @@ fuchsia_structured_config_values("default_config_values") {
     wide_band_speech = true
     enhanced_voice_recognition = false
     enhanced_voice_recognition_with_text = false
-    in_band_sco = false
+    controller_encoding_cvsd = true
+    controller_encoding_msbc = true
   }
 }
 

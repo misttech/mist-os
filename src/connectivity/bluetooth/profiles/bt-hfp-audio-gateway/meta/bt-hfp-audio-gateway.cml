@@ -105,7 +105,10 @@
         // TODO(fxbug.dev/66016): unimplemented, ignored for now
         enhanced_voice_recognition_with_text: { type: "bool" },
 
-        // Use in-band SCO connection instead of out-of-band SCO connection.
-        in_band_sco: { type: "bool" },
+        // Whether the controller on this product supports encoding in each of these codecs.
+        // Codecs that are not supported by the controller are encoded locally and sent through
+        // the BT transport.
+        controller_encoding_cvsd: { type: "bool" },
+        controller_encoding_msbc: { type: "bool" },
     },
 }
